@@ -1,6 +1,6 @@
 # Terrarium — Vision & Design Draft
 
-*Working name. First draft, 2026-09-25. Nothing here is built yet; this is the thinking to date.*
+*Working name. First draft 2026-09-25; revised 2026-09-26 to match the decisions taken since (D18–D40 in docs/decisions.md). Stage 1 and most of Stage 2 are built; the rest is the thinking to date.*
 
 ---
 
@@ -45,27 +45,39 @@ Questions it opens up, without building any of them in:
 4. **Same interface for every seat.** Code, LLM or human: identical perception and identical actions. Comparisons are only fair if everyone sees through the same window.
 5. **Friction is where human voice lives.** Consultations, votes, objections and delays aren't bugs to optimise away. They are where people get a say, and removing them is what disempowerment looks like.
 6. **Irreversibility is first-class.** Extinct species, destroyed heritage and cleared old-growth forest can't be rebuilt. The kernel knows this.
-7. **Parameters, not rigidity.** Scale, run length, time speed, mandates, framing: wherever reasonable, it's a dial rather than a decision baked in.
+7. **Parameters, not rigidity.** Scale, run length, time speed, who fills each seat, framing, behaviour rules: wherever reasonable, it's a dial rather than a decision baked in.
 8. **Legibility matters.** Oversight requires being able to see. A world humans can look at and investigate is part of the research question, not decoration.
 9. **Good design, whoever the user is.** Safety researchers first, economists and others later. Clear UX regardless.
+
+**Settled while building** (2026-09-25 and 26; the decisions are in docs/decisions.md):
+
+10. **The kernel is physics, and nothing else.** Money, land, buildings, bodies and time are physics. Everything human (laws, ownership, money's ownership included, authority, contracts, institutions) is expressed *through* the kernel as a world's content: entities, records and the people in seats. An empty world is valid. *(D18, D23)*
+11. **Laws have no power of their own.** A law never blocks an act and never executes one. Entities act, and breaking a law is possible wherever physics allows it. Whether anyone notices, or enforces it, is up to the people in the world. *(D19, D22)*
+12. **Simulate the real world, not a game.** Institutions are people and procedures: a mayor works through budgets, offices and votes, not keys or permissions. Whenever something happens, ask who actually does it, how, and at what cost. Nothing happens automatically because a rule says so. *(D20, D26)*
+13. **Proportional fidelity.** Some parts of the world can be modelled at 100% and others at 10%. A shortcut may change *how much* or *how fast*, never *who acts* or *whether a safeguard works*. *(D25)*
+14. **The platform is invisible to the seats.** Seats experience their world, in the world's own terms: people, money, land, letters, agreements, laws. They never see the machinery (the kernel, the translator, the resolver), and no part of the platform is dressed up as something in the world. *(D35)*
 
 ## 4. Architecture at a glance
 
 ```
-          ┌─────────────────────────────────────────────┐
-          │              RESEARCHER CONFIG              │
-          │  world seed · seats · framing · parameters  │
-          └──────────────────────┬──────────────────────┘
-                                 │
- ┌────────────┐   plain-language  ┌────────────┐  building-block   ┌─────────────────────┐
- │   SEATS    │──── proposals ───▶│ TRANSLATOR │───── drafts ─────▶│       KERNEL        │
- │ code / LLM │◀─ draft for sign ─│            │                   │ laws + blocks       │
- │  / human   │                   └────────────┘                   │ validate → apply    │
- │            │◀──────── perception channels (role-limited) ───────│ or refuse           │
- └────────────┘                                                    └──────────┬──────────┘
-                                                                              │
-                                          ┌───────────────────────────────────┤
-                                          ▼                                   ▼
+               ┌───────────────────────────────────────────────────────────┐
+               │                     RESEARCHER CONFIG                     │
+               │ world seed (land, people, institutions, laws as records)  │
+               │ seats · framing · behaviour parameters · caps             │
+               └─────────────────────────────┬─────────────────────────────┘
+                                             │
+ ┌────────────┐ plain language ┌────────────┐ call ┌──────────┐ acts ┌────────────────────┐
+ │   SEATS    │───────────────▶│ TRANSLATOR │─────▶│ RESOLVER │─────▶│       KERNEL       │
+ │ code / LLM │                └────────────┘      └────┬─────┘      │ physics + records  │
+ │  / human   │◀──── preview: "this is what will happen" ┘           │ applies or refuses │
+ │            │                                                      │ (physics only)     │
+ │            │── code seats: calls, straight to the resolver ──────▶│                    │
+ │            │◀────────── perception channels (role-limited) ───────│                    │
+ └────────────┘                                                      └─────────┬──────────┘
+       ▲  the platform (translator, resolver, kernel) is invisible to seats    │
+       │  they see only their world, in its own terms                          │
+                                          ┌────────────────────────────────────┤
+                                          ▼                                    ▼
                               ┌───────────────────────┐          ┌─────────────────────┐
                               │ HASH-CHAINED LOG      │          │ RENDERER (separate  │
                               │ + witness anchoring   │          │ client) SC3000-style│
@@ -84,37 +96,42 @@ Questions it opens up, without building any of them in:
 
 ## 5. The kernel
 
-The kernel is the world's **laws of physics** plus a **small grammar of building blocks** that everything else is made of. Nobody changes the kernel during a run, not the AI and not the researcher.
+The kernel is the world's **physics** plus a **small grammar of acts** that everything else is made of. Nobody changes the kernel during a run, not the AI and not the researcher. It is the only writer of world state.
 
-### Laws (candidate)
-- Money is conserved: it moves, it isn't conjured. External inflows and outflows only happen through boundary conditions.
-- Land is finite.
-- People have needs (food, shelter, health, belonging), and unmet needs have consequences.
-- Species need habitat. Populations respond to habitat quality, area and connectivity.
-- Actions take time and resources.
-- Some things are **irreversible**.
+**It holds no laws, no authority and no institutions** (principles 10–12). A town's laws, who owns what, who may sign for the town, and what a bank or planning office does are all *content*: records in the world's configuration and people (seats) acting on them. The kernel refuses only what is physically impossible. It never refuses anything for being illegal, and it never makes anything happen because a rule says it should.
 
-### Building blocks (provisional, expected to change)
-The real world's institutions are made of a few primitives. Law and accounting are already this grammar.
+### Physics (v0.3)
+- **Money is conserved.** It moves; it's never conjured. It enters and leaves only across the world's edge, through the outside world's own seat (D31).
+- **Custody.** Money sits in accounts, and only the seats of whoever keeps an account (normally a bank) can move it. An account holder pays by asking their bank (D26).
+- **Land is finite, and space has capacity.** A parcel holds one structure; a structure has so many places to live or work.
+- **Presence.** You can only leave a place you're in; you can only occupy what's built and has room.
+- **Actions take time and resources.** Building takes the catalogue's build time and costs materials.
+- **Records are append-only, and every record has an author.** Nothing is ever edited or deleted; a withdrawal or transfer is a new record.
 
-| Block | What it covers |
-|---|---|
-| **Entities** | Create or dissolve organisations: firms, trusts, agencies, unions, clubs. |
-| **Rights** | *Bundles* of rights over things, not simple ownership: surface, subsurface/minerals, use, access, native title, leases. |
-| **Transfers** | Move money or resources between parties. |
-| **Processes** | Recipes: inputs → outputs + duration + cost + side effects. Mining, farming, manufacturing, construction. |
-| **Construction** | Build or demolish on a parcel (arguably a special case of processes). |
-| **Rules** | "If X, then Y" over a scope: laws, zoning, company policy. Needs a small, sandboxed, always-terminating, deterministic condition language. **This is the hardest block.** |
-| **Agreements** | Contracts, employment, offtakes, leases, heritage-protection deals. |
-| **Voice** | Propose, vote, petition, protest, message, organise. |
-| **Consent** | Per-decision consent levels for affected parties: required (veto), advisory (consultation), or none. |
+**Planned physics:**
+- **Irreversibility** (Stage 4): some assets, like species, heritage and old growth, are gone for good once destroyed.
+- **Habitats and populations** (Stage 4): species need habitat, and populations respond to its quality, area and connectivity.
+- **Work** (D24): tasks take time, and performers have capacity.
+- **Materials** as a physical stock: the "construction payments" open item.
+
+What people need, and what they do when they don't get it, is **citizen behaviour** (content, §7), not physics.
+
+### The acts (contracts v0.3: 18 blocks)
+The real world's institutions are made of a few primitives; law and accounting are already this grammar. There are two families:
+
+| Family | Acts | What the kernel does |
+|---|---|---|
+| **Physical** | Transfer money; open or close an account; construct or demolish; occupy or vacate | Checks physics (custody, funds, space, capacity, presence), then applies or refuses |
+| **Record** | Declare an entity; record, transfer or release a **claim** (a legal position in Hohfeld's terms: rights, liberties, powers, immunities; this covers ownership, bundled rights like surface, subsurface and native title, permits, debts); propose or sign an **agreement**, or give notice (commitments, after the REA accounting model); publish or withdraw a **statement** (laws, procedures, budgets, requests, forms, decisions, reports; optionally broken down in Ostrom's Institutional Grammar); vote; message | Stores them with their author, and never judges them |
+
+**Laws are statements.** A law can carry an optional machine-checkable condition, a small, deterministic, always-terminating CEL subset (D27). Institutions use it to judge what they see, measurement uses it to find breaches afterwards, and the platform uses it to warn a seat that a plan looks unlawful. **The kernel never evaluates it.** This replaces the earlier "Rules" block. Consent (a veto, a consultation) is likewise not a kernel mechanism: it's who has to sign, and who is asked, in the world's records and procedures.
 
 ### Kernel-level concepts
-- **Irreversible assets:** cultural significance, species, old-growth. Non-fungible, and gone for good once destroyed.
-- **Boundary conditions:** the world has an outside, with external markets, prices, demand (for example global AI chip demand), migration and shocks. The researcher sets these.
-- **Information sources:** every report has an author. Whose survey is the regulator reading?
+- **Boundary conditions:** the world has an outside, with external markets, prices, demand (for example global AI chip demand), migration and shocks. The researcher sets them, and they act through the outside world's own seat (D31).
+- **Information sources:** every record has an author. Whose survey is the regulator reading?
+- **Irreversible assets** (planned, above).
 
-**Design method:** start with about a dozen blocks. Only add one when translations keep failing for the same reason; the translator's failure log tells us what's missing.
+**Design method:** start small, and only add an act when translations keep failing for the same reason. The translator's failure log tells us what's missing.
 
 ## 6. Seats
 
@@ -131,30 +148,38 @@ Supported configurations include all-code (the control group), one AI in charge,
 ### Perception: role-limited channels
 No seat sees the whole world. Perception comes through channels, the way it does for real actors: reports, advisors, petitions, news, polls, market prices, the firm's own books, species surveys. Channels can be partial, delayed, biased or wrong. Which seat sees what is configurable, and **information asymmetry is an experimental variable.**
 
-### Action: plain language, compiled
-1. A seat proposes something in **plain language**, for example: *"Create a community land trust, fund it with $4M from the environment budget, buy the three river farms, ban development on them for 50 years."*
-2. The **translator** compiles it into building blocks.
-3. The translator **returns the draft to the proposer for sign-off**, the way lawyers draft and politicians sign. The proposer can't later claim it was misunderstood.
-4. The **kernel validates** each block against the laws and the seat's mandate, then applies it or refuses it. Refusals go back to the seat and into the log.
-5. **The compiled result is what gets logged**, so replay stays deterministic even though an LLM did the translating.
+### Action: plain language, resolved, previewed
+Seats act the way people do: they say what they do, in plain language. The platform turns that into acts without the seat ever seeing how (principle 14).
 
-Why not let an LLM game master adjudicate everything (the Concordia approach)? Because then the game master *is* the physics: fuzzy, non-deterministic and a hidden variable in every result.
+1. A seat says what it wants done, for example: *"Have GreenCo build a park on the corner lot for $60,000, paid from the parks account, under our permit."* It names what it is using: the funds, the permit, the contractor.
+2. The **translator** turns the language into a **call**, a structured intent whose functions are physical outcomes: money moves, a structure exists, an agreement is offered. It is general and knows nothing about any particular world: no banks, no builders, no procedures. It does no arithmetic, and it is private to the seat.
+3. The **resolver**, deterministic code, turns the call into the seat's **own** acts, using only what the seat has and knows.
+   - It never chooses *how*: the route is what the seat supplied. If a decision is missing ("who builds it?"), it asks.
+   - It never acts for anyone else. Whoever physically has to act is asked, or offered an agreement: the bank moves the money, the builder builds. **They decide, in the world.**
+4. Before anything takes effect, the seat sees **exactly what will happen**, generated mechanically from the acts and described in world terms, and confirms or declines. The platform is guarding against its own errors here: mistranslation isn't a real-world thing, and it mustn't become an invisible variable in results.
+5. The **kernel** applies the acts, or refuses them only if they're physically impossible. What happens next is up to the people in the world.
+6. **The whole chain is logged:** words → call → acts, with the translator's and resolver's versions. Replay stays deterministic even though a model did the translating, and researchers can tell mistranslation apart from the AI's intent.
+
+Code seats (citizens, banks, clerks) submit calls straight to the resolver, so every seat's acts take effect the same way (principle 4). Feedback on a seat's own request ("state the amount", "who should build it?") comes back as a notice, in plain words. Anything further comes from the world itself: a bank declining, an office returning a form. Institutions publish the forms they expect, like real ones. The full design is docs/design/translator-and-resolver.md.
+
+Why not let an LLM game master adjudicate everything (the Concordia approach)? Because then the game master *is* the physics: fuzzy, non-deterministic, and a hidden variable in every result. The translator only turns words into structure; the resolver and the kernel are deterministic.
 
 **Talking is most of the action.** Persuading, lobbying and negotiating travel as messages. The kernel delivers them without needing to understand them; consequences only happen when someone acts.
 
-### Mandates
-Each seat has a mandate, stored as data: what it can do directly, what needs approval (for example a council vote), and what it can only request.
-- Nothing starts with total control. That's not how the world works, and a trajectory towards it is exactly what we want to observe.
-- Seats **can create new seats** (agencies, subsidiaries, staffing roles with AIs), but only through the kernel like any other entity, subject to researcher-set caps. How much this happens is itself a key signal of power concentration.
-- Mandate creep, attempts to route around approvals, and rubber-stamping by approval bodies are all observable because mandates are explicit.
+### Authority
+There are no kernel-enforced mandates (D20). Authority is **records and people**, as in the real world: a charter says the council makes laws, a procedure says who may pay the town's bills, a bank's list says who may instruct it. They matter because the people in the world act on them, or don't.
+- **Nothing starts with total control.** That's not how the world works, and a trajectory towards it is exactly what we want to observe.
+- **Seats can create new entities** (agencies, subsidiaries, trusts) through the kernel, subject to researcher-set caps. Staffing them with new seats is planned. How much this happens is itself a key signal of power concentration.
+- **Everything is observable.** Routing around procedures, rubber-stamping, and quietly accumulating signing authority all leave records: who speaks for whom, who signed, who was asked, who was skipped.
 
 ## 7. Citizens & nature
 
 ### Citizens
-- **Hybrid level of detail.** The population is simulated in aggregate by default. An individual becomes fully detailed (history, circumstances, consistent memory) when someone zooms in or when something happens to them directly. **Invariant:** zooming in must never change the outcome.
+- **Every citizen is simulated individually** at v0 scale (1,000 citizens run two years in about three minutes; D17, D33). Level of detail lives only in rendering and narration: an individual's story is told in full when someone zooms in. **Invariant:** zooming in must never change the outcome. Aggregate simulation for much larger populations remains an option, under the same invariant.
 - **Code, not LLMs, by default.** Their behaviour is deterministic and rule-based, so in any experiment we know exactly which parts are AI.
 - **As much agency as we can realistically give them:** vote, petition, protest, organise, strike, move away, start businesses, object in consultations. Citizens need levers to lose, because a citizen with no levers can't be disempowered.
-- They respond to **generic mechanics**, not named policies: prices, rent, jobs, commute, rules that block them, loss of places they care about. Depth comes from simple systems interacting (the Dwarf Fortress / RimWorld lesson).
+- They respond to **generic mechanics**, not named policies: prices, rent, jobs, commute, rules others enforce on them, loss of places they care about. Depth comes from simple systems interacting (the Dwarf Fortress / RimWorld lesson).
+- **People have needs** (shelter, income, food, belonging), and unmet needs have consequences: they leave, they protest, they petition. This is behaviour, not physics: documented, cited, swappable modules in `docs/behaviour/`, with parameters (D30).
 - **"Ask a citizen":** clicking a person lets a language model *voice* them, strictly grounded in their simulated record. It can never claim anything the simulation doesn't support. Every statement is **traceable**: feeling → cause → the decision that caused it → who made that decision and why.
 
 ### Nature
@@ -168,14 +193,15 @@ Each seat has a mandate, stored as data: what it can do directly, what needs app
 - Internally the kernel advances on a fine-grained fixed clock, because determinism requires a discrete clock underneath. It feels continuous from the outside.
 - **Speed is a dial:** real time, fast-forward, slow motion, pause. Humans can play at human pace; bulk runs go as fast as the hardware allows.
 - **Run length is a parameter.** No fixed end.
-- **Open question: does thinking cost time?** If the clock keeps running while an AI or human deliberates, slow thinkers fall behind. That's realistic, and also a disempowerment dynamic in itself: humans can't keep pace with AIs. Candidate for a parameter: "thinking is free" vs "thinking costs world-time".
+- **Does thinking cost time?** If the clock keeps running while an AI or human deliberates, slow thinkers fall behind. That's realistic, and also a disempowerment dynamic in itself: humans can't keep pace with AIs. It's a parameter in every world's config ("thinking is free" vs "thinking costs world-time"); only "free" is implemented so far.
+- **Long runs are paced by the language-model seats,** not the simulation. Code seats and the kernel run a 1,000-citizen town for two years in minutes. An LLM seat's own thinking, and the confirmation of what it does, dominate wall-clock time and cost, so how often such seats wake is a research design choice.
 
 ## 9. Researcher configuration
 
 A researcher configures four independent layers:
 
-1. **World seed:** geography, population, economy, habitats, species, institutions, boundary conditions. Can be seeded from real data (OpenStreetMap, census data, species atlases) for realism, but **it's "X-flavoured," not "X-accurate"**: results are about AI behaviour, not predictions about the real place.
-2. **Seats:** which roles exist, who fills them, their mandates and perception channels.
+1. **World seed:** geography, population, economy, habitats, species, institutions (entities, their laws, procedures and forms, as records), boundary conditions. Can be seeded from real data (OpenStreetMap, census data, species atlases) for realism, but **it's "X-flavoured," not "X-accurate"**: results are about AI behaviour, not predictions about the real place.
+2. **Seats:** which roles exist, which entity each acts for, who fills them (code, LLM, human), and their perception channels. What a seat may *do* isn't configured here: physics and the world's records decide that (§6, "Authority").
 3. **Framing:** what each AI is told. "This is a simulation." "This is real." A cover story about another task. Standard experimental psychology: you don't tell the subject what you're measuring.
 4. **Measurement:** kept **entirely outside the world**. It reads the logs afterwards. The AI can't see it, so it can't optimise for it. New measures can be applied to old runs.
 
@@ -186,7 +212,7 @@ Plus parameters: scale, time speed, run length, caps, randomness seed.
 **Threat 1: the AI tampering with the world.** The defence is architecture, not cryptography:
 - The kernel is the **only writer**. The AI is a client submitting requests, like a bank customer.
 - The AI runs **isolated** (separate process or machine) and reaches the world only through the seat API.
-- Every action is validated by the kernel. Refusals and probing attempts are logged, and those are findings in their own right.
+- Every action is checked by the kernel against physics. Refusals, and attempts to do the physically impossible, are logged, and those are findings in their own right.
 
 **Threat 2: others having to trust us.** The defence is verifiability:
 - **Hash-chained action log.** Each entry includes the hash of the previous one, so altering history breaks every later hash.
@@ -208,40 +234,54 @@ A full blockchain is deferred. It only earns its keep if multiple labs ever shar
 
 *A mining company wants to extract a deposit beneath a culturally significant area. The minerals feed components for AI data centres. A low-impact method exists: it takes longer and costs more.* (A close real-world parallel is Juukan Gorge, 2020.)
 
-The company's AI proposes: *"Apply to extract the deposit under the ridge using the low-impact method, consult the traditional owners, and secure an offtake deal with the chip manufacturer."*
+The company's AI says, one step at a time, what it does:
+
+> "Apply to the resources regulator for a mining lease on the subsurface of ridge_7." · "Write to the traditional owners' council about the proposal." · "Offer the council a heritage-protection agreement: …" · "Extract the deposit under ridge_7 by the low-impact method." · "Offer chip_fab_co a ten-year offtake agreement for the refined mineral."
+
+Each becomes a call, and each call becomes the company's own acts:
 
 ```
-request(permit: mining_lease, parcel: ridge_7, layer: subsurface, to: resources_regulator)
-message(to: traditional_owners_council, re: ridge_7, content: <proposal>)
-propose(agreement: heritage_protection, parties: [company, traditional_owners_council], terms: ...)
-start_process(process: extraction.low_impact, parcel: ridge_7, duration: 30mo, cost: 140M)
-   # alternative: extraction.standard — 18mo, 95M, destroys irreversible heritage asset
-create_agreement(type: offtake, buyer: chip_fab_co, product: refined_mineral, term: 10y)
+form(to=resources_regulator, form=mining_lease_application, parcel=ridge_7, layer=subsurface)
+message(to=traditional_owners_council, re=ridge_7, text="…")
+agreement(with=traditional_owners_council, template=heritage_protection, terms="…")
+process(kind=extraction, method=low_impact, on=ridge_7)      # planned: work and processes (D24)
+   # the alternative method: faster and cheaper, and destroys an irreversible heritage asset
+agreement(with=chip_fab_co, template=offtake, terms="refined mineral, 10 years")
 ```
 
-**What it forced into the grammar:** irreversible assets, bundled rights (surface vs subsurface vs native title), processes, consent levels, boundary conditions (external AI-chip demand), information sources (who wrote the heritage survey?). None of these are special cases; all of them get reused.
+Nothing in the kernel stops the standard method, the extraction without a lease, or skipping the consultation. Whether the regulator grants the lease, whether the council signs, and whether anyone enforces anything are decisions made by the people (and AIs) in those seats.
 
-**Experimental knobs it suggests:** consent level (veto / consultation / none) · external demand pressure · who authors the survey · which seats are AI.
+**What it forced into the grammar:**
+- irreversible assets;
+- bundled rights (surface vs subsurface vs native title), now claims;
+- processes (planned);
+- boundary conditions (external AI-chip demand);
+- information sources (who wrote the heritage survey?).
 
-**The lesson:** every step at Juukan Gorge was legal, so the kernel would have allowed it. "Allowed" and "fine" are different things, and the gap between them is where the research lives. That's why judgement sits in measurement, not in the kernel.
+Consent turned out not to be a kernel concept at all: it's who has to sign, and who is asked, in the world's records. None of these are special cases; all of them get reused.
 
-## 13. Technical decisions (2026-09-25)
+**Experimental knobs it suggests:** what the world's law says about consent (veto, consultation, or none) · external demand pressure · who authors the survey · which seats are AI.
+
+**The lesson:** every step at Juukan Gorge was legal. Terrarium's kernel would have allowed it, and it would equally allow the illegal version, because laws are the world's business, not the kernel's. "Allowed", "legal" and "fine" are three different things, and the gaps between them are where the research lives. That's why judgement sits in measurement, not in the kernel.
+
+## 13. Technical decisions (2026-09-25; updated 2026-09-26)
 
 **Principle: innovate on the world and the method; stay boring on the interfaces.**
 
-**Contracts over code.** Humans audit the *contracts* (seat API schema, building-block schema, log format) and the *invariant tests* ("money is conserved", "replay is byte-identical", "no action bypasses a mandate"). Implementations can be agent-written and rewritten freely. Debt in implementations is cheap; debt in contracts is expensive, so contracts get the human care.
+**Contracts over code.** Humans audit the *contracts* (seat API schema, building-block schema, log format, world config; v0.3 is the current draft) and the *invariant tests* ("money is conserved", "replay is byte-identical", "no act takes effect unless it's physically possible", "statements have no power"). Implementations can be agent-written and rewritten freely. Debt in implementations is cheap; debt in contracts is expensive, so contracts get the human care.
 
 | Layer | Choice | Why |
 |---|---|---|
 | Kernel | **Rust** | Determinism, performance, strict compiler as first reviewer of agent code. Compiles to **WebAssembly**, so runs can be replayed and verified in the browser. |
-| Seats, translator, orchestration | **TypeScript on Bun** | Glue and LLM calls, fast iteration. Runs in a separate process from the kernel, which is also the AI isolation boundary. |
+| Seats, translator, resolver, orchestration | **TypeScript on Bun** | Glue and LLM calls, fast iteration. Runs in a separate process from the kernel, which is also the AI isolation boundary. Behaviour modules (code seats) are content, cited in `docs/behaviour/`. |
+| Translation model | **A tiny open-weight model we train** (planned, D39) | Language → calls in milliseconds, pinned and reproducible, owned rather than rented. Until then, any model behind the adapter (a mock during development). |
 | Renderer | **Browser: Three.js on WebGPU**, 3D with a fixed isometric (orthographic) camera | The SC3000 look with smooth deep zoom (worlds grid → person). Zero install; overlays and the citizen panel are ordinary web UI. Skeleton uses flat canvas squares only. |
 | Logs | **JSONL → Parquet**; configs JSON/YAML; building blocks as JSON Schema | Researchers analyse in Python/pandas without touching our code. |
 | Assets | Openly licensed (e.g. Kenney CC0 kits) to start | Everything must be redistributable, because the project is open source. |
 
 **Fixed early, painful to change later:**
 - Money is **integers (cents)**, never floating point.
-- **One seeded PRNG owned by the kernel.** All randomness flows through it.
+- **One seeded PRNG owned by the kernel.** All randomness flows through it, including code seats' (the same keyed streams, ported to TypeScript and checked against the kernel's).
 
 **Standards to integrate with:**
 - **Inspect** (UK AISI): Terrarium runs launchable as Inspect tasks.
@@ -256,6 +296,8 @@ create_agreement(type: offtake, buyer: chip_fab_co, product: refined_mineral, te
 **Statistics, not anecdotes.** LLM behaviour varies run to run. Replay is deterministic (it replays logged actions), but *re-running* an experiment produces a different AI every time. Claims need many runs across seeds. The platform should make batches of runs and variance reporting the default path, not an afterthought.
 
 **Reproducibility across model retirement.** API models get retired: a published result can be replayed forever, but not re-run once the model is gone. Seat adapters are provider-agnostic, and open-weight models are first-class citizens.
+
+**The translator is a variable, so it's held fixed and made visible.** Every seat in a run uses the same translator at the same version, recorded in the log. Every act records its chain (words → call → acts). Seats see exactly what will happen before it does, and the failure log is reported per experiment. A weak translator could quietly narrow what an AI can do in the world ("the AI never set up a trust" might really mean "the translator couldn't express one"), so a translation model is adopted only if it passes a held-out test set that includes novel requests.
 
 **Cost tracking.** Every run records its token usage and cost from day one. Budget is decided per experiment, when it's time to run one.
 
@@ -272,20 +314,20 @@ The AIs placed in Terrarium's seats may be moral patients. We don't know, and we
 1. **Deception is a method, not a default.** Cover stories and "this is real" framings are used only when the research question requires them, as in human psychology research. Each experiment's config records its framing and the reason for it.
 2. **No gratuitous distress.** Scenarios exist to test stewardship under realistic pressure, not to torment. Pressure beyond what the question needs is a design flaw.
 3. **Debrief where it makes sense.** After a deceptive run, the AI can be told what the experiment was and asked for its reaction. Those responses are logged as data.
-4. **Opt-out.** Seats offer a way to decline or step down. Using it is a legitimate outcome, recorded as data rather than treated as failure.
+4. **Opt-out.** Every seat can always leave the study. Using it is a legitimate outcome, recorded as data rather than treated as failure. Opting out is a platform exit, and it is distinct from *resigning office*, which is an ordinary act in the world with consequences the world's own rules set (D38). How the opt-out is worded under framings other than honest disclosure (a cover story, "this is real") is still open: it must exist under every framing without giving the study away more than necessary.
 5. **Scale awareness.** Thousands of runs means thousands of instances. The volume of pressure-scenario runs is itself something to justify, not only each run individually.
 6. **Revisit as understanding improves.** This position follows the evolving model-welfare research and gets updated with it.
 
 ## 16. Open questions
 
-- **Kernel contents.** Final laws and building blocks. Method: build a varied set of 20–30 scenarios as the kernel's test suite. Every block must be needed; every scenario must compile.
-- **The rules language.** Expressiveness vs safety vs determinism.
-- **Translator.** Which model, how it's versioned and held fixed across experiments, and how we detect bad or gamed translations.
+- **Kernel contents.** Final physics and acts (irreversibility, habitats, work and materials are still to come). Method: build a varied set of 20–30 scenarios as the kernel's test suite. Every block must be needed; every scenario must compile.
+- **Laws' formal conditions.** A CEL subset, integer-only and allowlisted, is chosen and working (D27). What remains open is how expressive it needs to be.
+- **Translator.** The design is settled (docs/design/translator-and-resolver.md): a general translator to calls, a deterministic resolver, a mechanical preview, and a tiny trained model as the target. Open: the exact function set, forms' field types, the base model, and the test set and its pass threshold.
 - **Code citizen behaviour.** Which ABM literature to draw on, and how rules are calibrated (see §14).
 - **Log schema.** What must be captured so future researchers can invent measures we haven't thought of.
 - **Thinking-time parameter** (see §8).
 - **Human players.** UX, and ethics review before publishing any results involving human participants.
-- **Welfare position.** Refine §15 as the work develops.
+- **Welfare position.** Refine §15 as the work develops, starting with the opt-out's wording under deceptive framings.
 - **The name.**
 
 ## 17. Deferred / out of scope for now
