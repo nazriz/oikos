@@ -75,7 +75,6 @@ fn random_operations_reach_the_interesting_states() {
         "refused/not_custodian",
         "refused/not_holder",
         "refused/insufficient_funds",
-        "refused/boundary_protected",
         "refused/parcel_occupied",
         "refused/capacity_exceeded",
         "refused/structure_incomplete",
@@ -85,6 +84,7 @@ fn random_operations_reach_the_interesting_states() {
         "refused/wrong_record_kind",
         "refused/seat_resigned",
         "refused/account_not_empty",
+        "refused/boundary_protected",
     ] {
         assert!(seen.contains_key(must), "the generator never produced {must}:\n{}", report.join("\n"));
     }

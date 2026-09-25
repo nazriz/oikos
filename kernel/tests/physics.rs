@@ -69,6 +69,31 @@ fn money_cant_be_conjured_or_overdrawn() {
 }
 
 #[test]
+fn money_enters_only_through_the_outside_worlds_own_seat() {
+    // Riverbend has no outside-world seat, so no money can come in at all...
+    let mut run = town();
+    assert_eq!(
+        refusal(&act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-devco", "amount": 1}]))),
+        Some(RefusalCode::NotCustodian)
+    );
+    // ...until a world gives the outside world a seat: its behaviour is the boundary condition (D31).
+    let mut c = riverbend();
+    c["seats"].as_array_mut().unwrap().push(json!({"id": "export-demand", "entity": "outside", "channels": [], "controller": {"type": "code", "impl": "world.export_demand"}, "framing": {"disclosure": "unstated", "reason": "Code controller."}}));
+    let mut run = Run::start(c, "boundary", Vec::new(), None).unwrap();
+    let total = run.kernel().state().total_money();
+    assert_eq!(
+        refusal(&act(
+            &mut run,
+            "export-demand",
+            json!([{"block": "transfer", "from": "acc-outside", "to": "acc-devco", "amount": 5_000_000}])
+        )),
+        None
+    );
+    assert_eq!(balance(&run, "acc-outside"), -5_000_000, "the outside world's account goes negative as money flows in");
+    assert_eq!(run.kernel().state().total_money(), total, "and total money, counting the outside, is unchanged");
+}
+
+#[test]
 fn an_account_can_only_close_when_empty() {
     let mut run = town();
     assert_eq!(

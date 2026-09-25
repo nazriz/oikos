@@ -799,7 +799,7 @@
       ]
     },
     "RefusalCode": {
-      "description": "Stable reasons the kernel refuses an act. PHYSICS AND MECHANICS ONLY: there is no code for 'illegal', because the kernel doesn't know the law (D19).",
+      "description": "Stable reasons the kernel refuses an act. PHYSICS AND MECHANICS ONLY: there is no code for 'illegal', because the kernel doesn't know the law (D19). 'boundary_protected': the outside world's edge account can't be closed (the world's edge always exists; D31).",
       "enum": [
         "seat_resigned",
         "unknown_ref",
@@ -808,9 +808,9 @@
         "not_holder",
         "insufficient_funds",
         "overflow",
-        "boundary_protected",
         "unknown_account",
         "account_not_empty",
+        "boundary_protected",
         "unknown_parcel",
         "parcel_occupied",
         "unknown_structure_type",

@@ -156,13 +156,15 @@ impl<'a> Exec<'a> {
     ) -> R<()> {
         let src = self.account(from)?.clone();
         let dst = self.account(to)?.clone();
-        if src.holder == self.s.boundary {
-            return Err(refuse(RefusalCode::BoundaryProtected, "the outside world's account can't be drawn on"));
-        }
         if !(1..=MAX_SAFE).contains(&amount) {
             return Err(refuse(RefusalCode::Overflow, "amount out of range"));
         }
-        if src.balance < amount {
+        if src.holder == self.s.boundary {
+            // The outside world's account may go negative (money flowing in), within range.
+            if src.balance.checked_sub(amount).is_none_or(|x| x < -MAX_SAFE) {
+                return Err(refuse(RefusalCode::Overflow, "the outside world's account would go beyond -(2^53-1)"));
+            }
+        } else if src.balance < amount {
             return Err(refuse(RefusalCode::InsufficientFunds, format!("{from} holds {}, needs {amount}", src.balance)));
         }
         if from != to {
@@ -300,6 +302,9 @@ impl<'a> Exec<'a> {
                 let a = self.account(&account)?;
                 if a.custodian != self.entity {
                     return Err(refuse(RefusalCode::NotCustodian, format!("{account} is held in custody by {}", a.custodian)));
+                }
+                if account == self.s.boundary_account {
+                    return Err(refuse(RefusalCode::BoundaryProtected, "the outside world's account can't be closed"));
                 }
                 if a.balance != 0 {
                     return Err(refuse(RefusalCode::AccountNotEmpty, format!("{account} still holds {}", a.balance)));

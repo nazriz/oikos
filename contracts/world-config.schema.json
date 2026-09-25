@@ -104,7 +104,7 @@
       "additionalProperties": false,
       "properties": {
         "boundary": {
-          "description": "The single entity of kind 'boundary': the world's outside. Its account (custodian: itself) may go negative; total money including it is constant for the whole run.",
+          "description": "The single entity of kind 'boundary': the world's outside. Its account (custodian: itself) may go negative; total money including it is constant for the whole run. Money enters the world only when the outside world's own seat pays from that account (D31): exports bought, visitors' spending, grants. How much is researcher-set world content.",
           "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
         },
         "parcels": {

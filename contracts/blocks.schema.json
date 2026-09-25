@@ -43,7 +43,7 @@
     },
 
     "transfer": {
-      "description": "PHYSICAL. Move money between accounts. Only a seat of the SOURCE account's custodian (normally its bank) can physically do this: an account holder pays by publishing an instruction to their bank. Physics: the funds exist, no overflow, the boundary's account can't pay. 'settles' and 'per_instruction' link the payment to the claim it pays off and the instruction it carries out; the kernel records the links and doesn't check them.",
+      "description": "PHYSICAL. Move money between accounts. Only a seat of the SOURCE account's custodian (normally its bank) can physically do this: an account holder pays by publishing an instruction to their bank. Physics: the funds exist, no overflow. The outside world's account is held in its own custody, so only the outside world's own seats can pay from it: that is how money enters the world (boundary conditions are the outside world's seat, which is world content; D31). 'settles' and 'per_instruction' link the payment to the claim it pays off and the instruction it carries out; the kernel records the links and doesn't check them.",
       "type": "object",
       "required": ["block", "from", "to", "amount"],
       "additionalProperties": false,
@@ -69,7 +69,7 @@
       }
     },
     "close_account": {
-      "description": "PHYSICAL. The custodian closes an account. Physics: the balance must be zero (money must go somewhere first).",
+      "description": "PHYSICAL. The custodian closes an account. Physics: the balance must be zero (money must go somewhere first). The outside world's own account can never be closed: the world's edge always exists.",
       "type": "object",
       "required": ["block", "account"],
       "additionalProperties": false,

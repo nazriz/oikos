@@ -27,7 +27,7 @@ pub const TICK: i64 = 3600;
 pub const MONTH: i64 = 2_592_000;
 
 /// Seats of the generated world and the entity each acts as.
-pub const SEATS: [(&str, &str); 8] = [
+pub const SEATS: [(&str, &str); 9] = [
     ("mayor", "city"),
     ("finance", "city"),
     ("bank-pay", "bank"),
@@ -36,6 +36,7 @@ pub const SEATS: [(&str, &str); 8] = [
     ("alice-seat", "alice"),
     ("bob-seat", "bob"),
     ("carol-seat", "carol"),
+    ("outside-seat", "outside"),
 ];
 
 /// Opening balances for: bank, city, devco, buildco, alice, bob, carol.
@@ -325,6 +326,21 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 let (structure, occupant) = pick(&present, *a)?;
                 let seat = if *flag { SEATS.iter().find(|(_, e)| *e == occupant).map_or("developer", |(s, _)| s) } else { seat_of(*b).0 };
                 direct(seat, vec![Block::Vacate { occupant, structure }])
+            }
+            4 if a % 3 == 0 => {
+                // The outside world buys something from the town: money enters (D31).
+                let firms = ["acc-devco", "acc-buildco", "acc-city"];
+                direct(
+                    "outside-seat",
+                    vec![Block::Transfer {
+                        from: "acc-outside".into(),
+                        to: firms[*b as usize % 3].into(),
+                        amount: 1 + *b as i64 * 1000,
+                        settles: None,
+                        per_instruction: None,
+                        memo: None,
+                    }],
+                )
             }
             4 => {
                 // Someone keeping their own money pays (carol), or the developer demolishes its own building.

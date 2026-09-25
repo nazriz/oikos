@@ -57,14 +57,19 @@ fn predict(run: &Run<Vec<u8>>, seat: &str, b: &Block) -> Option<Result<(), Refus
         return Some(Err(RefusalCode::SeatResigned));
     }
     let types = &k.statics().types;
-    let boundary = &k.statics().boundary;
     Some(match b {
         Block::Transfer { from, to, amount, settles: None, per_instruction: None, .. } => {
             let (Some(f), Some(t)) = (st.accounts.get(from), st.accounts.get(to)) else { return Some(Err(RefusalCode::UnknownAccount)) };
             if f.custodian != me {
                 Err(RefusalCode::NotCustodian)
-            } else if f.holder == *boundary {
-                Err(RefusalCode::BoundaryProtected)
+            } else if f.holder == k.statics().boundary {
+                let below = (f.balance as i128) - (*amount as i128) < -9_007_199_254_740_991;
+                let above = from != to && t.balance as i128 + *amount as i128 > 9_007_199_254_740_991;
+                if below || above {
+                    Err(RefusalCode::Overflow)
+                } else {
+                    Ok(())
+                }
             } else if f.balance < *amount {
                 Err(RefusalCode::InsufficientFunds)
             } else if from != to && t.balance as i128 + *amount as i128 > 9_007_199_254_740_991 {
@@ -85,7 +90,8 @@ fn predict(run: &Run<Vec<u8>>, seat: &str, b: &Block) -> Option<Result<(), Refus
                 Err(RefusalCode::ParcelOccupied)
             } else if acc.holder != me {
                 Err(RefusalCode::NotHolder)
-            } else if acc.balance < ty.materials_cost {
+            } else if acc.holder != k.statics().boundary && acc.balance < ty.materials_cost {
+                // (The outside world pays materials to itself: a quirk of the temporary liberty.)
                 Err(RefusalCode::InsufficientFunds)
             } else {
                 Ok(())
@@ -116,6 +122,7 @@ fn predict(run: &Run<Vec<u8>>, seat: &str, b: &Block) -> Option<Result<(), Refus
         Block::CloseAccount { account } => match st.accounts.get(account) {
             None => Err(RefusalCode::UnknownAccount),
             Some(a) if a.custodian != me => Err(RefusalCode::NotCustodian),
+            Some(_) if *account == k.statics().boundary_account => Err(RefusalCode::BoundaryProtected),
             Some(a) if a.balance != 0 => Err(RefusalCode::AccountNotEmpty),
             Some(_) => Ok(()),
         },

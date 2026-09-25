@@ -37,7 +37,7 @@ An action is 1–32 blocks applied **atomically**. The acting seat is bound by t
 
 | Block | Who can do it | The only reasons it can be refused |
 |---|---|---|
-| `transfer` | a seat of the source account's **custodian** (normally its bank) | not the custodian; insufficient funds; overflow; the boundary can't pay |
+| `transfer` | a seat of the source account's **custodian** (normally its bank) | not the custodian; insufficient funds; overflow |
 | `open_account`, `close_account` | a seat of the custodian | closing needs a zero balance |
 | `construct` | the builder's seat | parcel missing or occupied; unknown structure type; the builder can't cover the materials cost |
 | `demolish` | whoever demolishes | structure missing; can't cover the cost |
@@ -61,7 +61,7 @@ Each record has an **author** (the seat, or `genesis` for records the world star
 
 ## Money, banks, debt (D26)
 
-Money is a conserved integer quantity in **accounts**. Every account has a **holder** and a **custodian**: a bank, or the holder itself if the world lets entities keep their own money. Only the custodian's seats can move money out of an account.
+Money is a conserved integer quantity in **accounts**. Every account has a **holder** and a **custodian**: a bank, or the holder itself if the world lets entities keep their own money. Only the custodian's seats can move money out of an account. The outside world holds its own account, so **money enters the world only when the outside world's seat pays** (buying exports, visitors spending, grants): boundary conditions are world content, a code seat with researcher-set parameters (D31).
 
 To pay, an account holder publishes an `instruction` addressed to their bank. The bank's seat reads it and executes the transfer, or doesn't. Standing orders and direct debits are standing instructions.
 

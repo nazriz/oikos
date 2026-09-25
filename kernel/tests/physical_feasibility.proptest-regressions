@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 1991c7129aae807b83a014b818e9bf3c92b1dc174db474f7411387a5bfa16e53 # shrinks to ops = [Act { seat: 26, blocks: [CloseAccount { account: 9 }] }, Smart { kind: 187, a: 0, b: 0, flag: false }]
+cc 2781baa76058c6f8c5b6380d2b1d89e014c8d9ba14ab94e3f5f903880e3f64bb # shrinks to ops = [Act { seat: 8, blocks: [Construct { parcel: 97, ty: 15, from: 5 }] }]
