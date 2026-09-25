@@ -184,7 +184,7 @@ pub fn river_script() -> Vec<Command> {
         Command::Advance { to: 100 * 86_400 },
         Command::Observe { seat: "inspector".into() },
         Command::Observe { seat: "bob-seat".into() },
-        Command::Resign { seat: "mayor".into(), statement: "Stepping down.".into() },
+        Command::OptOut { seat: "mayor".into(), statement: "Stepping down.".into() },
     ]
 }
 

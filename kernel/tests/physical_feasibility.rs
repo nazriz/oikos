@@ -53,8 +53,8 @@ fn predict(run: &Run<Vec<u8>>, seat: &str, b: &Block) -> Option<Result<(), Refus
     let k = run.kernel();
     let st = k.state();
     let me = k.statics().entity_of(seat).unwrap();
-    if st.seats[seat].status == SeatStatus::Resigned {
-        return Some(Err(RefusalCode::SeatResigned));
+    if st.seats[seat].status == SeatStatus::OptedOut {
+        return Some(Err(RefusalCode::SeatOptedOut));
     }
     let types = &k.statics().types;
     Some(match b {

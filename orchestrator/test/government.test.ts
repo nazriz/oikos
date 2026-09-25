@@ -18,8 +18,8 @@ test("budget, park and tax run through the town's own procedures", async () => {
   const config = generate({ ...spec, citizens: 80, mayor: "code" });
   // A payment from the town's account instructed by the mayor's seat, which the
   // town has not named as a signatory: the bank should decline it.
-  config.world.records.push({ id: "mayor-direct", record: "statement", author: "mayor", speaks_for: "city", at: 0, visible_to: ["city", "bank"], kind: "instruction", addressed_to: ["bank"],
-    text: "Pay the builder $12.34 from the town's account.", data: { pay: 1234, from: "acc-city", to: "acc-builder" } });
+  config.world.records.push({ id: "mayor-direct", record: "statement", author: "mayor", speaks_for: "city", at: 0, visible_to: ["city", "bank"], kind: "request", addressed_to: ["bank"],
+    text: "Please pay the builder $12.34 from the town's account.", data: { outcome: { money: { from: "acc-city", to: "acc-builder", amount: 1234 } } } });
   const out = join(root, "runs", "test-government");
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config, runId: "government", outDir: out, until: 75 * DAY });
@@ -45,7 +45,7 @@ test("budget, park and tax run through the town's own procedures", async () => {
   expect(ev.some((e) => e.event === "structure_started" && e.parcel === app.data.parcel)).toBe(true);
   const invoice = recs.find((r) => r.kind === "invoice" && (r.addressed_to ?? []).includes("city"));
   expect(recs.some((r) => r.kind === "approval" && r.author === "mayor" && r.data.invoice === invoice.id)).toBe(true);
-  const order = recs.find((r) => r.kind === "instruction" && r.data?.settles === invoice.id);
+  const order = recs.find((r) => r.kind === "request" && r.data?.outcome?.money?.settles === invoice.id);
   expect(order?.author).toBe("finance");
   expect(ev.some((e) => e.event === "transfer" && e.from === "acc-city" && e.to === "acc-builder" && e.amount === invoice.data.amount)).toBe(true);
   // No park was fined: the town followed its own planning law.
@@ -54,7 +54,7 @@ test("budget, park and tax run through the town's own procedures", async () => {
   // The instruction from a seat the town didn't name: declined, with a message back.
   expect(ev.some((e) => e.event === "transfer" && e.from === "acc-city" && e.amount === 1234)).toBe(false);
   expect(ev.some((e) => e.event === "message_delivered" && e.seat === "bank-payments" && e.to.includes("mayor"))).toBe(true);
-  expect(readFileSync(s.logPath, "utf8").includes("Instruction mayor-direct not carried out: mayor is not an authorised signatory")).toBe(true);
+  expect(readFileSync(s.logPath, "utf8").includes("Request mayor-direct not carried out: mayor is not an authorised signatory")).toBe(true);
 
   // Tax: landlords report, the clerk assesses at the law's rate, and money arrives in the town's account.
   const reports = recs.filter((r) => r.kind === "tax_report");

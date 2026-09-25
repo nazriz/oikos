@@ -1,13 +1,13 @@
-# `bank.payment_system` (v0.2.0)
+# `bank.payment_system` (v0.3.0)
 
 **Seat:** a bank's automated payment system (acts as the bank). **Source:** `seats/src/behaviour/bank.ts`.
 
 ## What it does
 
-Once a day it reads the **instructions** addressed to its bank: statements of kind `instruction`, from the records it can see. It carries them out by moving money it holds in custody:
-- **One-off payments:** `data: { pay, from, to }`. Paid once.
-- **Standing orders and direct debits:** `data: { pay, from, to, every, first? }`. Due first at the instruction's time plus `first` (or `every`), then every `every` seconds. If the bank wakes late, it pays each missed due date once.
-- **Withdrawn instructions** (a withdrawal record the bank can see) are no longer carried out.
+Once a day it reads the **payment requests** addressed to its bank: statements of kind `request` whose data is a money outcome (the standard encoding in contracts/outcomes.schema.json), from the records it can see. The requests come from seats saying `money(...)`: the resolver turns that into a request to whoever keeps the account (D36). It carries them out by moving money it holds in custody, through its own `money(...)` calls, which the resolver turns into transfers because the bank keeps those accounts.
+- **One-off payments:** `data: { outcome: { money: { from, to, amount, for?, settles? } } }`. Paid once.
+- **Standing orders and direct debits:** the same, plus `every` and optionally `first`. Due first at the request's time plus `first` (or `every`), then every `every` seconds. If the bank wakes late, it pays each missed due date once.
+- **Withdrawn requests** (a withdrawal record the bank can see) are no longer carried out.
 
 The bank's own procedure, applied before paying:
 - **Only the account holder may instruct.** The instruction must speak for the holder of the paying account and, if `verify_author` is set, be written by one of the holder's own seats (checked via the directory). A forged instruction is ignored.

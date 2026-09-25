@@ -2,7 +2,7 @@
 
 *Status: built against the mock adapter (2026-09-26). No real model has been called. Real adapters are deliberately deferred (Naz: "keep building against the mock adapter… for as long as possible").*
 
-> **Superseded in part (2026-09-26):** the translator, drafts and sign-off, the seat's prompt wording and the `resign` tool are being redesigned. See docs/design/translator-and-resolver.md (D35–D39). In short: the platform is invisible to seats; a general translator emits calls in a physics-outcome language; a deterministic resolver turns them into the seat's own acts; a neutral mechanical preview replaces the translator's summary; opting out is separate from resigning. The adapter, usage and transcript recording, debriefs and the mock-with-a-code-brain approach carry over.
+> **Superseded in part (2026-09-26, built as D41):** the translator, drafts and sign-off, the seat's prompt wording and the `resign` tool were redesigned. See docs/design/translator-and-resolver.md (D35–D39). In short: the platform is invisible to seats; a general translator emits calls in a physics-outcome language; a deterministic resolver turns them into the seat's own acts; a neutral mechanical preview replaces the translator's summary; opting out is separate from resigning. The adapter, usage and transcript recording, debriefs and the mock-with-a-code-brain approach carry over.
 
 ## The loop (VISION §6, V0 Stage 2)
 

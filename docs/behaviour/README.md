@@ -9,7 +9,7 @@ Each module's doc gives:
 4. **What it deliberately leaves out.**
 
 Rules every module follows (so re-runs are reproducible):
-- It sees only its Observation and acts only through SeatActions, like any other seat.
+- It sees only its Observation and acts only through SeatActions, like any other seat. Modules act through **calls** (contracts/calls.md): they say what they want brought about (`money(...)`, `form(...)`, `agreement(...)`), and the resolver turns that into the seat's own acts, exactly as for a language seat, only without the translator or a preview (D36). Paying someone is `money(...)`, and the resolver asks the account's bank. Agreements carry their commitments as outcomes, and payment requests are `request` statements (contracts/outcomes.schema.json). Helpers for all of this are in `seats/src/behaviour/common.ts`.
 - Randomness comes only from `ctx.rng(purpose)`: the kernel's keyed streams, keyed by seat, time and purpose.
 - No clocks and no I/O. Memory is allowed, as long as it depends only on what the seat has observed and drawn.
 - Its `version` is bumped whenever its rules change. Each run's log records every module's version and source hash (the `orchestrator` annotation).

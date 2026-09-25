@@ -195,6 +195,7 @@
       "required": ["block", "terms"],
       "additionalProperties": false,
       "properties": {
+        "basis": { "description": "What the agreement cites as its basis (e.g. a permit).", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
         "block": { "const": "propose_agreement" },
         "terms": { "$ref": "#/$defs/AgreementTerms" },
         "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },

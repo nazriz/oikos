@@ -1,0 +1,5 @@
+{
+  "type": "call",
+  "call": "money(to=acc-builder, amount=\"$500\", for=\"the fence\")",
+  "reasoning": "The fence is done."
+}

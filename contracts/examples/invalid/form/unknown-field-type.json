@@ -1,0 +1,12 @@
+{
+  "form": "x",
+  "submit_as": "x",
+  "submit_to": [
+    "city"
+  ],
+  "fields": {
+    "when": {
+      "type": "date"
+    }
+  }
+}

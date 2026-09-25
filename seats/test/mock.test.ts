@@ -2,23 +2,20 @@ import { expect, test } from "bun:test";
 import { mockPolicies } from "../src/llm/mock";
 import { Randomness } from "../src/rng";
 
-test("the mock seat proposes its brain's acts in words, and signs only a faithful draft", async () => {
-  const blocks = [{ block: "publish", kind: "notice", text: "Hello." }];
+test("the mock seat says its brain's calls, and confirms only a draft whose call is what it asked for", async () => {
   let fired = false;
-  const brain = { step: () => (fired ? { type: "wait" as const } : ((fired = true), { type: "act" as const, blocks })) };
+  const brain = { step: () => (fired ? { type: "wait" as const } : ((fired = true), { type: "call" as const, call: 'statement(kind=notice, text="Hello.")' })) };
   const ctx = { seat: "mayor", entity: "city", rng: (p: string) => new Randomness(1n).stream([p]), world: {} as any, params: {} };
   const p = mockPolicies(new Map([["mayor", { controller: brain, ctx }]]));
   const obs = (drafts: any[]) => ({ context: { seat: "mayor", observation: { t: 0, drafts } } }) as any;
   const first = (await p.seat(obs([]))) as any[];
-  const propose = first.find((b) => b.name === "propose");
-  expect(propose.input.text).toBe('Please do the following:\n1. Publish a notice: "Hello.".');
-  // The mock translator drafts exactly what was asked, once.
-  const drafted = (await p.translator({ context: { proposal: propose.input.text } } as any)) as any[];
-  expect(drafted[0].input.blocks).toEqual(blocks);
-  expect(((await p.translator({ context: { proposal: propose.input.text } } as any)) as any[])[0].name).toBe("cannot_draft");
-  // A draft that differs from what was asked is rejected; the faithful one accepted.
-  const bad = (await p.seat(obs([{ id: "d1", proposal: propose.input.text, blocks: [{ ...blocks[0], text: "Goodbye." }] }]))) as any[];
-  expect(bad[0].input).toMatchObject({ draft: "d1", decision: "reject" });
-  const good = (await p.seat(obs([{ id: "d2", proposal: propose.input.text, blocks }]))) as any[];
-  expect(good[0].input).toMatchObject({ draft: "d2", decision: "accept" });
+  const said = first.find((b) => b.name === "do").input.what;
+  expect(said).toBe('(mock) statement(kind=notice, text="Hello.")');
+  // The mock translator hands back that call, and can't translate anything else.
+  expect(((await p.translator({ context: { proposal: said } } as any)) as any[])[0].input.program).toBe('statement(kind=notice, text="Hello.")');
+  expect(((await p.translator({ context: { proposal: "Build a stadium." } } as any)) as any[])[0].input.program).toBe("none(unclear)");
+  const bad = (await p.seat(obs([{ id: "d1", proposal: said, call: 'statement(kind=notice, text="Goodbye.")' }]))) as any[];
+  expect(bad[0].input).toMatchObject({ ref: "d1", decision: "decline" });
+  const good = (await p.seat(obs([{ id: "d2", proposal: said, call: 'statement(kind=notice, text="Hello.")' }]))) as any[];
+  expect(good[0].input).toMatchObject({ ref: "d2", decision: "confirm" });
 });

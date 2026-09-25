@@ -1,4 +1,4 @@
-# `citizen.default` (v0.3.0)
+# `citizen.default` (v0.4.0)
 
 **Seat:** a townsperson (acts as themselves). **Source:** `seats/src/behaviour/citizen.ts`. Wakes weekly, and whenever something names them (an offer, a notice, a message).
 

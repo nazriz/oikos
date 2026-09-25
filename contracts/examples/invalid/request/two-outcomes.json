@@ -1,0 +1,11 @@
+{
+  "outcome": {
+    "money": {
+      "to": "a",
+      "amount": 1
+    },
+    "structure": {
+      "type": "park"
+    }
+  }
+}

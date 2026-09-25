@@ -7,17 +7,21 @@
     "bob",
     "bank"
   ],
-  "kind": "instruction",
+  "kind": "request",
   "speaks_for": "bob",
   "addressed_to": [
     "bank"
   ],
   "basis": "lease-bob",
-  "text": "Standing order: pay $1,800 from my account to Riverbend Developments every 30 days, for my rent.",
+  "text": "Please pay $1,800 from my account to Riverbend Developments every 30 days, for my rent.",
   "data": {
-    "pay": 180000,
-    "from": "acc-bob",
-    "to": "acc-devco",
+    "outcome": {
+      "money": {
+        "from": "acc-bob",
+        "to": "acc-devco",
+        "amount": 180000
+      }
+    },
     "every": 2592000,
     "first": 2592000
   }

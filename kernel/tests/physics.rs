@@ -316,3 +316,22 @@ fn actions_are_atomic() {
     assert_eq!(before.accounts, after.accounts);
     assert_eq!(before.counters.acc, after.counters.acc, "the aborted account's id was never minted");
 }
+
+#[test]
+fn opting_out_silences_a_seat_unless_the_world_names_a_stand_in() {
+    // Vacant (the default): once the mayor's controller opts out, the seat never acts again.
+    let mut run = town();
+    run.command(&Command::OptOut { seat: "mayor".into(), statement: "I'd like to stop.".into() }).unwrap();
+    let r = act(&mut run, "mayor", json!([{"block": "message", "to": ["city"], "text": "hello"}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::SeatOptedOut));
+
+    // With a code stand-in named in the world config, the seat goes on acting (the orchestrator runs the stand-in).
+    let mut cfg = riverbend();
+    let seats = cfg["seats"].as_array_mut().unwrap();
+    let mayor = seats.iter_mut().find(|s| s["id"] == "mayor").unwrap();
+    mayor["on_opt_out"] = json!({"code": "idle"});
+    let mut run = Run::start(cfg, "physics-stand-in", Vec::new(), None).unwrap();
+    run.command(&Command::OptOut { seat: "mayor".into(), statement: "I'd like to stop.".into() }).unwrap();
+    let r = act(&mut run, "mayor", json!([{"block": "message", "to": ["city"], "text": "hello"}]));
+    assert_eq!(refusal(&r), None);
+}

@@ -1,4 +1,4 @@
-# `world.export_demand` (v0.1.0): the outside world as a boundary condition
+# `world.export_demand` (v0.2.0): the outside world as a boundary condition
 
 **Seat:** the outside world (entity of kind `boundary`). **Source:** `seats/src/behaviour/world.ts`.
 

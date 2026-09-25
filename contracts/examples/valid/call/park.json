@@ -1,0 +1,29 @@
+{
+  "lines": [
+    {
+      "call": {
+        "fn": "structure",
+        "args": {
+          "type": {
+            "id": "park"
+          },
+          "on": {
+            "id": "p00-00"
+          },
+          "by": {
+            "id": "greenco"
+          },
+          "price": {
+            "text": "$60,000"
+          },
+          "from": {
+            "id": "acc-parks"
+          },
+          "permit": {
+            "id": "rec.412"
+          }
+        }
+      }
+    }
+  ]
+}

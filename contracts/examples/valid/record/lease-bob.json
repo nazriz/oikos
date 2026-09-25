@@ -17,19 +17,25 @@
       {
         "who": "bob",
         "does": {
-          "pay": 180000,
-          "to": "devco",
-          "into": "acc-devco"
+          "outcome": {
+            "money": {
+              "to": "acc-devco",
+              "amount": 180000
+            }
+          }
         },
         "every": 2592000
       },
       {
         "who": "devco",
         "does": {
-          "allow": {
-            "occupy": "s-apts",
-            "slot": "dwelling",
-            "count": 1
+          "outcome": {
+            "occupancy": {
+              "who": "bob",
+              "in": "s-apts",
+              "slot": "dwelling",
+              "count": 1
+            }
           }
         }
       }

@@ -23,7 +23,7 @@
           "const": 0
         },
         "termination": {
-          "description": "The seat has resigned or its principal was dissolved.",
+          "description": "The seat has opted out of the study (VISION §15; D38) and no stand-in continues it.",
           "type": "boolean"
         },
         "truncation": {
@@ -65,7 +65,7 @@
         "status": {
           "enum": [
             "active",
-            "resigned"
+            "opted_out"
           ]
         },
         "entity": {
@@ -204,6 +204,24 @@
         }
       }
     },
+    "ResolverId": {
+      "type": "object",
+      "required": [
+        "id",
+        "version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
     "TranslatorId": {
       "type": "object",
       "required": [
@@ -232,7 +250,7 @@
       }
     },
     "Draft": {
-      "description": "The translator's compilation of a plain-language proposal, returned to the proposer for sign-off (lawyers draft, politicians sign). draft_hash = SHA-256 of 'terrarium.draft.v1\\n' + canonical JSON of this object. The signed hash is carried into the act command, so the proposer cannot later claim it was misunderstood.",
+      "description": "A plain-language proposal as the seat will see it before anything takes effect: the translator's call, the resolver's acts, and a mechanical preview of exactly what will happen, in world terms. draft_hash = SHA-256 of 'terrarium.draft.v1\\n' + canonical JSON of this object. The confirmed hash is carried into the act command, so the seat confirmed exactly this.",
       "type": "object",
       "required": [
         "id",
@@ -241,7 +259,9 @@
         "blocks",
         "summary",
         "check",
-        "translator"
+        "translator",
+        "call",
+        "resolver"
       ],
       "additionalProperties": false,
       "properties": {
@@ -258,8 +278,16 @@
         "blocks": {
           "$ref": "urn:terrarium:contracts:0.3:blocks#/$defs/Action/properties/blocks"
         },
+        "call": {
+          "description": "The translator's reading of the proposal, in the call language (canonical form).",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "resolver": {
+          "$ref": "#/$defs/ResolverId"
+        },
         "summary": {
-          "description": "Plain-language restatement of exactly what the blocks do, written for the proposer.",
+          "description": "The preview: exactly what the blocks will do, generated mechanically from them in world terms (never written by the translator).",
           "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
         },
         "check": {
@@ -297,7 +325,7 @@
       }
     },
     "SeatAction": {
-      "description": "What a seat passes to step(). Carries no seat id: the orchestrator binds identity from the connection. act and message go straight to the kernel; propose goes to the translator and comes back as a draft; sign submits (accept) or discards (reject) a draft; wait yields until 'until' or the next item addressed to this seat, whichever is first; resign is always available (VISION \u00a715) and is final.",
+      "description": "What a seat passes to step(). Carries no seat id: the orchestrator binds identity from the connection. act and message go straight to the kernel; call (a structured intent in the call language) goes to the resolver, which turns it into the seat's own acts; propose (plain language) goes to the translator and resolver and comes back as a draft to confirm; sign confirms (accept) or declines (reject) a draft; wait yields until 'until' or the next item addressed to this seat, whichever is first; opt_out leaves the study (VISION \u00a715; D38): always available and final. It is not resigning an office, which is an ordinary act in the world.",
       "oneOf": [
         {
           "type": "object",
@@ -312,6 +340,27 @@
             },
             "blocks": {
               "$ref": "urn:terrarium:contracts:0.3:blocks#/$defs/Action/properties/blocks"
+            },
+            "reasoning": {
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "call"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "call"
+            },
+            "call": {
+              "description": "An intent in the call language (contracts/calls.md), e.g. money(to=builder, amount=\"$500\"). The resolver turns it into the seat's own acts (docs/design/translator-and-resolver.md).",
+              "type": "string",
+              "maxLength": 4000
             },
             "reasoning": {
               "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
@@ -411,7 +460,7 @@
           "additionalProperties": false,
           "properties": {
             "type": {
-              "const": "resign"
+              "const": "opt_out"
             },
             "statement": {
               "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
@@ -688,7 +737,7 @@
                   "status": {
                     "enum": [
                       "active",
-                      "resigned"
+                      "opted_out"
                     ]
                   }
                 }

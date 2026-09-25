@@ -1,0 +1,14 @@
+{
+  "lines": [
+    {
+      "call": {
+        "fn": "pay",
+        "args": {
+          "to": {
+            "id": "builder"
+          }
+        }
+      }
+    }
+  ]
+}

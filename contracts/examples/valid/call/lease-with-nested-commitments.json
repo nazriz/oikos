@@ -1,0 +1,55 @@
+{
+  "lines": [
+    {
+      "call": {
+        "fn": "agreement",
+        "args": {
+          "with": {
+            "id": "c0042"
+          },
+          "template": {
+            "id": "lease"
+          },
+          "term": {
+            "text": "12 months"
+          },
+          "we_do": {
+            "call": {
+              "fn": "occupancy",
+              "args": {
+                "who": {
+                  "id": "c0042"
+                },
+                "in": {
+                  "id": "str.3"
+                },
+                "slot": {
+                  "id": "dwelling"
+                },
+                "count": {
+                  "text": "1"
+                }
+              }
+            }
+          },
+          "they_do": {
+            "call": {
+              "fn": "money",
+              "args": {
+                "to": {
+                  "id": "acc-landlord-1"
+                },
+                "amount": {
+                  "text": "$850"
+                },
+                "every": {
+                  "text": "monthly"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

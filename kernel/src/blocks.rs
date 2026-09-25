@@ -109,6 +109,8 @@ pub enum Block {
     ProposeAgreement {
         terms: AgreementTerms,
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        basis: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         speaks_for: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         visible_to: Option<Visibility>,

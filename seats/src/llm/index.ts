@@ -4,3 +4,4 @@ export * from "./call";
 export * from "./render";
 export * from "./seat";
 export * from "./mock";
+export * from "./words";

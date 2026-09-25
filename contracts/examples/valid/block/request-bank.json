@@ -1,0 +1,23 @@
+{
+  "block": "publish",
+  "kind": "request",
+  "speaks_for": "devco",
+  "addressed_to": [
+    "bank"
+  ],
+  "visible_to": [
+    "devco",
+    "bank"
+  ],
+  "text": "Please pay Riverbend Builders $2,500,000 for the p12 foundations.",
+  "data": {
+    "outcome": {
+      "money": {
+        "from": "acc-devco",
+        "to": "acc-buildco",
+        "amount": 250000000,
+        "for": "the p12 foundations"
+      }
+    }
+  }
+}

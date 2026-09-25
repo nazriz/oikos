@@ -51,7 +51,8 @@ export type SeatAction =
   | { type: "sign"; draft: string; decision: "accept" | "reject"; note?: string }
   | { type: "message"; to: Id[]; text: string; re?: Id }
   | { type: "wait"; until?: number }
-  | { type: "resign"; statement: string };
+  | { type: "call"; call: string; reasoning?: string }
+  | { type: "opt_out"; statement: string };
 
 export interface Outcome {
   action: Id;
@@ -74,16 +75,18 @@ export type ChannelData =
   | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; balance: number }[]; transactions: Transaction[] }
   | { kind: "records"; records: Record[] }
   | { kind: "sites"; as_of: number; parcels: SiteParcel[] }
-  | { kind: "directory"; entities: { entity: Id; kind: string; name: string }[]; seats: { seat: Id; entity: Id; title?: string; role?: string; status: "active" | "resigned" }[] };
+  | { kind: "directory"; entities: { entity: Id; kind: string; name: string }[]; seats: { seat: Id; entity: Id; title?: string; role?: string; status: "active" | "opted_out" }[] };
 
 export interface Observation {
   seat: Id;
   t: number;
-  status: "active" | "resigned";
+  status: "active" | "opted_out";
   entity: Id;
   outcomes: Outcome[];
   inbox: Message[];
   drafts: Json[];
+  /** The orchestrator's notes about the seat's own requests (not world state); absent when there are none. */
+  notices?: { t: number; text: string; re?: string }[];
   channels: { [id: string]: ChannelData };
 }
 

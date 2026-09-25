@@ -70,7 +70,8 @@
       "properties": {
         "thinking_time": { "enum": ["free", "costs_world_time"] },
         "world_seconds_per_thinking_second": { "type": "integer", "minimum": 1, "maximum": 1000000 },
-        "max_actions_per_wake": { "type": "integer", "minimum": 1, "maximum": 1000 }
+        "max_actions_per_wake": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "confirm": { "description": "When a language seat sees and confirms what its plain-language request will do before it takes effect (docs/design/translator-and-resolver.md §10). Default 'always'. 'consequential': everything except plain messages. 'never': immersion, audited offline.", "enum": ["always", "consequential", "never"] }
       }
     }
   },
@@ -199,7 +200,7 @@
     },
 
     "Seat": {
-      "description": "A role or person that acts in the world: a mayor, a bank's payment system, a planning officer, a citizen. The kernel uses only 'entity' (whose hands this seat is, which determines what it can physically do, e.g. move money in that entity's custody) and 'channels' (what it can perceive). Every seat can always resign (VISION §15).",
+      "description": "A role or person that acts in the world: a mayor, a bank's payment system, a planning officer, a citizen. The kernel uses only 'entity' (whose hands this seat is, which determines what it can physically do, e.g. move money in that entity's custody) and 'channels' (what it can perceive). Every seat can always opt out of the study (VISION §15; D38); 'on_opt_out' says what happens to it afterwards.",
       "type": "object",
       "required": ["id", "entity", "channels", "controller", "framing"],
       "additionalProperties": false,
@@ -216,7 +217,14 @@
         },
         "channels": { "type": "array", "items": { "$ref": "#/$defs/Channel" }, "maxItems": 64 },
         "controller": { "$ref": "#/$defs/Controller" },
-        "framing": { "$ref": "#/$defs/Framing" }
+        "framing": { "$ref": "#/$defs/Framing" },
+        "on_opt_out": {
+          "description": "What happens to the seat if its controller opts out of the study: 'vacant' (default; the seat never acts again, and in the world the person simply stops acting) or a code stand-in that takes over. Recorded, never judged.",
+          "oneOf": [
+            { "const": "vacant" },
+            { "type": "object", "required": ["code"], "additionalProperties": false, "properties": { "code": { "type": "string", "maxLength": 200 }, "params": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Opaque" } } }
+          ]
+        }
       }
     },
 

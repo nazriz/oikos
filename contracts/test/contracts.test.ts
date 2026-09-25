@@ -17,6 +17,8 @@ const SCHEMA_FILES = [
   "world-config.schema.json",
   "seat-api.schema.json",
   "log.schema.json",
+  "calls.schema.json",
+  "outcomes.schema.json",
 ];
 
 // examples/<valid|invalid>/<dir>/*.json is checked against TARGETS[<dir>].
@@ -28,6 +30,9 @@ const TARGETS: Record<string, string> = {
   "seat-observation": `${NS}:seat-api#/$defs/Observation`,
   "step-result": `${NS}:seat-api#/$defs/StepResult`,
   "log-entry": `${NS}:log`,
+  call: `${NS}:calls`,
+  request: `${NS}:outcomes#/$defs/RequestData`,
+  form: `${NS}:outcomes#/$defs/FormData`,
 };
 
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));

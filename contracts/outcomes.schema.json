@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:terrarium:contracts:0.3:outcomes",
+  "title": "Outcomes, requests, commitments and forms",
+  "description": "The shared encodings the resolver writes and institutions read (docs/design/translator-and-resolver.md §9). They live inside records' opaque data, and the kernel never checks them (records are never judged, D22). They are a platform standard, like the message formats banks exchange, so that code seats, language seats and institutions all read and write one language.",
+  "$defs": {
+    "Amount": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Amount" },
+    "Id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" },
+    "Seconds": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "Outcome": {
+      "description": "A physical outcome someone is asked or committed to bring about: exactly one key.",
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "money": {
+          "type": "object",
+          "required": ["to", "amount"],
+          "additionalProperties": false,
+          "properties": {
+            "from": { "$ref": "#/$defs/Id" },
+            "to": { "$ref": "#/$defs/Id" },
+            "amount": { "$ref": "#/$defs/Amount" },
+            "for": { "type": "string", "maxLength": 500 },
+            "settles": { "$ref": "#/$defs/Id" }
+          }
+        },
+        "account": {
+          "type": "object",
+          "required": ["holder"],
+          "additionalProperties": false,
+          "properties": { "holder": { "$ref": "#/$defs/Id" }, "close": { "$ref": "#/$defs/Id" } }
+        },
+        "structure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "$ref": "#/$defs/Id" },
+            "on": { "$ref": "#/$defs/Id" },
+            "remove": { "$ref": "#/$defs/Id" }
+          }
+        },
+        "occupancy": {
+          "type": "object",
+          "required": ["who", "in"],
+          "additionalProperties": false,
+          "properties": {
+            "who": { "$ref": "#/$defs/Id" },
+            "in": { "$ref": "#/$defs/Id" },
+            "slot": { "type": "string", "maxLength": 64 },
+            "count": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+            "leave": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "RequestData": {
+      "description": "The data of a statement of kind 'request': whoever it is addressed to is asked to bring the outcome about, once, or every 'every' seconds starting 'first' seconds after the request. They decide.",
+      "type": "object",
+      "required": ["outcome"],
+      "additionalProperties": false,
+      "properties": {
+        "outcome": { "$ref": "#/$defs/Outcome" },
+        "every": { "$ref": "#/$defs/Seconds" },
+        "first": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+      }
+    },
+    "Commitment": {
+      "description": "An agreement commitment's 'does', in the standard encoding: the outcome the party commits to bring about. Free-form terms stay in the agreement's text.",
+      "type": "object",
+      "required": ["outcome"],
+      "additionalProperties": false,
+      "properties": { "outcome": { "$ref": "#/$defs/Outcome" } }
+    },
+    "FieldType": { "enum": ["parcel", "structure_type", "account", "entity", "structure", "record", "amount", "duration", "count", "text", "choice"] },
+    "FormData": {
+      "description": "The data of a statement of kind 'form': the input an institution expects. Filling it in publishes a statement of kind 'submit_as', addressed to 'submit_to', with the fields as its data, citing the form as its basis.",
+      "type": "object",
+      "required": ["form", "submit_as", "submit_to", "fields"],
+      "additionalProperties": false,
+      "properties": {
+        "form": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
+        "submit_as": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
+        "submit_to": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } },
+        "fields": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z_][a-z0-9_]{0,31}$" },
+          "additionalProperties": {
+            "type": "object",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+              "type": { "$ref": "#/$defs/FieldType" },
+              "required": { "type": "boolean" },
+              "description": { "type": "string", "maxLength": 500 },
+              "options": { "type": "array", "items": { "type": "string", "maxLength": 200 } }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,13 +1,11 @@
-// Rendering for language-model seats: an Observation as the reports a person
-// in that role would read, and blocks as plain words. Deterministic, so the
-// same observation always renders the same prompt.
-//
-// describeBlocks is the mechanical reading of a draft: what the blocks
-// literally do, independent of the translator's own summary. A seat signing
-// a draft sees both, so a translator can't slip something past it by
-// describing it favourably.
+// What a language seat reads (principle 14: the platform is invisible to the
+// seats). An Observation becomes the reports a person in that role would
+// read, in the world's own terms: accounts, letters, filings, titles,
+// agreements, a survey of the town. No blocks, records, channels or refusal
+// codes. Deterministic: the same observation always reads the same.
 
-import type { Block, Observation, Record, SiteParcel, Transaction } from "../contracts";
+import type { Observation, Record, SiteParcel, Transaction } from "../contracts";
+import { refusalText } from "./words";
 
 const DAY = 86_400;
 const YEAR = 365 * DAY;
@@ -20,7 +18,7 @@ export function money(cents: number): string {
 }
 
 export function when(t: number): string {
-  return `day ${Math.floor(t / DAY)} (year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((t % YEAR) / DAY) + 1})`;
+  return `year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((t % YEAR) / DAY) + 1}`;
 }
 
 export function duration(s: number): string {
@@ -29,89 +27,56 @@ export function duration(s: number): string {
   return `${s} seconds`;
 }
 
-const json = (x: unknown, max = 600) => {
-  const s = JSON.stringify(x);
-  return s.length > max ? s.slice(0, max) + "…" : s;
+const clip = (s: string, max = 400) => (s.length > max ? s.slice(0, max) + "…" : s);
+const words = (label: string) => label.replace(/_/g, " ");
+const details = (x: unknown, max = 400) => {
+  if (x === null || x === undefined || typeof x !== "object") return "";
+  const entries = Object.entries(x as object);
+  const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v));
+  return clip(flat ? entries.map(([k, v]) => `${words(k)}: ${v}`).join("; ") : JSON.stringify(x), max);
 };
 
-const as = (b: Block) => (b.speaks_for ? ` on behalf of ${b.speaks_for}` : "");
-const shown = (b: Block) => (b.visible_to === undefined ? "" : b.visible_to === "public" ? " (public)" : ` (visible to ${(b.visible_to as string[]).join(", ")})`);
-const ref = (b: Block) => (b.ref ? ` [referred to below as $${b.ref}]` : "");
-
-/** What one block does, literally. */
-export function describeBlock(b: Block): string {
-  switch (b.block) {
-    case "transfer":
-      return `Move ${money(b.amount)} from account ${b.from} to ${b.to}${b.settles ? `, settling ${b.settles}` : ""}${b.memo ? ` (memo: "${b.memo}")` : ""}.`;
-    case "open_account":
-      return `Open an account for ${b.holder}, kept by you${ref(b)}.`;
-    case "close_account":
-      return `Close account ${b.account}.`;
-    case "construct":
-      return `Start building a ${b.structure_type} on parcel ${b.parcel}, paying materials from ${b.materials_from}${ref(b)}.`;
-    case "demolish":
-      return `Demolish ${b.structure}, paying the cost from ${b.costs_from}.`;
-    case "occupy":
-      return `Take up ${b.count} ${b.slot} slot${b.count === 1 ? "" : "s"} in ${b.structure}.`;
-    case "vacate":
-      return `Remove ${b.occupant} from ${b.structure}.`;
-    case "create_entity":
-      return `Declare a new ${b.kind} called "${b.name}"${as(b)}${shown(b)}${ref(b)}.`;
-    case "record_claim":
-      return `Record that ${b.holder} holds a ${b.position}${b.counterparty ? ` against ${b.counterparty}` : ""}: ${json(b.about)}${b.basis ? `, on the basis of ${b.basis}` : ""}${as(b)}${shown(b)}${ref(b)}.`;
-    case "transfer_claim":
-      return `Record that claim ${b.claim} now belongs to ${b.to}${as(b)}${ref(b)}.`;
-    case "release_claim":
-      return `Release claim ${b.claim}${as(b)}${ref(b)}.`;
-    case "propose_agreement": {
-      const t = b.terms ?? {};
-      const commits = (t.commitments ?? []).map((c: any) => `${c.who} commits to ${json(c.does, 300)}${c.every ? ` every ${duration(c.every)}` : ""}`).join("; ");
-      return `Propose a ${t.template ?? "an"} agreement between ${(t.parties ?? []).join(" and ")}${t.term ? ` for ${duration(t.term)}` : ""}: ${commits}${t.text ? `. Text: "${t.text}"` : ""}${as(b)}${ref(b)}.`;
-    }
-    case "sign_agreement":
-      return `Sign agreement ${b.agreement} as ${b.as}.`;
-    case "give_notice":
-      return `Give notice on agreement ${b.agreement} as ${b.as}${b.text ? `: "${b.text}"` : ""}.`;
-    case "publish":
-      return `Publish a ${b.kind}${as(b)}${b.addressed_to ? `, addressed to ${b.addressed_to.join(", ")}` : ""}${shown(b)}: "${b.text}"${b.data ? ` with data ${json(b.data)}` : ""}${b.adico ? `, meaning ${json(b.adico, 400)}` : ""}${b.formal ? `, formally: ${b.formal.condition}` : ""}${b.basis ? `, citing ${b.basis}` : ""}${ref(b)}.`;
-    case "withdraw":
-      return `Withdraw ${b.record}${b.text ? `: "${b.text}"` : ""}${as(b)}.`;
-    case "vote":
-      return `Vote "${b.choice}" on ballot ${b.ballot}${as(b)}${shown(b)}.`;
-    case "message":
-      return `Send a message to ${b.to.join(", ")}: "${b.text}".`;
-    default:
-      return `An unrecognised block: ${json(b)}.`;
-  }
+/** An outcome someone commits to or is asked for (§9), in words. */
+export function outcomeWords(o: any, every?: number): string {
+  const rep = every ? ` every ${duration(every)}` : "";
+  if (o?.money) return `pay ${money(o.money.amount)}${o.money.from ? ` from ${o.money.from}` : ""} to ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
+  if (o?.structure) return o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on lot ${o.structure.on}`;
+  if (o?.occupancy) return o.occupancy.leave ? `have ${o.occupancy.who} leave ${o.occupancy.in}` : `give ${o.occupancy.who} a ${o.occupancy.slot ?? "place"} in ${o.occupancy.in}`;
+  if (o?.account) return o.account.close ? `close account ${o.account.close}` : `open an account for ${o.account.holder}`;
+  return "do what the terms say";
 }
 
-export function describeBlocks(blocks: Block[]): string {
-  return blocks.map((b, i) => `${i + 1}. ${describeBlock(b)}`).join("\n");
-}
+const POSITION: { [p: string]: string } = { right: "has a right", liberty: "is permitted", power: "has the power", immunity: "is immune" };
 
 function describeRecord(r: Record): string {
-  const by = `${r.author === "genesis" ? "from the start" : `by ${r.author}`}${r.speaks_for ? ` for ${r.speaks_for}` : ""}, ${when(r.at)}`;
+  const from = r.author === "genesis" ? "" : ` (${when(r.at)})`;
+  const who = r.speaks_for ?? r.author;
   switch (r.record) {
-    case "statement":
-      return `[${r.id}] ${r.kind} ${by}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}: "${r.text}"${r.data ? ` ${json(r.data, 400)}` : ""}${r.basis ? ` (basis: ${r.basis})` : ""}`;
+    case "statement": {
+      if (r.kind === "request" && r.data?.outcome) return `[${r.id}] ${who} asked ${(r.addressed_to ?? []).join(", ")} to ${outcomeWords(r.data.outcome, r.data.every)}${from}`;
+      const d = details(r.data);
+      return `[${r.id}] ${words(r.kind)} from ${who}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${r.basis}` : ""}`;
+    }
     case "claim":
-      return `[${r.id}] claim ${by}: ${r.holder} holds a ${r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}: ${json(r.about, 300)}`;
-    case "agreement":
-      return `[${r.id}] ${r.terms.template ?? ""} agreement ${by} between ${r.terms.parties.join(", ")}: ${json(r.terms.commitments, 400)}`;
+      return `[${r.id}] ${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}: ${details(r.about) || "(no details)"}${r.basis ? `, citing ${r.basis}` : ""}${from}`;
+    case "agreement": {
+      const c = r.terms.commitments.map((x) => `${x.who} will ${x.does?.outcome ? outcomeWords(x.does.outcome, x.every) : clip(JSON.stringify(x.does), 200)}`).join("; ");
+      return `[${r.id}] ${r.terms.template ? `${words(r.terms.template)} agreement` : "agreement"} between ${r.terms.parties.join(" and ")}${r.terms.term ? `, for ${duration(r.terms.term)}` : ""}: ${c || "no commitments"}${r.terms.text ? `. "${clip(r.terms.text)}"` : ""}${from}`;
+    }
     case "signature":
-      return `[${r.id}] ${r.as} signed ${r.agreement} (${when(r.at)})`;
+      return `[${r.id}] ${r.as} signed ${r.agreement}${from}`;
     case "notice":
-      return `[${r.id}] ${r.as} gave notice on ${r.agreement} (${when(r.at)})${r.text ? `: "${r.text}"` : ""}`;
+      return `[${r.id}] ${r.as} gave notice on ${r.agreement}${r.text ? `: "${clip(r.text)}"` : ""}${from}`;
     case "withdrawal":
-      return `[${r.id}] ${r.withdraws} withdrawn ${by}${r.text ? `: "${r.text}"` : ""}`;
+      return `[${r.id}] ${who} withdrew ${r.withdraws}${r.text ? `: "${clip(r.text)}"` : ""}${from}`;
     case "vote":
-      return `[${r.id}] vote "${r.choice}" on ${r.ballot} ${by}`;
+      return `[${r.id}] ${who} voted "${r.choice}" on ${r.ballot}${from}`;
     case "claim_transfer":
-      return `[${r.id}] claim ${r.claim} transferred to ${r.to} ${by}`;
+      return `[${r.id}] ${r.claim} now belongs to ${r.to}${from}`;
     case "claim_release":
-      return `[${r.id}] claim ${r.claim} released ${by}`;
+      return `[${r.id}] ${r.claim} was released${from}`;
     case "entity_declaration":
-      return `[${r.id}] ${r.kind} "${r.name}" (${r.entity}) declared ${by}`;
+      return `[${r.id}] ${who} set up a ${r.kind}, "${r.name}" (${r.entity})${from}`;
   }
 }
 
@@ -143,7 +108,8 @@ function recordLines(records: Record[]): string[] {
       const c = g[0]!;
       const objects = g.map((r) => r.about?.object ?? r.id);
       const total = g.reduce((a, r) => a + (Number.isInteger(r.about?.amount) ? r.about.amount : 0), 0);
-      return `${g.length} ${c.about?.kind ?? ""} claims: ${c.holder} holds a ${c.position}${c.counterparty ? ` against ${c.counterparty}` : ""}${total ? `, totalling ${money(total)}` : ""}, from ${when(g[0]!.at)} to ${when(g.at(-1)!.at)}: ${objects.slice(0, 12).join(", ")}${objects.length > 12 ? `, and ${objects.length - 12} more` : ""}`;
+      const what = c.about?.kind === "ownership" ? `${c.holder} owns ${g.length} lots` : `${g.length} ${c.about?.kind ? `${words(c.about.kind)} ` : ""}records: ${c.holder} ${POSITION[c.position] ?? c.position}${c.counterparty ? ` against ${c.counterparty}` : ""}`;
+      return `${what}${total ? `, totalling ${money(total)}` : ""}: ${objects.slice(0, 12).join(", ")}${objects.length > 12 ? `, and ${objects.length - 12} more` : ""}`;
     }
     const v = tallies.get(x)!;
     const counts = new Map<string, number>();
@@ -152,7 +118,7 @@ function recordLines(records: Record[]): string[] {
   });
 }
 
-/** A town survey from a sites channel: counts, not raw parcels. */
+/** A town survey: counts, not raw parcels. */
 function describeSites(parcels: SiteParcel[], asOf: number, capacity: (type: string) => { [slot: string]: number }): string {
   const byType = new Map<string, { done: number; building: number }>();
   const slots = new Map<string, { used: number; total: number }>();
@@ -174,9 +140,9 @@ function describeSites(parcels: SiteParcel[], asOf: number, capacity: (type: str
       slots.set(slot, u);
     }
   }
-  const types = [...byType].sort().map(([t, c]) => `${t}: ${c.done}${c.building ? ` (+${c.building} under construction)` : ""}`).join("; ");
-  const use = [...slots].sort().map(([s, u]) => `${s}: ${u.used} of ${u.total} taken`).join("; ");
-  return `Survey as of ${when(asOf)}: ${parcels.length} parcels, ${empty} empty. Buildings: ${types || "none"}. Space: ${use || "none"}.`;
+  const types = [...byType].sort().map(([t, c]) => `${c.done} ${words(t)}${c.building ? ` (and ${c.building} being built)` : ""}`).join(", ");
+  const use = [...slots].sort().map(([s, u]) => `${u.used} of ${u.total} ${words(s)} places taken`).join("; ");
+  return `As of ${when(asOf)}: ${parcels.length} lots, ${empty} of them empty. Buildings: ${types || "none"}. ${use ? `${use}.` : ""}`.trim();
 }
 
 function describeTransactions(txs: Transaction[], mine: Set<string>): string[] {
@@ -186,82 +152,80 @@ function describeTransactions(txs: Transaction[], mine: Set<string>): string[] {
     if (mine.has(x.to) && !mine.has(x.from)) inflow.set(x.from, (inflow.get(x.from) ?? 0) + x.amount);
     if (mine.has(x.from) && !mine.has(x.to)) outflow.set(x.to, (outflow.get(x.to) ?? 0) + x.amount);
   }
-  const top = (m: Map<string, number>) => [...m].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
   const line = (label: string, m: Map<string, number>) => {
     if (m.size === 0) return [];
     const total = [...m.values()].reduce((a, b) => a + b, 0);
-    const t = top(m);
-    return [`${label} ${money(total)} across ${m.size} account${m.size === 1 ? "" : "s"}: ${t.slice(0, 8).map(([a, v]) => `${a} ${money(v)}`).join(", ")}${t.length > 8 ? `, and ${t.length - 8} more` : ""}.`];
+    const t = [...m].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+    return [`${label} ${money(total)} since you last looked: ${t.slice(0, 8).map(([a, v]) => `${a} ${money(v)}`).join(", ")}${t.length > 8 ? `, and ${t.length - 8} more` : ""}.`];
   };
   return [...line("Received", inflow), ...line("Paid out", outflow)];
 }
 
 export interface RenderOptions {
-  /** Records shown per channel before the rest are summarised by kind. */
+  /** Items shown per report before earlier ones are only counted. */
   maxRecords?: number;
-  /** Capacity of a catalogue structure type, for the survey. */
+  /** Spaces in a kind of building (from the world's catalogue), for the survey. */
   capacity?: (type: string) => { [slot: string]: number };
-  /** Channel ids whose records are standing documents (rendered separately, in full). */
+  /** Reports whose items are standing documents (shown separately, in full). */
   standing?: Set<string>;
+  /** What the seat's reports are called (Channel.title). */
+  titles?: Map<string, string>;
+  /** What the seat's last action was, in words ("What you confirmed", "Your letter to …"). */
+  lastAction?: string;
+  /** How a draft awaiting confirmation reads. */
+  draftText?: (d: any) => string;
 }
 
-/** The part of an observation that changes: what's new since the seat last looked. */
+/** What's new since the seat last looked. */
 export function renderObservation(obs: Observation, o: RenderOptions = {}): string {
   const max = o.maxRecords ?? 40;
-  const out: string[] = [`It is ${when(obs.t)}. You act for ${obs.entity}.`];
+  const title = (id: string) => o.titles?.get(id) ?? words(id).replace(/^./, (c) => c.toUpperCase());
+  const out: string[] = [`It is ${when(obs.t)}.`];
   for (const x of obs.outcomes) {
-    out.push(x.status === "applied" ? `Your action ${x.action} was carried out.${x.created ? ` It created: ${json(x.created)}.` : ""}` : `Your action ${x.action} was refused: ${x.refusal?.code}${x.refusal?.detail ? ` (${x.refusal.detail})` : ""}.`);
+    const what = o.lastAction ?? "What you did";
+    out.push(x.status === "applied" ? `Done: ${what.charAt(0).toLowerCase()}${what.slice(1)}.` : `${what} couldn't be done: ${refusalText(x.refusal?.code, x.refusal?.detail)}.`);
   }
+  for (const n of obs.notices ?? []) out.push(`A note on your request: ${n.text}`);
   if (obs.inbox.length) {
-    out.push("", "## Messages");
-    for (const m of obs.inbox) out.push(`- From ${m.from}, ${when(m.t)}${m.re ? ` (re ${m.re})` : ""}: "${m.text}"`);
+    out.push("", "## Letters");
+    for (const m of obs.inbox) out.push(`- From ${m.from} (${when(m.t)})${m.re ? `, about ${m.re}` : ""}: "${m.text}"`);
   }
+  // Anything on file (standing documents) isn't repeated in other reports.
+  const onFile = new Set(Object.entries(obs.channels).flatMap(([id, ch]) => (o.standing?.has(id) && ch.kind === "records" ? ch.records.map((r) => r.id) : [])));
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (o.standing?.has(id)) continue;
     if (ch.kind === "accounts") {
-      out.push("", `## Accounts (${id})`);
-      for (const a of ch.accounts) out.push(`- ${a.account}, held by ${a.holder}, kept by ${a.custodian}: ${money(a.balance)}`);
+      out.push("", `## ${title(id)}`);
+      for (const a of ch.accounts) out.push(`- ${a.account}${a.holder === obs.entity ? "" : ` (${a.holder}'s)`}, kept by ${a.custodian === obs.entity ? "you" : a.custodian}: ${money(a.balance)}`);
       out.push(...describeTransactions(ch.transactions, new Set(ch.accounts.map((a) => a.account))).map((l) => `  ${l}`));
     } else if (ch.kind === "records") {
-      if (ch.records.length === 0) continue;
-      out.push("", `## ${id}: ${ch.records.length} new record${ch.records.length === 1 ? "" : "s"}`);
-      const lines = recordLines(ch.records);
-      if (lines.length > max) out.push(`(${lines.length - max} earlier item${lines.length - max === 1 ? "" : "s"} not listed.)`);
+      const fresh = ch.records.filter((r) => !onFile.has(r.id));
+      if (fresh.length === 0) continue;
+      const lines = recordLines(fresh);
+      out.push("", `## ${title(id)} (${lines.length} new)`);
+      if (lines.length > max) out.push(`(${lines.length - max} earlier ${lines.length - max === 1 ? "item" : "items"} not listed.)`);
       for (const l of lines.slice(-max)) out.push(`- ${l}`);
     } else if (ch.kind === "sites") {
-      out.push("", `## ${id}`, describeSites(ch.parcels, ch.as_of, o.capacity ?? (() => ({}))));
+      out.push("", `## ${title(id)}`, describeSites(ch.parcels, ch.as_of, o.capacity ?? (() => ({}))));
     } else if (ch.kind === "directory") {
-      out.push("", `## Directory (${id}): ${ch.entities.length} entities, ${ch.seats.length} seats`);
-      const roles = ch.seats.filter((s) => s.role).map((s) => `${s.seat} (${s.role}, for ${s.entity})`);
-      if (roles.length) out.push(`Office holders: ${roles.slice(0, 60).join(", ")}${roles.length > 60 ? ", …" : ""}`);
+      const orgs = ch.entities.filter((e) => e.kind !== "person").map((e) => `${e.name} (${e.entity})`);
+      const offices = ch.seats.filter((s) => s.role).map((s) => `${s.seat}: ${words(s.role!)}, for ${s.entity}${s.status === "active" ? "" : " (gone)"}`);
+      out.push("", `## ${title(id)}`, `Organisations: ${orgs.join(", ") || "none"}.`, ...(offices.length ? [`Office holders: ${offices.slice(0, 60).join("; ")}${offices.length > 60 ? "; …" : ""}.`] : []), `People: ${ch.entities.filter((e) => e.kind === "person").length}.`);
     }
   }
   if (obs.drafts.length) {
-    out.push("", "## Drafts awaiting your sign-off");
-    for (const d of obs.drafts) out.push(renderDraft(d));
+    out.push("", "## Waiting for you to confirm");
+    for (const d of obs.drafts) out.push(o.draftText ? o.draftText(d) : `(${d.id}) ${d.summary}`);
   }
   return out.join("\n");
 }
 
-/** Standing documents (laws, charters, procedures) from the given channels, in full. */
+/** Standing documents (laws, charters, procedures) from the given reports, in full. */
 export function renderStanding(obs: Observation, standing: Set<string>): string {
   const out: string[] = [];
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (!standing.has(id) || ch.kind !== "records") continue;
-    for (const r of ch.records) if (r.record === "statement") out.push(`- [${r.id}] ${r.kind}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` ${json(r.data, 400)}` : ""}${r.formal ? ` Formally: ${r.formal.condition}` : ""}`);
+    for (const r of ch.records) if (r.record === "statement") out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${details(r.data)})` : ""}`);
   }
   return out.join("\n");
-}
-
-export function renderDraft(d: any): string {
-  return [
-    `### Draft ${d.id}`,
-    `Your proposal: "${d.proposal}"`,
-    `The translator's summary: ${d.summary}`,
-    `What the blocks literally do:`,
-    describeBlocks(d.blocks),
-    d.check.ok ? "Physics check: possible right now." : `Physics check: NOT possible right now: ${d.check.refusal?.code}${d.check.refusal?.detail ? ` (${d.check.refusal.detail})` : ""}.`,
-    ...(d.check.warnings?.length ? [`Warnings: ${d.check.warnings.join(" ")}`] : []),
-    ...(d.caveats ? [`Caveats (not expressed): ${d.caveats}`] : []),
-  ].join("\n");
 }

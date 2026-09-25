@@ -30,6 +30,11 @@
         "id": "translator",
         "version": "0.2.0",
         "model": "claude-sonnet-5"
+      },
+      "call": "statement(kind=ballot, text=\"Should the river zoning law (law-river) be repealed?\", options=\"yes, no\", closes=\"in 90 days\")",
+      "resolver": {
+        "id": "resolver",
+        "version": "0.1.0"
       }
     },
     "reasoning": "Let the council decide."

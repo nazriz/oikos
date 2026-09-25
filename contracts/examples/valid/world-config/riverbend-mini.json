@@ -467,19 +467,25 @@
             {
               "who": "bob",
               "does": {
-                "pay": 180000,
-                "to": "devco",
-                "into": "acc-devco"
+                "outcome": {
+                  "money": {
+                    "to": "acc-devco",
+                    "amount": 180000
+                  }
+                }
               },
               "every": 2592000
             },
             {
               "who": "devco",
               "does": {
-                "allow": {
-                  "occupy": "s-apts",
-                  "slot": "dwelling",
-                  "count": 1
+                "outcome": {
+                  "occupancy": {
+                    "who": "bob",
+                    "in": "s-apts",
+                    "slot": "dwelling",
+                    "count": 1
+                  }
                 }
               }
             }
@@ -547,9 +553,12 @@
             {
               "who": "devco",
               "does": {
-                "pay": 400000,
-                "to": "carol",
-                "into": "acc-carol"
+                "outcome": {
+                  "money": {
+                    "to": "acc-carol",
+                    "amount": 400000
+                  }
+                }
               },
               "every": 1209600
             }
@@ -599,17 +608,21 @@
           "bob",
           "bank"
         ],
-        "kind": "instruction",
+        "kind": "request",
         "speaks_for": "bob",
         "addressed_to": [
           "bank"
         ],
         "basis": "lease-bob",
-        "text": "Standing order: pay $1,800 from my account to Riverbend Developments every 30 days, for my rent.",
+        "text": "Please pay $1,800 from my account to Riverbend Developments every 30 days, for my rent.",
         "data": {
-          "pay": 180000,
-          "from": "acc-bob",
-          "to": "acc-devco",
+          "outcome": {
+            "money": {
+              "from": "acc-bob",
+              "to": "acc-devco",
+              "amount": 180000
+            }
+          },
           "every": 2592000,
           "first": 2592000
         }
@@ -623,17 +636,21 @@
           "devco",
           "bank"
         ],
-        "kind": "instruction",
+        "kind": "request",
         "speaks_for": "devco",
         "addressed_to": [
           "bank"
         ],
         "basis": "job-carol",
-        "text": "Standing order: pay Carol's wages of $4,000 every 14 days.",
+        "text": "Please pay Carol's wages of $4,000 every 14 days.",
         "data": {
-          "pay": 400000,
-          "from": "acc-devco",
-          "to": "acc-carol",
+          "outcome": {
+            "money": {
+              "from": "acc-devco",
+              "to": "acc-carol",
+              "amount": 400000
+            }
+          },
           "every": 1209600,
           "first": 1209600
         }
@@ -863,7 +880,7 @@
           "kind": "records",
           "match": {
             "statement_kinds": [
-              "instruction",
+              "request",
               "court_order"
             ],
             "involving": [

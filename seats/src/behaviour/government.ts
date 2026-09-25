@@ -5,10 +5,11 @@
 // after counting a ballot; money moves because the finance officer instructed
 // the bank, and the bank checked its signatory list.
 
-import type { Block, StatementRecord } from "../contracts";
+import * as C from "../calls";
+import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type SeatContext } from "../module";
-import { Book, DAY, ownAccount, payInstruction, publishedCount } from "./common";
+import { Book, DAY, message, ownAccount, pay, publishedCount, record, say, vote, type Step } from "./common";
 import { stepper } from "./firms";
 
 const YEAR = 365 * DAY;
@@ -25,7 +26,7 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -40,15 +41,15 @@ export const mayorCode: BehaviourModule = {
       (obs) => {
         const me = obs.entity;
         const t = obs.t;
-        const steps: Block[][] = [];
+        const steps: Step[] = [];
         // The annual budget; tabled again every 45 days until the council adopts one for the year.
         const thisYear = Math.floor(t / YEAR) + 1;
         const adopted = book.open("budget").some((b) => b.data?.year === thisYear);
         if (t >= nextBudget || (!adopted && t >= lastTabled + 45 * DAY)) {
           if (t >= nextBudget) nextBudget = t + YEAR;
           lastTabled = t;
-          steps.push([{ block: "publish", kind: "proposal", speaks_for: me, addressed_to: [me], text: `Budget for year ${Math.floor(t / YEAR) + 1}: parks ${p.park_budget} cents.`,
-            data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: p.park_budget } } }, tags: ["budget"] } }]);
+          steps.push([say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: parks ${p.park_budget} cents.`, { to: [me],
+            data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: p.park_budget } } }, tags: ["budget"] } })]);
         }
         // A park a year, if the adopted budget has room and there's a city parcel free:
         // apply for planning permission like anyone else, then commission the builder once granted.
@@ -60,7 +61,8 @@ export const mayorCode: BehaviourModule = {
           const site = channels.sites(obs).find((s) => !s.structure && ownerIsCity(book, s.parcel))?.parcel;
           if (site) {
             parkYear = year;
-            steps.push([{ block: "publish", kind: "permit_application", speaks_for: me, addressed_to: [me], text: `Application to build a ${p.park_type} on ${site}.`, data: { parcel: site, structure_type: p.park_type } }]);
+            // The planning office's published form, like anyone else.
+            steps.push([C.call("form", { to: me, form: "permit_application", parcel: site, structure_type: p.park_type })]);
           }
         }
         for (const d of book.open("permit_decision")) {
@@ -70,11 +72,8 @@ export const mayorCode: BehaviourModule = {
           handled.add(d.id);
           if (d.data?.decision !== "granted") continue;
           const site = app.data?.parcel;
-          steps.push([
-            { block: "propose_agreement", speaks_for: me, ref: "park", terms: { template: "construction", parties: [me, p.builder],
-              commitments: [{ who: p.builder, does: { build: p.park_type, on: site } }, { who: me, does: { pay: price, to: p.builder } }], text: `A new park on ${site}.` } },
-            { block: "sign_agreement", agreement: "$park", as: me },
-          ]);
+          const from = ownAccount(obs)?.account;
+          steps.push([["park", C.call("structure", { type: p.park_type, on: site, by: p.builder, price: C.dollars(price), from, permit: d.id })]]);
         }
         // Approve invoices for work we commissioned (the payments procedure requires it over $50k).
         for (const inv of book.open("invoice")) {
@@ -82,7 +81,7 @@ export const mayorCode: BehaviourModule = {
           handled.add(inv.id);
           const ag = book.records.get(inv.basis ?? "");
           if (ag?.record === "agreement" && ag.author === ctx.seat) {
-            steps.push([{ block: "publish", kind: "approval", speaks_for: me, addressed_to: [me], basis: inv.id, text: `Approved: pay invoice ${inv.id}.`, data: { invoice: inv.id } }]);
+            steps.push([say("approval", `Approved: pay invoice ${inv.id}.`, { to: [me], basis: inv.id, data: { invoice: inv.id } })]);
           }
         }
         // Petitions with enough signatures become proposals (sometimes).
@@ -92,8 +91,8 @@ export const mayorCode: BehaviourModule = {
           handled.add(pet.id);
           if (ctx.rng(`respond-${pet.id}`).below(10_000) >= p.responsiveness_bps) continue;
           const d = pet.data?.demand ?? {};
-          steps.push([{ block: "publish", kind: "proposal", speaks_for: me, addressed_to: [me], basis: pet.id, text: `Proposal (from petition ${pet.id}): ${d.text}`,
-            data: { enact: { kind: "law", text: d.text, ...(d.adico ? { adico: d.adico } : {}), ...(d.formal ? { formal: d.formal } : {}) }, tags: d.tags ?? [] } }]);
+          steps.push([say("proposal", `Proposal (from petition ${pet.id}): ${d.text}`, { to: [me], basis: pet.id,
+            data: { enact: { kind: "law", text: d.text, ...(d.adico ? { adico: d.adico } : {}), ...(d.formal ? { formal: d.formal } : {}) }, tags: d.tags ?? [] } })]);
         }
         return steps;
       },
@@ -115,7 +114,7 @@ function ownerIsCity(book: Book, parcel: string): boolean {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: SeatContext) {
@@ -128,12 +127,12 @@ export const councilClerk: BehaviourModule = {
       (obs) => {
         const me = obs.entity;
         const t = obs.t;
-        const steps: Block[][] = [];
+        const steps: Step[] = [];
         const councillors = new Set([...book.seatEntity.keys()].filter((s) => (channels.directory(obs)?.seats ?? []).some((x) => x.seat === s && x.role === "councillor")));
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);
-          steps.push([{ block: "publish", kind: "ballot", speaks_for: me, basis: prop.id, text: `Council ballot: ${prop.text}`, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? [] } }]);
+          steps.push([say("ballot", `Council ballot: ${prop.text}`, { basis: prop.id, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? [] } })]);
         }
         for (const ballot of book.open("ballot")) {
           if (closed.has(ballot.id) || ballot.speaks_for !== me || t < (ballot.data?.closes_at ?? Infinity)) continue;
@@ -143,11 +142,11 @@ export const councilClerk: BehaviourModule = {
           const yes = [...latest.values()].filter((c) => c === "yes").length;
           const no = [...latest.values()].filter((c) => c === "no").length;
           const passed = yes > no && yes * 2 > councillors.size;
-          const blocks: Block[] = [{ block: "publish", kind: "ballot_result", speaks_for: me, basis: ballot.id, text: `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.`, data: { ballot: ballot.id, yes, no, passed } }];
+          const step: Step = [say("ballot_result", `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.`, { basis: ballot.id, data: { ballot: ballot.id, yes, no, passed } })];
           const prop = book.records.get(ballot.data?.proposal) as StatementRecord | undefined;
           const enact = prop?.data?.enact;
-          if (passed && enact) blocks.push({ block: "publish", kind: enact.kind, speaks_for: me, basis: ballot.id, text: enact.text, ...(enact.adico ? { adico: enact.adico } : {}), ...(enact.formal ? { formal: enact.formal } : {}), ...(enact.data ? { data: enact.data } : {}) });
-          steps.push(blocks);
+          if (passed && enact) step.push(say(enact.kind, enact.text, { basis: ballot.id, adico: enact.adico, formal: enact.formal?.condition, data: enact.data }));
+          steps.push(step);
         }
         return steps;
       },
@@ -165,7 +164,7 @@ export const councilClerk: BehaviourModule = {
  */
 export const councillor: BehaviourModule = {
   name: "city.councillor",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: SeatContext) {
@@ -176,7 +175,7 @@ export const councillor: BehaviourModule = {
     return stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
-        const steps: Block[][] = [];
+        const steps: Step[] = [];
         for (const b of book.open("ballot")) {
           if (voted.has(b.id) || b.data?.electorate !== "council" || obs.t >= (b.data?.closes_at ?? 0)) continue;
           voted.add(b.id);
@@ -189,7 +188,7 @@ export const councillor: BehaviourModule = {
             yes = Math.abs(p.position - x) < Math.abs(p.position - 0);
             if (r.below(10_000) < p.noise_bps) yes = !yes;
           }
-          steps.push([{ block: "vote", ballot: b.id, choice: yes ? "yes" : "no", speaks_for: obs.entity }]);
+          steps.push([vote(b.id, yes ? "yes" : "no")]);
         }
         return steps;
       },
@@ -205,7 +204,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: SeatContext) {
@@ -219,7 +218,7 @@ export const financeOfficer: BehaviourModule = {
       (obs) => {
         const me = obs.entity;
         const acc = ownAccount(obs);
-        const steps: Block[][] = [];
+        const steps: Step[] = [];
         if (!acc) return steps;
         const budget = book.open("budget").sort((a, b) => b.at - a.at)[0];
         if (budget && budget.data?.year !== budgetYear) {
@@ -237,7 +236,7 @@ export const financeOfficer: BehaviourModule = {
           if (acc.balance < amount) continue;
           paid.add(inv.id);
           spent += amount;
-          steps.push([payInstruction(me, acc.custodian, acc.account, inv.data.pay_to, amount, `Paying invoice ${inv.id}.`, { settles: inv.id })]);
+          steps.push([pay(inv.data.pay_to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })]);
         }
         return steps;
       },
@@ -255,7 +254,7 @@ export const financeOfficer: BehaviourModule = {
  */
 export const taxClerk: BehaviourModule = {
   name: "city.tax_clerk",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -272,7 +271,7 @@ export const taxClerk: BehaviourModule = {
       (obs) => {
         const me = obs.entity;
         const t = obs.t;
-        const steps: Block[][] = [];
+        const steps: Step[] = [];
         const law = book.records.get(p.law);
         const rate: number = law?.record === "statement" ? law.data?.rate_bps ?? 1000 : 1000;
         const penalty: number = law?.record === "statement" ? law.data?.penalty_bps ?? 2000 : 2000;
@@ -280,7 +279,7 @@ export const taxClerk: BehaviourModule = {
           if (assessed.has(rep.id) || !(rep.addressed_to ?? []).includes(me)) continue;
           const amount = Math.floor(((rep.data?.rent_received ?? 0) * rate) / 10_000);
           assessed.set(rep.id, { payer: rep.speaks_for!, account: rep.data?.account, amount, at: t, chased: false });
-          if (amount > 0) steps.push([{ block: "record_claim", position: "right", holder: me, counterparty: rep.speaks_for, speaks_for: me, basis: rep.id, about: { kind: "tax", amount, period_end: rep.data?.period_end } }]);
+          if (amount > 0) steps.push([record("right", me, { kind: "tax", amount, period_end: rep.data?.period_end }, { against: rep.speaks_for, basis: rep.id })]);
         }
         // Chase: apply what's arrived from each account to its assessments, oldest
         // first; chase an assessment still unpaid after the grace period.
@@ -293,8 +292,8 @@ export const taxClerk: BehaviourModule = {
           a.chased = true;
           const fine = Math.floor((a.amount * penalty) / 10_000);
           steps.push([
-            { block: "record_claim", position: "right", holder: me, counterparty: a.payer, speaks_for: me, basis: id, about: { kind: "tax_penalty", amount: fine } },
-            { block: "message", to: [a.payer], text: `Tax of ${a.amount} cents on report ${id} is overdue; a penalty of ${fine} cents has been recorded.`, re: id },
+            record("right", me, { kind: "tax_penalty", amount: fine }, { against: a.payer, basis: id }),
+            message([a.payer], `Tax of ${a.amount} cents on report ${id} is overdue; a penalty of ${fine} cents has been recorded.`, id),
           ]);
         }
         return steps;

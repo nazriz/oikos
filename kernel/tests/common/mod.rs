@@ -266,7 +266,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
         Op::Observe { seat } => Some(Command::Observe { seat: seat_of(*seat).0.into() }),
         Op::Resign { seat } => {
             let s = seat_of(*seat).0;
-            (st.seats[s].status == SeatStatus::Active).then(|| Command::Resign { seat: s.into(), statement: "stepping down".into() })
+            (st.seats[s].status == SeatStatus::Active).then(|| Command::OptOut { seat: s.into(), statement: "stepping down".into() })
         }
         Op::Smart { kind, a, b, flag } => match kind % 6 {
             0 => {
@@ -464,6 +464,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         bind: None,
                     },
                     B::Propose { a, b } => Block::ProposeAgreement {
+                        basis: None,
                         terms: AgreementTerms {
                             template: Some("loan".into()),
                             parties: {

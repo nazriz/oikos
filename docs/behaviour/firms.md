@@ -1,4 +1,4 @@
-# Firms: `firm.landlord` (v0.2.0) and `firm.employer` (v0.1.0)
+# Firms: `firm.landlord` (v0.3.0) and `firm.employer` (v0.2.0)
 
 **Source:** `seats/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
 

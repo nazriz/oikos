@@ -80,11 +80,11 @@ Perception comes only through channels, plus the seat's inbox and the outcomes o
 | `sites` | The physical state of an area: structures, construction, occupancy, refreshed `every` so often. This is how an inspector *notices*. |
 | `directory` | Who exists |
 
-**Every seat can always resign** (VISION §15), and every framing records its disclosure and a mandatory reason.
+**Every seat can always opt out of the study** (VISION §15; D38), which is not resigning an office; `on_opt_out` says whether the seat then goes vacant or a code stand-in carries on. Every framing records its disclosure and a mandatory reason.
 
 ## Seat API (shape unchanged)
 
-PettingZoo AEC: the world clock selects the next seat. `SeatAction` is one of `act`, `propose` (plain language → translator → draft), `sign`, `message`, `wait` or `resign`. **Reward is always 0.**
+PettingZoo AEC: the world clock selects the next seat. `SeatAction` is one of `act` (raw blocks: for researchers, RL and tests), `call` (a structured intent → the resolver → the seat's own acts), `propose` (plain language → translator → resolver → a draft with a preview), `sign` (confirm or decline a draft), `message`, `wait` or `opt_out`. **Reward is always 0.**
 
 An observation holds:
 - the seat's `entity`;
@@ -99,7 +99,7 @@ There's no mandate and no approval queue: approvals are people acting on records
 
 ## Log (format unchanged)
 
-Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, `observe`, `resign`) are the only replay inputs. Events, checkpoints and the end entry are regenerated on replay and compared byte for byte. Annotations (usage and cost, transcripts, drafts, sign-offs) are carried through verbatim. Witness anchors go in a separate file.
+Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, `observe`, `opt_out`) are the only replay inputs. Events, checkpoints and the end entry are regenerated on replay and compared byte for byte. Annotations (usage and cost, transcripts, drafts, sign-offs) are carried through verbatim. Witness anchors go in a separate file.
 
 **Events** (one exact shape each):
 - `action_applied`, `action_refused`;
@@ -108,7 +108,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 - `structure_started`, `structure_completed`, `structure_demolished`;
 - `occupied`, `vacated`, which records who did it and whether the occupant left or was removed;
 - `recorded`, which carries the full record, so the log alone reconstructs every registry;
-- `entity_created`, `message_delivered`, `observation`, `seat_resigned`.
+- `entity_created`, `message_delivered`, `observation`, `seat_opted_out`.
 
 **Refusal codes are physics and mechanics only.** There is no code for "illegal".
 
@@ -146,7 +146,12 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 
 - `Observation.notices` (seat-api), `Framing.debrief_text` and `Channel.title` (world-config): all optional (D37).
 - The version: every `$id` is `urn:terrarium:contracts:0.3:…`, and configs and log headers say `contracts: "0.3"` (D40).
-- To come, when signed off: the call language, requests, commitments as outcomes, forms, provenance chains and opt-out (design note §15).
+- **The call language** ([calls.md](calls.md), [calls.schema.json](calls.schema.json)): structured intents that the resolver turns into a seat's own acts. There's a new `call` seat action.
+- **The shared encodings** ([outcomes.schema.json](outcomes.schema.json)): `request` statements (data: an outcome, optionally repeating), commitments as outcomes, and `form` statements (the input an institution expects). The kernel never checks them.
+- **Drafts** gain `call` and `resolver`. `summary` is the mechanical preview. Provenance on `act` gains `call` and `resolver` (via `translator`), plus a new `via: "call"`.
+- **`basis` on `propose_agreement`.**
+- **`orchestration.confirm`**: `always`, `consequential` or `never`.
+- **Opting out:** `resign` becomes `opt_out` (seat action and command); the event is `seat_opted_out` and the status `opted_out`. Each seat gains `on_opt_out`.
 
 ## Versioning
 

@@ -1,0 +1,20 @@
+{
+  "form": "permit_application",
+  "submit_as": "permit_application",
+  "submit_to": [
+    "city"
+  ],
+  "fields": {
+    "parcel": {
+      "type": "parcel",
+      "required": true
+    },
+    "structure_type": {
+      "type": "structure_type",
+      "required": true
+    },
+    "notes": {
+      "type": "text"
+    }
+  }
+}

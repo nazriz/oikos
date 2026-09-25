@@ -147,6 +147,17 @@ pub struct Seat {
     pub controller: Value,
     /// Opaque to the kernel.
     pub framing: Value,
+    /// What happens after an opt-out: absent or "vacant" means the seat never acts again;
+    /// a code stand-in means acts continue (the orchestrator runs the stand-in).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_opt_out: Option<Value>,
+}
+
+impl Seat {
+    /// Whether the seat stays silent after its controller opts out.
+    pub fn vacant_after_opt_out(&self) -> bool {
+        !matches!(&self.on_opt_out, Some(Value::Object(_)))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

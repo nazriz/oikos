@@ -184,6 +184,12 @@ See the design note, §16.
 
 **D40. Contracts bumped to v0.3 (draft).** *(Naz, 2026-09-26: "bump to v0.3".)* Following the versioning rule rather than amending in place again (as D31 and D37 did), v0.3 is opened now as a draft. It holds D37's additions today, and D36's contract changes when they're signed off; it's frozen then. Schema ids are `urn:terrarium:contracts:0.3`, and configs and log headers say `"0.3"`. A v0.2 log header is now an invalid example. v0.2 logs replay only on a v0.2 kernel build (D6).
 
+**D41. The translator, resolver and in-world seats are built.** *(Naz signed off the design, 2026-09-26: "signed off, go ahead and build it".)*
+- Contracts v0.3 (draft): the call language; outcomes, requests and forms; drafts and provenance with the call and resolver; `basis` on agreements; confirmation modes; `resign` renamed `opt_out` with `on_opt_out`.
+- Every code seat acts through calls, and the bank reads requests. The planning office publishes its form.
+- Language seats read and act in world terms, confirm mechanical previews, and can opt out, with an optional stand-in.
+- What building it refined is recorded in docs/design/translator-and-resolver.md, §21.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

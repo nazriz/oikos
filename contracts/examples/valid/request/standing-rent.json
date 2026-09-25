@@ -1,0 +1,12 @@
+{
+  "outcome": {
+    "money": {
+      "from": "acc-c0042",
+      "to": "acc-landlord-1",
+      "amount": 85000,
+      "for": "rent"
+    }
+  },
+  "every": 2592000,
+  "first": 0
+}

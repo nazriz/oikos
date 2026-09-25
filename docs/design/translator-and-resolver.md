@@ -1,6 +1,6 @@
 # From plain language to acts: the translator, the resolver and a local translation model
 
-*Design note, 2026-09-26. Status: agreed in discussion with Naz, **awaiting sign-off before any building**. It supersedes the translator and sign-off parts of docs/design/m2-llm-seats.md (the mock-backed M2 build), which will be reworked to match. Contract changes it implies are listed in §15 and need explicit sign-off (CLAUDE.md: contracts first).*
+*Design note, 2026-09-26. Status: **signed off by Naz and built** (2026-09-26, D41), against the mock adapter. It supersedes the translator and sign-off parts of docs/design/m2-llm-seats.md. §21 records what building it refined. The contract changes in §15 are in contracts v0.3 (draft).*
 
 This note records a long discussion in which the design changed several times. Many of the details matter, so it errs on the side of saying too much. §18 is a chronological record of how each position was reached, including the wrong turns, so the reasoning isn't lost.
 
@@ -28,6 +28,7 @@ This note records a long discussion in which the design changed several times. M
 18. How we got here (the discussion, in order)
 19. Open questions
 20. Glossary
+21. Built: what building it refined
 
 ---
 
@@ -736,3 +737,36 @@ The call language, parser and resolver get built now. The translator stays behin
 - **Preview:** the mechanical, world-terms description of what will happen, shown before confirmation (option B).
 - **Notice:** platform feedback about the seat's own request (Observation.notices).
 - **Opt-out:** leaving the study (a platform exit). Distinct from **resigning**, an act in the world.
+
+---
+
+## 21. Built: what building it refined (2026-09-26)
+
+Everything above was built as designed. Building it also settled these details.
+
+**The call language** (contracts/calls.md):
+- **Structured data.** `statement` takes `data={…}`, and `claim` takes `about={…}`: integer-only JSON literals. Code seats publish many structured statements (listings, ballots, reports, decisions), and plain text can't carry their fields. `statement` also takes `adico` and `formal`, so a law can be enacted with its Institutional Grammar breakdown and CEL condition. Language seats normally reach institutions through forms instead.
+- **Commitments are nested calls:** `we_do=occupancy(…)` and `they_do=money(…, every="monthly")`. They become outcomes (§9.2), and a nested `every` becomes the commitment's `every`.
+- **An offered agreement is signed on the offerer's side,** as a real offer is.
+- **`money` takes `basis`** (a rent request cites its lease) **and `per_request`** (a bank's transfer names the request it carries out).
+- **Records are in the seat's own entity's name** (`speaks_for`) unless `for` says otherwise.
+- **Variable names start with a letter,** because the block-level `ref` they map to must.
+- **Durations may be zero** (`first="0 days"`: the first rent payment is due at once).
+
+**The resolver:**
+- **It uses the seat's knowledge only to fill things in** (names to ids, whose account, who keeps it). It doesn't reject ids the seat states outright: code seats know ids from their configuration, and a wrong id is refused by physics, as in real life. This refines P8 without weakening it: nothing is ever *revealed* from beyond the seat's knowledge.
+- **Knowledge** (`translator/src/knowledge.ts`) is kept per seat by the orchestrator, from every observation. It holds accounts, the accounts entities have stated as theirs (invoices' `pay_to`, applications' `account`), names, the seat-to-entity map, building types, forms, laws and claims.
+- **Occupancy** fills the slot only when a building has one kind of space; `count` defaults to 1.
+
+**Seats and the orchestrator:**
+- **The language seat's tools** are `do`, `confirm`, `write`, `done_for_now`, `notebook` and `opt_out`. The contract's actions (`propose`, `sign`, `message`, `wait`, `opt_out`) are underneath.
+- **Opt-out wording** (§14): honest under the `simulation` framing ("stop taking part in this study"); under other framings, a neutral "stop, permanently". The latter is provisional until VISION §15 settles it.
+- **Reports** use channel titles, never repeat what's on file, total and tally, and tell outcomes as "Done: …" or "… couldn't be done: *reason*". The test suite checks that no machinery word ever appears in what a seat reads.
+- **Confirmation modes** are implemented. With `never`, a draft is still made and hashed, and its signoff says `confirmation: never`, so the audit trail is the same.
+- **Opting out with a stand-in** (`on_opt_out: {code}`): the kernel lets the seat keep acting, and the orchestrator swaps its controller for the code module.
+- **The mock** now runs its code brain's *calls*: it says each one as its request, the mock translator returns the same call, and it confirms only a draft whose call matches.
+
+**What changed around it:**
+- **Every behaviour module acts through calls.** The bank reads `request` statements. The generator's genesis leases, jobs and standing orders use the standard encodings. The planning office publishes a `permit_application` form, and landlords and the mayor apply on it.
+- **Behaviour is unchanged:** a 2-year, 200-citizen run produces the same civic timeline and the same tax totals as before.
+- **Cost:** 2 years at 1,000 citizens now take ~206 s, against ~170 s before, the price of parsing and resolving every act and of longer statements.

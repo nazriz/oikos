@@ -15,7 +15,7 @@ cargo run -- replay run.jsonl   # regenerate the log; must be byte-identical
 
 | Module | Role |
 |---|---|
-| `kernel.rs` | Commands in, events out: `act` (applied, or refused for physics), `advance`, `observe`, `resign`, dry-run `check` |
+| `kernel.rs` | Commands in, events out: `act` (applied, or refused for physics), `advance`, `observe`, `opt_out` (leaving the study, D38), dry-run `check` |
 | `exec.rs` | Physical acts (custody, funds, space, capacity, presence) and record acts (store, never judge). The only place state changes. |
 | `observe.rs` | Perception through channels (`accounts`, `records`, `sites` with refresh intervals, `directory`), respecting each record's visibility |
 | `blocks.rs` | The 18 blocks and the record types |

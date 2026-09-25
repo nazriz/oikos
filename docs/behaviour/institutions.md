@@ -1,4 +1,4 @@
-# The people inside institutions (planning officer and inspector v0.1.0; builder v0.2.0)
+# The people inside institutions (planning officer and inspector v0.2.0; builder v0.3.0)
 
 **Source:** `seats/src/behaviour/institutions.ts`. These are code seats of the town (`entity: city`) and of the builder. None of this is kernel law. Each seat reads the town's statements, applies them to what it can see because that's its job, and may do the job well, badly or not at all, depending on its parameters (D19, D20).
 

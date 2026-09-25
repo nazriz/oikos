@@ -61,7 +61,7 @@ fn random_operations_reach_the_interesting_states() {
         "entity_created",
         "message_delivered",
         "observation",
-        "seat_resigned",
+        "seat_opted_out",
         "recorded/claim",
         "recorded/claim_transfer",
         "recorded/claim_release",
@@ -82,7 +82,7 @@ fn random_operations_reach_the_interesting_states() {
         "refused/not_present",
         "refused/reserved_kind",
         "refused/wrong_record_kind",
-        "refused/seat_resigned",
+        "refused/seat_opted_out",
         "refused/account_not_empty",
         "refused/boundary_protected",
     ] {

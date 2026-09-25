@@ -12,16 +12,16 @@
 // Everything is done the way a person does it: applying, signing, moving in,
 // asking the bank to pay. Nothing happens to them automatically.
 
-import type { Block, Observation, SeatAction } from "../contracts";
-import { act, params, wait, type BehaviourModule, type SeatContext } from "../module";
-import { Book, DAY, MONTH, ownAccount, payInstruction, petitionSignatures, publishedCount, standingOrder } from "./common";
+import type { Observation, SeatAction } from "../contracts";
+import { params, wait, type BehaviourModule, type SeatContext } from "../module";
+import { Book, callAction, DAY, jobTerms, leaseTerms, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, vote, withdraw, type Step } from "./common";
 
 interface Home { agreement: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean }
 interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; endsAt: number }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -54,7 +54,8 @@ export const citizen: BehaviourModule = {
     let joblessSince: number | null = null;
     let nextSpend = ctx.rng("spend-day").below(30) * DAY;
     let departed = false;
-    let todo: Block[][] = [];
+    let todo: Step[] = [];
+    let moveStep: Step | null = null; // the move-in step planned this wake
     let plannedAt = -1;
     let pendingRef: { kind: "rent"; agreement: string } | null = null;
     let moving = false; // a move-in is planned this wake
@@ -69,16 +70,14 @@ export const citizen: BehaviourModule = {
         const since = book.signedAt(r.id) ?? 0;
         const end = r.terms.term ? since + r.terms.term : Number.MAX_SAFE_INTEGER;
         if (r.terms.template === "lease" && !home) {
-          const pay = r.terms.commitments.find((c) => c.who === me)?.does;
-          const allow = r.terms.commitments.find((c) => c.who !== me)?.does?.allow;
+          const lt = leaseTerms(r, me);
           const landlord = r.terms.parties.find((x) => x !== me)!;
-          const order = [...book.records.values()].find((x) => x.record === "statement" && x.kind === "instruction" && x.basis === r.id && x.speaks_for === me)?.id;
-          home = { agreement: r.id, structure: allow?.occupy, landlord, rent: pay?.pay ?? 0, order, endsAt: end, movedIn: true };
+          const order = [...book.records.values()].find((x) => x.record === "statement" && x.kind === "request" && x.basis === r.id && x.speaks_for === me)?.id;
+          home = { agreement: r.id, structure: lt.structure!, landlord, rent: lt.rent, order, endsAt: end, movedIn: true };
         }
         if (r.terms.template === "employment" && !job) {
           const employer = r.terms.parties.find((x) => x !== me)!;
-          const c = r.terms.commitments.find((c) => c.who === employer);
-          job = { agreement: r.id, employer, wage: c?.does?.pay ?? 0, period: c?.every ?? 14 * DAY, workplace: r.terms.attrs?.workplace, endsAt: end };
+          job = { agreement: r.id, employer, ...jobTerms(r, me), endsAt: end };
         }
       }
       void obs;
@@ -103,13 +102,13 @@ export const citizen: BehaviourModule = {
       }
     };
 
-    const plan = (obs: Observation): Block[][] => {
+    const plan = (obs: Observation): Step[] => {
       if (plannedAt === -1) learnFromInitialRecords(obs);
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
-      const bank = acc.custodian;
-      const steps: Block[][] = [];
+      const steps: Step[] = [];
+      moveStep = null;
 
       // Notices on our agreements move their end dates.
       for (const r of fresh) {
@@ -123,15 +122,15 @@ export const citizen: BehaviourModule = {
 
       // A tenancy that has ended: move out and stop paying rent.
       if (home && t >= home.endsAt) {
-        const s: Block[] = home.movedIn ? [{ block: "vacate", occupant: me, structure: home.structure }] : [];
-        if (home.order) s.push({ block: "withdraw", record: home.order, speaks_for: me, text: "Tenancy ended; stop this standing order." });
+        const s: Step = home.movedIn ? [moveOut(home.structure, me)] : [];
+        if (home.order) s.push(withdraw(home.order, "Tenancy ended; stop this standing order."));
         if (s.length) steps.push(s);
         home = null;
         homelessSince = t;
       }
       // A job that has ended.
       if (job && t >= job.endsAt) {
-        if (job.workplace) steps.push([{ block: "vacate", occupant: me, structure: job.workplace }]);
+        if (job.workplace) steps.push([moveOut(job.workplace, me)]);
         job = null;
         joblessSince = t;
       }
@@ -143,32 +142,31 @@ export const citizen: BehaviourModule = {
         if (r.record !== "agreement" || !r.terms.parties.includes(me) || book.signedBy(r.id, me)) continue;
         const other = r.terms.parties.find((x) => x !== me)!;
         if (r.terms.template === "lease" && !home) {
-          const rent = r.terms.commitments.find((c) => c.who === me)?.does?.pay ?? 0;
-          const structure = r.terms.commitments.find((c) => c.who === other)?.does?.allow?.occupy;
-          if (!structure || !affordable(rent, acc.balance)) continue;
+          const { rent, rentTo, structure } = leaseTerms(r, me);
+          if (!structure || !rentTo || !affordable(rent, acc.balance)) continue;
           // Signing (a record) and moving in (physics) are separate acts: the
           // flat may not be free yet if the last tenant hasn't left.
           steps.push([
-            { block: "sign_agreement", agreement: r.id, as: me },
-            { ...standingOrder(me, bank, acc.account, r.terms.commitments.find((c) => c.who === me)!.does.into, rent, MONTH, 0, r.id, `Rent for ${structure}, monthly in advance.`), ref: "so" },
+            sign(r.id),
+            ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: 0, basis: r.id, for: `Rent for ${structure}, monthly in advance.` })],
           ]);
           home = { agreement: r.id, structure, landlord: other, rent, endsAt: t + (r.terms.term ?? 365 * DAY), movedIn: false };
           pendingRef = { kind: "rent", agreement: r.id };
           homelessSince = null;
         } else if (r.terms.template === "employment" && !job) {
-          const c = r.terms.commitments.find((c) => c.who === other);
-          const workplace = r.terms.attrs?.workplace;
-          const s: Block[] = [{ block: "sign_agreement", agreement: r.id, as: me }];
-          if (workplace) s.push({ block: "occupy", structure: workplace, slot: "workplace", count: 1 });
+          const terms = jobTerms(r, me);
+          const s: Step = [sign(r.id)];
+          if (terms.workplace) s.push(moveIn(terms.workplace, "workplace"));
           steps.push(s);
-          job = { agreement: r.id, employer: other, wage: c?.does?.pay ?? 0, period: c?.every ?? 14 * DAY, workplace, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER };
+          job = { agreement: r.id, employer: other, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER };
           joblessSince = null;
         }
       }
 
       // Moving into a home we hold a lease on, once there's physical room.
       if (home && !home.movedIn) {
-        steps.push([{ block: "occupy", structure: home.structure, slot: "dwelling", count: 1 }]);
+        moveStep = [moveIn(home.structure, "dwelling")];
+        steps.push(moveStep);
         moving = true;
       }
 
@@ -178,16 +176,16 @@ export const citizen: BehaviourModule = {
         (homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY) ||
         (joblessSince !== null && t - joblessSince >= p.leave_after_jobless_days * DAY && broke);
       if (leave) {
-        const s: Block[] = [];
+        const s: Step = [];
         if (home) {
-          if (home.movedIn) s.push({ block: "vacate", occupant: me, structure: home.structure });
-          if (home.order) s.push({ block: "withdraw", record: home.order, speaks_for: me });
-          s.push({ block: "give_notice", agreement: home.agreement, as: me, text: "Leaving town." });
+          if (home.movedIn) s.push(moveOut(home.structure, me));
+          if (home.order) s.push(withdraw(home.order));
+          s.push(notice(home.agreement, "Leaving town."));
         }
-        if (job?.workplace) s.push({ block: "vacate", occupant: me, structure: job.workplace });
-        if (job) s.push({ block: "give_notice", agreement: job.agreement, as: me, text: "Leaving town." });
-        s.push({ block: "publish", kind: "departure", speaks_for: me, text: `${me} has left town.` });
-        if (acc.balance > 0 && p.outside_account) s.push(payInstruction(me, bank, acc.account, p.outside_account, acc.balance, "Moving away: send all my savings with me."));
+        if (job?.workplace) s.push(moveOut(job.workplace, me));
+        if (job) s.push(notice(job.agreement, "Leaving town."));
+        s.push(say("departure", `${me} has left town.`));
+        if (acc.balance > 0 && p.outside_account) s.push(pay(p.outside_account, acc.balance, { from: acc.account, for: "Moving away: send all my savings with me." }));
         departed = true;
         return [s];
       }
@@ -199,7 +197,7 @@ export const citizen: BehaviourModule = {
         const best = listings[0];
         if (best?.speaks_for) {
           applied.add(best.id);
-          steps.push([{ block: "publish", kind: "rental_application", speaks_for: me, addressed_to: [best.speaks_for], visible_to: [me, best.speaks_for], text: `Application for ${best.data.structure}.`, data: { listing: best.id, account: acc.account } }]);
+          steps.push([say("rental_application", `Application for ${best.data.structure}.`, { to: [best.speaks_for], visible: [me, best.speaks_for], data: { listing: best.id, account: acc.account } })]);
         }
       }
       // Looking for work: the best-paid posting.
@@ -209,7 +207,7 @@ export const citizen: BehaviourModule = {
         const best = posts[0];
         if (best?.speaks_for) {
           applied.add(best.id);
-          steps.push([{ block: "publish", kind: "job_application", speaks_for: me, addressed_to: [best.speaks_for], visible_to: [me, best.speaks_for], text: "Application for the advertised job.", data: { posting: best.id, account: acc.account } }]);
+          steps.push([say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account } })]);
         }
       }
 
@@ -223,7 +221,7 @@ export const citizen: BehaviourModule = {
         const amount = Math.min(acc.balance - reserve, p.essentials + Math.floor((above * p.spend_above_buffer_bps) / 10_000));
         if (amount > 0 && shops.length) {
           const shop = ctx.rng(`shop-${t}`).pick(shops);
-          steps.push([payInstruction(me, bank, acc.account, shop, amount, "Shopping.")]);
+          steps.push([pay(shop, amount, { from: acc.account, for: "Shopping." })]);
         }
       }
       voice(t, steps);
@@ -240,7 +238,7 @@ export const citizen: BehaviourModule = {
     const signed = new Set<string>();
     const countsPublished = new Map<string, { n: number; at: number }>();
     let aggrievedUntil = 0;
-    const voice = (t: number, steps: Block[][]) => {
+    const voice = (t: number, steps: Step[]) => {
       const burden = home && monthlyIncome() > 0 ? (home.rent * 10_000) / monthlyIncome() : 0;
       const noticed = [...book.notices.entries()].some(([ag, ns]) => ag === home?.agreement && ns.some((n) => n.as !== me));
       if (home && (noticed || burden >= p.rent_burden_grievance_bps)) aggrievedUntil = t + 90 * DAY;
@@ -249,12 +247,12 @@ export const citizen: BehaviourModule = {
       // An organiser closes their petition after `petition_days`; a new one can then start.
       for (const pet of open) if (pet.speaks_for === me && t - pet.at >= p.petition_days * DAY && !signed.has(`closed-${pet.id}`)) {
         signed.add(`closed-${pet.id}`);
-        steps.push([{ block: "withdraw", record: pet.id, speaks_for: me, text: "Petition closed." }]);
+        steps.push([withdraw(pet.id, "Petition closed.")]);
       }
       if (aggrieved && open.length === 0 && ctx.rng(`petition-${t}`).below(10_000) < p.petition_start_bps) {
-        steps.push([{ block: "publish", kind: "petition", speaks_for: me, text: "Petition: landlords must give 90 days' notice, and may not raise rent by more than 5% a year.", data: { demand: {
+        steps.push([say("petition", "Petition: landlords must give 90 days' notice, and may not raise rent by more than 5% a year.", { data: { demand: {
           kind: "law", text: "A landlord must give at least 90 days' notice to end a tenancy, and may not raise the rent by more than 5% in any 12 months.",
-          adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"] } } }]);
+          adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"] } } })]);
         return;
       }
       for (const pet of open) {
@@ -265,7 +263,7 @@ export const citizen: BehaviourModule = {
           const last = countsPublished.get(pet.id);
           if ((!last || last.n !== n) && (!last || t - last.at >= 3 * DAY)) {
             countsPublished.set(pet.id, { n, at: t });
-            steps.push([{ block: "publish", kind: "petition_count", speaks_for: me, basis: pet.id, text: `${n} people have signed.`, data: { petition: pet.id, signatures: n } }]);
+            steps.push([say("petition_count", `${n} people have signed.`, { basis: pet.id, data: { petition: pet.id, signatures: n } })]);
           }
           continue;
         }
@@ -273,7 +271,7 @@ export const citizen: BehaviourModule = {
         const share = (publishedCount(book, pet) * 10_000) / p.population;
         if (aggrieved || (home && share >= threshold)) {
           signed.add(pet.id);
-          steps.push([{ block: "vote", ballot: pet.id, choice: "sign", speaks_for: me }]);
+          steps.push([vote(pet.id, "sign")]);
         }
       }
     };
@@ -290,8 +288,8 @@ export const citizen: BehaviourModule = {
           plannedAt = obs.t;
         }
         const next = todo.shift();
-        lastWasMove = !!next && next.length === 1 && next[0]!.block === "occupy" && next[0]!.slot === "dwelling";
-        return next ? act(next) : wait();
+        lastWasMove = !!next && next === moveStep;
+        return next ? callAction(next) : wait();
       },
     };
   },

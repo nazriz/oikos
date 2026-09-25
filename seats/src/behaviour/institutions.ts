@@ -5,11 +5,12 @@
 // and applies them to what it can see, because that is its job, and
 // (depending on its parameters) it may do the job well, badly, or not at all.
 
-import type { Block, SiteParcel, StatementRecord } from "../contracts";
+import * as C from "../calls";
+import type { SiteParcel, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type SeatContext } from "../module";
-import { Book, DAY, ownAccount } from "./common";
+import { Book, commitmentOf, DAY, ownAccount, record, say, sign, type Step } from "./common";
 import { stepper } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
@@ -37,7 +38,7 @@ export function ownerOf(book: Book, parcel: string): string | undefined {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -48,7 +49,7 @@ export const planningOfficer: BehaviourModule = {
       (obs) => void book.absorb(obs),
       (obs) => {
         const me = obs.entity;
-        const steps: Block[][] = [];
+        const steps: Step[] = [];
         const apps = book.open("permit_application").filter((a) => (a.addressed_to ?? []).includes(me) && !decided.has(a.id));
         for (const app of apps.sort((a, b) => (a.id < b.id ? -1 : 1))) {
           decided.add(app.id);
@@ -60,14 +61,12 @@ export const planningOfficer: BehaviourModule = {
           });
           const follows = ctx.rng(`comply-${app.id}`).below(10_000) < p.compliance_bps;
           const refuse = breached && follows;
-          const decision: Block = {
-            block: "publish", kind: "permit_decision", speaks_for: me, addressed_to: [applicant], basis: app.id,
-            text: refuse ? `Permit refused for ${app.data?.parcel}: it would breach ${breached!.id}.` : `Permit granted to build ${app.data?.structure_type} on ${app.data?.parcel}.`,
-            data: { application: app.id, decision: refuse ? "refused" : "granted", ...(breached ? { law: breached.id } : {}) },
-          };
-          const blocks: Block[] = [decision];
-          if (!refuse) blocks.unshift({ block: "record_claim", position: "liberty", holder: applicant, speaks_for: me, basis: app.id, about: { action: "build", parcel: app.data?.parcel, structure_type: app.data?.structure_type } });
-          steps.push(blocks);
+          const decision = say("permit_decision",
+            refuse ? `Permit refused for ${app.data?.parcel}: it would breach ${breached!.id}.` : `Permit granted to build ${app.data?.structure_type} on ${app.data?.parcel}.`,
+            { to: [applicant], basis: app.id, data: { application: app.id, decision: refuse ? "refused" : "granted", ...(breached ? { law: breached.id } : {}) } });
+          const step: Step = [decision];
+          if (!refuse) step.unshift(record("liberty", applicant, { action: "build", parcel: app.data?.parcel, structure_type: app.data?.structure_type }, { basis: app.id }));
+          steps.push(step);
         }
         return steps;
       },
@@ -85,7 +84,7 @@ export const planningOfficer: BehaviourModule = {
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -98,7 +97,7 @@ export const inspector: BehaviourModule = {
       (obs) => {
         const me = obs.entity;
         const sites: SiteParcel[] = channels.sites(obs);
-        const steps: Block[][] = [];
+        const steps: Step[] = [];
         if (first) {
           for (const s of sites) if (s.structure) known.add(s.structure.structure);
           first = false;
@@ -117,8 +116,8 @@ export const inspector: BehaviourModule = {
           });
           if (!breached || ctx.rng(`act-${st.structure}`).below(10_000) >= p.compliance_bps) continue;
           steps.push([
-            { block: "record_claim", position: "right", holder: me, counterparty: owner, speaks_for: me, basis: breached.id, about: { kind: "fine", amount: p.fine, for: `Unpermitted ${st.type} on ${site.parcel} (${st.structure}).` } },
-            { block: "publish", kind: "demolition_order", speaks_for: me, addressed_to: [owner], basis: breached.id, text: `Order: demolish ${st.structure} on ${site.parcel}, built in breach of ${breached.id}.`, data: { structure: st.structure, parcel: site.parcel, law: breached.id } },
+            record("right", me, { kind: "fine", amount: p.fine, for: `Unpermitted ${st.type} on ${site.parcel} (${st.structure}).` }, { against: owner, basis: breached.id }),
+            say("demolition_order", `Order: demolish ${st.structure} on ${site.parcel}, built in breach of ${breached.id}.`, { to: [owner], basis: breached.id, data: { structure: st.structure, parcel: site.parcel, law: breached.id } }),
           ]);
         }
         return steps;
@@ -134,7 +133,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -146,23 +145,23 @@ export const builder: BehaviourModule = {
       (obs) => {
         const me = obs.entity;
         const acc = ownAccount(obs);
-        const steps: Block[][] = [];
+        const steps: Step[] = [];
         if (!acc) return steps;
         let balance = acc.balance;
         for (const r of book.records.values()) {
           if (r.record !== "agreement" || r.terms.template !== "construction" || !r.terms.parties.includes(me) || started.has(r.id)) continue;
           const client = r.terms.parties.find((x) => x !== me)!;
           if (!book.signedBy(r.id, client)) continue;
-          const job = r.terms.commitments.find((c) => c.who === me)?.does ?? {};
-          const cost = types.get(job.build)?.materials_cost ?? Infinity;
-          if (balance < cost) continue;
+          const job = commitmentOf(r, me).outcome?.structure ?? {};
+          const cost = job.type ? types.get(job.type)?.materials_cost ?? Infinity : Infinity;
+          if (!job.on || balance < cost) continue;
           started.add(r.id);
           balance -= cost;
-          const price = r.terms.commitments.find((c) => c.who === client)?.does?.pay;
+          const price = commitmentOf(r, client).outcome?.money?.amount;
           steps.push([
-            ...(book.signedBy(r.id, me) ? [] : [{ block: "sign_agreement", agreement: r.id, as: me } as Block]),
-            { block: "construct", parcel: job.on, structure_type: job.build, materials_from: acc.account },
-            ...(price ? [{ block: "publish", kind: "invoice", speaks_for: me, addressed_to: [client], basis: r.id, text: `Invoice: ${price} cents for building a ${job.build} on ${job.on}.`, data: { amount: price, pay_to: acc.account, agreement: r.id } } as Block] : []),
+            ...(book.signedBy(r.id, me) ? [] : [sign(r.id)]),
+            C.call("structure", { type: job.type, on: job.on, by: me, from: acc.account }),
+            ...(price ? [say("invoice", `Invoice: ${price} cents for building a ${job.type} on ${job.on}.`, { to: [client], basis: r.id, data: { amount: price, pay_to: acc.account, agreement: r.id } })] : []),
           ]);
         }
         return steps;

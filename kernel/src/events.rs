@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RefusalCode {
-    SeatResigned,
+    SeatOptedOut,
     UnknownRef,
     DuplicateRef,
     NotCustodian,
@@ -143,7 +143,7 @@ pub enum EventBody {
         seat: Id,
         observation_hash: String,
     },
-    SeatResigned {
+    SeatOptedOut {
         seat: Id,
         statement: String,
     },
@@ -166,7 +166,7 @@ impl EventBody {
             EventBody::EntityCreated { .. } => "entity_created",
             EventBody::MessageDelivered { .. } => "message_delivered",
             EventBody::Observation { .. } => "observation",
-            EventBody::SeatResigned { .. } => "seat_resigned",
+            EventBody::SeatOptedOut { .. } => "seat_opted_out",
         }
     }
 

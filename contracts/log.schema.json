@@ -226,7 +226,7 @@
           "additionalProperties": false,
           "properties": {
             "command": {
-              "const": "resign"
+              "const": "opt_out"
             },
             "seat": {
               "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
@@ -260,7 +260,9 @@
             "proposal",
             "draft",
             "draft_hash",
-            "translator"
+            "translator",
+            "call",
+            "resolver"
           ],
           "additionalProperties": false,
           "properties": {
@@ -280,6 +282,36 @@
             },
             "translator": {
               "$ref": "urn:terrarium:contracts:0.3:seat-api#/$defs/TranslatorId"
+            },
+            "call": {
+              "description": "The translator's call (canonical form).",
+              "type": "string",
+              "maxLength": 4000
+            },
+            "resolver": {
+              "$ref": "urn:terrarium:contracts:0.3:seat-api#/$defs/ResolverId"
+            }
+          }
+        },
+        {
+          "description": "An intent submitted in the call language (code seats; D36), turned into acts by the resolver.",
+          "type": "object",
+          "required": [
+            "via",
+            "call",
+            "resolver"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "via": {
+              "const": "call"
+            },
+            "call": {
+              "type": "string",
+              "maxLength": 4000
+            },
+            "resolver": {
+              "$ref": "urn:terrarium:contracts:0.3:seat-api#/$defs/ResolverId"
             }
           }
         }
@@ -763,7 +795,7 @@
           "additionalProperties": false,
           "properties": {
             "event": {
-              "const": "seat_resigned"
+              "const": "seat_opted_out"
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
@@ -795,13 +827,13 @@
         "entity_created",
         "message_delivered",
         "observation",
-        "seat_resigned"
+        "seat_opted_out"
       ]
     },
     "RefusalCode": {
       "description": "Stable reasons the kernel refuses an act. PHYSICS AND MECHANICS ONLY: there is no code for 'illegal', because the kernel doesn't know the law (D19). 'boundary_protected': the outside world's edge account can't be closed (the world's edge always exists; D31).",
       "enum": [
-        "seat_resigned",
+        "seat_opted_out",
         "unknown_ref",
         "duplicate_ref",
         "not_custodian",

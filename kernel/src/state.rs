@@ -94,7 +94,7 @@ pub struct Stored {
 #[serde(rename_all = "snake_case")]
 pub enum SeatStatus {
     Active,
-    Resigned,
+    OptedOut,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

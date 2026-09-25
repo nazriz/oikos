@@ -2,7 +2,8 @@
 // memory. Records arrive through `new_only` channels, so each module keeps
 // its own book of the records relevant to it, as a person would.
 
-import type { Block, Observation, Record, StatementRecord } from "../contracts";
+import * as C from "../calls";
+import type { Observation, Record, SeatAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 
 export const DAY = 86_400;
@@ -91,14 +92,78 @@ export function ownAccount(obs: Observation): { account: string; balance: number
   return channels.accounts(obs).find((a) => a.holder === obs.entity);
 }
 
-/** Ask one's bank to pay (a one-off instruction). */
-export function payInstruction(me: string, bank: string, from: string, to: string, amount: number, text: string, extra: object = {}): Block {
-  return { block: "publish", kind: "instruction", speaks_for: me, addressed_to: [bank], visible_to: [me, bank], text, data: { pay: amount, from, to, ...extra } };
+// ------------------------------------------------------------------ acting through calls
+//
+// Code seats act the way every seat does (D36, P14): they say what they want
+// brought about, as calls, and the resolver turns each into the seat's own
+// acts. Paying someone is money(...): the resolver asks the account's bank.
+
+/** One atomic act: lines of calls, optionally binding a name (whose id comes back in the outcome's `created`). */
+export type Step = (C.Call | [string, C.Call])[];
+
+export const callAction = (step: Step): SeatAction => ({ type: "call", call: C.program(...step) });
+
+/** Money to an account: a one-off or repeating payment. */
+export function pay(to: string, amount: number, o: { from?: string; for?: string; settles?: string; every?: number; first?: number; basis?: string; per_request?: string } = {}): C.Call {
+  return C.call("money", {
+    to, amount: C.dollars(amount), from: o.from, for: o.for ? C.text(o.for) : undefined, settles: o.settles,
+    every: o.every ? C.secs(o.every) : undefined, first: o.first !== undefined ? C.secs(o.first) : undefined, basis: o.basis, per_request: o.per_request,
+  });
 }
 
-/** Ask one's bank to pay repeatedly. */
-export function standingOrder(me: string, bank: string, from: string, to: string, amount: number, every: number, first: number, basis: string, text: string): Block {
-  return { block: "publish", kind: "instruction", speaks_for: me, addressed_to: [bank], visible_to: [me, bank], basis, text, data: { pay: amount, from, to, every, first } };
+/** A published statement: kind, text, and optional addressees, data, visibility and basis. */
+export function say(kind: string, text: string, o: { to?: string[]; data?: unknown; visible?: "public" | string[]; basis?: string; for?: string; adico?: unknown; formal?: string } = {}): C.Call {
+  return C.call("statement", {
+    kind, text: C.text(text), to: o.to ? C.json(o.to) : undefined, data: o.data !== undefined ? C.json(o.data) : undefined,
+    adico: o.adico !== undefined ? C.json(o.adico) : undefined, formal: o.formal ? C.text(o.formal) : undefined,
+    visible: o.visible === undefined ? undefined : o.visible === "public" ? "public" : C.json(o.visible), basis: o.basis, for: o.for,
+  });
+}
+
+export const withdraw = (record: string, text?: string): C.Call => C.call("statement", { withdraw: record, text: text ? C.text(text) : undefined });
+export const sign = (agreement: string): C.Call => C.call("agreement", { sign: agreement });
+export const notice = (agreement: string, text: string): C.Call => C.call("agreement", { notice: agreement, text: C.text(text) });
+export const message = (to: string[], text: string, re?: string): C.Call => C.call("message", { to: C.json(to), text: C.text(text), re });
+export const moveIn = (structure: string, slot: string, count = 1): C.Call => C.call("occupancy", { in: structure, slot, count });
+export const moveOut = (structure: string, who: string): C.Call => C.call("occupancy", { in: structure, who, leave: "yes" });
+export const vote = (ballot: string, choice: string, visible?: "public"): C.Call => C.call("vote", { ballot, choice, visible });
+export const record = (position: "right" | "liberty", holder: string, about: unknown, o: { against?: string; basis?: string } = {}): C.Call =>
+  C.call("claim", { position, holder, about: C.json(about), against: o.against, basis: o.basis });
+
+/** Offer an agreement (signed on our side). `we` and `they` are the outcomes each side commits to. */
+export function offer(withWhom: string, o: { template: string; we?: C.Call; they?: C.Call; term?: number; ourNotice?: number; theirNotice?: number; text?: string; basis?: string }): C.Call {
+  return C.call("agreement", {
+    with: withWhom, template: o.template, we_do: o.we, they_do: o.they, term: o.term ? C.secs(o.term) : undefined,
+    our_notice: o.ourNotice ? C.secs(o.ourNotice) : undefined, their_notice: o.theirNotice ? C.secs(o.theirNotice) : undefined,
+    terms: o.text ? C.text(o.text) : undefined, basis: o.basis,
+  });
+}
+
+// ------------------------------------------------------------------ reading agreements (the standard encoding, §9.2)
+
+export type Outcome = { money?: { from?: string; to: string; amount: number; for?: string }; occupancy?: { who: string; in: string; slot?: string; count?: number }; structure?: { type?: string; on?: string; remove?: string } };
+
+/** What a party commits to bring about in an agreement, and how often. */
+export function commitmentOf(a: Record | undefined, who: string): { outcome?: Outcome; every?: number } {
+  if (a?.record !== "agreement") return {};
+  const c = a.terms.commitments.find((x) => x.who === who);
+  return { outcome: c?.does?.outcome, every: c?.every };
+}
+
+/** A lease's rent (paid by the tenant, into which account) and home (given by the other party). */
+export function leaseTerms(a: Record | undefined, tenant: string): { rent: number; rentTo?: string; structure?: string } {
+  if (a?.record !== "agreement") return { rent: 0 };
+  const other = a.terms.parties.find((x) => x !== tenant)!;
+  const pays = commitmentOf(a, tenant).outcome?.money;
+  return { rent: pays?.amount ?? 0, rentTo: pays?.to, structure: commitmentOf(a, other).outcome?.occupancy?.in };
+}
+
+/** A job's wage and pay period (from the employer) and workplace (where the worker commits to be). */
+export function jobTerms(a: Record | undefined, worker: string): { wage: number; period: number; workplace?: string } {
+  if (a?.record !== "agreement") return { wage: 0, period: 14 * DAY };
+  const employer = a.terms.parties.find((x) => x !== worker)!;
+  const pays = commitmentOf(a, employer);
+  return { wage: pays.outcome?.money?.amount ?? 0, period: pays.every ?? 14 * DAY, workplace: commitmentOf(a, worker).outcome?.occupancy?.in };
 }
 
 export const between = (lo: number, hi: number, u: number) => lo + Math.floor(u * (hi - lo + 1));

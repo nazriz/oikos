@@ -40,7 +40,7 @@ pub enum Command {
     Observe {
         seat: Id,
     },
-    Resign {
+    OptOut {
         seat: Id,
         statement: String,
     },
@@ -216,10 +216,10 @@ impl Kernel {
                     return perr(format!("{to} is beyond the end of the run ({})", self.s.run_end()));
                 }
             }
-            Command::Resign { seat, .. } => {
+            Command::OptOut { seat, .. } => {
                 seat_exists(seat)?;
-                if self.state.seats[seat].status == SeatStatus::Resigned {
-                    return perr(format!("seat {seat} has already resigned"));
+                if self.state.seats[seat].status == SeatStatus::OptedOut {
+                    return perr(format!("seat {seat} has already opted out"));
                 }
             }
         }
@@ -232,10 +232,10 @@ impl Kernel {
             Command::Act { seat, blocks, .. } => self.act(seat, blocks),
             Command::Advance { to } => self.advance(*to),
             Command::Observe { seat } => self.observe(seat),
-            Command::Resign { seat, statement } => {
-                self.state.seats.get_mut(seat).unwrap().status = SeatStatus::Resigned;
+            Command::OptOut { seat, statement } => {
+                self.state.seats.get_mut(seat).unwrap().status = SeatStatus::OptedOut;
                 Output {
-                    events: vec![Timed::new(self.state.t, EventBody::SeatResigned { seat: seat.clone(), statement: statement.clone() })],
+                    events: vec![Timed::new(self.state.t, EventBody::SeatOptedOut { seat: seat.clone(), statement: statement.clone() })],
                     observation: None,
                 }
             }
@@ -261,8 +261,8 @@ impl Kernel {
     fn act(&mut self, seat: &str, blocks: &[Block]) -> Output {
         let action = self.state.mint("act");
         let t = self.state.t;
-        let result = if self.state.seats[seat].status == SeatStatus::Resigned {
-            Err(refuse(RefusalCode::SeatResigned, format!("seat {seat} has resigned")))
+        let result = if self.state.seats[seat].status == SeatStatus::OptedOut && self.s.seats[seat].vacant_after_opt_out() {
+            Err(refuse(RefusalCode::SeatOptedOut, format!("seat {seat} has opted out")))
         } else {
             let mut scratch = self.state.clone();
             exec_action(&self.s, &mut scratch, seat, blocks).map(|res| (scratch, res))

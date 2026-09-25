@@ -484,9 +484,9 @@ impl<'a> Exec<'a> {
                 self.bind(bind, &id)
             }
 
-            Block::ProposeAgreement { terms, speaks_for, visible_to, bind } => {
+            Block::ProposeAgreement { terms, basis, speaks_for, visible_to, bind } => {
                 let terms = self.resolve_terms(terms)?;
-                let id = self.new_record(RecordBody::Agreement { terms }, self.ro(speaks_for)?, visible_to.clone(), None)?;
+                let id = self.new_record(RecordBody::Agreement { terms }, self.ro(speaks_for)?, visible_to.clone(), self.ro(basis)?)?;
                 self.bind(bind, &id)
             }
 

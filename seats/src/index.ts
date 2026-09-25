@@ -3,6 +3,7 @@ export * from "./module";
 export * from "./rng";
 export * from "./law";
 export * from "./canon";
+export * as calls from "./calls";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
 import { exportDemand, idle } from "./behaviour/world";
