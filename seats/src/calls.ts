@@ -4,6 +4,7 @@
 // these tables convert it, deterministically.
 
 import { canonical } from "./canon";
+import CALLS_SCHEMA from "../../contracts/calls.schema.json";
 
 export const FUNCTIONS = ["money", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
@@ -152,6 +153,31 @@ export function parseProgram(text: string): Program {
   }
   if (lines.length === 0) throw new CallSyntaxError("empty program");
   return { lines };
+}
+
+// ---------------------------------------------------------------- the contract's argument table (P12)
+
+/** Per function: the arguments it takes (undefined: any, as with a form's fields) and the ones it needs. Read from contracts/calls.schema.json, so it can't drift from the contract. */
+export const ARGS: { [fn: string]: { allowed?: Set<string>; required: string[] } } = Object.fromEntries(
+  (CALLS_SCHEMA as any).$defs.Call.allOf.map((rule: any) => {
+    const args = rule.then.properties.args;
+    return [rule.if.properties.fn.const, { allowed: args.propertyNames ? new Set<string>(args.propertyNames.enum) : undefined, required: args.required ?? [] }];
+  }),
+);
+
+/** What's wrong with a program against the contract (unknown or missing arguments, in any nested call); empty if nothing. */
+export function contractErrors(p: Program): string[] {
+  if ("none" in p) return [];
+  const out: string[] = [];
+  const check = (c: Call, where: string) => {
+    const a = ARGS[c.fn];
+    if (!a) return void out.push(`${where}: unknown function ${c.fn}`);
+    for (const k of Object.keys(c.args)) if (a.allowed && !a.allowed.has(k)) out.push(`${where}: ${c.fn} takes no argument ${k}`);
+    for (const k of a.required) if (!(k in c.args)) out.push(`${where}: ${c.fn} needs ${k}`);
+    for (const [k, v] of Object.entries(c.args)) if ("call" in v) check(v.call, `${where}.${k}`);
+  };
+  p.lines.forEach((l, i) => check(l.call, `line ${i + 1}`));
+  return out;
 }
 
 // ---------------------------------------------------------------- serialising

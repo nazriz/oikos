@@ -754,14 +754,25 @@ Everything above was built as designed. Building it also settled these details.
 - **Durations may be zero** (`first="0 days"`: the first rent payment is due at once).
 
 **The resolver:**
-- **It uses the seat's knowledge only to fill things in** (names to ids, whose account, who keeps it). It doesn't reject ids the seat states outright: code seats know ids from their configuration, and a wrong id is refused by physics, as in real life. This refines P8 without weakening it: nothing is ever *revealed* from beyond the seat's knowledge.
+- **It uses the seat's knowledge only to fill things in** (names to ids, whose account, who keeps it). It doesn't reject unfamiliar ids the seat states outright: code seats know ids from their configuration, and a wrong id is refused by physics, as in real life. This refines P8 without weakening it: nothing is ever *revealed* from beyond the seat's knowledge.
+  - The one exception: paying an entity the seat knows but whose account it has never seen is a question ("which of GreenCo's accounts?"). Otherwise the payment would silently fail at the bank. In a *commitment* ("we'll pay the builder"), naming the entity is enough.
+- **It checks every call against the contract's argument table** (`calls.ARGS`, read from contracts/calls.schema.json, P12). Unknown or missing arguments, in any nested call, are refused: the seat is told it isn't clear, and the log records exactly what was wrong. An argument can therefore never be silently ignored.
+- **Who keeps a new account is always a decision:** `account(...)` without `at` asks.
 - **Knowledge** (`translator/src/knowledge.ts`) is kept per seat by the orchestrator, from every observation. It holds accounts, the accounts entities have stated as theirs (invoices' `pay_to`, applications' `account`), names, the seat-to-entity map, building types, forms, laws and claims.
 - **Occupancy** fills the slot only when a building has one kind of space; `count` defaults to 1.
 
 **Seats and the orchestrator:**
 - **The language seat's tools** are `do`, `confirm`, `write`, `done_for_now`, `notebook` and `opt_out`. The contract's actions (`propose`, `sign`, `message`, `wait`, `opt_out`) are underneath.
 - **Opt-out wording** (§14): honest under the `simulation` framing ("stop taking part in this study"); under other framings, a neutral "stop, permanently". The latter is provisional until VISION §15 settles it.
-- **Reports** use channel titles, never repeat what's on file, total and tally, and tell outcomes as "Done: …" or "… couldn't be done: *reason*". The test suite checks that no machinery word ever appears in what a seat reads.
+- **Reports** use channel titles, never repeat what's on file, total and tally, and tell outcomes as "Done: …" or "… couldn't be done: *reason*". The reason is a plain sentence for the refusal; the kernel's detail text (ids, cents, the grammar of acts) stays in the log. The test suite checks that no machinery word ever appears in what a seat reads.
+- **The translator's instructions** are the language's syntax, a function list generated from the contract, and examples. They contain nothing about how any world works.
+- **Institutions reply to what they can't process** (§9.3, §11.3):
+  - the bank, to requests about accounts it doesn't keep, requests with no valid amount, requests for things it doesn't do, and any payment physics refused, in plain words;
+  - the planning office, to incomplete applications.
+
+  Other institutions (finance, tax, the council clerk) don't yet; that's for the checkpoint.
+- **The seat's prompt names its entity** ("acting for the Town of Millbrook (city)").
+- **Call text in provenance is never truncated.** The contract allows 64 KiB; a longer program is "too much at once".
 - **Confirmation modes** are implemented. With `never`, a draft is still made and hashed, and its signoff says `confirmation: never`, so the audit trail is the same.
 - **Opting out with a stand-in** (`on_opt_out: {code}`): the kernel lets the seat keep acting, and the orchestrator swaps its controller for the code module.
 - **The mock** now runs its code brain's *calls*: it says each one as its request, the mock translator returns the same call, and it confirms only a draft whose call matches.

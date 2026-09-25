@@ -38,7 +38,7 @@ export function ownerOf(book: Book, parcel: string): string | undefined {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -54,6 +54,13 @@ export const planningOfficer: BehaviourModule = {
         for (const app of apps.sort((a, b) => (a.id < b.id ? -1 : 1))) {
           decided.add(app.id);
           const applicant = app.speaks_for!;
+          // An application it can't decide gets a reply saying why (§9.3).
+          const missing = ["parcel", "structure_type"].filter((f) => typeof app.data?.[f] !== "string");
+          if (missing.length) {
+            steps.push([say("permit_decision", `Application ${app.id} can't be decided: it doesn't say ${missing.map((f) => (f === "parcel" ? "which lot" : "what kind of building")).join(" or ")}.`,
+              { to: [applicant], basis: app.id, data: { application: app.id, decision: "incomplete", missing } })]);
+            continue;
+          }
           const granting = { block: "grant_permit", parcel: app.data?.parcel, structure_type: app.data?.structure_type };
           const breached = prohibitions(book).find((l) => {
             const v = evaluate(l.formal!.condition, { block: granting, actor: applicant, now: obs.t }, []);

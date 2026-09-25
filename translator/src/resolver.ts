@@ -15,9 +15,10 @@ import type { Knowledge } from "./knowledge";
 type Call = calls.Call;
 type Value = calls.Value;
 
-export const RESOLVER = { id: "resolver", version: "0.1.0" };
+export const RESOLVER = { id: "resolver", version: "0.2.0" };
 
-export type Resolution = { ok: true; blocks: Block[] } | { ok: false; questions: string[] };
+/** A resolution: the seat's acts, or questions for the seat (and, when the call itself broke the contract, what was wrong, for the log). */
+export type Resolution = { ok: true; blocks: Block[] } | { ok: false; questions: string[]; invalid?: string[] };
 
 /** Fixed texts for the translator's refusal labels (§11.1). */
 export const LABEL_TEXT: Record<calls.Label, string> = {
@@ -35,6 +36,9 @@ const $ = (cents: number) => `$${Math.floor(cents / 100).toString().replace(/\B(
 /** Resolve a program. `capacity` gives a structure type's spaces (from the world's catalogue, which is public), for occupancy. */
 export function resolve(program: calls.Program, k: Knowledge, capacity: (type: string) => { [slot: string]: number } = () => ({})): Resolution {
   if ("none" in program) return { ok: false, questions: [LABEL_TEXT[program.none]] };
+  if (calls.programText(program).length > 65536) return { ok: false, questions: [LABEL_TEXT.too_much] };
+  const invalid = calls.contractErrors(program);
+  if (invalid.length) return { ok: false, questions: [LABEL_TEXT.unclear], invalid };
   const r = new Resolver(k, program);
   r.capacity = capacity;
   const blocks: Block[] = [];
@@ -156,14 +160,20 @@ class Resolver {
     if (own.length === 0) throw new Ask(`Which account should ${purpose} come from? You don't know of one you hold.`);
     throw new Ask(`Which account should ${purpose} come from: ${own.join(" or ")}?`);
   }
-  /** Where money goes: an account, or the only account the seat knows an entity holds. */
-  private payee(to: string): string {
+  /**
+   * Where money goes: an account, or the only account the seat knows an entity holds.
+   * For a payment made now, an entity with no known account is a question; in a
+   * commitment ("we'll pay the builder") the entity itself is enough.
+   */
+  private payee(to: string, commitment = false): string {
     if (to.startsWith("$") || this.k.isAccount(to)) return to;
     const e = this.k.entityOf(to);
+    const known = this.k.names.has(e) || this.k.seatEntity.has(to) || this.k.stated.has(e);
     const accts = this.k.accountsOf(e);
     if (accts.length === 1) return accts[0]!;
     if (accts.length > 1) throw new Ask(`Which of ${this.k.name(e)}'s accounts: ${accts.join(" or ")}?`);
-    return to; // stated outright as an account id the seat has reason to know; physics decides
+    if (known && !commitment) throw new Ask(`Which of ${this.k.name(e)}'s accounts should it go to? You don't know one.`);
+    return commitment && known ? e : to; // an id stated outright is taken as an account; physics decides
   }
   private keeper(account: string): string | undefined {
     return this.k.accounts.get(account)?.custodian;
@@ -188,10 +198,10 @@ class Resolver {
   }
 
   /** The money outcome of a call, for requests and commitments. */
-  private moneyOutcome(c: Call, from: string | undefined): { money: object } {
+  private moneyOutcome(c: Call, from: string | undefined, commitment = false): { money: object } {
     const amount = this.amount(c, "amount");
     if (amount === undefined) throw new Ask("How much?");
-    const to = this.payee(this.need(c, "to", "Paid to whom?"));
+    const to = this.payee(this.need(c, "to", "Paid to whom?"), commitment);
     const purpose = this.str(c, "for");
     const settles = this.id(c, "settles");
     return { money: { ...(from ? { from } : {}), to, amount, ...(purpose ? { for: purpose } : {}), ...(settles ? { settles } : {}) } };
@@ -222,7 +232,9 @@ class Resolver {
   private account(c: Call, bind?: string): Block[] {
     const at = this.id(c, "at");
     const close = this.id(c, "close");
-    const keeper = at ? this.k.entityOf(at) : close ? this.keeper(close) ?? this.me : this.me;
+    // Who keeps it is a choice (you, or a bank), unless an existing account's keeper is known.
+    const keeper = at ? this.k.entityOf(at) : close ? this.keeper(close) : undefined;
+    if (!keeper) throw new Ask(close ? `You don't know who keeps account ${close}.` : "Who should keep the account: you, or a bank (which)?");
     if (keeper === this.me) {
       if (close) return [{ block: "close_account", account: close }];
       return [{ block: "open_account", holder: this.need(c, "holder", "An account for whom?"), ...(bind ? { ref: bind } : {}) }];
@@ -320,7 +332,7 @@ class Resolver {
     const c = v.call;
     const every = c.fn === "money" ? this.seconds(c, "every") : undefined;
     const outcome =
-      c.fn === "money" ? this.moneyOutcome(c, this.id(c, "from"))
+      c.fn === "money" ? this.moneyOutcome(c, this.id(c, "from"), true)
       : c.fn === "occupancy" ? this.occupancyOutcome(c)
       : c.fn === "structure" ? { structure: this.id(c, "remove") ? { remove: this.id(c, "remove") } : { type: this.id(c, "type"), on: this.id(c, "on") } }
       : c.fn === "account" ? { account: { holder: this.id(c, "holder") ?? who, ...(this.id(c, "close") ? { close: this.id(c, "close") } : {}) } }

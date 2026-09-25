@@ -47,6 +47,8 @@ export interface RunSummary {
   /** Wall-clock milliseconds spent waiting on the kernel and in behaviour modules (profiling only; never logged). */
   kernelMs: number;
   moduleMs: number;
+  /** The orchestrator's own work: keeping seats' knowledge, parsing and resolving calls (profiling only). */
+  platformMs: number;
 }
 
 interface SeatSlot {
@@ -95,7 +97,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   const logPath = join(o.outDir, `${o.runId}.jsonl`);
   const anchorsPath = join(o.outDir, `${o.runId}.anchors.jsonl`);
   const k = o.kernel ?? new Kernel();
-  let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0;
+  let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
 
   await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath });
   let t = 0;
@@ -138,7 +140,8 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
       const p = c.params ?? {};
       const cadence = (p.cadence_days ?? 7) * DAY;
       const titles = new Map<string, string>(s.channels.filter((ch: any) => ch.title).map((ch: any) => [ch.id, ch.title]));
-      const config = { seat: s.id, entity: s.entity, title: s.title, role: s.role, framing: s.framing, standing: p.standing ?? [], titles, cadenceDays: p.cadence_days ?? 7, draftText };
+      const entityName = (cfg.world?.entities ?? []).find((e: any) => e.id === s.entity)?.name;
+      const config = { seat: s.id, entity: s.entity, entityName, title: s.title, role: s.role, framing: s.framing, standing: p.standing ?? [], titles, cadenceDays: p.cadence_days ?? 7, draftText };
       const controller = createLlmSeat(config, io);
       const module: BehaviourModule = { name: "llm.seat", version: LLM_SEAT_VERSION, doc: "docs/design/m2-llm-seats.md", cadence: () => cadence, create: () => controller as unknown as Controller };
       slot = { id: s.id, entity: s.entity, module, controller: controller as unknown as Controller, ctx, nextWake: 0, resigned: false, wakesThisTick: 0, wakeTick: -1, knowledge: new Knowledge(), notices: [],
@@ -234,7 +237,9 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     next.nextWake = t + ceilTo(next.module.cadence(next.ctx), tick); // default if it waits without a time
     for (let n = 0; n < maxActions; n++) {
       const obs: Observation = (await command({ command: "observe", seat: next.id })).observation;
+      const p0 = performance.now();
       next.knowledge.absorb(obs);
+      platformMs += performance.now() - p0;
       if (next.notices.length) obs.notices = next.notices.splice(0);
       const L = next.llm;
       if (L) obs.drafts = L.drafts.map((d) => d.draft);
@@ -274,6 +279,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
       }
       if (action.type === "call") {
         // A structured intent: the resolver turns it into the seat's own acts (D36).
+        const p1 = performance.now();
         let program: calls.Program;
         try {
           program = calls.parseProgram(action.call);
@@ -283,13 +289,14 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
           continue;
         }
         const res = resolve(program, next.knowledge, capacity);
+        platformMs += performance.now() - p1;
         if (!res.ok) {
-          await k.request({ op: "annotate", annotation: { annotation: "note", subject: next.id, data: { call_unresolved: calls.programText(program).slice(0, 4000), questions: res.questions } } });
+          await k.request({ op: "annotate", annotation: { annotation: "note", subject: next.id, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
           for (const q of res.questions) next.notices.push({ t, text: q });
           continue;
         }
-        const r = await command({ command: "act", seat: next.id, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program).slice(0, 4000), resolver: RESOLVER }, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
-        if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: next.id, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program).slice(0, 4000) } } });
+        const r = await command({ command: "act", seat: next.id, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program), resolver: RESOLVER }, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
+        if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: next.id, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
         continue;
       }
       if (!L) {
@@ -301,7 +308,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
         const draftId = `draft.${next.id}.${++L.drafted}`;
         const tr = await translator.translate({ draftId, seat: next.id, proposal: action.text, knowledge: next.knowledge });
         if (!tr.ok) {
-          await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: next.id, data: { draft: draftId, proposal: action.text.slice(0, 8000), reason: tr.notices.join(" ").slice(0, 8000), ...(tr.call ? { call: tr.call } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw).slice(0, 8000) } : {}) } } });
+          await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: next.id, data: { draft: draftId, proposal: action.text.slice(0, 8000), reason: tr.notices.join(" ").slice(0, 8000), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw).slice(0, 8000) } : {}) } } });
           for (const text of tr.notices) next.notices.push({ t, text, re: draftId });
           continue;
         }
@@ -333,5 +340,5 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   const end = await k.request({ op: "finish", reason: until === runEnd ? "completed" : "aborted", ...(until === runEnd ? {} : { detail: `stopped at ${until}` }) });
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}`);
-  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs) };
+  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs) };
 }

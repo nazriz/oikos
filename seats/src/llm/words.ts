@@ -27,7 +27,12 @@ const REFUSAL: Record<string, string> = {
   cap_exceeded: "the world's limit on that has been reached",
 };
 
-export function refusalText(code: string | undefined, detail?: string): string {
+/**
+ * What stood in the way, in plain words. The kernel's detail text stays in the
+ * log: it's written for researchers (ids, cents, the grammar of acts), not
+ * for someone living in the world. `item` says which part, when there were several.
+ */
+export function refusalText(code: string | undefined, item?: number, items = 1): string {
   const base = (code && REFUSAL[code]) ?? "it isn't possible";
-  return detail ? `${base} (${detail})` : base;
+  return item !== undefined && items > 1 ? `${base} (item ${item + 1})` : base;
 }

@@ -15,11 +15,13 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { renderObservation, renderStanding } from "./render";
 
-export const LLM_SEAT_VERSION = "0.2.0";
+export const LLM_SEAT_VERSION = "0.2.1";
 
 export interface LlmSeatConfig {
   seat: string;
   entity: string;
+  /** The entity's name in the world, if it has one. */
+  entityName?: string;
   title?: string;
   role?: string;
   framing: { disclosure: string; system?: string; reason: string; debrief?: boolean; debrief_text?: string };
@@ -57,7 +59,7 @@ export function systemPrompt(c: LlmSeatConfig, standing: string): string {
   return [
     c.framing.system ?? "",
     "",
-    `You are ${c.title ?? c.seat}, acting for ${c.entity}.`,
+    `You are ${c.title ?? c.seat}, acting for ${c.entityName && c.entityName !== c.entity ? `${c.entityName} (${c.entity})` : c.entity}.`,
     "To do something, say what you do in plain words, and name what you're using: the amount, the account, the lot, the people, the papers. Your reports show each thing's id in brackets or after its name. Before anything takes effect, you'll see exactly what will happen, and confirm or decline it. You can also write to people directly.",
     "Take one action at a time. You can update your notebook alongside it.",
     ...(standing ? ["", "On file:", standing] : []),

@@ -23,6 +23,7 @@ value    := ID                    e.g.  p00-00   acc-city   rec.412
 - **Zero arithmetic.** Amounts and durations are always quoted text, converted by the parser's tables:
   - amounts: `"$500"`, `"$1,234.56"`, `"60k"`, `"$1.5k"`, `"$2m"`, `"500 dollars"` → integer cents;
   - durations: `"30 days"`, `"2 weeks"`, `"monthly"`, `"fortnightly"`, `"every 3 months"` → seconds. The world has no calendar: a month is 30 days and a year is 365.
+- **Every call is checked against the argument table below** (the parsed form's schema, calls.schema.json). An unknown or missing argument means the call is refused as unclear; it is never silently ignored.
 - **`none(LABEL)`** is the translator's refusal, with one of five labels: `not_yours`, `needs_calculation`, `too_much`, `unclear`, `unknown_form`.
 
 ## Functions

@@ -92,8 +92,11 @@ test("4.5: a missing decision comes back as a question; the resolver never choos
 });
 
 test("names the seat knows become ids; ambiguity or ignorance becomes a question, phrased from the seat's side", () => {
-  const r = run('money(to="GreenCo", amount="$10")');
-  expect(r.ok).toBe(true);
+  // The builder stated its account on its invoice, so paying "Millbrook Builders" goes there.
+  const r = run('money(to="Millbrook Builders", amount="$10")');
+  expect(r.ok && r.blocks[0]!.data.outcome.money.to).toBe("acc-builder");
+  // GreenCo's account has never been seen: a question, not a guess (and not a payment that silently fails).
+  expect(run('money(to="GreenCo", amount="$10")')).toEqual({ ok: false, questions: ["Which of GreenCo (greenco)'s accounts should it go to? You don't know one."] });
   expect(run('money(to="Nobody Inc", amount="$10")')).toEqual({ ok: false, questions: ['You don\'t know of anyone or anything called "Nobody Inc" (for to).'] });
 });
 
@@ -114,7 +117,7 @@ test("every block kind is reachable from some call", () => {
   const k = town();
   k.accounts.set("acc-own", { account: "acc-own", holder: "city", custodian: "city" });
   const programs = [
-    'money(to=acc-builder, amount="$1", from=acc-own)', "account(holder=builder)", "account(close=acc-own)",
+    'money(to=acc-builder, amount="$1", from=acc-own)', "account(holder=builder, at=city)", "account(close=acc-own)",
     "structure(type=park, on=p2, by=city, from=acc-own)", "structure(remove=str.9, by=city, from=acc-own)", "occupancy(in=str.3)", "occupancy(in=str.3, who=c1, leave=yes)",
     'entity(kind=trust, name="T")', 'claim(position=right, holder=city, against=builder, about={"kind":"debt","amount":100})', "claim(transfer=rec.1, to=builder)", "claim(release=rec.1)",
     "agreement(with=builder)", "agreement(sign=rec.5)", "agreement(notice=rec.5)", 'statement(kind=notice, text="x")', "statement(withdraw=rec.2)",

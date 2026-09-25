@@ -53,7 +53,8 @@ fn predict(run: &Run<Vec<u8>>, seat: &str, b: &Block) -> Option<Result<(), Refus
     let k = run.kernel();
     let st = k.state();
     let me = k.statics().entity_of(seat).unwrap();
-    if st.seats[seat].status == SeatStatus::OptedOut {
+    // An opted-out seat can't act, unless the world names a stand-in that carries it on.
+    if st.seats[seat].status == SeatStatus::OptedOut && k.statics().seats[seat].vacant_after_opt_out() {
         return Some(Err(RefusalCode::SeatOptedOut));
     }
     let types = &k.statics().types;

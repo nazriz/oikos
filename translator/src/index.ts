@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.2.0";
+export const TRANSLATOR_VERSION = "0.3.0";
 
 export interface TranslatorId {
   id: string;
@@ -49,7 +49,7 @@ export interface TranslateRequest {
   knowledge: Knowledge;
 }
 
-export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown };
+export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[] };
 
 export type KernelCheck = (seat: string, blocks: Block[]) => Promise<{ ok: boolean; refusal?: any; error?: string }>;
 
@@ -59,9 +59,26 @@ const TOOLS: ToolSpec[] = [
   { name: "call", description: "The request, written in the call language.", input_schema: { type: "object", required: ["program"], properties: { program: { type: "string" } } } },
 ];
 
-/** The translator's instructions: the call language itself (contracts/calls.md), nothing about any world. */
+/** What each function brings about: the language's own glosses (no world, no platform). */
+const GLOSS: { [fn: string]: string } = {
+  money: "money moves to someone (once, or every so often)",
+  account: "an account is opened or closed",
+  structure: "a building goes up, or comes down (and who does it)",
+  occupancy: "someone moves into or out of a building",
+  entity: "a new organisation exists",
+  claim: "a right, permission, power or immunity is on record (or passed on, or released)",
+  agreement: "an agreement is offered (with what each side commits to), signed, or given notice on",
+  statement: "something is published (a notice, a law, a report, …), or withdrawn",
+  vote: "a choice is cast on a ballot",
+  message: "someone is told something",
+  form: "a published form is filled in and handed in",
+};
+
+/** The translator's instructions: the call language itself, generated from the contract (P12), and nothing about any world. */
 export function translatorSystem(): string {
-  const reference = CALLS_MD.slice(CALLS_MD.indexOf("## Syntax"));
+  const syntax = CALLS_MD.slice(CALLS_MD.indexOf("## Syntax"), CALLS_MD.indexOf("## Functions")).trim();
+  const fns = Object.entries(calls.ARGS).map(([fn, a]) => `- ${fn}(${a.allowed ? [...a.allowed].map((x) => (a.required.includes(x) ? `${x}*` : x)).join(", ") : [...a.required.map((x) => `${x}*`), "…the form's own fields"].join(", ")}): ${GLOSS[fn] ?? ""}`);
+  const examples = CALLS_MD.slice(CALLS_MD.indexOf("## Examples")).trim();
   return [
     "You translate one plain-language request into the call language below. You don't judge it, improve it or complete it: write exactly what was asked, with exactly the inputs given.",
     "- Copy ids exactly as written (p00-00, acc-city, rec.412). Copy names, amounts and durations as quoted text, exactly as written; never calculate anything.",
@@ -70,7 +87,12 @@ export function translatorSystem(): string {
     "- To fill in a form, use form(...) with the form's own field names, listed below the request.",
     "Answer with the call tool, whose program is your answer.",
     "",
-    reference,
+    syntax,
+    "",
+    "## Functions (* = required)",
+    ...fns,
+    "",
+    examples,
   ].join("\n");
 }
 
@@ -119,12 +141,12 @@ export function createTranslator(io: LlmIO, check: KernelCheck, capacity: (type:
       }
       const call = calls.programText(program);
       const r = resolve(program, req.knowledge, capacity);
-      if (!r.ok) return { ok: false, notices: r.questions, call };
+      if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}) };
       const k = await check(req.seat, r.blocks);
       if (k.error) return { ok: false, notices: [LABEL_TEXT.unclear], call };
       const warnings = lawWarnings(r.blocks, req.knowledge);
       const draft: Draft = {
-        id: req.draftId, seat: req.seat, proposal: req.proposal.slice(0, 16384), call: call.slice(0, 4000), resolver: RESOLVER,
+        id: req.draftId, seat: req.seat, proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
         blocks: r.blocks, summary: new Preview(req.knowledge).of(r.blocks).slice(0, 16384),
         check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
         translator: tid,
@@ -139,7 +161,7 @@ export function draftText(d: Draft): string {
   return [
     `Before this goes ahead (${d.id}), here is exactly what will happen:`,
     d.summary,
-    d.check.ok ? "Nothing stands in the way right now." : `This can't be done right now: ${refusalText(d.check.refusal?.code, d.check.refusal?.detail)}.`,
+    d.check.ok ? "Nothing stands in the way right now." : `This can't be done right now: ${refusalText(d.check.refusal?.code)}.`,
     ...(d.check.warnings?.length ? [`Legal note: ${d.check.warnings.join(" ")}`] : []),
     "Confirm it, or decline it.",
   ].join("\n");

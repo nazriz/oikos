@@ -281,7 +281,7 @@
         "call": {
           "description": "The translator's reading of the proposal, in the call language (canonical form).",
           "type": "string",
-          "maxLength": 4000
+          "maxLength": 65536
         },
         "resolver": {
           "$ref": "#/$defs/ResolverId"
@@ -360,7 +360,7 @@
             "call": {
               "description": "An intent in the call language (contracts/calls.md), e.g. money(to=builder, amount=\"$500\"). The resolver turns it into the seat's own acts (docs/design/translator-and-resolver.md).",
               "type": "string",
-              "maxLength": 4000
+              "maxLength": 65536
             },
             "reasoning": {
               "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"

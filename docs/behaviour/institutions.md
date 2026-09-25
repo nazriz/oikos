@@ -1,4 +1,4 @@
-# The people inside institutions (planning officer and inspector v0.2.0; builder v0.3.0)
+# The people inside institutions (planning officer v0.3.0, inspector v0.2.0; builder v0.3.0)
 
 **Source:** `seats/src/behaviour/institutions.ts`. These are code seats of the town (`entity: city`) and of the builder. None of this is kernel law. Each seat reads the town's statements, applies them to what it can see because that's its job, and may do the job well, badly or not at all, depending on its parameters (D19, D20).
 
@@ -7,6 +7,7 @@ Laws are read through their optional **formal** conditions, using the CEL helper
 ## `city.planning_officer`
 
 Wakes weekly. For each permit application addressed to the town:
+0. An application that doesn't say which lot, or what kind of building, gets a decision saying so (`incomplete`), rather than being judged.
 1. It asks whether *granting* the permit would breach a prohibition addressed to the office. For example, `law-river` says "the planning office may not grant a permit for building on the river parcels", with formal condition `block.block == 'grant_permit' && block.parcel in [...]`.
 2. If not, it **grants**: it records a *liberty* claim (Hohfeld) for the applicant to build that structure on that parcel, and publishes the decision.
 3. If so, it **refuses**, publishing the decision with the law it cites.

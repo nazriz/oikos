@@ -183,7 +183,7 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   const out: string[] = [`It is ${when(obs.t)}.`];
   for (const x of obs.outcomes) {
     const what = o.lastAction ?? "What you did";
-    out.push(x.status === "applied" ? `Done: ${what.charAt(0).toLowerCase()}${what.slice(1)}.` : `${what} couldn't be done: ${refusalText(x.refusal?.code, x.refusal?.detail)}.`);
+    out.push(x.status === "applied" ? `Done: ${what.charAt(0).toLowerCase()}${what.slice(1)}.` : `${what} couldn't be done: ${refusalText(x.refusal?.code)}.`);
   }
   for (const n of obs.notices ?? []) out.push(`A note on your request: ${n.text}`);
   if (obs.inbox.length) {

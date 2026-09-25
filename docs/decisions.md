@@ -51,7 +51,7 @@ Consequence: an LLM emitting malformed blocks leaves no trace in the kernel log.
 **D12. Reward is always 0 in the seat API.**
 Why: the platform doesn't judge. RL users wrap the environment with a reward computed outside the world.
 
-**D13. Resignation is always available and not configurable; every framing records a reason** (VISION §15).
+**D13. Resignation is always available and not configurable; every framing records a reason** (VISION §15). *(Refined by D38: what's always available is opting out of the study, which is distinct from resigning an office; what happens to the seat afterwards is configurable.)*
 
 **D14. Transport: the kernel is a subprocess speaking NDJSON over stdio.**
 Why: simple, deterministic, no ports, and the same messages carry over to WASM. Not a contract; can change freely.

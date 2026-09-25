@@ -11,13 +11,14 @@
 import type { Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type SeatContext } from "../module";
+import { refusalText } from "../llm/words";
 import { Book, callAction, message, pay, type Step } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -45,25 +46,39 @@ export const bankPaymentSystem: BehaviourModule = {
       const seatEntity = book.seatEntity;
       const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, a]));
       const instructions = [...book.records.values()]
-        .filter((r): r is StatementRecord => r.record === "statement" && r.kind === "request" && !!r.data?.outcome?.money && (r.addressed_to ?? []).includes(me))
+        .filter((r): r is StatementRecord => r.record === "statement" && r.kind === "request" && (r.addressed_to ?? []).includes(me))
         .sort((a, b) => (a.id < b.id ? -1 : 1));
       const out: Payment[] = [];
       for (const ins of instructions) {
         if (withdrawn.has(ins.id)) continue;
-        const m = ins.data.outcome.money;
+        // Requests the bank can't carry out get a reply, once, as a real bank's would (§9.3).
+        const cannot = (why: string) => {
+          if (done.has(ins.id)) return;
+          done.add(ins.id);
+          refusals.push(message([ins.author === "genesis" ? ins.speaks_for ?? me : ins.author], `Request ${ins.id} not carried out: ${why}`, ins.id));
+        };
+        const m = ins.data?.outcome?.money;
+        if (!m) {
+          cannot("this bank only makes payments.");
+          continue;
+        }
         const d = { from: m.from, to: m.to, pay: m.amount, settles: m.settles, every: ins.data.every, first: ins.data.first };
         const acc = custody.get(d.from);
-        if (!acc || !Number.isInteger(d.pay) || d.pay <= 0 || typeof d.to !== "string") continue;
+        if (!acc) {
+          cannot(`this bank doesn't keep account ${d.from}.`);
+          continue;
+        }
+        if (!Number.isInteger(d.pay) || d.pay <= 0 || typeof d.to !== "string") {
+          cannot("it doesn't say a valid amount and account to pay.");
+          continue;
+        }
         // The bank's procedure: only the account holder may instruct it, and if
         // the holder has named its signatories for this account, only they.
         const authorEntity = ins.author === "genesis" ? ins.speaks_for : seatEntity.get(ins.author);
         if (ins.speaks_for !== acc.holder || (verifyAuthor && authorEntity !== acc.holder)) continue;
         const named = signatories(acc.holder, d.from);
         if (named && ins.author !== "genesis" && !named.includes(ins.author)) {
-          if (!done.has(ins.id)) {
-            done.add(ins.id);
-            refusals.push(message([ins.author], `Request ${ins.id} not carried out: ${ins.author} is not an authorised signatory for ${d.from}.`, ins.id));
-          }
+          cannot(`${ins.author} is not an authorised signatory for ${d.from}.`);
           continue;
         }
         if (Number.isInteger(d.every) && d.every > 0) {
@@ -90,9 +105,15 @@ export const bankPaymentSystem: BehaviourModule = {
           queuedAt = obs.t;
           inFlight = [];
         }
-        // If the last batch was refused (the world changed under us), retry it one payment at a time.
+        // If the last batch was refused (the world changed under us), retry it one payment at a time;
+        // a single payment that's refused is reported to the account holder, in plain words.
         const last = obs.outcomes.at(-1);
         if (last?.status === "refused" && inFlight.length > 1) queue.unshift(...inFlight.map((p) => ({ ...p, single: true }) as Payment));
+        else if (last?.status === "refused" && inFlight.length === 1) {
+          const p = inFlight[0]!;
+          const holder = channels.accounts(obs).find((a) => a.account === p.from)?.holder;
+          if (holder) refusals.push(message([holder], `Payment of ${p.amount} cents to ${p.to} (request ${p.instruction}) couldn't be made: ${refusalText(last.refusal?.code)}.`, p.instruction));
+        }
         inFlight = [];
         if (refusals.length) return callAction(refusals.splice(0, 32));
         if (queue.length === 0) return wait();

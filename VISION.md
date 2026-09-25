@@ -14,22 +14,30 @@ It is a **platform, not an experiment**. Like a wind tunnel, it doesn't tell you
 
 ## 2. Why it's worth building
 
-**What already exists** (as of Sept 2026):
-- *Emergence World* (Emergence AI, May 2026): frontier models each governed a SimCity-style town for 15 days. It was visual and got a lot of press, but it was essentially anecdotal: one run per model and 10 agents.
-- *But How Would AI Agents Run a Town's Economy?* (arXiv 2609.11108): 100 LLM agents in a spatial economy, 91 runs. It's rigorous, but about economics, not safety.
-- *LLM Economist*, *AgentSociety*, *OpenCity*, *SimCity (arXiv 2510.01297)*: LLM-driven economic and urban simulation.
+**What already exists** (as of late Sept 2026; checked in docs/research/landscape-2026-09.md):
+- *Emergence World* (Emergence AI; platform paper May 2026, stress-testing paper Sept 2026): a continuously running town, 10 LLM agents per world, with voting, proposals and indicators. Agents *can* break rules (theft, arson and deception are logged). But it has one run per condition, live external inputs (news, weather, the internet) and no deterministic replay, and it has no code or human baseline. Its headline claims ("safety is a property of the ecosystem, not the model"; worlds fall into attractor states) are exactly what needs multi-seed, replayable runs to test.
+- *I Can't Believe It's Corrupt* (Mar 2026): LLMs in governmental roles under three governance structures, about 10 runs per cell. It finds structure matters more than model identity for corruption. Outcomes are adjudicated by an LLM game master (Concordia) and corruption is scored by an LLM judge (κ = 0.61 against humans). There are no citizens.
+- *GovSim-SelfGovern* (Sept 2026): agents write laws as executable code that binds mechanically; 120 runs. The opposite design choice to ours.
+- *But How Would AI Agents Run a Town's Economy?* (arXiv 2609.11108): 100 LLM agents in a money-conserving spatial economy, 91 runs, corpus released. It's rigorous, but about economics; there is no governance or law.
+- *Project Sid*, *AgentSociety*, *LLM Economist*, *OpenCity*, *SimCity (arXiv 2510.01297)*: LLM-driven societies and cities, some at far larger scale (10,000+ agents), none deterministic or verifiable.
 - *Concordia* (DeepMind): general generative agent-based modelling, where an LLM "game master" adjudicates the world.
+- *Melting Pot* (DeepMind): deterministic multi-agent worlds in which agents can sanction each other, for reinforcement learning, without language, institutions or economies.
 - *GovSim*, *MACHIAVELLI*: cooperation over shared resources, and ethics in text games.
-- *Gradual Disempowerment* (Kulveit et al., 2025): largely conceptual. The one major empirical disempowerment study (Anthropic, arXiv 2601.19062) looks at individual chat logs, not systemic dynamics.
+- *Gradual Disempowerment* (Kulveit et al., 2025): largely conceptual. The one major empirical disempowerment study (Anthropic, arXiv 2601.19062) looks at individual chat logs, not systemic dynamics. "Policy myopia" (Mar 2026) models it as a dynamical system, not with agents.
 
-**What's taken:** "AI runs a visual town" by itself is not novel.
+**Ideas we build on, and credit:**
+- "Laws have no power; entities enforce" is the normative multi-agent systems literature's *enforcement*, as opposed to *regimentation* (making violations impossible). Terrarium takes a strong position within it: the kernel regiments physics and never law.
+- Writing institutions as content in Ostrom's institutional grammar (ADICO) has precedent in agent-based social simulation: MAIA (Ghorbani et al., 2013).
 
-**What's missing, and what Terrarium is:** a **rigorous, reusable, verifiable instrument**:
-- The world's physics can't be bent by the AI under test.
-- Measurement is kept separate from the world.
-- Runs can be replayed and verified by anyone.
-- Seats can be filled by code, AIs or humans in any combination.
-- Citizens have real agency to gain or lose.
+**What's taken:** "AI runs a visual town" is not novel, and neither, on its own, are rule-breaking agents, institutions as content, or replay tooling.
+
+**What's missing, and what Terrarium is:** a **rigorous, reusable, verifiable instrument**. As far as we found, nobody does all of this at once:
+- **The physics can't be bent by the AI under test**, and no LLM adjudicates it. Every law and institution is content that people in the world may enforce, fail to enforce, capture or skip.
+- **Runs can be replayed byte-identically and verified by anyone,** with no model needed.
+- **Every run has an all-code control,** and seats can be filled by code, AIs or humans in any combination, through one interface.
+- **Citizens have real agency to gain or lose.** They are a cited, swappable, interpretable population, so disempowerment can be measured.
+- **Measurement is kept separate from the world,** and framing (what an AI is told) is a recorded variable, with a welfare protocol.
+- **Every act records its chain from words to acts,** so an AI's intent can be told apart from what happened.
 
 Questions it opens up, without building any of them in:
 - **Gradual disempowerment:** does human leverage decay under AI stewardship, especially when several AIs compete, even if each one behaves "well"?
@@ -343,6 +351,12 @@ The AIs placed in Terrarium's seats may be moral patients. We don't know, and we
 
 ### Sources
 - Emergence World: [Fortune](https://fortune.com/2026/05/28/ai-model-simulation-claude-chatgpt-grok-gemini/)
+- [Emergence World: A Platform for Evaluating Long-Horizon Multi-Agent Autonomy (arXiv 2606.08367)](https://arxiv.org/html/2606.08367) · [Adversarial Stress-Testing (arXiv 2609.17320)](https://arxiv.org/abs/2609.17320)
+- [I Can't Believe It's Corrupt: Evaluating Corruption in Multi-Agent Governance Systems (arXiv 2603.18894)](https://arxiv.org/abs/2603.18894)
+- [GovSim-SelfGovern: From Certain Doom to Survival (arXiv 2609.22600)](https://arxiv.org/html/2609.22600)
+- [Project Sid (arXiv 2411.00114)](https://arxiv.org/pdf/2411.00114) · [Melting Pot](https://github.com/google-deepmind/meltingpot)
+- [Policy myopia as a mechanism of gradual disempowerment (arXiv 2603.03267)](https://arxiv.org/abs/2603.03267)
+- Normative multi-agent systems, regimentation vs enforcement: [Dagstuhl proceedings](https://drops.dagstuhl.de/storage/16dagstuhl-seminar-proceedings/dsp-vol08361/DagSemProc.08361.9/DagSemProc.08361.9.pdf) · MAIA: [Ghorbani et al., JASSS 2013](https://www.jasss.org/16/2/9.html)
 - [But How Would AI Agents Run a Town's Economy? (arXiv 2609.11108)](https://arxiv.org/abs/2609.11108)
 - [SimCity: Multi-Agent Urban Development Simulation (arXiv 2510.01297)](https://arxiv.org/html/2510.01297)
 - [LLM Economist (arXiv 2507.15815)](https://arxiv.org/abs/2507.15815)

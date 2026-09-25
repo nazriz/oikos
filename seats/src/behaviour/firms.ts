@@ -88,7 +88,6 @@ export const landlord: BehaviourModule = {
     let income = 0;
     let nextSpend = MONTH;
 
-    const tenantAccount = new Map<string, string>(); // agreement -> tenant's paying account
     const vacancyHistory: { t: number; vacant: number; units: number }[] = [];
     let dev: { parcel: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string } | null = null;
     let devCooldownUntil = 0;
@@ -108,7 +107,6 @@ export const landlord: BehaviourModule = {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
-      const bank = acc.custodian;
       // What we own: completed homes on parcels our ownership records name
       // (seen through our own sites), including anything we've since built.
       const ownParcels = new Set([...book.records.values()].flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object] : [])));
@@ -156,7 +154,6 @@ export const landlord: BehaviourModule = {
           withdraw(listingId, "Let."),
         ]);
         offeredNow.push(listing.data.structure);
-        tenantAccount.set(listingId, pick.data?.account);
       }
 
       // Vacancies: list them, at a markup over what we currently get for that kind of home.
@@ -278,7 +275,6 @@ export const landlord: BehaviourModule = {
           if (obeys(`order-${r.id}`)) steps.push([C.call("structure", { remove: r.data?.structure, by: me, from: acc.account })]);
         }
       }
-      void tenantAccount;
       return steps;
     });
   },
@@ -323,7 +319,6 @@ export const employer: BehaviourModule = {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
-      const bank = acc.custodian;
       // Genesis standing orders for existing staff.
       for (const r of book.records.values()) if (r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.basis && !orders.has(r.basis) && !book.withdrawn.has(r.id)) orders.set(r.basis, r.id);
 
