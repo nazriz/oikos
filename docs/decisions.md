@@ -133,9 +133,15 @@ The kernel now implements physics plus records only. Mandates, typed rules, juri
 
 14 planted bugs, including two ways of sneaking law into the kernel, are each caught. The records' default visibility (who sees a record when its author doesn't say) is documented in contracts/README.md and tested in `tests/physics.rs`.
 
+**D30. Behaviour lives in TypeScript code seats: citizens, and the people inside institutions.** *(Naz suggested it, 2026-09-25; follows from D23.)*
+Citizens, bank payment systems, clerks, planning officers, inspectors, landlords and employers are code seats running swappable behaviour modules (content, cited in docs/behaviour/). They go through the same seat API as LLM and human seats (VISION principle 4), so any of them can be handed to an LLM or a human. Replay never needs their code, since their acts are logged commands. So that *re-runs* are reproducible too:
+- modules draw randomness only from the run seed, via the same keyed-stream algorithm as the kernel (ported to TypeScript and checked against the Rust known-answer vectors);
+- they read no clocks;
+- their version and code hash are recorded in the log.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`).
 
-- Citizen behaviour in the Rust kernel (deterministic, fast, re-runnable, but researchers must write Rust to swap models) vs TypeScript code seats (easy to swap, but replay-only reproducibility). Leaning kernel.
-- Which D15 laws become parameters, and their defaults.
+- ~~Citizen behaviour in the Rust kernel vs TypeScript code seats.~~ **Resolved by D30.**
+- ~~Which D15 laws become parameters.~~ **Obsolete** under D18/D19: there are no laws in the kernel; laws are records in a world's config.
