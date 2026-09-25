@@ -1,15 +1,15 @@
 {
-  "seq": 46,
-  "t": 172800,
+  "seq": 45,
+  "t": 2592000,
   "kind": "event",
   "body": {
     "event": "action_refused",
-    "cause": 41,
-    "action": "act.6",
+    "cause": 46,
+    "action": "act.21",
     "seat": "mayor",
-    "block": 1,
-    "code": "mandate_denied",
-    "detail": "no power matches dissolve_entity"
+    "block": 0,
+    "code": "not_custodian",
+    "detail": "acc-city is held by bank"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

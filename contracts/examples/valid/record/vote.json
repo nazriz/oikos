@@ -1,0 +1,10 @@
+{
+  "id": "rec.231",
+  "record": "vote",
+  "author": "alice-seat",
+  "speaks_for": "alice",
+  "at": 6912000,
+  "visible_to": "public",
+  "ballot": "rec.90",
+  "choice": "no"
+}

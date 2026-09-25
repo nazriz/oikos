@@ -1,0 +1,24 @@
+{
+  "seq": 41,
+  "t": 2592000,
+  "kind": "command",
+  "body": {
+    "command": "act",
+    "seat": "bank-payments",
+    "blocks": [
+      {
+        "block": "transfer",
+        "from": "acc-bob",
+        "to": "acc-devco",
+        "amount": 180000,
+        "per_instruction": "so-bob-rent",
+        "memo": "Rent, month 2"
+      }
+    ],
+    "provenance": {
+      "via": "direct"
+    }
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

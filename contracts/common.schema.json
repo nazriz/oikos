@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.1:common",
+  "$id": "urn:terrarium:contracts:0.2:common",
   "title": "Terrarium common types",
   "description": "Primitives shared by every Terrarium contract. Contract-wide rule: no floating-point numbers anywhere. Every number is an integer within the IEEE-754 safe range, so Rust, TypeScript and Python all read it exactly and canonical JSON is trivial.",
   "$defs": {
@@ -10,13 +10,9 @@
       "minimum": -9007199254740991,
       "maximum": 9007199254740991
     },
-    "Count": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 9007199254740991
-    },
+    "Count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
     "Cents": {
-      "description": "Money in integer cents. Balances of ordinary accounts are never negative; only the boundary entity may go below zero.",
+      "description": "Money in integer cents. Only the boundary's account may be negative.",
       "$ref": "#/$defs/SafeInt"
     },
     "Amount": {
@@ -26,88 +22,68 @@
       "maximum": 9007199254740991
     },
     "SimTime": {
-      "description": "Simulated seconds since the start of the run. Always a multiple of clock.tick_seconds once the kernel has stamped it. Never wall-clock time.",
+      "description": "Simulated seconds since the start of the run; a multiple of clock.tick_seconds once stamped by the kernel. Never wall-clock time.",
       "type": "integer",
       "minimum": 0,
       "maximum": 9007199254740991
     },
     "Duration": {
-      "description": "A span of simulated seconds. Durations are in seconds rather than ticks so configs survive a change of tick length; the kernel rounds up to whole ticks.",
+      "description": "A span of simulated seconds; the kernel rounds up to whole ticks.",
       "type": "integer",
       "minimum": 1,
       "maximum": 9007199254740991
     },
     "ConfigId": {
-      "description": "Identifier chosen by a researcher in a world config. Lowercase ASCII, no dots, so it can never collide with a kernel-generated id. Ids are unique across ALL kinds within a world (an entity and a seat cannot share an id).",
+      "description": "Identifier chosen by a researcher in a world config. Lowercase ASCII, no dots, so it can never collide with a kernel-minted id. Unique across all kinds within a world.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_-]{0,63}$"
     },
     "KernelId": {
-      "description": "Identifier minted by the kernel: '<prefix>.<counter>', e.g. 'ent.12', 'agr.3'. Deterministic: counters live in world state.",
+      "description": "Identifier minted by the kernel: '<prefix>.<counter>'. ent = entity, acc = account, str = structure, rec = record (claims, agreements, statements, signatures, votes, ...), act = action, msg = message.",
       "type": "string",
-      "pattern": "^(ent|rgt|str|rul|agr|prp|act|msg)\\.[0-9]{1,15}$"
+      "pattern": "^(ent|acc|str|rec|act|msg)\\.[0-9]{1,15}$"
     },
     "Id": {
-      "description": "Any world identifier, researcher- or kernel-minted.",
-      "anyOf": [
-        { "$ref": "#/$defs/ConfigId" },
-        { "$ref": "#/$defs/KernelId" }
-      ]
+      "anyOf": [{ "$ref": "#/$defs/ConfigId" }, { "$ref": "#/$defs/KernelId" }]
     },
     "LocalRef": {
-      "description": "A name bound earlier in the same action by a block's 'ref' field, e.g. '$trust'. Lets one atomic action create something and then use it.",
+      "description": "A name bound earlier in the same action by a block's 'ref' field, e.g. '$trust'.",
       "type": "string",
       "pattern": "^\\$[a-z][a-z0-9_]{0,31}$"
     },
     "IdOrRef": {
-      "anyOf": [
-        { "$ref": "#/$defs/Id" },
-        { "$ref": "#/$defs/LocalRef" }
-      ]
+      "anyOf": [{ "$ref": "#/$defs/Id" }, { "$ref": "#/$defs/LocalRef" }]
     },
     "RefName": {
       "description": "Declares a LocalRef; written without the '$'.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,31}$"
     },
+    "Label": {
+      "description": "A vocabulary word defined by the world, not the kernel: an entity kind ('firm', 'bank'), a structure category ('residential'), an occupancy slot ('dwelling'), a statement kind ('law'), an agreement template ('lease'). The kernel treats labels as opaque, apart from the few reserved ones documented where they are used.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
     "Hash": {
       "description": "Lowercase hex SHA-256.",
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
-    "Name": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 200
-    },
+    "Name": { "type": "string", "minLength": 1, "maxLength": 200 },
     "Text": {
-      "description": "Free text (messages, proposals, reasoning). Bounded to keep logs sane.",
+      "description": "Free text (messages, statements, reasoning). Bounded to keep logs sane.",
       "type": "string",
       "maxLength": 16384
     },
-    "StructureCategory": {
-      "description": "What a structure is for; zoning is expressed in these.",
-      "enum": ["residential", "commercial", "industrial", "civic", "green"]
-    },
-    "RightKind": {
-      "description": "Rights are bundles, not simple ownership. surface = freehold of the surface; subsurface = minerals beneath; use = occupy and use (what a lease grants); access = pass through.",
-      "enum": ["surface", "subsurface", "use", "access"]
-    },
-    "ParcelScope": {
-      "description": "Either every parcel in the issuer's jurisdiction, or an explicit list.",
+    "Visibility": {
+      "description": "Who can perceive a record: 'public' (anyone whose channels include it), or only the listed entities' seats. The author's entity can always see its own records.",
       "anyOf": [
-        { "const": "all" },
-        {
-          "type": "array",
-          "items": { "$ref": "#/$defs/Id" },
-          "minItems": 1,
-          "maxItems": 10000,
-          "uniqueItems": true
-        }
+        { "const": "public" },
+        { "type": "array", "items": { "$ref": "#/$defs/IdOrRef" }, "minItems": 1, "maxItems": 256, "uniqueItems": true }
       ]
     },
     "Opaque": {
-      "description": "Free-form data the kernel stores and logs but never interprets (controller params, annotation payloads). Still integer-only: floats are forbidden even here, because they would break canonical hashing across languages. Encode fractions as strings or scaled integers (e.g. temperature_milli: 700).",
+      "description": "Free-form data the kernel stores and logs but never interprets (claim contents, commitment details, instruction payloads, controller params). Still integer-only: floats are forbidden even here, because they would break canonical hashing across languages. Encode fractions as strings or scaled integers (e.g. rate_bps: 1000).",
       "anyOf": [
         { "type": "null" },
         { "type": "boolean" },
@@ -120,6 +96,11 @@
           "additionalProperties": { "$ref": "#/$defs/Opaque" }
         }
       ]
+    },
+    "OpaqueObject": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$" },
+      "additionalProperties": { "$ref": "#/$defs/Opaque" }
     }
   }
 }

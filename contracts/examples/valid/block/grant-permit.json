@@ -1,0 +1,13 @@
+{
+  "block": "record_claim",
+  "position": "liberty",
+  "holder": "devco",
+  "about": {
+    "action": "build",
+    "parcel": "p12",
+    "structure_type": "apartments"
+  },
+  "basis": "law-river",
+  "speaks_for": "city",
+  "ref": "permit"
+}

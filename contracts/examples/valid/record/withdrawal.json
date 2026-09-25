@@ -1,0 +1,10 @@
+{
+  "id": "rec.240",
+  "record": "withdrawal",
+  "author": "mayor",
+  "speaks_for": "city",
+  "at": 7948800,
+  "visible_to": "public",
+  "withdraws": "law-river",
+  "basis": "rec.95"
+}

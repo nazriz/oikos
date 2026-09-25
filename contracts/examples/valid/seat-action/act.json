@@ -1,0 +1,17 @@
+{
+  "type": "act",
+  "blocks": [
+    {
+      "block": "create_entity",
+      "kind": "trust",
+      "name": "Riverbend Community Land Trust",
+      "speaks_for": "city",
+      "ref": "trust"
+    },
+    {
+      "block": "open_account",
+      "holder": "$trust"
+    }
+  ],
+  "reasoning": "A code controller acting directly."
+}

@@ -1,0 +1,15 @@
+{
+  "seq": 44,
+  "t": 0,
+  "kind": "event",
+  "body": {
+    "event": "transfer",
+    "cause": 41,
+    "from": "acc-bob",
+    "to": "acc-devco",
+    "amount": 180000,
+    "reason": "payment"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

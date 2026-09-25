@@ -1,0 +1,7 @@
+{
+  "block": "transfer_claim",
+  "claim": "title-p12",
+  "to": "devco",
+  "basis": "rec.41",
+  "speaks_for": "city"
+}

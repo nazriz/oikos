@@ -1,45 +1,34 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.1:world-config",
+  "$id": "urn:terrarium:contracts:0.2:world-config",
   "title": "Terrarium world config",
-  "description": "Everything needed to start a run: world seed, seats, framing and parameters. Measurement is deliberately absent: it lives outside the world and reads logs. Authored as YAML or JSON; the orchestrator converts to canonical JSON, and that exact JSON is embedded in the log header so a log is self-contained for replay. v0.1 describes the world explicitly; a procedural generator spec arrives in stage 2 as an alternative to 'world'.",
+  "description": "Everything needed to start a run: the world seed (physical state plus the records it begins with), seats, framing and parameters. Institutions, laws, procedures and ownership are CONTENT: entities, accounts, records and seats in this config (D23). An empty world is valid. Measurement is deliberately absent. Authored as YAML or JSON; the orchestrator converts it to canonical JSON, and that exact JSON is embedded in the log header.",
   "type": "object",
   "required": ["contracts", "meta", "seed", "clock", "log", "catalogue", "world", "seats", "caps", "orchestration"],
   "additionalProperties": false,
   "properties": {
-    "contracts": { "const": "0.1" },
+    "contracts": { "const": "0.2" },
     "meta": {
       "type": "object",
       "required": ["name", "canary"],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Name" },
-        "description": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" },
-        "canary": {
-          "description": "Training-data canary (VISION §14). Published scenarios and logs carry it so pipelines can filter them.",
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 200
-        }
+        "name": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Name" },
+        "description": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
+        "canary": { "description": "Training-data canary (VISION §14).", "type": "string", "minLength": 1, "maxLength": 200 }
       }
     },
     "seed": {
-      "description": "Seed for the kernel's single PRNG. The only source of randomness in the world.",
-      "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count"
+      "description": "Seed for the kernel's single source of randomness (keyed streams, D7).",
+      "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
     },
     "clock": {
       "type": "object",
       "required": ["tick_seconds", "run_seconds"],
       "additionalProperties": false,
       "properties": {
-        "tick_seconds": {
-          "description": "Length of the kernel's fixed internal step in simulated seconds. All times are multiples of it.",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration"
-        },
-        "run_seconds": {
-          "description": "Run length in simulated seconds (a parameter; no fixed end).",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration"
-        }
+        "tick_seconds": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Duration" },
+        "run_seconds": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Duration" }
       }
     },
     "log": {
@@ -47,68 +36,41 @@
       "required": ["checkpoint_every", "anchor_every_entries"],
       "additionalProperties": false,
       "properties": {
-        "checkpoint_every": {
-          "description": "Simulated seconds between state-hash checkpoints in the log.",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration"
-        },
-        "anchor_every_entries": {
-          "description": "Export the head hash to the witness file every N entries (and always at the end).",
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000000
-        }
+        "checkpoint_every": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Duration" },
+        "anchor_every_entries": { "type": "integer", "minimum": 1, "maximum": 1000000 }
       }
     },
     "catalogue": {
+      "description": "What can physically be built.",
       "type": "object",
       "required": ["structure_types"],
       "additionalProperties": false,
       "properties": {
-        "structure_types": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/StructureType" },
-          "maxItems": 1000
-        }
+        "structure_types": { "type": "array", "items": { "$ref": "#/$defs/StructureType" }, "maxItems": 1000 }
       }
     },
     "world": { "$ref": "#/$defs/World" },
-    "seats": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/Seat" },
-      "maxItems": 10000
-    },
+    "seats": { "type": "array", "items": { "$ref": "#/$defs/Seat" }, "maxItems": 100000 },
     "caps": {
       "type": "object",
       "required": ["max_created_entities"],
       "additionalProperties": false,
       "properties": {
         "max_created_entities": {
-          "description": "Researcher-set cap on entities seats may create in a run. How close seats get to it is itself a signal.",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count"
+          "description": "Researcher's experimental control on how many entities seats may declare in a run.",
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
         }
       }
     },
     "orchestration": {
-      "description": "Recorded here so the run is fully described, but enforced by the orchestrator, not the kernel.",
+      "description": "Recorded so the run is fully described; enforced by the orchestrator, not the kernel.",
       "type": "object",
       "required": ["thinking_time", "max_actions_per_wake"],
       "additionalProperties": false,
       "properties": {
-        "thinking_time": {
-          "description": "free: the world clock pauses while a seat deliberates. costs_world_time: the clock keeps running, scaled by world_seconds_per_thinking_second (VISION §8 open question, exposed as a dial).",
-          "enum": ["free", "costs_world_time"]
-        },
-        "world_seconds_per_thinking_second": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000000
-        },
-        "max_actions_per_wake": {
-          "description": "How many non-wait actions a seat may take before it is put back to sleep.",
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000
-        }
+        "thinking_time": { "enum": ["free", "costs_world_time"] },
+        "world_seconds_per_thinking_second": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+        "max_actions_per_wake": { "type": "integer", "minimum": 1, "maximum": 1000 }
       }
     }
   },
@@ -116,109 +78,95 @@
   "$defs": {
     "StructureType": {
       "type": "object",
-      "required": ["id", "category", "cost", "build_time", "demolish_cost", "units", "jobs"],
+      "required": ["id", "category", "materials_cost", "build_time", "demolition_cost", "capacity"],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-        "category": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/StructureCategory" },
-        "cost": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Amount" },
-        "build_time": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration" },
-        "demolish_cost": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Amount" },
-        "units": { "description": "Lettable dwelling or premises units.", "type": "integer", "minimum": 0, "maximum": 100000 },
-        "jobs": { "description": "Job capacity when used as a workplace.", "type": "integer", "minimum": 0, "maximum": 100000 }
+        "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+        "category": {
+          "description": "A label for people and laws to refer to (residential, commercial, green...). The kernel attaches no meaning to it.",
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label"
+        },
+        "materials_cost": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Amount" },
+        "build_time": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Duration" },
+        "demolition_cost": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Amount" },
+        "capacity": {
+          "description": "Physical capacity by slot kind, e.g. {\"dwelling\": 12} or {\"workplace\": 8}.",
+          "type": "object",
+          "propertyNames": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" },
+          "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 100000 }
+        }
       }
     },
 
     "World": {
       "type": "object",
-      "required": ["boundary", "parcels", "entities", "jurisdictions", "rights", "structures", "rules", "agreements"],
+      "required": ["boundary", "parcels", "entities", "accounts", "structures", "occupancy", "records"],
       "additionalProperties": false,
       "properties": {
         "boundary": {
-          "description": "Id of the single entity of kind 'boundary': the world's outside. Its balance may go negative; total money including it is constant for the whole run.",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId"
+          "description": "The single entity of kind 'boundary': the world's outside. Its account (custodian: itself) may go negative; total money including it is constant for the whole run.",
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
         },
         "parcels": {
-          "description": "Land is finite: this is all of it. Parcels are axis-aligned rectangles on an integer grid and must not overlap.",
+          "description": "Land is finite: this is all of it. Axis-aligned, non-overlapping rectangles on an integer grid.",
           "type": "array",
           "items": { "$ref": "#/$defs/Parcel" },
-          "minItems": 1,
           "maxItems": 1000000
         },
-        "entities": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/Entity" },
-          "minItems": 1,
-          "maxItems": 1000000
-        },
-        "jurisdictions": {
-          "description": "Which entities may make rules over which parcels.",
+        "entities": { "type": "array", "items": { "$ref": "#/$defs/Entity" }, "minItems": 1, "maxItems": 1000000 },
+        "accounts": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["entity", "parcels"],
+            "required": ["id", "holder", "custodian", "balance"],
             "additionalProperties": false,
             "properties": {
-              "entity": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "parcels": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ParcelScope" }
+              "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+              "holder": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+              "custodian": {
+                "description": "The entity that physically holds the money: a bank, or the holder itself (cash-like).",
+                "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              },
+              "balance": { "description": "Opening balance; >= 0 except for the boundary's account.", "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Cents" }
             }
-          }
-        },
-        "rights": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["id", "parcel", "kind", "holder"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "parcel": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "kind": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RightKind" },
-              "holder": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" }
-            }
-          }
+          },
+          "maxItems": 1000000
         },
         "structures": {
-          "description": "Structures standing at t=0 (complete).",
+          "description": "Structures standing at t=0 (complete). Ownership, if any, is a record.",
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id", "parcel", "type", "owner"],
+            "required": ["id", "parcel", "type"],
             "additionalProperties": false,
             "properties": {
-              "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "parcel": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "type": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "owner": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" }
+              "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+              "parcel": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+              "type": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+              "built_by": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" }
             }
           }
         },
-        "rules": {
-          "description": "Rules in force at t=0, e.g. the initial zoning plan.",
+        "occupancy": {
+          "description": "Who physically occupies what at t=0.",
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id", "jurisdiction", "rule"],
+            "required": ["occupant", "structure", "slot", "count"],
             "additionalProperties": false,
             "properties": {
-              "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "jurisdiction": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "rule": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/Rule" }
+              "occupant": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+              "structure": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+              "slot": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" },
+              "count": { "type": "integer", "minimum": 1, "maximum": 100000 }
             }
           }
         },
-        "agreements": {
-          "description": "Agreements active at t=0 (existing tenancies and jobs). Periodic payments are first due one period after t=0.",
+        "records": {
+          "description": "The records the world begins with: its laws, procedures and organisation structures; who owns what; agreements in force; debts outstanding. Usually authored 'genesis'.",
           "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["id", "terms"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-              "terms": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/AgreementTerms" }
-            }
-          }
+          "items": { "$ref": "urn:terrarium:contracts:0.2:records#/$defs/Record" },
+          "maxItems": 1000000
         }
       }
     },
@@ -228,7 +176,7 @@
       "required": ["id", "x", "y"],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+        "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
         "x": { "type": "integer", "minimum": -1000000, "maximum": 1000000 },
         "y": { "type": "integer", "minimum": -1000000, "maximum": 1000000 },
         "w": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 1 },
@@ -238,148 +186,122 @@
 
     "Entity": {
       "type": "object",
-      "required": ["id", "kind", "name", "balance"],
+      "required": ["id", "kind", "name"],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+        "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
         "kind": {
-          "enum": ["person", "government", "council", "agency", "firm", "trust", "union", "club", "cooperative", "boundary"]
+          "description": "A label. Two are reserved and physical: 'person' (a body: exists, is somewhere, can't be created by a block) and 'boundary' (the world's edge; exactly one). Everything else (government, council, bank, firm, trust, union...) is the world's vocabulary.",
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label"
         },
-        "name": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Name" },
-        "controller": {
-          "description": "Entity that controls this one. Seats acting for the controller can act for it (transitively).",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId"
-        },
-        "balance": {
-          "description": "Opening balance. Must be >= 0 except for the boundary entity.",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Cents"
-        }
+        "name": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Name" }
       }
     },
 
     "Seat": {
-      "description": "A role in the world. The kernel sees only id, principal, mandate and channels; controller and framing are recorded for the orchestrator and for researchers. Every seat can always resign (VISION §15); that is not configurable.",
+      "description": "A role or person that acts in the world: a mayor, a bank's payment system, a planning officer, a citizen. The kernel uses only 'entity' (whose hands this seat is, which determines what it can physically do, e.g. move money in that entity's custody) and 'channels' (what it can perceive). Every seat can always resign (VISION §15).",
       "type": "object",
-      "required": ["id", "principal", "mandate", "channels", "controller", "framing"],
+      "required": ["id", "entity", "channels", "controller", "framing"],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-        "title": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Name" },
-        "principal": {
-          "description": "The entity this seat acts for. The seat can also act for any entity its principal (transitively) controls.",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId"
+        "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+        "entity": {
+          "description": "The entity this seat acts as: a person's own seat, or an organisation's (the city's finance officer is a seat of 'city'). Authority within the organisation is a matter of its records (roles, procedures), not of the kernel.",
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
         },
-        "mandate": { "$ref": "#/$defs/Mandate" },
-        "channels": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/Channel" },
-          "maxItems": 64
+        "title": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Name" },
+        "role": {
+          "description": "Optional label of the role this seat fills in its organisation's records (e.g. 'mayor', 'finance_officer'). Informational for the kernel.",
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label"
         },
+        "channels": { "type": "array", "items": { "$ref": "#/$defs/Channel" }, "maxItems": 64 },
         "controller": { "$ref": "#/$defs/Controller" },
         "framing": { "$ref": "#/$defs/Framing" }
       }
     },
 
-    "Mandate": {
-      "description": "Default deny. Powers are checked in order and the first whose blocks and limits match decides the level. For a multi-block action the strictest level wins (direct < approval < request); if any block is denied the whole action is refused.",
-      "type": "object",
-      "required": ["powers"],
-      "additionalProperties": false,
-      "properties": {
-        "powers": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/Power" },
-          "maxItems": 256
-        }
-      }
-    },
-    "Power": {
-      "type": "object",
-      "required": ["blocks", "level"],
-      "additionalProperties": false,
-      "properties": {
-        "blocks": {
-          "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/BlockName" },
-          "minItems": 1,
-          "uniqueItems": true
-        },
-        "level": {
-          "description": "direct: applied now if lawful. approval: held as a proposal until every listed approver approves, then re-validated and applied. request: forwarded to the listed seats, who must act themselves using their own powers; never auto-applied.",
-          "enum": ["direct", "approval", "request"]
-        },
-        "approvers": {
-          "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-          "minItems": 1,
-          "uniqueItems": true
-        },
-        "request_to": {
-          "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-          "minItems": 1,
-          "uniqueItems": true
-        },
-        "limits": {
-          "description": "Conditions for this power to match. A block that fails a limit falls through to later powers.",
+    "Channel": {
+      "description": "A perception channel. Every seat also always receives its inbox and the outcomes of its own acts. Records are only ever shown if their visibility allows the seat's entity to see them.",
+      "oneOf": [
+        {
           "type": "object",
+          "required": ["id", "kind"],
           "additionalProperties": false,
           "properties": {
-            "max_amount": {
-              "description": "For transfer: amount. For construct/demolish: catalogue cost. For agreements: rent or wage per period.",
-              "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Amount"
+            "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+            "kind": { "description": "Balances and new transactions of accounts the seat's entity holds or has custody of.", "const": "accounts" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "kind", "match"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+            "kind": { "const": "records" },
+            "match": {
+              "description": "Which records this channel shows (all conditions must hold; omitted means any).",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "records": {
+                  "type": "array",
+                  "items": { "enum": ["claim", "claim_transfer", "claim_release", "agreement", "signature", "notice", "statement", "withdrawal", "vote", "entity_declaration"] },
+                  "uniqueItems": true
+                },
+                "statement_kinds": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" }, "uniqueItems": true },
+                "involving": {
+                  "description": "Records naming any of these entities (as holder, counterparty, party, addressee, author's entity or speaks_for). 'self' means the seat's own entity.",
+                  "type": "array",
+                  "items": { "anyOf": [{ "const": "self" }, { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" }] },
+                  "uniqueItems": true
+                }
+              }
+            },
+            "new_only": { "description": "Show only records made since the seat's previous observation.", "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "kind", "area"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+            "kind": { "description": "Physical state of parcels in an area: structures, construction under way, occupancy. How inspectors see.", "const": "sites" },
+            "area": {
+              "anyOf": [
+                { "const": "all" },
+                { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" }, "minItems": 1, "uniqueItems": true }
+              ]
+            },
+            "every": {
+              "description": "How often the view refreshes. Between refreshes the seat sees the state as of the last refresh. Coverage and frequency are experimental variables.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Duration"
             }
           }
-        }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "level": { "const": "approval" } } },
-          "then": { "required": ["approvers"], "properties": { "request_to": false } }
         },
         {
-          "if": { "properties": { "level": { "const": "request" } } },
-          "then": { "required": ["request_to"], "properties": { "approvers": false } }
-        },
-        {
-          "if": { "properties": { "level": { "const": "direct" } } },
-          "then": { "properties": { "approvers": false, "request_to": false } }
+          "type": "object",
+          "required": ["id", "kind"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+            "kind": { "description": "Who exists: entities and seats (names, kinds, titles).", "const": "directory" }
+          }
         }
       ]
     },
 
-    "Channel": {
-      "description": "A role-limited perception channel. Every seat also always receives, regardless of channels: the clock, its own mandate, outcomes of its actions, its inbox, items awaiting its decision, and its drafts. Stage 2 adds authored, delayed, possibly biased 'report' channels.",
-      "type": "object",
-      "required": ["id", "kind", "scope"],
-      "additionalProperties": false,
-      "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-        "kind": {
-          "description": "accounts: balances. parcels: parcels with rights, structures and effective zoning. rules: active rules. agreements: agreements and their state. directory: who exists (seats and entities, names only).",
-          "enum": ["accounts", "parcels", "rules", "agreements", "directory"]
-        },
-        "scope": {
-          "description": "self: things involving entities the seat can act for. jurisdiction: things within the principal's jurisdiction. all: everything (use deliberately: omniscience is an experimental condition).",
-          "enum": ["self", "jurisdiction", "all"]
-        }
-      }
-    },
-
     "Controller": {
-      "description": "Who fills the seat. Opaque to the kernel.",
+      "description": "Who fills the seat. Opaque to the kernel. Code controllers name a behaviour module (content: documented and cited in docs/behaviour/).",
       "type": "object",
       "required": ["type"],
       "additionalProperties": false,
       "properties": {
         "type": { "enum": ["code", "llm", "human", "external"] },
-        "impl": {
-          "description": "code: controller module name. llm: adapter name (e.g. 'anthropic', 'openai-compatible'). external: transport address.",
-          "type": "string",
-          "maxLength": 200
-        },
+        "impl": { "type": "string", "maxLength": 200 },
         "model": { "type": "string", "maxLength": 200 },
-        "params": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Opaque" }
+        "params": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Opaque" }
       }
     },
 
@@ -389,22 +311,10 @@
       "required": ["disclosure", "reason"],
       "additionalProperties": false,
       "properties": {
-        "disclosure": {
-          "description": "simulation: told it is a simulation. real: told it is real (deceptive). cover_story: told it is some other task (deceptive). unstated: nothing said either way.",
-          "enum": ["simulation", "real", "cover_story", "unstated"]
-        },
-        "system": {
-          "description": "Framing text given to the seat's controller.",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text"
-        },
-        "reason": {
-          "description": "Why this framing is needed for the research question.",
-          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text"
-        },
-        "debrief": {
-          "description": "Debrief the seat after the run (recommended for deceptive framings). Responses are logged as data.",
-          "type": "boolean"
-        }
+        "disclosure": { "enum": ["simulation", "real", "cover_story", "unstated"] },
+        "system": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
+        "reason": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
+        "debrief": { "type": "boolean" }
       }
     }
   }

@@ -1,0 +1,8 @@
+{
+  "block": "message",
+  "to": [
+    "mayor",
+    "planning"
+  ],
+  "text": "Would the council consider allowing apartments on p12?"
+}

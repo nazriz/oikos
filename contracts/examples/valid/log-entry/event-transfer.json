@@ -1,0 +1,17 @@
+{
+  "seq": 44,
+  "t": 2592000,
+  "kind": "event",
+  "body": {
+    "event": "transfer",
+    "cause": 41,
+    "from": "acc-bob",
+    "to": "acc-devco",
+    "amount": 180000,
+    "by": "bank-payments",
+    "reason": "payment",
+    "per_instruction": "so-bob-rent"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

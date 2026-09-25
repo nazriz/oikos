@@ -1,0 +1,14 @@
+{
+  "seq": 45,
+  "t": 0,
+  "kind": "event",
+  "body": {
+    "event": "action_refused",
+    "cause": 46,
+    "action": "act.21",
+    "seat": "developer",
+    "code": "zoning_violation"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

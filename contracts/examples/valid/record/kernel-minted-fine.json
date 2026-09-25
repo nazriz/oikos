@@ -1,0 +1,19 @@
+{
+  "id": "rec.212",
+  "record": "claim",
+  "author": "inspector",
+  "speaks_for": "city",
+  "at": 8035200,
+  "visible_to": [
+    "city",
+    "devco"
+  ],
+  "basis": "law-river",
+  "position": "right",
+  "holder": "city",
+  "counterparty": "devco",
+  "about": {
+    "kind": "fine",
+    "amount": 5000000
+  }
+}

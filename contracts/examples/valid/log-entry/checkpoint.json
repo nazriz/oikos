@@ -1,6 +1,6 @@
 {
-  "seq": 52,
-  "t": 2592000,
+  "seq": 53,
+  "t": 5184000,
   "kind": "checkpoint",
   "body": {
     "state_hash": "abababababababababababababababababababababababababababababababab"

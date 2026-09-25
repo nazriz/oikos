@@ -1,0 +1,7 @@
+{
+  "block": "transfer",
+  "from": "acc-city",
+  "to": "acc-devco",
+  "amount": 100,
+  "seat": "finance"
+}

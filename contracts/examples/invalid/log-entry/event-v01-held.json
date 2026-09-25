@@ -1,0 +1,18 @@
+{
+  "seq": 45,
+  "t": 0,
+  "kind": "event",
+  "body": {
+    "event": "action_held",
+    "cause": 46,
+    "action": "act.21",
+    "seat": "mayor",
+    "level": "approval",
+    "proposal": "prp.1",
+    "awaiting": [
+      "council-seat"
+    ]
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

@@ -1,0 +1,8 @@
+{
+  "block": "publish",
+  "kind": "law",
+  "text": "Tax is 10%",
+  "data": {
+    "rate": 0.1
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "block": "propose_agreement",
+  "speaks_for": "bank",
+  "ref": "loan",
+  "terms": {
+    "template": "loan",
+    "parties": [
+      "bank",
+      "devco"
+    ],
+    "commitments": [
+      {
+        "who": "bank",
+        "does": {
+          "lend": 100000000,
+          "into": "acc-devco"
+        }
+      },
+      {
+        "who": "devco",
+        "does": {
+          "repay": 2200000,
+          "into": "acc-bank"
+        },
+        "every": 2592000
+      }
+    ],
+    "term": 62208000,
+    "attrs": {
+      "rate_bps": 650,
+      "security": "title-p10"
+    }
+  }
+}

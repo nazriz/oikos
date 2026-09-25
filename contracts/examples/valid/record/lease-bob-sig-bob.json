@@ -1,0 +1,12 @@
+{
+  "id": "lease-bob-sig-bob",
+  "record": "signature",
+  "author": "genesis",
+  "at": 0,
+  "visible_to": [
+    "devco",
+    "bob"
+  ],
+  "agreement": "lease-bob",
+  "as": "bob"
+}

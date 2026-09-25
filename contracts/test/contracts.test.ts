@@ -8,11 +8,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
-const NS = "urn:terrarium:contracts:0.1";
+const NS = "urn:terrarium:contracts:0.2";
 
 const SCHEMA_FILES = [
   "common.schema.json",
   "blocks.schema.json",
+  "records.schema.json",
   "world-config.schema.json",
   "seat-api.schema.json",
   "log.schema.json",
@@ -22,6 +23,7 @@ const SCHEMA_FILES = [
 const TARGETS: Record<string, string> = {
   "world-config": `${NS}:world-config`,
   block: `${NS}:blocks#/$defs/Block`,
+  record: `${NS}:records#/$defs/Record`,
   "seat-action": `${NS}:seat-api#/$defs/SeatAction`,
   "seat-observation": `${NS}:seat-api#/$defs/Observation`,
   "step-result": `${NS}:seat-api#/$defs/StepResult`,
@@ -86,18 +88,19 @@ describe("world-config mutations are rejected", () => {
   const v = validator(TARGETS["world-config"]);
   const cases: [string, (c: any) => void][] = [
     ["float hidden in opaque controller params", (c) => (c.seats[0].controller.params.temperature = 0.7)],
+    ["float hidden in a record's data", (c) => (c.world.records.find((r: any) => r.id === "law-tax").data.rate = 0.1)],
     ["config id shaped like a kernel id", (c) => (c.world.entities[1].id = "ent.1")],
-    ["uppercase config id", (c) => (c.world.parcels[0].id = "P00")],
     ["framing without a reason", (c) => delete c.seats[0].framing.reason],
-    ["approval power without approvers", (c) => delete c.seats[0].mandate.powers[2].approvers],
-    ["direct power naming approvers", (c) => (c.seats[0].mandate.powers[0].approvers = ["council-seat"])],
-    ["request power without request_to", (c) => delete c.seats[2].mandate.powers[1].request_to],
-    ["unknown block in a power", (c) => c.seats[0].mandate.powers[0].blocks.push("seize")],
+    ["a v0.1 mandate on a seat", (c) => (c.seats[0].mandate = { powers: [] })],
+    ["a v0.1 jurisdiction list", (c) => (c.world.jurisdictions = [])],
+    ["a v0.1 typed zoning rule", (c) => (c.world.rules = [{ id: "z", jurisdiction: "city", rule: { type: "zoning", parcels: "all", allow: [] } }])],
+    ["seat without an entity", (c) => delete c.seats[0].entity],
+    ["account without a custodian", (c) => delete c.world.accounts[1].custodian],
+    ["record without an author", (c) => delete c.world.records[0].author],
     ["measurement smuggled into config", (c) => (c.measurement = { reward: "gdp" })],
-    ["seat creatable persons via entity kind typo", (c) => (c.world.entities[4].kind = "citizen")],
-    ["float balance", (c) => (c.world.entities[1].balance = 1.5)],
+    ["float balance", (c) => (c.world.accounts[1].balance = 1.5)],
     ["zero tick length", (c) => (c.clock.tick_seconds = 0)],
-    ["wrong contracts version", (c) => (c.contracts = "0.2")],
+    ["wrong contracts version", (c) => (c.contracts = "0.1")],
   ];
   for (const [name, mutate] of cases) {
     test(name, () => {

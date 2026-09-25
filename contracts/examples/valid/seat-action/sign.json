@@ -1,1 +1,5 @@
-{ "type": "sign", "draft": "draft.mayor.7", "decision": "accept" }
+{
+  "type": "sign",
+  "draft": "draft.mayor.7",
+  "decision": "accept"
+}

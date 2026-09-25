@@ -1,0 +1,49 @@
+{
+  "id": "lease-bob",
+  "record": "agreement",
+  "author": "genesis",
+  "at": 0,
+  "visible_to": [
+    "devco",
+    "bob"
+  ],
+  "terms": {
+    "template": "lease",
+    "parties": [
+      "devco",
+      "bob"
+    ],
+    "commitments": [
+      {
+        "who": "bob",
+        "does": {
+          "pay": 180000,
+          "to": "devco",
+          "into": "acc-devco"
+        },
+        "every": 2592000
+      },
+      {
+        "who": "devco",
+        "does": {
+          "allow": {
+            "occupy": "s-apts",
+            "slot": "dwelling",
+            "count": 1
+          }
+        }
+      }
+    ],
+    "termination": [
+      {
+        "party": "devco",
+        "notice": 5184000
+      },
+      {
+        "party": "bob",
+        "notice": 2592000
+      }
+    ],
+    "text": "Bob rents one flat in the Riverbend apartments from Riverbend Developments for $1,800 a month."
+  }
+}

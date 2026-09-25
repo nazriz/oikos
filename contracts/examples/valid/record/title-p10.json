@@ -1,0 +1,20 @@
+{
+  "id": "title-p10",
+  "record": "claim",
+  "author": "genesis",
+  "at": 0,
+  "visible_to": "public",
+  "position": "right",
+  "holder": "devco",
+  "about": {
+    "kind": "ownership",
+    "object": "p10",
+    "includes": [
+      "exclude",
+      "use",
+      "sell",
+      "build"
+    ]
+  },
+  "speaks_for": "city"
+}

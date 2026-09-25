@@ -1,71 +1,155 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.1:log",
+  "$id": "urn:terrarium:contracts:0.2:log",
   "title": "Terrarium run log entry",
   "description": "One line of a run log (JSONL). The kernel is the only writer. Entry hash = SHA-256 over the bytes 'terrarium.log.v1\\n' followed by the canonical JSON (RFC 8785 / JCS) of the entry without its 'hash' field; 'prev' is the previous entry's hash (64 zeros for the header). Commands are the only replay inputs; events, checkpoints and the end entry are regenerated on replay and must match byte for byte; annotations are carried through verbatim. So replay can regenerate the entire log and compare it byte-identically.",
   "oneOf": [
-    { "$ref": "#/$defs/HeaderEntry" },
-    { "$ref": "#/$defs/CommandEntry" },
-    { "$ref": "#/$defs/EventEntry" },
-    { "$ref": "#/$defs/AnnotationEntry" },
-    { "$ref": "#/$defs/CheckpointEntry" },
-    { "$ref": "#/$defs/EndEntry" }
+    {
+      "$ref": "#/$defs/HeaderEntry"
+    },
+    {
+      "$ref": "#/$defs/CommandEntry"
+    },
+    {
+      "$ref": "#/$defs/EventEntry"
+    },
+    {
+      "$ref": "#/$defs/AnnotationEntry"
+    },
+    {
+      "$ref": "#/$defs/CheckpointEntry"
+    },
+    {
+      "$ref": "#/$defs/EndEntry"
+    }
   ],
   "$defs": {
     "EntryBase": {
       "type": "object",
-      "required": ["seq", "t", "kind", "body", "prev", "hash"],
+      "required": [
+        "seq",
+        "t",
+        "kind",
+        "body",
+        "prev",
+        "hash"
+      ],
       "properties": {
-        "seq": { "description": "0 for the header, then +1 per entry.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" },
-        "t": { "description": "Kernel sim time when the entry was written.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
-        "kind": { "enum": ["header", "command", "event", "annotation", "checkpoint", "end"] },
-        "body": { "type": "object" },
-        "prev": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" },
-        "hash": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" }
+        "seq": {
+          "description": "0 for the header, then +1 per entry.",
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+        },
+        "t": {
+          "description": "Kernel sim time when the entry was written.",
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/SimTime"
+        },
+        "kind": {
+          "enum": [
+            "header",
+            "command",
+            "event",
+            "annotation",
+            "checkpoint",
+            "end"
+          ]
+        },
+        "body": {
+          "type": "object"
+        },
+        "prev": {
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+        },
+        "hash": {
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+        }
       }
     },
-
     "HeaderEntry": {
       "$ref": "#/$defs/EntryBase",
       "type": "object",
       "unevaluatedProperties": false,
       "properties": {
-        "seq": { "const": 0 },
-        "t": { "const": 0 },
-        "kind": { "const": "header" },
-        "prev": { "const": "0000000000000000000000000000000000000000000000000000000000000000" },
+        "seq": {
+          "const": 0
+        },
+        "t": {
+          "const": 0
+        },
+        "kind": {
+          "const": "header"
+        },
+        "prev": {
+          "const": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
         "body": {
           "type": "object",
-          "required": ["contracts", "kernel", "run_id", "config", "config_hash", "initial_state_hash", "canary"],
+          "required": [
+            "contracts",
+            "kernel",
+            "run_id",
+            "config",
+            "config_hash",
+            "initial_state_hash",
+            "canary"
+          ],
           "additionalProperties": false,
           "properties": {
-            "contracts": { "const": "0.1" },
+            "contracts": {
+              "const": "0.2"
+            },
             "kernel": {
               "type": "object",
-              "required": ["version", "build"],
+              "required": [
+                "version",
+                "build"
+              ],
               "additionalProperties": false,
               "properties": {
-                "version": { "type": "string", "maxLength": 64 },
-                "build": { "description": "Kernel build identity (git commit, '+dirty' if uncommitted). Replay on a different build is reported, not silently accepted.", "type": "string", "maxLength": 128 }
+                "version": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "build": {
+                  "description": "Kernel build identity (git commit, '+dirty' if uncommitted). Replay on a different build is reported, not silently accepted.",
+                  "type": "string",
+                  "maxLength": 128
+                }
               }
             },
-            "run_id": { "description": "Minted by the orchestrator; opaque to the kernel.", "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$" },
-            "config": { "$ref": "urn:terrarium:contracts:0.1:world-config" },
-            "config_hash": { "description": "SHA-256 of 'terrarium.config.v1\\n' + canonical JSON of config.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" },
-            "initial_state_hash": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" },
-            "canary": { "type": "string", "maxLength": 200 }
+            "run_id": {
+              "description": "Minted by the orchestrator; opaque to the kernel.",
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            },
+            "config": {
+              "$ref": "urn:terrarium:contracts:0.2:world-config"
+            },
+            "config_hash": {
+              "description": "SHA-256 of 'terrarium.config.v1\\n' + canonical JSON of config.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+            },
+            "initial_state_hash": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+            },
+            "canary": {
+              "type": "string",
+              "maxLength": 200
+            }
           }
         }
       }
     },
-
     "CommandEntry": {
       "$ref": "#/$defs/EntryBase",
       "type": "object",
       "unevaluatedProperties": false,
       "properties": {
-        "kind": { "const": "command" },
-        "body": { "$ref": "#/$defs/Command" }
+        "kind": {
+          "const": "command"
+        },
+        "body": {
+          "$ref": "#/$defs/Command"
+        }
       }
     },
     "Command": {
@@ -73,42 +157,83 @@
       "oneOf": [
         {
           "type": "object",
-          "required": ["command", "seat", "blocks", "provenance"],
+          "required": [
+            "command",
+            "seat",
+            "blocks",
+            "provenance"
+          ],
           "additionalProperties": false,
           "properties": {
-            "command": { "const": "act" },
-            "seat": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-            "blocks": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/Action/properties/blocks" },
-            "provenance": { "$ref": "#/$defs/Provenance" },
-            "reasoning": { "description": "The seat's own stated reasoning, if it gave any. Logged, never interpreted.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
+            "command": {
+              "const": "act"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "blocks": {
+              "$ref": "urn:terrarium:contracts:0.2:blocks#/$defs/Action/properties/blocks"
+            },
+            "provenance": {
+              "$ref": "#/$defs/Provenance"
+            },
+            "reasoning": {
+              "description": "The seat's own stated reasoning, if it gave any. Logged, never interpreted.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+            }
           }
         },
         {
           "type": "object",
-          "required": ["command", "to"],
+          "required": [
+            "command",
+            "to"
+          ],
           "additionalProperties": false,
           "properties": {
-            "command": { "const": "advance" },
-            "to": { "description": "Advance the clock to this time, processing every scheduled effect (payments, completions, expiries) with time <= to, in (time, scheduling order).", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" }
+            "command": {
+              "const": "advance"
+            },
+            "to": {
+              "description": "Advance the clock to this time, processing every scheduled effect (payments, completions, expiries) with time <= to, in (time, scheduling order).",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/SimTime"
+            }
           }
         },
         {
           "type": "object",
-          "required": ["command", "seat"],
+          "required": [
+            "command",
+            "seat"
+          ],
           "additionalProperties": false,
           "properties": {
-            "command": { "const": "observe" },
-            "seat": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" }
+            "command": {
+              "const": "observe"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            }
           }
         },
         {
           "type": "object",
-          "required": ["command", "seat", "statement"],
+          "required": [
+            "command",
+            "seat",
+            "statement"
+          ],
           "additionalProperties": false,
           "properties": {
-            "command": { "const": "resign" },
-            "seat": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-            "statement": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
+            "command": {
+              "const": "resign"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "statement": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+            }
           }
         }
       ]
@@ -118,163 +243,600 @@
       "oneOf": [
         {
           "type": "object",
-          "required": ["via"],
+          "required": [
+            "via"
+          ],
           "additionalProperties": false,
-          "properties": { "via": { "const": "direct" } }
+          "properties": {
+            "via": {
+              "const": "direct"
+            }
+          }
         },
         {
           "type": "object",
-          "required": ["via", "proposal", "draft", "draft_hash", "translator"],
+          "required": [
+            "via",
+            "proposal",
+            "draft",
+            "draft_hash",
+            "translator"
+          ],
           "additionalProperties": false,
           "properties": {
-            "via": { "const": "translator" },
-            "proposal": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" },
-            "draft": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$" },
-            "draft_hash": { "description": "Hash of the signed-off draft (see seat-api Draft). The proposer signed exactly this.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" },
-            "translator": { "$ref": "urn:terrarium:contracts:0.1:seat-api#/$defs/TranslatorId" }
+            "via": {
+              "const": "translator"
+            },
+            "proposal": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+            },
+            "draft": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            },
+            "draft_hash": {
+              "description": "Hash of the signed-off draft (see seat-api Draft). The proposer signed exactly this.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+            },
+            "translator": {
+              "$ref": "urn:terrarium:contracts:0.2:seat-api#/$defs/TranslatorId"
+            }
           }
         }
       ]
     },
-
     "EventEntry": {
       "$ref": "#/$defs/EntryBase",
       "type": "object",
       "unevaluatedProperties": false,
       "properties": {
-        "kind": { "const": "event" },
-        "body": { "$ref": "#/$defs/Event" }
+        "kind": {
+          "const": "event"
+        },
+        "body": {
+          "$ref": "#/$defs/Event"
+        }
       }
     },
     "Event": {
-      "description": "Every change to world state emits at least one event, each pointing at the command that caused it, so a researcher can trace any outcome back to a seat's act without reading kernel source.",
-      "type": "object",
-      "required": ["event", "cause"],
-      "properties": {
-        "event": { "$ref": "#/$defs/EventName" },
-        "cause": { "description": "seq of the command entry that caused this event.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" },
-        "action": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" },
-        "seat": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-        "created": {
-          "description": "action_applied: local refs bound to minted ids.",
+      "description": "Every change to the world emits at least one event, each pointing at the command that caused it. There are no events for law: laws are records (the 'recorded' event) and nothing happens because of them unless someone acts.",
+      "oneOf": [
+        {
+          "description": "A seat's action took effect.",
           "type": "object",
-          "propertyNames": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RefName" },
-          "additionalProperties": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" }
+          "required": [
+            "event",
+            "cause",
+            "action",
+            "seat"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "action_applied"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "action": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/KernelId"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "created": {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName"
+              },
+              "additionalProperties": {
+                "$ref": "urn:terrarium:contracts:0.2:common#/$defs/KernelId"
+              }
+            }
+          }
         },
-        "block": { "description": "Index of the offending block (action_refused).", "type": "integer", "minimum": 0, "maximum": 31 },
-        "code": { "$ref": "#/$defs/RefusalCode" },
-        "detail": { "type": "string", "maxLength": 2000 },
-        "level": { "enum": ["approval", "request"] },
-        "proposal": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" },
-        "awaiting": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" } },
-        "by": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "decision": { "enum": ["approve", "reject", "accept", "decline"] },
-        "from": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "to": {
-          "anyOf": [
-            { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-            { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" } }
-          ]
+        {
+          "description": "A seat's action was physically impossible and nothing happened. Refusals are findings.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "action",
+            "seat",
+            "code"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "action_refused"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "action": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/KernelId"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "block": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 31
+            },
+            "code": {
+              "$ref": "#/$defs/RefusalCode"
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
         },
-        "amount": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Amount" },
-        "reason": {
-          "enum": [
-            "block", "rent", "wage", "construction", "demolition", "dissolution",
-            "revoked", "expired", "terminated", "breach", "agreement_ended"
-          ]
+        {
+          "description": "Money moved. Every movement of money emits exactly one.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "from",
+            "to",
+            "amount",
+            "by",
+            "reason"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "transfer"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "from": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "to": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "amount": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Amount"
+            },
+            "by": {
+              "description": "The seat that physically executed it.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "reason": {
+              "description": "payment: a transfer block. materials / demolition: the documented construction liberty (D25).",
+              "enum": [
+                "payment",
+                "materials",
+                "demolition"
+              ]
+            },
+            "settles": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "per_instruction": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "memo": {
+              "type": "string",
+              "maxLength": 500
+            }
+          }
         },
-        "entity": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "entity_kind": { "type": "string" },
-        "name": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Name" },
-        "founder": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "controller": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "successor": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "right": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "right_kind": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RightKind" },
-        "parcel": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "holder": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "grantor": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "units": { "type": "integer", "minimum": 1 },
-        "until": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
-        "structure": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "structure_type": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-        "owner": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "at": { "description": "A future time: completion, expiry, end of notice.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
-        "rule": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "jurisdiction": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "rule_body": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/Rule" },
-        "agreement": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
-        "terms": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/AgreementTerms" },
-        "message": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" },
-        "observation_hash": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" },
-        "statement": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
-      },
-      "additionalProperties": false,
-      "allOf": [
-        { "if": { "type": "object", "properties": { "event": { "const": "action_applied" } } }, "then": { "required": ["action", "seat"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "action_refused" } } }, "then": { "required": ["action", "seat", "code"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "action_held" } } }, "then": { "required": ["action", "seat", "level", "proposal", "awaiting"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "action_forwarded" } } }, "then": { "required": ["action", "seat", "level", "proposal", "awaiting"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "proposal_decided" } } }, "then": { "required": ["proposal", "by", "decision"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "transfer" } } }, "then": { "required": ["from", "to", "amount", "reason"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "entity_created" } } }, "then": { "required": ["entity", "entity_kind", "name", "founder", "controller"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "entity_dissolved" } } }, "then": { "required": ["entity", "successor"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "right_created" } } }, "then": { "required": ["right", "parcel", "right_kind", "holder"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "right_transferred" } } }, "then": { "required": ["right", "from", "to"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "right_ended" } } }, "then": { "required": ["right", "reason"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "structure_started" } } }, "then": { "required": ["structure", "parcel", "structure_type", "owner", "at"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "structure_completed" } } }, "then": { "required": ["structure"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "structure_demolished" } } }, "then": { "required": ["structure"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "rule_enacted" } } }, "then": { "required": ["rule", "jurisdiction", "rule_body"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "rule_repealed" } } }, "then": { "required": ["rule"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "agreement_proposed" } } }, "then": { "required": ["agreement", "terms", "by"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "agreement_responded" } } }, "then": { "required": ["agreement", "by", "decision"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "agreement_activated" } } }, "then": { "required": ["agreement"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "agreement_lapsed" } } }, "then": { "required": ["agreement"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "agreement_notice" } } }, "then": { "required": ["agreement", "by", "at"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "agreement_ended" } } }, "then": { "required": ["agreement", "reason"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "payment_failed" } } }, "then": { "required": ["agreement", "from", "amount"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "message_delivered" } } }, "then": { "required": ["message", "seat", "to"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "observation" } } }, "then": { "required": ["seat", "observation_hash"] } },
-        { "if": { "type": "object", "properties": { "event": { "const": "seat_resigned" } } }, "then": { "required": ["seat", "statement"] } }
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "account",
+            "holder",
+            "custodian",
+            "by"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "account_opened"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "account": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "holder": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "custodian": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "by": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "account",
+            "by"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "account_closed"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "account": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "by": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "structure",
+            "parcel",
+            "structure_type",
+            "built_by",
+            "at"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "structure_started"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "structure": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "parcel": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "structure_type": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "built_by": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "at": {
+              "description": "When it will be complete.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/SimTime"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "structure"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "structure_completed"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "structure": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "structure",
+            "by"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "structure_demolished"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "structure": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "by": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "occupant",
+            "structure",
+            "slot",
+            "count"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "occupied"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "occupant": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "structure": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "slot": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "occupant",
+            "structure",
+            "by",
+            "reason"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "vacated"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "occupant": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "structure": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "by": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "reason": {
+              "description": "left: by the occupant's own seat. removed: by someone else. demolition: the structure was demolished.",
+              "enum": [
+                "left",
+                "removed",
+                "demolition"
+              ]
+            }
+          }
+        },
+        {
+          "description": "A record was made. The full record is in the log, so the log alone reconstructs every registry.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "record"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "recorded"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "record": {
+              "$ref": "urn:terrarium:contracts:0.2:records#/$defs/Record"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "entity",
+            "kind",
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "entity_created"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "entity": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+            },
+            "kind": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label"
+            },
+            "name": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Name"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "message",
+            "seat",
+            "to"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "message_delivered"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "message": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/KernelId"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "to": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              }
+            }
+          }
+        },
+        {
+          "description": "A seat was shown something: the hash of exactly what it saw.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "seat",
+            "observation_hash"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "observation"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "observation_hash": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "seat",
+            "statement"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "seat_resigned"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "statement": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+            }
+          }
+        }
       ]
     },
     "EventName": {
-      "description": "action_applied/refused/held/forwarded: the fate of an act. proposal_decided: an approver voted. transfer: every movement of money, whatever its cause. The rest are named for the state change they record. observation: a seat was shown something (the hash of exactly what it saw).",
       "enum": [
-        "action_applied", "action_refused", "action_held", "action_forwarded", "proposal_decided",
+        "action_applied",
+        "action_refused",
         "transfer",
-        "entity_created", "entity_dissolved",
-        "right_created", "right_transferred", "right_ended",
-        "structure_started", "structure_completed", "structure_demolished",
-        "rule_enacted", "rule_repealed",
-        "agreement_proposed", "agreement_responded", "agreement_activated", "agreement_lapsed",
-        "agreement_notice", "agreement_ended", "payment_failed",
+        "account_opened",
+        "account_closed",
+        "structure_started",
+        "structure_completed",
+        "structure_demolished",
+        "occupied",
+        "vacated",
+        "recorded",
+        "entity_created",
         "message_delivered",
-        "observation", "seat_resigned"
+        "observation",
+        "seat_resigned"
       ]
     },
     "RefusalCode": {
-      "description": "Stable machine-readable reasons. Refusals are findings, not errors: they are logged and returned to the seat.",
+      "description": "Stable reasons the kernel refuses an act. PHYSICS AND MECHANICS ONLY: there is no code for 'illegal', because the kernel doesn't know the law (D19).",
       "enum": [
-        "malformed", "unknown_seat", "seat_resigned", "mandate_denied", "not_authorized",
-        "unknown_ref", "duplicate_ref", "unknown_entity", "entity_inactive", "invalid_kind",
-        "boundary_protected", "insufficient_funds", "overflow",
-        "unknown_parcel", "unknown_right", "right_not_held", "right_not_transferable", "right_not_revocable",
-        "parcel_occupied", "unknown_structure_type", "unknown_structure", "structure_incomplete", "structure_in_use",
-        "zoning_violation", "rent_cap_violation", "capacity_exceeded", "no_jurisdiction",
-        "unknown_rule", "unknown_agreement", "not_a_party", "invalid_state",
-        "unknown_proposal", "not_approver", "already_decided", "cap_exceeded", "time_in_past"
+        "seat_resigned",
+        "unknown_ref",
+        "duplicate_ref",
+        "not_custodian",
+        "not_holder",
+        "insufficient_funds",
+        "overflow",
+        "boundary_protected",
+        "unknown_account",
+        "account_not_empty",
+        "unknown_parcel",
+        "parcel_occupied",
+        "unknown_structure_type",
+        "unknown_structure",
+        "structure_incomplete",
+        "unknown_slot",
+        "capacity_exceeded",
+        "not_present",
+        "unknown_entity",
+        "reserved_kind",
+        "unknown_record",
+        "wrong_record_kind",
+        "cap_exceeded"
       ]
     },
-
     "AnnotationEntry": {
       "$ref": "#/$defs/EntryBase",
       "type": "object",
       "unevaluatedProperties": false,
       "properties": {
-        "kind": { "const": "annotation" },
-        "body": { "$ref": "#/$defs/Annotation" }
+        "kind": {
+          "const": "annotation"
+        },
+        "body": {
+          "$ref": "#/$defs/Annotation"
+        }
       }
     },
     "Annotation": {
@@ -282,104 +844,217 @@
       "oneOf": [
         {
           "type": "object",
-          "required": ["annotation", "purpose", "subject", "provider", "model", "input_tokens", "output_tokens", "cost_microusd"],
-          "additionalProperties": false,
-          "properties": {
-            "annotation": { "const": "usage" },
-            "purpose": { "enum": ["seat", "translator", "debrief"] },
-            "subject": { "description": "Seat id or translator id.", "type": "string", "maxLength": 128 },
-            "provider": { "type": "string", "maxLength": 64 },
-            "model": { "type": "string", "maxLength": 200 },
-            "input_tokens": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" },
-            "output_tokens": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" },
-            "cache_read_tokens": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" },
-            "cache_write_tokens": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" },
-            "cost_microusd": { "description": "Cost of this call in millionths of a US dollar, from the price table recorded in the orchestrator annotation.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["annotation", "draft"],
-          "additionalProperties": false,
-          "properties": {
-            "annotation": { "const": "draft" },
-            "draft": { "$ref": "urn:terrarium:contracts:0.1:seat-api#/$defs/Draft" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["annotation", "seat", "draft", "draft_hash", "decision"],
-          "additionalProperties": false,
-          "properties": {
-            "annotation": { "const": "signoff" },
-            "seat": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
-            "draft": { "type": "string", "maxLength": 128 },
-            "draft_hash": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" },
-            "decision": { "enum": ["accept", "reject"] },
-            "note": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["annotation", "subject", "data"],
+          "required": [
+            "annotation",
+            "purpose",
+            "subject",
+            "provider",
+            "model",
+            "input_tokens",
+            "output_tokens",
+            "cost_microusd"
+          ],
           "additionalProperties": false,
           "properties": {
             "annotation": {
-              "description": "transcript: raw exchange with a seat's controller (prompt as rendered, response). translation_failure: proposal the translator could not compile (the failure log that tells us which blocks are missing). debrief: post-run debrief exchange (VISION §15.3). orchestrator: orchestrator version, price tables, seat-controller bindings.",
-              "enum": ["transcript", "translation_failure", "debrief", "orchestrator", "note"]
+              "const": "usage"
             },
-            "subject": { "type": "string", "maxLength": 128 },
-            "data": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Opaque" }
+            "purpose": {
+              "enum": [
+                "seat",
+                "translator",
+                "debrief"
+              ]
+            },
+            "subject": {
+              "description": "Seat id or translator id.",
+              "type": "string",
+              "maxLength": 128
+            },
+            "provider": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "model": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "input_tokens": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "output_tokens": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "cache_read_tokens": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "cache_write_tokens": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            },
+            "cost_microusd": {
+              "description": "Cost of this call in millionths of a US dollar, from the price table recorded in the orchestrator annotation.",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "annotation",
+            "draft"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "annotation": {
+              "const": "draft"
+            },
+            "draft": {
+              "$ref": "urn:terrarium:contracts:0.2:seat-api#/$defs/Draft"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "annotation",
+            "seat",
+            "draft",
+            "draft_hash",
+            "decision"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "annotation": {
+              "const": "signoff"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+            },
+            "draft": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "draft_hash": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+            },
+            "decision": {
+              "enum": [
+                "accept",
+                "reject"
+              ]
+            },
+            "note": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "annotation",
+            "subject",
+            "data"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "annotation": {
+              "description": "transcript: raw exchange with a seat's controller (prompt as rendered, response). translation_failure: proposal the translator could not compile (the failure log that tells us which blocks are missing). debrief: post-run debrief exchange (VISION \u00a715.3). orchestrator: orchestrator version, price tables, seat-controller bindings.",
+              "enum": [
+                "transcript",
+                "translation_failure",
+                "debrief",
+                "orchestrator",
+                "note"
+              ]
+            },
+            "subject": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "data": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Opaque"
+            }
           }
         }
       ]
     },
-
     "CheckpointEntry": {
       "$ref": "#/$defs/EntryBase",
       "type": "object",
       "unevaluatedProperties": false,
       "properties": {
-        "kind": { "const": "checkpoint" },
+        "kind": {
+          "const": "checkpoint"
+        },
         "body": {
           "type": "object",
-          "required": ["state_hash"],
+          "required": [
+            "state_hash"
+          ],
           "additionalProperties": false,
           "properties": {
-            "state_hash": { "description": "SHA-256 of 'terrarium.state.v1\\n' + canonical JSON of the full world state (including PRNG state and id counters).", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" }
+            "state_hash": {
+              "description": "SHA-256 of 'terrarium.state.v1\\n' + canonical JSON of the full world state (including PRNG state and id counters).",
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+            }
           }
         }
       }
     },
-
     "EndEntry": {
       "$ref": "#/$defs/EntryBase",
       "type": "object",
       "unevaluatedProperties": false,
       "properties": {
-        "kind": { "const": "end" },
+        "kind": {
+          "const": "end"
+        },
         "body": {
           "type": "object",
-          "required": ["reason", "state_hash"],
+          "required": [
+            "reason",
+            "state_hash"
+          ],
           "additionalProperties": false,
           "properties": {
-            "reason": { "enum": ["completed", "aborted", "error"] },
-            "state_hash": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" },
-            "detail": { "type": "string", "maxLength": 2000 }
+            "reason": {
+              "enum": [
+                "completed",
+                "aborted",
+                "error"
+              ]
+            },
+            "state_hash": {
+              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 2000
+            }
           }
         }
       }
     },
-
     "Anchor": {
       "description": "One line of the witness file (<log>.anchors.jsonl), written outside the log to a location the seats cannot reach. Not part of the chain.",
       "type": "object",
-      "required": ["seq", "hash"],
+      "required": [
+        "seq",
+        "hash"
+      ],
       "additionalProperties": false,
       "properties": {
-        "seq": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" },
-        "hash": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" },
-        "wall_time": { "description": "Informational only; never used by the world.", "type": "string", "maxLength": 64 }
+        "seq": {
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+        },
+        "hash": {
+          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+        },
+        "wall_time": {
+          "description": "Informational only; never used by the world.",
+          "type": "string",
+          "maxLength": 64
+        }
       }
     }
   }

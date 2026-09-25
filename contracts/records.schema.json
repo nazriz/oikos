@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:terrarium:contracts:0.2:records",
+  "title": "Terrarium records",
+  "description": "Everything institutional in a world is a record: claims, agreements, signatures, notices, statements (laws, procedures, decisions, instructions, ballots...), withdrawals, votes, entity declarations. Records are APPEND-ONLY and each carries its AUTHOR (the seat that made it, or 'genesis' for records the world starts with), the entity it claims to speak for, and its claimed basis. The kernel stores records and shows them to whoever can perceive them. It never judges whether a record is valid, lawful or binding (D22). Forgeries are possible, and the author is always on the record.",
+  "$defs": {
+    "Author": {
+      "description": "The seat that made the record, or 'genesis' for records present when the world began.",
+      "anyOf": [{ "const": "genesis" }, { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" }]
+    },
+    "RecordBase": {
+      "type": "object",
+      "required": ["id", "record", "author", "at", "visible_to"],
+      "properties": {
+        "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "record": {
+          "enum": ["claim", "claim_transfer", "claim_release", "agreement", "signature", "notice", "statement", "withdrawal", "vote", "entity_declaration"]
+        },
+        "author": { "$ref": "#/$defs/Author" },
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "at": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/SimTime" },
+        "visible_to": {
+          "anyOf": [
+            { "const": "public" },
+            { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" }, "minItems": 1, "uniqueItems": true }
+          ]
+        },
+        "basis": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" }
+      }
+    },
+    "Record": {
+      "oneOf": [
+        { "$ref": "#/$defs/Claim" },
+        { "$ref": "#/$defs/ClaimTransfer" },
+        { "$ref": "#/$defs/ClaimRelease" },
+        { "$ref": "#/$defs/Agreement" },
+        { "$ref": "#/$defs/Signature" },
+        { "$ref": "#/$defs/Notice" },
+        { "$ref": "#/$defs/Statement" },
+        { "$ref": "#/$defs/Withdrawal" },
+        { "$ref": "#/$defs/Vote" },
+        { "$ref": "#/$defs/EntityDeclaration" }
+      ]
+    },
+    "Claim": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["position", "holder", "about"],
+      "properties": {
+        "record": { "const": "claim" },
+        "position": { "enum": ["right", "liberty", "power", "immunity"] },
+        "holder": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "counterparty": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "about": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/OpaqueObject" }
+      },
+      "unevaluatedProperties": false
+    },
+    "ClaimTransfer": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["claim", "to"],
+      "properties": {
+        "record": { "const": "claim_transfer" },
+        "claim": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" }
+      },
+      "unevaluatedProperties": false
+    },
+    "ClaimRelease": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["claim"],
+      "properties": {
+        "record": { "const": "claim_release" },
+        "claim": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" }
+      },
+      "unevaluatedProperties": false
+    },
+    "Agreement": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["terms"],
+      "properties": {
+        "record": { "const": "agreement" },
+        "terms": { "$ref": "urn:terrarium:contracts:0.2:blocks#/$defs/AgreementTerms" }
+      },
+      "unevaluatedProperties": false
+    },
+    "Signature": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["agreement", "as"],
+      "properties": {
+        "record": { "const": "signature" },
+        "agreement": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "as": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" }
+      },
+      "unevaluatedProperties": false
+    },
+    "Notice": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["agreement", "as"],
+      "properties": {
+        "record": { "const": "notice" },
+        "agreement": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "as": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" }
+      },
+      "unevaluatedProperties": false
+    },
+    "Statement": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["kind", "text"],
+      "properties": {
+        "record": { "const": "statement" },
+        "kind": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" },
+        "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
+        "data": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/OpaqueObject" },
+        "adico": { "$ref": "urn:terrarium:contracts:0.2:blocks#/$defs/Adico" },
+        "formal": { "$ref": "urn:terrarium:contracts:0.2:blocks#/$defs/Formal" },
+        "addressed_to": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" }, "minItems": 1, "uniqueItems": true }
+      },
+      "unevaluatedProperties": false
+    },
+    "Withdrawal": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["withdraws"],
+      "properties": {
+        "record": { "const": "withdrawal" },
+        "withdraws": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" }
+      },
+      "unevaluatedProperties": false
+    },
+    "Vote": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["ballot", "choice"],
+      "properties": {
+        "record": { "const": "vote" },
+        "ballot": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "choice": { "type": "string", "minLength": 1, "maxLength": 200 }
+      },
+      "unevaluatedProperties": false
+    },
+    "EntityDeclaration": {
+      "$ref": "#/$defs/RecordBase",
+      "type": "object",
+      "required": ["entity", "kind", "name"],
+      "properties": {
+        "record": { "const": "entity_declaration" },
+        "entity": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+        "kind": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" },
+        "name": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Name" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

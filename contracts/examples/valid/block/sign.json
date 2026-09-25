@@ -1,0 +1,5 @@
+{
+  "block": "sign_agreement",
+  "agreement": "$loan",
+  "as": "devco"
+}

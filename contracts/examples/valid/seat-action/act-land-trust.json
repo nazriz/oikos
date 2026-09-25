@@ -1,9 +1,0 @@
-{
-  "type": "act",
-  "blocks": [
-    { "block": "create_entity", "founder": "city", "kind": "trust", "name": "Riverbend Community Land Trust", "ref": "clt" },
-    { "block": "transfer", "from": "city", "to": "$clt", "amount": 4000000, "memo": "Seed funding" },
-    { "block": "enact_rule", "jurisdiction": "city", "rule": { "type": "zoning", "parcels": ["p10", "p11", "p12"], "allow": ["green"] }, "ref": "river_green" }
-  ],
-  "reasoning": "Signed directly by a code controller; no translator involved."
-}

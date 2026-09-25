@@ -1,31 +1,38 @@
 {
-  "seq": 41,
-  "t": 172800,
+  "seq": 42,
+  "t": 2592000,
   "kind": "command",
   "body": {
     "command": "act",
     "seat": "mayor",
     "blocks": [
       {
-        "block": "construct",
-        "owner": "city",
-        "parcel": "p00",
-        "structure_type": "park",
-        "contractor": "outside"
+        "block": "publish",
+        "kind": "ballot",
+        "speaks_for": "city",
+        "text": "Should the river zoning law (law-river) be repealed?",
+        "data": {
+          "options": [
+            "yes",
+            "no"
+          ],
+          "closes_at": 7776000
+        },
+        "ref": "b"
       }
     ],
     "provenance": {
       "via": "translator",
-      "proposal": "Build a park on p00.",
-      "draft": "draft.mayor.7",
+      "proposal": "Put the river law to a council vote.",
+      "draft": "draft.mayor.3",
       "draft_hash": "abababababababababababababababababababababababababababababababab",
       "translator": {
         "id": "translator",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "model": "claude-sonnet-5"
       }
     },
-    "reasoning": "Residents have asked for green space."
+    "reasoning": "Let the council decide."
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

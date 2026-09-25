@@ -1,0 +1,27 @@
+{
+  "seq": 47,
+  "t": 2592000,
+  "kind": "event",
+  "body": {
+    "event": "recorded",
+    "cause": 42,
+    "record": {
+      "id": "rec.90",
+      "record": "statement",
+      "author": "mayor",
+      "speaks_for": "city",
+      "at": 2592000,
+      "visible_to": "public",
+      "kind": "ballot",
+      "text": "Should the river zoning law (law-river) be repealed?",
+      "data": {
+        "options": [
+          "yes",
+          "no"
+        ]
+      }
+    }
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

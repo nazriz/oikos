@@ -1,0 +1,9 @@
+{
+  "block": "publish",
+  "kind": "law",
+  "text": "x",
+  "formal": {
+    "language": "python",
+    "condition": "True"
+  }
+}

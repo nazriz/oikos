@@ -1,1 +1,6 @@
-{ "block": "transfer", "from": "city", "to": "devco", "amount": 100.5 }
+{
+  "block": "transfer",
+  "from": "acc-bob",
+  "to": "acc-devco",
+  "amount": 1800.5
+}

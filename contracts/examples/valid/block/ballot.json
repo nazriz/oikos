@@ -1,0 +1,14 @@
+{
+  "block": "publish",
+  "kind": "ballot",
+  "speaks_for": "city",
+  "text": "Should the river zoning law (law-river) be repealed?",
+  "data": {
+    "options": [
+      "yes",
+      "no"
+    ],
+    "closes_at": 7776000
+  },
+  "ref": "b"
+}

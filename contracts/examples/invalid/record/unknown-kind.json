@@ -1,0 +1,22 @@
+{
+  "id": "law-river",
+  "record": "decree",
+  "author": "genesis",
+  "at": 0,
+  "visible_to": "public",
+  "kind": "law",
+  "speaks_for": "city",
+  "basis": "charter",
+  "text": "No building may be constructed on the river parcels (p10, p11, p12) without a permit from the planning office. Or else: a fine of $50,000 and an order to demolish.",
+  "adico": {
+    "attribute": "anyone",
+    "deontic": "must_not",
+    "aim": "construct a building",
+    "condition": "on parcels p10, p11 or p12, without a planning permit",
+    "or_else": "a fine of $50,000 and a demolition order"
+  },
+  "formal": {
+    "language": "cel",
+    "condition": "block.block == 'construct' && block.parcel in ['p10','p11','p12'] && !holds_liberty(actor, 'build', block.parcel)"
+  }
+}

@@ -1,16 +1,15 @@
 {
-  "seq": 48,
-  "t": 172800,
+  "seq": 50,
+  "t": 2600000,
   "kind": "event",
   "body": {
     "event": "structure_started",
-    "cause": 41,
-    "action": "act.7",
+    "cause": 51,
     "structure": "str.1",
-    "parcel": "p00",
-    "structure_type": "park",
-    "owner": "city",
-    "at": 2764800
+    "parcel": "p12",
+    "structure_type": "apartments",
+    "built_by": "buildco",
+    "at": 18152000
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

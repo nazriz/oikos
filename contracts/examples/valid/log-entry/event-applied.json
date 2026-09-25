@@ -1,15 +1,12 @@
 {
-  "seq": 45,
-  "t": 172800,
+  "seq": 43,
+  "t": 2592000,
   "kind": "event",
   "body": {
     "event": "action_applied",
     "cause": 41,
-    "action": "act.4",
-    "seat": "mayor",
-    "created": {
-      "clt": "ent.1"
-    }
+    "action": "act.20",
+    "seat": "bank-payments"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

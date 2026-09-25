@@ -1,0 +1,13 @@
+{
+  "block": "publish",
+  "kind": "law",
+  "speaks_for": "city",
+  "basis": "rec.77",
+  "text": "Rent on any dwelling may not rise by more than 5% in any 12-month period.",
+  "adico": {
+    "attribute": "landlords",
+    "deontic": "must_not",
+    "aim": "raise rent",
+    "condition": "by more than 5% within 12 months"
+  }
+}

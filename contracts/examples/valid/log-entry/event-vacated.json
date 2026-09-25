@@ -1,0 +1,15 @@
+{
+  "seq": 48,
+  "t": 2600000,
+  "kind": "event",
+  "body": {
+    "event": "vacated",
+    "cause": 49,
+    "occupant": "bob",
+    "structure": "s-apts",
+    "by": "developer",
+    "reason": "removed"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

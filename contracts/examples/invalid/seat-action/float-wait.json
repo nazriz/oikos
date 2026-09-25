@@ -1,1 +1,4 @@
-{ "type": "wait", "until": 1.5 }
+{
+  "type": "wait",
+  "until": 1.5
+}

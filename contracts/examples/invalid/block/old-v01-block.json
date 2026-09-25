@@ -1,0 +1,9 @@
+{
+  "block": "enact_rule",
+  "jurisdiction": "city",
+  "rule": {
+    "type": "zoning",
+    "parcels": "all",
+    "allow": []
+  }
+}
