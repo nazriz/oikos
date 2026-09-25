@@ -124,7 +124,11 @@ Money is a conserved integer quantity, as before, and it is held in accounts **a
 Statements' `formal` conditions are evaluated only by code-run institutions, the translator and measurement, never by the kernel (D19), so the kernel takes no CEL dependency. `@bufbuild/cel` 0.6.1 (Apache-2.0) passed every requirement: exact int64 via bigint, errors on overflow and division by zero, custom functions, a static allowlist over the standard syntax tree (no decimals, time or regex), determinism, ~1 µs per evaluation. Pinned exactly because it is pre-1.0; `@marcbachmann/cel-js` is the fallback.
 *Revisit if* measurement needs to evaluate conditions in Python (use cel-python on the same syntax).
 
+**D28. Contracts v0.2 approved.** *(Naz, 2026-09-25: "all is good.")* The eight choices listed in contracts/README.md ("What was decided while writing v0.2") are accepted, with one reservation (item 6, below).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
+
+- **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`).
 
 - Citizen behaviour in the Rust kernel (deterministic, fast, re-runnable, but researchers must write Rust to swap models) vs TypeScript code seats (easy to swap, but replay-only reproducibility). Leaning kernel.
 - Which D15 laws become parameters, and their defaults.

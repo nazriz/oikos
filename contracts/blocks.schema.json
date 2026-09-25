@@ -79,7 +79,7 @@
       }
     },
     "construct": {
-      "description": "PHYSICAL. The acting seat's entity (the builder) starts building a catalogue structure on an empty parcel. The catalogue's materials cost is paid from an account the builder holds, straight to the boundary. DOCUMENTED LIBERTY (D25): material purchases aren't modelled, and this one payment doesn't go through the builder's bank. The structure completes after the build time. No ownership is assigned: who owns it is a record. Not refused for lacking a permit or for building on someone else's land; those are matters of law.",
+      "description": "PHYSICAL. The acting seat's entity (the builder) starts building a catalogue structure on an empty parcel. The catalogue's materials cost is paid from an account the builder holds, straight to the boundary. DOCUMENTED LIBERTY (D25), ACCEPTED TEMPORARILY: material purchases aren't modelled, and this one payment doesn't go through the builder's bank. To be replaced by supplier purchases through banks, or construction as a task with inputs (see docs/decisions.md, under Open). The structure completes after the build time. No ownership is assigned: who owns it is a record. Not refused for lacking a permit or for building on someone else's land; those are matters of law.",
       "type": "object",
       "required": ["block", "parcel", "structure_type", "materials_from"],
       "additionalProperties": false,

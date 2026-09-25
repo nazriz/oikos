@@ -1,6 +1,6 @@
 # Terrarium contracts, v0.2
 
-*Status: **proposed, for review** (branch `v0.2-contracts`). It replaces v0.1, which put law, authority and ownership inside the kernel. The reasoning is in [the audit](../docs/audit-kernel-law.md), [the design](../docs/design/v0.2-physics-and-constructs.md), [the borrowing survey](../docs/research/borrowing-survey.md) and decisions D18–D27 in [docs/decisions.md](../docs/decisions.md).*
+*Status: **approved** (Naz, 2026-09-25; D28), with one reservation (the construction payment liberty, item 6 below). It replaces v0.1, which put law, authority and ownership inside the kernel. The reasoning is in [the audit](../docs/audit-kernel-law.md), [the design](../docs/design/v0.2-physics-and-constructs.md), [the borrowing survey](../docs/research/borrowing-survey.md) and decisions D18–D27 in [docs/decisions.md](../docs/decisions.md).*
 
 These schemas are the constitution. Humans review them and the invariant tests; implementations sit behind them. Changing a contract is an explicit, signed-off decision. A researcher should be able to write a seat controller, a world or a measurement from this directory alone.
 
@@ -130,7 +130,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 3. **Claims are append-only, and "current holder" is interpretation.** Selling land adds a transfer record. A registry (the land titles office, a code seat) is what people trust about who owns what, as in reality.
 4. **Initial records are authored by `genesis`**: the world as it began, attributed to nobody in it.
 5. **Records carry visibility.** Laws are usually public; leases are seen by their parties; instructions by the account holder and the bank.
-6. **The construction payment liberty** (the physical-acts section above).
+6. **The construction payment liberty** (the physical-acts section above). **Accepted only to unblock us; must be fleshed out later**: builders should buy materials from suppliers through their banks, or construction should become a task with inputs (D24). Tracked in docs/decisions.md, under "Open".
 7. **A seat acts as exactly one entity.** A person employed by the city isn't modelled separately from their role unless a world does so.
 8. **`sites` channels have a refresh interval**, so detection can be delayed and partial. Coverage and frequency are experimental variables.
 
