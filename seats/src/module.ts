@@ -54,3 +54,8 @@ export const wait = (until?: number): SeatAction => (until === undefined ? { typ
 export const act = (blocks: Block[], reasoning?: string): SeatAction => (reasoning ? { type: "act", blocks, reasoning } : { type: "act", blocks });
 
 export const DAY = 86_400;
+
+/** A module's parameters: its documented defaults, overridden by the world's (controller.params). */
+export function params<D extends object>(defaults: D, given: { [k: string]: any }): D & { [k: string]: any } {
+  return { ...defaults, ...given };
+}

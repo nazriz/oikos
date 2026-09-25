@@ -7,6 +7,19 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "skipLibCheck": true,
-    "types": ["bun-types"]
-  }
+    "types": [
+      "bun"
+    ],
+    "resolveJsonModule": true
+  },
+  "include": [
+    "seats",
+    "orchestrator",
+    "worlds",
+    "contracts/test",
+    "docs/research/cel-check"
+  ],
+  "exclude": [
+    "**/node_modules"
+  ]
 }

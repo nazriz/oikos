@@ -6,14 +6,15 @@ seed: 1
 citizens: 200
 years: 2
 grid: { w: 20, h: 12 }
-apartment_blocks: 12      # 144 homes
-houses: 50
+apartment_blocks: 10      # 120 homes
+houses: 55                # 175 homes for 200 people: housing is tight
 shops: 8                  # 48 jobs
 factories: 3              # 120 jobs
 landlords: 4
 rents: { apartment: 85000, house: 130000 }     # cents a month
 wages: { shop: 120000, factory: 150000 }       # cents every 14 days
 exports_per_month: 60000000                    # $600,000 a month bought from the factories
-housed_bps: 9200
+housed_bps: 9500
 employed_bps: 9000
 savings_months: [1, 6]
+landlord_compliance_bps: 5000                  # landlords obey a refusal, fine or order half the time

@@ -2,9 +2,19 @@
   "name": "terrarium",
   "private": true,
   "type": "module",
-  "workspaces": ["contracts", "seats", "orchestrator", "worlds"],
+  "workspaces": [
+    "contracts",
+    "seats",
+    "orchestrator",
+    "worlds"
+  ],
   "scripts": {
     "test": "bun test",
-    "kernel": "cargo build --release --manifest-path kernel/Cargo.toml"
+    "kernel": "cargo build --release --manifest-path kernel/Cargo.toml",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^7.0.2"
   }
 }

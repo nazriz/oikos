@@ -1,3 +1,14 @@
-{ "name": "@terrarium/seats", "version": "0.1.0", "private": true, "type": "module", "license": "Apache-2.0",
+{
+  "name": "@terrarium/seats",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
   "description": "Seat runtime: the behaviour-module interface, deterministic randomness, and behaviour modules (content, cited in docs/behaviour/).",
-  "exports": { ".": "./src/index.ts" } }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@bufbuild/cel": "0.6.1"
+  }
+}

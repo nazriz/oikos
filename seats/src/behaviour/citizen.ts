@@ -13,7 +13,7 @@
 // asking the bank to pay. Nothing happens to them automatically.
 
 import type { Block, Observation, SeatAction } from "../contracts";
-import { act, wait, type BehaviourModule, type SeatContext } from "../module";
+import { act, params, wait, type BehaviourModule, type SeatContext } from "../module";
 import { Book, DAY, MONTH, ownAccount, payInstruction, standingOrder } from "./common";
 
 interface Home { agreement: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean }
@@ -26,7 +26,8 @@ export const citizen: BehaviourModule = {
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
   create(ctx: SeatContext) {
-    const p = {
+    const p = params(
+    {
       rent_share_bps: 3300, // BoE: renters bid 33% of income
       savings_rent_months: 6, // without income, rent only if savings cover this many months
       essentials: 50_000, // cents per month
@@ -34,8 +35,9 @@ export const citizen: BehaviourModule = {
       buffer_months: 3,
       leave_after_homeless_days: 90,
       leave_after_jobless_days: 180,
-      ...ctx.params,
-    };
+    },
+    ctx.params,
+  );
     const me = ctx.entity;
     const book = new Book();
     let home: Home | null = null;

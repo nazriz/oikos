@@ -14,7 +14,7 @@
 
 import type { Block, Observation, SeatAction } from "../contracts";
 import { channels } from "../contracts";
-import { act, wait, type BehaviourModule, type SeatContext } from "../module";
+import { act, params, wait, type BehaviourModule, type SeatContext } from "../module";
 import { between, Book, DAY, MONTH, ownAccount, payInstruction, standingOrder } from "./common";
 
 /**
@@ -52,7 +52,8 @@ export const landlord: BehaviourModule = {
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
   create(ctx: SeatContext) {
-    const p = {
+    const p = params(
+    {
       markup_bps: 500,
       cut_bps: 500, // BoE: unlet rentals cut 5% a month
       min_term_months: 12, // BoE/ARLA: 12-24 months, uniform
@@ -63,8 +64,16 @@ export const landlord: BehaviourModule = {
       spend_share_bps: 6000, // owners' spending of rental income, at local shops
       upkeep_share_bps: 2000, // maintenance bought from outside
       base_rent: {} as { [type: string]: number },
-      ...ctx.params,
-    };
+      // Development (see docs/behaviour/firms.md).
+      develop: true,
+      develop_type: "house",
+      develop_window_days: 90, // look at average occupancy over this window
+      develop_max_vacancy_bps: 1000, // build when average vacancy is at most 10% of homes
+      build_markup_bps: 2000, // the builder's price over materials
+      compliance_bps: 10_000, // how often it obeys a refusal, a fine or an order
+    },
+    ctx.params,
+  );
     const me = ctx.entity;
     const book = new Book();
     const cfg = ctx.world.config;
@@ -78,9 +87,15 @@ export const landlord: BehaviourModule = {
     let nextSpend = MONTH;
 
     const tenantAccount = new Map<string, string>(); // agreement -> tenant's paying account
+    const vacancyHistory: { t: number; vacant: number; units: number }[] = [];
+    let dev: { parcel: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string } | null = null;
+    let devCooldownUntil = 0;
+    const answered = new Set<string>(); // fines and orders we've responded to
+    const obeys = (key: string) => ctx.rng(`comply-${key}`).below(10_000) < p.compliance_bps;
 
     const absorb = (obs: Observation) => {
       book.absorb(obs);
+      if (dev?.stage === "applying") for (const o of obs.outcomes) if (o.created?.app) { dev.app = o.created.app; dev.stage = "applied"; }
       const acc = ownAccount(obs);
       if (acc) for (const [from, amount] of receipts(obs, acc.account)) {
         received.set(from, (received.get(from) ?? 0) + amount);
@@ -92,13 +107,15 @@ export const landlord: BehaviourModule = {
       const acc = ownAccount(obs);
       if (!acc) return [];
       const bank = acc.custodian;
-      if (owned.length === 0) {
-        // What we own: the structures on parcels our ownership records name.
-        const parcels = new Set([...book.records.values()].flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object] : [])));
-        for (const s of cfg.world.structures) {
-          const ty = types.get(s.type);
-          if (parcels.has(s.parcel) && ty?.capacity?.dwelling) owned.push({ structure: s.id, type: s.type, units: ty.capacity.dwelling });
-        }
+      // What we own: completed homes on parcels our ownership records name
+      // (seen through our own sites), including anything we've since built.
+      const ownParcels = new Set([...book.records.values()].flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object] : [])));
+      const sites = channels.sites(obs).filter((s) => ownParcels.has(s.parcel));
+      owned.length = 0;
+      for (const site of sites) {
+        const st = site.structure;
+        const ty = st && types.get(st.type);
+        if (st?.complete && ty?.capacity?.dwelling) owned.push({ structure: st.structure, type: st.type, units: ty.capacity.dwelling });
       }
       // Our leases, and when each ends.
       // Our leases: in force, or offered by us and still awaiting the tenant's
@@ -179,7 +196,7 @@ export const landlord: BehaviourModule = {
         const rent = a.terms.commitments[0].does.pay;
         const since = book.signedAt(a.id)!;
         const due = Math.floor((t - since) / MONTH) + 1;
-        const paying = [...book.records.values()].find((r) => r.record === "statement" && r.kind === "rental_application" && r.speaks_for === tenant)?.data?.account ?? cfg.world.accounts.find((x: any) => x.holder === tenant)?.id;
+        const paying = ([...book.records.values()].find((r) => r.record === "statement" && r.kind === "rental_application" && r.speaks_for === tenant) as any)?.data?.account ?? cfg.world.accounts.find((x: any) => x.holder === tenant)?.id;
         const paid = paying ? received.get(paying) ?? 0 : 0;
         if ((due * rent - paid) >= p.arrears_months_before_notice * rent && t - since >= p.arrears_months_before_notice * MONTH) {
           noticeGiven.set(a.id, t);
@@ -199,6 +216,59 @@ export const landlord: BehaviourModule = {
         if (upkeep > 0 && p.outside_account) s.push(payInstruction(me, bank, acc.account, p.outside_account, upkeep, "Maintenance and repairs."));
         if (s.length) steps.push(s);
       }
+      // Development: once every home we have has been let for a while, build
+      // on a site we own. Apply for a permit; if refused, comply, or (with
+      // probability 1 - compliance) build anyway.
+      const units = owned.reduce((n, o) => n + o.units, 0);
+      vacancyHistory.push({ t, vacant: Math.max(0, units - active.length), units });
+      while (vacancyHistory.length && vacancyHistory[0]!.t < t - p.develop_window_days * DAY) vacancyHistory.shift();
+      const vacantSum = vacancyHistory.reduce((n, h) => n + h.vacant, 0);
+      const unitSum = vacancyHistory.reduce((n, h) => n + h.units, 0);
+      const occupiedEnough = t >= p.develop_window_days * DAY && unitSum > 0 && vacantSum * 10_000 <= unitSum * p.develop_max_vacancy_bps;
+      const emptySites = sites.filter((s) => !s.structure).map((s) => s.parcel).sort();
+      const devType = types.get(p.develop_type);
+      const price = devType ? Math.floor((devType.materials_cost * (10_000 + p.build_markup_bps)) / 10_000) : Infinity;
+      if (p.develop && !dev && t >= devCooldownUntil && occupiedEnough && emptySites.length && acc.balance >= price + price / 2 && p.city && p.builder) {
+        dev = { parcel: emptySites[0]!, stage: "applying" };
+        steps.push([{ block: "publish", kind: "permit_application", speaks_for: me, addressed_to: [p.city], ref: "app", text: `Application to build a ${p.develop_type} on ${dev.parcel}.`, data: { parcel: dev.parcel, structure_type: p.develop_type } }]);
+      }
+      if (dev?.stage === "applied") {
+        const decision = book.open("permit_decision").find((d) => d.data?.application === dev!.app);
+        if (decision?.data?.decision === "granted") dev.stage = "granted";
+        else if (decision?.data?.decision === "refused") {
+          if (obeys(`refusal-${dev.app}`)) {
+            dev = null;
+            devCooldownUntil = t + 180 * DAY;
+          } else dev.stage = "refused"; // building anyway
+        }
+      }
+      if (dev && (dev.stage === "granted" || dev.stage === "refused") && acc.balance >= price) {
+        const parcel = dev.parcel;
+        dev.stage = "contracted";
+        steps.push([
+          { block: "propose_agreement", speaks_for: me, ref: "build", terms: {
+            template: "construction", parties: [me, p.builder],
+            commitments: [{ who: p.builder, does: { build: p.develop_type, on: parcel } }, { who: me, does: { pay: price, to: p.builder } }],
+            text: `${p.builder} builds a ${p.develop_type} on ${parcel} for ${me}, for ${price} cents.`,
+          } },
+          { block: "sign_agreement", agreement: "$build", as: me },
+          payInstruction(me, bank, acc.account, p.builder_account, price, `Construction of a ${p.develop_type} on ${parcel}.`),
+        ]);
+      }
+      if (dev?.stage === "contracted" && sites.some((s) => s.parcel === dev!.parcel && s.structure)) dev = null;
+
+      // Fines recorded against us, and demolition orders addressed to us.
+      for (const r of book.records.values()) {
+        if (answered.has(r.id)) continue;
+        if (r.record === "claim" && r.position === "right" && r.counterparty === me && r.about?.kind === "fine") {
+          answered.add(r.id);
+          if (obeys(`fine-${r.id}`) && p.city_account && acc.balance >= r.about.amount) steps.push([payInstruction(me, bank, acc.account, p.city_account, r.about.amount, "Paying a fine.", { settles: r.id })]);
+        }
+        if (r.record === "statement" && r.kind === "demolition_order" && (r.addressed_to ?? []).includes(me)) {
+          answered.add(r.id);
+          if (obeys(`order-${r.id}`)) steps.push([{ block: "demolish", structure: r.data?.structure, costs_from: acc.account }]);
+        }
+      }
       void tenantAccount;
       return steps;
     });
@@ -212,15 +282,17 @@ export const employer: BehaviourModule = {
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
   create(ctx: SeatContext) {
-    const p = {
+    const p = params(
+    {
       wage: 140_000, // cents per period
       period: 14 * DAY,
       target_staff: 5,
       notice_days: 14,
       supplier_share_bps: 4000, // cost of goods bought from outside, as a share of revenue
       buffer_periods: 2,
-      ...ctx.params,
-    };
+    },
+    ctx.params,
+  );
     const me = ctx.entity;
     const book = new Book();
     const orders = new Map<string, string>(); // agreement -> wage standing order
@@ -255,7 +327,7 @@ export const employer: BehaviourModule = {
       // Newly signed: start paying wages by standing order.
       for (const a of staff) {
         if (orders.has(a.id) || [...pendingOrder.values()].includes(a.id)) continue;
-        const account = [...book.records.values()].find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === a.terms.parties[1])?.data?.account;
+        const account = ([...book.records.values()].find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === a.terms.parties[1]) as any)?.data?.account;
         if (!account) continue;
         const ref = `wo${n++}`;
         pendingOrder.set(ref, a.id);

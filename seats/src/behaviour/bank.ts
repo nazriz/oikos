@@ -12,7 +12,7 @@ import { channels } from "../contracts";
 import { act, DAY, wait, type BehaviourModule, type SeatContext } from "../module";
 import { Book } from "./common";
 
-interface Payment { instruction: string; from: string; to: string; amount: number; due: number; payee_holder?: string }
+interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
@@ -58,7 +58,7 @@ export const bankPaymentSystem: BehaviourModule = {
           nextDue.set(ins.id, due);
         } else if (!done.has(ins.id)) {
           done.add(ins.id);
-          out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at });
+          out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at, ...(typeof d.settles === "string" && book.records.has(d.settles) ? { settles: d.settles } : {}) });
         }
       }
       out.sort((a, b) => a.due - b.due || (a.instruction < b.instruction ? -1 : 1));
@@ -86,7 +86,7 @@ export const bankPaymentSystem: BehaviourModule = {
           const p = queue.shift()!;
           const have = balance.get(p.from) ?? 0;
           if (have >= p.amount) {
-            blocks.push({ block: "transfer", from: p.from, to: p.to, amount: p.amount, per_instruction: p.instruction });
+            blocks.push({ block: "transfer", from: p.from, to: p.to, amount: p.amount, per_instruction: p.instruction, ...(p.settles ? { settles: p.settles } : {}) });
             balance.set(p.from, have - p.amount);
             inFlight.push(p);
           } else {

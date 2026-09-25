@@ -1,0 +1,51 @@
+# The people inside institutions (v0.1.0)
+
+**Source:** `seats/src/behaviour/institutions.ts`. These are code seats of the town (`entity: city`) and of the builder. None of this is kernel law. Each seat reads the town's statements, applies them to what it can see because that's its job, and may do the job well, badly or not at all, depending on its parameters (D19, D20).
+
+Laws are read through their optional **formal** conditions, using the CEL helper `seats/src/law.ts` (D27). An institution treats a law as a *prohibition* when its Institutional Grammar breakdown says `must_not`. A condition that evaluates to true on an act means that act would breach the law.
+
+## `city.planning_officer`
+
+Wakes weekly. For each permit application addressed to the town:
+1. It asks whether *granting* the permit would breach a prohibition addressed to the office. For example, `law-river` says "the planning office may not grant a permit for building on the river parcels", with formal condition `block.block == 'grant_permit' && block.parcel in [...]`.
+2. If not, it **grants**: it records a *liberty* claim (Hohfeld) for the applicant to build that structure on that parcel, and publishes the decision.
+3. If so, it **refuses**, publishing the decision with the law it cites.
+
+**Parameters:** `compliance_bps` (default 10000) is how often it follows the law. Below 10000, some unlawful permits get granted: a lax or captured office.
+
+**Source:** administrative decision-making as procedure-following (MOISE+-style roles and procedures, borrowing survey §1). Discretion is a parameter rather than a mechanism.
+
+## `city.inspector`
+
+Wakes weekly and looks through its `sites` channel. In the example town that channel covers the whole town and refreshes every 14 days: the patrol. Detection is only as good as that coverage and cadence, which are experimental variables (VISION's "information sources").
+1. On its first look it takes everything already standing as the baseline.
+2. For each *new* structure, it evaluates the building prohibitions for the parcel's registered owner (read from the ownership records, following transfers) against the permits it knows of.
+3. For each breach, it records a **fine** (a claim: the town's right, the owner's duty) and publishes a **demolition order** to the owner, both citing the law.
+
+What happens next is up to the owner, and to whoever else might enforce.
+
+**Parameters:**
+- `fine` (default $50,000, matching the example law);
+- `compliance_bps` (default 10000): how often it acts on what it finds. Below 10000 it sometimes looks the other way.
+
+**Source:** deterrence depends on the probability of detection and the size of the sanction (Becker 1968). Inspection capacity and coverage limit detection (the inspection-game and risk-based-regulation literature, borrowing survey §5). The inspector's work has no time cost until work is modelled (D24).
+
+## `firm.builder`
+
+Wakes weekly. For each construction agreement a client has signed, if it can pay for the materials, it signs too and builds (`construct`), the materials being bought from outside (the temporary liberty in docs/decisions.md). It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
+
+## Landlords as developers (`firm.landlord`, see [firms.md](firms.md))
+
+When a landlord's **average vacancy over the last 90 days is at most 10%** of its homes, and it has 1.5× the price of a house in hand, it applies to build on an empty site it owns.
+- **Granted:** it contracts the builder and pays.
+- **Refused:** it complies with probability `compliance_bps`. Otherwise it **builds anyway**.
+
+It also pays fines and obeys demolition orders with that same probability.
+
+In the example town, `landlord_compliance_bps: 5000`. The river scenario test (`orchestrator/test/river.test.ts`) runs a tight-housing town at compliance 0 and 10000, and checks the whole chain:
+- the application;
+- the refusal citing law-river;
+- construction anyway (or not);
+- the inspector's patrol detecting it within three weeks;
+- the fine citing law-planning, and the demolition order;
+- the order being ignored (or never needed).

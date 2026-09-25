@@ -21,6 +21,9 @@ Rules every module follows (so re-runs are reproducible):
 | `citizen.default` | a townsperson: housing, work, spending, leaving town | [citizen.md](citizen.md) |
 | `firm.landlord` | a landlord's letting office | [firms.md](firms.md) |
 | `firm.employer` | a shop's or factory's manager | [firms.md](firms.md) |
+| `city.planning_officer` | decides permit applications under the laws that bind the office | [institutions.md](institutions.md) |
+| `city.inspector` | patrols, detects unpermitted building, fines and orders demolition | [institutions.md](institutions.md) |
+| `firm.builder` | builds what it's contracted to build | [institutions.md](institutions.md) |
 | `idle` | does nothing (placeholder, and a control condition) | this page |
 
 The town these modules run in is made by the [generator](generator.md).

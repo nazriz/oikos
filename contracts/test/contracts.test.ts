@@ -66,7 +66,7 @@ describe("schemas", () => {
 describe("valid examples", () => {
   for (const ex of examples("valid")) {
     test(`${ex.dir}/${ex.file}`, () => {
-      const v = validator(TARGETS[ex.dir]);
+      const v = validator(TARGETS[ex.dir]!);
       const ok = v(ex.data);
       if (!ok) console.error(JSON.stringify(v.errors, null, 2));
       expect(ok).toBe(true);
@@ -77,7 +77,7 @@ describe("valid examples", () => {
 describe("invalid examples", () => {
   for (const ex of examples("invalid")) {
     test(`${ex.dir}/${ex.file} is rejected`, () => {
-      expect(validator(TARGETS[ex.dir])(ex.data)).toBe(false);
+      expect(validator(TARGETS[ex.dir]!)(ex.data)).toBe(false);
     });
   }
 });
@@ -85,7 +85,7 @@ describe("invalid examples", () => {
 // Targeted mutations of the valid world config: each must be rejected.
 describe("world-config mutations are rejected", () => {
   const base = () => readJson(join(root, "examples/valid/world-config/riverbend-mini.json"));
-  const v = validator(TARGETS["world-config"]);
+  const v = validator(TARGETS["world-config"]!);
   const cases: [string, (c: any) => void][] = [
     ["float hidden in opaque controller params", (c) => (c.seats[0].controller.params.temperature = 0.7)],
     ["float hidden in a record's data", (c) => (c.world.records.find((r: any) => r.id === "law-tax").data.rate = 0.1)],

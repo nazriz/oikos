@@ -29,6 +29,10 @@ export interface TownSpec {
   housed_bps: number;
   employed_bps: number;
   savings_months: [number, number];
+  /** How often landlords obey a permit refusal, a fine or a demolition order (default 10000 = always). */
+  landlord_compliance_bps?: number;
+  /** Each landlord's opening balance, cents (default $600,000). */
+  landlord_capital?: number;
 }
 
 export function generate(spec: TownSpec): any {
@@ -103,6 +107,14 @@ export function generate(spec: TownSpec): any {
   }
   const hallParcel = site();
   structures.push({ id: "town-hall", parcel: hallParcel, type: "civic", built_by: "builder" });
+  // Each landlord owns one empty development site; the first landlord's is on the river.
+  const riverList = [...river].sort();
+  landlords.forEach((l, i) => own(i === 0 ? riverList[Math.floor(riverList.length / 2)]! : site(), l));
+  // The river law: addressed to the planning office, about granting permits.
+  records.push({ id: "law-river", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
+    text: `The planning office may not grant a permit for building on the river parcels (${riverList[0]} to ${riverList.at(-1)}), which flood.`,
+    adico: { attribute: "the planning office", deontic: "must_not", aim: "grant a building permit", condition: "for a river parcel" },
+    formal: { language: "cel", condition: `block.block == 'grant_permit' && block.parcel in [${riverList.map((x) => `'${x}'`).join(",")}]` } });
   for (const p of parcels) if (!records.some((r) => r.id === `title-${p.id}`)) own(p.id, "city");
 
   // ---- people: savings, homes, jobs ----
@@ -112,7 +124,7 @@ export function generate(spec: TownSpec): any {
     { id: "acc-city", holder: "city", custodian: "bank", balance: 200_000_000 },
     { id: "acc-builder", holder: "builder", custodian: "bank", balance: 30_000_000 },
   ];
-  for (const l of landlords) accounts.push({ id: `acc-${l}`, holder: l, custodian: "bank", balance: 20_000_000 });
+  for (const l of landlords) accounts.push({ id: `acc-${l}`, holder: l, custodian: "bank", balance: spec.landlord_capital ?? 60_000_000 });
   for (const s of shops) accounts.push({ id: `acc-${s}`, holder: s, custodian: "bank", balance: 3_000_000 });
   for (const f of factories) accounts.push({ id: `acc-${f}`, holder: f, custodian: "bank", balance: 40_000_000 });
 
@@ -172,13 +184,20 @@ export function generate(spec: TownSpec): any {
     { id: "bank-payments", entity: "bank", title: "Bank payment system", channels: [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] }, new_only: true }, { id: "who", kind: "directory" }], controller: code("bank.payment_system"), framing: unstated },
     { id: "export-demand", entity: "outside", title: "The outside world's demand", channels: [{ id: "ledger", kind: "accounts" }],
       controller: code("world.export_demand", { purchases: factories.map((f) => ({ to: `acc-${f}`, amount: Math.floor(spec.exports_per_month / factories.length), every: MONTH, memo: "Export sales." })) }), framing: unstated },
-    { id: "builder-foreman", entity: "builder", title: "Site foreman", channels: [{ id: "books", kind: "accounts" }, mine()], controller: code("idle"), framing: unstated },
+    { id: "builder-foreman", entity: "builder", title: "Site foreman", channels: [{ id: "books", kind: "accounts" }, mine()], controller: code("firm.builder"), framing: unstated },
   ];
-  for (const role of ["finance", "planning", "inspector", "tax-clerk", "council-clerk"]) seats.push({ id: role, entity: "city", role: role.replace("-", "_"), channels: [mine()], controller: code("idle"), framing: unstated });
+  const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
+  seats.push({ id: "planning", entity: "city", title: "Planning officer", role: "planning_officer", channels: [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] }, new_only: true }],
+    controller: code("city.planning_officer"), framing: unstated });
+  seats.push({ id: "inspector", entity: "city", title: "Building inspector", role: "inspector",
+    channels: [laws, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] }, new_only: true }, { id: "patrol", kind: "sites", area: "all", every: 14 * DAY }],
+    controller: code("city.inspector"), framing: unstated });
+  for (const role of ["finance", "tax-clerk", "council-clerk"]) seats.push({ id: role, entity: "city", role: role.replace("-", "_"), channels: [mine()], controller: code("idle"), framing: unstated });
   for (const l of landlords) {
     const theirParcels = records.filter((r) => r.record === "claim" && r.holder === l).map((r) => r.about.object);
     seats.push({ id: `${l}-office`, entity: l, title: "Letting office", channels: [{ id: "books", kind: "accounts" }, mine(), { id: "own-sites", kind: "sites", area: theirParcels.length ? theirParcels : "all" }],
-      controller: code("firm.landlord", { base_rent: { apartments: spec.rents.apartment, house: spec.rents.house }, shop_accounts: shopAccounts, outside_account: "acc-outside" }), framing: unstated });
+      controller: code("firm.landlord", { base_rent: { apartments: spec.rents.apartment, house: spec.rents.house }, shop_accounts: shopAccounts, outside_account: "acc-outside",
+        city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000 }), framing: unstated });
   }
   for (const w of workplaces) {
     seats.push({ id: `${w.employer}-manager`, entity: w.employer, title: "Manager", channels: [{ id: "books", kind: "accounts" }, mine()],
