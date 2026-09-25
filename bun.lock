@@ -20,6 +20,7 @@
       },
       "dependencies": {
         "@terrarium/seats": "workspace:*",
+        "@terrarium/worlds": "workspace:*",
       },
     },
     "seats": {

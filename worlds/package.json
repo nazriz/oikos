@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "ajv": "^8.17.1"
+  },
+  "exports": {
+    "./generator/generate": "./generator/generate.ts"
   }
 }
