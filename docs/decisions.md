@@ -96,6 +96,30 @@ Open, raised with Naz: what counts as physical *possession* (can anyone physical
 **D21. Work is real (simplified); borrow from existing economic models.** *(Naz, 2026-09-25.)*
 Jobs must be real in effect: tasks require units of time, workers have units of capacity. Institutional efficiency (e.g. an AI-run tax agency needing fewer staff) depends on it. We design it now and build it after the core, provided the core can be tested without it. We borrow freely from established agent-based economic models (their published models and rules, cited in docs/behaviour/, rather than their code, which is mostly Python/Java/NetLogo).
 
+**D22. The kernel never judges whether a record is valid.** *(Naz, 2026-09-25.)*
+Claims, agreements and statements are stored with their author and basis. Validity, legality and legitimacy are interpretation, done by entities (clerks, courts, the public). Forged titles, laws published without a vote, and fake permits are all possible, and the record shows who made them.
+
+**D23. Institutions are world content, not platform.** *(Naz, 2026-09-25.)*
+Councils, agencies, courts and inspectors are entities, roles, procedures and seats in a world's config, filled by behaviour modules, LLMs or humans. An empty world is valid. The platform provides the kernel and the ability to run code-controlled seats from swappable behaviour modules. Example worlds and example behaviour modules are content: cited, documented and replaceable.
+
+**D24. Work is designed in v0.2 and built after the core loop runs.** *(Naz, 2026-09-25.)* Tasks have time requirements and performers have capacity (the Acemoglu & Restrepo task framework). Until it's built, institutions act without time cost, so institutional-efficiency questions wait for it.
+
+**D25. Proportional fidelity: faithful where the research is, documented liberties elsewhere.** *(Naz, 2026-09-25: "some things can be 100%, others 10%." Fidelity map confirmed ("fine to proceed with where we're at"). Adding this principle to VISION.md §3 was proposed; VISION left unedited pending Naz.)*
+The rule: a simplification is acceptable if it changes *how much* or *how fast*. It is not acceptable if it decides *who acts* or *whether a safeguard works*. Every liberty taken is recorded here, or in docs/behaviour/.
+Proposed map:
+- **~100%:** power and institutions (who decides, how decisions are carried out, procedures that can be bent, laws that can be broken, enforcement by entities); human levers (vote, petition, protest, move away, object); information (who sees what; every report has an author).
+- **High:** nature and irreversibility (Stage 4).
+- **Medium:** the everyday economy (jobs, rent, prices, work taking time).
+- **Low (~10%):** the financial system, construction details, geography, transport, demographics.
+
+**D26. Money: conserved tokens held and moved by banks (option B).** *(Naz, 2026-09-25.)*
+Money is a conserved integer quantity, as before, and it is held in accounts **at banks**, which are entities in a world's config. The account holder instructs; the bank's seat (a code module by default, swappable, possibly AI) executes: payments, standing orders, refusals, freezes. **Debt and credit are fully supported** (Naz: "we still need to support debt and credit"):
+- loans, mortgages (with a security claim over property), overdrafts, credit limits, interest and arrears are agreements plus paired financial claims;
+- interest and repayment schedules are applied by the lender's seat, not computed by the kernel;
+- default and repossession are acts by entities.
+
+**The liberty:** lenders can only lend money they actually hold (their own funds or borrowed funds), so banks **cannot create money** by lending out deposits (no fractional-reserve money creation). Also out of scope: exotic instruments (derivatives, securitisation, traded securities markets). That's D25: the financial system is low fidelity. The alternative, money as claims on banks with credit creation (option A, stock-flow consistent), is recorded as a future upgrade if the research needs it. The money-conservation invariant stays.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - Citizen behaviour in the Rust kernel (deterministic, fast, re-runnable, but researchers must write Rust to swap models) vs TypeScript code seats (easy to swap, but replay-only reproducibility). Leaning kernel.
