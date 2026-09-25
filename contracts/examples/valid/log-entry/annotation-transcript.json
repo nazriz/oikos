@@ -1,0 +1,16 @@
+{
+  "seq": 51,
+  "t": 176400,
+  "kind": "annotation",
+  "body": {
+    "annotation": "transcript",
+    "subject": "mayor",
+    "data": {
+      "prompt": "...",
+      "response": "...",
+      "stop_reason": "end_turn"
+    }
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

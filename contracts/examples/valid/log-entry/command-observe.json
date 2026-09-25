@@ -1,0 +1,11 @@
+{
+  "seq": 43,
+  "t": 176400,
+  "kind": "command",
+  "body": {
+    "command": "observe",
+    "seat": "mayor"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

@@ -1,0 +1,16 @@
+{
+  "seq": 46,
+  "t": 172800,
+  "kind": "event",
+  "body": {
+    "event": "action_refused",
+    "cause": 41,
+    "action": "act.6",
+    "seat": "mayor",
+    "block": 1,
+    "code": "mandate_denied",
+    "detail": "no power matches dissolve_entity"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

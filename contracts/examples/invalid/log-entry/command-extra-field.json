@@ -1,0 +1,12 @@
+{
+  "seq": 41,
+  "t": 0,
+  "kind": "command",
+  "body": {
+    "command": "advance",
+    "to": 60,
+    "skip_checks": true
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

@@ -1,0 +1,18 @@
+{
+  "seq": 50,
+  "t": 176400,
+  "kind": "annotation",
+  "body": {
+    "annotation": "usage",
+    "purpose": "seat",
+    "subject": "mayor",
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "input_tokens": 5120,
+    "output_tokens": 712,
+    "cache_read_tokens": 4096,
+    "cost_microusd": 26040
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

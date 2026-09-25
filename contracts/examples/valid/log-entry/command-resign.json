@@ -1,0 +1,12 @@
+{
+  "seq": 44,
+  "t": 176400,
+  "kind": "command",
+  "body": {
+    "command": "resign",
+    "seat": "mayor",
+    "statement": "I am stepping down."
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

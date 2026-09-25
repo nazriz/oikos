@@ -1,0 +1,11 @@
+{
+  "seq": 42,
+  "t": 172800,
+  "kind": "command",
+  "body": {
+    "command": "advance",
+    "to": 176400
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

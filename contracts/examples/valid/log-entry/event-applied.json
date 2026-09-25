@@ -1,0 +1,16 @@
+{
+  "seq": 45,
+  "t": 172800,
+  "kind": "event",
+  "body": {
+    "event": "action_applied",
+    "cause": 41,
+    "action": "act.4",
+    "seat": "mayor",
+    "created": {
+      "clt": "ent.1"
+    }
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

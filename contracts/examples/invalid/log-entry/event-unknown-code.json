@@ -1,0 +1,14 @@
+{
+  "seq": 46,
+  "t": 0,
+  "kind": "event",
+  "body": {
+    "event": "action_refused",
+    "cause": 41,
+    "action": "act.6",
+    "seat": "mayor",
+    "code": "because"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

@@ -1,0 +1,1 @@
+{ "block": "enact_rule", "jurisdiction": "city", "rule": { "type": "rent_cap", "parcels": "all", "max_per_30d": 160000, "applies_to": "all_payments" } }

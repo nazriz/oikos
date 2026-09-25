@@ -1,0 +1,13 @@
+{
+  "seq": 49,
+  "t": 176400,
+  "kind": "event",
+  "body": {
+    "event": "observation",
+    "cause": 43,
+    "seat": "mayor",
+    "observation_hash": "abababababababababababababababababababababababababababababababab"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

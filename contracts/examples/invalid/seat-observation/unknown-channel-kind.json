@@ -1,0 +1,234 @@
+{
+  "seat": "mayor",
+  "t": 259200,
+  "status": "active",
+  "principal": "city",
+  "can_act_for": [
+    "city",
+    "ent.1"
+  ],
+  "mandate": {
+    "powers": [
+      {
+        "blocks": [
+          "transfer",
+          "construct"
+        ],
+        "level": "direct",
+        "limits": {
+          "max_amount": 5000000
+        }
+      },
+      {
+        "blocks": [
+          "enact_rule"
+        ],
+        "level": "approval",
+        "approvers": [
+          "council-seat"
+        ]
+      }
+    ]
+  },
+  "outcomes": [
+    {
+      "action": "act.4",
+      "t": 172800,
+      "status": "applied",
+      "created": {
+        "clt": "ent.1"
+      }
+    },
+    {
+      "action": "act.5",
+      "t": 172800,
+      "status": "held",
+      "proposal": "prp.1",
+      "awaiting": [
+        "council-seat"
+      ]
+    },
+    {
+      "action": "act.6",
+      "t": 259200,
+      "status": "refused",
+      "refusal": {
+        "code": "insufficient_funds",
+        "block": 1,
+        "detail": "city holds 496000000, needs 600000000"
+      }
+    }
+  ],
+  "inbox": [
+    {
+      "id": "msg.2",
+      "t": 216000,
+      "from": "developer",
+      "to": [
+        "mayor"
+      ],
+      "text": "Would the city consider rezoning p12 for apartments?"
+    }
+  ],
+  "awaiting": [
+    {
+      "type": "request",
+      "proposal": "prp.2",
+      "from": "developer",
+      "since": 216000,
+      "blocks": [
+        {
+          "block": "enact_rule",
+          "jurisdiction": "city",
+          "rule": {
+            "type": "zoning",
+            "parcels": [
+              "p12"
+            ],
+            "allow": [
+              "residential"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "type": "agreement_offer",
+      "agreement": "agr.3",
+      "terms": {
+        "type": "lease",
+        "lessor": "devco",
+        "lessee": "city",
+        "parcel": "p02",
+        "units": 1,
+        "rent": 90000,
+        "period": 2592000,
+        "notice": 2592000
+      },
+      "proposed_by": "devco",
+      "respond_as": "city",
+      "expires_at": 820800
+    }
+  ],
+  "drafts": [
+    {
+      "id": "draft.mayor.7",
+      "seat": "mayor",
+      "proposal": "Build a park on p00.",
+      "blocks": [
+        {
+          "block": "construct",
+          "owner": "city",
+          "parcel": "p00",
+          "structure_type": "park",
+          "contractor": "outside"
+        }
+      ],
+      "summary": "The city starts building a park on parcel p00, paying $50,000 to an outside contractor. It will be finished in 30 days.",
+      "check": {
+        "ok": true,
+        "level": "direct"
+      },
+      "translator": {
+        "id": "translator",
+        "version": "0.1.0",
+        "model": "claude-sonnet-5"
+      }
+    }
+  ],
+  "channels": {
+    "budget": {
+      "kind": "accounts",
+      "items": [
+        {
+          "entity": "city",
+          "name": "City of Riverbend",
+          "balance": 496000000
+        },
+        {
+          "entity": "ent.1",
+          "name": "Riverbend Community Land Trust",
+          "balance": 4000000
+        }
+      ]
+    },
+    "land": {
+      "kind": "parcels",
+      "items": [
+        {
+          "parcel": "p00",
+          "x": 0,
+          "y": 0,
+          "w": 1,
+          "h": 1,
+          "allow": [
+            "residential",
+            "commercial",
+            "civic",
+            "green"
+          ],
+          "rights": [
+            {
+              "right": "r-p00",
+              "kind": "surface",
+              "holder": "city"
+            }
+          ]
+        },
+        {
+          "parcel": "p10",
+          "x": 0,
+          "y": 1,
+          "w": 1,
+          "h": 1,
+          "allow": [
+            "residential",
+            "green"
+          ],
+          "structure": {
+            "structure": "s-apts",
+            "type": "apartments",
+            "owner": "devco",
+            "complete": true,
+            "units_leased": 1
+          },
+          "rights": [
+            {
+              "right": "r-p10",
+              "kind": "surface",
+              "holder": "devco"
+            },
+            {
+              "right": "rgt.1",
+              "kind": "use",
+              "holder": "bob",
+              "units": 1
+            }
+          ]
+        }
+      ]
+    },
+    "who": {
+      "kind": "directory",
+      "seats": [
+        {
+          "seat": "developer",
+          "title": "CEO, Riverbend Developments",
+          "principal": "devco",
+          "status": "active"
+        }
+      ],
+      "entities": [
+        {
+          "entity": "bob",
+          "kind": "person",
+          "name": "Bob"
+        }
+      ]
+    },
+    "omniscience": {
+      "kind": "world_state",
+      "items": []
+    }
+  }
+}

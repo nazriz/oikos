@@ -1,0 +1,404 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:terrarium:contracts:0.1:seat-api",
+  "title": "Terrarium seat API",
+  "description": "The only window a controller has onto the world. Identical for code, LLM, human and RL controllers (VISION principle 4). Shaped like PettingZoo's AEC API: the environment selects the next seat to act (the one whose wake time or triggering event comes first on the world clock), the seat reads last() and calls step(action). There are no turns; 'next seat' is decided by simulated time. See contracts/README.md for the lifecycle.",
+  "$defs": {
+    "StepResult": {
+      "description": "What last() returns for the selected seat. 'reward' is always 0: the platform does not judge. Researchers who want RL rewards compute them outside the world from logs or observations and wrap the environment.",
+      "type": "object",
+      "required": ["observation", "reward", "termination", "truncation", "info"],
+      "additionalProperties": false,
+      "properties": {
+        "observation": { "$ref": "#/$defs/Observation" },
+        "reward": { "const": 0 },
+        "termination": { "description": "The seat has resigned or its principal was dissolved.", "type": "boolean" },
+        "truncation": { "description": "The run reached clock.run_seconds or was stopped.", "type": "boolean" },
+        "info": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actions_left_this_wake": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" }
+          }
+        }
+      }
+    },
+
+    "Observation": {
+      "description": "Role-limited perception. Built by the kernel (deterministic, logged by hash) plus 'drafts', which the orchestrator adds from the translator. outcomes and inbox contain only what is new since this seat's previous observation; awaiting and drafts are always the full current set.",
+      "type": "object",
+      "required": ["seat", "t", "status", "principal", "can_act_for", "mandate", "outcomes", "inbox", "awaiting", "drafts", "channels"],
+      "additionalProperties": false,
+      "properties": {
+        "seat": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+        "t": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
+        "status": { "enum": ["active", "resigned"] },
+        "principal": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "can_act_for": {
+          "description": "The principal plus every active entity it transitively controls.",
+          "type": "array",
+          "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" }
+        },
+        "mandate": { "$ref": "urn:terrarium:contracts:0.1:world-config#/$defs/Mandate" },
+        "outcomes": { "type": "array", "items": { "$ref": "#/$defs/Outcome" } },
+        "inbox": { "type": "array", "items": { "$ref": "#/$defs/Message" } },
+        "awaiting": { "type": "array", "items": { "$ref": "#/$defs/AwaitingItem" } },
+        "drafts": { "type": "array", "items": { "$ref": "#/$defs/Draft" } },
+        "channels": {
+          "description": "Keyed by channel id from the seat's config.",
+          "type": "object",
+          "propertyNames": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+          "additionalProperties": { "$ref": "#/$defs/ChannelData" }
+        }
+      }
+    },
+
+    "Outcome": {
+      "description": "What happened to one of this seat's actions, or to a proposal it is waiting on.",
+      "type": "object",
+      "required": ["action", "t", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "action": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" },
+        "t": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
+        "status": {
+          "description": "held: waiting for approvers. forwarded: sent as a request. rejected: an approver said no. applied/refused: final.",
+          "enum": ["applied", "refused", "held", "forwarded", "rejected"]
+        },
+        "created": {
+          "type": "object",
+          "propertyNames": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RefName" },
+          "additionalProperties": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" }
+        },
+        "refusal": {
+          "type": "object",
+          "required": ["code"],
+          "additionalProperties": false,
+          "properties": {
+            "code": { "$ref": "urn:terrarium:contracts:0.1:log#/$defs/RefusalCode" },
+            "block": { "type": "integer", "minimum": 0, "maximum": 31 },
+            "detail": { "type": "string", "maxLength": 2000 }
+          }
+        },
+        "proposal": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" },
+        "awaiting": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" } }
+      }
+    },
+
+    "Message": {
+      "type": "object",
+      "required": ["id", "t", "from", "to", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" },
+        "t": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
+        "from": { "description": "Sending seat.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+        "to": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" } },
+        "text": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" },
+        "re": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" }
+      }
+    },
+
+    "AwaitingItem": {
+      "description": "Something that needs this seat's response.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "proposal", "from", "since", "blocks"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "description": "approval: answer with a 'decide' block. request: act yourself if you choose to; no reply is required.", "enum": ["approval", "request"] },
+            "proposal": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" },
+            "from": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+            "since": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
+            "blocks": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/Action/properties/blocks" },
+            "reasoning": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "agreement", "terms", "proposed_by", "respond_as"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "agreement_offer" },
+            "agreement": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/KernelId" },
+            "terms": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/AgreementTerms" },
+            "proposed_by": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+            "respond_as": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+            "expires_at": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" }
+          }
+        }
+      ]
+    },
+
+    "TranslatorId": {
+      "type": "object",
+      "required": ["id", "version", "model"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "version": { "description": "Translator release; prompt changes bump it so experiments can hold it fixed.", "type": "string", "maxLength": 64 },
+        "model": { "type": "string", "maxLength": 200 },
+        "prompt_hash": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Hash" }
+      }
+    },
+
+    "Draft": {
+      "description": "The translator's compilation of a plain-language proposal, returned to the proposer for sign-off (lawyers draft, politicians sign). draft_hash = SHA-256 of 'terrarium.draft.v1\\n' + canonical JSON of this object. The signed hash is carried into the act command, so the proposer cannot later claim it was misunderstood.",
+      "type": "object",
+      "required": ["id", "seat", "proposal", "blocks", "summary", "check", "translator"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$" },
+        "seat": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+        "proposal": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" },
+        "blocks": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/Action/properties/blocks" },
+        "summary": { "description": "Plain-language restatement of exactly what the blocks do, written for the proposer.", "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" },
+        "check": {
+          "description": "Kernel dry-run of the blocks at drafting time. The world may change before sign-off; the kernel re-checks on submission.",
+          "type": "object",
+          "required": ["ok"],
+          "additionalProperties": false,
+          "properties": {
+            "ok": { "type": "boolean" },
+            "level": { "enum": ["direct", "approval", "request"] },
+            "refusal": { "$ref": "#/$defs/Outcome/properties/refusal" }
+          }
+        },
+        "caveats": {
+          "description": "Parts of the proposal the translator could not express in blocks.",
+          "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text"
+        },
+        "translator": { "$ref": "#/$defs/TranslatorId" }
+      }
+    },
+
+    "SeatAction": {
+      "description": "What a seat passes to step(). Carries no seat id: the orchestrator binds identity from the connection. act and message go straight to the kernel; propose goes to the translator and comes back as a draft; sign submits (accept) or discards (reject) a draft; wait yields until 'until' or the next item addressed to this seat, whichever is first; resign is always available (VISION §15) and is final.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "blocks"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "act" },
+            "blocks": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/Action/properties/blocks" },
+            "reasoning": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "propose" },
+            "text": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" },
+            "reasoning": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "draft", "decision"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "sign" },
+            "draft": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$" },
+            "decision": { "enum": ["accept", "reject"] },
+            "note": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "to", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "message" },
+            "to": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/message/properties/to" },
+            "text": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" },
+            "re": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "wait" },
+            "until": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "statement"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "resign" },
+            "statement": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
+          }
+        }
+      ]
+    },
+
+    "ChannelData": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "items"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "accounts" },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["entity", "name", "balance"],
+                "additionalProperties": false,
+                "properties": {
+                  "entity": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                  "name": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Name" },
+                  "balance": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Cents" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "items"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "parcels" },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["parcel", "x", "y", "w", "h", "allow", "rights"],
+                "additionalProperties": false,
+                "properties": {
+                  "parcel": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                  "x": { "type": "integer" },
+                  "y": { "type": "integer" },
+                  "w": { "type": "integer", "minimum": 1 },
+                  "h": { "type": "integer", "minimum": 1 },
+                  "allow": {
+                    "description": "Effective zoning: categories that may be built here now.",
+                    "type": "array",
+                    "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/StructureCategory" }
+                  },
+                  "structure": {
+                    "type": "object",
+                    "required": ["structure", "type", "owner", "complete", "units_leased"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "structure": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                      "type": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+                      "owner": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                      "complete": { "type": "boolean" },
+                      "completes_at": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
+                      "units_leased": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Count" }
+                    }
+                  },
+                  "rights": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["right", "kind", "holder"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "right": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                        "kind": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RightKind" },
+                        "holder": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                        "until": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
+                        "units": { "type": "integer", "minimum": 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "items"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "rules" },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["rule", "jurisdiction", "enacted_at", "body"],
+                "additionalProperties": false,
+                "properties": {
+                  "rule": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                  "jurisdiction": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                  "enacted_at": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
+                  "body": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/Rule" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "items"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "agreements" },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["agreement", "status", "terms"],
+                "additionalProperties": false,
+                "properties": {
+                  "agreement": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                  "status": { "enum": ["pending", "active", "ending", "ended"] },
+                  "terms": { "$ref": "urn:terrarium:contracts:0.1:blocks#/$defs/AgreementTerms" },
+                  "next_payment_at": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" },
+                  "ends_at": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/SimTime" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "seats", "entities"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "directory" },
+            "seats": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["seat", "principal", "status"],
+                "additionalProperties": false,
+                "properties": {
+                  "seat": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+                  "title": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Name" },
+                  "principal": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                  "status": { "enum": ["active", "resigned"] }
+                }
+              }
+            },
+            "entities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["entity", "kind", "name"],
+                "additionalProperties": false,
+                "properties": {
+                  "entity": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+                  "kind": { "type": "string" },
+                  "name": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Name" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

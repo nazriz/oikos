@@ -1,0 +1,17 @@
+{
+  "seq": 48,
+  "t": 172800,
+  "kind": "event",
+  "body": {
+    "event": "structure_started",
+    "cause": 41,
+    "action": "act.7",
+    "structure": "str.1",
+    "parcel": "p00",
+    "structure_type": "park",
+    "owner": "city",
+    "at": 2764800
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

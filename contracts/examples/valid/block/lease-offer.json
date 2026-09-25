@@ -1,0 +1,1 @@
+{ "block": "propose_agreement", "terms": { "type": "lease", "lessor": "devco", "lessee": "alice", "parcel": "p10", "units": 1, "rent": 175000, "period": 2592000, "term": 31536000, "notice": 5184000 }, "offer_expires_after": 604800, "ref": "alice_lease" }

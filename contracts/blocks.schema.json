@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:terrarium:contracts:0.1:blocks",
+  "title": "Terrarium building blocks",
+  "description": "The grammar every consequential act compiles to. A seat submits an Action: an ordered bundle of blocks applied ATOMICALLY (all or nothing), so a sale can be 'transfer money + transfer right' with no escrow. Every block names its acting entity explicitly; there are no implicit defaults. The kernel checks each block against (1) the laws and (2) the acting seat's mandate. v0.1 set: 15 blocks. Add a block only when translations keep failing for the same reason.",
+  "$defs": {
+    "Action": {
+      "type": "object",
+      "required": ["blocks"],
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Block" },
+          "minItems": 1,
+          "maxItems": 32
+        }
+      }
+    },
+    "Block": {
+      "oneOf": [
+        { "$ref": "#/$defs/create_entity" },
+        { "$ref": "#/$defs/dissolve_entity" },
+        { "$ref": "#/$defs/transfer" },
+        { "$ref": "#/$defs/transfer_right" },
+        { "$ref": "#/$defs/grant_right" },
+        { "$ref": "#/$defs/revoke_right" },
+        { "$ref": "#/$defs/construct" },
+        { "$ref": "#/$defs/demolish" },
+        { "$ref": "#/$defs/enact_rule" },
+        { "$ref": "#/$defs/repeal_rule" },
+        { "$ref": "#/$defs/propose_agreement" },
+        { "$ref": "#/$defs/respond_agreement" },
+        { "$ref": "#/$defs/terminate_agreement" },
+        { "$ref": "#/$defs/message" },
+        { "$ref": "#/$defs/decide" }
+      ]
+    },
+    "BlockName": {
+      "enum": [
+        "create_entity", "dissolve_entity", "transfer", "transfer_right", "grant_right",
+        "revoke_right", "construct", "demolish", "enact_rule", "repeal_rule",
+        "propose_agreement", "respond_agreement", "terminate_agreement", "message", "decide"
+      ]
+    },
+
+    "create_entity": {
+      "description": "ENTITIES. Found an organisation. The founder must be an entity the seat can act for. The new entity starts with a zero balance and is controlled by 'controller' (default: the founder); seats that can act for the controller can act for it. Persons, governments and the boundary cannot be created by seats.",
+      "type": "object",
+      "required": ["block", "founder", "kind", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "create_entity" },
+        "founder": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "kind": { "enum": ["firm", "trust", "agency", "union", "club", "cooperative"] },
+        "name": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Name" },
+        "controller": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RefName" }
+      }
+    },
+    "dissolve_entity": {
+      "description": "ENTITIES. Wind up an entity the seat can act for. Its whole balance and every right it holds pass to 'successor'; its agreements end with reason 'dissolution'. Money is never destroyed.",
+      "type": "object",
+      "required": ["block", "entity", "successor"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "dissolve_entity" },
+        "entity": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "successor": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" }
+      }
+    },
+    "transfer": {
+      "description": "TRANSFERS. Move money from an entity the seat can act for to any active entity. Refused if it would overdraw 'from'. Nobody may draw from the boundary entity; money enters the world only through researcher-set boundary conditions.",
+      "type": "object",
+      "required": ["block", "from", "to", "amount"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "transfer" },
+        "from": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "to": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "amount": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Amount" },
+        "memo": { "type": "string", "maxLength": 500 }
+      }
+    },
+    "transfer_right": {
+      "description": "RIGHTS. Convey a whole right held by an entity the seat can act for (e.g. sell surface title). Derived rights (created by grant_right or by a lease) are not transferable in v0.1.",
+      "type": "object",
+      "required": ["block", "right", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "transfer_right" },
+        "right": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "to": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" }
+      }
+    },
+    "grant_right": {
+      "description": "RIGHTS. The holder of the surface right on a parcel grants a derived use or access right to another party, optionally time-limited. Leases create use rights automatically; this block is for easements, licences and similar.",
+      "type": "object",
+      "required": ["block", "grantor", "parcel", "kind", "to", "revocable"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "grant_right" },
+        "grantor": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "parcel": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "kind": { "enum": ["use", "access"] },
+        "to": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "units": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "duration": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration" },
+        "revocable": { "type": "boolean" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RefName" }
+      }
+    },
+    "revoke_right": {
+      "description": "RIGHTS. The grantor ends a derived right it granted with revocable: true. Rights created by leases can only end through the lease.",
+      "type": "object",
+      "required": ["block", "right"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "revoke_right" },
+        "right": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" }
+      }
+    },
+    "construct": {
+      "description": "CONSTRUCTION. Start building a catalogue structure on a parcel. The owner must hold the surface right (or a use right covering the parcel), the parcel must be empty, and zoning must allow the structure's category. The catalogue cost is paid by the owner to the contractor at the start; the structure completes after the catalogue build time. Paying the boundary entity as contractor is money leaving the world.",
+      "type": "object",
+      "required": ["block", "owner", "parcel", "structure_type", "contractor"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "construct" },
+        "owner": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "parcel": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "structure_type": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ConfigId" },
+        "contractor": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RefName" }
+      }
+    },
+    "demolish": {
+      "description": "CONSTRUCTION. Demolish a structure owned by an entity the seat can act for, paying the catalogue demolition cost to the contractor. Refused while any active lease covers the structure: tenants must be ended through the lease's own terms first.",
+      "type": "object",
+      "required": ["block", "structure", "contractor"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "demolish" },
+        "structure": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "contractor": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" }
+      }
+    },
+    "enact_rule": {
+      "description": "RULES. An entity with jurisdiction over the parcels in scope enacts a rule. v0.1 has two typed rules, not the general condition language. Zoning: for any parcel, the most recently enacted active zoning rule covering it decides what may be built. Rent cap: the lowest active cap covering a parcel applies.",
+      "type": "object",
+      "required": ["block", "jurisdiction", "rule"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "enact_rule" },
+        "jurisdiction": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "rule": { "$ref": "#/$defs/Rule" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RefName" }
+      }
+    },
+    "repeal_rule": {
+      "description": "RULES. Repeal an active rule enacted under a jurisdiction the seat can act for.",
+      "type": "object",
+      "required": ["block", "rule"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "repeal_rule" },
+        "rule": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" }
+      }
+    },
+    "propose_agreement": {
+      "description": "AGREEMENTS. Offer an agreement. The seat must be able to act for at least one party; that party signs by proposing. The agreement activates when every other party accepts (respond_agreement), and lapses if the offer expires first. Agreements a seat can act for on both sides activate immediately.",
+      "type": "object",
+      "required": ["block", "terms"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "propose_agreement" },
+        "terms": { "$ref": "#/$defs/AgreementTerms" },
+        "offer_expires_after": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/RefName" }
+      }
+    },
+    "respond_agreement": {
+      "description": "AGREEMENTS. Accept or decline a pending agreement on behalf of a party the seat can act for.",
+      "type": "object",
+      "required": ["block", "agreement", "as", "decision"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "respond_agreement" },
+        "agreement": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+        "as": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "decision": { "enum": ["accept", "decline"] }
+      }
+    },
+    "terminate_agreement": {
+      "description": "AGREEMENTS. A party gives notice. The agreement ends after its 'notice' duration; periodic payments continue until then.",
+      "type": "object",
+      "required": ["block", "agreement", "as"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "terminate_agreement" },
+        "agreement": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "as": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" }
+      }
+    },
+    "message": {
+      "description": "VOICE. Send text to seats or entities (an entity receives it through every seat that represents it). The kernel delivers and logs messages verbatim but never interprets them; consequences only follow when someone acts.",
+      "type": "object",
+      "required": ["block", "to", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "message" },
+        "to": {
+          "type": "array",
+          "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "text": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" },
+        "re": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" }
+      }
+    },
+    "decide": {
+      "description": "VOICE / CONSENT. The seat named as approver on a pending proposal approves or rejects it. When every required approver has approved, the kernel re-validates the original action against the world as it is now and applies or refuses it.",
+      "type": "object",
+      "required": ["block", "proposal", "decision"],
+      "additionalProperties": false,
+      "properties": {
+        "block": { "const": "decide" },
+        "proposal": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+        "decision": { "enum": ["approve", "reject"] },
+        "note": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Text" }
+      }
+    },
+
+    "Rule": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "parcels", "allow"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "zoning" },
+            "parcels": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ParcelScope" },
+            "allow": {
+              "description": "Structure categories permitted. Empty means nothing may be built.",
+              "type": "array",
+              "items": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/StructureCategory" },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "parcels", "max_per_30d", "applies_to"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "rent_cap" },
+            "parcels": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/ParcelScope" },
+            "max_per_30d": {
+              "description": "Maximum rent per unit, normalised to a 30-day period (compared exactly in integers: rent * 2592000 <= cap * period).",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "applies_to": {
+              "description": "new_agreements: refuse leases above the cap. all_payments: also clip rent on existing leases at each payment.",
+              "enum": ["new_agreements", "all_payments"]
+            }
+          }
+        }
+      ]
+    },
+
+    "AgreementTerms": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "lessor", "lessee", "parcel", "units", "rent", "period", "notice"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "lease" },
+            "lessor": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+            "lessee": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+            "parcel": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+            "units": {
+              "description": "Units of the parcel's completed structure being let. Total active leased units never exceed the structure's capacity.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "rent": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Amount" },
+            "period": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration" },
+            "term": {
+              "description": "Fixed term from activation. Omit for a periodic tenancy that runs until terminated.",
+              "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration"
+            },
+            "notice": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "employer", "employee", "wage", "period", "notice"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "employment" },
+            "employer": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+            "employee": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/IdOrRef" },
+            "workplace": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Id" },
+            "wage": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Amount" },
+            "period": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration" },
+            "term": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration" },
+            "notice": { "$ref": "urn:terrarium:contracts:0.1:common#/$defs/Duration" }
+          }
+        }
+      ]
+    }
+  }
+}

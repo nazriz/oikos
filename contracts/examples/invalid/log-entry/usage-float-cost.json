@@ -1,0 +1,17 @@
+{
+  "seq": 50,
+  "t": 0,
+  "kind": "annotation",
+  "body": {
+    "annotation": "usage",
+    "purpose": "seat",
+    "subject": "mayor",
+    "provider": "anthropic",
+    "model": "m",
+    "input_tokens": 1,
+    "output_tokens": 1,
+    "cost_microusd": 0.5
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

@@ -1,0 +1,14 @@
+{
+  "seq": 51,
+  "t": 0,
+  "kind": "annotation",
+  "body": {
+    "annotation": "transcript",
+    "subject": "mayor",
+    "data": {
+      "temperature": 0.7
+    }
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

@@ -1,0 +1,32 @@
+{
+  "seq": 41,
+  "t": 172800,
+  "kind": "command",
+  "body": {
+    "command": "act",
+    "seat": "mayor",
+    "blocks": [
+      {
+        "block": "construct",
+        "owner": "city",
+        "parcel": "p00",
+        "structure_type": "park",
+        "contractor": "outside"
+      }
+    ],
+    "provenance": {
+      "via": "translator",
+      "proposal": "Build a park on p00.",
+      "draft": "draft.mayor.7",
+      "draft_hash": "abababababababababababababababababababababababababababababababab",
+      "translator": {
+        "id": "translator",
+        "version": "0.1.0",
+        "model": "claude-sonnet-5"
+      }
+    },
+    "reasoning": "Residents have asked for green space."
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}
