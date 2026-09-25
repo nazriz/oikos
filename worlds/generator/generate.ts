@@ -225,7 +225,7 @@ export function generate(spec: TownSpec): any {
   for (const c of people) seats.push({ id: `${c}-seat`, entity: c, channels: [{ id: "money", kind: "accounts" }, mine(), market, withdrawals, petitions], controller: code("citizen.default", { shop_accounts: shopAccounts, outside_account: "acc-outside", population: spec.citizens }), framing: unstated });
 
   return {
-    contracts: "0.2",
+    contracts: "0.3",
     meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${spec.citizens} citizens, ${homes.length} homes, ${jobSlots.length} jobs.`, canary: CANARY },
     seed: spec.seed,
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },

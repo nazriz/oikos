@@ -170,7 +170,7 @@ Found scaling M1 to 1,000 citizens, where a year took 5.5 minutes, 95% of it in 
 
 Full detail, including every point settled in discussion: docs/design/translator-and-resolver.md.
 
-**D37. Contract additions: `Observation.notices`, `Framing.debrief_text`, `Channel.title`.** *(Naz, 2026-09-26: "make these contract additions"; "sure" to channel titles.)* All three are optional and additive. They're amended in place in v0.2 for now, as D31 was; Naz is to choose whether the next batch (D36's contract changes) bumps to v0.3.
+**D37. Contract additions: `Observation.notices`, `Framing.debrief_text`, `Channel.title`.** *(Naz, 2026-09-26: "make these contract additions"; "sure" to channel titles.)* All three are optional and additive. They were first amended in place in v0.2, then moved into v0.3 (D40).
 
 **D38. Opting out is not resigning.** *(Agreed, 2026-09-26.)* Resigning office is an act in the world (a published resignation, with consequences the world's charter sets). Opting out of the study is a platform exit: always available, recorded as a welfare outcome, never failure. What happens to the seat afterwards is set per world. The contract rename (`resign` → `opt_out`) is proposed in the design note, §15.
 
@@ -181,6 +181,8 @@ Full detail, including every point settled in discussion: docs/design/translator
 - **Until then:** the translator stays behind the adapter and emits the same calls.
 
 See the design note, §16.
+
+**D40. Contracts bumped to v0.3 (draft).** *(Naz, 2026-09-26: "bump to v0.3".)* Following the versioning rule rather than amending in place again (as D31 and D37 did), v0.3 is opened now as a draft. It holds D37's additions today, and D36's contract changes when they're signed off; it's frozen then. Schema ids are `urn:terrarium:contracts:0.3`, and configs and log headers say `"0.3"`. A v0.2 log header is now an invalid example. v0.2 logs replay only on a v0.2 kernel build (D6).
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 

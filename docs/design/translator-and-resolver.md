@@ -537,7 +537,7 @@ Debriefs still happen (§15.3 of VISION).
 
 ## 15. Contract changes this implies (for sign-off)
 
-**Already made (2026-09-26, uncommitted), amended in place in v0.2 like D31:**
+**Already made (2026-09-26), now part of v0.3 (D37, D40):**
 - `Observation.notices`: orchestrator-to-seat feedback (§11). Optional.
 - `Framing.debrief_text`: an experiment's own debrief. Optional.
 - `Channel.title`: headings for reports (P1). Optional; the kernel ignores it.
@@ -555,7 +555,7 @@ Debriefs still happen (§15.3 of VISION).
 6. **`basis` on `propose_agreement`,** so an agreement can cite a permit (4.3). Records already have `basis`; the block doesn't expose it.
 7. **Confirmation mode** in the world config's `orchestration`: `always | consequential | never`.
 8. **Opt-out:** rename `resign` → `opt_out` across the SeatAction, command, event and status. Add `on_opt_out: vacant | {code: <module>}` per seat.
-9. **Versioning:** these are additive except item 8. Pre-1.0, the rule says every change bumps the minor version. The choice is between amending v0.2 in place (as with D31; nothing published depends on it) and bumping to v0.3. **Naz to choose.**
+9. **Versioning:** decided (Naz, D40): v0.3 is opened as a draft now, and these changes land in it once signed off.
 
 ---
 
@@ -711,7 +711,7 @@ The call language, parser and resolver get built now. The translator stays behin
 
 ## 19. Open questions
 
-1. **Versioning** of the contract changes: amend v0.2 in place, or bump to v0.3 (§15.9).
+1. ~~Versioning~~: decided, v0.3 (D40).
 2. **The function set's exact cut and argument names** (§6), to finalise when generating it from the contract.
 3. **The field-type set for forms** (§9.3), and whether forms can nest.
 4. **Opt-out wording under non-`simulation` framings** (§14): a VISION §15 question.

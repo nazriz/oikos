@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACTS_VERSION: &str = "0.2";
+pub const CONTRACTS_VERSION: &str = "0.3";
 
 /// Entity kinds with physical meaning. Every other kind is the world's vocabulary.
 pub const PERSON: &str = "person";

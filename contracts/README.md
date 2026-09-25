@@ -1,6 +1,6 @@
-# Terrarium contracts, v0.2
+# Terrarium contracts, v0.3 (draft)
 
-*Status: **approved** (Naz, 2026-09-25; D28), with one reservation (the construction payment liberty, item 6 below). It replaces v0.1, which put law, authority and ownership inside the kernel. The reasoning is in [the audit](../docs/audit-kernel-law.md), [the design](../docs/design/v0.2-physics-and-constructs.md), [the borrowing survey](../docs/research/borrowing-survey.md) and decisions D18–D27 in [docs/decisions.md](../docs/decisions.md).*
+*Status: **v0.3 is a draft** (opened 2026-09-26, D40). It is v0.2 (approved by Naz on 2026-09-25, D28, with one reservation: the construction payment liberty, item 6 below) plus the optional additions in D37. The contract changes from the translator and resolver design (docs/design/translator-and-resolver.md, §15) will land in v0.3 once signed off, and v0.3 is frozen when they do. v0.2 replaced v0.1, which put law, authority and ownership inside the kernel; the reasoning is in [the audit](../docs/audit-kernel-law.md), [the design](../docs/design/v0.2-physics-and-constructs.md), [the borrowing survey](../docs/research/borrowing-survey.md) and decisions D18–D27 in [docs/decisions.md](../docs/decisions.md).*
 
 These schemas are the constitution. Humans review them and the invariant tests; implementations sit behind them. Changing a contract is an explicit, signed-off decision. A researcher should be able to write a seat controller, a world or a measurement from this directory alone.
 
@@ -142,13 +142,15 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 7. **A seat acts as exactly one entity.** A person employed by the city isn't modelled separately from their role unless a world does so.
 8. **`sites` channels have a refresh interval**, so detection can be delayed and partial. Coverage and frequency are experimental variables.
 
-## Additions since approval (amended in place, D37)
+## Changes from v0.2
 
-- `Observation.notices` (seat-api), `Framing.debrief_text` and `Channel.title` (world-config): all optional and additive, so existing configs, observations and logs stay valid.
+- `Observation.notices` (seat-api), `Framing.debrief_text` and `Channel.title` (world-config): all optional (D37).
+- The version: every `$id` is `urn:terrarium:contracts:0.3:…`, and configs and log headers say `contracts: "0.3"` (D40).
+- To come, when signed off: the call language, requests, commitments as outcomes, forms, provenance chains and opt-out (design note §15).
 
 ## Versioning
 
-`contracts: "0.2"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. v0.1 logs remain valid v0.1 logs and replay only on a v0.1 kernel build (D6).
+`contracts: "0.3"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version (like v0.3 now) collects agreed changes until it's frozen. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6): v0.1 and v0.2 logs need v0.1 and v0.2 builds respectively.
 
 ## Canary
 

@@ -8,7 +8,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
-const NS = "urn:terrarium:contracts:0.2";
+const NS = "urn:terrarium:contracts:0.3";
 
 const SCHEMA_FILES = [
   "common.schema.json",

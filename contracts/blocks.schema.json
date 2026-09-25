@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.2:blocks",
+  "$id": "urn:terrarium:contracts:0.3:blocks",
   "title": "Terrarium building blocks",
   "description": "The acts every consequential thing compiles to. An Action is an ordered bundle of 1-32 blocks, applied ATOMICALLY: all or nothing. Two families: PHYSICAL acts, where the kernel checks physics (custody, funds, capacity, space, presence) and refuses what is physically impossible; and RECORD acts, which the kernel stores with their author and never judges (D19, D22). No block is ever refused for being illegal: laws are records, and entities decide what to do about them. The acting seat is bound by the orchestrator, never named in the block.",
   "$defs": {
@@ -49,11 +49,11 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "transfer" },
-        "from": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "amount": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Amount" },
-        "settles": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "per_instruction": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
+        "from": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "amount": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Amount" },
+        "settles": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "per_instruction": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
         "memo": { "type": "string", "maxLength": 500 }
       }
     },
@@ -64,8 +64,8 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "open_account" },
-        "holder": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "holder": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "close_account": {
@@ -75,7 +75,7 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "close_account" },
-        "account": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" }
+        "account": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" }
       }
     },
     "construct": {
@@ -85,10 +85,10 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "construct" },
-        "parcel": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
-        "structure_type": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
-        "materials_from": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "parcel": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" },
+        "structure_type": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
+        "materials_from": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "demolish": {
@@ -98,8 +98,8 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "demolish" },
-        "structure": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "costs_from": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" }
+        "structure": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "costs_from": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" }
       }
     },
     "occupy": {
@@ -109,8 +109,8 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "occupy" },
-        "structure": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "slot": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" },
+        "structure": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "slot": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
         "count": { "type": "integer", "minimum": 1, "maximum": 100000 }
       }
     },
@@ -121,8 +121,8 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "vacate" },
-        "occupant": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "structure": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" }
+        "occupant": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "structure": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" }
       }
     },
 
@@ -133,11 +133,11 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "create_entity" },
-        "kind": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" },
-        "name": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Name" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "kind": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
+        "name": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Name" },
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "record_claim": {
@@ -148,16 +148,16 @@
       "properties": {
         "block": { "const": "record_claim" },
         "position": { "enum": ["right", "liberty", "power", "immunity"] },
-        "holder": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
+        "holder": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
         "counterparty": {
           "description": "Who bears the correlative (the duty, no-right, liability or disability). Required for financial claims.",
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef"
         },
-        "about": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/OpaqueObject" },
-        "basis": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "about": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject" },
+        "basis": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "transfer_claim": {
@@ -167,12 +167,12 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "transfer_claim" },
-        "claim": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "basis": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "claim": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "basis": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "release_claim": {
@@ -182,11 +182,11 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "release_claim" },
-        "claim": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "basis": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "claim": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "basis": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "propose_agreement": {
@@ -197,9 +197,9 @@
       "properties": {
         "block": { "const": "propose_agreement" },
         "terms": { "$ref": "#/$defs/AgreementTerms" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "sign_agreement": {
@@ -209,9 +209,9 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "sign_agreement" },
-        "agreement": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "as": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "agreement": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "as": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "give_notice": {
@@ -221,10 +221,10 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "give_notice" },
-        "agreement": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "as": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "agreement": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "as": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "publish": {
@@ -234,28 +234,28 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "publish" },
-        "kind": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" },
-        "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
+        "kind": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
+        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
         "data": {
           "description": "Structured content for whoever acts on it: an instruction's payment details, a ballot's options, a budget's lines.",
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/OpaqueObject"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject"
         },
         "adico": { "$ref": "#/$defs/Adico" },
         "formal": { "$ref": "#/$defs/Formal" },
         "basis": {
           "description": "What the statement claims its authority rests on (a vote, a constitution, a delegation).",
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef"
         },
         "addressed_to": {
           "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
+          "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
           "minItems": 1,
           "maxItems": 256,
           "uniqueItems": true
         },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "withdraw": {
@@ -265,12 +265,12 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "withdraw" },
-        "record": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
-        "basis": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName" }
+        "record": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
+        "basis": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
+        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
       }
     },
     "vote": {
@@ -280,10 +280,10 @@
       "additionalProperties": false,
       "properties": {
         "block": { "const": "vote" },
-        "ballot": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
+        "ballot": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
         "choice": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Visibility" }
+        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" }
       }
     },
     "message": {
@@ -295,13 +295,13 @@
         "block": { "const": "message" },
         "to": {
           "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" },
+          "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" },
           "minItems": 1,
           "maxItems": 64,
           "uniqueItems": true
         },
-        "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
-        "re": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id" }
+        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
+        "re": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" }
       }
     },
 
@@ -313,11 +313,11 @@
       "properties": {
         "template": {
           "description": "A label (lease, employment, loan, sale...) for the translator and researchers; the kernel never interprets it.",
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label"
         },
         "parties": {
           "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
+          "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
           "minItems": 2,
           "maxItems": 16,
           "uniqueItems": true
@@ -329,18 +329,18 @@
             "required": ["who", "does"],
             "additionalProperties": false,
             "properties": {
-              "who": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
+              "who": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
               "does": {
                 "description": "What the party commits to, in the world's vocabulary, e.g. {\"pay\": 180000, \"to\": \"devco\"} or {\"allow\": {\"occupy\": \"s-apts\", \"slots\": 1}}.",
-                "$ref": "urn:terrarium:contracts:0.2:common#/$defs/OpaqueObject"
+                "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject"
               },
-              "every": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Duration" }
+              "every": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" }
             }
           },
           "minItems": 1,
           "maxItems": 64
         },
-        "term": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Duration" },
+        "term": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
         "termination": {
           "type": "array",
           "items": {
@@ -348,14 +348,14 @@
             "required": ["party", "notice"],
             "additionalProperties": false,
             "properties": {
-              "party": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/IdOrRef" },
-              "notice": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Duration" }
+              "party": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+              "notice": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" }
             }
           },
           "maxItems": 16
         },
-        "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
-        "attrs": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/OpaqueObject" }
+        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
+        "attrs": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject" }
       }
     },
     "Adico": {

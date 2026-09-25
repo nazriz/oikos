@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.2:log",
+  "$id": "urn:terrarium:contracts:0.3:log",
   "title": "Terrarium run log entry",
   "description": "One line of a run log (JSONL). The kernel is the only writer. Entry hash = SHA-256 over the bytes 'terrarium.log.v1\\n' followed by the canonical JSON (RFC 8785 / JCS) of the entry without its 'hash' field; 'prev' is the previous entry's hash (64 zeros for the header). Commands are the only replay inputs; events, checkpoints and the end entry are regenerated on replay and must match byte for byte; annotations are carried through verbatim. So replay can regenerate the entire log and compare it byte-identically.",
   "oneOf": [
@@ -37,11 +37,11 @@
       "properties": {
         "seq": {
           "description": "0 for the header, then +1 per entry.",
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
         },
         "t": {
           "description": "Kernel sim time when the entry was written.",
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/SimTime"
         },
         "kind": {
           "enum": [
@@ -57,10 +57,10 @@
           "type": "object"
         },
         "prev": {
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
         },
         "hash": {
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
         }
       }
     },
@@ -95,7 +95,7 @@
           "additionalProperties": false,
           "properties": {
             "contracts": {
-              "const": "0.2"
+              "const": "0.3"
             },
             "kernel": {
               "type": "object",
@@ -122,14 +122,14 @@
               "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
             },
             "config": {
-              "$ref": "urn:terrarium:contracts:0.2:world-config"
+              "$ref": "urn:terrarium:contracts:0.3:world-config"
             },
             "config_hash": {
               "description": "SHA-256 of 'terrarium.config.v1\\n' + canonical JSON of config.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
             },
             "initial_state_hash": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
             },
             "canary": {
               "type": "string",
@@ -169,17 +169,17 @@
               "const": "act"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "blocks": {
-              "$ref": "urn:terrarium:contracts:0.2:blocks#/$defs/Action/properties/blocks"
+              "$ref": "urn:terrarium:contracts:0.3:blocks#/$defs/Action/properties/blocks"
             },
             "provenance": {
               "$ref": "#/$defs/Provenance"
             },
             "reasoning": {
               "description": "The seat's own stated reasoning, if it gave any. Logged, never interpreted.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
             }
           }
         },
@@ -196,7 +196,7 @@
             },
             "to": {
               "description": "Advance the clock to this time, processing every scheduled effect (payments, completions, expiries) with time <= to, in (time, scheduling order).",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/SimTime"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/SimTime"
             }
           }
         },
@@ -212,7 +212,7 @@
               "const": "observe"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             }
           }
         },
@@ -229,10 +229,10 @@
               "const": "resign"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "statement": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
             }
           }
         }
@@ -268,7 +268,7 @@
               "const": "translator"
             },
             "proposal": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
             },
             "draft": {
               "type": "string",
@@ -276,10 +276,10 @@
             },
             "draft_hash": {
               "description": "Hash of the signed-off draft (see seat-api Draft). The proposer signed exactly this.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
             },
             "translator": {
-              "$ref": "urn:terrarium:contracts:0.2:seat-api#/$defs/TranslatorId"
+              "$ref": "urn:terrarium:contracts:0.3:seat-api#/$defs/TranslatorId"
             }
           }
         }
@@ -317,21 +317,21 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "action": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/KernelId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/KernelId"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "created": {
               "type": "object",
               "propertyNames": {
-                "$ref": "urn:terrarium:contracts:0.2:common#/$defs/RefName"
+                "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName"
               },
               "additionalProperties": {
-                "$ref": "urn:terrarium:contracts:0.2:common#/$defs/KernelId"
+                "$ref": "urn:terrarium:contracts:0.3:common#/$defs/KernelId"
               }
             }
           }
@@ -353,13 +353,13 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "action": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/KernelId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/KernelId"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "block": {
               "type": "integer",
@@ -394,20 +394,20 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "from": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "to": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "amount": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Amount"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Amount"
             },
             "by": {
               "description": "The seat that physically executed it.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "reason": {
               "description": "payment: a transfer block. materials / demolition: the documented construction liberty (D25).",
@@ -418,10 +418,10 @@
               ]
             },
             "settles": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "per_instruction": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "memo": {
               "type": "string",
@@ -446,19 +446,19 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "account": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "holder": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "custodian": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "by": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             }
           }
         },
@@ -477,13 +477,13 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "account": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "by": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             }
           }
         },
@@ -505,23 +505,23 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "structure": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "parcel": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "structure_type": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "built_by": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "at": {
               "description": "When it will be complete.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/SimTime"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/SimTime"
             }
           }
         },
@@ -539,10 +539,10 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "structure": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             }
           }
         },
@@ -561,13 +561,13 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "structure": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "by": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             }
           }
         },
@@ -588,16 +588,16 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "occupant": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "structure": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "slot": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label"
             },
             "count": {
               "type": "integer",
@@ -622,16 +622,16 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "occupant": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "structure": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "by": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "reason": {
               "description": "left: by the occupant's own seat. removed: by someone else. demolition: the structure was demolished.",
@@ -658,10 +658,10 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "record": {
-              "$ref": "urn:terrarium:contracts:0.2:records#/$defs/Record"
+              "$ref": "urn:terrarium:contracts:0.3:records#/$defs/Record"
             }
           }
         },
@@ -681,16 +681,16 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "entity": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
             },
             "kind": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label"
             },
             "name": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Name"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Name"
             }
           }
         },
@@ -710,18 +710,18 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "message": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/KernelId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/KernelId"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "to": {
               "type": "array",
               "items": {
-                "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
               }
             }
           }
@@ -742,13 +742,13 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "observation_hash": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
             }
           }
         },
@@ -767,13 +767,13 @@
             },
             "cause": {
               "description": "seq of the command entry that caused this event.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "statement": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
             }
           }
         }
@@ -880,20 +880,20 @@
               "maxLength": 200
             },
             "input_tokens": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "output_tokens": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "cache_read_tokens": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "cache_write_tokens": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             },
             "cost_microusd": {
               "description": "Cost of this call in millionths of a US dollar, from the price table recorded in the orchestrator annotation.",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
             }
           }
         },
@@ -909,7 +909,7 @@
               "const": "draft"
             },
             "draft": {
-              "$ref": "urn:terrarium:contracts:0.2:seat-api#/$defs/Draft"
+              "$ref": "urn:terrarium:contracts:0.3:seat-api#/$defs/Draft"
             }
           }
         },
@@ -928,14 +928,14 @@
               "const": "signoff"
             },
             "seat": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
             },
             "draft": {
               "type": "string",
               "maxLength": 128
             },
             "draft_hash": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
             },
             "decision": {
               "enum": [
@@ -944,7 +944,7 @@
               ]
             },
             "note": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text"
             }
           }
         },
@@ -972,7 +972,7 @@
               "maxLength": 128
             },
             "data": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Opaque"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Opaque"
             }
           }
         }
@@ -995,7 +995,7 @@
           "properties": {
             "state_hash": {
               "description": "SHA-256 of 'terrarium.state.v1\\n' + canonical JSON of the full world state (including PRNG state and id counters).",
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
             }
           }
         }
@@ -1025,7 +1025,7 @@
               ]
             },
             "state_hash": {
-              "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
             },
             "detail": {
               "type": "string",
@@ -1045,10 +1045,10 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Count"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
         },
         "hash": {
-          "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Hash"
         },
         "wall_time": {
           "description": "Informational only; never used by the world.",

@@ -32,7 +32,7 @@ function blocksValidator() {
   if (!validateBlocks) {
     const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });
     for (const s of SCHEMAS) ajv.addSchema(s);
-    validateBlocks = ajv.getSchema("urn:terrarium:contracts:0.2:blocks#/$defs/Action/properties/blocks") as any;
+    validateBlocks = ajv.getSchema("urn:terrarium:contracts:0.3:blocks#/$defs/Action/properties/blocks") as any;
   }
   return validateBlocks!;
 }
@@ -100,7 +100,7 @@ export function translatorSystem(): string {
     "- Laws are records and never block anything; if a proposal looks unlawful, draft it anyway and say so in caveats.",
     "- If part of the proposal can't be expressed, draft what can and explain the rest in caveats. If none of it can, use cannot_draft.",
     "",
-    "The blocks (contracts v0.2):",
+    "The blocks (contracts v0.3):",
     blockReference(),
   ].join("\n");
 }
