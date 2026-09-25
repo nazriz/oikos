@@ -42,7 +42,7 @@
       }
     },
     "Observation": {
-      "description": "What a seat perceives. Built by the kernel (deterministic, logged by hash) plus 'drafts', added by the orchestrator from the translator. 'outcomes' and 'inbox' hold only what is new since the seat's previous observation.",
+      "description": "What a seat perceives. Built by the kernel (deterministic, logged by hash) plus 'drafts' and 'notices', added by the orchestrator. 'outcomes', 'inbox' and 'notices' hold only what is new since the seat's previous observation.",
       "type": "object",
       "required": [
         "seat",
@@ -88,6 +88,20 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/Draft"
+          }
+        },
+        "notices": {
+          "description": "Added by the orchestrator: what the seat needs to know about its own requests that isn't world state, e.g. that a proposal couldn't be drafted, or that a draft it tried to sign doesn't exist. Logged as annotations (translation_failure, note). Absent when there are none.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["t", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "t": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/SimTime" },
+              "text": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
+              "re": { "description": "The draft or proposal it's about.", "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$" }
+            }
           }
         },
         "channels": {

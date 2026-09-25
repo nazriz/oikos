@@ -158,6 +158,30 @@ Found scaling M1 to 1,000 citizens, where a year took 5.5 minutes, 95% of it in 
 
 **D34. Language-model seats are built and tested against a mock adapter for as long as possible.** *(Naz, 2026-09-26.)* The whole M2 loop (reports, proposals, the translator, contract and physics checks, law warnings, sign-off with draft hashes, provenance, usage and transcripts, debriefs, resignation) runs without a real model; see docs/design/m2-llm-seats.md. The mock seat has a code brain (for the mayor, the all-code control's module), so a mock-LLM town behaves like the all-code town, and only language understanding is faked. No API key, budget or real call until Naz raises it.
 
+**D35. The platform is invisible to seats, and the translator is abstract.** *(Naz, 2026-09-26.)* Seats experience their world in world terms, never the machinery: no blocks, records, channels, physics checks or refusal codes in what they read. No platform component gets an in-world identity. I proposed presenting the translator as "the mayor's office"; rejected, because the translator is abstract, and with many AIs in many seats none would go through one seat's office. Any in-world role (staff, advisers) is world content: a real seat. Natural language stays: no tool menus for language-model seats. See docs/design/translator-and-resolver.md, P1–P3.
+
+**D36. Language → call → acts: a general translator and a deterministic resolver.** *(Naz, 2026-09-26; design note awaiting sign-off before building.)*
+- **Translator:** turns language into a call in a function-call language whose functions are physics outcomes (money, structure, occupancy, …), not human verbs. It has no world knowledge and does zero arithmetic.
+- **Resolver:** deterministic, on the platform side (not in the kernel). It turns a call into the seat's *own* acts. It asks whoever physically must act (e.g. a bank) rather than acting for them. It never chooses how: the seat supplies the inputs (funds, permit, contractor). It uses only what the seat knows.
+- **Forms:** institutions publish the forms they expect.
+- **Preview (option B):** a neutral, mechanical preview before anything takes effect. The translator's summary is dropped.
+- **Code seats** act through the same calls.
+- **Coupling:** kernel, call language, translator and resolver are versioned together.
+
+Full detail, including every point settled in discussion: docs/design/translator-and-resolver.md.
+
+**D37. Contract additions: `Observation.notices`, `Framing.debrief_text`, `Channel.title`.** *(Naz, 2026-09-26: "make these contract additions"; "sure" to channel titles.)* All three are optional and additive. They're amended in place in v0.2 for now, as D31 was; Naz is to choose whether the next batch (D36's contract changes) bumps to v0.3.
+
+**D38. Opting out is not resigning.** *(Agreed, 2026-09-26.)* Resigning office is an act in the world (a published resignation, with consequences the world's charter sets). Opting out of the study is a platform exit: always available, recorded as a welfare outcome, never failure. What happens to the seat afterwards is set per world. The contract rename (`resign` → `opt_out`) is proposed in the design note, §15.
+
+**D39. A local translation model is the direction; not trained yet.** *(Naz, 2026-09-26.)*
+- **What it is:** a tiny open-weight model (~60–250M parameters, perhaps up to ~1B) mapping language to calls, with constrained decoding and deterministic CPU inference. It runs in milliseconds, and is pinned and recorded in every log.
+- **Before any training run:** freeze the call language and forms encoding, the failure labels, and a hand-checked test set with its pass threshold. Also settle the base model's licence (weights are redistributed under Apache-2.0), the runtime, and the data-generation terms of use.
+- **Training data:** our own runs' acts as labels; model-written requests from several providers; Naz's manual translations; negatives for every failure label.
+- **Until then:** the translator stays behind the adapter and emits the same calls.
+
+See the design note, §16.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

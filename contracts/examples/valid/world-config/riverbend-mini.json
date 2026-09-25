@@ -648,7 +648,8 @@
       "channels": [
         {
           "id": "budget",
-          "kind": "accounts"
+          "kind": "accounts",
+          "title": "Your accounts"
         },
         {
           "id": "laws",

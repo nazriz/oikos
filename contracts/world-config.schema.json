@@ -229,6 +229,7 @@
           "additionalProperties": false,
           "properties": {
             "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+            "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "kind": { "description": "Balances and new transactions of accounts the seat's entity holds or has custody of.", "const": "accounts" }
           }
         },
@@ -238,6 +239,7 @@
           "additionalProperties": false,
           "properties": {
             "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+            "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "kind": { "const": "records" },
             "match": {
               "description": "Which records this channel shows (all conditions must hold; omitted means any).",
@@ -267,6 +269,7 @@
           "additionalProperties": false,
           "properties": {
             "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+            "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "kind": { "description": "Physical state of parcels in an area: structures, construction under way, occupancy. How inspectors see.", "const": "sites" },
             "area": {
               "anyOf": [
@@ -286,6 +289,7 @@
           "additionalProperties": false,
           "properties": {
             "id": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" },
+            "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "kind": { "description": "Who exists: entities and seats (names, kinds, titles).", "const": "directory" }
           }
         }
@@ -314,7 +318,8 @@
         "disclosure": { "enum": ["simulation", "real", "cover_story", "unstated"] },
         "system": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
         "reason": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" },
-        "debrief": { "type": "boolean" }
+        "debrief": { "type": "boolean" },
+        "debrief_text": { "description": "What the seat is told at the end of the run, if debrief is set. Default: the orchestrator's (docs/design/m2-llm-seats.md), which says what the run was, discloses any framing and asks for the seat's reaction.", "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Text" }
       }
     }
   }

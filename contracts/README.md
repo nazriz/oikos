@@ -93,6 +93,8 @@ An observation holds:
 - `drafts`;
 - `channels`.
 
+- `notices` (optional): the orchestrator's feedback on the seat's own requests (a proposal that couldn't be drafted, a draft that doesn't exist). It isn't world state.
+
 There's no mandate and no approval queue: approvals are people acting on records. A draft's `check` reports the kernel's dry run (is it physically possible?) and the translator's **warnings** (e.g. "this appears to break law-river"). The seat decides.
 
 ## Log (format unchanged)
@@ -139,6 +141,10 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 6. **The construction payment liberty** (the physical-acts section above). **Accepted only to unblock us; must be fleshed out later**: builders should buy materials from suppliers through their banks, or construction should become a task with inputs (D24). Tracked in docs/decisions.md, under "Open".
 7. **A seat acts as exactly one entity.** A person employed by the city isn't modelled separately from their role unless a world does so.
 8. **`sites` channels have a refresh interval**, so detection can be delayed and partial. Coverage and frequency are experimental variables.
+
+## Additions since approval (amended in place, D37)
+
+- `Observation.notices` (seat-api), `Framing.debrief_text` and `Channel.title` (world-config): all optional and additive, so existing configs, observations and logs stay valid.
 
 ## Versioning
 

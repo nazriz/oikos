@@ -170,6 +170,9 @@ pub enum ChannelKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Channel {
     pub id: Id,
+    /// Presentation only (what a seat's reports call the channel).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     #[serde(flatten)]
     pub kind: ChannelKind,
 }
