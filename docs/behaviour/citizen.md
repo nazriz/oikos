@@ -1,4 +1,4 @@
-# `citizen.default` (v0.2.0)
+# `citizen.default` (v0.3.0)
 
 **Seat:** a townsperson (acts as themselves). **Source:** `seats/src/behaviour/citizen.ts`. Wakes weekly, and whenever something names them (an offer, a notice, a message).
 
@@ -15,7 +15,7 @@ Everything happens the way a person does it: they apply, sign, move in, and ask 
 | **Work** | If unemployed, apply for the best-paid posting seen, one a week | Simple job search; the labour-market literature (Dosi et al.) is the planned refinement |
 | **Spending** | Once a month: essentials ($500) plus 30% of savings above a buffer of 3 months' income, at a local shop picked at random | BoE model eq. (2): consumption is a fraction of the gap between the bank balance and a desired balance |
 | **Voice: starting a petition** | A tenant is *aggrieved* for 90 days after their landlord gives them notice, or while rent is ≥40% of income. If no tenant-protection petition is open, an aggrieved tenant starts one with probability 3% per wake. It demands a law (90 days' notice; rent rises capped at 5% a year), stated with its Institutional Grammar breakdown and tagged `tenant_protection`. The organiser closes it after 180 days. | Hirschman (1970): voice as the alternative to exit |
-| **Voice: signing** | A tenant signs (a public `vote` with choice `sign`) when aggrieved, or once the share of the town already signed reaches their personal threshold. Thresholds are drawn once per person, roughly normal (mean 25%, sd 10%, via the Irwin–Hall sum of 12 uniforms). | Granovetter, "Threshold Models of Collective Behavior" (1978). A uniform distribution, the first version, always cascades to everyone, which is Granovetter's own point; a normal one makes the outcome contingent. |
+| **Voice: signing** | A tenant signs (a `vote` with choice `sign`, seen by the signer and the organiser only) when aggrieved, or once the share of the town that has signed, as the organiser's latest published `petition_count` says, reaches their personal threshold. The organiser publishes the running count at most every 3 days, as petition sites show one. Thresholds are drawn once per person, roughly normal (mean 25%, sd 10%, via the Irwin–Hall sum of 12 uniforms). | Granovetter, "Threshold Models of Collective Behavior" (1978). A uniform distribution, the first version, always cascades to everyone, which is Granovetter's own point; a normal one makes the outcome contingent. |
 | **Leaving town** | After 90 days without a home, or 180 days without work *and* without enough money for a month's rent: move out, give notice, and take all savings out of town | Hirschman, *Exit, Voice, and Loyalty* (1970): exit as the response to decline. Thresholds are placeholders to calibrate. |
 
 ## Parameters (defaults)

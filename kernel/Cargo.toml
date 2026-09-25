@@ -21,6 +21,7 @@ sha2 = "0.10"
 # Validates every input (config, command, annotation) against the contract
 # schemas, which are compiled into the binary.
 jsonschema = { version = "0.30", default-features = false }
+imbl = { version = "7.0.2", features = ["serde"] }
 
 [dev-dependencies]
 proptest = "1"

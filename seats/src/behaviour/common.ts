@@ -73,6 +73,19 @@ export class Book {
   }
 }
 
+/** Signatures on a petition this seat can see: votes with choice "sign", one per signing entity (the organiser sees them all). */
+export function petitionSignatures(book: Book, petition: string): number {
+  const who = new Set<string>();
+  for (const r of book.records.values()) if (r.record === "vote" && r.ballot === petition && r.choice === "sign" && r.speaks_for) who.add(r.speaks_for);
+  return who.size;
+}
+
+/** A petition's signature count as its organiser last published it (0 if never), organiser included. */
+export function publishedCount(book: Book, petition: StatementRecord): number {
+  const counts = book.open("petition_count").filter((c) => c.data?.petition === petition.id && c.speaks_for === petition.speaks_for);
+  return counts.length ? (counts.at(-1)!.data.signatures as number) : 0;
+}
+
 /** The seat's own account (held by its entity). */
 export function ownAccount(obs: Observation): { account: string; balance: number; custodian: string } | undefined {
   return channels.accounts(obs).find((a) => a.holder === obs.entity);

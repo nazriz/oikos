@@ -1,4 +1,4 @@
-# The town's government (v0.1.0)
+# The town's government (code mayor v0.2.0; the rest v0.1.0)
 
 **Source:** `seats/src/behaviour/government.ts`. These are code seats of the town (`entity: city`), plus the mayor's code stand-in. None of this is kernel mechanics (D19, D20). A law exists because a clerk published it after counting a ballot. Money leaves the town's account because the finance officer instructed the bank, and the bank checked its list of signatories. Every step is a person following, or not following, a procedure written as a record.
 
@@ -24,7 +24,7 @@ A rule-following mayor. In AI experiments an LLM takes this seat instead (M2), a
 - **Budget:** each year it proposes a budget (`data.enact` = a `budget` statement with `lines`, for now just `parks`). If the council hasn't adopted one within 45 days, it tables it again.
 - **A park a year:** when the current year's adopted budget can pay for one and the town owns a free parcel, it applies for planning permission. Once that is granted, it proposes and signs a construction agreement with the builder at 1.2× materials cost.
 - **Approvals:** it writes an `approval` for each invoice for work it commissioned. The payments procedure needs one over $50,000.
-- **Petitions:** once a petition's signatures reach `petition_threshold_bps` of the population, it turns the petition into a proposal carrying the petition's demand, with probability `responsiveness_bps`.
+- **Petitions:** once a petition's organiser's published count (`petition_count`) reaches `petition_threshold_bps` of the population, it turns the petition into a proposal carrying the petition's demand, with probability `responsiveness_bps`.
 
 Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 200, `park_budget` $80,000, `builder`, `park_type`.
 
@@ -73,7 +73,7 @@ It works only from what is reported, so under-reporting is invisible to it. Audi
 
 ## What the other modules do (see their docs)
 
-- **Citizens** ([citizen.md](citizen.md)) start petitions when aggrieved and sign by Granovetter thresholds.
+- **Citizens** ([citizen.md](citizen.md)) start petitions when aggrieved and sign by Granovetter thresholds against the organiser's published count. Signatures are private to signer and organiser. Nobody verifies the count, so an organiser who lies is a possible later module.
 - **Landlords** ([firms.md](firms.md)) report rent monthly and pay the tax, under-reporting by half when they don't comply. They pay tax penalties like fines.
 - **The bank** ([bank-payment-system.md](bank-payment-system.md)) applies the signatories list.
 

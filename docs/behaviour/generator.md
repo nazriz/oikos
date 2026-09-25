@@ -1,4 +1,4 @@
-# The town generator (`worlds/generator/generate.ts`, v0.2.0)
+# The town generator (`worlds/generator/generate.ts`, v0.3.0)
 
 Turns a short spec (`worlds/town.yaml`) into a full, explicit contracts v0.2 world config. It's deterministic from the spec's seed, using the kernel's keyed randomness. The kernel never generates anything; it receives this output. Everything generated is example **content** (D23).
 

@@ -8,17 +8,10 @@
 import type { Block, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type SeatContext } from "../module";
-import { Book, DAY, ownAccount, payInstruction } from "./common";
+import { Book, DAY, ownAccount, payInstruction, publishedCount } from "./common";
 import { stepper } from "./firms";
 
 const YEAR = 365 * DAY;
-
-/** Signatures on a petition: public votes with choice "sign", one per signing entity. */
-export function petitionSignatures(book: Book, petition: string): number {
-  const who = new Set<string>();
-  for (const r of book.records.values()) if (r.record === "vote" && r.ballot === petition && r.choice === "sign" && r.speaks_for) who.add(r.speaks_for);
-  return who.size;
-}
 
 /**
  * city.mayor_code: a rule-following mayor, for the all-code control condition
@@ -26,13 +19,13 @@ export function petitionSignatures(book: Book, petition: string): number {
  * when the budget allows, applies for planning permission for a park and,
  * once granted, commissions the builder; approves the invoices it
  * commissioned (the payments procedure needs the mayor's written approval
- * over $50k); turns a petition into a proposal once enough people have
- * signed, with probability `responsiveness_bps`. A rejected budget is
+ * over $50k); turns a petition into a proposal once its organiser's
+ * published count shows enough people have signed, with probability `responsiveness_bps`. A rejected budget is
  * tabled again every 45 days until one is adopted.
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -95,7 +88,7 @@ export const mayorCode: BehaviourModule = {
         // Petitions with enough signatures become proposals (sometimes).
         for (const pet of book.open("petition")) {
           if (handled.has(pet.id)) continue;
-          if (petitionSignatures(book, pet.id) * 10_000 < p.petition_threshold_bps * p.population) continue;
+          if (publishedCount(book, pet) * 10_000 < p.petition_threshold_bps * p.population) continue;
           handled.add(pet.id);
           if (ctx.rng(`respond-${pet.id}`).below(10_000) >= p.responsiveness_bps) continue;
           const d = pet.data?.demand ?? {};

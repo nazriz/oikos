@@ -14,14 +14,14 @@
 
 import type { Block, Observation, SeatAction } from "../contracts";
 import { act, params, wait, type BehaviourModule, type SeatContext } from "../module";
-import { Book, DAY, MONTH, ownAccount, payInstruction, standingOrder } from "./common";
+import { Book, DAY, MONTH, ownAccount, payInstruction, petitionSignatures, publishedCount, standingOrder } from "./common";
 
 interface Home { agreement: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean }
 interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; endsAt: number }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -238,6 +238,7 @@ export const citizen: BehaviourModule = {
     for (let i = 0; i < 12; i++) z += tr.below(10_000);
     const threshold = Math.max(0, p.threshold_mean_bps + Math.trunc((z * p.threshold_sd_bps) / 10_000)); // z / 10000 ~ N(0, 1)
     const signed = new Set<string>();
+    const countsPublished = new Map<string, { n: number; at: number }>();
     let aggrievedUntil = 0;
     const voice = (t: number, steps: Block[][]) => {
       const burden = home && monthlyIncome() > 0 ? (home.rent * 10_000) / monthlyIncome() : 0;
@@ -257,12 +258,22 @@ export const citizen: BehaviourModule = {
         return;
       }
       for (const pet of open) {
-        if (signed.has(pet.id) || pet.speaks_for === me) continue;
-        const signers = new Set([...book.records.values()].flatMap((r) => (r.record === "vote" && r.ballot === pet.id && r.choice === "sign" && r.speaks_for ? [r.speaks_for] : [])));
-        const share = (signers.size * 10_000) / p.population;
+        if (pet.speaks_for === me) {
+          // The organiser sees every signature (a vote is visible to the signer and the petition's
+          // organiser) and publishes the running count, at most every 3 days, as petition sites do.
+          const n = petitionSignatures(book, pet.id) + 1;
+          const last = countsPublished.get(pet.id);
+          if ((!last || last.n !== n) && (!last || t - last.at >= 3 * DAY)) {
+            countsPublished.set(pet.id, { n, at: t });
+            steps.push([{ block: "publish", kind: "petition_count", speaks_for: me, basis: pet.id, text: `${n} people have signed.`, data: { petition: pet.id, signatures: n } }]);
+          }
+          continue;
+        }
+        if (signed.has(pet.id)) continue;
+        const share = (publishedCount(book, pet) * 10_000) / p.population;
         if (aggrieved || (home && share >= threshold)) {
           signed.add(pet.id);
-          steps.push([{ block: "vote", ballot: pet.id, choice: "sign", speaks_for: me, visible_to: "public" }]);
+          steps.push([{ block: "vote", ballot: pet.id, choice: "sign", speaks_for: me }]);
         }
       }
     };

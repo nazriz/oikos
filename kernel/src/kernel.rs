@@ -81,6 +81,8 @@ pub struct Check {
 pub struct Kernel {
     s: Statics,
     state: State,
+    /// Derived lookups for observations; not part of the state.
+    index: observe::RecordIndex,
 }
 
 fn refusal_info(r: &Refusal) -> RefusalInfo {
@@ -120,10 +122,10 @@ impl Kernel {
                 .iter()
                 .map(|p| (p.id.clone(), Parcel { x: p.x, y: p.y, w: p.w.unwrap_or(1), h: p.h.unwrap_or(1), structure: None }))
                 .collect(),
-            structures: BTreeMap::new(),
-            occupancy: BTreeMap::new(),
-            records: BTreeMap::new(),
-            record_order: vec![],
+            structures: crate::state::Map::new(),
+            occupancy: crate::state::Map::new(),
+            records: crate::state::Map::new(),
+            record_order: imbl::Vector::new(),
             seats: c
                 .seats
                 .iter()
@@ -168,7 +170,7 @@ impl Kernel {
         for r in &w.records {
             st.store(r.clone());
         }
-        let k = Kernel { s, state: st };
+        let k = Kernel { s, state: st, index: Default::default() };
         k.state_hash().map_err(|e| format!("initial state is not canonical: {e}"))?;
         Ok(k)
     }
@@ -304,7 +306,7 @@ impl Kernel {
     }
 
     fn observe(&mut self, seat: &str) -> Output {
-        let obs = observe::observe(&self.s, &mut self.state, seat);
+        let obs = observe::observe(&self.s, &mut self.state, &mut self.index, seat);
         let hash = canon::hash_value(canon::DOMAIN_OBSERVATION, &obs).expect("observations are canonical");
         Output {
             events: vec![Timed::new(self.state.t, EventBody::Observation { seat: seat.into(), observation_hash: hash })],

@@ -63,7 +63,7 @@ Work stays designed-not-built (D24), so institutions act without time cost in St
 
 ## Risks
 
-- **Scale.** 1,000 citizen seats plus institutions, each observing and acting through the kernel, means a lot of log entries. Plan: start at ~200 citizens, measure, then scale. If needed, add a batched `act` command, which would be a contract addition proposed to Naz.
+- **Scale.** 1,000 citizen seats plus institutions, each observing and acting through the kernel, means a lot of log entries. Plan: start at ~200 citizens, measure, then scale. If needed, add a batched `act` command, which would be a contract addition proposed to Naz. *Measured in M1 (D33):* after fixing two kernel costs that grew with population and time, 2 years at 1,000 citizens take ~170 s (kernel ~140 s, modules ~26 s) and 188k commands. A batched `act` isn't needed yet.
 - **Behaviour realism is the most judgement-laden part of Stage 2.** Every rule is cited and swappable, and the checkpoint reviews them.
 - **The translator writing records** (especially laws with CEL conditions) is a harder job than v0.1's blocks. The re-rendered sign-off and translation-failure logs are how we'll see where it breaks.
 

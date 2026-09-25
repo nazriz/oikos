@@ -111,7 +111,7 @@ fn involved<'a>(s: &'a Statics, st: &'a State, rec: &'a Record) -> Vec<&'a str> 
     v
 }
 
-fn matches(s: &Statics, st: &State, rec: &Record, f: &RecordFilter, me: &str) -> bool {
+fn matches(s: &Statics, st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&str>>) -> bool {
     if f.records.as_ref().is_some_and(|k| !k.iter().any(|x| x == rec.body.kind_name())) {
         return false;
     }
@@ -121,13 +121,88 @@ fn matches(s: &Statics, st: &State, rec: &Record, f: &RecordFilter, me: &str) ->
             _ => return false,
         }
     }
-    if let Some(inv) = &f.involving {
-        let want: BTreeSet<&str> = inv.iter().map(|e| if e == "self" { me } else { e.as_str() }).collect();
+    if let Some(want) = want {
         if !involved(s, st, rec).into_iter().any(|e| want.contains(e)) {
             return false;
         }
     }
     true
+}
+
+/// A lookup of records by record kind, statement kind and involved entity,
+/// so a channel reads only its candidates instead of every record. It is
+/// derived from the state (never part of it, never hashed), built as
+/// records appear. Records are append-only and a record's involvement is
+/// fixed when it's made (what it refers to must already exist), so indexing
+/// once gives the same answer as looking again later. Every lookup is a
+/// superset of the channel's matches; the full filter still decides.
+#[derive(Debug, Default)]
+pub struct RecordIndex {
+    indexed: usize,
+    by_record: BTreeMap<&'static str, Vec<u64>>,
+    by_kind: BTreeMap<String, Vec<u64>>,
+    by_entity: BTreeMap<String, Vec<u64>>,
+    accounts: Option<AccountsByEntity>,
+}
+
+/// entity -> accounts it holds or keeps, for the account set identified by
+/// (accounts ever opened, accounts now open): accounts are only opened or
+/// closed, never changed, so that pair pins the set down.
+type AccountsByEntity = ((u64, usize), BTreeMap<Id, Vec<Id>>);
+
+impl RecordIndex {
+    fn catch_up(&mut self, s: &Statics, st: &State) {
+        for i in self.indexed..st.record_order.len() {
+            let stored = &st.records[&st.record_order[i]];
+            let (seq, rec) = (stored.seq, &*stored.record);
+            self.by_record.entry(rec.body.kind_name()).or_default().push(seq);
+            if let crate::blocks::RecordBody::Statement { kind, .. } = &rec.body {
+                self.by_kind.entry(kind.clone()).or_default().push(seq);
+            }
+            let who: BTreeSet<&str> = involved(s, st, rec).into_iter().collect();
+            for e in who {
+                self.by_entity.entry(e.to_string()).or_default().push(seq);
+            }
+        }
+        self.indexed = st.record_order.len();
+    }
+
+    /// Sequence numbers above `after` that might match the filter, in order.
+    fn candidates(&self, f: &RecordFilter, want: Option<&BTreeSet<&str>>, after: u64) -> Option<Vec<u64>> {
+        fn tail(v: &[u64], after: u64) -> &[u64] {
+            &v[v.partition_point(|&q| q <= after)..]
+        }
+        let mut options: Vec<Vec<&[u64]>> = vec![];
+        if let Some(k) = &f.records {
+            options.push(k.iter().filter_map(|x| self.by_record.get(x.as_str())).map(|v| tail(v, after)).collect());
+        }
+        if let Some(k) = &f.statement_kinds {
+            options.push(k.iter().filter_map(|x| self.by_kind.get(x)).map(|v| tail(v, after)).collect());
+        }
+        if let Some(w) = want {
+            options.push(w.iter().filter_map(|e| self.by_entity.get(*e)).map(|v| tail(v, after)).collect());
+        }
+        let best = options.into_iter().min_by_key(|lists| lists.iter().map(|l| l.len()).sum::<usize>())?;
+        let mut seqs: Vec<u64> = best.into_iter().flatten().copied().collect();
+        seqs.sort_unstable();
+        seqs.dedup();
+        Some(seqs)
+    }
+
+    fn accounts_of<'a>(&'a mut self, st: &State, entity: &str) -> &'a [Id] {
+        let key = (st.counters.acc, st.accounts.len());
+        if self.accounts.as_ref().is_none_or(|(k, _)| *k != key) {
+            let mut m: BTreeMap<Id, Vec<Id>> = BTreeMap::new();
+            for (id, a) in st.accounts.iter() {
+                m.entry(a.holder.clone()).or_default().push(id.clone());
+                if a.custodian != a.holder {
+                    m.entry(a.custodian.clone()).or_default().push(id.clone());
+                }
+            }
+            self.accounts = Some((key, m));
+        }
+        self.accounts.as_ref().unwrap().1.get(entity).map(Vec::as_slice).unwrap_or(&[])
+    }
 }
 
 fn site_parcels(st: &State, area: &Area) -> Vec<SiteParcel> {
@@ -167,45 +242,51 @@ fn site_parcels(st: &State, area: &Area) -> Vec<SiteParcel> {
 }
 
 /// Build a seat's observation, consuming its "new since last time" state.
-pub fn observe(s: &Statics, st: &mut State, seat: &str) -> Observation {
+pub fn observe(s: &Statics, st: &mut State, index: &mut RecordIndex, seat: &str) -> Observation {
     let cfg = &s.seats[seat];
     let me = cfg.entity.clone();
     let cursor = st.seats[seat].record_cursor;
-    // Records in the order they were made; record i has seq i+1.
-    let in_order = |from_seq: u64| st.record_order[from_seq as usize..].iter().map(|id| (st.records[id].seq, &*st.records[id].record));
+    index.catch_up(s, st);
+    // Record with seq q is the q-th made.
+    let at_seq = |q: u64| &*st.records[&st.record_order[(q - 1) as usize]].record;
 
     let mut channels = BTreeMap::new();
     let mut refreshed: Vec<(Id, SiteView)> = vec![];
     for ch in &cfg.channels {
         let data = match &ch.kind {
             ChannelKind::Accounts => ChannelData::Accounts {
-                accounts: st
-                    .accounts
+                accounts: index
+                    .accounts_of(st, &me)
                     .iter()
-                    .filter(|(_, a)| a.holder == me || a.custodian == me)
-                    .map(|(id, a)| AccountItem {
-                        account: id.clone(),
-                        holder: a.holder.clone(),
-                        custodian: a.custodian.clone(),
-                        balance: a.balance,
+                    .map(|id| {
+                        let a = &st.accounts[id];
+                        AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance }
                     })
                     .collect(),
                 transactions: st.seats[seat].new_transactions.clone(),
             },
-            ChannelKind::Records { filter, new_only } => ChannelData::Records {
-                records: in_order(if new_only.unwrap_or(false) { cursor } else { 0 })
-                    .filter(|(_, r)| can_see(s, r, &me) && matches(s, st, r, filter, &me))
-                    .map(|(_, r)| r.clone())
-                    .collect(),
-            },
+            ChannelKind::Records { filter, new_only } => {
+                let after = if new_only.unwrap_or(false) { cursor } else { 0 };
+                let want: Option<BTreeSet<&str>> =
+                    filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me.as_str() } else { e.as_str() }).collect());
+                let seqs = index.candidates(filter, want.as_ref(), after).unwrap_or_else(|| (after + 1..=st.record_order.len() as u64).collect());
+                ChannelData::Records {
+                    records: seqs
+                        .into_iter()
+                        .map(at_seq)
+                        .filter(|r| can_see(s, r, &me) && matches(s, st, r, filter, want.as_ref()))
+                        .cloned()
+                        .collect(),
+                }
+            }
             ChannelKind::Sites { area, every } => match (every, st.seats[seat].site_views.get(&ch.id)) {
-                (Some(e), Some(v)) if st.t < v.as_of + e => ChannelData::Sites { as_of: v.as_of, parcels: v.parcels.clone() },
+                (Some(e), Some(v)) if st.t < v.as_of + e => ChannelData::Sites { as_of: v.as_of, parcels: (*v.parcels).clone() },
                 (every, _) => {
-                    let view = SiteView { as_of: st.t, parcels: site_parcels(st, area) };
+                    let view = SiteView { as_of: st.t, parcels: std::sync::Arc::new(site_parcels(st, area)) };
                     if every.is_some() {
                         refreshed.push((ch.id.clone(), view.clone()));
                     }
-                    ChannelData::Sites { as_of: view.as_of, parcels: view.parcels }
+                    ChannelData::Sites { as_of: view.as_of, parcels: (*view.parcels).clone() }
                 }
             },
             ChannelKind::Directory => ChannelData::Directory {

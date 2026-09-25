@@ -12,20 +12,25 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+/// Persistent (structurally shared) ordered map: cloning the state for an
+/// all-or-nothing action is O(1), and only what the action touches is copied.
+/// Iterates in key order, like BTreeMap, so serialization is unchanged.
+pub type Map<K, V> = imbl::OrdMap<K, V>;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
     pub t: i64,
     pub counters: Counters,
-    pub entities: BTreeMap<Id, Entity>,
-    pub accounts: BTreeMap<Id, Account>,
-    pub parcels: BTreeMap<Id, Parcel>,
-    pub structures: BTreeMap<Id, Structure>,
+    pub entities: Map<Id, Entity>,
+    pub accounts: Map<Id, Account>,
+    pub parcels: Map<Id, Parcel>,
+    pub structures: Map<Id, Structure>,
     /// structure -> occupant -> slot -> count
-    pub occupancy: BTreeMap<Id, BTreeMap<Id, BTreeMap<String, u32>>>,
-    pub records: BTreeMap<Id, Stored>,
+    pub occupancy: Map<Id, BTreeMap<Id, BTreeMap<String, u32>>>,
+    pub records: Map<Id, Stored>,
     /// Record ids in the order they were made (record i has seq i+1).
-    pub record_order: Vec<Id>,
-    pub seats: BTreeMap<Id, SeatState>,
+    pub record_order: imbl::Vector<Id>,
+    pub seats: Map<Id, SeatState>,
     /// Future physical effects (construction completing), sorted by (at, seq).
     pub schedule: Vec<Scheduled>,
 }
@@ -108,7 +113,8 @@ pub struct SeatState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SiteView {
     pub as_of: i64,
-    pub parcels: Vec<SiteParcel>,
+    /// Shared, so copying a seat's state doesn't copy the town.
+    pub parcels: Arc<Vec<SiteParcel>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -204,7 +210,7 @@ impl State {
     pub fn store(&mut self, record: Record) {
         self.counters.record_seq += 1;
         let seq = self.counters.record_seq;
-        self.record_order.push(record.id.clone());
+        self.record_order.push_back(record.id.clone());
         self.records.insert(record.id.clone(), Stored { seq, record: Arc::new(record) });
     }
 
