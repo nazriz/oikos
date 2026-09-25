@@ -10,12 +10,13 @@
 import type { Block, Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { act, DAY, wait, type BehaviourModule, type SeatContext } from "../module";
+import { Book } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; payee_holder?: string }
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.1.0",
+  version: "0.1.1",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -28,13 +29,15 @@ export const bankPaymentSystem: BehaviourModule = {
     let queuedAt = -1;
     let inFlight: Payment[] = [];
 
+    // The bank's own book of instructions, built up from what it has seen
+    // (its channel can show only what's new; it doesn't reread the archive).
+    const book = new Book();
     const plan = (obs: Observation) => {
       const me = obs.entity;
-      const records = channels.records(obs);
-      const withdrawn = new Set(records.flatMap((r) => (r.record === "withdrawal" ? [r.withdraws] : [])));
-      const seatEntity = new Map((channels.directory(obs)?.seats ?? []).map((s) => [s.seat, s.entity]));
+      const withdrawn = book.withdrawn;
+      const seatEntity = book.seatEntity;
       const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, a]));
-      const instructions = records
+      const instructions = [...book.records.values()]
         .filter((r): r is StatementRecord => r.record === "statement" && r.kind === "instruction" && (r.addressed_to ?? []).includes(me))
         .sort((a, b) => (a.id < b.id ? -1 : 1));
       const out: Payment[] = [];
@@ -64,6 +67,7 @@ export const bankPaymentSystem: BehaviourModule = {
 
     return {
       step(obs) {
+        book.absorb(obs);
         if (queuedAt !== obs.t) {
           queue = plan(obs);
           queuedAt = obs.t;

@@ -53,3 +53,20 @@ test("the bank refuses an instruction from someone who isn't the account holder"
   const s = await runWorld({ config: c, runId: "forged", outDir: out, until: 5 * DAY });
   expect(events(s.logPath).filter((e) => e.event === "transfer" && e.to === "acc-alice")).toEqual([]);
 }, 60_000);
+
+test("the generated town runs 60 days headless: people find homes and work, and the log replays", async () => {
+  const { generate } = await import("@terrarium/worlds/generator/generate");
+  const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+  const out = join(import.meta.dir, "../../runs/test-town");
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config: generate({ ...spec, citizens: 80 }), runId: "town", outDir: out, until: 60 * DAY });
+  const ev = events(s.logPath);
+  const count = (f: (e: any) => boolean) => ev.filter(f).length;
+  expect(count((e) => e.event === "transfer" && e.by === "bank-payments")).toBeGreaterThan(100);
+  expect(count((e) => e.event === "recorded" && e.record.kind === "rental_listing")).toBeGreaterThan(0);
+  expect(count((e) => e.event === "recorded" && e.record.record === "signature")).toBeGreaterThan(0);
+  // No commands were off-contract.
+  expect(readFileSync(s.logPath, "utf8").includes("rejected_action")).toBe(false);
+  const replay = Bun.spawnSync([kernelBinary(), "replay", s.logPath, "--anchors", s.anchorsPath]);
+  expect(replay.exitCode).toBe(0);
+}, 120_000);

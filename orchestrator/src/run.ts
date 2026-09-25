@@ -33,6 +33,9 @@ export interface RunSummary {
   refused: number;
   wakes: number;
   t: number;
+  /** Wall-clock milliseconds spent waiting on the kernel and in behaviour modules (profiling only; never logged). */
+  kernelMs: number;
+  moduleMs: number;
 }
 
 interface SeatSlot {
@@ -70,7 +73,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   const logPath = join(o.outDir, `${o.runId}.jsonl`);
   const anchorsPath = join(o.outDir, `${o.runId}.anchors.jsonl`);
   const k = o.kernel ?? new Kernel();
-  let commands = 0, refused = 0, wakes = 0;
+  let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0;
 
   await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath });
   let t = 0;
@@ -118,7 +121,9 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     }
   };
   const command = async (cmd: object) => {
+    const t0 = performance.now();
     const r = await k.tryRequest({ op: "command", command: cmd });
+    kernelMs += performance.now() - t0;
     if (r === null) return null;
     commands++;
     for (const e of r.events) if (e.event === "action_refused") refused++;
@@ -147,7 +152,9 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     next.nextWake = t + ceilTo(next.module.cadence(next.ctx), tick); // default if it waits without a time
     for (let n = 0; n < maxActions; n++) {
       const obs: Observation = (await command({ command: "observe", seat: next.id })).observation;
+      const m0 = performance.now();
       const action: SeatAction = next.controller.step(obs, next.ctx);
+      moduleMs += performance.now() - m0;
       if (action.type === "wait") {
         if (action.until !== undefined) next.nextWake = Math.max(t + tick, ceilTo(action.until, tick));
         break;
@@ -178,5 +185,5 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   const end = await k.request({ op: "finish", reason: until === runEnd ? "completed" : "aborted", ...(until === runEnd ? {} : { detail: `stopped at ${until}` }) });
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}`);
-  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, t };
+  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs) };
 }

@@ -32,6 +32,9 @@
       "dependencies": {
         "@terrarium/seats": "workspace:*",
       },
+      "devDependencies": {
+        "ajv": "^8.17.1",
+      },
     },
   },
   "packages": {

@@ -72,10 +72,32 @@ impl<W: Write> LogWriter<W> {
     pub fn append(&mut self, t: i64, kind: Kind, body: Value) -> io::Result<Entry> {
         let err = |e: canon::CanonError| io::Error::new(io::ErrorKind::InvalidData, e.to_string());
         let seq = self.next_seq;
-        let hash = entry_hash(seq, t, kind, &body, &self.prev).map_err(err)?;
-        let entry = Entry { seq, t, kind, body, prev: self.prev.clone(), hash: hash.clone() };
-        let mut line = canon::canonical(&entry).map_err(err)?;
+        // Canonicalise the body once, then assemble both the hashed form and the
+        // written line from it. Keys in canonical order: body, hash, kind, prev, seq, t.
+        // (Byte-identical to canonicalising the whole entry; see entry_hash and the tests.)
+        let body_bytes = canon::canonical_value(&body).map_err(err)?;
+        let kind_name = serde_json::to_value(kind).expect("kinds serialize");
+        let mut tail = Vec::with_capacity(160);
+        tail.extend_from_slice(b",\"kind\":");
+        canon::write_string(kind_name.as_str().expect("kind is a string"), &mut tail);
+        tail.extend_from_slice(b",\"prev\":");
+        canon::write_string(&self.prev, &mut tail);
+        tail.extend_from_slice(format!(",\"seq\":{seq},\"t\":{t}}}").as_bytes());
+        let mut unhashed = Vec::with_capacity(body_bytes.len() + tail.len() + 16);
+        unhashed.extend_from_slice(b"{\"body\":");
+        unhashed.extend_from_slice(&body_bytes);
+        unhashed.extend_from_slice(&tail);
+        let hash = canon::hash_with_domain(canon::DOMAIN_LOG, &unhashed);
+        let mut line = Vec::with_capacity(unhashed.len() + 80);
+        line.extend_from_slice(b"{\"body\":");
+        line.extend_from_slice(&body_bytes);
+        line.extend_from_slice(b",\"hash\":");
+        canon::write_string(&hash, &mut line);
+        line.extend_from_slice(&tail);
         line.push(b'\n');
+        debug_assert_eq!(hash, entry_hash(seq, t, kind, &body, &self.prev).unwrap());
+        let entry = Entry { seq, t, kind, body, prev: self.prev.clone(), hash: hash.clone() };
+        debug_assert_eq!(&line[..line.len() - 1], &canon::canonical(&entry).unwrap()[..]);
         self.out.write_all(&line)?;
         self.next_seq += 1;
         self.prev = hash;

@@ -1,0 +1,39 @@
+# Firms: `firm.landlord` and `firm.employer` (v0.1.0)
+
+**Source:** `seats/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
+
+## `firm.landlord`: a letting office
+
+| Rule | Detail | Source |
+|---|---|---|
+| **Listing** | Each vacant home is listed at a 5% markup over what the landlord currently gets for homes in the same building, ±2.5% noise. With no comparable, it uses the world's base rent. | BoE housing model eq. (11): the asking rent is a markup over the average rent |
+| **Cutting** | A listing unlet for a month is withdrawn and relisted 5% lower | BoE model §3.4.4: "the price is reduced each month by a constant fraction of 5%" |
+| **Choosing a tenant** | One applicant at random per listing | BoE model §3.5: when several bidders can afford an offer, "one is randomly chosen", because a bidder's maximum is private |
+| **Term** | 12–24 months, uniform; 60 days' notice from the landlord, 30 from the tenant | BoE model: "chosen randomly from 12 to 24 months with uniform probability, as suggested by data from the Association of Residential Letting Agents". The notice periods match the example tenancy law. |
+| **Counting homes as taken** | Homes under a lease in force, *or* offered and still awaiting the tenant's signature (up to a month) | Found in M1: counting only signed leases let the same flat twice |
+| **Arrears** | After 2 months' unpaid rent, give notice | A typical landlord practice, not a law: what tenancy law requires is a record the landlord may follow or not |
+| **Owners' spending** | Monthly: 60% of rental income spent at local shops, 20% on upkeep bought from outside | A placeholder to stop money pooling at landlords (see the calibration notes below) |
+
+**Differs from the BoE model on purpose:** that model injects cash so tenants never miss rent. Here arrears happen, and what follows is up to the landlord.
+
+## `firm.employer`: a shop or factory's manager
+
+| Rule | Detail |
+|---|---|
+| **Posting** | If staff plus pending offers are below the target headcount, and the balance covers 2 pay periods of the wage bill, post one job at the firm's wage |
+| **Hiring** | One applicant at random per posting. The offer includes the workplace. |
+| **Paying** | Once the worker signs, set up a standing order through the firm's bank for wages every 14 days |
+| **Layoffs** | If the balance can't cover the next pay period, give 14 days' notice to the most recent hire, and stop their wages when it runs out |
+| **Suppliers** | Monthly: 40% of the month's revenue paid to the outside world, for goods bought in |
+
+The labour-market literature (the Dosi et al. "Schumpeter meeting Keynes" labour extension) is the planned refinement for wage-setting and hiring.
+
+## Calibration notes for the checkpoint
+
+Over a 2-year run of the 200-citizen town (`worlds/town.yaml`):
+- Employment holds at about 160.
+- Housing settles at about 152 of the ~159 who stay; 41 people leave town.
+- **Money pools in shops**, which pass profits on to no one.
+- **Factories slowly run down**: wages plus supplies exceed export sales.
+
+Modelling owners and their profit draws is the obvious next step. That's economic calibration, a medium-fidelity area (D25).

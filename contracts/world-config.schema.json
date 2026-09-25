@@ -251,7 +251,7 @@
                 },
                 "statement_kinds": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/Label" }, "uniqueItems": true },
                 "involving": {
-                  "description": "Records naming any of these entities (as holder, counterparty, party, addressee, author's entity or speaks_for). 'self' means the seat's own entity.",
+                  "description": "Records naming any of these entities (as holder, counterparty, party, addressee, author's entity or speaks_for), or referring to a record that does (a signature on their agreement, a withdrawal of their statement, a vote on their ballot; one hop). 'self' means the seat's own entity.",
                   "type": "array",
                   "items": { "anyOf": [{ "const": "self" }, { "$ref": "urn:terrarium:contracts:0.2:common#/$defs/ConfigId" }] },
                   "uniqueItems": true

@@ -127,7 +127,7 @@ fn write_value(v: &Value, out: &mut Vec<u8>) {
     }
 }
 
-fn write_string(s: &str, out: &mut Vec<u8>) {
+pub fn write_string(s: &str, out: &mut Vec<u8>) {
     out.push(b'"');
     for c in s.chars() {
         match c {

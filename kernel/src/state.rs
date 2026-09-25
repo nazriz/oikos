@@ -10,6 +10,7 @@ use crate::events::RefusalCode;
 use crate::observe::SiteParcel;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
@@ -22,6 +23,8 @@ pub struct State {
     /// structure -> occupant -> slot -> count
     pub occupancy: BTreeMap<Id, BTreeMap<Id, BTreeMap<String, u32>>>,
     pub records: BTreeMap<Id, Stored>,
+    /// Record ids in the order they were made (record i has seq i+1).
+    pub record_order: Vec<Id>,
     pub seats: BTreeMap<Id, SeatState>,
     /// Future physical effects (construction completing), sorted by (at, seq).
     pub schedule: Vec<Scheduled>,
@@ -78,7 +81,8 @@ pub struct Structure {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Stored {
     pub seq: u64,
-    pub record: Record,
+    /// Records are immutable once made, so copies of the state share them.
+    pub record: Arc<Record>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -200,7 +204,8 @@ impl State {
     pub fn store(&mut self, record: Record) {
         self.counters.record_seq += 1;
         let seq = self.counters.record_seq;
-        self.records.insert(record.id.clone(), Stored { seq, record });
+        self.record_order.push(record.id.clone());
+        self.records.insert(record.id.clone(), Stored { seq, record: Arc::new(record) });
     }
 
     /// Total money in the world, including the boundary. Constant for a run.

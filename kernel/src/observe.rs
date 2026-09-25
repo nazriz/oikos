@@ -97,7 +97,21 @@ pub fn can_see(s: &Statics, rec: &Record, entity: &str) -> bool {
     rec.visible_to.allows(entity) || s.entity_of(&rec.author) == Some(entity)
 }
 
-fn matches(s: &Statics, rec: &Record, f: &RecordFilter, me: &str) -> bool {
+/// Entities a record involves: those it names, its author's entity, and (one
+/// hop) those named by any record it refers to. A signature on my agreement,
+/// or a withdrawal of my listing, involves me (D32).
+fn involved<'a>(s: &'a Statics, st: &'a State, rec: &'a Record) -> Vec<&'a str> {
+    let mut v: Vec<&str> = rec.entities_named().into_iter().chain(s.entity_of(&rec.author)).collect();
+    for other in rec.body.records_referenced() {
+        if let Some(o) = st.records.get(other) {
+            v.extend(o.record.entities_named());
+            v.extend(s.entity_of(&o.record.author));
+        }
+    }
+    v
+}
+
+fn matches(s: &Statics, st: &State, rec: &Record, f: &RecordFilter, me: &str) -> bool {
     if f.records.as_ref().is_some_and(|k| !k.iter().any(|x| x == rec.body.kind_name())) {
         return false;
     }
@@ -109,8 +123,7 @@ fn matches(s: &Statics, rec: &Record, f: &RecordFilter, me: &str) -> bool {
     }
     if let Some(inv) = &f.involving {
         let want: BTreeSet<&str> = inv.iter().map(|e| if e == "self" { me } else { e.as_str() }).collect();
-        let named = rec.entities_named().into_iter().chain(s.entity_of(&rec.author));
-        if !named.into_iter().any(|e| want.contains(e)) {
+        if !involved(s, st, rec).into_iter().any(|e| want.contains(e)) {
             return false;
         }
     }
@@ -158,8 +171,8 @@ pub fn observe(s: &Statics, st: &mut State, seat: &str) -> Observation {
     let cfg = &s.seats[seat];
     let me = cfg.entity.clone();
     let cursor = st.seats[seat].record_cursor;
-    let mut by_seq: Vec<(u64, &Record)> = st.records.values().map(|x| (x.seq, &x.record)).collect();
-    by_seq.sort_by_key(|(seq, _)| *seq);
+    // Records in the order they were made; record i has seq i+1.
+    let in_order = |from_seq: u64| st.record_order[from_seq as usize..].iter().map(|id| (st.records[id].seq, &*st.records[id].record));
 
     let mut channels = BTreeMap::new();
     let mut refreshed: Vec<(Id, SiteView)> = vec![];
@@ -180,10 +193,9 @@ pub fn observe(s: &Statics, st: &mut State, seat: &str) -> Observation {
                 transactions: st.seats[seat].new_transactions.clone(),
             },
             ChannelKind::Records { filter, new_only } => ChannelData::Records {
-                records: by_seq
-                    .iter()
-                    .filter(|(seq, r)| (!new_only.unwrap_or(false) || *seq > cursor) && can_see(s, r, &me) && matches(s, r, filter, &me))
-                    .map(|(_, r)| (*r).clone())
+                records: in_order(if new_only.unwrap_or(false) { cursor } else { 0 })
+                    .filter(|(_, r)| can_see(s, r, &me) && matches(s, st, r, filter, &me))
+                    .map(|(_, r)| r.clone())
                     .collect(),
             },
             ChannelKind::Sites { area, every } => match (every, st.seats[seat].site_views.get(&ch.id)) {

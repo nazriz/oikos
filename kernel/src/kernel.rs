@@ -123,6 +123,7 @@ impl Kernel {
             structures: BTreeMap::new(),
             occupancy: BTreeMap::new(),
             records: BTreeMap::new(),
+            record_order: vec![],
             seats: c
                 .seats
                 .iter()

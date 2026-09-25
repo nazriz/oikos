@@ -18,4 +18,9 @@ Rules every module follows (so re-runs are reproducible):
 |---|---|---|
 | `bank.payment_system` | a bank's automated payment system | [bank-payment-system.md](bank-payment-system.md) |
 | `world.export_demand` | the outside world (a boundary condition, D31) | [boundary.md](boundary.md) |
+| `citizen.default` | a townsperson: housing, work, spending, leaving town | [citizen.md](citizen.md) |
+| `firm.landlord` | a landlord's letting office | [firms.md](firms.md) |
+| `firm.employer` | a shop's or factory's manager | [firms.md](firms.md) |
 | `idle` | does nothing (placeholder, and a control condition) | this page |
+
+The town these modules run in is made by the [generator](generator.md).

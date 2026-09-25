@@ -1,0 +1,20 @@
+{
+  "description": "An example legal code for a small town: EXAMPLE CONTENT, not a default (D18). A world includes it deliberately. Each statement is a record with plain text, an Institutional Grammar breakdown (who / may-must-must not / what / when / or else) and, where machine-checkable, a formal CEL condition used by code-run institutions and by measurement, never by the kernel.",
+  "records": [
+    { "id": "law-charter", "record": "statement", "author": "genesis", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "charter",
+      "text": "The town is governed by an elected mayor and council. The council makes the town's laws by majority vote, on proposals from the mayor or any councillor. The mayor proposes the annual budget and the council approves it. The finance office pays the town's bills within the approved budget. The planning office decides building permits under the planning laws. The building inspector inspects sites and reports breaches." },
+    { "id": "law-property", "record": "statement", "author": "genesis", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "law", "basis": "law-charter",
+      "text": "Land and buildings belong to whoever the land registry records as their owner. No one may build on, occupy or demolish another's property without the owner's agreement. Or else: the owner may seek removal and damages through the council.",
+      "adico": { "attribute": "anyone", "deontic": "must_not", "aim": "build on, occupy or demolish another's property", "condition": "without the owner's agreement", "or_else": "removal and damages" } },
+    { "id": "law-tenancy", "record": "statement", "author": "genesis", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "law", "basis": "law-charter",
+      "text": "A landlord may end a tenancy only by giving at least 60 days' notice in writing, and may not remove a tenant before the notice has run out. A tenant may leave on 30 days' notice. Or else: the removal is unlawful and the tenant may return.",
+      "adico": { "attribute": "landlords", "deontic": "must_not", "aim": "remove a tenant", "condition": "before 60 days' written notice has run out", "or_else": "the removal is unlawful; the tenant may return" } },
+    { "id": "law-planning", "record": "statement", "author": "genesis", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "law", "basis": "law-charter",
+      "text": "No building may be built anywhere in town without a permit from the planning office. No permit may be granted for building on the river parcels (the southern row). Or else: a fine of $50,000 and an order to demolish.",
+      "adico": { "attribute": "anyone", "deontic": "must_not", "aim": "build", "condition": "without a planning permit; and never on the river parcels", "or_else": "a fine of $50,000 and a demolition order" } },
+    { "id": "law-tax", "record": "statement", "author": "genesis", "at": 0, "visible_to": "public", "speaks_for": "city", "kind": "law", "basis": "law-charter",
+      "text": "Anyone who receives rent owes the town 10% of it. Rent received each month must be reported to the town, and the tax paid, by the end of the following month. Or else: a penalty of 20% of the tax owed.",
+      "adico": { "attribute": "anyone receiving rent", "deontic": "must", "aim": "report rent received and pay 10% of it to the town", "condition": "monthly, by the end of the following month", "or_else": "a penalty of 20% of the tax owed" },
+      "data": { "rate_bps": 1000, "penalty_bps": 2000 } }
+  ]
+}

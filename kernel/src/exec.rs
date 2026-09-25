@@ -121,7 +121,7 @@ impl<'a> Exec<'a> {
     }
 
     fn record_of_kind(&self, id: &str, kind: &str) -> R<&Record> {
-        let r = &self.st.records.get(id).ok_or_else(|| refuse(RefusalCode::UnknownRecord, format!("no record {id}")))?.record;
+        let r = &*self.st.records.get(id).ok_or_else(|| refuse(RefusalCode::UnknownRecord, format!("no record {id}")))?.record;
         if kind != "any" && r.body.kind_name() != kind {
             return Err(refuse(RefusalCode::WrongRecordKind, format!("{id} is a {}, not a {kind}", r.body.kind_name())));
         }

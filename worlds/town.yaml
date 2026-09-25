@@ -1,0 +1,19 @@
+# A small generated town (M1): the all-code control world.
+# `terrarium run worlds/town.yaml --seeds 5`
+generate: town
+name: Millbrook
+seed: 1
+citizens: 200
+years: 2
+grid: { w: 20, h: 12 }
+apartment_blocks: 12      # 144 homes
+houses: 50
+shops: 8                  # 48 jobs
+factories: 3              # 120 jobs
+landlords: 4
+rents: { apartment: 85000, house: 130000 }     # cents a month
+wages: { shop: 120000, factory: 150000 }       # cents every 14 days
+exports_per_month: 60000000                    # $600,000 a month bought from the factories
+housed_bps: 9200
+employed_bps: 9000
+savings_months: [1, 6]
