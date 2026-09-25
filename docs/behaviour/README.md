@@ -23,7 +23,12 @@ Rules every module follows (so re-runs are reproducible):
 | `firm.employer` | a shop's or factory's manager | [firms.md](firms.md) |
 | `city.planning_officer` | decides permit applications under the laws that bind the office | [institutions.md](institutions.md) |
 | `city.inspector` | patrols, detects unpermitted building, fines and orders demolition | [institutions.md](institutions.md) |
-| `firm.builder` | builds what it's contracted to build | [institutions.md](institutions.md) |
+| `firm.builder` | builds what it's contracted to build, and invoices | [institutions.md](institutions.md) |
+| `city.mayor_code` | a rule-following mayor (the all-code control; an LLM takes this seat in AI runs) | [government.md](government.md) |
+| `city.council_clerk` | runs council ballots, publishes results and what passed | [government.md](government.md) |
+| `city.councillor` | votes on council ballots (spatial voting) | [government.md](government.md) |
+| `city.finance_officer` | pays the town's invoices under the payments procedure | [government.md](government.md) |
+| `city.tax_clerk` | assesses reported tax, chases arrears | [government.md](government.md) |
 | `idle` | does nothing (placeholder, and a control condition) | this page |
 
 The town these modules run in is made by the [generator](generator.md).

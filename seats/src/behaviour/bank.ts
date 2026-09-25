@@ -16,7 +16,7 @@ interface Payment { instruction: string; from: string; to: string; amount: numbe
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.1.1",
+  version: "0.2.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -32,6 +32,12 @@ export const bankPaymentSystem: BehaviourModule = {
     // The bank's own book of instructions, built up from what it has seen
     // (its channel can show only what's new; it doesn't reread the archive).
     const book = new Book();
+    let refusals: Block[] = [];
+    /** The seats an account holder has told the bank may instruct payments from an account (latest standing list), if any. */
+    const signatories = (holder: string, account: string): string[] | undefined => {
+      const lists = book.open("signatories").filter((r) => r.speaks_for === holder && r.data?.account === account);
+      return lists.length ? (lists.at(-1)!.data.seats as string[]) : undefined;
+    };
     const plan = (obs: Observation) => {
       const me = obs.entity;
       const withdrawn = book.withdrawn;
@@ -46,9 +52,18 @@ export const bankPaymentSystem: BehaviourModule = {
         const d = ins.data ?? {};
         const acc = custody.get(d.from);
         if (!acc || !Number.isInteger(d.pay) || d.pay <= 0 || typeof d.to !== "string") continue;
-        // The bank's procedure: only the account holder may instruct it.
+        // The bank's procedure: only the account holder may instruct it, and if
+        // the holder has named its signatories for this account, only they.
         const authorEntity = ins.author === "genesis" ? ins.speaks_for : seatEntity.get(ins.author);
         if (ins.speaks_for !== acc.holder || (verifyAuthor && authorEntity !== acc.holder)) continue;
+        const named = signatories(acc.holder, d.from);
+        if (named && ins.author !== "genesis" && !named.includes(ins.author)) {
+          if (!done.has(ins.id)) {
+            done.add(ins.id);
+            refusals.push({ block: "message", to: [ins.author], text: `Instruction ${ins.id} not carried out: ${ins.author} is not an authorised signatory for ${d.from}.`, re: ins.id });
+          }
+          continue;
+        }
         if (Number.isInteger(d.every) && d.every > 0) {
           let due = nextDue.get(ins.id) ?? ins.at + (Number.isInteger(d.first) ? d.first : d.every);
           while (due <= obs.t) {
@@ -77,6 +92,10 @@ export const bankPaymentSystem: BehaviourModule = {
         const last = obs.outcomes.at(-1);
         if (last?.status === "refused" && inFlight.length > 1) queue.unshift(...inFlight.map((p) => ({ ...p, single: true }) as Payment));
         inFlight = [];
+        if (refusals.length) {
+          const blocks = refusals.splice(0, 32);
+          return act(blocks);
+        }
         if (queue.length === 0) return wait();
 
         const balance = new Map(channels.accounts(obs).map((a) => [a.account, a.balance]));

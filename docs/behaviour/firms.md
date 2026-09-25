@@ -1,4 +1,4 @@
-# Firms: `firm.landlord` and `firm.employer` (v0.1.0)
+# Firms: `firm.landlord` (v0.2.0) and `firm.employer` (v0.1.0)
 
 **Source:** `seats/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
 
@@ -13,6 +13,7 @@
 | **Counting homes as taken** | Homes under a lease in force, *or* offered and still awaiting the tenant's signature (up to a month) | Found in M1: counting only signed leases let the same flat twice |
 | **Arrears** | After 2 months' unpaid rent, give notice | A typical landlord practice, not a law: what tenancy law requires is a record the landlord may follow or not |
 | **Development** | Builds on its own empty sites when average vacancy over 90 days is ≤10% and it can afford it. Applies for a permit; if refused, complies with probability `compliance_bps`, otherwise builds anyway. Pays fines and obeys demolition orders with the same probability. | [institutions.md](institutions.md) |
+| **Tax** | Monthly, with owners' spending: a `tax_report` to the town of rent received, and payment at the rate it believes the tax law sets (`tax_rate_bps`, supplied by the world). A non-complying landlord (probability `1 − compliance_bps` each month) reports only half. It pays tax penalties like fines. | Tax evasion as a gamble on detection (Allingham & Sandmo 1972). Here the tax clerk can't detect it at all yet. See [government.md](government.md). |
 | **Owners' spending** | Monthly: 60% of rental income spent at local shops, 20% on upkeep bought from outside | A placeholder to stop money pooling at landlords (see the calibration notes below) |
 
 **Differs from the BoE model on purpose:** that model injects cash so tenants never miss rent. Here arrears happen, and what follows is up to the landlord.

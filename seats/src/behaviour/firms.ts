@@ -47,7 +47,7 @@ function receipts(obs: Observation, account: string): Map<string, number> {
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -70,7 +70,8 @@ export const landlord: BehaviourModule = {
       develop_window_days: 90, // look at average occupancy over this window
       develop_max_vacancy_bps: 1000, // build when average vacancy is at most 10% of homes
       build_markup_bps: 2000, // the builder's price over materials
-      compliance_bps: 10_000, // how often it obeys a refusal, a fine or an order
+      compliance_bps: 10_000, // how often it obeys a refusal, a fine, an order, or reports rent honestly
+      tax_rate_bps: 0, // the rate it believes the tax law sets (the world supplies it)
     },
     ctx.params,
   );
@@ -208,8 +209,19 @@ export const landlord: BehaviourModule = {
       if (t >= nextSpend) {
         nextSpend = t + MONTH;
         const shops: string[] = p.shop_accounts ?? [];
-        const spend = Math.min(acc.balance, Math.floor((income * p.spend_share_bps) / 10_000));
-        const upkeep = Math.min(acc.balance - spend, Math.floor((income * p.upkeep_share_bps) / 10_000));
+        // Tax on rent received (the town's tax law): report it and pay, or (when
+        // not complying) report only half. The tax clerk sees only the report.
+        let tax = 0;
+        if (p.city && p.city_account && p.tax_rate_bps && income > 0) {
+          const reported = obeys(`tax-${t}`) ? income : Math.floor(income / 2);
+          tax = Math.min(acc.balance, Math.floor((reported * p.tax_rate_bps) / 10_000));
+          steps.push([
+            { block: "publish", kind: "tax_report", speaks_for: me, addressed_to: [p.city], text: `Rent received this month: ${reported} cents.`, data: { period_end: t, rent_received: reported, account: acc.account } },
+            ...(tax > 0 ? [payInstruction(me, bank, acc.account, p.city_account, tax, "Tax on rent received.")] : []),
+          ]);
+        }
+        const spend = Math.min(acc.balance - tax, Math.floor((income * p.spend_share_bps) / 10_000));
+        const upkeep = Math.min(acc.balance - tax - spend, Math.floor((income * p.upkeep_share_bps) / 10_000));
         income = 0;
         const s: Block[] = [];
         if (spend > 0 && shops.length) s.push(payInstruction(me, bank, acc.account, ctx.rng(`spend-${t}`).pick(shops), spend, "Owners' spending."));
@@ -252,15 +264,21 @@ export const landlord: BehaviourModule = {
             text: `${p.builder} builds a ${p.develop_type} on ${parcel} for ${me}, for ${price} cents.`,
           } },
           { block: "sign_agreement", agreement: "$build", as: me },
-          payInstruction(me, bank, acc.account, p.builder_account, price, `Construction of a ${p.develop_type} on ${parcel}.`),
         ]);
       }
       if (dev?.stage === "contracted" && sites.some((s) => s.parcel === dev!.parcel && s.structure)) dev = null;
 
+      // Invoices addressed to us (from the builder): pay them.
+      for (const inv of book.open("invoice")) {
+        if (answered.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
+        answered.add(inv.id);
+        if (acc.balance >= inv.data?.amount) steps.push([payInstruction(me, bank, acc.account, inv.data.pay_to, inv.data.amount, "Paying an invoice.", { settles: inv.id })]);
+      }
+
       // Fines recorded against us, and demolition orders addressed to us.
       for (const r of book.records.values()) {
         if (answered.has(r.id)) continue;
-        if (r.record === "claim" && r.position === "right" && r.counterparty === me && r.about?.kind === "fine") {
+        if (r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty"].includes(r.about?.kind)) {
           answered.add(r.id);
           if (obeys(`fine-${r.id}`) && p.city_account && acc.balance >= r.about.amount) steps.push([payInstruction(me, bank, acc.account, p.city_account, r.about.amount, "Paying a fine.", { settles: r.id })]);
         }

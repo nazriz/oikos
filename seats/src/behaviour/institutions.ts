@@ -129,12 +129,12 @@ export const inspector: BehaviourModule = {
 
 /**
  * firm.builder: takes construction contracts. When a client it has a
- * contract with has signed, and it can pay for materials, it signs and
- * builds, and asks to be paid the contract price.
+ * contract with has signed, and it can pay for materials, it signs, builds,
+ * and invoices the contract price.
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -158,9 +158,11 @@ export const builder: BehaviourModule = {
           if (balance < cost) continue;
           started.add(r.id);
           balance -= cost;
+          const price = r.terms.commitments.find((c) => c.who === client)?.does?.pay;
           steps.push([
             ...(book.signedBy(r.id, me) ? [] : [{ block: "sign_agreement", agreement: r.id, as: me } as Block]),
             { block: "construct", parcel: job.on, structure_type: job.build, materials_from: acc.account },
+            ...(price ? [{ block: "publish", kind: "invoice", speaks_for: me, addressed_to: [client], basis: r.id, text: `Invoice: ${price} cents for building a ${job.build} on ${job.on}.`, data: { amount: price, pay_to: acc.account, agreement: r.id } } as Block] : []),
           ]);
         }
         return steps;

@@ -14,6 +14,8 @@ export class Book {
   readonly withdrawn = new Set<string>();
   readonly signatures = new Map<string, Set<string>>(); // agreement -> parties who signed
   readonly notices = new Map<string, { as: string; at: number }[]>(); // agreement -> notices
+  readonly signedTimes = new Map<string, number[]>(); // agreement -> signature times
+  private readonly byKind = new Map<string, StatementRecord[]>(); // statement kind -> statements, in the order seen
   readonly seatEntity = new Map<string, string>();
   readonly entityKind = new Map<string, string>();
 
@@ -28,6 +30,12 @@ export class Book {
         const s = this.signatures.get(r.agreement) ?? new Set();
         s.add(r.as);
         this.signatures.set(r.agreement, s);
+        this.signedTimes.set(r.agreement, [...(this.signedTimes.get(r.agreement) ?? []), r.at]);
+      }
+      if (r.record === "statement") {
+        const list = this.byKind.get(r.kind);
+        if (list) list.push(r);
+        else this.byKind.set(r.kind, [r]);
       }
       if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
     }
@@ -41,7 +49,7 @@ export class Book {
 
   /** Statements of a kind that are still standing (not withdrawn). */
   open(kind: string): StatementRecord[] {
-    return [...this.records.values()].filter((r): r is StatementRecord => r.record === "statement" && r.kind === kind && !this.withdrawn.has(r.id));
+    return (this.byKind.get(kind) ?? []).filter((r) => !this.withdrawn.has(r.id));
   }
 
   signedBy(agreement: string, party: string): boolean {
@@ -57,8 +65,7 @@ export class Book {
   /** The time the last party signed, if all have. */
   signedAt(agreement: string): number | undefined {
     if (!this.inForce(agreement)) return undefined;
-    const times = [...this.records.values()].flatMap((r) => (r.record === "signature" && r.agreement === agreement ? [r.at] : []));
-    return Math.max(...times);
+    return Math.max(...(this.signedTimes.get(agreement) ?? []));
   }
 
   entitiesOfKind(kind: string): string[] {

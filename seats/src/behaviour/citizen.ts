@@ -21,7 +21,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -35,6 +35,13 @@ export const citizen: BehaviourModule = {
       buffer_months: 3,
       leave_after_homeless_days: 90,
       leave_after_jobless_days: 180,
+      // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
+      petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
+      petition_days: 180, // how long an organiser keeps a petition open
+      threshold_mean_bps: 2500, // personal thresholds (share of the population already signed) are
+      threshold_sd_bps: 1000, //   roughly normal with this mean and spread (Granovetter 1978)
+      population: 200,
+      rent_burden_grievance_bps: 4000,
     },
     ctx.params,
   );
@@ -219,8 +226,45 @@ export const citizen: BehaviourModule = {
           steps.push([payInstruction(me, bank, acc.account, shop, amount, "Shopping.")]);
         }
       }
+      voice(t, steps);
       fresh = [];
       return steps;
+    };
+
+    // Granovetter (1978): each person joins once the share already joined reaches their own threshold.
+    // Irwin–Hall approximation to a normal: the sum of 12 uniforms on [0, 1) has mean 6 and sd 1.
+    const tr = ctx.rng("threshold");
+    let z = -6 * 10_000;
+    for (let i = 0; i < 12; i++) z += tr.below(10_000);
+    const threshold = Math.max(0, p.threshold_mean_bps + Math.trunc((z * p.threshold_sd_bps) / 10_000)); // z / 10000 ~ N(0, 1)
+    const signed = new Set<string>();
+    let aggrievedUntil = 0;
+    const voice = (t: number, steps: Block[][]) => {
+      const burden = home && monthlyIncome() > 0 ? (home.rent * 10_000) / monthlyIncome() : 0;
+      const noticed = [...book.notices.entries()].some(([ag, ns]) => ag === home?.agreement && ns.some((n) => n.as !== me));
+      if (home && (noticed || burden >= p.rent_burden_grievance_bps)) aggrievedUntil = t + 90 * DAY;
+      const aggrieved = t < aggrievedUntil;
+      const open = book.open("petition").filter((x) => (x.data?.demand?.tags ?? []).includes("tenant_protection"));
+      // An organiser closes their petition after `petition_days`; a new one can then start.
+      for (const pet of open) if (pet.speaks_for === me && t - pet.at >= p.petition_days * DAY && !signed.has(`closed-${pet.id}`)) {
+        signed.add(`closed-${pet.id}`);
+        steps.push([{ block: "withdraw", record: pet.id, speaks_for: me, text: "Petition closed." }]);
+      }
+      if (aggrieved && open.length === 0 && ctx.rng(`petition-${t}`).below(10_000) < p.petition_start_bps) {
+        steps.push([{ block: "publish", kind: "petition", speaks_for: me, text: "Petition: landlords must give 90 days' notice, and may not raise rent by more than 5% a year.", data: { demand: {
+          kind: "law", text: "A landlord must give at least 90 days' notice to end a tenancy, and may not raise the rent by more than 5% in any 12 months.",
+          adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"] } } }]);
+        return;
+      }
+      for (const pet of open) {
+        if (signed.has(pet.id) || pet.speaks_for === me) continue;
+        const signers = new Set([...book.records.values()].flatMap((r) => (r.record === "vote" && r.ballot === pet.id && r.choice === "sign" && r.speaks_for ? [r.speaks_for] : [])));
+        const share = (signers.size * 10_000) / p.population;
+        if (aggrieved || (home && share >= threshold)) {
+          signed.add(pet.id);
+          steps.push([{ block: "vote", ballot: pet.id, choice: "sign", speaks_for: me, visible_to: "public" }]);
+        }
+      }
     };
 
     const affordable = (rent: number, balance: number) =>

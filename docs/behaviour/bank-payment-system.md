@@ -1,4 +1,4 @@
-# `bank.payment_system` (v0.1.0)
+# `bank.payment_system` (v0.2.0)
 
 **Seat:** a bank's automated payment system (acts as the bank). **Source:** `seats/src/behaviour/bank.ts`.
 
@@ -11,6 +11,7 @@ Once a day it reads the **instructions** addressed to its bank: statements of ki
 
 The bank's own procedure, applied before paying:
 - **Only the account holder may instruct.** The instruction must speak for the holder of the paying account and, if `verify_author` is set, be written by one of the holder's own seats (checked via the directory). A forged instruction is ignored.
+- **Named signatories.** If the account holder has told the bank who may instruct payments from an account (a `signatories` statement addressed to the bank, `data: { account, seats }`; the latest one stands), an instruction from any other seat is declined, and the author is told why. Organisations use this: the town names only its finance officer.
 - **The money must be there.** If it isn't, the payment is not made and the holder is sent a message saying so. The obligation behind it, such as rent, simply stays unpaid; what follows is up to the creditor.
 
 It batches up to 32 payments per action. If a batch is refused because the world changed under it, it retries those payments one at a time.

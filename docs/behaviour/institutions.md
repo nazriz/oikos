@@ -1,4 +1,4 @@
-# The people inside institutions (v0.1.0)
+# The people inside institutions (planning officer and inspector v0.1.0; builder v0.2.0)
 
 **Source:** `seats/src/behaviour/institutions.ts`. These are code seats of the town (`entity: city`) and of the builder. None of this is kernel law. Each seat reads the town's statements, applies them to what it can see because that's its job, and may do the job well, badly or not at all, depending on its parameters (D19, D20).
 
@@ -32,12 +32,12 @@ What happens next is up to the owner, and to whoever else might enforce.
 
 ## `firm.builder`
 
-Wakes weekly. For each construction agreement a client has signed, if it can pay for the materials, it signs too and builds (`construct`), the materials being bought from outside (the temporary liberty in docs/decisions.md). It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
+Wakes weekly. For each construction agreement a client has signed, if it can pay for the materials, it signs too and builds (`construct`), the materials being bought from outside (the temporary liberty in docs/decisions.md). It then **invoices** the client for the contract price (an `invoice` statement with `data: { amount, pay_to, agreement }`). Payment is the client's act, through their bank. It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
 
 ## Landlords as developers (`firm.landlord`, see [firms.md](firms.md))
 
 When a landlord's **average vacancy over the last 90 days is at most 10%** of its homes, and it has 1.5× the price of a house in hand, it applies to build on an empty site it owns.
-- **Granted:** it contracts the builder and pays.
+- **Granted:** it contracts the builder and pays the invoice when it arrives.
 - **Refused:** it complies with probability `compliance_bps`. Otherwise it **builds anyway**.
 
 It also pays fines and obeys demolition orders with that same probability.

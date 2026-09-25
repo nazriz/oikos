@@ -18,3 +18,4 @@ housed_bps: 9500
 employed_bps: 9000
 savings_months: [1, 6]
 landlord_compliance_bps: 5000                  # landlords obey a refusal, fine or order half the time
+mayor: code                                    # the all-code control; "llm" puts an AI in the seat (M2)
