@@ -1,0 +1,276 @@
+//! A run: a kernel plus the log it writes. The kernel logs every command
+//! before applying it, then the events it caused, then a checkpoint whenever
+//! an advance crosses a `log.checkpoint_every` boundary.
+
+use crate::canon;
+use crate::config::{self, CONTRACTS_VERSION};
+use crate::events::Event;
+use crate::kernel::{Command, Kernel, Output, ProtocolError};
+use crate::log::{self, Kind, LogWriter};
+use crate::observe::Observation;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::io::Write;
+
+pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const KERNEL_BUILD: &str = env!("TERRARIUM_BUILD");
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KernelIdentity {
+    pub version: String,
+    pub build: String,
+}
+
+impl KernelIdentity {
+    pub fn current() -> Self {
+        KernelIdentity { version: KERNEL_VERSION.into(), build: KERNEL_BUILD.into() }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Header {
+    pub contracts: String,
+    pub kernel: KernelIdentity,
+    pub run_id: String,
+    pub config: Value,
+    pub config_hash: String,
+    pub initial_state_hash: String,
+    pub canary: String,
+}
+
+#[derive(Debug)]
+pub enum RunError {
+    Protocol(ProtocolError),
+    Io(std::io::Error),
+    Config(String),
+}
+
+impl std::fmt::Display for RunError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RunError::Protocol(e) => write!(f, "protocol error: {e}"),
+            RunError::Io(e) => write!(f, "log write failed: {e}"),
+            RunError::Config(e) => write!(f, "invalid config: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for RunError {}
+
+impl From<ProtocolError> for RunError {
+    fn from(e: ProtocolError) -> Self {
+        RunError::Protocol(e)
+    }
+}
+
+impl From<std::io::Error> for RunError {
+    fn from(e: std::io::Error) -> Self {
+        RunError::Io(e)
+    }
+}
+
+/// What a command produced: its log seq, its events (as logged) and, for
+/// `observe`, the observation.
+#[derive(Debug, Clone, Serialize)]
+pub struct Response {
+    pub seq: u64,
+    pub events: Vec<Event>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observation: Option<Observation>,
+}
+
+pub struct Run<W: Write> {
+    kernel: Kernel,
+    log: LogWriter<W>,
+    checkpoint_every: i64,
+    ended: bool,
+}
+
+impl<W: Write> Run<W> {
+    pub fn start(config: Value, run_id: &str, out: W, anchors: Option<Box<dyn Write>>) -> Result<Self, RunError> {
+        Self::start_as(config, run_id, KernelIdentity::current(), out, anchors)
+    }
+
+    /// Start with an explicit kernel identity (replay reproduces the original header).
+    pub fn start_as(
+        config: Value,
+        run_id: &str,
+        identity: KernelIdentity,
+        out: W,
+        anchors: Option<Box<dyn Write>>,
+    ) -> Result<Self, RunError> {
+        if run_id.is_empty() || run_id.len() > 128 || !run_id.bytes().all(|b| b.is_ascii_alphanumeric() || b"_.:-".contains(&b)) {
+            return Err(RunError::Config(format!("invalid run id {run_id:?}")));
+        }
+        let loaded = config::load(config).map_err(RunError::Config)?;
+        let kernel = Kernel::new(&loaded).map_err(RunError::Config)?;
+        let header = Header {
+            contracts: CONTRACTS_VERSION.into(),
+            kernel: identity,
+            run_id: run_id.into(),
+            config: loaded.canonical.clone(),
+            config_hash: loaded.hash.clone(),
+            initial_state_hash: kernel.state_hash().map_err(|e| RunError::Config(e.to_string()))?,
+            canary: loaded.config.meta.canary.clone(),
+        };
+        let mut log = LogWriter::new(out, anchors, loaded.config.log.anchor_every_entries);
+        log.append(0, Kind::Header, serde_json::to_value(&header).expect("header serializes"))?;
+        Ok(Run { checkpoint_every: loaded.config.log.checkpoint_every, kernel, log, ended: false })
+    }
+
+    pub fn kernel(&self) -> &Kernel {
+        &self.kernel
+    }
+
+    pub fn head(&self) -> &str {
+        self.log.head()
+    }
+
+    fn not_ended(&self) -> Result<(), RunError> {
+        if self.ended {
+            return Err(ProtocolError("the run has ended".into()).into());
+        }
+        Ok(())
+    }
+
+    pub fn command(&mut self, cmd: &Command) -> Result<Response, RunError> {
+        self.not_ended()?;
+        self.kernel.precheck(cmd)?;
+        let from = self.kernel.t();
+        let body = serde_json::to_value(cmd).expect("commands serialize");
+        let seq = self.log.append(from, Kind::Command, body)?.seq;
+        let Output { events, observation } = self.kernel.apply(cmd)?;
+        let mut logged = Vec::with_capacity(events.len());
+        for mut timed in events {
+            timed.event.cause = seq;
+            self.log.append(timed.t, Kind::Event, serde_json::to_value(&timed.event).expect("events serialize"))?;
+            logged.push(timed.event);
+        }
+        if let Command::Advance { to } = cmd {
+            if to / self.checkpoint_every > from / self.checkpoint_every {
+                self.checkpoint()?;
+            }
+        }
+        Ok(Response { seq, events: logged, observation })
+    }
+
+    fn checkpoint(&mut self) -> Result<(), RunError> {
+        let hash = self.kernel.state_hash().map_err(|e| RunError::Config(e.to_string()))?;
+        self.log.append(self.kernel.t(), Kind::Checkpoint, json!({ "state_hash": hash }))?;
+        Ok(())
+    }
+
+    /// Record non-state information (usage, transcripts, drafts, ...),
+    /// validated against the Annotation contract.
+    pub fn annotate(&mut self, annotation: Value) -> Result<u64, RunError> {
+        self.not_ended()?;
+        canon::check_integers(&annotation).map_err(|e| ProtocolError(e.to_string()))?;
+        crate::contracts::check(&crate::contracts::contracts().annotation, &annotation)
+            .map_err(|e| ProtocolError(format!("annotation {e}")))?;
+        Ok(self.log.append(self.kernel.t(), Kind::Annotation, annotation)?.seq)
+    }
+
+    pub fn finish(&mut self, reason: &str, detail: Option<&str>) -> Result<(u64, String), RunError> {
+        self.not_ended()?;
+        if !["completed", "aborted", "error"].contains(&reason) {
+            return Err(ProtocolError(format!("unknown end reason {reason}")).into());
+        }
+        let hash = self.kernel.state_hash().map_err(|e| RunError::Config(e.to_string()))?;
+        let mut body = json!({ "reason": reason, "state_hash": hash });
+        if let Some(d) = detail {
+            body["detail"] = Value::String(d.chars().take(2000).collect());
+        }
+        let seq = self.log.append(self.kernel.t(), Kind::End, body)?.seq;
+        self.log.anchor()?;
+        self.log.flush()?;
+        self.ended = true;
+        Ok((seq, hash))
+    }
+
+    pub fn into_log(self) -> W {
+        self.log.into_inner()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReplayReport {
+    pub entries: usize,
+    pub state_hash: String,
+    pub canonical_state: Vec<u8>,
+    pub complete: bool,
+    /// The log was written by a different kernel build than this one.
+    pub build_differs: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReplayError {
+    Chain(log::VerifyError),
+    /// Replay produced a different log. `line` is the first differing line (0-based).
+    Diverged {
+        line: usize,
+        detail: String,
+    },
+    Invalid(String),
+}
+
+impl std::fmt::Display for ReplayError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReplayError::Chain(e) => write!(f, "hash chain does not verify: {e}"),
+            ReplayError::Diverged { line, detail } => write!(f, "replay diverged at line {}: {detail}", line + 1),
+            ReplayError::Invalid(e) => write!(f, "cannot replay: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for ReplayError {}
+
+/// Replay a log from its header and commands, regenerate the entire log, and
+/// require it to be byte-identical to the original.
+pub fn replay(original: &[u8], anchors: Option<&[u8]>) -> Result<ReplayReport, ReplayError> {
+    let verified = log::verify(original, anchors).map_err(ReplayError::Chain)?;
+    let header: Header =
+        serde_json::from_value(verified.entries[0].body.clone()).map_err(|e| ReplayError::Invalid(format!("bad header: {e}")))?;
+    let current = KernelIdentity::current();
+    let build_differs = (header.kernel != current).then(|| {
+        format!("log written by {} ({}), replayed by {} ({})", header.kernel.version, header.kernel.build, current.version, current.build)
+    });
+    let invalid = |e: RunError| ReplayError::Invalid(e.to_string());
+    let mut run = Run::start_as(header.config.clone(), &header.run_id, header.kernel.clone(), Vec::new(), None).map_err(invalid)?;
+    for e in &verified.entries[1..] {
+        match e.kind {
+            Kind::Command => {
+                let cmd: Command = serde_json::from_value(e.body.clone())
+                    .map_err(|x| ReplayError::Invalid(format!("entry {}: bad command: {x}", e.seq)))?;
+                run.command(&cmd).map_err(|x| ReplayError::Diverged { line: e.seq as usize, detail: x.to_string() })?;
+            }
+            Kind::Annotation => {
+                run.annotate(e.body.clone()).map_err(|x| ReplayError::Diverged { line: e.seq as usize, detail: x.to_string() })?;
+            }
+            Kind::End => {
+                let reason = e.body["reason"].as_str().unwrap_or("");
+                run.finish(reason, e.body.get("detail").and_then(Value::as_str))
+                    .map_err(|x| ReplayError::Diverged { line: e.seq as usize, detail: x.to_string() })?;
+            }
+            // Regenerated by the commands; compared below.
+            Kind::Event | Kind::Checkpoint | Kind::Header => {}
+        }
+    }
+    let state_hash = run.kernel().state_hash().map_err(|e| ReplayError::Invalid(e.to_string()))?;
+    let canonical_state = run.kernel().canonical_state().map_err(|e| ReplayError::Invalid(e.to_string()))?;
+    let regenerated = run.into_log();
+    if regenerated != original {
+        let (a, b) = (log::lines(original), log::lines(&regenerated));
+        let line = a.iter().zip(b.iter()).position(|(x, y)| x != y).unwrap_or(a.len().min(b.len()));
+        let detail = match (a.get(line), b.get(line)) {
+            (Some(x), Some(y)) => format!("logged {} / replayed {}", String::from_utf8_lossy(x), String::from_utf8_lossy(y)),
+            (Some(_), None) => "replay produced fewer entries".into(),
+            (None, Some(y)) => format!("replay produced an extra entry {}", String::from_utf8_lossy(y)),
+            (None, None) => "logs differ".into(),
+        };
+        return Err(ReplayError::Diverged { line, detail });
+    }
+    Ok(ReplayReport { entries: verified.entries.len(), state_hash, canonical_state, complete: verified.complete, build_differs })
+}

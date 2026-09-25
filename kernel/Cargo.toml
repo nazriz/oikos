@@ -1,0 +1,29 @@
+[package]
+name = "terrarium-kernel"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Terrarium world kernel: laws, building blocks, mandates, clock, hash-chained log, replay"
+rust-version = "1.85"
+
+[lib]
+name = "terrarium_kernel"
+path = "src/lib.rs"
+
+[[bin]]
+name = "terrarium-kernel"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+# Validates every input (config, command, annotation) against the contract
+# schemas, which are compiled into the binary.
+jsonschema = { version = "0.30", default-features = false }
+
+[dev-dependencies]
+proptest = "1"
+
+[profile.test]
+opt-level = 1

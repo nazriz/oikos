@@ -1,0 +1,11 @@
+# Determinism guardrails. Results must not depend on iteration order, wall-clock
+# time or ambient randomness. tests/determinism_lint.rs enforces the same list
+# textually, so it holds even when clippy isn't run.
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "iteration order is nondeterministic; use BTreeMap" },
+  { path = "std::collections::HashSet", reason = "iteration order is nondeterministic; use BTreeSet" },
+]
+disallowed-methods = [
+  { path = "std::time::SystemTime::now", reason = "no wall-clock time in the world" },
+  { path = "std::time::Instant::now", reason = "no wall-clock time in the world" },
+]

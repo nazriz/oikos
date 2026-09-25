@@ -121,6 +121,24 @@ This means **replay regenerates the entire log and checks it byte for byte.** Th
 
 **Cost tracking:** every LLM call (seat, translator, debrief) produces a `usage` annotation with tokens and `cost_microusd`. The orchestrator also records its price table in an `orchestrator` annotation, so costs can be recomputed.
 
+## Kernel semantics (v0.1)
+
+*Pinned down while implementing the kernel; the schemas didn't change. Each item is tested in `kernel/tests/laws.rs` or `kernel/tests/mandate.rs`.*
+
+- **Inputs are validated against these schemas by the kernel itself.** The schema files are compiled into the kernel binary, and every config, command and annotation is checked against them before it can touch the log. Anything off-contract is rejected as a *protocol error* and never logged. A *refusal*, by contrast, is a lawful-but-refused act, and it is logged as a finding. Consequence: a log can never contain an entry that violates the contract, whoever wrote the orchestrator.
+- **Requests are not dry-run.** Approval-level actions are checked for lawfulness *as the proposer* before approvers see them. Request-level actions are not, since a request asks someone else to act with authority the requester lacks. A recipient answering a request with `decide` closes it. `approve` means "acknowledged": nothing is applied, and the recipient must act itself.
+- **Approved actions are re-validated at approval time** and apply even if the proposer has since resigned: the act was made in office.
+- **Leases:** `rent` is for all the leased units together; rent caps are per unit. Rent is paid in advance (at activation, then every period) and wages in arrears (one period after activation). Agreements in the initial config first pay one period after t=0. A failed payment ends the agreement with `breach`.
+- **Structures are fixtures:** a structure owned by the surface-right holder passes with the surface right. A surface right that has derived rights granted from it (e.g. a tenant's lease) can't be transferred.
+- **Zoning:** with no zoning rule covering a parcel, building there is unrestricted.
+- **Channel scopes:**
+  - `accounts/jurisdiction` covers the seat's own entities plus holders of rights and owners of structures on the principal's parcels.
+  - `rules/jurisdiction` covers rules the seat's entities issued plus rules covering the principal's parcels.
+  - `agreements/jurisdiction` covers the seat's own agreements plus leases on the principal's parcels.
+  - `directory/self` lists only the seat's own entities and the seats that act for them.
+- **`observation_hash`** is the hash of the kernel-built observation, with `drafts: []`.
+- **Checkpoints** are written after any `advance` that crosses a multiple of `log.checkpoint_every`, carrying the state hash at the end of that advance.
+
 ## Framing and welfare (VISION §15)
 
 Every seat's `framing` records its `disclosure` (`simulation` / `real` / `cover_story` / `unstated`) and a mandatory `reason`. Deception is a method, not a default, and the config has to say why. `debrief: true` schedules a post-run debrief whose responses are logged as data. Resignation is always available.
@@ -131,7 +149,7 @@ Measurement (by principle: the config schema rejects a `measurement` key). State
 
 ## Transport (proposal; not a contract)
 
-The kernel runs as a subprocess of the orchestrator and speaks newline-delimited JSON on stdio: one command in, then its events and any observation out. This is synchronous, deterministic, needs no ports and reuses the same message types in WASM later. Seat controllers talk only to the orchestrator: in-process for TS code seats, WebSocket or stdio for external ones such as Python RL agents. LLM seats are adapters inside the orchestrator, so the model only ever sees rendered observations.
+The kernel runs as a subprocess of the orchestrator and speaks newline-delimited JSON on stdio (`terrarium-kernel serve`; the ops are documented in `kernel/src/protocol.rs`): one command in, then its events and any observation out. A `check` op dry-runs an action for the translator's drafts. This is synchronous, deterministic, needs no ports and reuses the same message types in WASM later. Seat controllers talk only to the orchestrator: in-process for TS code seats, WebSocket or stdio for external ones such as Python RL agents. LLM seats are adapters inside the orchestrator, so the model only ever sees rendered observations.
 
 ## Versioning
 

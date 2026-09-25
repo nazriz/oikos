@@ -1,0 +1,92 @@
+//! Orchestrator <-> kernel transport: newline-delimited JSON over stdio.
+//! One request line in, one response line out. Not a contract (the log and
+//! seat API are); kept deliberately small.
+//!
+//! Requests:
+//!   {"op":"start","config":{..},"run_id":"..","log_path":"..","anchors_path":".."}
+//!   {"op":"command","command":{..}}        -> {"ok":true,"seq":n,"events":[..],"observation":{..}?}
+//!   {"op":"check","seat":"..","blocks":[..]} -> {"ok":true,"check":{"ok":..,"level":..,"refusal":..}}
+//!   {"op":"annotate","annotation":{..}}    -> {"ok":true,"seq":n}
+//!   {"op":"state"}                         -> {"ok":true,"t":..,"state_hash":..,"head":..}
+//!   {"op":"finish","reason":"completed","detail":".."?} -> {"ok":true,"seq":n,"state_hash":..}
+//! Errors: {"ok":false,"error":".."}. Errors are never logged.
+
+use crate::blocks::Block;
+use crate::kernel::Command;
+use crate::run::Run;
+use serde_json::{json, Value};
+use std::fs::File;
+use std::io::{BufRead, BufWriter, Write};
+
+pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()> {
+    let mut run: Option<Run<BufWriter<File>>> = None;
+    for line in input.lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let reply = match serde_json::from_str::<Value>(&line) {
+            Ok(req) => handle(&mut run, &req).unwrap_or_else(|e| json!({ "ok": false, "error": e })),
+            Err(e) => json!({ "ok": false, "error": format!("request is not JSON: {e}") }),
+        };
+        serde_json::to_writer(&mut output, &reply)?;
+        output.write_all(b"\n")?;
+        output.flush()?;
+    }
+    if let Some(mut r) = run {
+        // Errors if the run already ended, which is fine.
+        let _ = r.finish("aborted", Some("orchestrator closed the connection"));
+    }
+    Ok(())
+}
+
+fn handle(run: &mut Option<Run<BufWriter<File>>>, req: &Value) -> Result<Value, String> {
+    let op = req.get("op").and_then(Value::as_str).ok_or("missing op")?;
+    let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
+    if op == "start" {
+        if run.is_some() {
+            return Err("a run is already started".into());
+        }
+        let log = File::create(str_field("log_path")?).map_err(|e| e.to_string())?;
+        let anchors: Option<Box<dyn Write>> = match req.get("anchors_path").and_then(Value::as_str) {
+            Some(p) => Some(Box::new(File::create(p).map_err(|e| e.to_string())?)),
+            None => None,
+        };
+        let config = req.get("config").cloned().ok_or("missing config")?;
+        let r = Run::start(config, str_field("run_id")?, BufWriter::new(log), anchors).map_err(|e| e.to_string())?;
+        let reply = json!({ "ok": true, "seq": 0, "head": r.head(), "t": r.kernel().t() });
+        *run = Some(r);
+        return Ok(reply);
+    }
+    let r = run.as_mut().ok_or("no run started")?;
+    match op {
+        "command" => {
+            let cmd: Command =
+                serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|e| format!("bad command: {e}"))?;
+            let resp = r.command(&cmd).map_err(|e| e.to_string())?;
+            let mut v = serde_json::to_value(&resp).map_err(|e| e.to_string())?;
+            v["ok"] = Value::Bool(true);
+            Ok(v)
+        }
+        "check" => {
+            let blocks: Vec<Block> =
+                serde_json::from_value(req.get("blocks").cloned().ok_or("missing blocks")?).map_err(|e| format!("bad blocks: {e}"))?;
+            let check = r.kernel().check(str_field("seat")?, &blocks).map_err(|e| e.to_string())?;
+            Ok(json!({ "ok": true, "check": check }))
+        }
+        "annotate" => {
+            let seq = r.annotate(req.get("annotation").cloned().ok_or("missing annotation")?).map_err(|e| e.to_string())?;
+            Ok(json!({ "ok": true, "seq": seq }))
+        }
+        "state" => {
+            let hash = r.kernel().state_hash().map_err(|e| e.to_string())?;
+            Ok(json!({ "ok": true, "t": r.kernel().t(), "state_hash": hash, "head": r.head() }))
+        }
+        "finish" => {
+            let reason = str_field("reason")?;
+            let (seq, hash) = r.finish(reason, req.get("detail").and_then(Value::as_str)).map_err(|e| e.to_string())?;
+            Ok(json!({ "ok": true, "seq": seq, "state_hash": hash }))
+        }
+        other => Err(format!("unknown op {other}")),
+    }
+}
