@@ -120,6 +120,10 @@ Money is a conserved integer quantity, as before, and it is held in accounts **a
 
 **The liberty:** lenders can only lend money they actually hold (their own funds or borrowed funds), so banks **cannot create money** by lending out deposits (no fractional-reserve money creation). Also out of scope: exotic instruments (derivatives, securitisation, traded securities markets). That's D25: the financial system is low fidelity. The alternative, money as claims on banks with credit creation (option A, stock-flow consistent), is recorded as a future upgrade if the research needs it. The money-conservation invariant stays.
 
+**D27. CEL lives in TypeScript, not the kernel; library `@bufbuild/cel`, pinned.** *(2026-09-25; check in docs/research/cel-check/.)*
+Statements' `formal` conditions are evaluated only by code-run institutions, the translator and measurement, never by the kernel (D19), so the kernel takes no CEL dependency. `@bufbuild/cel` 0.6.1 (Apache-2.0) passed every requirement: exact int64 via bigint, errors on overflow and division by zero, custom functions, a static allowlist over the standard syntax tree (no decimals, time or regex), determinism, ~1 µs per evaluation. Pinned exactly because it is pre-1.0; `@marcbachmann/cel-js` is the fallback.
+*Revisit if* measurement needs to evaluate conditions in Python (use cel-python on the same syntax).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - Citizen behaviour in the Rust kernel (deterministic, fast, re-runnable, but researchers must write Rust to swap models) vs TypeScript code seats (easy to swap, but replay-only reproducibility). Leaning kernel.

@@ -1,0 +1,9 @@
+{
+  "name": "@terrarium/cel-check",
+  "private": true,
+  "type": "module",
+  "description": "Feasibility check: can @bufbuild/cel evaluate Terrarium's formal law conditions under our rules? Run: bun install && bun test",
+  "devDependencies": {
+    "@bufbuild/cel": "0.6.1"
+  }
+}
