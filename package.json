@@ -1,0 +1,10 @@
+{
+  "name": "terrarium",
+  "private": true,
+  "type": "module",
+  "workspaces": ["contracts", "seats", "orchestrator", "worlds"],
+  "scripts": {
+    "test": "bun test",
+    "kernel": "cargo build --release --manifest-path kernel/Cargo.toml"
+  }
+}
