@@ -156,9 +156,13 @@ Found scaling M1 to 1,000 citizens, where a year took 5.5 minutes, 95% of it in 
 
 **Remaining costs, for the checkpoint:** the bank's `directory` channel resends the whole directory (~120 KB at 1,000 citizens) on every daily wake. Directories rarely change, so a refresh interval on `directory` channels (like `sites` has with `every`) would remove most of it. That's a **contract addition**, to be proposed. After that, what's left is broadcast data that's genuinely public (listings and their withdrawals, which every house-hunter sees) and per-entry log hashing.
 
+**D34. Language-model seats are built and tested against a mock adapter for as long as possible.** *(Naz, 2026-09-26.)* The whole M2 loop (reports, proposals, the translator, contract and physics checks, law warnings, sign-off with draft hashes, provenance, usage and transcripts, debriefs, resignation) runs without a real model; see docs/design/m2-llm-seats.md. The mock seat has a code brain (for the mayor, the all-code control's module), so a mock-LLM town behaves like the all-code town, and only language understanding is faked. No API key, budget or real call until Naz raises it.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
 
+- **Contract additions proposed by M2** (docs/design/m2-llm-seats.md, "Open"): `notices` on the Observation (translation failures and similar orchestrator-to-seat notes), and `framing.debrief_text`.
+- **Directory refresh interval** (D33): a proposed contract addition.
 - ~~Citizen behaviour in the Rust kernel vs TypeScript code seats.~~ **Resolved by D30.**
 - ~~Which D15 laws become parameters.~~ **Obsolete** under D18/D19: there are no laws in the kernel; laws are records in a world's config.

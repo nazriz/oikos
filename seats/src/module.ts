@@ -32,8 +32,8 @@ export interface SeatContext {
 }
 
 export interface Controller {
-  /** Called repeatedly while the seat is awake; return {type: "wait"} to sleep. */
-  step(obs: Observation, ctx: SeatContext): SeatAction;
+  /** Called repeatedly while the seat is awake; return {type: "wait"} to sleep. Code modules answer synchronously; model-backed seats return a promise. */
+  step(obs: Observation, ctx: SeatContext): SeatAction | Promise<SeatAction>;
 }
 
 export interface BehaviourModule {

@@ -5,6 +5,7 @@
   "workspaces": [
     "contracts",
     "seats",
+    "translator",
     "orchestrator",
     "worlds"
   ],

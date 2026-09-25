@@ -1,0 +1,15 @@
+{
+  "name": "@terrarium/translator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Plain language -> block drafts -> sign-off: the translator that drafts a seat's proposals as kernel blocks (VISION §6).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@terrarium/seats": "workspace:*",
+    "ajv": "^8.17.1"
+  }
+}

@@ -24,6 +24,7 @@
       },
       "dependencies": {
         "@terrarium/seats": "workspace:*",
+        "@terrarium/translator": "workspace:*",
         "@terrarium/worlds": "workspace:*",
       },
     },
@@ -32,6 +33,14 @@
       "version": "0.1.0",
       "dependencies": {
         "@bufbuild/cel": "0.6.1",
+      },
+    },
+    "translator": {
+      "name": "@terrarium/translator",
+      "version": "0.1.0",
+      "dependencies": {
+        "@terrarium/seats": "workspace:*",
+        "ajv": "^8.17.1",
       },
     },
     "worlds": {
@@ -59,6 +68,8 @@
     "@terrarium/orchestrator": ["@terrarium/orchestrator@workspace:orchestrator"],
 
     "@terrarium/seats": ["@terrarium/seats@workspace:seats"],
+
+    "@terrarium/translator": ["@terrarium/translator@workspace:translator"],
 
     "@terrarium/worlds": ["@terrarium/worlds@workspace:worlds"],
 
