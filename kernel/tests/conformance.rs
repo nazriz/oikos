@@ -42,6 +42,9 @@ fn contract_examples_round_trip_through_kernel_types() {
     for (name, v) in examples("block") {
         round_trips::<Block>(&name, &v);
     }
+    for (name, v) in examples("record") {
+        round_trips::<terrarium_kernel::blocks::Record>(&name, &v);
+    }
     for (name, v) in examples("seat-action") {
         if v["type"] == "act" {
             round_trips::<Vec<Block>>(&name, &v["blocks"]);
@@ -64,7 +67,7 @@ struct Schemas {
 }
 
 fn schemas() -> Schemas {
-    let files = ["common", "blocks", "world-config", "seat-api", "log"];
+    let files = ["common", "blocks", "records", "world-config", "seat-api", "log"];
     let build = |root: Value| {
         let mut opts = jsonschema::options();
         for f in files {
@@ -75,9 +78,9 @@ fn schemas() -> Schemas {
         opts.build(&root).unwrap()
     };
     Schemas {
-        entry: build(json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.1:log"})),
+        entry: build(json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.2:log"})),
         observation: build(
-            json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.1:seat-api#/$defs/Observation"}),
+            json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.2:seat-api#/$defs/Observation"}),
         ),
     }
 }
@@ -94,14 +97,20 @@ fn assert_valid(v: &jsonschema::Validator, instance: &Value, what: &str) -> Resu
     Ok(())
 }
 
-fn check_outputs(config: Value, seats: &[&str], ops: &[Op], s: &Schemas) -> Result<(), TestCaseError> {
+fn check_outputs(
+    config: Value,
+    seats: &[&str],
+    cmds: impl Fn(&Run<Vec<u8>>, usize) -> Option<Option<Command>>,
+    s: &Schemas,
+) -> Result<(), TestCaseError> {
     let mut run = Run::start(config, "conformance", Vec::new(), None).unwrap();
-    for op in ops {
-        if let Some(cmd) = concretize(&run, op) {
-            let Some(resp) = step(&mut run, &cmd) else { continue };
-            if let Some(o) = resp.observation {
-                assert_valid(&s.observation, &serde_json::to_value(&o).unwrap(), "observation")?;
-            }
+    let mut i = 0;
+    while let Some(next) = cmds(&run, i) {
+        i += 1;
+        let Some(cmd) = next else { continue };
+        let Some(resp) = step(&mut run, &cmd) else { continue };
+        if let Some(o) = resp.observation {
+            assert_valid(&s.observation, &serde_json::to_value(&o).unwrap(), "observation")?;
         }
     }
     for seat in seats {
@@ -123,25 +132,67 @@ proptest! {
     #[test]
     fn kernel_outputs_validate_against_the_contracts(ops in proptest::collection::vec(op_strategy(), 1..50)) {
         thread_local!(static S: Schemas = schemas());
-        S.with(|s| check_outputs(world(&permissive()), &SEATS, &ops, s))?;
+        let seats: Vec<&str> = SEATS.iter().map(|(s, _)| *s).collect();
+        S.with(|s| check_outputs(world(&default_params()), &seats, |run, i| ops.get(i).map(|op| concretize(run, op)), s))?;
     }
+}
+
+/// The river scenario, scripted, on the Riverbend contract example.
+pub fn river_script() -> Vec<Command> {
+    let act = |seat: &str, blocks: Value| Command::Act {
+        seat: seat.into(),
+        blocks: serde_json::from_value(blocks).unwrap(),
+        provenance: json!({"via": "direct"}),
+        reasoning: None,
+    };
+    vec![
+        Command::Observe { seat: "inspector".into() },
+        act(
+            "bank-payments",
+            json!([{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": 180000, "per_instruction": "so-bob-rent"}]),
+        ),
+        act(
+            "developer",
+            json!([{"block": "publish", "kind": "permit_application", "speaks_for": "devco", "addressed_to": ["city"], "text": "Apartments on p12, please.", "data": {"parcel": "p12"}, "ref": "app"}]),
+        ),
+        act(
+            "planning",
+            json!([{"block": "publish", "kind": "permit_decision", "speaks_for": "city", "addressed_to": ["devco"], "basis": "law-river", "text": "Refused: river zone.", "data": {"decision": "refused"}}]),
+        ),
+        act(
+            "developer",
+            json!([{"block": "propose_agreement", "speaks_for": "devco", "ref": "job", "terms": {"template": "construction", "parties": ["devco", "buildco"], "commitments": [{"who": "buildco", "does": {"build": "apartments", "on": "p12"}}, {"who": "devco", "does": {"pay": 30000000}}]}},
+                                 {"block": "sign_agreement", "agreement": "$job", "as": "devco"}]),
+        ),
+        act(
+            "builder",
+            json!([{"block": "construct", "parcel": "p12", "structure_type": "house", "materials_from": "acc-buildco", "ref": "h"}]),
+        ),
+        Command::Advance { to: 20 * 86_400 },
+        Command::Observe { seat: "inspector".into() },
+        act(
+            "inspector",
+            json!([{"block": "record_claim", "position": "right", "holder": "city", "counterparty": "devco", "basis": "law-river", "speaks_for": "city", "about": {"kind": "fine", "amount": 5000000}}]),
+        ),
+        act(
+            "mayor",
+            json!([{"block": "publish", "kind": "ballot", "speaks_for": "city", "text": "Repeal law-river?", "data": {"options": ["yes", "no"]}, "ref": "b"}]),
+        ),
+        act("alice-seat", json!([{"block": "vote", "ballot": "rec.6", "choice": "no", "speaks_for": "alice"}])),
+        act("developer", json!([{"block": "vacate", "occupant": "bob", "structure": "s-apts"}])),
+        act("finance", json!([{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 1}])),
+        Command::Advance { to: 100 * 86_400 },
+        Command::Observe { seat: "inspector".into() },
+        Command::Observe { seat: "bob-seat".into() },
+        Command::Resign { seat: "mayor".into(), statement: "Stepping down.".into() },
+    ]
 }
 
 #[test]
 fn riverbend_outputs_validate_against_the_contracts() {
     let s = schemas();
-    let ops = vec![
-        Op::Observe { seat: 0 },
-        Op::Act {
-            seat: 0,
-            blocks: vec![
-                B::Create { founder: 1, controller: None, bind: true },
-                B::Transfer { from: 1, to: 0, amount: 4_000_000, to_ref: true },
-            ],
-        },
-        Op::Act { seat: 2, blocks: vec![B::Zoning { parcels: vec![5], allow: vec![0] }] },
-        Op::Advance { ticks: 1000 },
-        Op::Observe { seat: 1 },
-    ];
-    check_outputs(riverbend(), &["mayor", "council-seat", "developer"], &ops, &s).unwrap();
+    let script = river_script();
+    let seats =
+        ["mayor", "finance", "planning", "inspector", "bank-payments", "developer", "builder", "alice-seat", "bob-seat", "carol-seat"];
+    check_outputs(riverbend(), &seats, |_, i| script.get(i).cloned().map(Some), &s).unwrap();
 }

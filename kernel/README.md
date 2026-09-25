@@ -1,11 +1,11 @@
-# terrarium-kernel
+# terrarium-kernel (v0.2)
 
-The world's laws of physics, and its only writer. Rust, no `unsafe`, no floats, no hash maps, no wall-clock time; randomness comes only from `rng::Randomness` (one seed from the config, with keyed streams derived from it).
+**Physics, plus a place to keep records.** The kernel refuses only what is physically impossible. Laws, ownership, permits, agreements, procedures, debts and votes are records it stores with their authors and never judges. When a law is enforced or a payment made, it's because some seat chose to act (D18–D22).
 
-The contracts in [`../contracts`](../contracts) are the source of truth. Their schemas are compiled into this crate, and every input is validated against them.
+Rust, no `unsafe`, no floats, no hash maps, no wall-clock time. Randomness comes only from `rng::Randomness` (one seed, keyed streams). The contracts in [`../contracts`](../contracts) (v0.2) are the source of truth: their schemas are compiled in, and every input is validated against them.
 
 ```bash
-cargo test                      # all invariant, conformance and law tests
+cargo test                      # all invariant, conformance and physics tests
 cargo run -- serve              # NDJSON protocol on stdin/stdout (see src/protocol.rs)
 cargo run -- verify run.jsonl --anchors run.anchors.jsonl
 cargo run -- replay run.jsonl   # regenerate the log; must be byte-identical
@@ -15,31 +15,34 @@ cargo run -- replay run.jsonl   # regenerate the log; must be byte-identical
 
 | Module | Role |
 |---|---|
-| `kernel.rs` | Commands in, events out. Mandate verdict, the act → hold → approve → apply pipeline, `advance`, `observe`, dry-run `check`. |
-| `exec.rs` | Applying blocks (atomically, against a scratch state) and scheduled effects (payments, completions, expiries). This is where the laws live. |
-| `laws.rs` | Read-only questions the laws ask: authority, zoning, rent caps, capacity. |
-| `mandate.rs` | Mandate evaluation: default deny, first matching power, strictest level wins. |
-| `observe.rs` | Role-limited observations through configured channels. |
-| `run.rs` | Kernel plus log: command → log → apply → events → checkpoints; `replay`. |
-| `log.rs` | Hash-chained JSONL writer, verifier and witness anchors. |
-| `canon.rs` | Canonical JSON (JCS subset) and domain-separated SHA-256. |
-| `contracts.rs` | The contract schemas, compiled in; input validation. |
-| `rng.rs` | xoshiro256** with keyed streams; frozen by known-answer tests. |
+| `kernel.rs` | Commands in, events out: `act` (applied, or refused for physics), `advance`, `observe`, `resign`, dry-run `check` |
+| `exec.rs` | Physical acts (custody, funds, space, capacity, presence) and record acts (store, never judge). The only place state changes. |
+| `observe.rs` | Perception through channels (`accounts`, `records`, `sites` with refresh intervals, `directory`), respecting each record's visibility |
+| `blocks.rs` | The 18 blocks and the record types |
+| `state.rs` | Accounts, parcels, structures, occupancy, the append-only record store, per-seat perception cursors |
+| `config.rs` | World config and its coherence checks (none of them law) |
+| `run.rs`, `log.rs` | Kernel plus hash-chained log, replay, witness anchors |
+| `canon.rs`, `rng.rs`, `contracts.rs` | Canonical JSON and hashing; the PRNG; the compiled-in schemas |
 
-## Invariant tests (V0.md)
+## Invariant tests
 
 | Invariant | Test | How |
 |---|---|---|
-| Money is conserved | `tests/money_conservation.rs` | Property test over random worlds and command sequences: total including the boundary is constant, no ordinary balance goes negative, and every balance equals opening balance plus logged `transfer` events. |
-| Replay is byte-identical | `tests/replay.rs` | Property test: replay regenerates the *whole log* byte for byte and the final canonical state matches; the same inputs in a fresh kernel give the same log; a forged-but-rechained log is caught at the first divergent line. |
-| Nothing bypasses a mandate | `tests/mandate.rs` | Property test against an independent oracle that reads mandates from the config JSON, with random multi-approver mandates. Also concrete approval, bundle and request flows. |
-| The hash chain verifies; tampering is detected | `tests/hash_chain.rs` | Every field edit, insertion, deletion, reorder, reformat and single-byte flip is detected. Rewriting with recomputed hashes, and truncation, are caught by the witness anchors (and only by them, by design). |
+| Money is conserved | `tests/money_conservation.rs` | Property test: total money including the boundary is constant; no ordinary account goes negative; every balance equals opening plus logged transfers; every payment was executed by the paying account's custodian |
+| Replay is byte-identical | `tests/replay.rs` | Replay regenerates the whole log byte for byte; the same inputs give the same log; a forged-but-rechained log is caught at the first divergent line |
+| **No act takes effect unless it's physically possible** (replaces v0.1's mandate invariant, D20) | `tests/physical_feasibility.rs` | An independent mirror of the physical world replays every physical event and checks it was possible; an oracle predicts every single-block physical act's outcome; refused actions change nothing |
+| **Statements have no power** (D19 as code) | `tests/statements_have_no_power.rs` | The same commands in a world with and without extra laws, instructions, court orders and contradictory claims produce identical outcomes, payments, buildings and occupants |
+| The hash chain verifies; tampering is detected | `tests/hash_chain.rs` | Every edit, insertion, deletion, reorder, reformat and byte flip is detected; rewriting with recomputed hashes, and truncation, are caught by the witness anchors |
 
 Supporting tests:
-- `tests/conformance.rs`: kernel outputs validate against the schemas, and contract examples round-trip through the Rust types.
-- `tests/laws.rs`: one test per law.
-- `tests/cli.rs`: the real binary end to end.
-- `tests/generator_reach.rs`: guards against vacuous property tests by requiring the random operations to reach leases, approvals, breaches, clipped rents and so on.
-- `tests/determinism_lint.rs`: a textual ban on `HashMap`, floats, clocks and ambient randomness.
+- `tests/physics.rs`: one test per physical law and record mechanic, including the river scenario, in which an illegal building goes up because physics allows it.
+- `tests/conformance.rs`: examples round-trip, and all outputs validate against the schemas.
+- `tests/cli.rs`: the binary end to end.
+- `tests/generator_reach.rs`: guards against vacuous property tests by requiring every record kind, payment kind, eviction kind and physical refusal to occur.
+- `tests/determinism_lint.rs`.
 
-The property tests were also checked by mutation: 11 deliberately planted kernel bugs (money leaks, skipped approvals, nondeterministic ids, weakened chain checks, and others), each caught by its suite.
+**Mutation-checked:** 14 deliberately planted bugs are each caught by their suite. They include money leaks, bypassing the bank, over-capacity occupancy, silent eviction, overwritten claims, public votes, nondeterministic ids, weakened chain checks, and two ways of **sneaking law into the kernel**: a bank freeze enforced by physics, and construction obeying a law's text.
+
+## Documented liberties
+
+- Construction and demolition costs are paid from the builder's own account straight to the boundary, bypassing its bank. Accepted temporarily; see docs/decisions.md, under "Open".

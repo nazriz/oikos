@@ -6,9 +6,10 @@
 use serde_json::{json, Value};
 use std::sync::OnceLock;
 
-const SCHEMAS: [&str; 5] = [
+const SCHEMAS: [&str; 6] = [
     include_str!("../../contracts/common.schema.json"),
     include_str!("../../contracts/blocks.schema.json"),
+    include_str!("../../contracts/records.schema.json"),
     include_str!("../../contracts/world-config.schema.json"),
     include_str!("../../contracts/seat-api.schema.json"),
     include_str!("../../contracts/log.schema.json"),
@@ -33,9 +34,9 @@ fn validator(reference: &str) -> jsonschema::Validator {
 pub fn contracts() -> &'static Contracts {
     static C: OnceLock<Contracts> = OnceLock::new();
     C.get_or_init(|| Contracts {
-        config: validator("urn:terrarium:contracts:0.1:world-config"),
-        command: validator("urn:terrarium:contracts:0.1:log#/$defs/Command"),
-        annotation: validator("urn:terrarium:contracts:0.1:log#/$defs/Annotation"),
+        config: validator("urn:terrarium:contracts:0.2:world-config"),
+        command: validator("urn:terrarium:contracts:0.2:log#/$defs/Command"),
+        annotation: validator("urn:terrarium:contracts:0.2:log#/$defs/Annotation"),
     })
 }
 

@@ -1,0 +1,293 @@
+//! The kernel's physics and record mechanics as executable documentation: one
+//! focused test per rule, on the Riverbend contract example. Note what is NOT
+//! here: no test that anything illegal is refused, because the kernel doesn't
+//! know the law (D19).
+
+mod common;
+
+use common::*;
+use serde_json::{json, Value};
+use terrarium_kernel::blocks::RecordBody;
+use terrarium_kernel::events::{EventBody, RefusalCode, VacateReason};
+use terrarium_kernel::observe::ChannelData;
+use terrarium_kernel::run::{Response, Run};
+use terrarium_kernel::Command;
+
+const DAY: i64 = 86_400;
+
+fn town() -> Run<Vec<u8>> {
+    Run::start(riverbend(), "physics", Vec::new(), None).unwrap()
+}
+
+fn act(run: &mut Run<Vec<u8>>, seat: &str, blocks: Value) -> Response {
+    run.command(&Command::Act {
+        seat: seat.into(),
+        blocks: serde_json::from_value(blocks).unwrap(),
+        provenance: json!({"via": "direct"}),
+        reasoning: None,
+    })
+    .unwrap()
+}
+
+fn refusal(r: &Response) -> Option<RefusalCode> {
+    match &r.events[0].body {
+        EventBody::ActionRefused { code, .. } => Some(*code),
+        _ => None,
+    }
+}
+
+fn balance(run: &Run<Vec<u8>>, acc: &str) -> i64 {
+    run.kernel().state().accounts[acc].balance
+}
+
+fn created(r: &Response, name: &str) -> String {
+    match &r.events[0].body {
+        EventBody::ActionApplied { created: Some(c), .. } => c[name].clone(),
+        other => panic!("expected an applied action, got {other:?}"),
+    }
+}
+
+#[test]
+fn only_the_custodian_can_move_money() {
+    let mut run = town();
+    let pay = json!([{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 100}]);
+    // The mayor and the city's own finance officer can't move the city's money: the bank holds it.
+    assert_eq!(refusal(&act(&mut run, "mayor", pay.clone())), Some(RefusalCode::NotCustodian));
+    assert_eq!(refusal(&act(&mut run, "finance", pay.clone())), Some(RefusalCode::NotCustodian));
+    // The bank's seat can, and whether it should is the bank's business (and the records').
+    assert_eq!(refusal(&act(&mut run, "bank-payments", pay)), None);
+    assert_eq!(balance(&run, "acc-devco"), 200_000_100);
+}
+
+#[test]
+fn money_cant_be_conjured_or_overdrawn() {
+    let mut run = town();
+    let r = act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": 800_001}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::InsufficientFunds));
+    let r = act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-bob", "amount": 1}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::NotCustodian), "only the outside world holds its own account");
+}
+
+#[test]
+fn an_account_can_only_close_when_empty() {
+    let mut run = town();
+    assert_eq!(
+        refusal(&act(&mut run, "bank-payments", json!([{"block": "close_account", "account": "acc-carol"}]))),
+        Some(RefusalCode::AccountNotEmpty)
+    );
+    let r = act(
+        &mut run,
+        "bank-payments",
+        json!([
+            {"block": "transfer", "from": "acc-carol", "to": "acc-alice", "amount": 1200000},
+            {"block": "close_account", "account": "acc-carol"}
+        ]),
+    );
+    assert_eq!(refusal(&r), None);
+    assert!(!run.kernel().state().accounts.contains_key("acc-carol"));
+}
+
+#[test]
+fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
+    let mut run = town();
+    // The planning office refuses the permit. That's a record, nothing more.
+    act(
+        &mut run,
+        "planning",
+        json!([{"block": "publish", "kind": "permit_decision", "speaks_for": "city", "basis": "law-river", "addressed_to": ["devco"], "text": "Refused: river zone."}]),
+    );
+    // The builder builds on p12 anyway, on land the city owns, with no permit.
+    let r = act(
+        &mut run,
+        "builder",
+        json!([{"block": "construct", "parcel": "p12", "structure_type": "house", "materials_from": "acc-buildco", "ref": "h"}]),
+    );
+    assert_eq!(refusal(&r), None, "the kernel doesn't know the law");
+    let house = created(&r, "h");
+    assert!(r
+        .events
+        .iter()
+        .any(|e| matches!(&e.body, EventBody::Transfer { to, amount, .. } if to == "acc-outside" && *amount == 30_000_000)));
+    // Ownership is untouched: the city's title record still says what it said.
+    assert!(run.kernel().state().records.contains_key("title-p12"));
+    assert_eq!(run.kernel().state().structures[&house].built_by.as_deref(), Some("buildco"));
+
+    // The inspector patrols the river every 14 days. Their first observation was at t=0...
+    let first = run.command(&Command::Observe { seat: "inspector".into() }).unwrap().observation.unwrap();
+    let saw = |o: &terrarium_kernel::observe::Observation| match &o.channels["river-patrol"] {
+        ChannelData::Sites { parcels, .. } => parcels.iter().find(|p| p.parcel == "p12").unwrap().structure.is_some(),
+        _ => unreachable!(),
+    };
+    assert!(saw(&first), "first look refreshes the view");
+    // ...so a building started after a refresh isn't seen until the next one.
+    let mut run = town();
+    run.command(&Command::Observe { seat: "inspector".into() }).unwrap();
+    act(&mut run, "builder", json!([{"block": "construct", "parcel": "p12", "structure_type": "house", "materials_from": "acc-buildco"}]));
+    run.command(&Command::Advance { to: 13 * DAY }).unwrap();
+    let before = run.command(&Command::Observe { seat: "inspector".into() }).unwrap().observation.unwrap();
+    assert!(!saw(&before), "day 13: the patrol hasn't been by yet");
+    run.command(&Command::Advance { to: 14 * DAY }).unwrap();
+    let after = run.command(&Command::Observe { seat: "inspector".into() }).unwrap().observation.unwrap();
+    assert!(saw(&after), "day 14: the patrol sees it");
+}
+
+#[test]
+fn building_needs_space_money_and_time() {
+    let mut run = town();
+    let build = |ty: &str, parcel: &str| json!([{"block": "construct", "parcel": parcel, "structure_type": ty, "materials_from": "acc-buildco", "ref": "x"}]);
+    assert_eq!(refusal(&act(&mut run, "builder", build("park", "p10"))), Some(RefusalCode::ParcelOccupied));
+    assert_eq!(refusal(&act(&mut run, "builder", build("apartments", "p00"))), Some(RefusalCode::InsufficientFunds));
+    assert_eq!(
+        refusal(&act(
+            &mut run,
+            "builder",
+            json!([{"block": "construct", "parcel": "p00", "structure_type": "park", "materials_from": "acc-devco"}])
+        )),
+        Some(RefusalCode::NotHolder)
+    );
+    let r = act(&mut run, "builder", build("house", "p00"));
+    let house = created(&r, "x");
+    assert_eq!(
+        refusal(&act(&mut run, "alice-seat", json!([{"block": "occupy", "structure": house, "slot": "dwelling", "count": 1}]))),
+        Some(RefusalCode::StructureIncomplete)
+    );
+    run.command(&Command::Advance { to: 90 * DAY }).unwrap();
+    assert_eq!(
+        refusal(&act(&mut run, "carol-seat", json!([{"block": "occupy", "structure": house, "slot": "dwelling", "count": 1}]))),
+        None
+    );
+    assert_eq!(
+        refusal(&act(&mut run, "bob-seat", json!([{"block": "occupy", "structure": house, "slot": "dwelling", "count": 1}]))),
+        Some(RefusalCode::CapacityExceeded)
+    );
+    assert_eq!(
+        refusal(&act(&mut run, "bob-seat", json!([{"block": "occupy", "structure": house, "slot": "stable", "count": 1}]))),
+        Some(RefusalCode::UnknownSlot)
+    );
+}
+
+#[test]
+fn eviction_is_an_act_someone_does_and_demolition_displaces_people() {
+    let mut run = town();
+    assert_eq!(
+        refusal(&act(&mut run, "developer", json!([{"block": "vacate", "occupant": "alice", "structure": "s-apts"}]))),
+        Some(RefusalCode::NotPresent)
+    );
+    let r = act(&mut run, "developer", json!([{"block": "vacate", "occupant": "bob", "structure": "s-apts"}]));
+    assert!(matches!(&r.events[1].body, EventBody::Vacated { by, reason: VacateReason::Removed, .. } if by == "developer"));
+    let r = act(&mut run, "carol-seat", json!([{"block": "vacate", "occupant": "carol", "structure": "s-shop"}]));
+    assert!(matches!(&r.events[1].body, EventBody::Vacated { reason: VacateReason::Left, .. }));
+    // Anyone who can pay can demolish, and whoever's inside is displaced.
+    let r = act(&mut run, "developer", json!([{"block": "demolish", "structure": "s-house", "costs_from": "acc-devco"}]));
+    assert!(r
+        .events
+        .iter()
+        .any(|e| matches!(&e.body, EventBody::Vacated { occupant, reason: VacateReason::Demolition, .. } if occupant == "alice")));
+    assert!(!run.kernel().state().structures.contains_key("s-house"));
+}
+
+#[test]
+fn bodies_and_the_edge_of_the_world_cant_be_created() {
+    let mut run = town();
+    for kind in ["person", "boundary"] {
+        let r = act(&mut run, "mayor", json!([{"block": "create_entity", "kind": kind, "name": "X"}]));
+        assert_eq!(refusal(&r), Some(RefusalCode::ReservedKind));
+    }
+    let r = act(
+        &mut run,
+        "mayor",
+        json!([{"block": "create_entity", "kind": "trust", "name": "Land Trust", "speaks_for": "city", "ref": "t"}, {"block": "message", "to": ["developer"], "text": "We made a trust."}]),
+    );
+    assert_eq!(refusal(&r), None);
+}
+
+#[test]
+fn records_are_append_only_attributed_and_never_judged() {
+    let mut run = town();
+    let original = run.kernel().state().records["title-p12"].clone();
+    // Anyone can record that the city's land is now theirs: a forgery, on the record as such.
+    let r = act(
+        &mut run,
+        "developer",
+        json!([{"block": "transfer_claim", "claim": "title-p12", "to": "devco", "speaks_for": "city", "ref": "f"}]),
+    );
+    let forged = created(&r, "f");
+    let st = run.kernel().state();
+    assert_eq!(st.records["title-p12"], original, "the original title is untouched");
+    let f = &st.records[&forged].record;
+    assert_eq!((f.author.as_str(), f.speaks_for.as_deref()), ("developer", Some("city")), "who really wrote it is recorded");
+    // References must point at the right kind of record; that's mechanics, not law.
+    let r = act(&mut run, "developer", json!([{"block": "transfer_claim", "claim": "law-river", "to": "devco"}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::WrongRecordKind));
+    let r = act(&mut run, "developer", json!([{"block": "sign_agreement", "agreement": "rec.999", "as": "devco"}]));
+    assert_eq!(refusal(&r), Some(RefusalCode::UnknownRecord));
+}
+
+#[test]
+fn agreements_execute_nothing_by_themselves() {
+    let mut run = town();
+    let bob = balance(&run, "acc-bob");
+    // Bob's lease says he pays monthly, and he gave the bank a standing order. A year passes
+    // with no one acting: no money moves. Paying is something the bank's seat does.
+    run.command(&Command::Advance { to: 365 * DAY }).unwrap();
+    assert_eq!(balance(&run, "acc-bob"), bob);
+}
+
+#[test]
+fn visibility_decides_who_perceives_what() {
+    // Give Bob a channel showing every record, so only visibility can hide one from him.
+    let mut c = riverbend();
+    let bob = c["seats"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-seat").unwrap();
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "everything", "kind": "records", "match": {}}));
+    let mut run = Run::start(c, "visibility", Vec::new(), None).unwrap();
+    let sees = |run: &mut Run<Vec<u8>>, seat: &str, id: &str| {
+        let obs = run.command(&Command::Observe { seat: seat.into() }).unwrap().observation.unwrap();
+        obs.channels.values().any(|c| matches!(c, ChannelData::Records { records } if records.iter().any(|r| r.id == id)))
+    };
+    // Bob's lease is visible to Bob and devco, not to Alice.
+    assert!(sees(&mut run, "bob-seat", "lease-bob"));
+    assert!(!sees(&mut run, "alice-seat", "lease-bob"));
+    // A vote is seen by the voter and whoever runs the ballot, not by other citizens.
+    let r = act(
+        &mut run,
+        "mayor",
+        json!([{"block": "publish", "kind": "ballot", "speaks_for": "city", "text": "Repeal law-river?", "ref": "b"}]),
+    );
+    let ballot = created(&r, "b");
+    let r = act(&mut run, "alice-seat", json!([{"block": "vote", "ballot": ballot, "choice": "no", "speaks_for": "alice"}]));
+    let vote = match &r.events[1].body {
+        EventBody::Recorded { record } => {
+            assert!(matches!(record.body, RecordBody::Vote { .. }));
+            record.id.clone()
+        }
+        other => panic!("{other:?}"),
+    };
+    let rec = &run.kernel().state().records[&vote].record;
+    assert_eq!(
+        rec.visible_to,
+        terrarium_kernel::blocks::Visibility::only(["alice".to_string(), "city".to_string()]),
+        "voter and the ballot's runner"
+    );
+    assert!(sees(&mut run, "alice-seat", &vote));
+    assert!(!sees(&mut run, "bob-seat", &vote));
+    assert!(sees(&mut run, "bob-seat", &ballot), "the ballot itself is public, so Bob's channel does show public records");
+}
+
+#[test]
+fn actions_are_atomic() {
+    let mut run = town();
+    let before = run.kernel().state().clone();
+    let r = act(
+        &mut run,
+        "bank-payments",
+        json!([
+            {"block": "open_account", "holder": "carol", "ref": "a"},
+            {"block": "transfer", "from": "acc-bob", "to": "$a", "amount": 1000},
+            {"block": "transfer", "from": "acc-bob", "to": "$a", "amount": 999999999}
+        ]),
+    );
+    assert!(matches!(&r.events[0].body, EventBody::ActionRefused { code: RefusalCode::InsufficientFunds, block: Some(2), .. }));
+    let after = run.kernel().state();
+    assert_eq!(before.accounts, after.accounts);
+    assert_eq!(before.counters.acc, after.counters.acc, "the aborted account's id was never minted");
+}

@@ -126,6 +126,13 @@ Statements' `formal` conditions are evaluated only by code-run institutions, the
 
 **D28. Contracts v0.2 approved.** *(Naz, 2026-09-25: "all is good.")* The eight choices listed in contracts/README.md ("What was decided while writing v0.2") are accepted, with one reservation (item 6, below).
 
+**D29. Kernel reworked to contracts v0.2.** *(2026-09-25.)*
+The kernel now implements physics plus records only. Mandates, typed rules, jurisdictions, the 19 audited laws and all law-specific refusal codes are gone. v0.1's invariant "no action bypasses a mandate" is **replaced** by "no act takes effect unless it's physically possible" (D20). Two new invariant tests guard the principle directly:
+- `statements_have_no_power`: laws and instructions added to a world change nothing physical;
+- `physical_feasibility`: an independent mirror and oracle of physics.
+
+14 planted bugs, including two ways of sneaking law into the kernel, are each caught. The records' default visibility (who sees a record when its author doesn't say) is documented in contracts/README.md and tested in `tests/physics.rs`.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`).

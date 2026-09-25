@@ -1,9 +1,9 @@
 [package]
 name = "terrarium-kernel"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "Terrarium world kernel: laws, building blocks, mandates, clock, hash-chained log, replay"
+description = "Terrarium world kernel: physics and records, clock, hash-chained log, replay"
 rust-version = "1.85"
 
 [lib]

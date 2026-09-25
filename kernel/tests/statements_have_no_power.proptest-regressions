@@ -4,4 +4,4 @@
 #
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
-cc 4f5cf8a560437655bd7669fffff9763547e68f96ac93da4f251910ff3feb2367 # shrinks to ops = [Act { seat: 0, blocks: [Job { employer: 0, employee: 0, wage: 1, period: 0 }] }]
+cc 7fc7ff6104eff8db41d81d5511d886f76e0e14948cc4b82f96f0ad191aec3d81 # shrinks to extras = [(0, 0)], ops = [Act { seat: 39, blocks: [Demolish { structure: 1, from: 1 }, CloseAccount { account: 1 }] }, Smart { kind: 88, a: 0, b: 0, flag: true }]

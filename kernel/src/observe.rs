@@ -1,12 +1,15 @@
-//! Role-limited observations, mirroring the Observation definition in
-//! contracts/seat-api.schema.json. The kernel builds everything except
-//! `drafts`, which the orchestrator adds from the translator; the observation
-//! hash in the log covers the kernel-built observation (with `drafts: []`).
+//! Observations (v0.2), mirroring the Observation definition in
+//! contracts/seat-api.schema.json. A seat perceives only through its channels
+//! (plus its inbox and the outcomes of its own acts), and a record only ever
+//! appears if its visibility lets the seat's entity see it. The kernel builds
+//! everything except `drafts`, which the orchestrator adds from the
+//! translator; the observation hash in the log covers the kernel-built
+//! observation (with `drafts: []`).
 
-use crate::blocks::{AgreementTerms, Block, Id, RightKind, Rule, StructureCategory};
-use crate::config::{ChannelKind, Level, Mandate, Scope};
-use crate::laws::{self, Statics};
-use crate::state::{AgreementStatus, Message, Outcome, SeatStatus, State};
+use crate::blocks::{Id, Record};
+use crate::config::{Area, ChannelKind, RecordFilter};
+use crate::state::{Message, Outcome, SeatStatus, SiteView, State, Transaction};
+use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -16,124 +19,59 @@ pub struct Observation {
     pub seat: Id,
     pub t: i64,
     pub status: SeatStatus,
-    pub principal: Id,
-    pub can_act_for: Vec<Id>,
-    pub mandate: Mandate,
+    pub entity: Id,
     pub outcomes: Vec<Outcome>,
     pub inbox: Vec<Message>,
-    pub awaiting: Vec<AwaitingItem>,
     pub drafts: Vec<Value>,
     pub channels: BTreeMap<Id, ChannelData>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum AwaitingItem {
-    Approval {
-        proposal: Id,
-        from: Id,
-        since: i64,
-        blocks: Vec<Block>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        reasoning: Option<String>,
-    },
-    Request {
-        proposal: Id,
-        from: Id,
-        since: i64,
-        blocks: Vec<Block>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        reasoning: Option<String>,
-    },
-    AgreementOffer {
-        agreement: Id,
-        terms: AgreementTerms,
-        proposed_by: Id,
-        respond_as: Id,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        expires_at: Option<i64>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChannelData {
-    Accounts { items: Vec<AccountItem> },
-    Parcels { items: Vec<ParcelItem> },
-    Rules { items: Vec<RuleItem> },
-    Agreements { items: Vec<AgreementItem> },
-    Directory { seats: Vec<SeatItem>, entities: Vec<EntityItem> },
+    Accounts { accounts: Vec<AccountItem>, transactions: Vec<Transaction> },
+    Records { records: Vec<Record> },
+    Sites { as_of: i64, parcels: Vec<SiteParcel> },
+    Directory { entities: Vec<EntityItem>, seats: Vec<SeatItem> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountItem {
-    pub entity: Id,
-    pub name: String,
+    pub account: Id,
+    pub holder: Id,
+    pub custodian: Id,
     pub balance: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ParcelItem {
+pub struct SiteParcel {
     pub parcel: Id,
     pub x: i64,
     pub y: i64,
     pub w: i64,
     pub h: i64,
-    pub allow: Vec<StructureCategory>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub structure: Option<StructureItem>,
-    pub rights: Vec<RightItem>,
+    pub structure: Option<SiteStructure>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StructureItem {
+pub struct SiteStructure {
     pub structure: Id,
     #[serde(rename = "type")]
     pub structure_type: Id,
-    pub owner: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub built_by: Option<Id>,
     pub complete: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completes_at: Option<i64>,
-    pub units_leased: u64,
+    pub occupancy: Vec<OccupancyItem>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RightItem {
-    pub right: Id,
-    pub kind: RightKind,
-    pub holder: Id,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub until: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub units: Option<u32>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuleItem {
-    pub rule: Id,
-    pub jurisdiction: Id,
-    pub enacted_at: i64,
-    pub body: Rule,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgreementItem {
-    pub agreement: Id,
-    pub status: AgreementStatus,
-    pub terms: AgreementTerms,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_payment_at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ends_at: Option<i64>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SeatItem {
-    pub seat: Id,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    pub principal: Id,
-    pub status: SeatStatus,
+pub struct OccupancyItem {
+    pub occupant: Id,
+    pub slot: String,
+    pub count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -143,178 +81,158 @@ pub struct EntityItem {
     pub name: String,
 }
 
-/// Build (and consume the "new since last time" parts of) a seat's observation.
-pub fn observe(s: &Statics, st: &mut State, seat: &str) -> Observation {
-    let cfg = &s.seats[seat];
-    let principal = cfg.principal.clone();
-    let mine = laws::actable_set(st, &principal);
-    let juris: BTreeSet<Id> = s.jurisdictions.get(&principal).cloned().unwrap_or_default();
-
-    let mut awaiting = vec![];
-    for (id, p) in &st.proposals {
-        if p.awaiting.contains(seat) && !p.approved.contains(seat) {
-            let (proposal, from, since, blocks, reasoning) = (id.clone(), p.seat.clone(), p.since, p.blocks.clone(), p.reasoning.clone());
-            awaiting.push(match p.level {
-                Level::Request => AwaitingItem::Request { proposal, from, since, blocks, reasoning },
-                _ => AwaitingItem::Approval { proposal, from, since, blocks, reasoning },
-            });
-        }
-    }
-    for (id, a) in &st.agreements {
-        if a.status != AgreementStatus::Pending {
-            continue;
-        }
-        for party in a.terms.parties() {
-            if !a.accepted.contains(party) && mine.contains(party) {
-                awaiting.push(AwaitingItem::AgreementOffer {
-                    agreement: id.clone(),
-                    terms: a.terms.clone(),
-                    proposed_by: a.proposed_by.clone(),
-                    respond_as: party.to_string(),
-                    expires_at: a.expires_at,
-                });
-            }
-        }
-    }
-
-    let mut channels = BTreeMap::new();
-    for ch in &cfg.channels {
-        let data = match ch.kind {
-            ChannelKind::Accounts => ChannelData::Accounts { items: accounts(st, ch.scope, &mine, &juris) },
-            ChannelKind::Parcels => ChannelData::Parcels { items: parcels(s, st, ch.scope, &mine, &juris) },
-            ChannelKind::Rules => ChannelData::Rules { items: rules(s, st, ch.scope, &mine, &juris) },
-            ChannelKind::Agreements => ChannelData::Agreements { items: agreements(st, ch.scope, &mine, &juris) },
-            ChannelKind::Directory => directory(s, st, ch.scope, &mine),
-        };
-        channels.insert(ch.id.clone(), data);
-    }
-
-    let ss = st.seats.get_mut(seat).unwrap();
-    Observation {
-        seat: seat.to_string(),
-        t: st.t,
-        status: ss.status,
-        principal,
-        can_act_for: mine.into_iter().collect(),
-        mandate: cfg.mandate.clone(),
-        outcomes: std::mem::take(&mut ss.new_outcomes),
-        inbox: std::mem::take(&mut ss.new_inbox),
-        awaiting,
-        drafts: vec![],
-        channels,
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SeatItem {
+    pub seat: Id,
+    pub entity: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    pub status: SeatStatus,
 }
 
-fn parcel_in_scope(st: &State, p: &str, scope: Scope, mine: &BTreeSet<Id>, juris: &BTreeSet<Id>) -> bool {
-    match scope {
-        Scope::All => true,
-        Scope::Jurisdiction => juris.contains(p),
-        Scope::Own => {
-            st.rights.values().any(|r| r.parcel == p && mine.contains(&r.holder))
-                || st.parcels[p].structure.as_ref().is_some_and(|s| mine.contains(&st.structures[s].owner))
-        }
-    }
+/// Can seats of `entity` perceive this record? The author's entity always can.
+pub fn can_see(s: &Statics, rec: &Record, entity: &str) -> bool {
+    rec.visible_to.allows(entity) || s.entity_of(&rec.author) == Some(entity)
 }
 
-fn accounts(st: &State, scope: Scope, mine: &BTreeSet<Id>, juris: &BTreeSet<Id>) -> Vec<AccountItem> {
-    let mut ids: BTreeSet<&Id> = mine.iter().collect();
-    match scope {
-        Scope::Own => {}
-        Scope::Jurisdiction => {
-            ids.extend(st.rights.values().filter(|r| juris.contains(&r.parcel)).map(|r| &r.holder));
-            ids.extend(st.structures.values().filter(|s| juris.contains(&s.parcel)).map(|s| &s.owner));
-        }
-        Scope::All => ids.extend(st.entities.keys()),
+fn matches(s: &Statics, rec: &Record, f: &RecordFilter, me: &str) -> bool {
+    if f.records.as_ref().is_some_and(|k| !k.iter().any(|x| x == rec.body.kind_name())) {
+        return false;
     }
-    ids.into_iter()
-        .filter_map(|id| {
-            st.entities.get(id).filter(|e| e.active).map(|e| AccountItem { entity: id.clone(), name: e.name.clone(), balance: e.balance })
-        })
-        .collect()
+    if let Some(kinds) = &f.statement_kinds {
+        match &rec.body {
+            crate::blocks::RecordBody::Statement { kind, .. } if kinds.contains(kind) => {}
+            _ => return false,
+        }
+    }
+    if let Some(inv) = &f.involving {
+        let want: BTreeSet<&str> = inv.iter().map(|e| if e == "self" { me } else { e.as_str() }).collect();
+        let named = rec.entities_named().into_iter().chain(s.entity_of(&rec.author));
+        if !named.into_iter().any(|e| want.contains(e)) {
+            return false;
+        }
+    }
+    true
 }
 
-fn parcels(s: &Statics, st: &State, scope: Scope, mine: &BTreeSet<Id>, juris: &BTreeSet<Id>) -> Vec<ParcelItem> {
+fn site_parcels(st: &State, area: &Area) -> Vec<SiteParcel> {
     st.parcels
         .iter()
-        .filter(|(id, _)| parcel_in_scope(st, id, scope, mine, juris))
-        .map(|(id, p)| ParcelItem {
+        .filter(|(id, _)| match area {
+            Area::All(_) => true,
+            Area::Parcels(ps) => ps.iter().any(|p| p == *id),
+        })
+        .map(|(id, p)| SiteParcel {
             parcel: id.clone(),
             x: p.x,
             y: p.y,
             w: p.w,
             h: p.h,
-            allow: laws::zoning_allows(s, st, id),
             structure: p.structure.as_ref().map(|sid| {
                 let x = &st.structures[sid];
-                StructureItem {
+                SiteStructure {
                     structure: sid.clone(),
                     structure_type: x.structure_type.clone(),
-                    owner: x.owner.clone(),
+                    built_by: x.built_by.clone(),
                     complete: x.complete,
                     completes_at: x.completes_at,
-                    units_leased: laws::leased_units(st, id),
+                    occupancy: st
+                        .occupancy
+                        .get(sid)
+                        .into_iter()
+                        .flatten()
+                        .flat_map(|(occ, slots)| {
+                            slots.iter().map(|(slot, c)| OccupancyItem { occupant: occ.clone(), slot: slot.clone(), count: *c })
+                        })
+                        .collect(),
                 }
             }),
-            rights: st
-                .rights
-                .iter()
-                .filter(|(_, r)| r.parcel == *id)
-                .map(|(rid, r)| RightItem { right: rid.clone(), kind: r.kind, holder: r.holder.clone(), until: r.until, units: r.units })
-                .collect(),
         })
         .collect()
 }
 
-fn rules(s: &Statics, st: &State, scope: Scope, mine: &BTreeSet<Id>, juris: &BTreeSet<Id>) -> Vec<RuleItem> {
-    st.rules
-        .iter()
-        .filter(|(_, r)| match scope {
-            Scope::All => true,
-            Scope::Own => mine.contains(&r.jurisdiction),
-            Scope::Jurisdiction => mine.contains(&r.jurisdiction) || juris.iter().any(|p| laws::rule_covers(s, r, p)),
-        })
-        .map(|(id, r)| RuleItem { rule: id.clone(), jurisdiction: r.jurisdiction.clone(), enacted_at: r.enacted_at, body: r.rule.clone() })
-        .collect()
-}
+/// Build a seat's observation, consuming its "new since last time" state.
+pub fn observe(s: &Statics, st: &mut State, seat: &str) -> Observation {
+    let cfg = &s.seats[seat];
+    let me = cfg.entity.clone();
+    let cursor = st.seats[seat].record_cursor;
+    let mut by_seq: Vec<(u64, &Record)> = st.records.values().map(|x| (x.seq, &x.record)).collect();
+    by_seq.sort_by_key(|(seq, _)| *seq);
 
-fn agreements(st: &State, scope: Scope, mine: &BTreeSet<Id>, juris: &BTreeSet<Id>) -> Vec<AgreementItem> {
-    st.agreements
-        .iter()
-        .filter(|(_, a)| {
-            let own = a.terms.parties().iter().any(|p| mine.contains(*p));
-            match scope {
-                Scope::All => true,
-                Scope::Own => own,
-                Scope::Jurisdiction => own || matches!(&a.terms, AgreementTerms::Lease { parcel, .. } if juris.contains(parcel)),
-            }
-        })
-        .map(|(id, a)| AgreementItem {
-            agreement: id.clone(),
-            status: a.status,
-            terms: a.terms.clone(),
-            next_payment_at: a.next_payment_at,
-            ends_at: a.ends_at,
-        })
-        .collect()
-}
+    let mut channels = BTreeMap::new();
+    let mut refreshed: Vec<(Id, SiteView)> = vec![];
+    for ch in &cfg.channels {
+        let data = match &ch.kind {
+            ChannelKind::Accounts => ChannelData::Accounts {
+                accounts: st
+                    .accounts
+                    .iter()
+                    .filter(|(_, a)| a.holder == me || a.custodian == me)
+                    .map(|(id, a)| AccountItem {
+                        account: id.clone(),
+                        holder: a.holder.clone(),
+                        custodian: a.custodian.clone(),
+                        balance: a.balance,
+                    })
+                    .collect(),
+                transactions: st.seats[seat].new_transactions.clone(),
+            },
+            ChannelKind::Records { filter, new_only } => ChannelData::Records {
+                records: by_seq
+                    .iter()
+                    .filter(|(seq, r)| (!new_only.unwrap_or(false) || *seq > cursor) && can_see(s, r, &me) && matches(s, r, filter, &me))
+                    .map(|(_, r)| (*r).clone())
+                    .collect(),
+            },
+            ChannelKind::Sites { area, every } => match (every, st.seats[seat].site_views.get(&ch.id)) {
+                (Some(e), Some(v)) if st.t < v.as_of + e => ChannelData::Sites { as_of: v.as_of, parcels: v.parcels.clone() },
+                (every, _) => {
+                    let view = SiteView { as_of: st.t, parcels: site_parcels(st, area) };
+                    if every.is_some() {
+                        refreshed.push((ch.id.clone(), view.clone()));
+                    }
+                    ChannelData::Sites { as_of: view.as_of, parcels: view.parcels }
+                }
+            },
+            ChannelKind::Directory => ChannelData::Directory {
+                entities: st
+                    .entities
+                    .iter()
+                    .map(|(id, e)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone() })
+                    .collect(),
+                seats: s
+                    .seats
+                    .values()
+                    .map(|x| SeatItem {
+                        seat: x.id.clone(),
+                        entity: x.entity.clone(),
+                        title: x.title.clone(),
+                        role: x.role.clone(),
+                        status: st.seats[&x.id].status,
+                    })
+                    .collect(),
+            },
+        };
+        channels.insert(ch.id.clone(), data);
+    }
 
-fn directory(s: &Statics, st: &State, scope: Scope, mine: &BTreeSet<Id>) -> ChannelData {
-    let own = scope == Scope::Own;
-    let seats = s
-        .seats
-        .values()
-        .filter(|x| !own || mine.contains(&x.principal))
-        .map(|x| SeatItem { seat: x.id.clone(), title: x.title.clone(), principal: x.principal.clone(), status: st.seats[&x.id].status })
-        .collect();
-    let entities = st
-        .entities
-        .iter()
-        .filter(|(id, e)| e.active && (!own || mine.contains(*id)))
-        .map(|(id, e)| EntityItem {
-            entity: id.clone(),
-            kind: serde_json::to_value(e.kind).ok().and_then(|v| v.as_str().map(String::from)).unwrap_or_default(),
-            name: e.name.clone(),
-        })
-        .collect();
-    ChannelData::Directory { seats, entities }
+    let record_seq = st.counters.record_seq;
+    let ss = st.seats.get_mut(seat).unwrap();
+    for (id, view) in refreshed {
+        ss.site_views.insert(id, view);
+    }
+    ss.record_cursor = record_seq;
+    ss.new_transactions.clear();
+    Observation {
+        seat: seat.into(),
+        t: st.t,
+        status: ss.status,
+        entity: me,
+        outcomes: std::mem::take(&mut ss.new_outcomes),
+        inbox: std::mem::take(&mut ss.new_inbox),
+        drafts: vec![],
+        channels,
+    }
 }

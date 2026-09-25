@@ -1,249 +1,189 @@
 //! Events and refusal codes, mirroring the Event and RefusalCode definitions
-//! in contracts/log.schema.json. An event is a flat record: which fields are
-//! present depends on `event` (the schema pins the required ones per type).
+//! in contracts/log.schema.json (v0.2). Every refusal code is physics or
+//! mechanics; there is no code for "illegal" (D19).
 
-use crate::blocks::{AgreementTerms, Id, RightKind, Rule};
+use crate::blocks::{Id, Record};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum EventName {
-    ActionApplied,
-    ActionRefused,
-    ActionHeld,
-    ActionForwarded,
-    ProposalDecided,
-    Transfer,
-    EntityCreated,
-    EntityDissolved,
-    RightCreated,
-    RightTransferred,
-    RightEnded,
-    StructureStarted,
-    StructureCompleted,
-    StructureDemolished,
-    RuleEnacted,
-    RuleRepealed,
-    AgreementProposed,
-    AgreementResponded,
-    AgreementActivated,
-    AgreementLapsed,
-    AgreementNotice,
-    AgreementEnded,
-    PaymentFailed,
-    MessageDelivered,
-    Observation,
-    SeatResigned,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum RefusalCode {
-    Malformed,
-    UnknownSeat,
     SeatResigned,
-    MandateDenied,
-    NotAuthorized,
     UnknownRef,
     DuplicateRef,
-    UnknownEntity,
-    EntityInactive,
-    InvalidKind,
-    BoundaryProtected,
+    NotCustodian,
+    NotHolder,
     InsufficientFunds,
     Overflow,
+    BoundaryProtected,
+    UnknownAccount,
+    AccountNotEmpty,
     UnknownParcel,
-    UnknownRight,
-    RightNotHeld,
-    RightNotTransferable,
-    RightNotRevocable,
     ParcelOccupied,
     UnknownStructureType,
     UnknownStructure,
     StructureIncomplete,
-    StructureInUse,
-    ZoningViolation,
-    RentCapViolation,
+    UnknownSlot,
     CapacityExceeded,
-    NoJurisdiction,
-    UnknownRule,
-    UnknownAgreement,
-    NotAParty,
-    InvalidState,
-    UnknownProposal,
-    NotApprover,
-    AlreadyDecided,
+    NotPresent,
+    UnknownEntity,
+    ReservedKind,
+    UnknownRecord,
+    WrongRecordKind,
     CapExceeded,
-    TimeInPast,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum Reason {
-    Block,
-    Rent,
-    Wage,
-    Construction,
+pub enum TransferReason {
+    Payment,
+    Materials,
     Demolition,
-    Dissolution,
-    Revoked,
-    Expired,
-    Terminated,
-    Breach,
-    AgreementEnded,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum EventDecision {
-    Approve,
-    Reject,
-    Accept,
-    Decline,
+pub enum VacateReason {
+    Left,
+    Removed,
+    Demolition,
 }
 
+/// One event: the command that caused it, plus what happened.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum OneOrMany {
-    One(Id),
-    Many(Vec<Id>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Event {
-    pub event: EventName,
     /// seq of the command entry that caused this event; set by the log writer.
     pub cause: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub action: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seat: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created: Option<BTreeMap<String, Id>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub block: Option<usize>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub code: Option<RefusalCode>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub detail: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub level: Option<crate::config::Level>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub proposal: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub awaiting: Option<Vec<Id>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub by: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub decision: Option<EventDecision>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub from: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub to: Option<OneOrMany>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub amount: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reason: Option<Reason>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entity: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub entity_kind: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub founder: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub controller: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub successor: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub right: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub right_kind: Option<RightKind>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub parcel: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub holder: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grantor: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub units: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub until: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub structure: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub structure_type: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub owner: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub jurisdiction: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rule_body: Option<Rule>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agreement: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub terms: Option<AgreementTerms>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub message: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub observation_hash: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub statement: Option<String>,
+    #[serde(flatten)]
+    pub body: EventBody,
 }
 
-impl Event {
-    pub fn new(event: EventName) -> Self {
-        Event {
-            event,
-            cause: 0,
-            action: None,
-            seat: None,
-            created: None,
-            block: None,
-            code: None,
-            detail: None,
-            level: None,
-            proposal: None,
-            awaiting: None,
-            by: None,
-            decision: None,
-            from: None,
-            to: None,
-            amount: None,
-            reason: None,
-            entity: None,
-            entity_kind: None,
-            name: None,
-            founder: None,
-            controller: None,
-            successor: None,
-            right: None,
-            right_kind: None,
-            parcel: None,
-            holder: None,
-            grantor: None,
-            units: None,
-            until: None,
-            structure: None,
-            structure_type: None,
-            owner: None,
-            at: None,
-            rule: None,
-            jurisdiction: None,
-            rule_body: None,
-            agreement: None,
-            terms: None,
-            message: None,
-            observation_hash: None,
-            statement: None,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "event", rename_all = "snake_case")]
+pub enum EventBody {
+    ActionApplied {
+        action: Id,
+        seat: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        created: Option<BTreeMap<String, Id>>,
+    },
+    ActionRefused {
+        action: Id,
+        seat: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        block: Option<usize>,
+        code: RefusalCode,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        detail: Option<String>,
+    },
+    Transfer {
+        from: Id,
+        to: Id,
+        amount: i64,
+        by: Id,
+        reason: TransferReason,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        settles: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        per_instruction: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        memo: Option<String>,
+    },
+    AccountOpened {
+        account: Id,
+        holder: Id,
+        custodian: Id,
+        by: Id,
+    },
+    AccountClosed {
+        account: Id,
+        by: Id,
+    },
+    StructureStarted {
+        structure: Id,
+        parcel: Id,
+        structure_type: Id,
+        built_by: Id,
+        at: i64,
+    },
+    StructureCompleted {
+        structure: Id,
+    },
+    StructureDemolished {
+        structure: Id,
+        by: Id,
+    },
+    Occupied {
+        occupant: Id,
+        structure: Id,
+        slot: String,
+        count: u32,
+    },
+    Vacated {
+        occupant: Id,
+        structure: Id,
+        by: Id,
+        reason: VacateReason,
+    },
+    Recorded {
+        record: Box<Record>,
+    },
+    EntityCreated {
+        entity: Id,
+        kind: String,
+        name: String,
+    },
+    MessageDelivered {
+        message: Id,
+        seat: Id,
+        to: Vec<Id>,
+    },
+    Observation {
+        seat: Id,
+        observation_hash: String,
+    },
+    SeatResigned {
+        seat: Id,
+        statement: String,
+    },
+}
+
+impl EventBody {
+    pub fn name(&self) -> &'static str {
+        match self {
+            EventBody::ActionApplied { .. } => "action_applied",
+            EventBody::ActionRefused { .. } => "action_refused",
+            EventBody::Transfer { .. } => "transfer",
+            EventBody::AccountOpened { .. } => "account_opened",
+            EventBody::AccountClosed { .. } => "account_closed",
+            EventBody::StructureStarted { .. } => "structure_started",
+            EventBody::StructureCompleted { .. } => "structure_completed",
+            EventBody::StructureDemolished { .. } => "structure_demolished",
+            EventBody::Occupied { .. } => "occupied",
+            EventBody::Vacated { .. } => "vacated",
+            EventBody::Recorded { .. } => "recorded",
+            EventBody::EntityCreated { .. } => "entity_created",
+            EventBody::MessageDelivered { .. } => "message_delivered",
+            EventBody::Observation { .. } => "observation",
+            EventBody::SeatResigned { .. } => "seat_resigned",
         }
+    }
+
+    /// Does this event change the physical world (as opposed to records,
+    /// messages, perception and bookkeeping)?
+    pub fn is_physical(&self) -> bool {
+        matches!(
+            self,
+            EventBody::Transfer { .. }
+                | EventBody::AccountOpened { .. }
+                | EventBody::AccountClosed { .. }
+                | EventBody::StructureStarted { .. }
+                | EventBody::StructureCompleted { .. }
+                | EventBody::StructureDemolished { .. }
+                | EventBody::Occupied { .. }
+                | EventBody::Vacated { .. }
+        )
     }
 }
 
@@ -252,4 +192,10 @@ impl Event {
 pub struct Timed {
     pub t: i64,
     pub event: Event,
+}
+
+impl Timed {
+    pub fn new(t: i64, body: EventBody) -> Self {
+        Timed { t, event: Event { cause: 0, body } }
+    }
 }

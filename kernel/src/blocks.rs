@@ -1,8 +1,14 @@
-//! Building blocks, mirroring contracts/blocks.schema.json. Field names and
-//! shapes must match the schema exactly; tests/conformance.rs checks that the
-//! contract examples round-trip through these types.
+//! Building blocks and records, mirroring contracts/blocks.schema.json and
+//! contracts/records.schema.json (v0.2). Field names and shapes must match
+//! the schemas exactly; tests/conformance.rs checks that the contract
+//! examples round-trip through these types.
+//!
+//! Opaque parts of the contracts (claim contents, commitments, statement
+//! data, the Institutional Grammar breakdown, formal conditions) stay as JSON
+//! values: the kernel stores them and never interprets them.
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// An id, or a `$name` bound earlier in the same action.
 pub type IdOrRef = String;
@@ -11,84 +17,160 @@ pub type Id = String;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "block", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Block {
-    CreateEntity {
-        founder: IdOrRef,
-        kind: CreatableKind,
-        name: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        controller: Option<IdOrRef>,
-        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
-        bind: Option<String>,
-    },
-    DissolveEntity {
-        entity: IdOrRef,
-        successor: IdOrRef,
-    },
+    // ---- physical ----
     Transfer {
         from: IdOrRef,
         to: IdOrRef,
         amount: i64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        settles: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        per_instruction: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         memo: Option<String>,
     },
-    TransferRight {
-        right: Id,
-        to: IdOrRef,
-    },
-    GrantRight {
-        grantor: IdOrRef,
-        parcel: Id,
-        kind: GrantableRight,
-        to: IdOrRef,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        units: Option<u32>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        duration: Option<i64>,
-        revocable: bool,
+    OpenAccount {
+        holder: IdOrRef,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },
-    RevokeRight {
-        right: Id,
+    CloseAccount {
+        account: IdOrRef,
     },
     Construct {
-        owner: IdOrRef,
         parcel: Id,
         structure_type: Id,
-        contractor: IdOrRef,
+        materials_from: IdOrRef,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },
     Demolish {
-        structure: Id,
-        contractor: IdOrRef,
+        structure: IdOrRef,
+        costs_from: IdOrRef,
     },
-    EnactRule {
-        jurisdiction: Id,
-        rule: Rule,
+    Occupy {
+        structure: IdOrRef,
+        slot: String,
+        count: u32,
+    },
+    Vacate {
+        occupant: IdOrRef,
+        structure: IdOrRef,
+    },
+    // ---- records ----
+    CreateEntity {
+        kind: String,
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speaks_for: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visible_to: Option<Visibility>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },
-    RepealRule {
-        rule: Id,
+    RecordClaim {
+        position: Position,
+        holder: IdOrRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        counterparty: Option<IdOrRef>,
+        about: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        basis: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speaks_for: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visible_to: Option<Visibility>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    TransferClaim {
+        claim: IdOrRef,
+        to: IdOrRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        basis: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speaks_for: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visible_to: Option<Visibility>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    ReleaseClaim {
+        claim: IdOrRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        basis: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speaks_for: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visible_to: Option<Visibility>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
     },
     ProposeAgreement {
         terms: AgreementTerms,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        offer_expires_after: Option<i64>,
+        speaks_for: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visible_to: Option<Visibility>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },
-    RespondAgreement {
+    SignAgreement {
         agreement: IdOrRef,
         #[serde(rename = "as")]
-        party: Id,
-        decision: AgreementDecision,
+        party: IdOrRef,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
     },
-    TerminateAgreement {
-        agreement: Id,
+    GiveNotice {
+        agreement: IdOrRef,
         #[serde(rename = "as")]
-        party: Id,
+        party: IdOrRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    Publish {
+        kind: String,
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        data: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        adico: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        formal: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        basis: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        addressed_to: Option<Vec<IdOrRef>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speaks_for: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visible_to: Option<Visibility>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    Withdraw {
+        record: IdOrRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        basis: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speaks_for: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visible_to: Option<Visibility>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    Vote {
+        ballot: IdOrRef,
+        choice: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speaks_for: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visible_to: Option<Visibility>,
     },
     Message {
         to: Vec<Id>,
@@ -96,227 +178,251 @@ pub enum Block {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         re: Option<Id>,
     },
-    Decide {
-        proposal: Id,
-        decision: Decision,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        note: Option<String>,
-    },
 }
 
 impl Block {
     pub fn name(&self) -> &'static str {
         match self {
-            Block::CreateEntity { .. } => "create_entity",
-            Block::DissolveEntity { .. } => "dissolve_entity",
             Block::Transfer { .. } => "transfer",
-            Block::TransferRight { .. } => "transfer_right",
-            Block::GrantRight { .. } => "grant_right",
-            Block::RevokeRight { .. } => "revoke_right",
+            Block::OpenAccount { .. } => "open_account",
+            Block::CloseAccount { .. } => "close_account",
             Block::Construct { .. } => "construct",
             Block::Demolish { .. } => "demolish",
-            Block::EnactRule { .. } => "enact_rule",
-            Block::RepealRule { .. } => "repeal_rule",
+            Block::Occupy { .. } => "occupy",
+            Block::Vacate { .. } => "vacate",
+            Block::CreateEntity { .. } => "create_entity",
+            Block::RecordClaim { .. } => "record_claim",
+            Block::TransferClaim { .. } => "transfer_claim",
+            Block::ReleaseClaim { .. } => "release_claim",
             Block::ProposeAgreement { .. } => "propose_agreement",
-            Block::RespondAgreement { .. } => "respond_agreement",
-            Block::TerminateAgreement { .. } => "terminate_agreement",
+            Block::SignAgreement { .. } => "sign_agreement",
+            Block::GiveNotice { .. } => "give_notice",
+            Block::Publish { .. } => "publish",
+            Block::Withdraw { .. } => "withdraw",
+            Block::Vote { .. } => "vote",
             Block::Message { .. } => "message",
-            Block::Decide { .. } => "decide",
-        }
-    }
-}
-
-pub const BLOCK_NAMES: [&str; 15] = [
-    "create_entity",
-    "dissolve_entity",
-    "transfer",
-    "transfer_right",
-    "grant_right",
-    "revoke_right",
-    "construct",
-    "demolish",
-    "enact_rule",
-    "repeal_rule",
-    "propose_agreement",
-    "respond_agreement",
-    "terminate_agreement",
-    "message",
-    "decide",
-];
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CreatableKind {
-    Firm,
-    Trust,
-    Agency,
-    Union,
-    Club,
-    Cooperative,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GrantableRight {
-    Use,
-    Access,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RightKind {
-    Surface,
-    Subsurface,
-    Use,
-    Access,
-}
-
-impl From<GrantableRight> for RightKind {
-    fn from(g: GrantableRight) -> Self {
-        match g {
-            GrantableRight::Use => RightKind::Use,
-            GrantableRight::Access => RightKind::Access,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum StructureCategory {
-    Residential,
-    Commercial,
-    Industrial,
-    Civic,
-    Green,
+pub enum Position {
+    Right,
+    Liberty,
+    Power,
+    Immunity,
 }
 
-pub const ALL_CATEGORIES: [StructureCategory; 5] = [
-    StructureCategory::Residential,
-    StructureCategory::Commercial,
-    StructureCategory::Industrial,
-    StructureCategory::Civic,
-    StructureCategory::Green,
-];
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AgreementDecision {
-    Accept,
-    Decline,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Decision {
-    Approve,
-    Reject,
-}
-
-/// `"all"` or an explicit list of parcel ids.
+/// `"public"`, or the entities whose seats may perceive the record.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum ParcelScope {
-    All(AllMarker),
-    List(Vec<Id>),
+pub enum Visibility {
+    Public(PublicMarker),
+    Only(Vec<Id>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum AllMarker {
-    All,
+pub enum PublicMarker {
+    Public,
+}
+
+impl Visibility {
+    pub fn public() -> Self {
+        Visibility::Public(PublicMarker::Public)
+    }
+
+    /// Visible to exactly these entities (sorted and de-duplicated).
+    pub fn only(ids: impl IntoIterator<Item = Id>) -> Self {
+        let set: std::collections::BTreeSet<Id> = ids.into_iter().collect();
+        Visibility::Only(set.into_iter().collect())
+    }
+
+    pub fn allows(&self, entity: &str) -> bool {
+        match self {
+            Visibility::Public(_) => true,
+            Visibility::Only(ids) => ids.iter().any(|i| i == entity),
+        }
+    }
+}
+
+/// An agreement's terms. Apart from who the parties are, all of it is opaque data.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgreementTerms {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+    pub parties: Vec<IdOrRef>,
+    pub commitments: Vec<Commitment>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub term: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub termination: Option<Vec<Termination>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attrs: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum Rule {
-    Zoning { parcels: ParcelScope, allow: Vec<StructureCategory> },
-    RentCap { parcels: ParcelScope, max_per_30d: i64, applies_to: RentCapScope },
-}
-
-impl Rule {
-    pub fn parcels(&self) -> &ParcelScope {
-        match self {
-            Rule::Zoning { parcels, .. } | Rule::RentCap { parcels, .. } => parcels,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RentCapScope {
-    NewAgreements,
-    AllPayments,
+#[serde(deny_unknown_fields)]
+pub struct Commitment {
+    pub who: IdOrRef,
+    pub does: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub every: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-pub enum AgreementTerms {
-    Lease {
-        lessor: IdOrRef,
-        lessee: IdOrRef,
-        parcel: Id,
-        units: u32,
-        rent: i64,
-        period: i64,
+#[serde(deny_unknown_fields)]
+pub struct Termination {
+    pub party: IdOrRef,
+    pub notice: i64,
+}
+
+// ---- records ----------------------------------------------------------------
+
+/// Author of the records a world begins with.
+pub const GENESIS: &str = "genesis";
+
+/// A stored record. Append-only: records are never edited or removed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Record {
+    pub id: Id,
+    /// A seat id, or "genesis".
+    pub author: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaks_for: Option<Id>,
+    pub at: i64,
+    pub visible_to: Visibility,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basis: Option<Id>,
+    #[serde(flatten)]
+    pub body: RecordBody,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "record", rename_all = "snake_case")]
+pub enum RecordBody {
+    Claim {
+        position: Position,
+        holder: Id,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        term: Option<i64>,
-        notice: i64,
+        counterparty: Option<Id>,
+        about: Value,
     },
-    Employment {
-        employer: IdOrRef,
-        employee: IdOrRef,
+    ClaimTransfer {
+        claim: Id,
+        to: Id,
+    },
+    ClaimRelease {
+        claim: Id,
+    },
+    Agreement {
+        terms: AgreementTerms,
+    },
+    Signature {
+        agreement: Id,
+        #[serde(rename = "as")]
+        party: Id,
+    },
+    Notice {
+        agreement: Id,
+        #[serde(rename = "as")]
+        party: Id,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        workplace: Option<Id>,
-        wage: i64,
-        period: i64,
+        text: Option<String>,
+    },
+    Statement {
+        kind: String,
+        text: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        term: Option<i64>,
-        notice: i64,
+        data: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        adico: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        formal: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        addressed_to: Option<Vec<Id>>,
+    },
+    Withdrawal {
+        withdraws: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        text: Option<String>,
+    },
+    Vote {
+        ballot: Id,
+        choice: String,
+    },
+    EntityDeclaration {
+        entity: Id,
+        kind: String,
+        name: String,
     },
 }
 
-impl AgreementTerms {
-    /// (payer, payee) of the periodic payment.
-    pub fn payer_payee(&self) -> (&str, &str) {
+impl RecordBody {
+    pub fn kind_name(&self) -> &'static str {
         match self {
-            AgreementTerms::Lease { lessor, lessee, .. } => (lessee, lessor),
-            AgreementTerms::Employment { employer, employee, .. } => (employer, employee),
+            RecordBody::Claim { .. } => "claim",
+            RecordBody::ClaimTransfer { .. } => "claim_transfer",
+            RecordBody::ClaimRelease { .. } => "claim_release",
+            RecordBody::Agreement { .. } => "agreement",
+            RecordBody::Signature { .. } => "signature",
+            RecordBody::Notice { .. } => "notice",
+            RecordBody::Statement { .. } => "statement",
+            RecordBody::Withdrawal { .. } => "withdrawal",
+            RecordBody::Vote { .. } => "vote",
+            RecordBody::EntityDeclaration { .. } => "entity_declaration",
         }
     }
 
-    pub fn parties(&self) -> [&str; 2] {
+    /// Records this record points at (they must exist).
+    pub fn records_referenced(&self) -> Vec<&str> {
         match self {
-            AgreementTerms::Lease { lessor, lessee, .. } => [lessor, lessee],
-            AgreementTerms::Employment { employer, employee, .. } => [employer, employee],
+            RecordBody::ClaimTransfer { claim, .. } | RecordBody::ClaimRelease { claim } => vec![claim],
+            RecordBody::Signature { agreement, .. } | RecordBody::Notice { agreement, .. } => vec![agreement],
+            RecordBody::Withdrawal { withdraws, .. } => vec![withdraws],
+            RecordBody::Vote { ballot, .. } => vec![ballot],
+            _ => vec![],
         }
     }
+}
 
-    pub fn amount(&self) -> i64 {
-        match self {
-            AgreementTerms::Lease { rent, .. } => *rent,
-            AgreementTerms::Employment { wage, .. } => *wage,
+impl Record {
+    /// Every entity this record names directly. Used by `involving` channel
+    /// filters and to check that references exist.
+    pub fn entities_named(&self) -> Vec<&str> {
+        let mut v: Vec<&str> = vec![];
+        if let Some(s) = &self.speaks_for {
+            v.push(s);
         }
+        match &self.body {
+            RecordBody::Claim { holder, counterparty, .. } => {
+                v.push(holder);
+                v.extend(counterparty.as_deref());
+            }
+            RecordBody::ClaimTransfer { to, .. } => v.push(to),
+            RecordBody::Agreement { terms } => {
+                v.extend(terms.parties.iter().map(String::as_str));
+                v.extend(terms.commitments.iter().map(|c| c.who.as_str()));
+                v.extend(terms.termination.iter().flatten().map(|t| t.party.as_str()));
+            }
+            RecordBody::Signature { party, .. } | RecordBody::Notice { party, .. } => v.push(party),
+            RecordBody::Statement { addressed_to, .. } => v.extend(addressed_to.iter().flatten().map(String::as_str)),
+            RecordBody::EntityDeclaration { entity, .. } => v.push(entity),
+            RecordBody::ClaimRelease { .. } | RecordBody::Withdrawal { .. } | RecordBody::Vote { .. } => {}
+        }
+        v
     }
 
-    pub fn period(&self) -> i64 {
-        match self {
-            AgreementTerms::Lease { period, .. } | AgreementTerms::Employment { period, .. } => *period,
+    /// Entities in the visibility list (they must exist, but a record isn't
+    /// "about" someone just because they can see it).
+    pub fn visibility_entities(&self) -> Vec<&str> {
+        match &self.visible_to {
+            Visibility::Only(ids) => ids.iter().map(String::as_str).collect(),
+            Visibility::Public(_) => vec![],
         }
-    }
-
-    pub fn term(&self) -> Option<i64> {
-        match self {
-            AgreementTerms::Lease { term, .. } | AgreementTerms::Employment { term, .. } => *term,
-        }
-    }
-
-    pub fn notice(&self) -> i64 {
-        match self {
-            AgreementTerms::Lease { notice, .. } | AgreementTerms::Employment { notice, .. } => *notice,
-        }
-    }
-
-    pub fn is_lease(&self) -> bool {
-        matches!(self, AgreementTerms::Lease { .. })
     }
 }

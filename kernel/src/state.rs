@@ -1,52 +1,57 @@
-//! Mutable world state. Every map is a BTreeMap, so serialization (and hence
-//! the state hash) is deterministic. Static facts (catalogue, jurisdictions,
-//! mandates, channels) live in the config, which the log header carries.
+//! Mutable world state (v0.2). Every map is a BTreeMap, so serialization (and
+//! hence the state hash) is deterministic. Static facts (the catalogue, seats
+//! and their channels) live in the config, which the log header carries.
+//!
+//! The state holds physics (accounts, parcels, structures, occupancy) and the
+//! append-only record store. Nothing in it describes law or authority.
 
-use crate::blocks::{AgreementTerms, Block, Id, RightKind, Rule};
-use crate::config::{EntityKind, Level};
+use crate::blocks::{Id, Record};
 use crate::events::RefusalCode;
+use crate::observe::SiteParcel;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
     pub t: i64,
     pub counters: Counters,
     pub entities: BTreeMap<Id, Entity>,
+    pub accounts: BTreeMap<Id, Account>,
     pub parcels: BTreeMap<Id, Parcel>,
-    pub rights: BTreeMap<Id, Right>,
     pub structures: BTreeMap<Id, Structure>,
-    pub rules: BTreeMap<Id, RuleRec>,
-    pub agreements: BTreeMap<Id, Agreement>,
-    pub proposals: BTreeMap<Id, Proposal>,
+    /// structure -> occupant -> slot -> count
+    pub occupancy: BTreeMap<Id, BTreeMap<Id, BTreeMap<String, u32>>>,
+    pub records: BTreeMap<Id, Stored>,
     pub seats: BTreeMap<Id, SeatState>,
-    /// Future effects, kept sorted by (at, seq).
+    /// Future physical effects (construction completing), sorted by (at, seq).
     pub schedule: Vec<Scheduled>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Counters {
     pub ent: u64,
-    pub rgt: u64,
+    pub acc: u64,
     pub str: u64,
-    pub rul: u64,
-    pub agr: u64,
-    pub prp: u64,
+    pub rec: u64,
     pub act: u64,
     pub msg: u64,
     pub sched: u64,
-    pub rule_order: u64,
+    /// Order in which records were made; drives `new_only` channels.
+    pub record_seq: u64,
     pub created_entities: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entity {
-    pub kind: EntityKind,
+    pub kind: String,
     pub name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub controller: Option<Id>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Account {
+    pub holder: Id,
+    pub custodian: Id,
     pub balance: i64,
-    pub active: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,91 +65,20 @@ pub struct Parcel {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Right {
-    pub parcel: Id,
-    pub kind: RightKind,
-    pub holder: Id,
-    /// Set for derived rights (grants and leases).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub grantor: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub until: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub units: Option<u32>,
-    pub revocable: bool,
-    /// The agreement that created this right, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub under: Option<Id>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Structure {
     pub parcel: Id,
     pub structure_type: Id,
-    pub owner: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub built_by: Option<Id>,
     pub complete: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completes_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuleRec {
-    pub jurisdiction: Id,
-    pub rule: Rule,
-    pub enacted_at: i64,
-    /// Enactment order; the latest zoning rule covering a parcel wins.
-    pub order: u64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AgreementStatus {
-    Pending,
-    Active,
-    Ending,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EndReason {
-    Expired,
-    Terminated,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Agreement {
-    /// Terms with every local ref resolved to an id.
-    pub terms: AgreementTerms,
-    pub status: AgreementStatus,
-    pub proposed_by: Id,
-    pub accepted: BTreeSet<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expires_at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub activated_at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ends_at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub end_reason: Option<EndReason>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub next_payment_at: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub use_right: Option<Id>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Proposal {
-    /// Approval or Request.
-    pub level: Level,
-    pub seat: Id,
-    pub action: Id,
-    /// As submitted (local refs unresolved); resolved when applied.
-    pub blocks: Vec<Block>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reasoning: Option<String>,
-    pub awaiting: BTreeSet<Id>,
-    pub approved: BTreeSet<Id>,
-    pub since: i64,
+pub struct Stored {
+    pub seq: u64,
+    pub record: Record,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -160,6 +94,17 @@ pub struct SeatState {
     /// Delivered at this seat's next observation, then cleared.
     pub new_outcomes: Vec<Outcome>,
     pub new_inbox: Vec<Message>,
+    pub new_transactions: Vec<Transaction>,
+    /// Records with seq above this are "new" for `new_only` channels.
+    pub record_cursor: u64,
+    /// Last refresh of each `sites` channel that has a refresh interval.
+    pub site_views: BTreeMap<Id, SiteView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SiteView {
+    pub as_of: i64,
+    pub parcels: Vec<SiteParcel>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -167,9 +112,6 @@ pub struct SeatState {
 pub enum OutcomeStatus {
     Applied,
     Refused,
-    Held,
-    Forwarded,
-    Rejected,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -190,10 +132,6 @@ pub struct Outcome {
     pub created: Option<BTreeMap<String, Id>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refusal: Option<RefusalInfo>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub proposal: Option<Id>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub awaiting: Option<Vec<Id>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -208,6 +146,21 @@ pub struct Message {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Transaction {
+    pub t: i64,
+    pub from: Id,
+    pub to: Id,
+    pub amount: i64,
+    pub by: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settles: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub per_instruction: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memo: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Scheduled {
     pub at: i64,
     pub seq: u64,
@@ -218,10 +171,6 @@ pub struct Scheduled {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sched {
     StructureComplete { structure: Id },
-    Payment { agreement: Id },
-    AgreementEnd { agreement: Id },
-    OfferExpire { agreement: Id },
-    RightExpire { right: Id },
 }
 
 impl State {
@@ -229,11 +178,9 @@ impl State {
         let c = &mut self.counters;
         let n = match prefix {
             "ent" => &mut c.ent,
-            "rgt" => &mut c.rgt,
+            "acc" => &mut c.acc,
             "str" => &mut c.str,
-            "rul" => &mut c.rul,
-            "agr" => &mut c.agr,
-            "prp" => &mut c.prp,
+            "rec" => &mut c.rec,
             "act" => &mut c.act,
             "msg" => &mut c.msg,
             other => panic!("unknown id prefix {other}"),
@@ -249,8 +196,19 @@ impl State {
         self.schedule.insert(pos, item);
     }
 
-    /// Total money in the world, including the boundary entity. Constant for a run.
+    /// Store a record, giving it the next sequence number.
+    pub fn store(&mut self, record: Record) {
+        self.counters.record_seq += 1;
+        let seq = self.counters.record_seq;
+        self.records.insert(record.id.clone(), Stored { seq, record });
+    }
+
+    /// Total money in the world, including the boundary. Constant for a run.
     pub fn total_money(&self) -> i128 {
-        self.entities.values().map(|e| e.balance as i128).sum()
+        self.accounts.values().map(|a| a.balance as i128).sum()
+    }
+
+    pub fn occupied(&self, structure: &str, slot: &str) -> u64 {
+        self.occupancy.get(structure).map_or(0, |occ| occ.values().filter_map(|slots| slots.get(slot)).map(|c| *c as u64).sum())
     }
 }

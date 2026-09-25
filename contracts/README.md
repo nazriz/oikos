@@ -110,7 +110,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 
 **Refusal codes are physics and mechanics only.** There is no code for "illegal".
 
-## Invariants (for the kernel rework)
+## Invariants (implemented; kernel/README.md)
 
 **Carried over:**
 - money is conserved;
@@ -129,7 +129,13 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 2. **Dissolving an organisation is a statement, not a block.** Its accounts are held at banks, so what happens to its money is the banks' act, on reading the dissolution.
 3. **Claims are append-only, and "current holder" is interpretation.** Selling land adds a transfer record. A registry (the land titles office, a code seat) is what people trust about who owns what, as in reality.
 4. **Initial records are authored by `genesis`**: the world as it began, attributed to nobody in it.
-5. **Records carry visibility.** Laws are usually public; leases are seen by their parties; instructions by the account holder and the bank.
+5. **Records carry visibility.** Laws are usually public; leases are seen by their parties; instructions by the account holder and the bank. When a block doesn't say, the kernel applies these defaults (the author's entity can always see its own records):
+   - entity declarations, claims without a counterparty, and statements without addressees: public;
+   - claims with a counterparty: author, holder and counterparty;
+   - agreements: author and parties;
+   - statements with addressees: author and addressees;
+   - signatures, notices, claim transfers and releases, and withdrawals: whoever could see the record they refer to (plus the new holder, for transfers);
+   - votes: the voter and whoever runs the ballot. Not public, so ballots are secret by default.
 6. **The construction payment liberty** (the physical-acts section above). **Accepted only to unblock us; must be fleshed out later**: builders should buy materials from suppliers through their banks, or construction should become a task with inputs (D24). Tracked in docs/decisions.md, under "Open".
 7. **A seat acts as exactly one entity.** A person employed by the city isn't modelled separately from their role unless a world does so.
 8. **`sites` channels have a refresh interval**, so detection can be delayed and partial. Coverage and frequency are experimental variables.

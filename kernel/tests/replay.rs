@@ -58,13 +58,13 @@ proptest! {
 
     #[test]
     fn replay_is_byte_identical(ops in proptest::collection::vec(op_strategy(), 1..60), finish in any::<bool>()) {
-        let (log, anchors, state) = live(&permissive(), &ops, finish);
+        let (log, anchors, state) = live(&default_params(), &ops, finish);
         let report = replay(&log, Some(&anchors)).map_err(|e| TestCaseError::fail(e.to_string()))?;
         prop_assert_eq!(&report.canonical_state, &state);
         prop_assert_eq!(report.complete, finish);
         prop_assert!(report.build_differs.is_none());
 
-        let (log2, anchors2, state2) = live(&permissive(), &ops, finish);
+        let (log2, anchors2, state2) = live(&default_params(), &ops, finish);
         prop_assert!(log == log2, "same inputs produced different logs");
         prop_assert_eq!(anchors, anchors2);
         prop_assert_eq!(state, state2);
@@ -75,9 +75,8 @@ proptest! {
 fn replay_detects_a_kernel_that_behaves_differently() {
     // Simulate a kernel change: edit a logged event and re-hash the whole chain,
     // so the chain is valid but the events no longer match what the kernel does.
-    let ops: Vec<Op> =
-        vec![Op::Act { seat: 0, blocks: vec![B::Transfer { from: 1, to: 3, amount: 500, to_ref: false }] }, Op::Advance { ticks: 800 }];
-    let (log, _, _) = live(&permissive(), &ops, true);
+    let ops: Vec<Op> = vec![Op::Smart { kind: 0, a: 0, b: 1, flag: false }, Op::Advance { ticks: 800 }];
+    let (log, _, _) = live(&default_params(), &ops, true);
     let text = String::from_utf8(log).unwrap();
     let mut entries: Vec<serde_json::Value> = text.lines().map(|l| serde_json::from_str(l).unwrap()).collect();
     let i = entries.iter().position(|e| e["kind"] == "event" && e["body"]["event"] == "transfer").unwrap();

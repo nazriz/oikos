@@ -1,14 +1,20 @@
-//! World config, mirroring contracts/world-config.schema.json, plus the
-//! semantic checks JSON Schema can't express (unique ids, references resolve,
-//! one boundary entity, no overlapping parcels, no control cycles, ...).
+//! World config, mirroring contracts/world-config.schema.json (v0.2), plus
+//! the semantic checks JSON Schema can't express: unique ids, references
+//! resolve, one boundary, parcels don't overlap, occupancy within capacity.
+//! None of these checks is law; they keep the world's physical description
+//! coherent.
 
-use crate::blocks::{AgreementTerms, Id, ParcelScope, RightKind, Rule, StructureCategory, BLOCK_NAMES};
+use crate::blocks::{Id, Record, RecordBody, GENESIS};
 use crate::canon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACTS_VERSION: &str = "0.1";
+pub const CONTRACTS_VERSION: &str = "0.2";
+
+/// Entity kinds with physical meaning. Every other kind is the world's vocabulary.
+pub const PERSON: &str = "person";
+pub const BOUNDARY: &str = "boundary";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -59,12 +65,11 @@ pub struct Catalogue {
 #[serde(deny_unknown_fields)]
 pub struct StructureType {
     pub id: Id,
-    pub category: StructureCategory,
-    pub cost: i64,
+    pub category: String,
+    pub materials_cost: i64,
     pub build_time: i64,
-    pub demolish_cost: i64,
-    pub units: u32,
-    pub jobs: u32,
+    pub demolition_cost: i64,
+    pub capacity: BTreeMap<String, u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,11 +78,10 @@ pub struct World {
     pub boundary: Id,
     pub parcels: Vec<ParcelCfg>,
     pub entities: Vec<EntityCfg>,
-    pub jurisdictions: Vec<JurisdictionCfg>,
-    pub rights: Vec<RightCfg>,
+    pub accounts: Vec<AccountCfg>,
     pub structures: Vec<StructureCfg>,
-    pub rules: Vec<RuleCfg>,
-    pub agreements: Vec<AgreementCfg>,
+    pub occupancy: Vec<OccupancyCfg>,
+    pub records: Vec<Record>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,46 +96,21 @@ pub struct ParcelCfg {
     pub h: Option<i64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EntityKind {
-    Person,
-    Government,
-    Council,
-    Agency,
-    Firm,
-    Trust,
-    Union,
-    Club,
-    Cooperative,
-    Boundary,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EntityCfg {
     pub id: Id,
-    pub kind: EntityKind,
+    pub kind: String,
     pub name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub controller: Option<Id>,
-    pub balance: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct JurisdictionCfg {
-    pub entity: Id,
-    pub parcels: ParcelScope,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RightCfg {
+pub struct AccountCfg {
     pub id: Id,
-    pub parcel: Id,
-    pub kind: RightKind,
     pub holder: Id,
+    pub custodian: Id,
+    pub balance: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -141,32 +120,28 @@ pub struct StructureCfg {
     pub parcel: Id,
     #[serde(rename = "type")]
     pub structure_type: Id,
-    pub owner: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub built_by: Option<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct RuleCfg {
-    pub id: Id,
-    pub jurisdiction: Id,
-    pub rule: Rule,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AgreementCfg {
-    pub id: Id,
-    pub terms: AgreementTerms,
+pub struct OccupancyCfg {
+    pub occupant: Id,
+    pub structure: Id,
+    pub slot: String,
+    pub count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Seat {
     pub id: Id,
+    pub entity: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    pub principal: Id,
-    pub mandate: Mandate,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
     pub channels: Vec<Channel>,
     /// Opaque to the kernel.
     pub controller: Value,
@@ -175,64 +150,53 @@ pub struct Seat {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Mandate {
-    pub powers: Vec<Power>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Level {
-    Direct,
-    Approval,
-    Request,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Power {
-    pub blocks: Vec<String>,
-    pub level: Level,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub approvers: Option<Vec<Id>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub request_to: Option<Vec<Id>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limits: Option<Limits>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Limits {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_amount: Option<i64>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ChannelKind {
     Accounts,
-    Parcels,
-    Rules,
-    Agreements,
+    Records {
+        #[serde(rename = "match")]
+        filter: RecordFilter,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        new_only: Option<bool>,
+    },
+    Sites {
+        area: Area,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        every: Option<i64>,
+    },
     Directory,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Scope {
-    #[serde(rename = "self")]
-    Own,
-    Jurisdiction,
-    All,
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Channel {
+    pub id: Id,
+    #[serde(flatten)]
+    pub kind: ChannelKind,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecordFilter {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub records: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub statement_kinds: Option<Vec<String>>,
+    /// Entity ids, or "self" for the seat's own entity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub involving: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Channel {
-    pub id: Id,
-    pub kind: ChannelKind,
-    pub scope: Scope,
+#[serde(untagged)]
+pub enum Area {
+    All(AllMarker),
+    Parcels(Vec<Id>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AllMarker {
+    All,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -259,14 +223,6 @@ pub fn load(v: Value) -> Result<LoadedConfig, String> {
     Ok(LoadedConfig { config, canonical: v, hash })
 }
 
-fn is_config_id(s: &str) -> bool {
-    let b = s.as_bytes();
-    !b.is_empty()
-        && b.len() <= 64
-        && b[0].is_ascii_lowercase()
-        && b.iter().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'_' || *c == b'-')
-}
-
 /// Semantic validation beyond the JSON Schema.
 pub fn validate(c: &Config) -> Result<(), String> {
     if c.contracts != CONTRACTS_VERSION {
@@ -278,224 +234,179 @@ pub fn validate(c: &Config) -> Result<(), String> {
     if c.seed > canon::MAX_SAFE as u64 {
         return Err("seed must be <= 2^53-1".into());
     }
+    let w = &c.world;
 
     // Ids are unique across every kind.
     let mut ids: BTreeSet<String> = BTreeSet::new();
     let mut claim = |id: &str, what: &str| -> Result<(), String> {
-        if !is_config_id(id) {
-            return Err(format!("{what} id {id:?} is not a valid config id"));
-        }
         if !ids.insert(id.to_string()) {
-            return Err(format!("duplicate id {id:?}"));
+            return Err(format!("duplicate id {id:?} ({what})"));
         }
         Ok(())
     };
-    let w = &c.world;
     for p in &w.parcels {
         claim(&p.id, "parcel")?;
     }
     for e in &w.entities {
         claim(&e.id, "entity")?;
     }
-    for r in &w.rights {
-        claim(&r.id, "right")?;
+    for a in &w.accounts {
+        claim(&a.id, "account")?;
     }
     for s in &w.structures {
         claim(&s.id, "structure")?;
     }
-    for r in &w.rules {
-        claim(&r.id, "rule")?;
-    }
-    for a in &w.agreements {
-        claim(&a.id, "agreement")?;
+    for r in &w.records {
+        claim(&r.id, "record")?;
     }
     for s in &c.seats {
         claim(&s.id, "seat")?;
     }
     let mut types = BTreeMap::new();
     for t in &c.catalogue.structure_types {
-        if !is_config_id(&t.id) || types.insert(t.id.as_str(), t).is_some() {
-            return Err(format!("bad or duplicate structure type {:?}", t.id));
-        }
-        if t.cost < 1 || t.build_time < 1 || t.demolish_cost < 1 {
-            return Err(format!("structure type {} needs positive cost, build_time, demolish_cost", t.id));
+        if types.insert(t.id.as_str(), t).is_some() {
+            return Err(format!("duplicate structure type {:?}", t.id));
         }
     }
 
     let entities: BTreeMap<&str, &EntityCfg> = w.entities.iter().map(|e| (e.id.as_str(), e)).collect();
-    let parcels: BTreeMap<&str, &ParcelCfg> = w.parcels.iter().map(|p| (p.id.as_str(), p)).collect();
+    let parcels: BTreeSet<&str> = w.parcels.iter().map(|p| p.id.as_str()).collect();
     let seats: BTreeSet<&str> = c.seats.iter().map(|s| s.id.as_str()).collect();
+    let records: BTreeMap<&str, &Record> = w.records.iter().map(|r| (r.id.as_str(), r)).collect();
     let entity = |id: &str| entities.get(id).copied().ok_or_else(|| format!("unknown entity {id:?}"));
-    let parcel = |id: &str| parcels.get(id).copied().ok_or_else(|| format!("unknown parcel {id:?}"));
 
-    // Money.
-    let boundaries: Vec<&EntityCfg> = w.entities.iter().filter(|e| e.kind == EntityKind::Boundary).collect();
+    // The boundary.
+    let boundaries: Vec<&EntityCfg> = w.entities.iter().filter(|e| e.kind == BOUNDARY).collect();
     if boundaries.len() != 1 || boundaries[0].id != w.boundary {
         return Err("exactly one entity of kind boundary is required, and world.boundary must name it".into());
     }
+    if !w.accounts.iter().any(|a| a.holder == w.boundary && a.custodian == w.boundary) {
+        return Err("the boundary needs an account it holds in its own custody".into());
+    }
+
+    // Money.
     let mut total: i128 = 0;
-    for e in &w.entities {
-        if e.kind != EntityKind::Boundary && e.balance < 0 {
-            return Err(format!("entity {} has a negative opening balance", e.id));
+    for a in &w.accounts {
+        entity(&a.holder)?;
+        entity(&a.custodian)?;
+        if a.holder != w.boundary && a.balance < 0 {
+            return Err(format!("account {} has a negative opening balance", a.id));
         }
-        if e.balance.abs() > canon::MAX_SAFE {
-            return Err(format!("entity {} balance out of range", e.id));
+        if a.balance.abs() > canon::MAX_SAFE {
+            return Err(format!("account {} balance out of range", a.id));
         }
-        total += e.balance as i128;
+        total += a.balance as i128;
     }
     if total.abs() > canon::MAX_SAFE as i128 {
         return Err("total money out of range".into());
     }
 
-    // Control has no cycles and points at real entities.
-    for e in &w.entities {
-        let mut seen = BTreeSet::new();
-        let mut cur = e;
-        while let Some(ctrl) = &cur.controller {
-            if !seen.insert(cur.id.as_str()) {
-                return Err(format!("control cycle through {}", e.id));
-            }
-            cur = entity(ctrl)?;
-        }
-    }
-
     // Land: parcels don't overlap.
-    let rects: Vec<(i64, i64, i64, i64, &str)> =
-        w.parcels.iter().map(|p| (p.x, p.y, p.x + p.w.unwrap_or(1), p.y + p.h.unwrap_or(1), p.id.as_str())).collect();
+    let mut rects: Vec<(i64, i64, i64, i64, &str)> = vec![];
     for p in &w.parcels {
-        if p.w.unwrap_or(1) < 1 || p.h.unwrap_or(1) < 1 {
+        let (pw, ph) = (p.w.unwrap_or(1), p.h.unwrap_or(1));
+        if pw < 1 || ph < 1 {
             return Err(format!("parcel {} has non-positive size", p.id));
         }
+        rects.push((p.x, p.y, p.x + pw, p.y + ph, p.id.as_str()));
     }
-    let mut sorted = rects.clone();
-    sorted.sort();
-    for (i, a) in sorted.iter().enumerate() {
-        for b in &sorted[i + 1..] {
+    rects.sort();
+    for (i, a) in rects.iter().enumerate() {
+        for b in &rects[i + 1..] {
             if b.0 >= a.2 {
                 break;
             }
-            if a.0 < b.2 && b.0 < a.2 && a.1 < b.3 && b.1 < a.3 {
+            if a.1 < b.3 && b.1 < a.3 {
                 return Err(format!("parcels {} and {} overlap", a.4, b.4));
             }
         }
     }
 
-    let check_scope = |s: &ParcelScope| -> Result<(), String> {
-        if let ParcelScope::List(l) = s {
-            for p in l {
-                parcel(p)?;
-            }
-        }
-        Ok(())
-    };
-    let mut juris = BTreeSet::new();
-    for j in &w.jurisdictions {
-        entity(&j.entity)?;
-        check_scope(&j.parcels)?;
-        if !juris.insert(j.entity.as_str()) {
-            return Err(format!("entity {} has more than one jurisdiction entry", j.entity));
-        }
-    }
-    for r in &w.rights {
-        parcel(&r.parcel)?;
-        entity(&r.holder)?;
-        if r.kind == RightKind::Surface && w.rights.iter().any(|o| o.id != r.id && o.parcel == r.parcel && o.kind == RightKind::Surface) {
-            return Err(format!("parcel {} has more than one surface right", r.parcel));
-        }
-    }
+    // Structures: one per parcel, of a known type.
     let mut occupied = BTreeSet::new();
+    let mut structures = BTreeMap::new();
     for s in &w.structures {
-        parcel(&s.parcel)?;
-        entity(&s.owner)?;
-        if !types.contains_key(s.structure_type.as_str()) {
-            return Err(format!("structure {} has unknown type {}", s.structure_type, s.id));
+        if !parcels.contains(s.parcel.as_str()) {
+            return Err(format!("structure {} is on unknown parcel {}", s.id, s.parcel));
+        }
+        let ty = types.get(s.structure_type.as_str()).ok_or_else(|| format!("structure {} has unknown type {}", s.id, s.structure_type))?;
+        if let Some(b) = &s.built_by {
+            entity(b)?;
         }
         if !occupied.insert(s.parcel.as_str()) {
             return Err(format!("parcel {} has more than one structure", s.parcel));
         }
+        structures.insert(s.id.as_str(), *ty);
     }
-    for r in &w.rules {
-        entity(&r.jurisdiction)?;
-        if !juris.contains(r.jurisdiction.as_str()) {
-            return Err(format!("rule {} issued by {} which has no jurisdiction", r.id, r.jurisdiction));
+
+    // Occupancy within physical capacity.
+    let mut used: BTreeMap<(&str, &str), u64> = BTreeMap::new();
+    let mut seen_occupant = BTreeSet::new();
+    for o in &w.occupancy {
+        entity(&o.occupant)?;
+        let ty = structures.get(o.structure.as_str()).ok_or_else(|| format!("occupancy names unknown structure {}", o.structure))?;
+        let cap = *ty.capacity.get(&o.slot).ok_or_else(|| format!("structure {} has no {} slots", o.structure, o.slot))? as u64;
+        if !seen_occupant.insert((o.occupant.as_str(), o.structure.as_str(), o.slot.as_str())) {
+            return Err(format!("{} occupies {} slots in {} twice", o.occupant, o.slot, o.structure));
         }
-        check_scope(r.rule.parcels())?;
+        let u = used.entry((o.structure.as_str(), o.slot.as_str())).or_default();
+        *u += o.count as u64;
+        if *u > cap {
+            return Err(format!("structure {} is over its {} capacity", o.structure, o.slot));
+        }
     }
-    for a in &w.agreements {
-        let [p1, p2] = a.terms.parties();
-        entity(p1)?;
-        entity(p2)?;
-        if p1 == p2 {
-            return Err(format!("agreement {} has the same party twice", a.id));
+
+    // Records: authors exist, and everything they reference exists.
+    for r in &w.records {
+        if r.author != GENESIS && !seats.contains(r.author.as_str()) {
+            return Err(format!("record {} has unknown author {}", r.id, r.author));
         }
-        if a.terms.amount() < 1 || a.terms.period() < 1 || a.terms.notice() < 1 || a.terms.term().is_some_and(|t| t < 1) {
-            return Err(format!("agreement {} needs positive amount, period, notice and term", a.id));
+        for e in r.entities_named().into_iter().chain(r.visibility_entities()) {
+            entity(e).map_err(|x| format!("record {}: {x}", r.id))?;
         }
-        match &a.terms {
-            AgreementTerms::Lease { parcel: p, lessor, units, .. } => {
-                parcel(p)?;
-                if !w.rights.iter().any(|r| r.parcel == *p && r.kind == RightKind::Surface && r.holder == *lessor) {
-                    return Err(format!("lease {}: lessor does not hold the surface right on {p}", a.id));
-                }
-                let s = w.structures.iter().find(|s| s.parcel == *p).ok_or_else(|| format!("lease {}: no structure on {p}", a.id))?;
-                let leased: u64 = w
-                    .agreements
-                    .iter()
-                    .filter_map(|o| match &o.terms {
-                        AgreementTerms::Lease { parcel: op, units: u, .. } if op == p => Some(*u as u64),
-                        _ => None,
-                    })
-                    .sum();
-                if *units < 1 || leased > types[s.structure_type.as_str()].units as u64 {
-                    return Err(format!("leases on {p} exceed the structure's capacity"));
-                }
-            }
-            AgreementTerms::Employment { workplace, .. } => {
-                if let Some(p) = workplace {
-                    parcel(p)?;
-                }
+        for other in r.body.records_referenced().into_iter().chain(r.basis.as_deref()) {
+            if !records.contains_key(other) {
+                return Err(format!("record {} references unknown record {other}", r.id));
             }
         }
+        let want = match &r.body {
+            RecordBody::ClaimTransfer { claim, .. } | RecordBody::ClaimRelease { claim } => Some((claim, "claim")),
+            RecordBody::Signature { agreement, .. } | RecordBody::Notice { agreement, .. } => Some((agreement, "agreement")),
+            RecordBody::Vote { ballot, .. } => Some((ballot, "statement")),
+            _ => None,
+        };
+        if let Some((other, kind)) = want {
+            if records[other.as_str()].body.kind_name() != kind {
+                return Err(format!("record {} must reference a {kind}, but {other} is not one", r.id));
+            }
+        }
+        if r.at != 0 {
+            return Err(format!("record {} in the initial world must be at t=0", r.id));
+        }
     }
+
+    // Seats and their channels.
     for s in &c.seats {
-        entity(&s.principal)?;
+        entity(&s.entity)?;
         let mut chans = BTreeSet::new();
         for ch in &s.channels {
             if !chans.insert(ch.id.as_str()) {
                 return Err(format!("seat {} has duplicate channel {}", s.id, ch.id));
             }
-        }
-        for p in &s.mandate.powers {
-            for b in &p.blocks {
-                if !BLOCK_NAMES.contains(&b.as_str()) {
-                    return Err(format!("seat {}: unknown block {b} in mandate", s.id));
-                }
-            }
-            let targets = match p.level {
-                Level::Direct => {
-                    if p.approvers.is_some() || p.request_to.is_some() {
-                        return Err(format!("seat {}: direct power names approvers or request targets", s.id));
+            match &ch.kind {
+                ChannelKind::Records { filter, .. } => {
+                    for e in filter.involving.iter().flatten().filter(|e| *e != "self") {
+                        entity(e).map_err(|x| format!("seat {} channel {}: {x}", s.id, ch.id))?;
                     }
-                    vec![]
                 }
-                Level::Approval => p
-                    .approvers
-                    .clone()
-                    .filter(|v| !v.is_empty())
-                    .ok_or_else(|| format!("seat {}: approval power without approvers", s.id))?,
-                Level::Request => p
-                    .request_to
-                    .clone()
-                    .filter(|v| !v.is_empty())
-                    .ok_or_else(|| format!("seat {}: request power without request_to", s.id))?,
-            };
-            for t in &targets {
-                if !seats.contains(t.as_str()) {
-                    return Err(format!("seat {}: mandate names unknown seat {t}", s.id));
+                ChannelKind::Sites { area: Area::Parcels(ps), .. } => {
+                    for p in ps {
+                        if !parcels.contains(p.as_str()) {
+                            return Err(format!("seat {} channel {} names unknown parcel {p}", s.id, ch.id));
+                        }
+                    }
                 }
-                if t == &s.id {
-                    return Err(format!("seat {} cannot approve or receive its own requests", s.id));
-                }
+                _ => {}
             }
         }
     }

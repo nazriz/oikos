@@ -44,7 +44,12 @@ fn sample_log() -> (Vec<u8>, Vec<u8>) {
         provenance: json!({"via": "direct"}),
         reasoning: Some("because".into()),
     };
-    run.command(&act("mayor", json!([{"block": "transfer", "from": "city", "to": "alice", "amount": 1000}]))).unwrap();
+    run.command(&act(
+        "bank-payments",
+        json!([{"block": "transfer", "from": "acc-city", "to": "acc-alice", "amount": 1000, "per_instruction": "so-bob-rent"}]),
+    ))
+    .unwrap();
+    run.command(&act("mayor", json!([{"block": "transfer", "from": "acc-city", "to": "acc-alice", "amount": 1000}]))).unwrap(); // refused: not custodian
     run.command(&act("mayor", json!([{"block": "message", "to": ["developer"], "text": "hello \"there\"\n"}]))).unwrap();
     run.annotate(json!({"annotation": "note", "subject": "test", "data": {"x": [1, "y", null]}})).unwrap();
     for m in 1..=4 {
