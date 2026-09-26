@@ -13,7 +13,8 @@ export interface AccountFact {
 export class Knowledge {
   readonly withdrawn = new Set<string>();
   readonly accounts = new Map<string, AccountFact>(); // accounts the seat can see directly
-  readonly stated = new Map<string, Set<string>>(); // entity -> accounts it has stated as its own (invoices' pay_to, reports' account)
+  /** entity -> accounts it has asked to be paid into (the shared outcome language: a money outcome with no `from`, in a statement it speaks for). */
+  readonly stated = new Map<string, Set<string>>();
   readonly names = new Map<string, string>(); // entity -> name
   readonly seatEntity = new Map<string, string>();
   readonly structures = new Map<string, string>(); // structure -> type
@@ -55,11 +56,10 @@ export class Knowledge {
     if (r.record === "statement") {
       if (r.kind === "form") this.formsById.set(r.id, r);
       if (r.kind === "law" && r.formal?.condition) this.laws.set(r.id, r);
+      // Someone asking to be paid names where the money should go: that's where they receive money.
       const who = r.speaks_for;
-      for (const k of ["pay_to", "account"]) {
-        const a = r.data?.[k];
-        if (who && typeof a === "string") this.stated.set(who, new Set([...(this.stated.get(who) ?? []), a]));
-      }
+      const m = r.data?.outcome?.money;
+      if (who && m && typeof m.to === "string" && m.from === undefined) this.stated.set(who, new Set([...(this.stated.get(who) ?? []), m.to]));
     }
   }
 

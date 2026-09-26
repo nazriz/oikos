@@ -26,7 +26,7 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.3.0",
+  version: "0.3.1",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -73,7 +73,7 @@ export const mayorCode: BehaviourModule = {
           if (d.data?.decision !== "granted") continue;
           const site = app.data?.parcel;
           const from = ownAccount(obs)?.account;
-          steps.push([["park", C.call("structure", { type: p.park_type, on: site, by: p.builder, price: C.dollars(price), from, permit: d.id })]]);
+          steps.push([["park", C.call("structure", { type: p.park_type, on: site, by: p.builder, price: C.dollars(price), from, basis: d.id })]]);
         }
         // Approve invoices for work we commissioned (the payments procedure requires it over $50k).
         for (const inv of book.open("invoice")) {
@@ -204,7 +204,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: SeatContext) {
@@ -228,7 +228,8 @@ export const financeOfficer: BehaviourModule = {
         const limit = budget ? Object.values(budget.data?.lines ?? {}).reduce((s: number, v: any) => s + (v as number), 0) : 0;
         for (const inv of book.open("invoice").sort((a, b) => (a.id < b.id ? -1 : 1))) {
           if (paid.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
-          const amount: number = inv.data?.amount ?? 0;
+          const owed = inv.data?.outcome?.money;
+          const amount: number = owed?.amount ?? 0;
           const approved = book.open("approval").some((a) => a.data?.invoice === inv.id && a.author === p.mayor_seat);
           const withinProcedure = spent + amount <= limit && (amount <= p.approval_over || approved);
           const follows = ctx.rng(`procedure-${inv.id}`).below(10_000) < p.compliance_bps;
@@ -236,7 +237,7 @@ export const financeOfficer: BehaviourModule = {
           if (acc.balance < amount) continue;
           paid.add(inv.id);
           spent += amount;
-          steps.push([pay(inv.data.pay_to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })]);
+          steps.push([pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })]);
         }
         return steps;
       },

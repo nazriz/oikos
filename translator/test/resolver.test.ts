@@ -19,7 +19,7 @@ function town(): Knowledge {
         seats: [{ seat: "planning", entity: "city", role: "planning_officer", status: "active" }] },
       town: { kind: "sites", as_of: 0, parcels: [{ parcel: "p1", x: 0, y: 0, w: 1, h: 1, structure: { structure: "str.3", type: "apartments", complete: true, occupancy: [] } }] },
       mine: { kind: "records", records: [
-        rec({ id: "inv.1", record: "statement", author: "builder-foreman", speaks_for: "builder", kind: "invoice", text: "Invoice", data: { amount: 50000, pay_to: "acc-builder" }, addressed_to: ["city"] }),
+        rec({ id: "inv.1", record: "statement", author: "builder-foreman", speaks_for: "builder", kind: "invoice", text: "Invoice", data: { outcome: { money: { to: "acc-builder", amount: 50000 } } }, addressed_to: ["city"] }),
         rec({ id: "form-permit", record: "statement", author: "planning", speaks_for: "city", kind: "form", text: "Permit application.",
           data: { form: "permit_application", submit_as: "permit_application", submit_to: ["city"], fields: { parcel: { type: "parcel", required: true }, structure_type: { type: "structure_type", required: true }, notes: { type: "text" } } } }),
       ] },
@@ -61,7 +61,7 @@ test("4.2: a repeating payment is a standing request", () => {
 });
 
 test("4.3: with the inputs supplied, an offered agreement to whoever builds, citing the permit", () => {
-  const r = run('structure(type=park, on=p00-00, by=greenco, price="$60,000", from=acc-city, permit=rec.412)');
+  const r = run('structure(type=park, on=p00-00, by=greenco, price="$60,000", from=acc-city, basis=rec.412)');
   if (!r.ok) throw new Error(r.questions.join(" "));
   expect(r.blocks).toEqual([
     { block: "propose_agreement", speaks_for: "city", ref: "offer1", basis: "rec.412", terms: { template: "construction", parties: ["city", "greenco"],

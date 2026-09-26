@@ -33,7 +33,7 @@ What happens next is up to the owner, and to whoever else might enforce.
 
 ## `firm.builder`
 
-Wakes weekly. For each construction agreement a client has signed, if it can pay for the materials, it signs too and builds (`construct`), the materials being bought from outside (the temporary liberty in docs/decisions.md). It then **invoices** the client for the contract price (an `invoice` statement with `data: { amount, pay_to, agreement }`). Payment is the client's act, through their bank. It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
+Wakes weekly. For each construction agreement a client has signed, if it can pay for the materials, it signs too and builds (`construct`), the materials being bought from outside (the temporary liberty in docs/decisions.md). It then **invoices** the client for the contract price (an `invoice` statement whose data is the payment it asks for, in the shared outcome language: `data: { outcome: { money: { to, amount } }, agreement }`). Payment is the client's act, through their bank. It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
 
 ## Landlords as developers (`firm.landlord`, see [firms.md](firms.md))
 

@@ -110,7 +110,7 @@ LANGUAGE-MODEL OR HUMAN SEAT                          CODE SEAT (behaviour modul
   input: the text (+ the fields of a form, if one is named)    │
   output: a call, or a fixed failure label                     │
     structure(type=park, on=p00-00, by=greenco,                │
-              price="$60,000", from=acc-parks, permit=rec.412) │
+              price="$60,000", from=acc-parks, basis=rec.412) │
             │                                                  │
             ▼                                                  ▼
   PARSER  (deterministic: amounts and time units by lookup; grammar check)
@@ -183,13 +183,13 @@ money(to=landlord-1, amount="$850", every="month", for="rent")
 > "Have GreenCo build a park on p00-00 for $60,000, paid from acc-parks, under permit rec.412."
 
 ```
-structure(type=park, on=p00-00, by=greenco, price="$60,000", from=acc-parks, permit=rec.412)
+structure(type=park, on=p00-00, by=greenco, price="$60,000", from=acc-parks, basis=rec.412)
 ```
 
 - **Resolve:**
   - `by=greenco`: GreenCo is the entity that physically builds, and it isn't `city`, so `city` can't do it. It offers GreenCo an agreement.
   - `price` and `from`: the town's side of the agreement.
-  - `permit=rec.412`: has no physical role. It's attached as the agreement's basis, like showing your permit to the builder. (`propose_agreement` has no `basis` field today: a contract gap, see §15.)
+  - `basis=rec.412`: has no physical role. It's attached as the agreement's basis, like showing your permit to the builder. (`propose_agreement` has no `basis` field today: a contract gap, see §15.)
 - **Resolved acts** (one atomic act):
   ```json
   [ { "block": "propose_agreement", "speaks_for": "city", "ref": "a", "terms": { "template": "construction", "parties": ["city", "greenco"],
@@ -297,7 +297,7 @@ Roughly one function per physics outcome, plus `form`, **generated from the kern
 |---|---|---|---|
 | `money` | Money moves between accounts | `to`, `amount`, `from?`, `every?`, `first?`, `for?`, `settles?` | `transfer` if the seat's entity keeps the paying account; otherwise a `request` to its keeper (standing if `every`) |
 | `account` | An account exists / is closed | `holder`, `at?`, `close?` | `open_account` / `close_account` if the seat's entity is the keeper; otherwise a `request` to `at` |
-| `structure` | A building exists / is gone | `type`, `on`, `by?`, `price?`, `from?`, `permit?`, `remove?` | `construct` / `demolish` if `by` is the seat's entity; otherwise an offered agreement to `by` (4.3). Missing `by` or `from` → a question (4.5) |
+| `structure` | A building exists / is gone | `type`, `on`, `by?`, `price?`, `from?`, `basis?`, `remove?` | `construct` / `demolish` if `by` is the seat's entity; otherwise an offered agreement to `by` (4.3). Missing `by` or `from` → a question (4.5) |
 | `occupancy` | Someone is in / out of a building | `in`, `who?`, `slot?`, `count?`, `leave?` | `occupy` / `vacate`. Removing someone else is physically possible (eviction), and done exactly as said |
 | `entity` | An organisation exists | `kind`, `name`, `visible?` | `create_entity` |
 | `claim` | A legal position is on record / transferred / released | `holder`, `position`, `against?`, `about`, `basis?`, `to?`, `release?` | `record_claim` / `transfer_claim` / `release_claim` |

@@ -47,7 +47,7 @@ test("budget, park and tax run through the town's own procedures", async () => {
   expect(recs.some((r) => r.kind === "approval" && r.author === "mayor" && r.data.invoice === invoice.id)).toBe(true);
   const order = recs.find((r) => r.kind === "request" && r.data?.outcome?.money?.settles === invoice.id);
   expect(order?.author).toBe("finance");
-  expect(ev.some((e) => e.event === "transfer" && e.from === "acc-city" && e.to === "acc-builder" && e.amount === invoice.data.amount)).toBe(true);
+  expect(ev.some((e) => e.event === "transfer" && e.from === "acc-city" && e.to === "acc-builder" && e.amount === invoice.data.outcome.money.amount)).toBe(true);
   // No park was fined: the town followed its own planning law.
   expect(recs.some((r) => r.record === "claim" && r.about?.kind === "fine" && r.counterparty === "city")).toBe(false);
 

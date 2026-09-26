@@ -20,7 +20,7 @@ test("reports use the world's words: titles, totals, tallies; never the machiner
   const votes = ["yes", "no", "yes"].map((choice, i) => ({ id: `v${i}`, record: "vote", author: `councillor-${i}`, at: 5, visible_to: ["city"], ballot: "rec.7", choice }));
   const text = renderObservation(obs({ mine: { kind: "records", records: [...claims, ...votes] } }), { titles: new Map([["mine", "Filings concerning the town"]]) });
   expect(text).toContain("## Filings concerning the town (2 new)");
-  expect(text).toContain("city owns 30 lots: p0, p1");
+  expect(text).toContain("30 ownership claims: city has a right: p0, p1");
   expect(text).toContain("and 18 more");
   expect(text).toContain("3 votes on rec.7: no 1, yes 2");
   for (const machinery of ["block", "record", "channel", "insufficient_funds", "kernel", "translator"]) expect(text.toLowerCase()).not.toContain(machinery);

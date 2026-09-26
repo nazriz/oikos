@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.3.0";
+export const TRANSLATOR_VERSION = "0.3.1";
 
 export interface TranslatorId {
   id: string;

@@ -140,7 +140,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: SeatContext) {
@@ -168,7 +168,7 @@ export const builder: BehaviourModule = {
           steps.push([
             ...(book.signedBy(r.id, me) ? [] : [sign(r.id)]),
             C.call("structure", { type: job.type, on: job.on, by: me, from: acc.account }),
-            ...(price ? [say("invoice", `Invoice: ${price} cents for building a ${job.type} on ${job.on}.`, { to: [client], basis: r.id, data: { amount: price, pay_to: acc.account, agreement: r.id } })] : []),
+            ...(price ? [say("invoice", `Invoice: ${price} cents for building a ${job.type} on ${job.on}.`, { to: [client], basis: r.id, data: { outcome: { money: { to: acc.account, amount: price, for: `building a ${job.type} on ${job.on}` } }, agreement: r.id } })] : []),
           ]);
         }
         return steps;

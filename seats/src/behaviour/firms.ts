@@ -48,7 +48,7 @@ function receipts(obs: Observation, account: string): Map<string, number> {
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.3.0",
+  version: "0.3.1",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -260,7 +260,8 @@ export const landlord: BehaviourModule = {
       for (const inv of book.open("invoice")) {
         if (answered.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
         answered.add(inv.id);
-        if (acc.balance >= inv.data?.amount) steps.push([pay(inv.data.pay_to, inv.data.amount, { from: acc.account, for: "Paying an invoice.", settles: inv.id })]);
+        const owed = inv.data?.outcome?.money;
+        if (owed && acc.balance >= owed.amount) steps.push([pay(owed.to, owed.amount, { from: acc.account, for: "Paying an invoice.", settles: inv.id })]);
       }
 
       // Fines recorded against us, and demolition orders addressed to us.

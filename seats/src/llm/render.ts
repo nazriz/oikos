@@ -108,7 +108,8 @@ function recordLines(records: Record[]): string[] {
       const c = g[0]!;
       const objects = g.map((r) => r.about?.object ?? r.id);
       const total = g.reduce((a, r) => a + (Number.isInteger(r.about?.amount) ? r.about.amount : 0), 0);
-      const what = c.about?.kind === "ownership" ? `${c.holder} owns ${g.length} lots` : `${g.length} ${c.about?.kind ? `${words(c.about.kind)} ` : ""}records: ${c.holder} ${POSITION[c.position] ?? c.position}${c.counterparty ? ` against ${c.counterparty}` : ""}`;
+      // Grouped by what the claims say, in the world's own words (its `about.kind`), with no special cases.
+      const what = `${g.length} ${c.about?.kind ? `${words(c.about.kind)} ` : ""}claims: ${c.holder} ${POSITION[c.position] ?? c.position}${c.counterparty ? ` against ${c.counterparty}` : ""}`;
       return `${what}${total ? `, totalling ${money(total)}` : ""}: ${objects.slice(0, 12).join(", ")}${objects.length > 12 ? `, and ${objects.length - 12} more` : ""}`;
     }
     const v = tallies.get(x)!;

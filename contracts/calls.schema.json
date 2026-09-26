@@ -56,7 +56,7 @@
       "allOf": [
         { "if": { "properties": { "fn": { "const": "money" } } }, "then": { "properties": { "args": { "type": "object", "required": ["to", "amount"], "propertyNames": { "enum": ["to", "amount", "from", "every", "first", "for", "settles", "basis", "per_request"] } } } } },
         { "if": { "properties": { "fn": { "const": "account" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["holder", "at", "close"] } } } } },
-        { "if": { "properties": { "fn": { "const": "structure" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["type", "on", "by", "price", "from", "permit", "remove"] } } } } },
+        { "if": { "properties": { "fn": { "const": "structure" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["type", "on", "by", "price", "from", "basis", "remove"] } } } } },
         { "if": { "properties": { "fn": { "const": "occupancy" } } }, "then": { "properties": { "args": { "type": "object", "required": ["in"], "propertyNames": { "enum": ["in", "who", "slot", "count", "leave"] } } } } },
         { "if": { "properties": { "fn": { "const": "entity" } } }, "then": { "properties": { "args": { "type": "object", "required": ["kind", "name"], "propertyNames": { "enum": ["kind", "name", "visible"] } } } } },
         { "if": { "properties": { "fn": { "const": "claim" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["holder", "position", "against", "about", "basis", "transfer", "to", "release", "visible", "for"] } } } } },

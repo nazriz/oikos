@@ -34,7 +34,7 @@ Each function names a physical outcome. The resolver decides nothing on the seat
 |---|---|---|
 | `money` | `to*` (account or entity), `amount*`, `from`, `every`, `first`, `for`, `settles`, `basis`, `per_request` | `transfer` if the seat's entity keeps `from` (`per_request` links the request it carries out); otherwise a `request` to its keeper, citing `basis` |
 | `account` | `holder`, `at`, `close` | `open_account` / `close_account` if the seat's entity keeps it; otherwise a `request` to `at` |
-| `structure` | `type`, `on`, `by`, `price`, `from`, `permit`, `remove` | `construct` / `demolish` if `by` is the seat's entity (materials or costs `from`); otherwise an offered construction agreement to `by` |
+| `structure` | `type`, `on`, `by`, `price`, `from`, `basis`, `remove` | `construct` / `demolish` if `by` is the seat's entity (materials or costs `from`); otherwise an offered construction agreement to `by` |
 | `occupancy` | `in*`, `who`, `slot`, `count`, `leave` | `occupy` / `vacate` |
 | `entity` | `kind*`, `name*`, `visible` | `create_entity` |
 | `claim` | `holder`, `position`, `against`, `about`, `basis`, `transfer`, `to`, `release`, `visible` | `record_claim` / `transfer_claim` / `release_claim` |
@@ -54,7 +54,7 @@ Each function names a physical outcome. The resolver decides nothing on the seat
 ```
 money(to=builder, amount="$500", for="the fence")
 money(to=acc-landlord-1, amount="$850", every="monthly", for="rent")
-structure(type=park, on=p00-00, by=greenco, price="$60,000", from=acc-parks, permit=rec.412)
+structure(type=park, on=p00-00, by=greenco, price="$60,000", from=acc-parks, basis=rec.412)
 form(to=planning, form=permit_application, parcel=p00-00, structure_type=park)
 agreement(with=c0042, template=lease, term="12 months", our_notice="60 days", their_notice="30 days",
           we_do=occupancy(who=c0042, in=str.3, slot=dwelling, count="1"),

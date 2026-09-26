@@ -15,7 +15,7 @@ import type { Knowledge } from "./knowledge";
 type Call = calls.Call;
 type Value = calls.Value;
 
-export const RESOLVER = { id: "resolver", version: "0.2.0" };
+export const RESOLVER = { id: "resolver", version: "0.3.0" };
 
 /** A resolution: the seat's acts, or questions for the seat (and, when the call itself broke the contract, what was wrong, for the log). */
 export type Resolution = { ok: true; blocks: Block[] } | { ok: false; questions: string[]; invalid?: string[] };
@@ -234,7 +234,7 @@ class Resolver {
     const close = this.id(c, "close");
     // Who keeps it is a choice (you, or a bank), unless an existing account's keeper is known.
     const keeper = at ? this.k.entityOf(at) : close ? this.keeper(close) : undefined;
-    if (!keeper) throw new Ask(close ? `You don't know who keeps account ${close}.` : "Who should keep the account: you, or a bank (which)?");
+    if (!keeper) throw new Ask(close ? `You don't know who keeps account ${close}.` : "Who should keep the account: you, or someone else (who)?");
     if (keeper === this.me) {
       if (close) return [{ block: "close_account", account: close }];
       return [{ block: "open_account", holder: this.need(c, "holder", "An account for whom?"), ...(bind ? { ref: bind } : {}) }];
@@ -254,7 +254,7 @@ class Resolver {
     if (!by) throw new Ask(`Who should ${place}${this.has(c, "price") || this.has(c, "from") ? "" : ", and from which account is it paid"}?`);
     const type = remove ? undefined : this.need(c, "type", "What should be built?");
     const on = remove ? undefined : this.need(c, "on", "On which lot?");
-    const permit = this.id(c, "permit");
+    const basis = this.id(c, "basis");
     if (this.k.entityOf(by) === this.me) {
       const from = this.payer(c, remove ? "the demolition" : "the materials");
       return remove
@@ -269,7 +269,7 @@ class Resolver {
     const ref = bind ?? this.fresh("offer");
     return [
       {
-        block: "propose_agreement", speaks_for: this.me, ref, ...(permit ? { basis: permit } : {}),
+        block: "propose_agreement", speaks_for: this.me, ref, ...(basis ? { basis } : {}),
         terms: {
           template: "construction", parties: [this.me, builder],
           commitments: [
