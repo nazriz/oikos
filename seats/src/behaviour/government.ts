@@ -128,7 +128,7 @@ export const councilClerk: BehaviourModule = {
         const me = obs.entity;
         const t = obs.t;
         const steps: Step[] = [];
-        const councillors = new Set([...book.seatEntity.keys()].filter((s) => (channels.directory(obs)?.seats ?? []).some((x) => x.seat === s && x.role === "councillor")));
+        const councillors = new Set((channels.directory(obs)?.seats ?? []).filter((x) => x.role === "councillor").map((x) => x.seat));
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);

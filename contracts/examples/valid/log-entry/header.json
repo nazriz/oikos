@@ -700,8 +700,7 @@
                 "involving": [
                   "self"
                 ]
-              },
-              "new_only": true
+              }
             },
             {
               "id": "town",
@@ -766,8 +765,7 @@
                 "involving": [
                   "self"
                 ]
-              },
-              "new_only": true
+              }
             }
           ],
           "controller": {
@@ -807,8 +805,7 @@
                 "statement_kinds": [
                   "permit_application"
                 ]
-              },
-              "new_only": true
+              }
             },
             {
               "id": "land",
@@ -1018,8 +1015,7 @@
                 "statement_kinds": [
                   "law"
                 ]
-              },
-              "new_only": true
+              }
             }
           ],
           "controller": {
@@ -1056,8 +1052,7 @@
                 "statement_kinds": [
                   "law"
                 ]
-              },
-              "new_only": true
+              }
             }
           ],
           "controller": {
@@ -1094,8 +1089,7 @@
                 "statement_kinds": [
                   "law"
                 ]
-              },
-              "new_only": true
+              }
             }
           ],
           "controller": {

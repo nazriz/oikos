@@ -139,12 +139,14 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
 
     // The inspector patrols the river every 14 days. Their first observation was at t=0...
     let first = run.command(&Command::Observe { seat: "inspector".into() }).unwrap().observation.unwrap();
-    let saw = |o: &terrarium_kernel::observe::Observation| match &o.channels["river-patrol"] {
-        ChannelData::Sites { parcels, .. } => parcels.iter().find(|p| p.parcel == "p12").unwrap().structure.is_some(),
+    // A look delivers what changed since the last look through the channel; a channel that isn't due is absent.
+    let saw = |o: &terrarium_kernel::observe::Observation| match o.channels.get("river-patrol") {
+        Some(ChannelData::Sites { parcels, .. }) => parcels.iter().find(|p| p.parcel == "p12").is_some_and(|p| p.structure.is_some()),
+        None => false,
         _ => unreachable!(),
     };
-    assert!(saw(&first), "first look refreshes the view");
-    // ...so a building started after a refresh isn't seen until the next one.
+    assert!(saw(&first), "a first look delivers everything the patrol covers");
+    // ...so a building started after a look isn't seen until the next one, which delivers the change.
     let mut run = town();
     run.command(&Command::Observe { seat: "inspector".into() }).unwrap();
     act(&mut run, "builder", json!([{"block": "construct", "parcel": "p12", "structure_type": "house", "materials_from": "acc-buildco"}]));
@@ -294,8 +296,11 @@ fn visibility_decides_who_perceives_what() {
         "voter and the ballot's runner"
     );
     assert!(sees(&mut run, "alice-seat", &vote));
-    assert!(!sees(&mut run, "bob-seat", &vote));
-    assert!(sees(&mut run, "bob-seat", &ballot), "the ballot itself is public, so Bob's channel does show public records");
+    // One look for Bob (a look delivers each new record once): the public ballot, but not Alice's vote.
+    let obs = run.command(&Command::Observe { seat: "bob-seat".into() }).unwrap().observation.unwrap();
+    let got = |id: &str| obs.channels.values().any(|c| matches!(c, ChannelData::Records { records } if records.iter().any(|r| r.id == id)));
+    assert!(!got(&vote));
+    assert!(got(&ballot), "the ballot itself is public, so Bob's channel does show public records");
 }
 
 #[test]

@@ -15,12 +15,12 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, modules as builtin, Randomness, type BehaviourModule, type Controller, type Observation, type Record, type SeatAction, type SeatContext } from "@terrarium/seats";
+import { calls, modules as builtin, Randomness, View, type BehaviourModule, type Controller, type Observation, type Record, type SeatAction, type SeatContext } from "@terrarium/seats";
 import { createLlmSeat, LLM_SEAT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, type LlmAdapter, type LlmController, type LlmIO, type MockBrain } from "@terrarium/seats/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
 
-export const ORCHESTRATOR_VERSION = "0.3.0";
+export const ORCHESTRATOR_VERSION = "0.4.0";
 
 export interface RunOptions {
   config: any;
@@ -33,6 +33,8 @@ export interface RunOptions {
   log?: (msg: string) => void;
   /** The model behind every LLM seat and the translator. Default (and, until real adapters are added, the only option): the mock. */
   adapter?: LlmAdapter;
+  /** For tests: called after each look, with the seat's view-filled observation and the kernel (e.g. to check the view against the kernel's full picture). */
+  inspect?: (seat: string, obs: Observation, kernel: Kernel) => Promise<void>;
 }
 
 export interface RunSummary {
@@ -64,6 +66,8 @@ interface SeatSlot {
   wakesThisTick: number;
   /** What the seat has observed, for the resolver (P8). */
   knowledge: Knowledge;
+  /** The seat's current picture, kept from its looks (perception is changes). */
+  view: View;
   /** Notes about the seat's own requests, delivered with its next observation (Observation.notices). */
   notices: { t: number; text: string; re?: string }[];
   wakeTick: number;
@@ -144,7 +148,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
       const config = { seat: s.id, entity: s.entity, entityName, title: s.title, role: s.role, framing: s.framing, standing: p.standing ?? [], titles, cadenceDays: p.cadence_days ?? 7, draftText };
       const controller = createLlmSeat(config, io);
       const module: BehaviourModule = { name: "llm.seat", version: LLM_SEAT_VERSION, doc: "docs/design/m2-llm-seats.md", cadence: () => cadence, create: () => controller as unknown as Controller };
-      slot = { id: s.id, entity: s.entity, module, controller: controller as unknown as Controller, ctx, nextWake: 0, resigned: false, wakesThisTick: 0, wakeTick: -1, knowledge: new Knowledge(), notices: [],
+      slot = { id: s.id, entity: s.entity, module, controller: controller as unknown as Controller, ctx, nextWake: 0, resigned: false, wakesThisTick: 0, wakeTick: -1, knowledge: new Knowledge(), notices: [], view: new View(new Set(p.standing ?? [])),
         llm: { controller, config: s, drafts: [], drafted: 0 } };
       debriefs.push({ seat: s, controller });
       bindings[s.id] = { configured: `${c.impl ?? "?"}/${c.model ?? "?"}`, adapter: `${io.adapter.provider}/${io.adapter.model}` };
@@ -164,7 +168,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
       const module = c.type === "code" ? mods[c.impl] : undefined;
       if (!module) throw new Error(`seat ${s.id}: no behaviour module "${c.impl}" (controller type ${c.type})`);
       await hashSource(module);
-      slot = { id: s.id, entity: s.entity, module, controller: module.create(ctx), ctx, nextWake: ceilTo(module.firstWake?.(ctx) ?? 0, tick), resigned: false, wakesThisTick: 0, wakeTick: -1, knowledge: new Knowledge(), notices: [] };
+      slot = { id: s.id, entity: s.entity, module, controller: module.create(ctx), ctx, nextWake: ceilTo(module.firstWake?.(ctx) ?? 0, tick), resigned: false, wakesThisTick: 0, wakeTick: -1, knowledge: new Knowledge(), notices: [], view: new View() };
       seatsOf.set(s.entity, [...(seatsOf.get(s.entity) ?? []), s.id]);
     }
     seats.push(slot);
@@ -236,10 +240,13 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     wakes++;
     next.nextWake = t + ceilTo(next.module.cadence(next.ctx), tick); // default if it waits without a time
     for (let n = 0; n < maxActions; n++) {
-      const obs: Observation = (await command({ command: "observe", seat: next.id })).observation;
-      const p0 = performance.now();
-      next.knowledge.absorb(obs);
-      platformMs += performance.now() - p0;
+      const raw: Observation = (await command({ command: "observe", seat: next.id })).observation;
+      const p00 = performance.now();
+      // Knowledge takes in the changes themselves; the controller reads the view's full picture.
+      next.knowledge.absorb(raw);
+      const obs: Observation = next.view.apply(raw);
+      platformMs += performance.now() - p00;
+      if (o.inspect) await o.inspect(next.id, obs, k);
       if (next.notices.length) obs.notices = next.notices.splice(0);
       const L = next.llm;
       if (L) obs.drafts = L.drafts.map((d) => d.draft);

@@ -78,6 +78,11 @@ fn handle(run: &mut Option<Run<BufWriter<File>>>, req: &Value) -> Result<Value, 
             let seq = r.annotate(req.get("annotation").cloned().ok_or("missing annotation")?).map_err(|e| e.to_string())?;
             Ok(json!({ "ok": true, "seq": seq }))
         }
+        "view" => {
+            // What a seat's channels cover right now, in full: for checking a seat runtime's view. Not logged; changes nothing.
+            let obs = r.full_view(str_field("seat")?).ok_or("unknown seat")?;
+            Ok(json!({ "ok": true, "observation": obs }))
+        }
         "state" => {
             let hash = r.kernel().state_hash().map_err(|e| e.to_string())?;
             Ok(json!({ "ok": true, "t": r.kernel().t(), "state_hash": hash, "head": r.head() }))

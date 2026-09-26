@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 488a9128dfe6b03cf2826018c42f8e834c653f94eeb36c2f730cba0b597c2667 # shrinks to ops = [Observe { seat: 1 }, Smart { kind: 104, a: 0, b: 0, flag: false }, Advance { ticks: 168 }, Observe { seat: 190 }]

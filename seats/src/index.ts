@@ -4,6 +4,7 @@ export * from "./rng";
 export * from "./law";
 export * from "./canon";
 export * as calls from "./calls";
+export { View } from "./view";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
 import { exportDemand, idle } from "./behaviour/world";

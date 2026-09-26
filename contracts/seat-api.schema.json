@@ -470,6 +470,7 @@
       ]
     },
     "ChannelData": {
+      "description": "What a look through a channel delivers: what changed within its scope since the seat's previous look through it (a first look: everything it covers). Accounts: accounts opened, whose balance moved, or closed ('closed'); transactions since the previous look. Records: new records. Sites: lots whose building or occupancy changed. Directory: new entities, and seats whose status changed. A channel that isn't due (its 'every') is absent.",
       "oneOf": [
         {
           "type": "object",
@@ -506,12 +507,16 @@
                   },
                   "balance": {
                     "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Cents"
+                  },
+                  "closed": {
+                    "description": "The account was closed since the seat's previous look.",
+                    "const": true
                   }
                 }
               }
             },
             "transactions": {
-              "description": "Transfers touching these accounts since the seat's previous observation.",
+              "description": "Transfers touching these accounts since the seat's previous look through an accounts channel.",
               "type": "array",
               "items": {
                 "type": "object",

@@ -167,13 +167,9 @@ pub enum ChannelKind {
     Records {
         #[serde(rename = "match")]
         filter: RecordFilter,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        new_only: Option<bool>,
     },
     Sites {
         area: Area,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        every: Option<i64>,
     },
     Directory,
 }
@@ -184,6 +180,9 @@ pub struct Channel {
     /// Presentation only (what a seat's reports call the channel).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    /// How often the seat looks through this channel (seconds). Between looks, changes accumulate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub every: Option<i64>,
     #[serde(flatten)]
     pub kind: ChannelKind,
 }

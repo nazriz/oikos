@@ -18,7 +18,7 @@ Wakes weekly. For each permit application addressed to the town:
 
 ## `city.inspector`
 
-Wakes weekly and looks through its `sites` channel. In the example town that channel covers the whole town and refreshes every 14 days: the patrol. Detection is only as good as that coverage and cadence, which are experimental variables (VISION's "information sources").
+Wakes weekly and looks through its `sites` channel. In the example town that channel covers the whole town, and the inspector looks through it every 14 days (`every`): the patrol. Each look delivers what changed since the last. Detection is only as good as that coverage and cadence, which are experimental variables (VISION's "information sources").
 1. On its first look it takes everything already standing as the baseline.
 2. For each *new* structure, it evaluates the building prohibitions for the parcel's registered owner (read from the ownership records, following transfers) against the permits it knows of.
 3. For each breach, it records a **fine** (a claim: the town's right, the owner's duty) and publishes a **demolition order** to the owner, both citing the law.

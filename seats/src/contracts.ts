@@ -72,7 +72,7 @@ export interface SiteParcel {
 }
 
 export type ChannelData =
-  | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; balance: number }[]; transactions: Transaction[] }
+  | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; balance: number; closed?: true }[]; transactions: Transaction[] }
   | { kind: "records"; records: Record[] }
   | { kind: "sites"; as_of: number; parcels: SiteParcel[] }
   | { kind: "directory"; entities: { entity: Id; kind: string; name: string }[]; seats: { seat: Id; entity: Id; title?: string; role?: string; status: "active" | "opted_out" }[] };

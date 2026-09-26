@@ -229,7 +229,7 @@
     },
 
     "Channel": {
-      "description": "A perception channel. Every seat also always receives its inbox and the outcomes of its own acts. Records are only ever shown if their visibility allows the seat's entity to see them.",
+      "description": "A perception channel. Perception is changes, not snapshots: each look through a channel delivers what changed within its scope since the seat's previous look through it (a first look delivers everything it covers), and the seat keeps its own view (the seat runtime maintains it). Every seat also always receives its inbox and the outcomes of its own acts. Records are only ever shown if their visibility allows the seat's entity to see them.",
       "oneOf": [
         {
           "type": "object",
@@ -238,6 +238,7 @@
           "properties": {
             "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
+            "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
             "kind": { "description": "Balances and new transactions of accounts the seat's entity holds or has custody of.", "const": "accounts" }
           }
         },
@@ -248,6 +249,7 @@
           "properties": {
             "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
+            "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
             "kind": { "const": "records" },
             "match": {
               "description": "Which records this channel shows (all conditions must hold; omitted means any).",
@@ -267,8 +269,7 @@
                   "uniqueItems": true
                 }
               }
-            },
-            "new_only": { "description": "Show only records made since the seat's previous observation.", "type": "boolean" }
+            }
           }
         },
         {
@@ -278,16 +279,13 @@
           "properties": {
             "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
+            "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
             "kind": { "description": "Physical state of parcels in an area: structures, construction under way, occupancy. How inspectors see.", "const": "sites" },
             "area": {
               "anyOf": [
                 { "const": "all" },
                 { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" }, "minItems": 1, "uniqueItems": true }
               ]
-            },
-            "every": {
-              "description": "How often the view refreshes. Between refreshes the seat sees the state as of the last refresh. Coverage and frequency are experimental variables.",
-              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration"
             }
           }
         },
@@ -298,6 +296,7 @@
           "properties": {
             "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
+            "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
             "kind": { "description": "Who exists: entities and seats (names, kinds, titles).", "const": "directory" }
           }
         }

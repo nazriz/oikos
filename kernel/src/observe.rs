@@ -8,7 +8,7 @@
 
 use crate::blocks::{Id, Record};
 use crate::config::{Area, ChannelKind, RecordFilter};
-use crate::state::{Message, Outcome, SeatStatus, SiteView, State, Transaction};
+use crate::state::{Look, Message, Outcome, Parcel, SeatStatus, State, Transaction};
 use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -41,6 +41,9 @@ pub struct AccountItem {
     pub holder: Id,
     pub custodian: Id,
     pub balance: i64,
+    /// Set when the account has been closed since the seat last looked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -205,71 +208,111 @@ impl RecordIndex {
     }
 }
 
-fn site_parcels(st: &State, area: &Area) -> Vec<SiteParcel> {
-    st.parcels
-        .iter()
-        .filter(|(id, _)| match area {
-            Area::All(_) => true,
-            Area::Parcels(ps) => ps.iter().any(|p| p == *id),
-        })
-        .map(|(id, p)| SiteParcel {
-            parcel: id.clone(),
-            x: p.x,
-            y: p.y,
-            w: p.w,
-            h: p.h,
-            structure: p.structure.as_ref().map(|sid| {
-                let x = &st.structures[sid];
-                SiteStructure {
-                    structure: sid.clone(),
-                    structure_type: x.structure_type.clone(),
-                    built_by: x.built_by.clone(),
-                    complete: x.complete,
-                    completes_at: x.completes_at,
-                    occupancy: st
-                        .occupancy
-                        .get(sid)
-                        .into_iter()
-                        .flatten()
-                        .flat_map(|(occ, slots)| {
-                            slots.iter().map(|(slot, c)| OccupancyItem { occupant: occ.clone(), slot: slot.clone(), count: *c })
-                        })
-                        .collect(),
-                }
-            }),
-        })
-        .collect()
+fn site_parcel(st: &State, id: &Id, p: &Parcel) -> SiteParcel {
+    SiteParcel {
+        parcel: id.clone(),
+        x: p.x,
+        y: p.y,
+        w: p.w,
+        h: p.h,
+        structure: p.structure.as_ref().map(|sid| {
+            let x = &st.structures[sid];
+            SiteStructure {
+                structure: sid.clone(),
+                structure_type: x.structure_type.clone(),
+                built_by: x.built_by.clone(),
+                complete: x.complete,
+                completes_at: x.completes_at,
+                occupancy: st
+                    .occupancy
+                    .get(sid)
+                    .into_iter()
+                    .flatten()
+                    .flat_map(|(occ, slots)| slots.iter().map(|(slot, c)| OccupancyItem { occupant: occ.clone(), slot: slot.clone(), count: *c }))
+                    .collect(),
+            }
+        }),
+    }
+}
+
+/// How an observation is built.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mode {
+    /// A seat's ordinary look: only channels that are due (`every`), and in each,
+    /// only what changed since the seat last looked through it. Consumes what it delivers.
+    Look,
+    /// Everything each channel covers, now, ignoring `every` and consuming nothing:
+    /// what a seat's view, built up from its looks, must equal (the perception invariant).
+    Full,
 }
 
 /// Build a seat's observation, consuming its "new since last time" state.
 pub fn observe(s: &Statics, st: &mut State, index: &mut RecordIndex, seat: &str) -> Observation {
+    let (obs, looks, drained) = build(s, st, index, seat, Mode::Look);
+    let ss = st.seats.get_mut(seat).unwrap();
+    for (id, look) in looks {
+        ss.looks.insert(id, look);
+    }
+    if drained {
+        ss.new_transactions.clear();
+    }
+    let ss = st.seats.get_mut(seat).unwrap();
+    Observation { outcomes: std::mem::take(&mut ss.new_outcomes), inbox: std::mem::take(&mut ss.new_inbox), ..obs }
+}
+
+/// The full picture a seat's channels cover right now (Mode::Full), changing nothing.
+pub fn full_view(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str) -> Observation {
+    build(s, st, index, seat, Mode::Full).0
+}
+
+fn build(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str, mode: Mode) -> (Observation, Vec<(Id, Look)>, bool) {
     let cfg = &s.seats[seat];
     let me = cfg.entity.clone();
-    let cursor = st.seats[seat].record_cursor;
     index.catch_up(s, st);
+    let ss = &st.seats[seat];
     // Record with seq q is the q-th made.
     let at_seq = |q: u64| &*st.records[&st.record_order[(q - 1) as usize]].record;
 
     let mut channels = BTreeMap::new();
-    let mut refreshed: Vec<(Id, SiteView)> = vec![];
+    let mut looks = vec![];
+    let mut drained = false;
     for ch in &cfg.channels {
+        let last = if mode == Mode::Full { None } else { ss.looks.get(&ch.id).copied() };
+        if let (Some(every), Some(l)) = (ch.every, last) {
+            if st.t < l.at + every {
+                continue; // not looking through this channel yet; changes accumulate
+            }
+        }
+        // Changes after this cursor are new to the seat; None: everything (a first look, or the full picture).
+        let after = last.map(|l| l.cursor);
+        let changed = |c: u64| after.is_none_or(|a| c > a);
         let data = match &ch.kind {
-            ChannelKind::Accounts => ChannelData::Accounts {
-                accounts: index
+            ChannelKind::Accounts => {
+                let mut accounts: Vec<AccountItem> = index
                     .accounts_of(st, &me)
                     .iter()
-                    .map(|id| {
+                    .filter_map(|id| {
                         let a = &st.accounts[id];
-                        AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance }
+                        changed(a.changed).then(|| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance, closed: None })
                     })
-                    .collect(),
-                transactions: st.seats[seat].new_transactions.clone(),
-            },
-            ChannelKind::Records { filter, new_only } => {
-                let after = if new_only.unwrap_or(false) { cursor } else { 0 };
+                    .collect();
+                if after.is_some() {
+                    for (id, x) in st.closed_accounts.iter() {
+                        if (x.holder == me || x.custodian == me) && changed(x.changed) {
+                            accounts.push(AccountItem { account: id.clone(), holder: x.holder.clone(), custodian: x.custodian.clone(), balance: 0, closed: Some(true) });
+                        }
+                    }
+                }
+                accounts.sort_by(|a, b| a.account.cmp(&b.account));
+                let transactions = if mode == Mode::Look { ss.new_transactions.clone() } else { vec![] };
+                drained = mode == Mode::Look;
+                ChannelData::Accounts { accounts, transactions }
+            }
+            ChannelKind::Records { filter } => {
+                let from = after.unwrap_or(0);
                 let want: Option<BTreeSet<&str>> =
                     filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me.as_str() } else { e.as_str() }).collect());
-                let seqs = index.candidates(filter, want.as_ref(), after).unwrap_or_else(|| (after + 1..=st.record_order.len() as u64).collect());
+                let seqs = index.candidates(filter, want.as_ref(), from).unwrap_or_else(|| (from + 1..=st.record_order.len() as u64).collect());
                 ChannelData::Records {
                     records: seqs
                         .into_iter()
@@ -279,25 +322,32 @@ pub fn observe(s: &Statics, st: &mut State, index: &mut RecordIndex, seat: &str)
                         .collect(),
                 }
             }
-            ChannelKind::Sites { area, every } => match (every, st.seats[seat].site_views.get(&ch.id)) {
-                (Some(e), Some(v)) if st.t < v.as_of + e => ChannelData::Sites { as_of: v.as_of, parcels: (*v.parcels).clone() },
-                (every, _) => {
-                    let view = SiteView { as_of: st.t, parcels: std::sync::Arc::new(site_parcels(st, area)) };
-                    if every.is_some() {
-                        refreshed.push((ch.id.clone(), view.clone()));
-                    }
-                    ChannelData::Sites { as_of: view.as_of, parcels: (*view.parcels).clone() }
-                }
+            ChannelKind::Sites { area } => ChannelData::Sites {
+                as_of: st.t,
+                parcels: st
+                    .parcels
+                    .iter()
+                    .filter(|(id, p)| {
+                        changed(p.changed)
+                            && match area {
+                                Area::All(_) => true,
+                                Area::Parcels(ps) => ps.iter().any(|x| x == *id),
+                            }
+                    })
+                    .map(|(id, p)| site_parcel(st, id, p))
+                    .collect(),
             },
             ChannelKind::Directory => ChannelData::Directory {
                 entities: st
                     .entities
                     .iter()
+                    .filter(|(_, e)| changed(e.changed))
                     .map(|(id, e)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone() })
                     .collect(),
                 seats: s
                     .seats
                     .values()
+                    .filter(|x| changed(st.seats[&x.id].status_changed))
                     .map(|x| SeatItem {
                         seat: x.id.clone(),
                         entity: x.entity.clone(),
@@ -308,24 +358,21 @@ pub fn observe(s: &Statics, st: &mut State, index: &mut RecordIndex, seat: &str)
                     .collect(),
             },
         };
+        if mode == Mode::Look {
+            let cursor = if matches!(ch.kind, ChannelKind::Records { .. }) { st.counters.record_seq } else { st.counters.change };
+            looks.push((ch.id.clone(), Look { at: st.t, cursor }));
+        }
         channels.insert(ch.id.clone(), data);
     }
-
-    let record_seq = st.counters.record_seq;
-    let ss = st.seats.get_mut(seat).unwrap();
-    for (id, view) in refreshed {
-        ss.site_views.insert(id, view);
-    }
-    ss.record_cursor = record_seq;
-    ss.new_transactions.clear();
-    Observation {
+    let obs = Observation {
         seat: seat.into(),
         t: st.t,
         status: ss.status,
         entity: me,
-        outcomes: std::mem::take(&mut ss.new_outcomes),
-        inbox: std::mem::take(&mut ss.new_inbox),
+        outcomes: if mode == Mode::Full { vec![] } else { ss.new_outcomes.clone() },
+        inbox: if mode == Mode::Full { vec![] } else { ss.new_inbox.clone() },
         drafts: vec![],
         channels,
-    }
+    };
+    (obs, looks, drained)
 }

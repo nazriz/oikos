@@ -73,12 +73,14 @@ A seat is a role or a person. It **acts as one entity** (a citizen as themselves
 
 Perception comes only through channels, plus the seat's inbox and the outcomes of its own acts:
 
-| Channel | Shows |
+| Channel | Covers |
 |---|---|
-| `accounts` | Accounts the seat's entity holds or has custody of, and their new transactions |
-| `records` | Records matching a filter (record type, statement kind, entities involved, new only) that the seat is allowed to see |
-| `sites` | The physical state of an area: structures, construction, occupancy, refreshed `every` so often. This is how an inspector *notices*. |
-| `directory` | Who exists |
+| `accounts` | Accounts the seat's entity holds or has custody of, and their transactions |
+| `records` | Records matching a filter (record type, statement kind, entities involved) that the seat is allowed to see |
+| `sites` | The physical state of an area: structures, construction, occupancy. This is how an inspector *notices*. |
+| `directory` | Who exists, and who holds which seat |
+
+**Perception is changes, not snapshots (D42).** Each look through a channel delivers what changed within its scope since the seat's previous look through it: accounts opened, moved or closed; new records; lots whose building or occupancy changed; new entities and seats whose status changed. A first look delivers everything the channel covers. The seat runtime keeps each seat's **view** from these changes (`seats/src/view.ts`) and gives its controller the current picture, so nothing is re-sent. A kernel invariant test checks that a view built from looks always equals the full picture (`kernel/tests/perception.rs`). Any channel can have `every`, how often the seat looks (an inspector's patrol, a monthly statement); between looks, changes accumulate.
 
 **Every seat can always opt out of the study** (VISION §15; D38), which is not resigning an office; `on_opt_out` says whether the seat then goes vacant or a code stand-in carries on. Every framing records its disclosure and a mandatory reason.
 
@@ -151,6 +153,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 - **Drafts** gain `call` and `resolver`. `summary` is the mechanical preview. Provenance on `act` gains `call` and `resolver` (via `translator`), plus a new `via: "call"`.
 - **`basis` on `propose_agreement`.**
 - **`orchestration.confirm`**: `always`, `consequential` or `never`.
+- **Perception is changes** (D42): every channel delivers only what changed since the seat's last look through it. `new_only` is gone; `every` applies to any channel; account items can be `closed`.
 - **Opting out:** `resign` becomes `opt_out` (seat action and command); the event is `seat_opted_out` and the status `opted_out`. Each seat gains `on_opt_out`.
 
 ## Versioning

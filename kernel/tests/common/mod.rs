@@ -126,7 +126,7 @@ pub fn world(p: &WorldParams) -> Value {
         .map(|(id, e)| {
             json!({"id": id, "entity": e, "channels": [
                 {"id": "money", "kind": "accounts"},
-                {"id": "mine", "kind": "records", "match": {"involving": ["self"]}, "new_only": true},
+                {"id": "mine", "kind": "records", "match": {"involving": ["self"]}},
                 {"id": "laws", "kind": "records", "match": {"records": ["statement"]}},
                 {"id": "town", "kind": "sites", "area": "all", "every": 7 * 86_400},
                 {"id": "who", "kind": "directory"}

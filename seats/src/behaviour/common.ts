@@ -1,5 +1,5 @@
 // Shared helpers for behaviour modules: turning what a seat has seen into
-// memory. Records arrive through `new_only` channels, so each module keeps
+// memory. Records arrive as what's new since the seat last looked, so each module keeps
 // its own book of the records relevant to it, as a person would.
 
 import * as C from "../calls";
@@ -19,6 +19,7 @@ export class Book {
   private readonly byKind = new Map<string, StatementRecord[]>(); // statement kind -> statements, in the order seen
   readonly seatEntity = new Map<string, string>();
   readonly entityKind = new Map<string, string>();
+  private lastDirectory: unknown; // the directory list last read (the seat's view hands back the same list until it changes)
 
   absorb(obs: Observation): Record[] {
     const fresh: Record[] = [];
@@ -41,7 +42,8 @@ export class Book {
       if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
     }
     const dir = channels.directory(obs);
-    if (dir) {
+    if (dir && dir.seats !== this.lastDirectory) {
+      this.lastDirectory = dir.seats;
       for (const s of dir.seats) this.seatEntity.set(s.seat, s.entity);
       for (const e of dir.entities) this.entityKind.set(e.entity, e.kind);
     }

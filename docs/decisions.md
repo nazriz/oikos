@@ -190,11 +190,22 @@ See the design note, §16.
 - Language seats read and act in world terms, confirm mechanical previews, and can opt out, with an optional stand-in.
 - What building it refined is recorded in docs/design/translator-and-resolver.md, §21.
 
+**D42. Perception is changes, not snapshots.** *(Naz, 2026-09-26: "architecturally this does not seem scalable at all… we can substantially improve this + make it more general".)*
+- **The problem:** every observation used to be a snapshot, re-sent, hashed and logged in full. So cost grew with the size of what a seat could see, not with what happened: the bank got its whole ledger and the whole directory every day.
+- **Now:** every channel delivers only what changed within its scope since the seat's last look through it. The kernel keeps change stamps on accounts, parcels, entities and seats, closed-account tombstones, and per-channel cursors. All of it is hashed state, so it replays exactly.
+- **Views:** the seat runtime keeps each seat's view (`seats/src/view.ts`) and hands its controller the current picture, so modules and the renderer are unchanged.
+- **`new_only` is gone.** `every` becomes a perception cadence for any channel.
+- **Invariants:** a kernel test (and a mutation check of it) proves that a view built from looks equals the full picture, over random worlds; a runtime test checks the same on a real town.
+- **Results unchanged:** a 2-year, 200-citizen run has the identical final state. At 1,000 citizens, two years now take ~112 s, down from ~206 s.
+- **Considered and not taken:** a refresh interval on the directory (stale, and useless for balances); stamping records with the author's true entity (defeats forgery for every reader); a database (it wouldn't change what's re-sent; a database belongs in measurement, and later as an on-disk archive for very long runs; see the note below).
+
+**Database, noted for later (from the same discussion):** DuckDB over Parquet for measurement, built with M3. An on-disk archive for old records (SQLite or an embedded key-value store) with incremental hashing, once run lengths reach tens of millions of records.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
 
 - **Contract additions proposed by M2** (docs/design/m2-llm-seats.md, "Open"): `notices` on the Observation (translation failures and similar orchestrator-to-seat notes), and `framing.debrief_text`.
-- **Directory refresh interval** (D33): a proposed contract addition.
+- ~~Directory refresh interval (D33)~~: superseded by D42 (perception is changes).
 - ~~Citizen behaviour in the Rust kernel vs TypeScript code seats.~~ **Resolved by D30.**
 - ~~Which D15 laws become parameters.~~ **Obsolete** under D18/D19: there are no laws in the kernel; laws are records in a world's config.

@@ -66,6 +66,7 @@ pub fn scheduled(st: &mut State, item: Scheduled) -> Vec<Timed> {
             Some(x) if !x.complete && x.completes_at == Some(item.at) => {
                 x.complete = true;
                 x.completes_at = None;
+                st.touch_structure(&structure);
                 vec![Timed::new(item.at, EventBody::StructureCompleted { structure })]
             }
             // Demolished before completion: nothing to do.
@@ -171,8 +172,13 @@ impl<'a> Exec<'a> {
             if dst.balance.checked_add(amount).is_none_or(|x| x > MAX_SAFE) {
                 return Err(refuse(RefusalCode::Overflow, format!("{to}'s balance would exceed 2^53-1")));
             }
-            self.st.accounts.get_mut(from).unwrap().balance -= amount;
-            self.st.accounts.get_mut(to).unwrap().balance += amount;
+            let c = self.st.stamp();
+            let a = self.st.accounts.get_mut(from).unwrap();
+            a.balance -= amount;
+            a.changed = c;
+            let b = self.st.accounts.get_mut(to).unwrap();
+            b.balance += amount;
+            b.changed = c;
         }
         let tx = Transaction {
             t: self.now(),
@@ -292,7 +298,8 @@ impl<'a> Exec<'a> {
                 let holder = self.r(holder)?;
                 self.entity_exists(&holder)?;
                 let id = self.st.mint("acc");
-                self.st.accounts.insert(id.clone(), Account { holder: holder.clone(), custodian: self.entity.into(), balance: 0 });
+                let c = self.st.stamp();
+                self.st.accounts.insert(id.clone(), Account { holder: holder.clone(), custodian: self.entity.into(), balance: 0, changed: c });
                 self.emit(EventBody::AccountOpened { account: id.clone(), holder, custodian: self.entity.into(), by: self.seat.into() });
                 self.bind(bind, &id)
             }
@@ -309,7 +316,10 @@ impl<'a> Exec<'a> {
                 if a.balance != 0 {
                     return Err(refuse(RefusalCode::AccountNotEmpty, format!("{account} still holds {}", a.balance)));
                 }
-                self.st.accounts.remove(&account);
+                let c = self.st.stamp();
+                if let Some(gone) = self.st.accounts.remove(&account) {
+                    self.st.closed_accounts.insert(account.clone(), crate::state::ClosedAccount { holder: gone.holder, custodian: gone.custodian, changed: c });
+                }
                 self.emit(EventBody::AccountClosed { account, by: self.seat.into() });
                 Ok(())
             }
@@ -345,7 +355,10 @@ impl<'a> Exec<'a> {
                         completes_at: Some(completes),
                     },
                 );
-                self.st.parcels.get_mut(parcel).unwrap().structure = Some(id.clone());
+                let c = self.st.stamp();
+                let p = self.st.parcels.get_mut(parcel).unwrap();
+                p.structure = Some(id.clone());
+                p.changed = c;
                 self.st.schedule(completes, Sched::StructureComplete { structure: id.clone() });
                 self.emit(EventBody::StructureStarted {
                     structure: id.clone(),
@@ -381,7 +394,10 @@ impl<'a> Exec<'a> {
                     });
                 }
                 self.st.structures.remove(&sid);
-                self.st.parcels.get_mut(&x.parcel).unwrap().structure = None;
+                let c = self.st.stamp();
+                let p = self.st.parcels.get_mut(&x.parcel).unwrap();
+                p.structure = None;
+                p.changed = c;
                 self.emit(EventBody::StructureDemolished { structure: sid, by: self.seat.into() });
                 Ok(())
             }
@@ -410,6 +426,7 @@ impl<'a> Exec<'a> {
                     .or_default()
                     .entry(slot.clone())
                     .or_default() += count;
+                self.st.touch_structure(&sid);
                 self.emit(EventBody::Occupied { occupant: self.entity.into(), structure: sid, slot: slot.clone(), count: *count });
                 Ok(())
             }
@@ -424,6 +441,7 @@ impl<'a> Exec<'a> {
                 if self.st.occupancy.get(&sid).is_some_and(|o| o.is_empty()) {
                     self.st.occupancy.remove(&sid);
                 }
+                self.st.touch_structure(&sid);
                 let reason = if occupant == self.entity { VacateReason::Left } else { VacateReason::Removed };
                 self.emit(EventBody::Vacated { occupant, structure: sid, by: self.seat.into(), reason });
                 Ok(())
@@ -443,7 +461,8 @@ impl<'a> Exec<'a> {
                 let speaks_for = self.ro(speaks_for)?;
                 let id = self.st.mint("ent");
                 self.st.counters.created_entities += 1;
-                self.st.entities.insert(id.clone(), Entity { kind: kind.clone(), name: name.clone() });
+                let c = self.st.stamp();
+                self.st.entities.insert(id.clone(), Entity { kind: kind.clone(), name: name.clone(), changed: c });
                 self.emit(EventBody::EntityCreated { entity: id.clone(), kind: kind.clone(), name: name.clone() });
                 self.new_record(
                     RecordBody::EntityDeclaration { entity: id.clone(), kind: kind.clone(), name: name.clone() },

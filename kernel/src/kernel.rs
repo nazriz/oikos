@@ -111,21 +111,22 @@ impl Kernel {
         let mut st = State {
             t: 0,
             counters: Counters::default(),
-            entities: w.entities.iter().map(|e| (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone() })).collect(),
+            entities: w.entities.iter().map(|e| (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0 })).collect(),
             accounts: w
                 .accounts
                 .iter()
-                .map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance }))
+                .map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance, changed: 0 }))
                 .collect(),
             parcels: w
                 .parcels
                 .iter()
-                .map(|p| (p.id.clone(), Parcel { x: p.x, y: p.y, w: p.w.unwrap_or(1), h: p.h.unwrap_or(1), structure: None }))
+                .map(|p| (p.id.clone(), Parcel { x: p.x, y: p.y, w: p.w.unwrap_or(1), h: p.h.unwrap_or(1), structure: None, changed: 0 }))
                 .collect(),
             structures: crate::state::Map::new(),
             occupancy: crate::state::Map::new(),
             records: crate::state::Map::new(),
             record_order: imbl::Vector::new(),
+            closed_accounts: crate::state::Map::new(),
             seats: c
                 .seats
                 .iter()
@@ -137,8 +138,8 @@ impl Kernel {
                             new_outcomes: vec![],
                             new_inbox: vec![],
                             new_transactions: vec![],
-                            record_cursor: 0,
-                            site_views: BTreeMap::new(),
+                            status_changed: 0,
+                            looks: BTreeMap::new(),
                         },
                     )
                 })
@@ -233,7 +234,10 @@ impl Kernel {
             Command::Advance { to } => self.advance(*to),
             Command::Observe { seat } => self.observe(seat),
             Command::OptOut { seat, statement } => {
-                self.state.seats.get_mut(seat).unwrap().status = SeatStatus::OptedOut;
+                let c = self.state.stamp();
+                let ss = self.state.seats.get_mut(seat).unwrap();
+                ss.status = SeatStatus::OptedOut;
+                ss.status_changed = c;
                 Output {
                     events: vec![Timed::new(self.state.t, EventBody::SeatOptedOut { seat: seat.clone(), statement: statement.clone() })],
                     observation: None,
@@ -303,6 +307,11 @@ impl Kernel {
         }
         self.state.t = to;
         Output { events, observation: None }
+    }
+
+    /// The full picture a seat's channels cover right now; changes nothing.
+    pub fn full_view(&mut self, seat: &str) -> Option<observe::Observation> {
+        self.s.seats.contains_key(seat).then(|| observe::full_view(&self.s, &self.state, &mut self.index, seat))
     }
 
     fn observe(&mut self, seat: &str) -> Output {

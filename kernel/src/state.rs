@@ -7,7 +7,6 @@
 
 use crate::blocks::{Id, Record};
 use crate::events::RefusalCode;
-use crate::observe::SiteParcel;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -31,6 +30,8 @@ pub struct State {
     /// Record ids in the order they were made (record i has seq i+1).
     pub record_order: imbl::Vector<Id>,
     pub seats: Map<Id, SeatState>,
+    /// Accounts that have been closed, kept so seats that keep or hold them perceive the closure.
+    pub closed_accounts: Map<Id, ClosedAccount>,
     /// Future physical effects (construction completing), sorted by (at, seq).
     pub schedule: Vec<Scheduled>,
 }
@@ -44,15 +45,20 @@ pub struct Counters {
     pub act: u64,
     pub msg: u64,
     pub sched: u64,
-    /// Order in which records were made; drives `new_only` channels.
+    /// Order in which records were made; records channels deliver those after a seat's last look.
     pub record_seq: u64,
     pub created_entities: u64,
+    /// Order of changes to accounts, parcels, entities and seats: other channels deliver
+    /// what changed after a seat's last look (perception is changes, not snapshots).
+    pub change: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entity {
     pub kind: String,
     pub name: String,
+    /// The change stamp at which it came to exist (0: from the start).
+    pub changed: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,6 +66,8 @@ pub struct Account {
     pub holder: Id,
     pub custodian: Id,
     pub balance: i64,
+    /// The change stamp of its last change (opened, balance moved).
+    pub changed: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,6 +78,8 @@ pub struct Parcel {
     pub h: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structure: Option<Id>,
+    /// The change stamp of its last change (a building started, finished or gone; occupancy moved).
+    pub changed: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,21 +110,30 @@ pub enum SeatStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SeatState {
     pub status: SeatStatus,
+    /// The change stamp of the last status change (0: from the start).
+    pub status_changed: u64,
     /// Delivered at this seat's next observation, then cleared.
     pub new_outcomes: Vec<Outcome>,
     pub new_inbox: Vec<Message>,
+    /// Delivered by the seat's next look through an accounts channel.
     pub new_transactions: Vec<Transaction>,
-    /// Records with seq above this are "new" for `new_only` channels.
-    pub record_cursor: u64,
-    /// Last refresh of each `sites` channel that has a refresh interval.
-    pub site_views: BTreeMap<Id, SiteView>,
+    /// When the seat last looked through each channel, and how far it had seen.
+    pub looks: BTreeMap<Id, Look>,
+}
+
+/// A seat's last look through a channel: when, and the cursor it had reached
+/// (the record sequence for records channels, the change stamp for the others).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Look {
+    pub at: i64,
+    pub cursor: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SiteView {
-    pub as_of: i64,
-    /// Shared, so copying a seat's state doesn't copy the town.
-    pub parcels: Arc<Vec<SiteParcel>>,
+pub struct ClosedAccount {
+    pub holder: Id,
+    pub custodian: Id,
+    pub changed: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -204,6 +223,21 @@ impl State {
         let item = Scheduled { at, seq: self.counters.sched, what };
         let pos = self.schedule.partition_point(|s| (s.at, s.seq) <= (item.at, item.seq));
         self.schedule.insert(pos, item);
+    }
+
+    /// The next change stamp.
+    pub fn stamp(&mut self) -> u64 {
+        self.counters.change += 1;
+        self.counters.change
+    }
+
+    /// Mark the parcel a structure stands on as changed (building, completion, occupancy).
+    pub fn touch_structure(&mut self, structure: &str) {
+        let Some(parcel) = self.structures.get(structure).map(|x| x.parcel.clone()) else { return };
+        let c = self.stamp();
+        if let Some(p) = self.parcels.get_mut(&parcel) {
+            p.changed = c;
+        }
     }
 
     /// Store a record, giving it the next sequence number.

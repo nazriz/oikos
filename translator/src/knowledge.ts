@@ -30,7 +30,10 @@ export class Knowledge {
     this.t = obs.t;
     for (const ch of Object.values(obs.channels)) {
       if (ch.kind === "accounts") {
-        for (const a of ch.accounts) this.accounts.set(a.account, { account: a.account, holder: a.holder, custodian: a.custodian });
+        for (const a of ch.accounts) {
+          if (a.closed) this.accounts.delete(a.account);
+          else this.accounts.set(a.account, { account: a.account, holder: a.holder, custodian: a.custodian });
+        }
       } else if (ch.kind === "sites") {
         for (const p of ch.parcels) if (p.structure) this.structures.set(p.structure.structure, p.structure.type);
       } else if (ch.kind === "directory") {
