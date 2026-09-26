@@ -25,6 +25,7 @@
 |---|---|
 | **Posting** | If staff plus pending offers are below the target headcount, and the balance covers 2 pay periods of the wage bill, post one job at the firm's wage |
 | **Hiring** | One applicant at random per posting. The offer includes the workplace. |
+| **Postings** | A posting says where the work is (`data.workplace`), so someone told about a workplace can find it. |
 | **Paying** | Once the worker signs, set up a standing order through the firm's bank for wages every 14 days |
 | **Layoffs** | If the balance can't cover the next pay period, give 14 days' notice to the most recent hire, and stop their wages when it runs out |
 | **Suppliers** | Monthly: 40% of the month's revenue paid to the outside world, for goods bought in |

@@ -8,20 +8,27 @@
 // same model's consumption rule): essentials, plus a fraction of savings
 // above a desired buffer. Exit (Hirschman 1970): after long enough without a
 // home, or without work and money, they leave town and take their money.
+// Word of mouth (D44; Granovetter 1974, Ioannides & Loury 2004): people who
+// start hunting ask the people they live and work with, now and before; those
+// who can see room where they live, or at their own work, say where.
 //
 // Everything is done the way a person does it: applying, signing, moving in,
 // asking the bank to pay. Nothing happens to them automatically.
 
-import type { LookRequest, Observation, SeatAction, StatementRecord } from "../contracts";
+import type { LookRequest, Observation, SeatAction, SiteParcel, StatementRecord } from "../contracts";
 import { params, wait, type BehaviourModule, type SeatContext } from "../module";
-import { Book, callAction, DAY, jobTerms, leaseTerms, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, vote, withdraw, type Step } from "./common";
+import { Book, callAction, DAY, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, vote, withdraw, type Step } from "./common";
+
+/** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
+export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
+type Want = keyof typeof ASKING;
 
 interface Home { agreement: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean }
 interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; endsAt: number }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -43,6 +50,12 @@ export const citizen: BehaviourModule = {
       population: 200,
       rent_burden_grievance_bps: 4000,
       search_limit: 20, // how many listings or postings a search shows, best first
+      // Word of mouth (docs/behaviour/citizen.md, D44).
+      ask_home_bps: 3700, // chance a new home hunt starts by asking around (37% of renters ask friends or family: Apartments.com/NAA 2026)
+      ask_work_bps: 6900, // chance a new job hunt starts by asking around (69% of young job seekers used friends and relatives over a year: Holzer 1987)
+      ask_again_days: 60, // still hunting after this long: a new hunt, asked about again (placeholder)
+      max_contacts: 15, // people remembered from homes and workplaces shared, most recent first (placeholder; Dunbar's ~15 "sympathy group")
+      pass_on_bps: 10_000, // chance a contact who can see a lead passes it on (placeholder)
     },
     ctx.params,
   );
@@ -64,6 +77,15 @@ export const citizen: BehaviourModule = {
     let pendingRef: { kind: "rent"; agreement: string } | null = null;
     let moving = false; // a move-in is planned this wake
     let lastWasMove = false; // the action we last returned was that move-in
+    // Word of mouth: who we know (entity -> when we last shared a home or workplace), whom we asked when,
+    // who asked us, and the buildings people told us about.
+    const contacts = new Map<string, number>();
+    const askedAt: { [w in Want]?: number } = {};
+    let asked: { seat: string; want: Want }[] = [];
+    let leads: string[] = []; // buildings, most recent last
+    let looking: "leads" | "market" | null = null; // which search the next observation answers
+    const leadFound: { homes: StatementRecord[]; jobs: StatementRecord[] } = { homes: [], jobs: [] };
+    const capacity = new Map<string, { [slot: string]: number }>((ctx.world.config?.catalogue?.structure_types ?? []).map((t: any) => [t.id, t.capacity ?? {}]));
 
     const monthlyIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
 
@@ -93,7 +115,16 @@ export const citizen: BehaviourModule = {
       fresh.push(...book.absorb(obs));
       for (const k of ["homes", "jobs", "petitions"] as const) {
         const ch = obs.channels[k];
-        if (ch?.kind === "records" && ch.search) found[k] = ch.records as StatementRecord[];
+        if (ch?.kind !== "records" || !ch.search) continue;
+        if (looking === "leads" && k !== "petitions") leadFound[k] = ch.records as StatementRecord[];
+        else found[k] = ch.records as StatementRecord[];
+      }
+      // Words from people: someone asking around, or someone telling us where to look.
+      for (const m of obs.inbox) {
+        const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
+        if (want) asked.push({ seat: m.from, want });
+        // A place someone names in reply to our asking (not a reply about a record: those are institutions answering requests).
+        else if (m.re && (askedAt.home !== undefined || askedAt.work !== undefined) && !book.records.has(m.re)) leads = [...leads.filter((x) => x !== m.re), m.re].slice(-5);
       }
       // Did the move-in we just attempted work?
       if (moving && lastWasMove && obs.outcomes.length) {
@@ -117,6 +148,10 @@ export const citizen: BehaviourModule = {
       if (!acc) return [];
       const steps: Step[] = [];
       moveStep = null;
+      // Are we in a building? Around us we see who's in our own buildings; without that view, assume we are.
+      const street = obs.channels.street;
+      const inside = (structure: string) =>
+        street?.kind !== "sites" || street.parcels.some((l) => l.structure?.structure === structure && l.structure.occupancy.some((o) => o.occupant === me));
 
       // Notices on our agreements move their end dates.
       for (const r of fresh) {
@@ -138,7 +173,7 @@ export const citizen: BehaviourModule = {
       }
       // A job that has ended.
       if (job && t >= job.endsAt) {
-        if (job.workplace) steps.push([moveOut(job.workplace, me)]);
+        if (job.workplace && inside(job.workplace)) steps.push([moveOut(job.workplace, me)]);
         job = null;
         joblessSince = t;
       }
@@ -190,7 +225,7 @@ export const citizen: BehaviourModule = {
           if (home.order) s.push(withdraw(home.order));
           s.push(notice(home.agreement, "Leaving town."));
         }
-        if (job?.workplace) s.push(moveOut(job.workplace, me));
+        if (job?.workplace && inside(job.workplace)) s.push(moveOut(job.workplace, me));
         if (job) s.push(notice(job.agreement, "Leaving town."));
         s.push(say("departure", `${me} has left town.`));
         if (acc.balance > 0 && p.outside_account) s.push(pay(p.outside_account, acc.balance, { from: acc.account, for: "Moving away: send all my savings with me." }));
@@ -198,9 +233,12 @@ export const citizen: BehaviourModule = {
         return [s];
       }
 
-      // Looking for a home: the best one we can afford among the listings we've seen.
+      wordOfMouth(obs, t, steps);
+
+      // Looking for a home: what someone told us about first, then the best one we can afford among the listings we've seen.
       if (!home) {
-        const listings = found.homes.filter((l) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance));
+        const told = leadFound.homes.filter((l) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance));
+        const listings = (told.length ? told : found.homes).filter((l) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance));
         listings.sort((a, b) => b.data.rent - a.data.rent || (a.id < b.id ? -1 : 1));
         const best = listings[0];
         if (best?.speaks_for) {
@@ -208,9 +246,10 @@ export const citizen: BehaviourModule = {
           steps.push([say("rental_application", `Application for ${best.data.structure}.`, { to: [best.speaks_for], visible: [me, best.speaks_for], data: { listing: best.id, account: acc.account } })]);
         }
       }
-      // Looking for work: the best-paid posting.
+      // Looking for work: where someone told us about first, then the best-paid posting.
       if (!job) {
-        const posts = found.jobs.filter((j) => !applied.has(j.id));
+        const told = leadFound.jobs.filter((j) => !applied.has(j.id));
+        const posts = (told.length ? told : found.jobs).filter((j) => !applied.has(j.id));
         posts.sort((a, b) => (b.data?.wage ?? 0) - (a.data?.wage ?? 0) || (a.id < b.id ? -1 : 1));
         const best = posts[0];
         if (best?.speaks_for) {
@@ -235,6 +274,44 @@ export const citizen: BehaviourModule = {
       voice(t, steps);
       fresh = [];
       return steps;
+    };
+
+    // Word of mouth. Ties are the people we share (or shared) a home or workplace with: in our own
+    // buildings we see who. Asked, we say where we can see room: where we live or next door for a
+    // home, our own workplace for work (we're on the inside there). Hunting, we ask once per hunt.
+    const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
+      const street = obs.channels.street;
+      const lots: SiteParcel[] = street?.kind === "sites" ? street.parcels : [];
+      for (const lot of lots) for (const o of lot.structure?.occupancy ?? []) if (o.occupant && o.occupant !== me) contacts.set(o.occupant, t);
+      if (contacts.size > p.max_contacts) {
+        const keep = [...contacts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, p.max_contacts);
+        contacts.clear();
+        for (const [k, v] of keep) contacts.set(k, v);
+      }
+      const room = (lot: SiteParcel, slot: string) => {
+        const st = lot.structure;
+        if (!st?.complete) return false;
+        const taken = st.occupancy.filter((o) => o.slot === slot).reduce((a, o) => a + o.count, 0);
+        return taken < (capacity.get(st.type)?.[slot] ?? 0);
+      };
+      for (const q of asked) {
+        const lead = q.want === "home"
+          ? lots.find((l) => room(l, "dwelling"))?.structure?.structure
+          : job?.workplace && lots.some((l) => l.structure?.structure === job!.workplace && room(l, "workplace")) ? job.workplace : undefined;
+        if (lead && ctx.rng(`pass-on-${q.seat}-${t}`).below(10_000) < p.pass_on_bps)
+          steps.push([message([q.seat], q.want === "home" ? `There looks to be room at ${lead}, near me.` : `They have room at my work, ${lead}.`, lead)]);
+      }
+      asked = [];
+      const known = [...contacts.keys()];
+      for (const [want, needed, chance] of [["home", !home, p.ask_home_bps], ["work", !job, p.ask_work_bps]] as [Want, boolean, number][]) {
+        if (!needed) {
+          delete askedAt[want];
+          continue;
+        }
+        if (askedAt[want] !== undefined && t - askedAt[want]! < p.ask_again_days * DAY) continue;
+        askedAt[want] = t;
+        if (known.length && ctx.rng(`ask-${want}-${t}`).below(10_000) < chance) steps.push([message(known, ASKING[want])]);
+      }
     };
 
     // Granovetter (1978): each person joins once the share already joined reaches their own threshold.
@@ -292,11 +369,22 @@ export const citizen: BehaviourModule = {
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
         if (plannedAt !== obs.t) {
-          // Hunting? Look at what's on offer first (the next step, at once, has the results).
           const acc = ownAccount(obs);
+          const budget = acc ? (job ? Math.floor((monthlyIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
+          // Told about a building? Look there first: what's on offer in it now.
+          if (looking === null && lookedAt !== obs.t && acc && leads.length && (!home || !job)) {
+            const lead = leads.pop()!;
+            const looks: LookRequest[] = [];
+            if (!home) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }], limit: p.search_limit } });
+            if (!job) looks.push({ channel: "jobs", query: { standing: true, where: [{ field: "data.workplace", op: "=", value: lead }], limit: p.search_limit } });
+            leadFound.homes = [];
+            leadFound.jobs = [];
+            looking = "leads";
+            return { type: "look", looks };
+          }
+          // Hunting? Look at what's on offer (the next step, at once, has the results).
           const looks: LookRequest[] = [];
           if (lookedAt !== obs.t && acc) {
-            const budget = job ? Math.floor((monthlyIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months);
             if (!home) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }], order: { field: "data.rent", desc: true }, limit: p.search_limit } });
             if (!job) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
             // A glance at the petitions board: what's standing now.
@@ -307,11 +395,15 @@ export const citizen: BehaviourModule = {
             found.homes = [];
             found.jobs = [];
             found.petitions = [];
+            looking = "market";
             return { type: "look", looks }; // the results arrive with the next observation, and are planned with
           }
           lookedAt = obs.t;
+          looking = null;
           todo = plan(obs);
           plannedAt = obs.t;
+          leadFound.homes = [];
+          leadFound.jobs = [];
         }
         const next = todo.shift();
         lastWasMove = !!next && next === moveStep;

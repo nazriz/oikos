@@ -29,7 +29,38 @@ It then chooses from what it found, as the rules above say. Someone with a home 
 
 ## Position: what a citizen can see around it (D44)
 
-A citizen sees the lots touching where it lives and works ("Around you"): what's on each, and how full it is. It sees its household and workmates by name, and nobody else's. The view moves when it moves. It doesn't act on this yet: it's the ground that word of mouth (next) builds on.
+A citizen sees the lots touching where it lives and works ("Around you"): what's on each, and how full it is. It sees its household and workmates by name, and nobody else's. The view moves when it moves.
+
+It also uses this to tell whether it's actually in its workplace before leaving it (a citizen whose move into a full workplace failed never entered it). That removed the long-standing `not_present` refusal.
+
+## Word of mouth (D44)
+
+Word of mouth is people telling people, over ordinary messages; the platform passes nothing along.
+
+| Rule | Source |
+|---|---|
+| **Ties.** The people a citizen shares, or has shared, a home or workplace with: in its own buildings it sees who. The most recent `max_contacts` are remembered. | Granovetter, "The Strength of Weak Ties" (1973): former workmates and housemates are the weak ties that carry news. The cap is a placeholder, after Dunbar's ~15-person "sympathy group". |
+| **Asking around.** Starting a hunt for a home, a citizen asks all its contacts with probability `ask_home_bps`; for work, `ask_work_bps`. Still hunting after `ask_again_days`, it counts as a new hunt. | Homes: 37% of renters ask friends or family (Apartments.com survey reported by the National Apartment Association, 2026, n > 15,000; a listing site's own audience, so likely an understatement). Work: 69% of 16–23-year-old job seekers used friends and relatives over a year (Holzer 1987, via Ioannides & Loury, *JEL* 2004); per month it's 15–23% (CPS). |
+| **Passing on.** Asked, a citizen names a building where it can see room: for a home, its own building or one next to it; for work, only its own workplace (it's on the inside there). It says only what it can see; it can't know whether the owner is letting or hiring. With probability `pass_on_bps`. | Placeholder. |
+| **Following up.** A citizen told about a building searches the listings or postings for it first, and applies to what it finds there before anything on the open market. | Schmidt, "Finding a Home during the Affordable Housing Crisis", *ASR* 2025 (qualitative; 69 renters): ties are leaned on heavily, and leads from them are acted on. |
+
+Code citizens understand only their own phrasing of a question (`ASKING` in the module). A language-model citizen understands anything, and a code citizen won't understand its questions. That's a limit of code citizens, not of the world.
+
+**No coded distortion.** A code citizen acts on the building named, not the words, so garbled wording would change nothing. Distortion arrives with language-model citizens; measurement can compare what was said with what was there.
+
+**Calibration targets (outcomes to measure, never set):**
+- Jobs found through friends or relatives: about half (Corcoran et al. 1980: 52% of white men, 47% of women); 30–60% across 24 studies (Bewley 1999). Both via Ioannides & Loury (2004).
+- Homes found through ties: no rate found. Qualitative evidence says it's substantial for low-income renters (Schmidt 2025).
+
+**Observed (2 years; measured from the log):**
+- **200 citizens:** 116 home hunts and 34 job hunts asked around. 18% of move-ins followed a tip naming that building (31 of 189). No hire did (0 of 19).
+- **1,000 citizens:** 18% of move-ins (178 of 981) and 1 of 61 hires.
+- **Jobs are far below the target.** Likely reasons:
+  - employers don't favour referred applicants (real ones do: Fernandez & Weinberg 1997);
+  - insiders know only that there's room, not that the employer is hiring, and a lead is checked once;
+  - there are very few hires at all.
+
+  To calibrate, not to tune by hand.
 
 ## Parameters (defaults)
 
@@ -43,6 +74,7 @@ A citizen sees the lots touching where it lives and works ("Around you"): what's
 - `petition_start_bps` 300, `petition_days` 180, `rent_burden_grievance_bps` 4000
 - `threshold_mean_bps` 2500, `threshold_sd_bps` 1000
 - `search_limit` 20
+- `ask_home_bps` 3700, `ask_work_bps` 6900, `ask_again_days` 60, `max_contacts` 15, `pass_on_bps` 10000
 - `shop_accounts`, `outside_account`, `population`: supplied by the world
 
 ## Leaves out (for now)

@@ -234,12 +234,32 @@ See the design note, §16.
 - **Documented liberties (proportional fidelity):** no movement through the day (you're at home and at work at once), no line of sight or noise, and no travel time or cost to go and put a notice up somewhere. Each can come back when a scenario needs it; a protest in a public square is the obvious trigger. You also can't yet come to know a neighbour in another building by name: that would be an act (introducing yourself), which is the word-of-mouth step.
 - **Revisit if:** a scenario needs presence in public space, or travel costs matter (placing notices far away becomes a real strategy).
 
+**D45. Word of mouth is citizen behaviour.** *(Naz, 2026-09-27: "yes, go ahead"; figures are initial test configuration, not baked in.)*
+- **What it is:**
+  - Citizens who start hunting ask the people they share, or shared, a home or workplace with.
+  - Those people name a building where they can see room.
+  - The seeker searches that building's listings or postings first.
+  - All of it is ordinary messages, the teller's `re` naming the building. The platform passes nothing along and has no notion of a tie.
+- **Figures are content.** They're the citizen module's parameters, with sourced defaults, set per world in its config. Inputs are what people do: whether they ask (37% for homes, 69% for work, sourced), whether they pass a lead on (a placeholder). Aggregate outcomes are calibration targets to measure and compare, never parameters: the share of jobs found through contacts (about half, 30–60%).
+- **Nobody tells more than they could know.** A runtime test checks every tip names a building the teller could see around it then (mutation-checked).
+- **Results:**
+  - 18% of move-ins follow a tip.
+  - Hires almost never do, far below the job target. Reasons and remedies are in docs/behaviour/citizen.md; it's calibration work.
+  - The economy stays in line: 191 leases vs 197, 55 departures vs 54.
+  - Zero refusals at 200 and at 1,000 citizens: the old `not_present` refusal is gone, because citizens now see whether they're in their workplace.
+  - At 1,000 citizens two years take ~73 s (was ~67 s): asking around wakes the people asked.
+- **Revisit if:**
+  - calibration needs employers to favour referrals;
+  - leads need remembering and re-checking;
+  - job seekers need to approach employers directly (the commonest method in the CPS);
+  - language-model citizens arrive (they'll speak and understand freely).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
 
 - **Contract additions proposed by M2** (docs/design/m2-llm-seats.md, "Open"): `notices` on the Observation (translation failures and similar orchestrator-to-seat notes), and `framing.debrief_text`.
 - ~~Directory refresh interval (D33)~~: superseded by D42 (perception is changes).
-- **Word of mouth** (D44): proximity is built; word of mouth comes next, as citizen behaviour over messages, with sources and parameters in docs/behaviour/.
+- **Calibrating word of mouth** (D45): hires via contacts are far below the 30–60% target. To address with citizen calibration (M3 batch runs give the measurement).
 - ~~Citizen behaviour in the Rust kernel vs TypeScript code seats.~~ **Resolved by D30.**
 - ~~Which D15 laws become parameters.~~ **Obsolete** under D18/D19: there are no laws in the kernel; laws are records in a world's config.

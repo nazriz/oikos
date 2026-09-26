@@ -293,7 +293,7 @@ export const landlord: BehaviourModule = {
 
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -379,7 +379,7 @@ export const employer: BehaviourModule = {
       // Post a job if short-staffed and the wage bill is affordable.
       const bill = (staff.length + 1) * p.wage;
       if (staff.length + offered.length + offersNow < p.target_staff && posts.length === 0 && acc.balance >= p.buffer_periods * bill) {
-        steps.push([say("job_posting", `Hiring: ${p.wage} cents every ${p.period / DAY} days.`, { data: { wage: p.wage, period: p.period, role: p.role ?? "staff" } })]);
+        steps.push([say("job_posting", `Hiring: ${p.wage} cents every ${p.period / DAY} days.`, { data: { wage: p.wage, period: p.period, role: p.role ?? "staff", ...(p.workplace ? { workplace: p.workplace } : {}) } })]);
       }
 
       // Can't cover the next pay period: lay off the most recent hire.
