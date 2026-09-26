@@ -120,7 +120,8 @@
         "data": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject" },
         "adico": { "$ref": "urn:terrarium:contracts:0.3:blocks#/$defs/Adico" },
         "formal": { "$ref": "urn:terrarium:contracts:0.3:blocks#/$defs/Formal" },
-        "addressed_to": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" }, "minItems": 1, "uniqueItems": true }
+        "addressed_to": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" }, "minItems": 1, "uniqueItems": true },
+        "place": { "description": "The parcel it's put up on. A placed statement (and its withdrawal) is seen through channels that look at that place, and by its own author.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" }
       },
       "unevaluatedProperties": false
     },

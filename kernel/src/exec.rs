@@ -386,6 +386,7 @@ impl<'a> Exec<'a> {
                 let boundary = self.s.boundary_account.clone();
                 self.move_money(&from, &boundary, cost, TransferReason::Demolition, None, None, None)?;
                 for occupant in self.st.occupancy.remove(&sid).unwrap_or_default().into_keys() {
+                    self.st.moved(&occupant);
                     self.emit(EventBody::Vacated {
                         occupant,
                         structure: sid.clone(),
@@ -417,6 +418,7 @@ impl<'a> Exec<'a> {
                 if *count == 0 || used + *count as u64 > cap {
                     return Err(refuse(RefusalCode::CapacityExceeded, format!("{sid} has {cap} {slot} slots, {used} taken")));
                 }
+                let arriving = !self.st.occupancy.get(&sid).is_some_and(|o| o.contains_key(self.entity));
                 *self
                     .st
                     .occupancy
@@ -427,6 +429,9 @@ impl<'a> Exec<'a> {
                     .entry(slot.clone())
                     .or_default() += count;
                 self.st.touch_structure(&sid);
+                if arriving {
+                    self.st.moved(self.entity);
+                }
                 self.emit(EventBody::Occupied { occupant: self.entity.into(), structure: sid, slot: slot.clone(), count: *count });
                 Ok(())
             }
@@ -442,6 +447,7 @@ impl<'a> Exec<'a> {
                     self.st.occupancy.remove(&sid);
                 }
                 self.st.touch_structure(&sid);
+                self.st.moved(&occupant);
                 let reason = if occupant == self.entity { VacateReason::Left } else { VacateReason::Removed };
                 self.emit(EventBody::Vacated { occupant, structure: sid, by: self.seat.into(), reason });
                 Ok(())
@@ -462,7 +468,7 @@ impl<'a> Exec<'a> {
                 let id = self.st.mint("ent");
                 self.st.counters.created_entities += 1;
                 let c = self.st.stamp();
-                self.st.entities.insert(id.clone(), Entity { kind: kind.clone(), name: name.clone(), changed: c });
+                self.st.entities.insert(id.clone(), Entity { kind: kind.clone(), name: name.clone(), changed: c, moved: 0 });
                 self.emit(EventBody::EntityCreated { entity: id.clone(), kind: kind.clone(), name: name.clone() });
                 self.new_record(
                     RecordBody::EntityDeclaration { entity: id.clone(), kind: kind.clone(), name: name.clone() },
@@ -526,8 +532,13 @@ impl<'a> Exec<'a> {
                 self.bind(bind, &id)
             }
 
-            Block::Publish { kind, text, data, adico, formal, basis, addressed_to, speaks_for, visible_to, bind } => {
+            Block::Publish { kind, text, data, adico, formal, basis, addressed_to, place, speaks_for, visible_to, bind } => {
                 let addressed_to = addressed_to.as_ref().map(|a| a.iter().map(|x| self.r(x)).collect::<R<Vec<_>>>()).transpose()?;
+                if let Some(p) = place {
+                    if !self.st.parcels.contains_key(p) {
+                        return Err(refuse(RefusalCode::UnknownParcel, format!("no parcel {p}")));
+                    }
+                }
                 let body = RecordBody::Statement {
                     kind: kind.clone(),
                     text: text.clone(),
@@ -535,6 +546,7 @@ impl<'a> Exec<'a> {
                     adico: adico.clone(),
                     formal: formal.clone(),
                     addressed_to,
+                    place: place.clone(),
                 };
                 let id = self.new_record(body, self.ro(speaks_for)?, visible_to.clone(), self.ro(basis)?)?;
                 self.bind(bind, &id)

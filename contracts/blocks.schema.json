@@ -254,6 +254,10 @@
           "maxItems": 256,
           "uniqueItems": true
         },
+        "place": {
+          "description": "A parcel to put it up on (a sign, a notice on a fence). It's then seen by those whose channels look at that place, not through channels that look at no place. The kernel checks only that the parcel exists; whether it may be put there is for the world's laws.",
+          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
+        },
         "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
         "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
         "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }

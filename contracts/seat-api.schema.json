@@ -219,7 +219,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "standing": { "description": "Only records not withdrawn by their own author (or whoever they speak for).", "type": "boolean" },
+        "standing": { "description": "Only records still standing: not withdrawn by their own author (or whoever they speak for). Withdrawals themselves never stand.", "type": "boolean" },
         "where": {
           "type": "array",
           "maxItems": 16,
@@ -643,6 +643,10 @@
             "search": {
               "description": "These are a search's results (what matches now), not what's new since the last look.",
               "const": true
+            },
+            "whole": {
+              "description": "The seat's entity has moved since its last look through this channel (which looks near it): these are everything the channel now covers, in place of what it covered before.",
+              "const": true
             }
           }
         },
@@ -661,6 +665,10 @@
             "as_of": {
               "description": "When this view was last refreshed (see the channel's 'every').",
               "$ref": "urn:terrarium:contracts:0.3:common#/$defs/SimTime"
+            },
+            "whole": {
+              "description": "The seat's entity has moved since its last look through this channel (which looks near it): these parcels are the whole of its new surroundings, in place of the old.",
+              "const": true
             },
             "parcels": {
               "type": "array",
@@ -719,10 +727,10 @@
                       },
                       "occupancy": {
                         "type": "array",
+                        "description": "Who is there, per slot: named in a building the seat's own entity occupies, or where the channel shows names; otherwise one item per slot with no occupant, counting everyone in it.",
                         "items": {
                           "type": "object",
                           "required": [
-                            "occupant",
                             "slot",
                             "count"
                           ],

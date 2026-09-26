@@ -7,7 +7,7 @@
 //! observation (with `drafts: []`).
 
 use crate::blocks::{Id, Record};
-use crate::config::{Area, ChannelKind, CmpOp, LookRequest, Query, RecordFilter};
+use crate::config::{Area, ChannelKind, CmpOp, LookRequest, Occupants, Query, RecordFilter};
 use crate::state::{Look, Message, Outcome, Parcel, SeatStatus, State, Transaction};
 use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
@@ -35,8 +35,18 @@ pub enum ChannelData {
         /// Set when these are a search's results (what matches now), not what's new since the last look.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         search: Option<bool>,
+        /// Set when the seat's surroundings changed (it moved): everything the channel now covers,
+        /// in place of what it covered before.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        whole: Option<bool>,
     },
-    Sites { as_of: i64, parcels: Vec<SiteParcel> },
+    Sites {
+        as_of: i64,
+        parcels: Vec<SiteParcel>,
+        /// As for records: the whole of the seat's new surroundings, in place of the old.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        whole: Option<bool>,
+    },
     Directory { entities: Vec<EntityItem>, seats: Vec<SeatItem> },
 }
 
@@ -77,7 +87,9 @@ pub struct SiteStructure {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OccupancyItem {
-    pub occupant: Id,
+    /// Who, where the seat can tell (its own buildings, or a channel that shows names); otherwise a count per slot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occupant: Option<Id>,
     pub slot: String,
     pub count: u32,
 }
@@ -103,6 +115,55 @@ pub struct SeatItem {
 /// Can seats of `entity` perceive this record? The author's entity always can.
 pub fn can_see(s: &Statics, rec: &Record, entity: &str) -> bool {
     rec.visible_to.allows(entity) || s.entity_of(&rec.author) == Some(entity)
+}
+
+/// Where a record physically is: the parcel a statement was put up on, and the same place for
+/// taking it down (a withdrawal of a placed statement).
+pub fn place_of<'a>(st: &'a State, rec: &'a Record) -> Option<&'a Id> {
+    match &rec.body {
+        crate::blocks::RecordBody::Statement { place, .. } => place.as_ref(),
+        crate::blocks::RecordBody::Withdrawal { withdraws, .. } => match &st.records.get(withdraws)?.record.body {
+            crate::blocks::RecordBody::Statement { place, .. } => place.as_ref(),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Can this channel show the record, as far as place goes? A channel with an area sees what's
+/// placed there; one without sees what isn't placed anywhere, and what the seat's entity put up itself.
+fn placed_ok(s: &Statics, st: &State, rec: &Record, me: &str, area: Option<&Scope>) -> bool {
+    match (place_of(st, rec), area) {
+        (None, None) => true,
+        (None, Some(_)) => false,
+        (Some(p), Some(scope)) => scope.covers(p),
+        (Some(_), None) => s.entity_of(&rec.author) == Some(me) || rec.speaks_for.as_deref() == Some(me),
+    }
+}
+
+/// The parcels an area covers for a seat, now.
+#[derive(Debug)]
+enum Scope {
+    Everywhere,
+    Parcels(BTreeSet<Id>),
+}
+
+impl Scope {
+    fn covers(&self, p: &str) -> bool {
+        match self {
+            Scope::Everywhere => true,
+            Scope::Parcels(ps) => ps.contains(p),
+        }
+    }
+}
+
+/// Are two parcels within `n` of each other? The distance is the gap between their rectangles
+/// (0 when they touch), in the world's own units.
+pub fn within(a: &Parcel, b: &Parcel, n: i64) -> bool {
+    let gap = |a0: i64, a1: i64, b0: i64, b1: i64| (a0.max(b0) as i128 - a1.min(b1) as i128).max(0);
+    let dx = gap(a.x, a.x + a.w, b.x, b.x + b.w);
+    let dy = gap(a.y, a.y + a.h, b.y, b.y + b.h);
+    dx * dx + dy * dy <= n as i128 * n as i128
 }
 
 /// Entities a record involves: those it names, its author's entity, and (one
@@ -154,7 +215,13 @@ pub struct RecordIndex {
     /// statement kind and by record kind: what a search for standing records scans.
     standing_kind: BTreeMap<String, BTreeSet<u64>>,
     standing_record: BTreeMap<&'static str, BTreeSet<u64>>,
+    /// parcel -> records placed there (and withdrawals of them).
+    by_place: BTreeMap<Id, Vec<u64>>,
     accounts: Option<AccountsByEntity>,
+    /// entity -> (its `moved` stamp, the parcels where it occupies a building then).
+    places: BTreeMap<Id, (u64, Vec<Id>)>,
+    /// distance -> parcel -> parcels within that distance. Parcels never change, so this is built once per distance.
+    near: BTreeMap<i64, BTreeMap<Id, Vec<Id>>>,
 }
 
 /// entity -> accounts it holds or keeps, for the account set identified by
@@ -175,7 +242,13 @@ impl RecordIndex {
             for e in who {
                 self.by_entity.entry(e.to_string()).or_default().push(seq);
             }
-            self.standing_record.entry(rec.body.kind_name()).or_default().insert(seq);
+            if let Some(p) = place_of(st, rec) {
+                self.by_place.entry(p.clone()).or_default().push(seq);
+            }
+            // Everything stands when made, except a withdrawal: it takes something down.
+            if !matches!(rec.body, crate::blocks::RecordBody::Withdrawal { .. }) {
+                self.standing_record.entry(rec.body.kind_name()).or_default().insert(seq);
+            }
             if let crate::blocks::RecordBody::Statement { kind, .. } = &rec.body {
                 self.standing_kind.entry(kind.clone()).or_default().insert(seq);
             }
@@ -237,6 +310,46 @@ impl RecordIndex {
         seqs
     }
 
+    /// Is this record still standing?
+    fn is_standing(&self, rec: &Record, seq: u64) -> bool {
+        self.standing_record.get(rec.body.kind_name()).is_some_and(|x| x.contains(&seq))
+    }
+
+    /// Records placed within the scope, above `after`, in order.
+    fn placed(&self, scope: &Scope, after: u64) -> Vec<u64> {
+        let tail = |v: &Vec<u64>| v[v.partition_point(|&q| q <= after)..].to_vec();
+        let mut seqs: Vec<u64> = match scope {
+            Scope::Everywhere => self.by_place.values().flat_map(tail).collect(),
+            Scope::Parcels(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(tail).collect(),
+        };
+        seqs.sort_unstable();
+        seqs
+    }
+
+    /// The parcels an area covers for an entity, now.
+    fn scope(&mut self, st: &State, area: &Area, me: &str) -> Scope {
+        match area {
+            Area::All(_) => Scope::Everywhere,
+            Area::Parcels(ps) => Scope::Parcels(ps.iter().cloned().collect()),
+            Area::Near(n) => {
+                let moved = st.entities.get(me).map_or(0, |e| e.moved);
+                if self.places.get(me).is_none_or(|(m, _)| *m != moved) {
+                    let mut ps: Vec<Id> = st
+                        .occupancy
+                        .iter()
+                        .filter(|(_, occ)| occ.contains_key(me))
+                        .filter_map(|(sid, _)| st.structures.get(sid).map(|x| x.parcel.clone()))
+                        .collect();
+                    ps.sort();
+                    ps.dedup();
+                    self.places.insert(me.to_string(), (moved, ps));
+                }
+                let table = self.near.entry(n.near).or_insert_with(|| near_table(st, n.near));
+                Scope::Parcels(self.places[me].1.iter().flat_map(|p| table.get(p).into_iter().flatten().cloned()).collect())
+            }
+        }
+    }
+
     fn accounts_of<'a>(&'a mut self, st: &State, entity: &str) -> &'a [Id] {
         let key = (st.counters.acc, st.accounts.len());
         if self.accounts.as_ref().is_none_or(|(k, _)| *k != key) {
@@ -251,6 +364,23 @@ impl RecordIndex {
         }
         self.accounts.as_ref().unwrap().1.get(entity).map(Vec::as_slice).unwrap_or(&[])
     }
+}
+
+/// Each parcel's neighbours within `n` (itself included), found by sweeping along x.
+fn near_table(st: &State, n: i64) -> BTreeMap<Id, Vec<Id>> {
+    let mut by_x: Vec<(&Id, &Parcel)> = st.parcels.iter().collect();
+    by_x.sort_by_key(|(id, p)| (p.x, (*id).clone()));
+    let widest = by_x.iter().map(|(_, p)| p.w).max().unwrap_or(0);
+    let mut out = BTreeMap::new();
+    for (id, p) in &by_x {
+        // Anything within reach starts no further left than this, and no further right than p's far edge plus n.
+        let lo = by_x.partition_point(|(_, q)| (q.x as i128) < p.x as i128 - n as i128 - widest as i128);
+        let hi = by_x.partition_point(|(_, q)| (q.x as i128) <= p.x as i128 + p.w as i128 + n as i128);
+        let mut v: Vec<Id> = by_x[lo..hi].iter().filter(|(_, q)| within(p, q, n)).map(|(qid, _)| (*qid).clone()).collect();
+        v.sort();
+        out.insert((*id).clone(), v);
+    }
+    out
 }
 
 /// A field a search can use. Purely mechanical: names a place in a record, and never says what it means.
@@ -313,7 +443,7 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
     }
 }
 
-fn site_parcel(st: &State, id: &Id, p: &Parcel) -> SiteParcel {
+fn site_parcel(st: &State, id: &Id, p: &Parcel, me: &str, names: bool) -> SiteParcel {
     SiteParcel {
         parcel: id.clone(),
         x: p.x,
@@ -328,13 +458,24 @@ fn site_parcel(st: &State, id: &Id, p: &Parcel) -> SiteParcel {
                 built_by: x.built_by.clone(),
                 complete: x.complete,
                 completes_at: x.completes_at,
-                occupancy: st
-                    .occupancy
-                    .get(sid)
-                    .into_iter()
-                    .flatten()
-                    .flat_map(|(occ, slots)| slots.iter().map(|(slot, c)| OccupancyItem { occupant: occ.clone(), slot: slot.clone(), count: *c }))
-                    .collect(),
+                occupancy: {
+                    let occ = st.occupancy.get(sid);
+                    // Who is in a building: known in one's own, and where the channel shows names; otherwise how many.
+                    if names || occ.is_some_and(|o| o.contains_key(me)) {
+                        occ.into_iter()
+                            .flatten()
+                            .flat_map(|(o, slots)| slots.iter().map(|(slot, c)| OccupancyItem { occupant: Some(o.clone()), slot: slot.clone(), count: *c }))
+                            .collect()
+                    } else {
+                        let mut by_slot: BTreeMap<&String, u32> = BTreeMap::new();
+                        for slots in occ.into_iter().flat_map(|o| o.values()) {
+                            for (slot, c) in slots {
+                                *by_slot.entry(slot).or_default() += c;
+                            }
+                        }
+                        by_slot.into_iter().map(|(slot, count)| OccupancyItem { occupant: None, slot: slot.clone(), count }).collect()
+                    }
+                },
             }
         }),
     }
@@ -384,8 +525,9 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str, mode: Mod
     for ch in &cfg.channels {
         let asked = requested.iter().find(|l| l.channel == ch.id);
         // A search: what matches now, within what the seat may see; its cursor for changes is untouched.
-        if let (Some(LookRequest { query: Some(q), .. }), ChannelKind::Records { filter }) = (asked, &ch.kind) {
-            channels.insert(ch.id.clone(), ChannelData::Records { records: search(s, st, index, &me, filter, q), search: Some(true) });
+        if let (Some(LookRequest { query: Some(q), .. }), ChannelKind::Records { filter, area }) = (asked, &ch.kind) {
+            let scope = area.as_ref().map(|a| index.scope(st, a, &me));
+            channels.insert(ch.id.clone(), ChannelData::Records { records: search(s, st, index, &me, filter, scope.as_ref(), q), search: Some(true), whole: None });
             continue;
         }
         if mode == Mode::Look && ch.on_request == Some(true) && asked.is_none() {
@@ -397,8 +539,19 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str, mode: Mod
                 continue; // not looking through this channel yet; changes accumulate
             }
         }
-        // Changes after this cursor are new to the seat; None: everything (a first look, or the full picture).
-        let after = last.map(|l| l.cursor);
+        // A channel that looks near the seat's entity looks from where it is now: if it has moved since
+        // the last look, the whole of its new surroundings replaces the old.
+        let area = match &ch.kind {
+            ChannelKind::Records { area, .. } => area.as_ref(),
+            ChannelKind::Sites { area, .. } => Some(area),
+            _ => None,
+        };
+        let from = matches!(area, Some(Area::Near(_))).then(|| st.entities.get(&me).map_or(0, |e| e.moved));
+        let moved = last.is_some_and(|l| l.from != from);
+        let whole = moved.then_some(true);
+        let scope = area.map(|a| index.scope(st, a, &me));
+        // Changes after this cursor are new to the seat; None: everything (a first look, a move, or the full picture).
+        let after = if moved { None } else { last.map(|l| l.cursor) };
         let changed = |c: u64| after.is_none_or(|a| c > a);
         let data = match &ch.kind {
             ChannelKind::Accounts => {
@@ -422,36 +575,37 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str, mode: Mod
                 drained = mode == Mode::Look;
                 ChannelData::Accounts { accounts, transactions }
             }
-            ChannelKind::Records { filter } => {
+            ChannelKind::Records { filter, .. } => {
                 let from = after.unwrap_or(0);
                 let want: Option<BTreeSet<&str>> =
                     filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me.as_str() } else { e.as_str() }).collect());
-                let seqs = index.candidates(filter, want.as_ref(), from).unwrap_or_else(|| (from + 1..=st.record_order.len() as u64).collect());
+                let seqs = match &scope {
+                    Some(sc) => index.placed(sc, from),
+                    None => index.candidates(filter, want.as_ref(), from).unwrap_or_else(|| (from + 1..=st.record_order.len() as u64).collect()),
+                };
                 ChannelData::Records {
                     records: seqs
                         .into_iter()
                         .map(at_seq)
-                        .filter(|r| can_see(s, r, &me) && matches(s, st, r, filter, want.as_ref()))
+                        .filter(|r| can_see(s, r, &me) && placed_ok(s, st, r, &me, scope.as_ref()) && matches(s, st, r, filter, want.as_ref()))
                         .cloned()
                         .collect(),
                     search: None,
+                    whole,
                 }
             }
-            ChannelKind::Sites { area } => ChannelData::Sites {
-                as_of: st.t,
-                parcels: st
-                    .parcels
-                    .iter()
-                    .filter(|(id, p)| {
-                        changed(p.changed)
-                            && match area {
-                                Area::All(_) => true,
-                                Area::Parcels(ps) => ps.iter().any(|x| x == *id),
-                            }
-                    })
-                    .map(|(id, p)| site_parcel(st, id, p))
-                    .collect(),
-            },
+            ChannelKind::Sites { occupants, .. } => {
+                let names = *occupants == Some(Occupants::Names);
+                let site = |(id, p): (&Id, &Parcel)| changed(p.changed).then(|| site_parcel(st, id, p, &me, names));
+                ChannelData::Sites {
+                    as_of: st.t,
+                    parcels: match scope.as_ref().unwrap() {
+                        Scope::Everywhere => st.parcels.iter().filter_map(site).collect(),
+                        Scope::Parcels(ps) => ps.iter().filter_map(|id| st.parcels.get_key_value(id)).filter_map(site).collect(),
+                    },
+                    whole,
+                }
+            }
             ChannelKind::Directory => ChannelData::Directory {
                 entities: st
                     .entities
@@ -475,7 +629,7 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str, mode: Mod
         };
         if mode == Mode::Look {
             let cursor = if matches!(ch.kind, ChannelKind::Records { .. }) { st.counters.record_seq } else { st.counters.change };
-            looks.push((ch.id.clone(), Look { at: st.t, cursor }));
+            looks.push((ch.id.clone(), Look { at: st.t, cursor, from }));
         }
         channels.insert(ch.id.clone(), data);
     }
@@ -495,21 +649,28 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str, mode: Mod
 /// A search through a records channel: records the seat may see that match the channel's filter
 /// and the query, now. Standing records only if asked; ordered as asked (newest first by default);
 /// at most `limit` (default 20).
-fn search(s: &Statics, st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, q: &Query) -> Vec<Record> {
+fn search(s: &Statics, st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, area: Option<&Scope>, q: &Query) -> Vec<Record> {
     let want: Option<BTreeSet<&str>> = filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me } else { e.as_str() }).collect());
-    let seqs: Vec<u64> = if q.standing == Some(true) {
+    let at_seq = |seq: u64| &*st.records[&st.record_order[(seq - 1) as usize]].record;
+    let seqs: Vec<u64> = if let Some(sc) = area {
+        let mut v = index.placed(sc, 0);
+        if q.standing == Some(true) {
+            v.retain(|&seq| index.is_standing(at_seq(seq), seq));
+        }
+        v.reverse();
+        v
+    } else if q.standing == Some(true) {
         index.standing(filter)
     } else {
         let mut v = index.candidates(filter, want.as_ref(), 0).unwrap_or_else(|| (1..=st.record_order.len() as u64).collect());
         v.reverse();
         v
     };
-    let at_seq = |seq: u64| &*st.records[&st.record_order[(seq - 1) as usize]].record;
     let conditions = q.conditions.as_deref().unwrap_or(&[]);
     let mut hits: Vec<(u64, &Record)> = seqs
         .into_iter()
         .map(|seq| (seq, at_seq(seq)))
-        .filter(|(_, r)| can_see(s, r, me) && matches(s, st, r, filter, want.as_ref()) && conditions.iter().all(|c| holds(r, c)))
+        .filter(|(_, r)| can_see(s, r, me) && placed_ok(s, st, r, me, area) && matches(s, st, r, filter, want.as_ref()) && conditions.iter().all(|c| holds(r, c)))
         .collect();
     if let Some(o) = &q.order {
         // Records without the field sort last; ties keep newest first.

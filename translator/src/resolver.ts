@@ -380,7 +380,8 @@ class Resolver {
     const data = this.json(c, "data");
     const adico = this.json(c, "adico");
     const formal = this.str(c, "formal");
-    return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}), ...common }];
+    const on = this.id(c, "on");
+    return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(on ? { place: on } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}), ...common }];
   }
 
   private form(c: Call, bind?: string): Block[] {

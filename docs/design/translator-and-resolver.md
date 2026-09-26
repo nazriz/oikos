@@ -302,7 +302,7 @@ Roughly one function per physics outcome, plus `form`, **generated from the kern
 | `entity` | An organisation exists | `kind`, `name`, `visible?` | `create_entity` |
 | `claim` | A legal position is on record / transferred / released | `holder`, `position`, `against?`, `about`, `basis?`, `to?`, `release?` | `record_claim` / `transfer_claim` / `release_claim` |
 | `agreement` | An agreement is offered / signed / given notice | `with`, `terms`, `template?`, `sign?`, `notice?` | `propose_agreement` (+ `sign_agreement`) / `sign_agreement` / `give_notice` |
-| `statement` | A statement is published / withdrawn | `kind`, `text`, `to?`, `visible?`, `basis?`, `withdraw?` | `publish` / `withdraw` |
+| `statement` | A statement is published (or put up on a lot, `on?`: D44) / withdrawn | `kind`, `text`, `to?`, `visible?`, `basis?`, `on?`, `withdraw?` | `publish` / `withdraw` |
 | `vote` | A choice is cast | `ballot`, `choice` | `vote` |
 | `message` | Someone is told something | `to`, `text`, `re?` | `message` |
 | `form` | A published form is filled in and submitted | `to`, `form`, plus the form's own fields | `publish` of the form's statement kind, fields checked (4.4) |

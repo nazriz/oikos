@@ -27,6 +27,10 @@ A citizen doesn't receive the housing or job market. It looks when it needs to, 
 
 It then chooses from what it found, as the rules above say. Someone with a home and a job never looks at the markets at all.
 
+## Position: what a citizen can see around it (D44)
+
+A citizen sees the lots touching where it lives and works ("Around you"): what's on each, and how full it is. It sees its household and workmates by name, and nobody else's. The view moves when it moves. It doesn't act on this yet: it's the ground that word of mouth (next) builds on.
+
 ## Parameters (defaults)
 
 - `rent_share_bps` 3300

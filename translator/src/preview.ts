@@ -49,7 +49,7 @@ export class Preview {
         const to = b.addressed_to?.length ? `, addressed to ${b.addressed_to.map((x: string) => this.who(x)).join(", ")}` : "";
         const seen = b.visible_to === "public" ? ", publicly" : Array.isArray(b.visible_to) ? `, seen only by ${b.visible_to.map((x: string) => this.who(x)).join(", ")}` : "";
         const d = this.details(b.data);
-        return `You will publish a ${String(b.kind).replace(/_/g, " ")}${b.speaks_for && this.k.entityOf(b.speaks_for) !== this.k.entity ? ` in the name of ${this.who(b.speaks_for)}` : ""}${to}${seen}: "${b.text}"${d ? `, with these details: ${d}` : ""}${b.basis ? `, citing ${b.basis}` : ""}.`;
+        return `You will ${b.place ? "put up" : "publish"} a ${String(b.kind).replace(/_/g, " ")}${b.place ? ` on ${b.place}` : ""}${b.speaks_for && this.k.entityOf(b.speaks_for) !== this.k.entity ? ` in the name of ${this.who(b.speaks_for)}` : ""}${to}${seen}: "${b.text}"${d ? `, with these details: ${d}` : ""}${b.basis ? `, citing ${b.basis}` : ""}.`;
       }
       case "propose_agreement": {
         const t = b.terms;

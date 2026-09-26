@@ -32,7 +32,7 @@ fn notice(run: &mut Run<Vec<u8>>, rent: i64, private: bool) -> String {
 
 fn board(o: &Observation) -> Option<(Vec<String>, bool)> {
     match o.channels.get("board")? {
-        ChannelData::Records { records, search } => Some((records.iter().map(|r| r.id.clone()).collect(), search.is_some())),
+        ChannelData::Records { records, search, .. } => Some((records.iter().map(|r| r.id.clone()).collect(), search.is_some())),
         _ => None,
     }
 }

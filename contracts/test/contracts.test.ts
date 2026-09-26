@@ -106,6 +106,9 @@ describe("world-config mutations are rejected", () => {
     ["float balance", (c) => (c.world.accounts[1].balance = 1.5)],
     ["zero tick length", (c) => (c.clock.tick_seconds = 0)],
     ["wrong contracts version", (c) => (c.contracts = "0.1")],
+    ["a negative distance", (c) => c.seats[0].channels.push({ id: "street", kind: "sites", area: { near: -1 } })],
+    ["an unknown way of showing occupants", (c) => c.seats[0].channels.push({ id: "street", kind: "sites", area: { near: 1 }, occupants: "faces" })],
+    ["an area on a directory", (c) => c.seats[0].channels.push({ id: "who2", kind: "directory", area: "all" })],
   ];
   for (const [name, mutate] of cases) {
     test(name, () => {

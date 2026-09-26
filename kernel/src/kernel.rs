@@ -117,7 +117,7 @@ impl Kernel {
         let mut st = State {
             t: 0,
             counters: Counters::default(),
-            entities: w.entities.iter().map(|e| (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0 })).collect(),
+            entities: w.entities.iter().map(|e| (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0 })).collect(),
             accounts: w
                 .accounts
                 .iter()

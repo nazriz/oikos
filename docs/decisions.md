@@ -206,12 +206,33 @@ See the design note, §16.
   - reach (channels, visibility, involvement);
   - sources (every record has an author);
   - attention (cadence, and now looking on request and searching);
-  - position (proximity, word of mouth: next, as its own design discussion);
+  - position (proximity, word of mouth: see D44);
   - memory (views never forget, for now).
 - **Built:** `on_request` channels; a `look` action and command; searches over any records channel (standing, conditions on named fields, order, limit). A search returns what matches now. It's mechanical matching: the kernel never learns what a field means. No world vocabulary is involved; the kernel's tests use a generic noticeboard.
 - **In the town:** citizens search the housing and job markets only when hunting, and glance at the petitions board. The broadcast market and withdrawals channels are gone. Language seats get a `look` tool for their on-request reports.
 - **Also found:** a landlord double-let (a relist in the same plan as the letting; no free-home check before offering), fixed in the landlord module.
 - **Results:** the economy is in line with before (leases 197 vs 192, move-ins 194 vs 190, departures 54 vs 57). At 1,000 citizens, two years take ~68 s, down from ~112 s.
+
+**D44. Position: what you can see depends on where you are.** *(Naz, 2026-09-27, on the position discussion: word of mouth as content, not a kernel mechanic: "yes"; occupant names hidden from outside by default: "yes"; proximity and placed records first, then word of mouth: "yes this makes sense".)*
+- **The split:**
+  - Proximity is physics: where you are decides what you can physically see. It's in the kernel.
+  - Word of mouth is people telling people: the delay is when you next see them, and the distortion is what they chose to say and how well they remembered it. That belongs to the teller. A kernel mechanic that passed things along ties with a delay and a distortion rate would be a game rule (the same mistake as laws in the kernel), and it would hide the hand-offs that measurement wants to trace. So it becomes behaviour, over the `message` block that already exists. There's no "tie" concept either: relationships are already in the world (sharing a home or workplace, being near, agreements, past messages).
+- **Built (kernel and contracts v0.3):**
+  - **Places:** an entity is where it occupies a building. Nothing new is stored beyond a `moved` change stamp on the entity; an organisation that occupies nothing has no position, and nothing is near it.
+  - **Distance:** the gap between parcel rectangles (0 when they touch), straight-line, in the world's own units. The kernel never knows what a unit is. Computed exactly in integers.
+  - **`area: { near: N }`:** for sites channels and, newly, records channels. It covers the parcels within N of any of the entity's places, and moves with it. After a move, the next look delivers the whole of the new surroundings, flagged `whole`, and the view replaces the old picture. What was seen of the old street is memory, a separate axis (D43).
+  - **Placed statements:** `publish` takes an optional `place` (a parcel): a sign, a notice on a fence. A placed statement, and its withdrawal (taking it down, where it was), is seen only through channels whose area covers the place, and by whoever put it up. A channel without an area sees what isn't placed anywhere. The kernel checks only that the parcel exists. Whether it may be put there is for the world's laws. Searches respect the area.
+  - **Occupants:** from outside a building a seat sees how many are in it, per slot, not who. It sees who in the buildings its own entity occupies (a household, a workplace), and wherever a channel is configured with `occupants: "names"` (an owner's inspection, a register). That's reach, set per channel.
+  - **The call language:** `statement(…, on=<lot>)`. The resolver passes the id through, like `structure(on=…)`, and the preview reads "You will put up a notice on p1: …". Language seats see placed records as "put up on p07-03", and a handful of lots one by one (what's on each, who's there where they can tell).
+  - **Standing searches never return withdrawals themselves** (found while testing: a withdrawal is never withdrawn, so it "stood"). A takedown isn't something that's still up.
+- **In the town (generator 0.8.0):** citizens get an "Around you" channel: the lots touching where they live and work, with their household and workmates by name. Code citizens don't act on it yet; it's the physical ground that word of mouth builds on. Landlords, the inspector and the mayor now see occupancy as counts; none of them used names.
+- **Tests:**
+  - `kernel/tests/position.rs`: distance, near views, counts vs names, a move bringing the whole new surroundings, placed notices seen by being near, a search near the seat, an unknown place refused.
+  - The perception invariant (random worlds) now includes near channels and placed notices. A mutation that ignores moves fails it.
+  - The runtime perception test checks every citizen's surroundings after every look in a real town, and requires that moves happen. A View that ignores `whole` fails it.
+- **Results:** the 2-year, 200-citizen economy is identical to D43's (the citizen doesn't read its surroundings yet). At 1,000 citizens two years take ~67 s (was ~68 s).
+- **Documented liberties (proportional fidelity):** no movement through the day (you're at home and at work at once), no line of sight or noise, and no travel time or cost to go and put a notice up somewhere. Each can come back when a scenario needs it; a protest in a public square is the obvious trigger. You also can't yet come to know a neighbour in another building by name: that would be an act (introducing yourself), which is the word-of-mouth step.
+- **Revisit if:** a scenario needs presence in public space, or travel costs matter (placing notices far away becomes a real strategy).
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 
@@ -219,6 +240,6 @@ See the design note, §16.
 
 - **Contract additions proposed by M2** (docs/design/m2-llm-seats.md, "Open"): `notices` on the Observation (translation failures and similar orchestrator-to-seat notes), and `framing.debrief_text`.
 - ~~Directory refresh interval (D33)~~: superseded by D42 (perception is changes).
-- **Position in perception** (D43): proximity ("near me", from occupancy) and word of mouth (along real ties, with delay and distortion). A design discussion before the checkpoint.
+- **Word of mouth** (D44): proximity is built; word of mouth comes next, as citizen behaviour over messages, with sources and parameters in docs/behaviour/.
 - ~~Citizen behaviour in the Rust kernel vs TypeScript code seats.~~ **Resolved by D30.**
 - ~~Which D15 laws become parameters.~~ **Obsolete** under D18/D19: there are no laws in the kernel; laws are records in a world's config.

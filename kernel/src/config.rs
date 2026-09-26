@@ -167,9 +167,17 @@ pub enum ChannelKind {
     Records {
         #[serde(rename = "match")]
         filter: RecordFilter,
+        /// Where the channel looks: only records placed there (and the seat's own) are seen through it.
+        /// Without an area, the channel sees records that aren't placed anywhere.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        area: Option<Area>,
     },
     Sites {
         area: Area,
+        /// What the seat can tell about who is in a building it doesn't occupy itself:
+        /// how many (the default), or who.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        occupants: Option<Occupants>,
     },
     Directory,
 }
@@ -207,6 +215,22 @@ pub struct RecordFilter {
 pub enum Area {
     All(AllMarker),
     Parcels(Vec<Id>),
+    /// Every parcel within this distance of a parcel where the seat's entity occupies a building
+    /// (in the world's own units; 0 is its own parcels and those touching them). Moves with it.
+    Near(Near),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Near {
+    pub near: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Occupants {
+    Counts,
+    Names,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -385,6 +409,11 @@ pub fn validate(c: &Config) -> Result<(), String> {
                 return Err(format!("record {} references unknown record {other}", r.id));
             }
         }
+        if let RecordBody::Statement { place: Some(p), .. } = &r.body {
+            if !parcels.contains(p.as_str()) {
+                return Err(format!("record {} is placed on unknown parcel {p}", r.id));
+            }
+        }
         let want = match &r.body {
             RecordBody::ClaimTransfer { claim, .. } | RecordBody::ClaimRelease { claim } => Some((claim, "claim")),
             RecordBody::Signature { agreement, .. } | RecordBody::Notice { agreement, .. } => Some((agreement, "agreement")),
@@ -409,19 +438,25 @@ pub fn validate(c: &Config) -> Result<(), String> {
             if !chans.insert(ch.id.as_str()) {
                 return Err(format!("seat {} has duplicate channel {}", s.id, ch.id));
             }
-            match &ch.kind {
-                ChannelKind::Records { filter, .. } => {
-                    for e in filter.involving.iter().flatten().filter(|e| *e != "self") {
-                        entity(e).map_err(|x| format!("seat {} channel {}: {x}", s.id, ch.id))?;
-                    }
+            if let ChannelKind::Records { filter, .. } = &ch.kind {
+                for e in filter.involving.iter().flatten().filter(|e| *e != "self") {
+                    entity(e).map_err(|x| format!("seat {} channel {}: {x}", s.id, ch.id))?;
                 }
-                ChannelKind::Sites { area: Area::Parcels(ps), .. } => {
+            }
+            let area = match &ch.kind {
+                ChannelKind::Records { area, .. } => area.as_ref(),
+                ChannelKind::Sites { area, .. } => Some(area),
+                _ => None,
+            };
+            match area {
+                Some(Area::Parcels(ps)) => {
                     for p in ps {
                         if !parcels.contains(p.as_str()) {
                             return Err(format!("seat {} channel {} names unknown parcel {p}", s.id, ch.id));
                         }
                     }
                 }
+                Some(Area::Near(n)) if n.near < 0 => return Err(format!("seat {} channel {}: near must be 0 or more", s.id, ch.id)),
                 _ => {}
             }
         }

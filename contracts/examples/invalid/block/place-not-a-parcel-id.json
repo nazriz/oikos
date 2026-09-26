@@ -1,0 +1,6 @@
+{
+  "block": "publish",
+  "kind": "notice",
+  "text": "Lost cat.",
+  "place": { "x": 3, "y": 4 }
+}

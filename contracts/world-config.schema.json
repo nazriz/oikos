@@ -271,6 +271,14 @@
                   "uniqueItems": true
                 }
               }
+            },
+            "area": {
+              "description": "Where this channel looks. With an area, it shows records placed on those parcels (a notice put up somewhere is seen by being near it). Without one, it shows records not placed anywhere, and those the seat's own entity put up. Which parcels: 'all', a list, or those near where the seat's entity is (within a distance, in the world's own units, of a parcel where it occupies a building; 0: those parcels and the ones touching them). 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
+              "anyOf": [
+                { "const": "all" },
+                { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" }, "minItems": 1, "uniqueItems": true },
+                { "type": "object", "required": ["near"], "additionalProperties": false, "properties": { "near": { "type": "integer", "minimum": 0 } } }
+              ]
             }
           }
         },
@@ -283,12 +291,18 @@
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
             "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
-            "kind": { "description": "Physical state of parcels in an area: structures, construction under way, occupancy. How inspectors see.", "const": "sites" },
+            "kind": { "description": "Physical state of parcels in an area: structures, construction under way, occupancy. What can be seen of a place by being there, or by inspecting it.", "const": "sites" },
             "area": {
+              "description": "Which parcels: 'all', a list, or those near where the seat's entity is (within a distance, in the world's own units, of a parcel where it occupies a building; 0: those parcels and the ones touching them). 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
               "anyOf": [
                 { "const": "all" },
-                { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" }, "minItems": 1, "uniqueItems": true }
+                { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" }, "minItems": 1, "uniqueItems": true },
+                { "type": "object", "required": ["near"], "additionalProperties": false, "properties": { "near": { "type": "integer", "minimum": 0 } } }
               ]
+            },
+            "occupants": {
+              "description": "What the seat can tell about who is in a building its own entity doesn't occupy: 'counts' (how many, per slot; the default: from outside, you see a place is lived in, not by whom) or 'names' (who: an owner's inspection, a register). In buildings its entity occupies, it always sees who.",
+              "enum": ["counts", "names"]
             }
           }
         },

@@ -1023,6 +1023,18 @@
       "title": "Bob",
       "channels": [
         {
+          "id": "street",
+          "title": "Your street",
+          "kind": "sites",
+          "area": { "near": 1 }
+        },
+        {
+          "id": "noticeboard",
+          "kind": "records",
+          "match": { "records": ["statement", "withdrawal"] },
+          "area": { "near": 1 }
+        },
+        {
           "id": "money",
           "kind": "accounts"
         },

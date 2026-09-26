@@ -39,7 +39,7 @@ Each function names a physical outcome. The resolver decides nothing on the seat
 | `entity` | `kind*`, `name*`, `visible` | `create_entity` |
 | `claim` | `holder`, `position`, `against`, `about`, `basis`, `transfer`, `to`, `release`, `visible` | `record_claim` / `transfer_claim` / `release_claim` |
 | `agreement` | `with`, `template`, `terms`, `we_do`, `they_do`, `term`, `our_notice`, `their_notice`, `basis`, `visible`, `sign`, `notice`, `text` | An offer: `propose_agreement` plus the seat's own `sign_agreement`. `sign=<agreement>` signs one; `notice=<agreement>` gives notice |
-| `statement` | `kind`, `text`, `to`, `visible`, `basis`, `for`, `data`, `adico`, `formal`, `withdraw` | `publish` / `withdraw` (`adico` is the Institutional Grammar breakdown as data; `formal` a CEL condition, as text) |
+| `statement` | `kind`, `text`, `to`, `visible`, `basis`, `for`, `data`, `adico`, `formal`, `on`, `withdraw` | `publish` / `withdraw` (`adico` is the Institutional Grammar breakdown as data; `formal` a CEL condition, as text; `on` a lot to put it up on, where it's seen by those nearby) |
 | `vote` | `ballot*`, `choice*`, `visible` | `vote` |
 | `message` | `to*`, `text*`, `re` | `message` |
 | `form` | `to*`, `form*`, plus the form's own fields | `publish` of the form's statement kind, with its fields checked against the form |

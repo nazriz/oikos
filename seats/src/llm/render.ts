@@ -55,7 +55,7 @@ function describeRecord(r: Record): string {
     case "statement": {
       if (r.kind === "request" && r.data?.outcome) return `[${r.id}] ${who} asked ${(r.addressed_to ?? []).join(", ")} to ${outcomeWords(r.data.outcome, r.data.every)}${from}`;
       const d = details(r.data);
-      return `[${r.id}] ${words(r.kind)} from ${who}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${r.basis}` : ""}`;
+      return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${r.basis}` : ""}`;
     }
     case "claim":
       return `[${r.id}] ${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}: ${details(r.about) || "(no details)"}${r.basis ? `, citing ${r.basis}` : ""}${from}`;
@@ -116,6 +116,22 @@ function recordLines(records: Record[]): string[] {
     const counts = new Map<string, number>();
     for (const r of v) counts.set(r.choice, (counts.get(r.choice) ?? 0) + 1);
     return `${v.length} vote${v.length === 1 ? "" : "s"} on ${v[0]!.ballot}: ${[...counts].sort().map(([c, n]) => `${c} ${n}`).join(", ")}`;
+  });
+}
+
+/** A few lots, one by one: what's on each, and who's there where the seat can tell. */
+function describeLots(parcels: SiteParcel[], me: string, capacity: (type: string) => { [slot: string]: number }): string[] {
+  return parcels.map((p) => {
+    const s = p.structure;
+    if (!s) return `- ${p.parcel}: empty`;
+    const what = `${words(s.type)} (${s.structure})${s.complete ? "" : `, being built${s.completes_at ? ` until ${when(s.completes_at)}` : ""}`}`;
+    const named = s.occupancy.filter((o) => o.occupant).map((o) => (o.occupant === me ? "you" : o.occupant!));
+    const counted = [...new Set(s.occupancy.map((o) => o.slot))].map((slot) => {
+      const n = s.occupancy.filter((o) => o.slot === slot).reduce((a, o) => a + o.count, 0);
+      const cap = capacity(s.type)[slot];
+      return `${n}${cap ? ` of ${cap}` : ""} ${words(slot)} places taken`;
+    });
+    return `- ${p.parcel}: ${what}${named.length ? `; here: ${named.join(", ")}` : ""}${s.complete && counted.length ? `; ${counted.join(", ")}` : ""}`;
   });
 }
 
@@ -207,7 +223,9 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       if (lines.length > max) out.push(`(${lines.length - max} earlier ${lines.length - max === 1 ? "item" : "items"} not listed.)`);
       for (const l of lines.slice(-max)) out.push(`- ${l}`);
     } else if (ch.kind === "sites") {
-      out.push("", `## ${title(id)}`, describeSites(ch.parcels, ch.as_of, o.capacity ?? (() => ({}))));
+      // A handful of lots (the seat's surroundings) one by one; a whole town as a survey.
+      if (ch.parcels.length <= 30) out.push("", `## ${title(id)}`, ...(ch.parcels.length ? describeLots(ch.parcels, obs.entity, o.capacity ?? (() => ({}))) : ["Nothing to see here."]));
+      else out.push("", `## ${title(id)}`, describeSites(ch.parcels, ch.as_of, o.capacity ?? (() => ({}))));
     } else if (ch.kind === "directory") {
       const orgs = ch.entities.filter((e) => e.kind !== "person").map((e) => `${e.name} (${e.entity})`);
       const offices = ch.seats.filter((s) => s.role).map((s) => `${s.seat}: ${words(s.role!)}, for ${s.entity}${s.status === "active" ? "" : " (gone)"}`);

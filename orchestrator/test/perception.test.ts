@@ -2,7 +2,8 @@
 // changed since its last look, and the seat runtime keeps the seat's view. The
 // kernel's own invariant test checks the kernel side (kernel/tests/perception.rs);
 // this checks the runtime's View on a real town: after every look, each seat's
-// accounts, survey and directory equal the kernel's full picture.
+// accounts, survey and directory equal the kernel's full picture. Every citizen's
+// surroundings are checked too, and must follow it when it moves.
 
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
@@ -18,15 +19,24 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 test("every seat's view equals the kernel's full picture, after every look", async () => {
   const out = join(root, "runs", "test-perception");
   rmSync(out, { recursive: true, force: true });
-  let checked = 0;
+  let checked = 0, moves = 0;
   const kinds = new Set<string>();
+  const where = new Map<string, string>(); // seat -> the lots around it, last look
   await runWorld({
     config: generate({ ...spec, citizens: 60 }), runId: "perception", outDir: out, until: 45 * DAY,
     inspect: async (seat, obs, kernel) => {
-      // Check the institutions every look, and a sample of the rest (it's a full-picture query each time).
-      if (!/^(bank-payments|council-clerk|inspector|planning|landlord-1-office|mayor|c000[0-3]-seat)$/.test(seat)) return;
+      // Check the institutions every look, every citizen's surroundings, and a sample of the rest (it's a full-picture query each time).
+      const sampled = /^(bank-payments|council-clerk|inspector|planning|landlord-1-office|mayor|c000[0-3]-seat)$/.test(seat);
+      if (!sampled && !obs.channels.street) return;
       const full = (await kernel.request({ op: "view", seat })).observation;
+      const street = obs.channels.street;
+      if (street?.kind === "sites") {
+        const lots = street.parcels.map((p) => p.parcel).join(" ");
+        if (where.has(seat) && where.get(seat) !== lots) moves++;
+        where.set(seat, lots);
+      }
       for (const [id, ch] of Object.entries(obs.channels)) {
+        if (!sampled && id !== "street") continue;
         if (ch.kind === "records") continue; // records are what's new; the books keep them
         const want = full.channels[id];
         const strip = (c: any) => (c.kind === "accounts" ? { ...c, transactions: [] } : c.kind === "sites" ? { ...c, as_of: 0 } : c);
@@ -39,5 +49,6 @@ test("every seat's view equals the kernel's full picture, after every look", asy
     },
   });
   expect(checked).toBeGreaterThan(500);
+  expect(moves).toBeGreaterThan(0); // someone moved, and their view followed
   expect(kinds).toEqual(new Set(["accounts", "sites", "directory"]));
 }, 300_000);

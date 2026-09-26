@@ -22,7 +22,7 @@ export type Record =
   | (RecordBase & { record: "agreement"; terms: AgreementTerms })
   | (RecordBase & { record: "signature"; agreement: Id; as: Id })
   | (RecordBase & { record: "notice"; agreement: Id; as: Id; text?: string })
-  | (RecordBase & { record: "statement"; kind: string; text: string; data?: Json; adico?: Json; formal?: { language: "cel"; condition: string }; addressed_to?: Id[] })
+  | (RecordBase & { record: "statement"; kind: string; text: string; data?: Json; adico?: Json; formal?: { language: "cel"; condition: string }; addressed_to?: Id[]; place?: Id })
   | (RecordBase & { record: "withdrawal"; withdraws: Id; text?: string })
   | (RecordBase & { record: "vote"; ballot: Id; choice: string })
   | (RecordBase & { record: "entity_declaration"; entity: Id; kind: string; name: string });
@@ -80,13 +80,14 @@ export interface Transaction { t: number; from: Id; to: Id; amount: number; by: 
 
 export interface SiteParcel {
   parcel: Id; x: number; y: number; w: number; h: number;
-  structure?: { structure: Id; type: Id; built_by?: Id; complete: boolean; completes_at?: number; occupancy: { occupant: Id; slot: string; count: number }[] };
+  structure?: { structure: Id; type: Id; built_by?: Id; complete: boolean; completes_at?: number; /** Named in the seat's own buildings (or where its channel shows names); otherwise a count per slot, with no occupant. */
+  occupancy: { occupant?: Id; slot: string; count: number }[] };
 }
 
 export type ChannelData =
   | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; balance: number; closed?: true }[]; transactions: Transaction[] }
-  | { kind: "records"; records: Record[]; search?: true }
-  | { kind: "sites"; as_of: number; parcels: SiteParcel[] }
+  | { kind: "records"; records: Record[]; search?: true; whole?: true }
+  | { kind: "sites"; as_of: number; parcels: SiteParcel[]; whole?: true }
   | { kind: "directory"; entities: { entity: Id; kind: string; name: string }[]; seats: { seat: Id; entity: Id; title?: string; role?: string; status: "active" | "opted_out" }[] };
 
 export interface Observation {

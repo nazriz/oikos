@@ -113,6 +113,13 @@ test("occupancy fills the only kind of space a building has, and asks otherwise"
   expect(r.ok && r.blocks).toEqual([{ block: "occupy", structure: "str.3", slot: "dwelling", count: 1 }]);
 });
 
+test("a statement can be put up on a lot, and the preview says where", () => {
+  const k = town();
+  const r = run('statement(kind=notice, text="Park works start Monday.", on=p1)', k);
+  expect(r.ok && r.blocks).toEqual([{ block: "publish", kind: "notice", text: "Park works start Monday.", place: "p1", speaks_for: "city" }]);
+  expect(r.ok && new Preview(k).of(r.blocks)).toContain('You will put up a notice on p1: "Park works start Monday."');
+});
+
 test("every block kind is reachable from some call", () => {
   const k = town();
   k.accounts.set("acc-own", { account: "acc-own", holder: "city", custodian: "city" });

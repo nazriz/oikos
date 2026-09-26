@@ -59,6 +59,13 @@ pub struct Entity {
     pub name: String,
     /// The change stamp at which it came to exist (0: from the start).
     pub changed: u64,
+    /// The change stamp at which the buildings it occupies last changed (0: never).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub moved: u64,
+}
+
+fn is_zero(x: &u64) -> bool {
+    *x == 0
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -127,6 +134,9 @@ pub struct SeatState {
 pub struct Look {
     pub at: i64,
     pub cursor: u64,
+    /// For a channel that looks near the seat's entity: where it was then (the entity's `moved` stamp).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -237,6 +247,14 @@ impl State {
         let c = self.stamp();
         if let Some(p) = self.parcels.get_mut(&parcel) {
             p.changed = c;
+        }
+    }
+
+    /// Mark an entity as having arrived in, or left, a building.
+    pub fn moved(&mut self, entity: &str) {
+        let c = self.stamp();
+        if let Some(e) = self.entities.get_mut(entity) {
+            e.moved = c;
         }
     }
 

@@ -129,6 +129,8 @@ pub fn world(p: &WorldParams) -> Value {
                 {"id": "mine", "kind": "records", "match": {"involving": ["self"]}},
                 {"id": "laws", "kind": "records", "match": {"records": ["statement"]}},
                 {"id": "town", "kind": "sites", "area": "all", "every": 7 * 86_400},
+                {"id": "street", "kind": "sites", "area": {"near": 0}},
+                {"id": "board", "kind": "records", "match": {"records": ["statement", "withdrawal"]}, "area": {"near": 0}},
                 {"id": "who", "kind": "directory"}
             ], "controller": {"type": "code", "impl": "test"}, "framing": {"disclosure": "unstated", "reason": "test"}})
         })
@@ -194,7 +196,7 @@ pub enum B {
     Propose { a: u8, b: u8 },
     Sign { record: u8, party: u8 },
     Notice { record: u8, party: u8 },
-    Publish { kind: u8, addressed: Option<u8>, private: bool },
+    Publish { kind: u8, addressed: Option<u8>, private: bool, place: Option<u8> },
     Withdraw { record: u8 },
     Vote { record: u8 },
     Message { to: Vec<u8> },
@@ -221,7 +223,8 @@ pub fn block_strategy() -> impl Strategy<Value = B> {
         1 => (u(), u()).prop_map(|(a, b)| B::Propose { a, b }),
         1 => (u(), u()).prop_map(|(record, party)| B::Sign { record, party }),
         1 => (u(), u()).prop_map(|(record, party)| B::Notice { record, party }),
-        2 => (u(), proptest::option::of(u()), any::<bool>()).prop_map(|(kind, addressed, private)| B::Publish { kind, addressed, private }),
+        2 => (u(), proptest::option::of(u()), any::<bool>(), proptest::option::of(u()))
+            .prop_map(|(kind, addressed, private, place)| B::Publish { kind, addressed, private, place }),
         1 => u().prop_map(|record| B::Withdraw { record }),
         1 => u().prop_map(|record| B::Vote { record }),
         1 => proptest::collection::vec(u(), 1..3).prop_map(|to| B::Message { to }),
@@ -495,7 +498,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                     B::Notice { record, party } => {
                         Block::GiveNotice { agreement: pick(&records, *record).unwrap(), party: e(*party), text: None, bind: None }
                     }
-                    B::Publish { kind, addressed, private } => Block::Publish {
+                    B::Publish { kind, addressed, private, place } => Block::Publish {
                         kind: stmt_kinds[*kind as usize % stmt_kinds.len()].into(),
                         text: "Notice to all.".into(),
                         data: Some(json!({"n": *kind as i64})),
@@ -503,6 +506,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         formal: None,
                         basis: None,
                         addressed_to: addressed.map(|a| vec![e(a)]),
+                        place: place.map(|p| pick(&parcels, p).unwrap()),
                         speaks_for: Some(me.into()),
                         visible_to: private.then(|| Visibility::only([me.to_string()])),
                         bind: None,

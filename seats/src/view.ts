@@ -45,11 +45,12 @@ export class View {
         }
         if (ch.accounts.length) this.cache.delete(id);
       } else if (ch.kind === "sites") {
-        const v = this.sites.get(id) ?? { as_of: ch.as_of, parcels: new Map() };
+        // A move: the whole of the new surroundings replaces the old (what was seen there is the seat's memory, not its view).
+        const v = (!ch.whole && this.sites.get(id)) || { as_of: ch.as_of, parcels: new Map() };
         v.as_of = ch.as_of;
         for (const p of ch.parcels) v.parcels.set(p.parcel, p);
         this.sites.set(id, v);
-        if (ch.parcels.length) this.cache.delete(id);
+        if (ch.parcels.length || ch.whole) this.cache.delete(id);
       } else if (ch.kind === "directory") {
         const v = this.directories.get(id) ?? { entities: new Map(), seats: new Map() };
         for (const e of ch.entities) v.entities.set(e.entity, e);
@@ -59,10 +60,10 @@ export class View {
       } else if (ch.search) {
         channels[id] = ch; // a search's results: what matches now, as they are
       } else if (this.full.has(id)) {
-        const m = this.kept.get(id) ?? new Map();
+        const m = (!ch.whole && this.kept.get(id)) || new Map();
         for (const r of ch.records) m.set(r.id, r);
         this.kept.set(id, m);
-      } else channels[id] = ch;
+      } else channels[id] = ch; // what's new (after a move: everything near the new place, all new to the seat)
     }
     const txs = (id: string) => {
       const ch = obs.channels[id];

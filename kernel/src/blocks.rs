@@ -146,6 +146,9 @@ pub enum Block {
         basis: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<IdOrRef>>,
+        /// A parcel it's put up on: then it's seen by being near there.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        place: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         speaks_for: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -347,6 +350,9 @@ pub enum RecordBody {
         formal: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<Id>>,
+        /// The parcel it's put up on, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        place: Option<Id>,
     },
     Withdrawal {
         withdraws: Id,
