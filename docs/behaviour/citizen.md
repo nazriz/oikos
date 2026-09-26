@@ -1,4 +1,4 @@
-# `citizen.default` (v0.4.0)
+# `citizen.default` (v0.5.0)
 
 **Seat:** a townsperson (acts as themselves). **Source:** `seats/src/behaviour/citizen.ts`. Wakes weekly, and whenever something names them (an offer, a notice, a message).
 
@@ -18,6 +18,15 @@ Everything happens the way a person does it: they apply, sign, move in, and ask 
 | **Voice: signing** | A tenant signs (a `vote` with choice `sign`, seen by the signer and the organiser only) when aggrieved, or once the share of the town that has signed, as the organiser's latest published `petition_count` says, reaches their personal threshold. The organiser publishes the running count at most every 3 days, as petition sites show one. Thresholds are drawn once per person, roughly normal (mean 25%, sd 10%, via the Irwin–Hall sum of 12 uniforms). | Granovetter, "Threshold Models of Collective Behavior" (1978). A uniform distribution, the first version, always cascades to everyone, which is Granovetter's own point; a normal one makes the outcome contingent. |
 | **Leaving town** | After 90 days without a home, or 180 days without work *and* without enough money for a month's rent: move out, give notice, and take all savings out of town | Hirschman, *Exit, Voice, and Loyalty* (1970): exit as the response to decline. Thresholds are placeholders to calibrate. |
 
+## Attention: what a citizen looks at (D43)
+
+A citizen doesn't receive the housing or job market. It looks when it needs to, the way a person reads the listings when they're hunting:
+- **Needing a home:** a search of standing rental listings within its budget (the rent rule above), dearest first, the top 20.
+- **Needing work:** a search of standing job postings, best-paid first, the top 20.
+- **Every wake:** a glance at the petitions board (standing petitions). The running signature counts arrive as an ordinary report.
+
+It then chooses from what it found, as the rules above say. Someone with a home and a job never looks at the markets at all.
+
 ## Parameters (defaults)
 
 - `rent_share_bps` 3300
@@ -29,6 +38,7 @@ Everything happens the way a person does it: they apply, sign, move in, and ask 
 - `leave_after_jobless_days` 180
 - `petition_start_bps` 300, `petition_days` 180, `rent_burden_grievance_bps` 4000
 - `threshold_mean_bps` 2500, `threshold_sd_bps` 1000
+- `search_limit` 20
 - `shop_accounts`, `outside_account`, `population`: supplied by the world
 
 ## Leaves out (for now)

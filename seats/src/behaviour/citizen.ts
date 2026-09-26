@@ -12,7 +12,7 @@
 // Everything is done the way a person does it: applying, signing, moving in,
 // asking the bank to pay. Nothing happens to them automatically.
 
-import type { Observation, SeatAction } from "../contracts";
+import type { LookRequest, Observation, SeatAction, StatementRecord } from "../contracts";
 import { params, wait, type BehaviourModule, type SeatContext } from "../module";
 import { Book, callAction, DAY, jobTerms, leaseTerms, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, vote, withdraw, type Step } from "./common";
 
@@ -21,7 +21,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -42,6 +42,7 @@ export const citizen: BehaviourModule = {
       threshold_sd_bps: 1000, //   roughly normal with this mean and spread (Granovetter 1978)
       population: 200,
       rent_burden_grievance_bps: 4000,
+      search_limit: 20, // how many listings or postings a search shows, best first
     },
     ctx.params,
   );
@@ -50,6 +51,9 @@ export const citizen: BehaviourModule = {
     let home: Home | null = null;
     let job: Job | null = null;
     const applied = new Set<string>();
+    // Attention: the market is looked at only when hunting, as a search (what's on offer now).
+    let lookedAt = -1;
+    const found: { homes: StatementRecord[]; jobs: StatementRecord[]; petitions: StatementRecord[] } = { homes: [], jobs: [], petitions: [] };
     let homelessSince: number | null = null;
     let joblessSince: number | null = null;
     let nextSpend = ctx.rng("spend-day").below(30) * DAY;
@@ -87,6 +91,10 @@ export const citizen: BehaviourModule = {
     let fresh: ReturnType<Book["absorb"]> = [];
     const absorb = (obs: Observation) => {
       fresh.push(...book.absorb(obs));
+      for (const k of ["homes", "jobs", "petitions"] as const) {
+        const ch = obs.channels[k];
+        if (ch?.kind === "records" && ch.search) found[k] = ch.records as StatementRecord[];
+      }
       // Did the move-in we just attempted work?
       if (moving && lastWasMove && obs.outcomes.length) {
         if (obs.outcomes.at(-1)!.status === "applied" && home) home.movedIn = true;
@@ -192,7 +200,7 @@ export const citizen: BehaviourModule = {
 
       // Looking for a home: the best one we can afford among the listings we've seen.
       if (!home) {
-        const listings = book.open("rental_listing").filter((l) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance));
+        const listings = found.homes.filter((l) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance));
         listings.sort((a, b) => b.data.rent - a.data.rent || (a.id < b.id ? -1 : 1));
         const best = listings[0];
         if (best?.speaks_for) {
@@ -202,7 +210,7 @@ export const citizen: BehaviourModule = {
       }
       // Looking for work: the best-paid posting.
       if (!job) {
-        const posts = book.open("job_posting").filter((j) => !applied.has(j.id));
+        const posts = found.jobs.filter((j) => !applied.has(j.id));
         posts.sort((a, b) => (b.data?.wage ?? 0) - (a.data?.wage ?? 0) || (a.id < b.id ? -1 : 1));
         const best = posts[0];
         if (best?.speaks_for) {
@@ -243,7 +251,7 @@ export const citizen: BehaviourModule = {
       const noticed = [...book.notices.entries()].some(([ag, ns]) => ag === home?.agreement && ns.some((n) => n.as !== me));
       if (home && (noticed || burden >= p.rent_burden_grievance_bps)) aggrievedUntil = t + 90 * DAY;
       const aggrieved = t < aggrievedUntil;
-      const open = book.open("petition").filter((x) => (x.data?.demand?.tags ?? []).includes("tenant_protection"));
+      const open = found.petitions.filter((x) => (x.data?.demand?.tags ?? []).includes("tenant_protection"));
       // An organiser closes their petition after `petition_days`; a new one can then start.
       for (const pet of open) if (pet.speaks_for === me && t - pet.at >= p.petition_days * DAY && !signed.has(`closed-${pet.id}`)) {
         signed.add(`closed-${pet.id}`);
@@ -284,6 +292,24 @@ export const citizen: BehaviourModule = {
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
         if (plannedAt !== obs.t) {
+          // Hunting? Look at what's on offer first (the next step, at once, has the results).
+          const acc = ownAccount(obs);
+          const looks: LookRequest[] = [];
+          if (lookedAt !== obs.t && acc) {
+            const budget = job ? Math.floor((monthlyIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months);
+            if (!home) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }], order: { field: "data.rent", desc: true }, limit: p.search_limit } });
+            if (!job) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
+            // A glance at the petitions board: what's standing now.
+            looks.push({ channel: "petitions", query: { standing: true, limit: 10 } });
+          }
+          if (looks.length) {
+            lookedAt = obs.t;
+            found.homes = [];
+            found.jobs = [];
+            found.petitions = [];
+            return { type: "look", looks }; // the results arrive with the next observation, and are planned with
+          }
+          lookedAt = obs.t;
           todo = plan(obs);
           plannedAt = obs.t;
         }

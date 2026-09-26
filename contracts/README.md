@@ -82,6 +82,8 @@ Perception comes only through channels, plus the seat's inbox and the outcomes o
 
 **Perception is changes, not snapshots (D42).** Each look through a channel delivers what changed within its scope since the seat's previous look through it: accounts opened, moved or closed; new records; lots whose building or occupancy changed; new entities and seats whose status changed. A first look delivers everything the channel covers. The seat runtime keeps each seat's **view** from these changes (`seats/src/view.ts`) and gives its controller the current picture, so nothing is re-sent. A kernel invariant test checks that a view built from looks always equals the full picture (`kernel/tests/perception.rs`). Any channel can have `every`, how often the seat looks (an inspector's patrol, a monthly statement); between looks, changes accumulate.
 
+**Attention (D43):** a channel with `on_request` is perceived only when the seat asks, with a `look` action (the `look` command in the log). A look through a records channel can be a **search**: records still standing (not withdrawn by their own author or whoever they speak for), conditions on named fields (`data.<path>`, `about.<path>`, `kind`, `at`, …), an order and a limit. It returns what matches now, marked `search`. The matching is mechanical: the kernel compares fields and never learns what they mean.
+
 **Every seat can always opt out of the study** (VISION §15; D38), which is not resigning an office; `on_opt_out` says whether the seat then goes vacant or a code stand-in carries on. Every framing records its disclosure and a mandatory reason.
 
 ## Seat API (shape unchanged)
@@ -154,6 +156,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 - **`basis` on `propose_agreement`.**
 - **`orchestration.confirm`**: `always`, `consequential` or `never`.
 - **Perception is changes** (D42): every channel delivers only what changed since the seat's last look through it. `new_only` is gone; `every` applies to any channel; account items can be `closed`.
+- **Attention** (D43): `on_request` channels; the `look` seat action and log command; searches (`Query`); `search` on records channel data.
 - **Opting out:** `resign` becomes `opt_out` (seat action and command); the event is `seat_opted_out` and the status `opted_out`. Each seat gains `on_opt_out`.
 
 ## Versioning

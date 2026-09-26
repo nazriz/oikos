@@ -1,0 +1,11 @@
+{
+  "type": "look",
+  "looks": [
+    {
+      "channel": "homes",
+      "query": {
+        "limit": 1000
+      }
+    }
+  ]
+}

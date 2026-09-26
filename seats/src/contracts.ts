@@ -52,7 +52,19 @@ export type SeatAction =
   | { type: "message"; to: Id[]; text: string; re?: Id }
   | { type: "wait"; until?: number }
   | { type: "call"; call: string; reasoning?: string }
+  | { type: "look"; looks: LookRequest[] }
   | { type: "opt_out"; statement: string };
+
+/** Look through a channel now (attention); a records channel can be searched (contracts/seat-api.schema.json, Query). */
+export interface LookRequest {
+  channel: Id;
+  query?: {
+    standing?: boolean;
+    where?: { field: string; op: "=" | "!=" | "<" | "<=" | ">" | ">="; value: number | string | boolean }[];
+    order?: { field: string; desc?: boolean };
+    limit?: number;
+  };
+}
 
 export interface Outcome {
   action: Id;
@@ -73,7 +85,7 @@ export interface SiteParcel {
 
 export type ChannelData =
   | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; balance: number; closed?: true }[]; transactions: Transaction[] }
-  | { kind: "records"; records: Record[] }
+  | { kind: "records"; records: Record[]; search?: true }
   | { kind: "sites"; as_of: number; parcels: SiteParcel[] }
   | { kind: "directory"; entities: { entity: Id; kind: string; name: string }[]; seats: { seat: Id; entity: Id; title?: string; role?: string; status: "active" | "opted_out" }[] };
 

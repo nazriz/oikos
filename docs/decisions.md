@@ -201,11 +201,24 @@ See the design note, §16.
 
 **Database, noted for later (from the same discussion):** DuckDB over Parquet for measurement, built with M3. An on-disk archive for old records (SQLite or an embedded key-value store) with incremental hashing, once run lengths reach tens of millions of records.
 
+**D43. Perception follows attention.** *(Naz, 2026-09-26: "every citizen does not need to see every house listing… each entity, just like the real world, has a map in their mind of the world".)*
+- **The frame:** a seat's view is its mental map, and the platform gives general ways for maps to differ:
+  - reach (channels, visibility, involvement);
+  - sources (every record has an author);
+  - attention (cadence, and now looking on request and searching);
+  - position (proximity, word of mouth: next, as its own design discussion);
+  - memory (views never forget, for now).
+- **Built:** `on_request` channels; a `look` action and command; searches over any records channel (standing, conditions on named fields, order, limit). A search returns what matches now. It's mechanical matching: the kernel never learns what a field means. No world vocabulary is involved; the kernel's tests use a generic noticeboard.
+- **In the town:** citizens search the housing and job markets only when hunting, and glance at the petitions board. The broadcast market and withdrawals channels are gone. Language seats get a `look` tool for their on-request reports.
+- **Also found:** a landlord double-let (a relist in the same plan as the letting; no free-home check before offering), fixed in the landlord module.
+- **Results:** the economy is in line with before (leases 197 vs 192, move-ins 194 vs 190, departures 54 vs 57). At 1,000 citizens, two years take ~68 s, down from ~112 s.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
 
 - **Contract additions proposed by M2** (docs/design/m2-llm-seats.md, "Open"): `notices` on the Observation (translation failures and similar orchestrator-to-seat notes), and `framing.debrief_text`.
 - ~~Directory refresh interval (D33)~~: superseded by D42 (perception is changes).
+- **Position in perception** (D43): proximity ("near me", from occupancy) and word of mouth (along real ties, with delay and distortion). A design discussion before the checkpoint.
 - ~~Citizen behaviour in the Rust kernel vs TypeScript code seats.~~ **Resolved by D30.**
 - ~~Which D15 laws become parameters.~~ **Obsolete** under D18/D19: there are no laws in the kernel; laws are records in a world's config.

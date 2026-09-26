@@ -183,6 +183,9 @@ pub struct Channel {
     /// How often the seat looks through this channel (seconds). Between looks, changes accumulate.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub every: Option<i64>,
+    /// Perceived only when the seat asks (a look), never at ordinary observations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_request: Option<bool>,
     #[serde(flatten)]
     pub kind: ChannelKind,
 }
@@ -424,4 +427,63 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// A seat's request to look through one of its channels now (attention).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LookRequest {
+    pub channel: Id,
+    /// A search (records channels only): what matches now, rather than what changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query: Option<Query>,
+}
+
+/// A search over records: mechanical matching, never interpretation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Query {
+    /// Only records not withdrawn by their own author (or whoever they speak for).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub standing: Option<bool>,
+    #[serde(default, rename = "where", skip_serializing_if = "Option::is_none")]
+    pub conditions: Option<Vec<Condition>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order: Option<Order>,
+    /// At most this many results (default 20, at most 200).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Condition {
+    /// "record", "kind", "at", "author", "speaks_for", "basis", "data.<path>" or "about.<path>".
+    pub field: String,
+    pub op: CmpOp,
+    pub value: Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CmpOp {
+    #[serde(rename = "=")]
+    Eq,
+    #[serde(rename = "!=")]
+    Ne,
+    #[serde(rename = "<")]
+    Lt,
+    #[serde(rename = "<=")]
+    Le,
+    #[serde(rename = ">")]
+    Gt,
+    #[serde(rename = ">=")]
+    Ge,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Order {
+    pub field: String,
+    #[serde(default)]
+    pub desc: bool,
 }

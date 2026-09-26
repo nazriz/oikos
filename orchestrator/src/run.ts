@@ -15,12 +15,12 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, modules as builtin, Randomness, View, type BehaviourModule, type Controller, type Observation, type Record, type SeatAction, type SeatContext } from "@terrarium/seats";
+import { calls, modules as builtin, Randomness, View, type LookRequest, type BehaviourModule, type Controller, type Observation, type Record, type SeatAction, type SeatContext } from "@terrarium/seats";
 import { createLlmSeat, LLM_SEAT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, type LlmAdapter, type LlmController, type LlmIO, type MockBrain } from "@terrarium/seats/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
 
-export const ORCHESTRATOR_VERSION = "0.4.0";
+export const ORCHESTRATOR_VERSION = "0.5.0";
 
 export interface RunOptions {
   config: any;
@@ -70,6 +70,8 @@ interface SeatSlot {
   view: View;
   /** Notes about the seat's own requests, delivered with its next observation (Observation.notices). */
   notices: { t: number; text: string; re?: string }[];
+  /** Channels the seat asked to look through with its next observation (attention). */
+  looks?: LookRequest[];
   wakeTick: number;
 }
 
@@ -145,7 +147,8 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
       const cadence = (p.cadence_days ?? 7) * DAY;
       const titles = new Map<string, string>(s.channels.filter((ch: any) => ch.title).map((ch: any) => [ch.id, ch.title]));
       const entityName = (cfg.world?.entities ?? []).find((e: any) => e.id === s.entity)?.name;
-      const config = { seat: s.id, entity: s.entity, entityName, title: s.title, role: s.role, framing: s.framing, standing: p.standing ?? [], titles, cadenceDays: p.cadence_days ?? 7, draftText };
+      const onRequest = s.channels.filter((ch: any) => ch.on_request).map((ch: any) => ch.id);
+      const config = { seat: s.id, entity: s.entity, entityName, onRequest, title: s.title, role: s.role, framing: s.framing, standing: p.standing ?? [], titles, cadenceDays: p.cadence_days ?? 7, draftText };
       const controller = createLlmSeat(config, io);
       const module: BehaviourModule = { name: "llm.seat", version: LLM_SEAT_VERSION, doc: "docs/design/m2-llm-seats.md", cadence: () => cadence, create: () => controller as unknown as Controller };
       slot = { id: s.id, entity: s.entity, module, controller: controller as unknown as Controller, ctx, nextWake: 0, resigned: false, wakesThisTick: 0, wakeTick: -1, knowledge: new Knowledge(), notices: [], view: new View(new Set(p.standing ?? [])),
@@ -240,7 +243,16 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     wakes++;
     next.nextWake = t + ceilTo(next.module.cadence(next.ctx), tick); // default if it waits without a time
     for (let n = 0; n < maxActions; n++) {
-      const raw: Observation = (await command({ command: "observe", seat: next.id })).observation;
+      const looks = next.looks;
+      next.looks = undefined;
+      let reply = looks ? await command({ command: "look", seat: next.id, looks }) : null;
+      if (looks && reply === null) {
+        // A look the kernel won't take (an unknown channel, a bad query): recorded, and the seat observes as usual.
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: next.id, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
+        next.notices.push({ t, text: "That couldn't be looked up." });
+      }
+      reply ??= await command({ command: "observe", seat: next.id });
+      const raw: Observation = reply.observation;
       const p00 = performance.now();
       // Knowledge takes in the changes themselves; the controller reads the view's full picture.
       next.knowledge.absorb(raw);
@@ -256,6 +268,10 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
       if (action.type === "wait") {
         if (action.until !== undefined) next.nextWake = Math.max(t + tick, ceilTo(action.until, tick));
         break;
+      }
+      if (action.type === "look") {
+        next.looks = action.looks; // perceived with the next observation, which follows at once
+        continue;
       }
       if (action.type === "opt_out") {
         // Leaving the study (D38): a platform exit, recorded; what follows is the world's config.

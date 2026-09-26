@@ -40,6 +40,12 @@ pub enum Command {
     Observe {
         seat: Id,
     },
+    /// An observation that also looks through the named channels now (attention): on-request
+    /// channels are perceived only this way, and a look through a records channel can be a search.
+    Look {
+        seat: Id,
+        looks: Vec<crate::config::LookRequest>,
+    },
     OptOut {
         seat: Id,
         statement: String,
@@ -206,6 +212,29 @@ impl Kernel {
         let seat_exists = |seat: &str| if self.s.seats.contains_key(seat) { Ok(()) } else { perr(format!("unknown seat {seat}")) };
         match cmd {
             Command::Act { seat, .. } | Command::Observe { seat } => seat_exists(seat)?,
+            Command::Look { seat, looks } => {
+                seat_exists(seat)?;
+                let cfg = &self.s.seats[seat];
+                if looks.is_empty() || looks.len() > 16 {
+                    return perr("a look names 1..=16 channels");
+                }
+                for l in looks {
+                    let Some(ch) = cfg.channels.iter().find(|c| c.id == l.channel) else { return perr(format!("seat {seat} has no channel {}", l.channel)) };
+                    if let Some(q) = &l.query {
+                        if !matches!(ch.kind, crate::config::ChannelKind::Records { .. }) {
+                            return perr(format!("channel {} isn't a records channel, so it can't be searched", l.channel));
+                        }
+                        if q.limit.is_some_and(|n| n == 0 || n > 200) {
+                            return perr("a search's limit is 1..=200");
+                        }
+                        for f in q.conditions.iter().flatten().map(|c| &c.field).chain(q.order.iter().map(|o| &o.field)) {
+                            if !observe::known_field(f) {
+                                return perr(format!("{f} isn't a field a search can use"));
+                            }
+                        }
+                    }
+                }
+            }
             Command::Advance { to } => {
                 if *to < self.state.t {
                     return perr(format!("cannot advance to {to}: the clock is at {}", self.state.t));
@@ -232,7 +261,8 @@ impl Kernel {
         Ok(match cmd {
             Command::Act { seat, blocks, .. } => self.act(seat, blocks),
             Command::Advance { to } => self.advance(*to),
-            Command::Observe { seat } => self.observe(seat),
+            Command::Observe { seat } => self.observe(seat, &[]),
+            Command::Look { seat, looks } => self.observe(seat, looks),
             Command::OptOut { seat, statement } => {
                 let c = self.state.stamp();
                 let ss = self.state.seats.get_mut(seat).unwrap();
@@ -314,8 +344,8 @@ impl Kernel {
         self.s.seats.contains_key(seat).then(|| observe::full_view(&self.s, &self.state, &mut self.index, seat))
     }
 
-    fn observe(&mut self, seat: &str) -> Output {
-        let obs = observe::observe(&self.s, &mut self.state, &mut self.index, seat);
+    fn observe(&mut self, seat: &str, looks: &[crate::config::LookRequest]) -> Output {
+        let obs = observe::observe(&self.s, &mut self.state, &mut self.index, seat, looks);
         let hash = canon::hash_value(canon::DOMAIN_OBSERVATION, &obs).expect("observations are canonical");
         Output {
             events: vec![Timed::new(self.state.t, EventBody::Observation { seat: seat.into(), observation_hash: hash })],

@@ -15,7 +15,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { renderObservation, renderStanding } from "./render";
 
-export const LLM_SEAT_VERSION = "0.2.1";
+export const LLM_SEAT_VERSION = "0.3.0";
 
 export interface LlmSeatConfig {
   seat: string;
@@ -29,6 +29,8 @@ export interface LlmSeatConfig {
   standing: string[];
   /** What the seat's reports are called. */
   titles: Map<string, string>;
+  /** Reports the seat reads only when it chooses to (on request). */
+  onRequest?: string[];
   cadenceDays: number;
   maxTokens?: number;
   /** How a draft awaiting confirmation reads (from the translator package). */
@@ -52,6 +54,10 @@ export function tools(c: LlmSeatConfig): ToolSpec[] {
     { name: "notebook", description: "Replace your notebook: the only thing you'll remember from one day to the next. Use it alongside another action.",
       input_schema: { type: "object", required: ["text"], properties: { text: { type: "string", maxLength: 4000 } } } },
     { name: "opt_out", description: leave, input_schema: { type: "object", required: ["statement"], properties: { statement: { type: "string" } } } },
+    ...(c.onRequest?.length
+      ? [{ name: "look", description: `Look at one of the reports you only read when you choose to: ${c.onRequest.map((id) => `"${c.titles.get(id) ?? id}" (${id})`).join(", ")}. You'll see what's there with your next report.`,
+          input_schema: { type: "object", required: ["report"], properties: { report: { enum: c.onRequest }, current_only: { type: "boolean", description: "Only what's still current (not withdrawn by whoever put it up)." } } } }]
+      : []),
   ];
 }
 
@@ -124,6 +130,10 @@ export function createLlmSeat(c: LlmSeatConfig, io: LlmIO): LlmController {
           break;
         case "done_for_now":
           return done(Number.isInteger(i.days) && i.days > 0 ? { type: "wait", until: obs.t + i.days * 86_400 } : { type: "wait" });
+        case "look":
+          if (text(i.report) && c.onRequest?.includes(i.report))
+            return done({ type: "look", looks: [{ channel: i.report, ...(i.current_only ? { query: { standing: true, limit: 20 } } : {}) }] });
+          break;
         case "opt_out":
           if (text(i.statement)) return done({ type: "opt_out", statement: i.statement });
           break;

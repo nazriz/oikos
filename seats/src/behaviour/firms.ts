@@ -48,7 +48,7 @@ function receipts(obs: Observation, account: string): Map<string, number> {
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.3.1",
+  version: "0.3.2",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -137,10 +137,20 @@ export const landlord: BehaviourModule = {
       const apps = book.open("rental_application").filter((a) => (a.addressed_to ?? []).includes(me) && !handled.has(a.id));
       const byListing = new Map<string, typeof apps>();
       for (const a of apps) byListing.set(a.data?.listing, [...(byListing.get(a.data?.listing) ?? []), a]);
+      const lettingNow = new Set<string>(); // listings being let (or withdrawn) in this plan: never also relisted
+      const unitsIn = (structure: string) => owned.find((o) => o.structure === structure)?.units ?? 0;
+      const takenIn = (structure: string) => [...active, ...awaiting].filter((a) => leaseTerms(a, tenantOf(a)).structure === structure).length + offeredNow.filter((x) => x === structure).length;
       for (const [listingId, as] of byListing) {
         for (const a of as) handled.add(a.id);
         const listing = book.records.get(listingId);
         if (listing?.record !== "statement" || book.withdrawn.has(listingId)) continue;
+        // Only let a home that's still free; a stale listing is taken down instead.
+        if (takenIn(listing.data.structure) >= unitsIn(listing.data.structure)) {
+          lettingNow.add(listingId);
+          steps.push([withdraw(listingId, "No longer available.")]);
+          continue;
+        }
+        lettingNow.add(listingId);
         const pick = ctx.rng(`pick-${listingId}`).pick(as.sort((x, y) => (x.id < y.id ? -1 : 1)));
         const tenant = pick.speaks_for!;
         const months = between(p.min_term_months, p.max_term_months, ctx.rng(`term-${listingId}`).below(1_000_000) / 1_000_000);
@@ -161,7 +171,7 @@ export const landlord: BehaviourModule = {
       for (const o of owned) {
         const homeOf = (a: any) => leaseTerms(a, tenantOf(a)).structure;
         const let_ = [...active, ...awaiting].filter((a) => homeOf(a) === o.structure).length;
-        const listed = openListings.filter((l) => l.data?.structure === o.structure);
+        const listed = openListings.filter((l) => l.data?.structure === o.structure && !lettingNow.has(l.id));
         const pendingOffers = offeredNow.filter((x) => x === o.structure).length;
         const vacant = o.units - let_ - listed.length - pendingOffers;
         for (let i = 0; i < vacant; i++) {

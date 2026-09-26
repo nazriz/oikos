@@ -269,7 +269,7 @@ fn visibility_decides_who_perceives_what() {
     let mut run = Run::start(c, "visibility", Vec::new(), None).unwrap();
     let sees = |run: &mut Run<Vec<u8>>, seat: &str, id: &str| {
         let obs = run.command(&Command::Observe { seat: seat.into() }).unwrap().observation.unwrap();
-        obs.channels.values().any(|c| matches!(c, ChannelData::Records { records } if records.iter().any(|r| r.id == id)))
+        obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id == id)))
     };
     // Bob's lease is visible to Bob and devco, not to Alice.
     assert!(sees(&mut run, "bob-seat", "lease-bob"));
@@ -298,7 +298,7 @@ fn visibility_decides_who_perceives_what() {
     assert!(sees(&mut run, "alice-seat", &vote));
     // One look for Bob (a look delivers each new record once): the public ballot, but not Alice's vote.
     let obs = run.command(&Command::Observe { seat: "bob-seat".into() }).unwrap().observation.unwrap();
-    let got = |id: &str| obs.channels.values().any(|c| matches!(c, ChannelData::Records { records } if records.iter().any(|r| r.id == id)));
+    let got = |id: &str| obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id == id)));
     assert!(!got(&vote));
     assert!(got(&ballot), "the ballot itself is public, so Bob's channel does show public records");
 }

@@ -1,0 +1,23 @@
+{
+  "type": "look",
+  "looks": [
+    {
+      "channel": "homes",
+      "query": {
+        "standing": true,
+        "where": [
+          {
+            "field": "data.rent",
+            "op": "<=",
+            "value": 110000
+          }
+        ],
+        "order": {
+          "field": "data.rent",
+          "desc": true
+        },
+        "limit": 20
+      }
+    }
+  ]
+}

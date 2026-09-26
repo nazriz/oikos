@@ -37,3 +37,13 @@ test("canonical JSON sorts keys by UTF-16 code units and escapes like the kernel
   expect(canonical({ b: 1, a: [true, null, "x\n\u0001é"], "é": 0, Z: {} })).toBe('{"Z":{},"a":[true,null,"x\\n\\u0001é"],"b":1,"é":0}');
   expect(() => canonical({ x: 1.5 })).toThrow();
 });
+
+test("a language seat with on-request reports can look at them, in its own words", async () => {
+  const { createLlmSeat } = await import("../src/llm/seat");
+  const { MockAdapter } = await import("../src/llm/adapter");
+  const adapter = new MockAdapter("mock", { seat: () => [{ type: "tool_use", id: "1", name: "look", input: { report: "board", current_only: true } }] });
+  const seat = createLlmSeat({ seat: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["board", "Noticeboard"]]), onRequest: ["board"], cadenceDays: 7, draftText: () => "" },
+    { adapter, annotate: async () => {}, now: () => 0 });
+  const a = await seat.step(obs({}), { world: { config: {} } } as any);
+  expect(a).toEqual({ type: "look", looks: [{ channel: "board", query: { standing: true, limit: 20 } }] });
+});

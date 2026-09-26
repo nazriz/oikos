@@ -1,0 +1,17 @@
+{
+  "type": "look",
+  "looks": [
+    {
+      "channel": "homes",
+      "query": {
+        "where": [
+          {
+            "field": "rent",
+            "op": "<=",
+            "value": 1
+          }
+        ]
+      }
+    }
+  ]
+}

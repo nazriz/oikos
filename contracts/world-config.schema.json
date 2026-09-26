@@ -239,6 +239,7 @@
             "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
+            "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
             "kind": { "description": "Balances and new transactions of accounts the seat's entity holds or has custody of.", "const": "accounts" }
           }
         },
@@ -250,6 +251,7 @@
             "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
+            "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
             "kind": { "const": "records" },
             "match": {
               "description": "Which records this channel shows (all conditions must hold; omitted means any).",
@@ -280,6 +282,7 @@
             "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
+            "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
             "kind": { "description": "Physical state of parcels in an area: structures, construction under way, occupancy. How inspectors see.", "const": "sites" },
             "area": {
               "anyOf": [
@@ -297,6 +300,7 @@
             "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
             "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
             "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
+            "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
             "kind": { "description": "Who exists: entities and seats (names, kinds, titles).", "const": "directory" }
           }
         }

@@ -37,7 +37,7 @@ impl View {
                     }
                 }
             }
-            ChannelData::Records { records } => self.records.extend(records.iter().map(|r| r.id.clone())),
+            ChannelData::Records { records, .. } => self.records.extend(records.iter().map(|r| r.id.clone())),
             ChannelData::Sites { parcels, .. } => {
                 for p in parcels {
                     self.parcels.insert(p.parcel.clone(), p.clone());

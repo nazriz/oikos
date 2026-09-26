@@ -217,6 +217,30 @@
           }
         },
         {
+          "description": "An observation that also looks through the named channels now (attention).",
+          "type": "object",
+          "required": [
+            "command",
+            "seat",
+            "looks"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "command": {
+              "const": "look"
+            },
+            "seat": {
+              "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
+            },
+            "looks": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": { "$ref": "urn:terrarium:contracts:0.3:seat-api#/$defs/LookRequest" }
+            }
+          }
+        },
+        {
           "type": "object",
           "required": [
             "command",

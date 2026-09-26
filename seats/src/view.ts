@@ -56,6 +56,8 @@ export class View {
         for (const s of ch.seats) v.seats.set(s.seat, s);
         this.directories.set(id, v);
         if (ch.entities.length || ch.seats.length) this.cache.delete(id);
+      } else if (ch.search) {
+        channels[id] = ch; // a search's results: what matches now, as they are
       } else if (this.full.has(id)) {
         const m = this.kept.get(id) ?? new Map();
         for (const r of ch.records) m.set(r.id, r);
