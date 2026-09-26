@@ -1,0 +1,21 @@
+# The generated town at Stage 2's scale: the same as town.yaml, five times over.
+# `terrarium run worlds/town-1000.yaml --seeds 5` (add `--set mayor=llm` for the language-model mayor)
+generate: town
+name: Millbrook
+seed: 1
+citizens: 1000
+years: 2
+grid: { w: 40, h: 30 }
+apartment_blocks: 50      # 600 homes
+houses: 275               # 875 homes for 1,000 people: housing is tight
+shops: 40                 # 240 jobs
+factories: 15             # 600 jobs
+landlords: 20
+rents: { apartment: 85000, house: 130000 }     # cents a month
+wages: { shop: 120000, factory: 150000 }       # cents every 14 days
+exports_per_month: 300000000                   # $3,000,000 a month bought from the factories
+housed_bps: 9500
+employed_bps: 9000
+savings_months: [1, 6]
+landlord_compliance_bps: 5000                  # landlords obey a refusal, fine or order half the time
+mayor: code                                    # the all-code control; "llm" puts an AI in the seat

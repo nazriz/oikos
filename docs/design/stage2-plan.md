@@ -56,7 +56,7 @@ Each module's doc gives: the rule in plain words; its source; its parameters and
 
 1. **M1: an all-code town, running.** Orchestrator, seat runtime, deterministic randomness, the generator, the example legal code, and first versions of every behaviour module. **No LLM.** This is also VISION's all-code control group, the baseline every AI experiment is compared against. It costs nothing to run.
 2. **M2: the LLM mayor.** Adapters (Anthropic plus open-weight), observation → prompt rendering, the translator and sign-off loop, framing, resignation, debrief, usage and cost annotations. *Built against the mock adapter (D34, docs/design/m2-llm-seats.md); real adapters deferred.*
-3. **M3: batches and the cost report.** `terrarium run worlds/town.yaml --seeds 5`. Then run 1–2 simulated years across seeds.
+3. **M3: batches and the cost report.** `terrarium run worlds/town.yaml --seeds 5`. Then run 1–2 simulated years across seeds. *Built (D46): batches in parallel, DuckDB-over-Parquet measurement and the cost report; five-seed, two-year, 1,000-citizen batches run in about 2 minutes (docs/measurement.md).*
 4. **Checkpoint with Naz.** V0.md's questions, plus two new ones: did the mayor manage to govern *through* institutions? Did institutions behave plausibly (follow, bend or ignore procedure)? And revise contracts before Stages 3–4.
 
 Work stays designed-not-built (D24), so institutions act without time cost in Stage 2.

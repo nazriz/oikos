@@ -7,7 +7,8 @@
     "seats",
     "translator",
     "orchestrator",
-    "worlds"
+    "worlds",
+    "measure"
   ],
   "scripts": {
     "test": "bun test",

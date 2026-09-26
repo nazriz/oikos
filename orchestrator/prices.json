@@ -1,0 +1,11 @@
+{
+  "about": "Published API prices, for cost projections (and for real adapters when they're added). Micro-USD per million tokens. Cache prices are for the 5-minute cache.",
+  "source": "https://claude.com/pricing",
+  "retrieved": "2026-09-27",
+  "models": {
+    "anthropic/claude-sonnet-5": { "input": 2000000, "output": 10000000, "cache_read": 200000, "cache_write": 2500000 },
+    "anthropic/claude-opus-5-5": { "input": 4000000, "output": 20000000, "cache_read": 200000, "cache_write": 5000000 },
+    "anthropic/claude-fable-5-1": { "input": 10000000, "output": 50000000, "cache_read": 250000, "cache_write": 12500000 },
+    "anthropic/claude-haiku-4-5": { "input": 1000000, "output": 5000000, "cache_read": 100000, "cache_write": 1250000 }
+  }
+}

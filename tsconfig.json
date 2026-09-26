@@ -17,6 +17,7 @@
     "translator",
     "orchestrator",
     "worlds",
+    "measure",
     "contracts/test",
     "docs/research/cel-check"
   ],

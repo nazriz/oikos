@@ -254,6 +254,32 @@ See the design note, §16.
   - job seekers need to approach employers directly (the commonest method in the CPS);
   - language-model citizens arrive (they'll speak and understand freely).
 
+**D46. M3: batch runs, measurement and the cost report.** *(Naz, 2026-09-27: "yes, go ahead with M3".)*
+- **Batches:**
+  - `terrarium run <world> --seeds N` runs each seed in its own process (with its own kernel), several in parallel.
+  - A test checks a batch run is identical to the same seed run alone. Seed 1 of the 1,000-citizen batch also has the same final state as the earlier standalone run.
+  - Seeds vary randomness, not the world.
+  - `--set path=value` overrides the world file.
+  - `batch.json` records what ran.
+  - Guide: docs/measurement.md.
+- **Measurement (`measure/`, DuckDB over Parquet, as D42 noted):**
+  - Logs are exported to plain-fact tables, one Parquet file per table per run, so a batch is a folder DuckDB reads together.
+  - Standing queries are SQL files with a description line. Generic: overview, activity, refusals, usage, language seats. Town-specific: economy, word of mouth.
+  - Measurement lives outside the world and reads only logs.
+  - DuckDB is `@duckdb/node-api` (1.5.5), which works under Bun. It's the platform's first native dependency, confined to measurement.
+- **Cost report:**
+  - Two figures, never mixed. *Recorded* is what was spent, priced when each call was made.
+  - *Projected* is what the same calls would cost on each seat's configured model, at published prices (`orchestrator/prices.json`: claude.com/pricing, retrieved 2026-09-27).
+  - While seats run on the mock, the report says why the projection is an order of magnitude: estimated tokens, short mock replies, the code brain's pace, and no caching.
+  - The translator's model isn't set by any world, so it's priced as the seats' model or `--translator-model`. If worlds should name it, that's a proposed contract addition (orchestration), not made.
+- **`worlds/town-1000.yaml`:** Stage 2's scale (the town five times over).
+  - `--set citizens=1000` on town.yaml gives 1,000 people 175 homes, and most leave.
+- **First batches** (five seeds, two years, 1,000 citizens; all-code and mock-LLM mayor; results in docs/measurement.md):
+  - About 2 minutes a batch, and a full-size log replays byte-identically.
+  - The two batches are close to each other, as they should be: the mock mayor's brain is the code mayor.
+  - The projected cost of the language-model mayor at Sonnet 5 prices is about $0.70 per run.
+- **Revisit if:** runs outgrow memory or disk (logs are about 260 MB per 2-year, 1,000-citizen run; the measurement tables about a tenth of that), or real adapters arrive (usage is then a provider's count, and the projection becomes a check).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
