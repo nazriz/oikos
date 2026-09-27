@@ -6,7 +6,7 @@
     "event": "structure_started",
     "cause": 51,
     "structure": "str.1",
-    "parcel": "p12",
+    "on": "cell.2.1",
     "structure_type": "apartments",
     "built_by": "buildco",
     "at": 18152000

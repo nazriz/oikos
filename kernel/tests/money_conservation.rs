@@ -6,7 +6,7 @@
 //!   2. no ordinary account is negative;
 //!   3. every account's balance equals its opening balance plus the `transfer`
 //!      events logged so far: no money moves without a transfer event;
-//!   4. every payment was executed by a seat of the paying account's custodian.
+//!   4. every payment was executed by someone acting for the paying account's custodian.
 
 mod common;
 
@@ -26,15 +26,20 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
         let Some(cmd) = concretize(&run, op) else { continue };
         let before = run.kernel().state().accounts.clone();
         let Some(resp) = step(&mut run, &cmd) else { continue };
+        // Who acted, and for whom: the capacity the action was made in.
+        let acting = resp.events.iter().find_map(|e| match &e.body {
+            EventBody::ActionApplied { participant, position, .. } => run.kernel().state().acting_entity(participant, position.as_deref()),
+            _ => None,
+        });
         for e in &resp.events {
-            if let EventBody::Transfer { from, to, amount, by, reason, .. } = &e.body {
+            if let EventBody::Transfer { from, to, amount, reason, .. } = &e.body {
                 prop_assert!(*amount > 0);
                 // An account opened earlier in this same action isn't in `before`.
                 let src = before.get(from).or_else(|| run.kernel().state().accounts.get(from)).expect("paying account existed");
-                let by_entity = run.kernel().statics().entity_of(by).unwrap();
+                let by_entity = acting.clone().expect("money moves only in an applied action");
                 match reason {
-                    TransferReason::Payment => prop_assert_eq!(by_entity, src.custodian.as_str(), "payment not executed by the custodian"),
-                    _ => prop_assert_eq!(by_entity, src.holder.as_str(), "construction cost not paid by the builder"),
+                    TransferReason::Payment | TransferReason::Carried => prop_assert_eq!(by_entity.as_str(), src.custodian.as_str(), "payment not executed by the custodian"),
+                    _ => prop_assert_eq!(by_entity.as_str(), src.holder.as_str(), "construction cost not paid by the builder"),
                 }
                 *ledger.entry(from.clone()).or_insert(0) -= *amount as i128;
                 *ledger.entry(to.clone()).or_insert(0) += *amount as i128;

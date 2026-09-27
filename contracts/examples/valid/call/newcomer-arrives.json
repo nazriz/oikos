@@ -1,0 +1,6 @@
+{
+  "lines": [
+    { "call": { "fn": "presence", "args": { "name": { "text": "Ana Silva" }, "age": { "text": "31 years" }, "template": { "id": "newcomer" }, "carrying": { "text": "$2,400" } } } },
+    { "call": { "fn": "occupancy", "args": { "in": { "id": "apts-3/dwelling.2" }, "who": { "id": "c0042" } } } }
+  ]
+}

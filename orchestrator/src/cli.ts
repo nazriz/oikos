@@ -28,7 +28,7 @@ const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 &&
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
-  if (existsSync(join(dir, "runs")) && existsSync(join(dir, "seats"))) return dir; // already a measurement folder
+  if (existsSync(join(dir, "runs")) && existsSync(join(dir, "participants"))) return dir; // already a measurement folder
   const m = join(dir, "measure");
   if (!existsSync(m)) {
     const logs = readdirSync(dir).filter((f) => f.endsWith(".jsonl") && !f.endsWith(".anchors.jsonl")).map((f) => join(dir, f));

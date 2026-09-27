@@ -6,7 +6,7 @@
     "event": "action_applied",
     "cause": 41,
     "action": "act.20",
-    "seat": "bank-payments"
+    "participant": "bank-payments"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

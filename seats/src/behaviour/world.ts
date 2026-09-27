@@ -32,7 +32,7 @@ export const exportDemand: BehaviourModule = {
   },
 };
 
-/** idle: a seat that does nothing (placeholder, and a control condition). */
+/** idle: a participant that does nothing (placeholder, and a control condition). */
 export const idle: BehaviourModule = {
   name: "idle",
   version: "0.1.0",

@@ -120,9 +120,9 @@ impl<W: Write> Run<W> {
         Ok(Run { checkpoint_every: loaded.config.log.checkpoint_every, kernel, log, ended: false })
     }
 
-    /// The full picture a seat's channels cover right now (the perception invariant's reference). Changes nothing; not logged.
-    pub fn full_view(&mut self, seat: &str) -> Option<crate::observe::Observation> {
-        self.kernel.full_view(seat)
+    /// The full picture a participant's channels cover right now (the perception invariant's reference). Changes nothing; not logged.
+    pub fn full_view(&mut self, participant: &str) -> Option<crate::observe::Observation> {
+        self.kernel.full_view(participant)
     }
 
     pub fn kernel(&self) -> &Kernel {

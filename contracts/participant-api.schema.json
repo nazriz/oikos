@@ -1,0 +1,1042 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:terrarium:contracts:0.4:participant-api",
+  "title": "Participant API (v0.4)",
+  "description": "The only window a controller has onto the world. Identical for code, LLM, human and RL controllers (VISION principle 4). Shaped like PettingZoo's AEC API: the environment selects the next participant to act (the one whose wake time or triggering event comes first on the world clock), the participant reads last() and calls step(action). There are no turns. A participant perceives only through its channels; there is no mandate and no approval queue in v0.2, because authority is a matter of records and people (D20).",
+  "$defs": {
+    "StepResult": {
+      "description": "What last() returns for the selected participant. 'reward' is always 0: the platform does not judge. Researchers who want RL rewards compute them outside the world from logs or observations and wrap the environment.",
+      "type": "object",
+      "required": [
+        "observation",
+        "reward",
+        "termination",
+        "truncation",
+        "info"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "observation": {
+          "$ref": "#/$defs/Observation"
+        },
+        "reward": {
+          "const": 0
+        },
+        "termination": {
+          "description": "The participant has opted out of the study (VISION §15; D38) and no stand-in continues it.",
+          "type": "boolean"
+        },
+        "truncation": {
+          "description": "The run reached clock.run_seconds or was stopped.",
+          "type": "boolean"
+        },
+        "info": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "actions_left_this_wake": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Count"
+            }
+          }
+        }
+      }
+    },
+    "Observation": {
+      "description": "What a participant perceives. Built by the kernel (deterministic, logged by hash) plus 'drafts' and 'notices', added by the orchestrator. 'outcomes', 'inbox' and 'notices' hold only what is new since the participant's previous observation.",
+      "type": "object",
+      "required": [
+        "participant",
+        "t",
+        "status",
+        "outcomes",
+        "inbox",
+        "drafts",
+        "channels"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "participant": {
+          "description": "Who is looking.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+        },
+        "t": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "opted_out",
+            "ended"
+          ]
+        },
+        "entity": {
+          "description": "A person's participant: its person (it acts as this person). Absent for a system.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+        },
+        "body": {
+          "description": "A person's participant: its own body, in full (it always knows its age, whether it's in the world, and what's wrong with it).",
+          "type": "object",
+          "required": [
+            "born_at",
+            "present",
+            "alive"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "born_at": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "present": {
+              "type": "boolean"
+            },
+            "alive": {
+              "type": "boolean"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+              },
+              "maxItems": 2
+            },
+            "conditions": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "kind",
+                  "severity",
+                  "since",
+                  "until"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/KernelId"
+                  },
+                  "kind": {
+                    "enum": [
+                      "illness",
+                      "injury"
+                    ]
+                  },
+                  "severity": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "since": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                  },
+                  "until": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "positions": {
+          "description": "The positions it holds now. Their channels are in 'channels' as '<position>/<channel>'.",
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "required": [
+              "position",
+              "entity"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "position": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+              },
+              "entity": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+              },
+              "title": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+              },
+              "role": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+              }
+            }
+          }
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Outcome"
+          }
+        },
+        "inbox": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Message"
+          }
+        },
+        "drafts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Draft"
+          }
+        },
+        "notices": {
+          "description": "Added by the orchestrator: what the participant needs to know about its own requests that isn't world state, e.g. that a proposal couldn't be drafted, or that a draft it tried to sign doesn't exist. Logged as annotations (translation_failure, note). Absent when there are none.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "t",
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "t": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+              },
+              "text": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+              },
+              "re": {
+                "description": "The draft or proposal it's about.",
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+              }
+            }
+          }
+        },
+        "channels": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ChannelPath"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/ChannelData"
+          }
+        }
+      }
+    },
+    "Outcome": {
+      "description": "What happened to one of this participant's actions. There are only two outcomes: applied, or refused because it was physically impossible.",
+      "type": "object",
+      "required": [
+        "action",
+        "t",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/KernelId"
+        },
+        "t": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+        },
+        "status": {
+          "enum": [
+            "applied",
+            "refused"
+          ]
+        },
+        "created": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+          },
+          "additionalProperties": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/KernelId"
+          }
+        },
+        "refusal": {
+          "type": "object",
+          "required": [
+            "code"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "$ref": "urn:terrarium:contracts:0.4:log#/$defs/RefusalCode"
+            },
+            "block": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 31
+            },
+            "detail": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          }
+        }
+      }
+    },
+    "Message": {
+      "type": "object",
+      "required": [
+        "id",
+        "t",
+        "from",
+        "to",
+        "text"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/KernelId"
+        },
+        "t": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+        },
+        "from": {
+          "description": "The participant who wrote it.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+        },
+        "as": {
+          "description": "The position it wrote in (absent: as itself).",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+        },
+        "to": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          }
+        },
+        "text": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "re": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+        }
+      }
+    },
+    "LookRequest": {
+      "description": "Look through one of the participant's channels now (attention). On-request channels are perceived only this way. A look through a records channel may carry a query: a search, which returns what matches now rather than what changed.",
+      "type": "object",
+      "required": [
+        "channel"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ChannelPath"
+        },
+        "query": {
+          "$ref": "#/$defs/Query"
+        }
+      }
+    },
+    "Query": {
+      "description": "A search over records: mechanical matching on named fields, never interpretation.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "standing": {
+          "description": "Only records still standing: not withdrawn by their own author (or whoever they speak for). Withdrawals themselves never stand.",
+          "type": "boolean"
+        },
+        "where": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": [
+              "field",
+              "op",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "field": {
+                "$ref": "#/$defs/QueryField"
+              },
+              "op": {
+                "enum": [
+                  "=",
+                  "!=",
+                  "<",
+                  "<=",
+                  ">",
+                  ">="
+                ]
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SafeInt"
+                  },
+                  {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "order": {
+          "type": "object",
+          "required": [
+            "field"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "$ref": "#/$defs/QueryField"
+            },
+            "desc": {
+              "type": "boolean"
+            }
+          }
+        },
+        "limit": {
+          "description": "At most this many results (default 20).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      }
+    },
+    "QueryField": {
+      "description": "A place in a record: record (its kind of record), kind (a statement's kind), at, author, speaks_for, basis, data.<path> (a statement's data) or about.<path> (a claim's contents).",
+      "type": "string",
+      "pattern": "^(record|kind|at|author|speaks_for|basis|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
+    },
+    "ResolverId": {
+      "type": "object",
+      "required": [
+        "id",
+        "version"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "TranslatorId": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "model"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "version": {
+          "description": "Translator release; prompt changes bump it so experiments can hold it fixed.",
+          "type": "string",
+          "maxLength": 64
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "prompt_hash": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Hash"
+        }
+      }
+    },
+    "Draft": {
+      "description": "A plain-language proposal as the participant will see it before anything takes effect: the translator's call, the resolver's acts, and a mechanical preview of exactly what will happen, in world terms. draft_hash = SHA-256 of 'terrarium.draft.v1\\n' + canonical JSON of this object. The confirmed hash is carried into the act command, so the participant confirmed exactly this.",
+      "type": "object",
+      "required": [
+        "id",
+        "participant",
+        "proposal",
+        "blocks",
+        "summary",
+        "check",
+        "translator",
+        "call",
+        "resolver"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+        },
+        "participant": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+        },
+        "as": {
+          "description": "The capacity the acts are made in: a position it holds (absent: as itself).",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+        },
+        "proposal": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "blocks": {
+          "$ref": "urn:terrarium:contracts:0.4:blocks#/$defs/Action/properties/blocks"
+        },
+        "call": {
+          "description": "The translator's reading of the proposal, in the call language (canonical form).",
+          "type": "string",
+          "maxLength": 65536
+        },
+        "resolver": {
+          "$ref": "#/$defs/ResolverId"
+        },
+        "summary": {
+          "description": "The preview: exactly what the blocks will do, generated mechanically from them in world terms (never written by the translator).",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "check": {
+          "description": "Kernel dry run of the blocks at drafting time: would physics allow them? Plus the translator's warnings about records (e.g. laws the plan appears to break). The world may change before sign-off; the kernel re-checks on submission.",
+          "type": "object",
+          "required": [
+            "ok"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ok": {
+              "type": "boolean"
+            },
+            "refusal": {
+              "$ref": "#/$defs/Outcome/properties/refusal"
+            },
+            "warnings": {
+              "description": "Things the translator noticed but the kernel doesn't judge, e.g. 'this appears to break law rec.4 (river zone)'. Informational; the participant decides.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "maxItems": 32
+            }
+          }
+        },
+        "caveats": {
+          "description": "Parts of the proposal the translator could not express in blocks.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "translator": {
+          "$ref": "#/$defs/TranslatorId"
+        }
+      }
+    },
+    "ChannelData": {
+      "description": "What a look through a channel delivers: what changed within its scope since the participant's previous look through it (a first look: everything it covers). Accounts: accounts opened, whose balance moved, or closed ('closed'); transactions since the previous look. Records: new records. Sites: cells whose building, or whose building's occupants, changed. Directory: new entities, and positions created or handed over. A channel that isn't due (its 'every') is absent.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "accounts",
+            "transactions"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "accounts"
+            },
+            "accounts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "account",
+                  "holder",
+                  "custodian",
+                  "balance"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "account": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "holder": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "custodian": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "balance": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Cents"
+                  },
+                  "closed": {
+                    "description": "The account was closed since the participant's previous look.",
+                    "const": true
+                  }
+                }
+              }
+            },
+            "transactions": {
+              "description": "Transfers touching these accounts since the participant's previous look through an accounts channel.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "t",
+                  "from",
+                  "to",
+                  "amount",
+                  "by"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "t": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                  },
+                  "from": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "to": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "amount": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount"
+                  },
+                  "by": {
+                    "description": "The participant that executed it.",
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "settles": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "per_instruction": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "memo": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "records"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "records"
+            },
+            "records": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:terrarium:contracts:0.4:records#/$defs/Record"
+              }
+            },
+            "search": {
+              "description": "These are a search's results (what matches now), not what's new since the last look.",
+              "const": true
+            },
+            "whole": {
+              "description": "The participant's entity has moved since its last look through this channel (which looks near it): these are everything the channel now covers, in place of what it covered before.",
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "as_of",
+            "cells"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "sites"
+            },
+            "as_of": {
+              "description": "When this view was last refreshed (see the channel's 'every').",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+            },
+            "whole": {
+              "description": "The capacity's entity has moved since its last look through this channel (which looks near it): these cells are the whole of its new surroundings, in place of the old.",
+              "const": true
+            },
+            "cells": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "cell",
+                  "x",
+                  "y"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "cell": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "terrain": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "structure": {
+                    "description": "The building standing on this cell (the same on every cell of its footprint).",
+                    "type": "object",
+                    "required": [
+                      "structure",
+                      "type",
+                      "at",
+                      "w",
+                      "h",
+                      "complete",
+                      "spaces"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "structure": {
+                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                      },
+                      "type": {
+                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                      },
+                      "at": {
+                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                      },
+                      "w": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "h": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "built_by": {
+                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                      },
+                      "complete": {
+                        "type": "boolean"
+                      },
+                      "completes_at": {
+                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                      },
+                      "spaces": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "space",
+                            "kind",
+                            "capacity",
+                            "count"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "space": {
+                              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SpaceId"
+                            },
+                            "kind": {
+                              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                            },
+                            "capacity": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "attrs": {
+                              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+                            },
+                            "count": {
+                              "description": "How many bodies are in it.",
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "occupants": {
+                              "description": "Who, where that can be told: in the capacity's own buildings, or through a channel that shows names. Absent: only how many.",
+                              "type": "array",
+                              "items": {
+                                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "entities",
+            "positions"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "directory"
+            },
+            "entities": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "entity",
+                  "kind",
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "entity": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "kind": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "name": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+                  },
+                  "participant": {
+                    "description": "A person's participant (who acts as them).",
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  }
+                }
+              }
+            },
+            "positions": {
+              "description": "Organisations' positions, and who holds them now: the participant, and a name (the person's, or a system's title).",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "position",
+                  "entity"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "position": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "entity": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "title": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+                  },
+                  "role": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "holder": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                  },
+                  "held_by": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ParticipantAction": {
+      "description": "What a participant passes to step(). Carries no participant id: the orchestrator binds identity from the connection. act and message go straight to the kernel; call (a structured intent in the call language) goes to the resolver, which turns it into the participant's own acts; propose (plain language) goes to the translator and resolver and comes back as a draft to confirm; sign confirms (accept) or declines (reject) a draft; wait yields until 'until' or the next item addressed to this participant, whichever is first; opt_out leaves the study (VISION §15; D38): always available and final. It is not resigning an office, which is an ordinary act in the world.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "blocks"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "act"
+            },
+            "blocks": {
+              "$ref": "urn:terrarium:contracts:0.4:blocks#/$defs/Action/properties/blocks"
+            },
+            "reasoning": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+            },
+            "as": {
+              "description": "The position to act in (absent: as itself, a person's only).",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "call"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "call"
+            },
+            "call": {
+              "description": "An intent in the call language (contracts/calls.md), e.g. money(to=builder, amount=\"$500\"). The resolver turns it into the participant's own acts (docs/design/translator-and-resolver.md).",
+              "type": "string",
+              "maxLength": 65536
+            },
+            "reasoning": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+            },
+            "as": {
+              "description": "The position to act in (absent: as itself, a person's only).",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "text"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "propose"
+            },
+            "text": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+            },
+            "reasoning": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+            },
+            "as": {
+              "description": "The position to act in (absent: as itself, a person's only).",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "draft",
+            "decision"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "sign"
+            },
+            "draft": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
+            },
+            "decision": {
+              "enum": [
+                "accept",
+                "reject"
+              ]
+            },
+            "note": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "to",
+            "text"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "message"
+            },
+            "to": {
+              "$ref": "urn:terrarium:contracts:0.4:blocks#/$defs/message/properties/to"
+            },
+            "text": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+            },
+            "re": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+            },
+            "as": {
+              "description": "The position to act in (absent: as itself, a person's only).",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "looks"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "look"
+            },
+            "looks": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "$ref": "#/$defs/LookRequest"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "wait"
+            },
+            "until": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "type",
+            "statement"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "opt_out"
+            },
+            "statement": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

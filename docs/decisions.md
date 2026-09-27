@@ -280,6 +280,39 @@ See the design note, §16.
   - The projected cost of the language-model mayor at Sonnet 5 prices is about $0.70 per run.
 - **Revisit if:** runs outgrow memory or disk (logs are about 260 MB per 2-year, 1,000-citizen run; the measurement tables about a tenth of that), or real adapters arrive (usage is then a provider's count, and the projection becomes a check).
 
+**D47. Contracts v0.4: a world whose cast and land can change (Pass A: the platform, and the town rebuilt on it).** *(Naz, 2026-09-27: "design and build it all now"; "participant is fine, and yes overcrowding possible, go ahead and build"; "be extra vigilant to not video-gameise". Design: docs/design/v0.4-cast-and-land.md. The contract details are built and tested and await Naz's review.)*
+- **Why:** the Stage 2 checkpoint found no world could have migration, births, new firms staffed by new people, elections that change who holds office, or land development: the cast and the lots were fixed at genesis.
+- **What's in (contracts, kernel, runtime, translator, measurement):**
+  - Seats became **participants** (people or systems; templates create them mid-run), acting as themselves or in **positions** only their organisation can create and fill.
+  - **Bodies and life physics:** arrive and leave only through the boundary (deportation physically possible), birth, illness, accidents and harm drawn from the world's tables, death. Basic, and marked for expansion (design note §4).
+  - **Land:** cells with terrain, footprints, buildings made of **spaces** with a physical capacity and the world's attributes (bedrooms). Lots are registry records. Overcrowding is physically possible and measurable, never blocked.
+- **Choices made while building (please review):**
+  - **Capacity is on the action, not on each call function.** The design note (§9) had every call function take an optional `as`. One program is one act, and the kernel's act command takes one capacity, so `as` sits on `act`, `call`, `propose` and `message`; a language-model participant names the post in its `do` and `write` tools (in world words: "the post you're acting in"). A post it doesn't hold is a malformed tool use, like any other.
+  - **The resolver fills only single physical answers for land and space.** On a lot, the one corner cell from which the type's footprint fits the lot's open ground (the kernel's terrain rule mirrored), otherwise it asks which cell. In a building with one space, that space; otherwise it asks which. The design note's "the one space it holds a claim to" isn't done: leases now name the space itself, so it wasn't needed.
+  - **New call functions:** `presence`, `birth`, `harm`, `position`, `system`, and `entity(position=…)`. `harm` exists because the physics does; no code citizen commits violence (that needs its own sourced behaviour, recorded as future work).
+  - **Formal law sees `block.cells` and `block.lot`,** supplied by whoever evaluates (the translator's warnings from what the participant knows; the inspector from its survey and the registry). Laws speak of lots and cells; the kernel still never evaluates them.
+  - **The builder's office sees the registry's lots and surveys the ground weekly,** so it knows where on a lot a building goes. Content, in the generator.
+  - **Measurement 0.2.0:** tables `participants`, `entities`, `positions`, `appointments` and `life` replace `seats`; occupancy is by space (with its structure and kind split out); acts, commands and messages carry `participant` and `as`; records carry `in_position`. New query `cast`. `language-seats` became `language-participants`.
+- **Checked:**
+  - Every test passes: kernel (including the physics oracle with bodies, spaces and holders, and statistical checks of life against its tables), contracts (127), TypeScript (176).
+  - **The town on v0.4 behaves like v0.3** (five seeds, two years, 1,000 citizens, all code): leases 978–1,010 per run (v0.3: 977–992), departures 229–235 (229–245), 20–22 constructions (20–22), about $1.32–1.35m paid to the town (1.24–1.37m). About 2 minutes a batch, as before.
+  - **The mock-LLM mayor batch matches too:** 8–11 drafts per run, all confirmed; 621 model calls (v0.3: 633); projected $0.71 a run at Sonnet 5 prices (v0.3: $0.69). Two regressions were found and fixed on the way:
+    - The first v0.4 build woke language-model participants on every record naming their organisation (each tax report to the city). That was 3,426 calls and $4.25 a run. v0.3 woke them only on their cadence and on letters, as the orchestrator's own header said. That's restored: a mayor reads the office's filings on their own schedule, and a stream of filings must never drive a model's cost.
+    - "Who's who" listed all ~70 posts, every letting office and shop manager included. It now lists posts with a public role (as v0.3 listed office holders), names holders rather than internal ids, and counts the rest.
+  - **Refusals went from 0–3 per run to none.** v0.3's were a new tenant moving in before the old one had left. A dwelling now holds up to six bodies, so that overlap is physically possible, as it is in reality.
+- **Not yet (Pass B, content):**
+  - households, and leases naming them;
+  - the occupancy standard (bedrooms needed) as households' and landlords' behaviour;
+  - sourced life tables, illness and occupational injury for the town;
+  - fertility behaviour;
+  - migration (Harris–Todaro) run by the boundary;
+  - templates for newcomers and children.
+  Until then the generated town has no `life` section: nobody is born, falls ill or dies, and the `cast` query shows zeros.
+- **Revisit if:**
+  - acting in two capacities in one act turns out to be needed (a person signing for a firm and personally guaranteeing it);
+  - corner-filling on lots proves too literal for developers assembling land (they'd name cells);
+  - the per-capacity views get expensive for participants holding many positions.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

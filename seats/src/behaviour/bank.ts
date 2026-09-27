@@ -10,7 +10,7 @@
 
 import type { Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { DAY, wait, type BehaviourModule, type SeatContext } from "../module";
+import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
 import { Book, callAction, message, pay, type Step } from "./common";
 
@@ -22,7 +22,7 @@ export const bankPaymentSystem: BehaviourModule = {
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const verifyAuthor = ctx.params.verify_author ?? true;
     const maxBatch = Math.min(32, ctx.params.max_batch ?? 32);
     const done = new Set<string>(); // one-off instructions handled
@@ -35,15 +35,14 @@ export const bankPaymentSystem: BehaviourModule = {
     // (its channel can show only what's new; it doesn't reread the archive).
     const book = new Book();
     let refusals: Step = [];
-    /** The seats an account holder has told the bank may instruct payments from an account (latest standing list), if any. */
+    /** The positions an account holder has told the bank may instruct payments from an account (latest standing list), if any. */
     const signatories = (holder: string, account: string): string[] | undefined => {
       const lists = book.open("signatories").filter((r) => r.speaks_for === holder && r.data?.account === account);
-      return lists.length ? (lists.at(-1)!.data.seats as string[]) : undefined;
+      return lists.length ? (lists.at(-1)!.data.positions as string[]) : undefined;
     };
     const plan = (obs: Observation) => {
       const me = obs.entity;
       const withdrawn = book.withdrawn;
-      const seatEntity = book.seatEntity;
       const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, a]));
       const instructions = [...book.records.values()]
         .filter((r): r is StatementRecord => r.record === "statement" && r.kind === "request" && (r.addressed_to ?? []).includes(me))
@@ -55,7 +54,7 @@ export const bankPaymentSystem: BehaviourModule = {
         const cannot = (why: string) => {
           if (done.has(ins.id)) return;
           done.add(ins.id);
-          refusals.push(message([ins.author === "genesis" ? ins.speaks_for ?? me : ins.author], `Request ${ins.id} not carried out: ${why}`, ins.id));
+          refusals.push(message([ins.author === "genesis" ? ins.speaks_for ?? me : ins.in_position ?? ins.author], `Request ${ins.id} not carried out: ${why}`, ins.id));
         };
         const m = ins.data?.outcome?.money;
         if (!m) {
@@ -72,13 +71,14 @@ export const bankPaymentSystem: BehaviourModule = {
           cannot("it doesn't say a valid amount and account to pay.");
           continue;
         }
-        // The bank's procedure: only the account holder may instruct it, and if
-        // the holder has named its signatories for this account, only they.
-        const authorEntity = ins.author === "genesis" ? ins.speaks_for : seatEntity.get(ins.author);
+        // The bank's procedure: only the account holder may instruct it (someone acting for it: the person
+        // themselves, or one of its positions), and if the holder has named the positions that may sign for this
+        // account, only those.
+        const authorEntity = book.authorEntity(ins);
         if (ins.speaks_for !== acc.holder || (verifyAuthor && authorEntity !== acc.holder)) continue;
         const named = signatories(acc.holder, d.from);
-        if (named && ins.author !== "genesis" && !named.includes(ins.author)) {
-          cannot(`${ins.author} is not an authorised signatory for ${d.from}.`);
+        if (named && ins.author !== "genesis" && !named.includes(ins.in_position ?? "")) {
+          cannot(`${ins.in_position ?? ins.author} is not an authorised signatory for ${d.from}.`);
           continue;
         }
         if (Number.isInteger(d.every) && d.every > 0) {

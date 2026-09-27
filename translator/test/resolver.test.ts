@@ -3,31 +3,50 @@
 
 import { expect, test } from "bun:test";
 import { calls } from "@terrarium/seats";
+import BLOCKS from "../../contracts/blocks.schema.json";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
-import { resolve } from "../src/resolver";
+import { resolve, type StructureTypeInfo } from "../src/resolver";
 
-/** The town, as its mayor's seat knows it. */
+const dwellings = (n: number) => Array.from({ length: n }, (_, i) => ({ space: `str.3/dwelling.${i}`, kind: "dwelling", capacity: 6, attrs: { bedrooms: 2 }, count: 0 }));
+const building = (structure: string, type: string, at: string, spaces: any[]) => ({ structure, type, at, w: 1, h: 1, complete: true, spaces });
+
+/** The town, as its mayor knows it (a code participant's slice, acting as mayor for the city). */
 function town(): Knowledge {
   const k = new Knowledge();
   const rec = (r: any) => ({ author: "genesis", at: 0, visible_to: "public", ...r });
   k.absorb({
-    seat: "mayor", t: 86_400 * 30, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [],
+    participant: "mayor-system", as: "mayor", t: 86_400 * 30, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [],
     channels: {
       treasury: { kind: "accounts", transactions: [], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance: 10_000_000 }] },
-      who: { kind: "directory", entities: [{ entity: "city", kind: "town", name: "Millbrook" }, { entity: "bank", kind: "bank", name: "Millbrook Bank" }, { entity: "builder", kind: "firm", name: "Millbrook Builders" }, { entity: "greenco", kind: "firm", name: "GreenCo" }],
-        seats: [{ seat: "planning", entity: "city", role: "planning_officer", status: "active" }] },
-      town: { kind: "sites", as_of: 0, parcels: [{ parcel: "p1", x: 0, y: 0, w: 1, h: 1, structure: { structure: "str.3", type: "apartments", complete: true, occupancy: [] } }] },
+      who: { kind: "directory", entities: [{ entity: "city", kind: "town", name: "Millbrook" }, { entity: "bank", kind: "bank", name: "Millbrook Bank" }, { entity: "builder", kind: "firm", name: "Millbrook Builders" }, { entity: "greenco", kind: "firm", name: "GreenCo" }, { entity: "c0042", kind: "person", name: "Dana Reyes", participant: "c0042-self" }],
+        positions: [{ position: "planning", entity: "city", role: "planning_officer", holder: "planning-system" }, { position: "mayor", entity: "city", role: "mayor", holder: "mayor-system" }] },
+      town: { kind: "sites", as_of: 0, cells: [
+        { cell: "cell.0.0", x: 0, y: 0, structure: building("str.3", "apartments", "cell.0.0", dwellings(12)) },
+        { cell: "cell.1.0", x: 1, y: 0 },
+        { cell: "cell.2.0", x: 2, y: 0 },
+        { cell: "cell.3.0", x: 3, y: 0, terrain: "water" },
+        { cell: "cell.0.1", x: 0, y: 1, structure: building("str.4", "shop", "cell.0.1", [{ space: "str.4/floor.0", kind: "floor", capacity: 20, count: 3 }]) },
+      ] },
       mine: { kind: "records", records: [
         rec({ id: "inv.1", record: "statement", author: "builder-foreman", speaks_for: "builder", kind: "invoice", text: "Invoice", data: { outcome: { money: { to: "acc-builder", amount: 50000 } } }, addressed_to: ["city"] }),
-        rec({ id: "form-permit", record: "statement", author: "planning", speaks_for: "city", kind: "form", text: "Permit application.",
-          data: { form: "permit_application", submit_as: "permit_application", submit_to: ["city"], fields: { parcel: { type: "parcel", required: true }, structure_type: { type: "structure_type", required: true }, notes: { type: "text" } } } }),
+        rec({ id: "form-permit", record: "statement", author: "planning-system", in_position: "planning", speaks_for: "city", kind: "form", text: "Permit application.",
+          data: { form: "permit_application", submit_as: "permit_application", submit_to: ["city"], fields: { lot: { type: "lot", required: true }, structure_type: { type: "structure_type", required: true }, notes: { type: "text" } } } }),
+        rec({ id: "lot-00", record: "statement", author: "registry", speaks_for: "city", kind: "lot", text: "Lot 00.", data: { cells: ["cell.1.0"] } }),
+        rec({ id: "lot-01", record: "statement", author: "registry", speaks_for: "city", kind: "lot", text: "Lot 01.", data: { cells: ["cell.2.0", "cell.3.0"] } }),
       ] },
     },
   } as any);
   return k;
 }
-const run = (src: string, k = town()) => resolve(calls.parseProgram(src), k, (t) => (t === "apartments" ? { dwelling: 12 } : { dwelling: 1 }));
+const TYPES: { [t: string]: StructureTypeInfo } = {
+  apartments: { footprint: { w: 1, h: 1 }, spaces: [{ kind: "dwelling", count: 12, capacity: 6 }] },
+  park: { footprint: { w: 1, h: 1 }, spaces: [] },
+  jetty: { footprint: { w: 1, h: 1 }, terrains: ["water"], spaces: [] },
+  plaza: { footprint: { w: 2, h: 1 }, spaces: [] },
+};
+const typeOf = (t: string) => TYPES[t];
+const run = (src: string, k = town(), as?: string) => resolve(calls.parseProgram(src), k, typeOf, as);
 
 test("the call language parses, and prints back canonically", () => {
   const p = calls.parseProgram('money(to=builder, amount="$500", for="the \\"fence\\"")\nt = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, for=t, text="…", data={"b":1,"a":[2]})');
@@ -61,37 +80,37 @@ test("4.2: a repeating payment is a standing request", () => {
 });
 
 test("4.3: with the inputs supplied, an offered agreement to whoever builds, citing the permit", () => {
-  const r = run('structure(type=park, on=p00-00, by=greenco, price="$60,000", from=acc-city, basis=rec.412)');
+  const r = run('structure(type=park, on=lot-00, by=greenco, price="$60,000", from=acc-city, basis=rec.412)');
   if (!r.ok) throw new Error(r.questions.join(" "));
   expect(r.blocks).toEqual([
     { block: "propose_agreement", speaks_for: "city", ref: "offer1", basis: "rec.412", terms: { template: "construction", parties: ["city", "greenco"],
-      commitments: [{ who: "greenco", does: { outcome: { structure: { type: "park", on: "p00-00" } } } }, { who: "city", does: { outcome: { money: { from: "acc-city", to: "greenco", amount: 6000000 } } } }],
-      text: "GreenCo (greenco) will build a park on p00-00; Millbrook (city) pays $60,000.00 from acc-city." } },
+      commitments: [{ who: "greenco", does: { outcome: { structure: { type: "park", on: "lot-00" } } } }, { who: "city", does: { outcome: { money: { from: "acc-city", to: "greenco", amount: 6000000 } } } }],
+      text: "GreenCo (greenco) will build a park on lot-00; Millbrook (city) pays $60,000.00 from acc-city." } },
     { block: "sign_agreement", agreement: "$offer1", as: "city" },
   ]);
-  expect(new Preview(town()).of(r.blocks)).toContain("You will offer GreenCo (greenco) a construction agreement: GreenCo (greenco) will build a park on lot p00-00; you will pay $60,000.00 from your account (acc-city) to GreenCo (greenco)");
+  expect(new Preview(town()).of(r.blocks)).toContain("You will offer GreenCo (greenco) a construction agreement: GreenCo (greenco) will build a park on lot-00; you will pay $60,000.00 from your account (acc-city) to GreenCo (greenco)");
   expect(new Preview(town()).of(r.blocks)).toContain("It cites rec.412, and sign it on your side.");
 });
 
 test("4.4: filling in a published form, checked against its fields", () => {
-  const r = run("form(to=planning, form=permit_application, parcel=p00-00, structure_type=park)");
+  const r = run("form(to=planning, form=permit_application, lot=lot-00, structure_type=park)");
   if (!r.ok) throw new Error(r.questions.join(" "));
-  expect(r.blocks).toEqual([{ block: "publish", kind: "permit_application", speaks_for: "city", addressed_to: ["city"], basis: "form-permit", text: "permit application: parcel p00-00, structure type park.", data: { parcel: "p00-00", structure_type: "park" } }]);
-  const missing = run("form(to=planning, form=permit_application, parcel=p00-00)");
+  expect(r.blocks).toEqual([{ block: "publish", kind: "permit_application", speaks_for: "city", addressed_to: ["city"], basis: "form-permit", text: "permit application: lot lot-00, structure type park.", data: { lot: "lot-00", structure_type: "park" } }]);
+  const missing = run("form(to=planning, form=permit_application, lot=lot-00)");
   expect(missing).toEqual({ ok: false, questions: ["The permit application needs: structure_type."] });
   expect(run("form(to=planning, form=dog_licence, name=rex)")).toEqual({ ok: false, questions: ["You haven't seen a form by that name."] });
 });
 
 test("4.5: a missing decision comes back as a question; the resolver never chooses", () => {
-  expect(run("structure(type=park, on=p00-00)")).toEqual({ ok: false, questions: ["Who should build a park on p00-00, and from which account is it paid?"] });
-  expect(run('structure(type=park, on=p00-00, by=greenco)')).toEqual({ ok: false, questions: ["For what price should GreenCo (greenco) build a park on p00-00?"] });
-  // "We'll build it ourselves" is also the seat's choice, and physics may allow it.
-  const self = run("structure(type=park, on=p00-00, by=city)"); // one account, so which pays is a single answer
-  expect(self.ok && self.blocks).toEqual([{ block: "construct", parcel: "p00-00", structure_type: "park", materials_from: "acc-city" }]);
+  expect(run("structure(type=park, on=lot-00)")).toEqual({ ok: false, questions: ["Who should build a park on lot-00, and from which account is it paid?"] });
+  expect(run('structure(type=park, on=lot-00, by=greenco)')).toEqual({ ok: false, questions: ["For what price should GreenCo (greenco) build a park on lot-00?"] });
+  // "We'll build it ourselves" is also the participant's choice, and physics may allow it.
+  const self = run("structure(type=park, on=lot-00, by=city)"); // one account, so which pays is a single answer; one cell, so where too
+  expect(self.ok && self.blocks).toEqual([{ block: "construct", at: "cell.1.0", structure_type: "park", materials_from: "acc-city" }]);
   expect(run("none(not_yours)")).toEqual({ ok: false, questions: ["That's for someone else to decide. You could write to them, or propose something."] });
 });
 
-test("names the seat knows become ids; ambiguity or ignorance becomes a question, phrased from the seat's side", () => {
+test("names the participant knows become ids; ambiguity or ignorance becomes a question, phrased from its side", () => {
   // The builder stated its account on its invoice, so paying "Millbrook Builders" goes there.
   const r = run('money(to="Millbrook Builders", amount="$10")');
   expect(r.ok && r.blocks[0]!.data.outcome.money.to).toBe("acc-builder");
@@ -101,23 +120,58 @@ test("names the seat knows become ids; ambiguity or ignorance becomes a question
 });
 
 test("a lease: nested commitments become outcomes, notice periods and term are durations", () => {
-  const r = run('agreement(with=c0042, template=lease, term="12 months", our_notice="60 days", their_notice="30 days", we_do=occupancy(who=c0042, in=str.3, slot=dwelling), they_do=money(to=acc-city, amount="$850", every="monthly", for="rent"))');
+  const r = run('agreement(with=c0042, template=lease, term="12 months", our_notice="60 days", their_notice="30 days", we_do=occupancy(who=c0042, in=str.3/dwelling.2), they_do=money(to=acc-city, amount="$850", every="monthly", for="rent"))');
   if (!r.ok) throw new Error(r.questions.join(" "));
   expect(r.blocks[0]!.terms).toEqual({ template: "lease", parties: ["city", "c0042"], term: 31104000,
-    commitments: [{ who: "city", does: { outcome: { occupancy: { who: "c0042", in: "str.3", slot: "dwelling", count: 1 } } } }, { who: "c0042", does: { outcome: { money: { to: "acc-city", amount: 85000, for: "rent" } } }, every: 2592000 }],
+    commitments: [{ who: "city", does: { outcome: { occupancy: { who: "c0042", in: "str.3/dwelling.2" } } } }, { who: "c0042", does: { outcome: { money: { to: "acc-city", amount: 85000, for: "rent" } } }, every: 2592000 }],
     termination: [{ party: "city", notice: 5184000 }, { party: "c0042", notice: 2592000 }] });
 });
 
-test("occupancy fills the only kind of space a building has, and asks otherwise", () => {
-  const r = run("occupancy(in=str.3)");
-  expect(r.ok && r.blocks).toEqual([{ block: "occupy", structure: "str.3", slot: "dwelling", count: 1 }]);
+test("occupancy fills the only space a building has, and asks otherwise", () => {
+  expect(run("occupancy(in=str.4)")).toEqual({ ok: true, blocks: [{ block: "occupy", space: "str.4/floor.0" }] });
+  expect(run("occupancy(in=str.3/dwelling.5)")).toEqual({ ok: true, blocks: [{ block: "occupy", space: "str.3/dwelling.5" }] });
+  const ask = run("occupancy(in=str.3)");
+  expect(ask.ok).toBe(false);
+  expect(!ask.ok && ask.questions[0]).toStartWith("Which space in str.3: str.3/dwelling.0, str.3/dwelling.1,");
+  // Bringing someone, and removing them: a participant named is its person.
+  expect(run("occupancy(in=str.3/dwelling.5, who=c0042-self)")).toEqual({ ok: true, blocks: [{ block: "occupy", space: "str.3/dwelling.5", who: "c0042" }] });
+  expect(run("occupancy(in=str.3, who=c0042, leave=yes)")).toEqual({ ok: true, blocks: [{ block: "vacate", occupant: "c0042", from: "str.3" }] });
+});
+
+test("building on a lot: the one corner that fits is filled in; a choice or a misfit is a question", () => {
+  const b = (type: string, on: string) => run(`structure(type=${type}, on=${on}, by=city)`);
+  expect(b("park", "lot-00")).toEqual({ ok: true, blocks: [{ block: "construct", at: "cell.1.0", structure_type: "park", materials_from: "acc-city" }] });
+  // lot-01 is one dry cell and one of water: a park fits only on the dry one, a jetty only on the water.
+  expect(b("park", "lot-01").ok && (b("park", "lot-01") as any).blocks[0].at).toBe("cell.2.0");
+  expect(b("jetty", "lot-01").ok && (b("jetty", "lot-01") as any).blocks[0].at).toBe("cell.3.0");
+  // A plaza is two cells wide: it would need the water cell too.
+  expect(b("plaza", "lot-01")).toEqual({ ok: false, questions: ["A plaza (2 by 1) doesn't fit on the open ground of lot-01 as far as you've seen. Which cell should its corner be?"] });
+  // A cell stated outright is taken as the corner: physics decides.
+  expect(b("plaza", "cell.1.0")).toEqual({ ok: true, blocks: [{ block: "construct", at: "cell.1.0", structure_type: "plaza", materials_from: "acc-city" }] });
+});
+
+test("a language-model participant sees all its capacities: the one it acts in decides whose name it's in", () => {
+  const k = new Knowledge();
+  k.absorb({
+    participant: "ada", t: 0, status: "active", entity: "ada-p", outcomes: [], inbox: [], drafts: [],
+    positions: [{ position: "mayor", entity: "city", title: "Mayor" }],
+    channels: {
+      wallet: { kind: "accounts", transactions: [], accounts: [{ account: "acc-ada", holder: "ada-p", custodian: "bank", balance: 100 }] },
+      "mayor/treasury": { kind: "accounts", transactions: [], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance: 10_000_000 }] },
+    },
+  } as any);
+  const own = resolve(calls.parseProgram('statement(kind=notice, text="Hello")'), k, typeOf);
+  expect(own.ok && own.blocks[0]!.speaks_for).toBe("ada-p");
+  const asMayor = resolve(calls.parseProgram('money(to=acc-x, amount="$5")'), k, typeOf, "mayor");
+  expect(asMayor.ok && asMayor.blocks[0]!.data.outcome.money.from).toBe("acc-city");
+  expect(asMayor.ok && new Preview(k, k.actingFor("mayor")).of(asMayor.blocks)).toContain("from your account (acc-city)");
 });
 
 test("a statement can be put up on a lot, and the preview says where", () => {
   const k = town();
-  const r = run('statement(kind=notice, text="Park works start Monday.", on=p1)', k);
-  expect(r.ok && r.blocks).toEqual([{ block: "publish", kind: "notice", text: "Park works start Monday.", place: "p1", speaks_for: "city" }]);
-  expect(r.ok && new Preview(k).of(r.blocks)).toContain('You will put up a notice on p1: "Park works start Monday."');
+  const r = run('statement(kind=notice, text="Park works start Monday.", on=lot-00)', k);
+  expect(r.ok && r.blocks).toEqual([{ block: "publish", kind: "notice", text: "Park works start Monday.", place: "lot-00", speaks_for: "city" }]);
+  expect(r.ok && new Preview(k).of(r.blocks)).toContain('You will put up a notice on lot-00: "Park works start Monday."');
 });
 
 test("every block kind is reachable from some call", () => {
@@ -125,16 +179,20 @@ test("every block kind is reachable from some call", () => {
   k.accounts.set("acc-own", { account: "acc-own", holder: "city", custodian: "city" });
   const programs = [
     'money(to=acc-builder, amount="$1", from=acc-own)', "account(holder=builder, at=city)", "account(close=acc-own)",
-    "structure(type=park, on=p2, by=city, from=acc-own)", "structure(remove=str.9, by=city, from=acc-own)", "occupancy(in=str.3)", "occupancy(in=str.3, who=c1, leave=yes)",
-    'entity(kind=trust, name="T")', 'claim(position=right, holder=city, against=builder, about={"kind":"debt","amount":100})', "claim(transfer=rec.1, to=builder)", "claim(release=rec.1)",
+    "structure(type=park, on=lot-00, by=city, from=acc-own)", "structure(remove=str.9, by=city, from=acc-own)", "occupancy(in=str.4)", "occupancy(in=str.3, who=c1, leave=yes)",
+    'entity(kind=trust, name="T", position="Trustee")', 'presence(name="Ana", age="31 years", template=newcomer, carrying="$2,400")', "presence(leave=yes)",
+    'birth(name="Kim", template=child, with=c0042)', "harm(who=c0042)", 'position(title="Clerk", role=clerk)', "position(appoint=planning, to=c0042)", "position(vacate=planning)",
+    'system(template=payroll, title="Payroll")', "system(retire=par.9)", 'claim(position=right, holder=city, against=builder, about={"kind":"debt","amount":100})', "claim(transfer=rec.1, to=builder)", "claim(release=rec.1)",
     "agreement(with=builder)", "agreement(sign=rec.5)", "agreement(notice=rec.5)", 'statement(kind=notice, text="x")', "statement(withdraw=rec.2)",
     "vote(ballot=rec.3, choice=yes)", 'message(to=builder, text="hi")',
   ];
   const kinds = new Set<string>();
   for (const p of programs) {
-    const r = resolve(calls.parseProgram(p), k, () => ({ dwelling: 1 }));
+    const r = resolve(calls.parseProgram(p), k, typeOf);
     if (!r.ok) throw new Error(`${p}: ${r.questions}`);
     for (const b of r.blocks) kinds.add(b.block);
   }
-  expect([...kinds].sort()).toEqual(["close_account", "construct", "create_entity", "demolish", "give_notice", "message", "occupy", "open_account", "propose_agreement", "publish", "record_claim", "release_claim", "sign_agreement", "transfer", "transfer_claim", "vacate", "vote", "withdraw"]);
+  // Every block the kernel has, from contracts/blocks.schema.json.
+  const all = (BLOCKS.$defs.BlockName.enum as string[]).slice().sort();
+  expect([...kinds].sort()).toEqual(all);
 });

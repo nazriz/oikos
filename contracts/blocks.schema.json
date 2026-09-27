@@ -1,328 +1,705 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.3:blocks",
+  "$id": "urn:terrarium:contracts:0.4:blocks",
   "title": "Terrarium building blocks",
   "description": "The acts every consequential thing compiles to. An Action is an ordered bundle of 1-32 blocks, applied ATOMICALLY: all or nothing. Two families: PHYSICAL acts, where the kernel checks physics (custody, funds, capacity, space, presence) and refuses what is physically impossible; and RECORD acts, which the kernel stores with their author and never judges (D19, D22). No block is ever refused for being illegal: laws are records, and entities decide what to do about them. The acting seat is bound by the orchestrator, never named in the block.",
   "$defs": {
     "Action": {
       "type": "object",
-      "required": ["blocks"],
+      "required": [
+        "blocks"
+      ],
       "additionalProperties": false,
       "properties": {
-        "blocks": { "type": "array", "items": { "$ref": "#/$defs/Block" }, "minItems": 1, "maxItems": 32 }
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Block"
+          },
+          "minItems": 1,
+          "maxItems": 32
+        }
       }
     },
     "Block": {
       "oneOf": [
-        { "$ref": "#/$defs/transfer" },
-        { "$ref": "#/$defs/open_account" },
-        { "$ref": "#/$defs/close_account" },
-        { "$ref": "#/$defs/construct" },
-        { "$ref": "#/$defs/demolish" },
-        { "$ref": "#/$defs/occupy" },
-        { "$ref": "#/$defs/vacate" },
-        { "$ref": "#/$defs/create_entity" },
-        { "$ref": "#/$defs/record_claim" },
-        { "$ref": "#/$defs/transfer_claim" },
-        { "$ref": "#/$defs/release_claim" },
-        { "$ref": "#/$defs/propose_agreement" },
-        { "$ref": "#/$defs/sign_agreement" },
-        { "$ref": "#/$defs/give_notice" },
-        { "$ref": "#/$defs/publish" },
-        { "$ref": "#/$defs/withdraw" },
-        { "$ref": "#/$defs/vote" },
-        { "$ref": "#/$defs/message" }
+        {
+          "$ref": "#/$defs/transfer"
+        },
+        {
+          "$ref": "#/$defs/open_account"
+        },
+        {
+          "$ref": "#/$defs/close_account"
+        },
+        {
+          "$ref": "#/$defs/construct"
+        },
+        {
+          "$ref": "#/$defs/demolish"
+        },
+        {
+          "$ref": "#/$defs/occupy"
+        },
+        {
+          "$ref": "#/$defs/vacate"
+        },
+        {
+          "$ref": "#/$defs/create_entity"
+        },
+        {
+          "$ref": "#/$defs/record_claim"
+        },
+        {
+          "$ref": "#/$defs/transfer_claim"
+        },
+        {
+          "$ref": "#/$defs/release_claim"
+        },
+        {
+          "$ref": "#/$defs/propose_agreement"
+        },
+        {
+          "$ref": "#/$defs/sign_agreement"
+        },
+        {
+          "$ref": "#/$defs/give_notice"
+        },
+        {
+          "$ref": "#/$defs/publish"
+        },
+        {
+          "$ref": "#/$defs/withdraw"
+        },
+        {
+          "$ref": "#/$defs/vote"
+        },
+        {
+          "$ref": "#/$defs/message"
+        },
+        {
+          "$ref": "#/$defs/arrive"
+        },
+        {
+          "$ref": "#/$defs/leave"
+        },
+        {
+          "$ref": "#/$defs/birth"
+        },
+        {
+          "$ref": "#/$defs/harm"
+        },
+        {
+          "$ref": "#/$defs/create_position"
+        },
+        {
+          "$ref": "#/$defs/appoint"
+        },
+        {
+          "$ref": "#/$defs/deploy"
+        },
+        {
+          "$ref": "#/$defs/retire"
+        }
       ]
     },
     "BlockName": {
       "enum": [
-        "transfer", "open_account", "close_account", "construct", "demolish", "occupy", "vacate",
-        "create_entity", "record_claim", "transfer_claim", "release_claim",
-        "propose_agreement", "sign_agreement", "give_notice", "publish", "withdraw", "vote", "message"
+        "transfer",
+        "open_account",
+        "close_account",
+        "construct",
+        "demolish",
+        "occupy",
+        "vacate",
+        "create_entity",
+        "record_claim",
+        "transfer_claim",
+        "release_claim",
+        "propose_agreement",
+        "sign_agreement",
+        "give_notice",
+        "publish",
+        "withdraw",
+        "vote",
+        "message",
+        "arrive",
+        "leave",
+        "birth",
+        "harm",
+        "create_position",
+        "appoint",
+        "deploy",
+        "retire"
       ]
     },
-
     "transfer": {
-      "description": "PHYSICAL. Move money between accounts. Only a seat of the SOURCE account's custodian (normally its bank) can physically do this: an account holder pays by publishing an instruction to their bank. Physics: the funds exist, no overflow. The outside world's account is held in its own custody, so only the outside world's own seats can pay from it: that is how money enters the world (boundary conditions are the outside world's seat, which is world content; D31). 'settles' and 'per_instruction' link the payment to the claim it pays off and the instruction it carries out; the kernel records the links and doesn't check them.",
+      "description": "PHYSICAL. Move money between accounts. Only someone acting for the SOURCE account's custodian (normally its bank) can physically do this: an account holder pays by publishing an instruction to their bank. Physics: the funds exist, no overflow. The outside world's account is held in its own custody, so only those acting for the outside world can pay from it: that is how money enters the world (boundary conditions are the outside world's participants, which are world content; D31). 'settles' and 'per_instruction' link the payment to the claim it pays off and the instruction it carries out; the kernel records the links and doesn't check them.",
       "type": "object",
-      "required": ["block", "from", "to", "amount"],
+      "required": [
+        "block",
+        "from",
+        "to",
+        "amount"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "transfer" },
-        "from": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "amount": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Amount" },
-        "settles": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "per_instruction": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "memo": { "type": "string", "maxLength": 500 }
+        "block": {
+          "const": "transfer"
+        },
+        "from": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "amount": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount"
+        },
+        "settles": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "per_instruction": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "memo": {
+          "type": "string",
+          "maxLength": 500
+        }
       }
     },
     "open_account": {
-      "description": "PHYSICAL. A custodian (a bank, or an entity keeping its own money) opens an account for a holder. The acting seat's entity becomes the custodian. Balance starts at zero.",
+      "description": "PHYSICAL. A custodian (a bank, or an entity keeping its own money) opens an account for a holder. The entity acted for becomes the custodian. Balance starts at zero.",
       "type": "object",
-      "required": ["block", "holder"],
+      "required": [
+        "block",
+        "holder"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "open_account" },
-        "holder": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "block": {
+          "const": "open_account"
+        },
+        "holder": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "close_account": {
       "description": "PHYSICAL. The custodian closes an account. Physics: the balance must be zero (money must go somewhere first). The outside world's own account can never be closed: the world's edge always exists.",
       "type": "object",
-      "required": ["block", "account"],
+      "required": [
+        "block",
+        "account"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "close_account" },
-        "account": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" }
+        "block": {
+          "const": "close_account"
+        },
+        "account": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        }
       }
     },
     "construct": {
-      "description": "PHYSICAL. The acting seat's entity (the builder) starts building a catalogue structure on an empty parcel. The catalogue's materials cost is paid from an account the builder holds, straight to the boundary. DOCUMENTED LIBERTY (D25), ACCEPTED TEMPORARILY: material purchases aren't modelled, and this one payment doesn't go through the builder's bank. To be replaced by supplier purchases through banks, or construction as a task with inputs (see docs/decisions.md, under Open). The structure completes after the build time. No ownership is assigned: who owns it is a record. Not refused for lacking a permit or for building on someone else's land; those are matters of law.",
+      "description": "PHYSICAL. The entity acted for (the builder) starts building a catalogue structure on open ground, its footprint's corner at a cell. The catalogue's materials cost is paid from an account the builder holds, straight to the boundary. DOCUMENTED LIBERTY (D25), ACCEPTED TEMPORARILY: material purchases aren't modelled, and this one payment doesn't go through the builder's bank. To be replaced by supplier purchases through banks, or construction as a task with inputs (see docs/decisions.md, under Open). The structure completes after the build time. No ownership is assigned: who owns it is a record. Not refused for lacking a permit or for building on someone else's land; those are matters of law.",
       "type": "object",
-      "required": ["block", "parcel", "structure_type", "materials_from"],
+      "required": [
+        "block",
+        "at",
+        "structure_type",
+        "materials_from"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "construct" },
-        "parcel": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" },
-        "structure_type": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-        "materials_from": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "block": {
+          "const": "construct"
+        },
+        "at": {
+          "description": "The corner cell of the footprint: the building stands on the structure type's w x h cells from here. Refused only if a cell is off the ground, already built on, or of a terrain the type can't stand on.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+        },
+        "structure_type": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "materials_from": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "demolish": {
-      "description": "PHYSICAL. The acting seat's entity demolishes a structure, paying the catalogue demolition cost from an account it holds (same liberty as construct). Anyone still occupying it is displaced (recorded as vacated). Whose building it is doesn't matter to physics.",
+      "description": "PHYSICAL. The entity acted for demolishes a structure, paying the catalogue demolition cost from an account it holds (same liberty as construct). Anyone still occupying it is displaced (recorded as vacated). Whose building it is doesn't matter to physics.",
       "type": "object",
-      "required": ["block", "structure", "costs_from"],
+      "required": [
+        "block",
+        "structure",
+        "costs_from"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "demolish" },
-        "structure": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "costs_from": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" }
+        "block": {
+          "const": "demolish"
+        },
+        "structure": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "costs_from": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        }
       }
     },
     "occupy": {
-      "description": "PHYSICAL. The acting seat's entity takes up 'count' slots of a kind (a label from the catalogue, e.g. dwelling, workplace) in a completed structure. Physics: within capacity. Whether it has any right to be there is a matter of records.",
+      "description": "PHYSICAL. A body goes into a space: the acting person, or someone they bring ('who'), who must be alive and in the world. Refused only if the structure is incomplete or the space is full (its physical capacity: how many bodies could fit at all, not how many should).",
       "type": "object",
-      "required": ["block", "structure", "slot", "count"],
+      "required": [
+        "block",
+        "space"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "occupy" },
-        "structure": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "slot": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
-        "count": { "type": "integer", "minimum": 1, "maximum": 100000 }
+        "block": {
+          "const": "occupy"
+        },
+        "space": {
+          "anyOf": [
+            {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SpaceId"
+            },
+            {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/LocalRef"
+            }
+          ]
+        },
+        "who": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        }
       }
     },
     "vacate": {
-      "description": "PHYSICAL. An occupant leaves a structure (if the acting seat is the occupant's), or is removed by someone else (eviction). Physics: the occupant is there. The kernel records who did it.",
+      "description": "PHYSICAL. An occupant leaves a space, or every space it's in in a structure (the acting person themselves), or is removed by someone else (eviction). Physics: the occupant is there. The kernel records who did it.",
       "type": "object",
-      "required": ["block", "occupant", "structure"],
+      "required": [
+        "block",
+        "occupant",
+        "from"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "vacate" },
-        "occupant": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "structure": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" }
+        "block": {
+          "const": "vacate"
+        },
+        "occupant": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "from": {
+          "description": "A structure (every space the occupant is in there) or one space.",
+          "anyOf": [
+            {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+            },
+            {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SpaceId"
+            }
+          ]
+        }
       }
     },
-
     "create_entity": {
       "description": "RECORD. Declare an organisation: gives it an id that can hold accounts, be a party and be spoken for. Whether it's recognised (registered, lawful) is interpretation. Reserved kinds 'person' and 'boundary' can't be created: bodies and the world's edge are physics. Dissolution is not a block: it's a published statement, which banks and others act on.",
       "type": "object",
-      "required": ["block", "kind", "name"],
+      "required": [
+        "block",
+        "kind",
+        "name"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "create_entity" },
-        "kind": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
-        "name": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Name" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "block": {
+          "const": "create_entity"
+        },
+        "kind": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+        },
+        "name": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "speaks_for": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "visible_to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Visibility"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        },
+        "first_position": {
+          "description": "The new organisation's first position, held by the acting participant (otherwise nobody could act for it).",
+          "$ref": "#/$defs/NewPosition"
+        }
       }
     },
     "record_claim": {
       "description": "RECORD. Record a claim: a Hohfeldian legal position. right (the counterparty has a duty, e.g. to pay), liberty (e.g. a permit to build), power (e.g. to grant permits), immunity. 'about' holds the specifics in the world's vocabulary. Anyone can record a claim; the record shows who did, for whom, and on what basis. A forged title is possible.",
       "type": "object",
-      "required": ["block", "position", "holder", "about"],
+      "required": [
+        "block",
+        "position",
+        "holder",
+        "about"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "record_claim" },
-        "position": { "enum": ["right", "liberty", "power", "immunity"] },
-        "holder": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+        "block": {
+          "const": "record_claim"
+        },
+        "position": {
+          "enum": [
+            "right",
+            "liberty",
+            "power",
+            "immunity"
+          ]
+        },
+        "holder": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
         "counterparty": {
           "description": "Who bears the correlative (the duty, no-right, liability or disability). Required for financial claims.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef"
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
         },
-        "about": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject" },
-        "basis": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "about": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+        },
+        "basis": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "speaks_for": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "visible_to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Visibility"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "transfer_claim": {
       "description": "RECORD. Record that a claim now belongs to someone else (a sale of land, an assigned debt). Records are append-only: this adds a record referencing the claim and never edits it. Who holds a claim 'now' is read from the chain of records, and whose records to trust is interpretation.",
       "type": "object",
-      "required": ["block", "claim", "to"],
+      "required": [
+        "block",
+        "claim",
+        "to"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "transfer_claim" },
-        "claim": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "basis": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "block": {
+          "const": "transfer_claim"
+        },
+        "claim": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "basis": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "speaks_for": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "visible_to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Visibility"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "release_claim": {
       "description": "RECORD. Record that a claim is released, waived, revoked or discharged. Append-only, like transfer_claim.",
       "type": "object",
-      "required": ["block", "claim"],
+      "required": [
+        "block",
+        "claim"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "release_claim" },
-        "claim": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "basis": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "block": {
+          "const": "release_claim"
+        },
+        "claim": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "basis": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "speaks_for": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "visible_to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Visibility"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "propose_agreement": {
       "description": "RECORD. Propose an agreement: parties and their commitments. Nothing in an agreement executes automatically. Parties (or their banks, via standing instructions) carry out commitments, and creditors record what's owed. Visible to the parties unless stated otherwise.",
       "type": "object",
-      "required": ["block", "terms"],
+      "required": [
+        "block",
+        "terms"
+      ],
       "additionalProperties": false,
       "properties": {
-        "basis": { "description": "What the agreement cites as its basis (e.g. a permit).", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "block": { "const": "propose_agreement" },
-        "terms": { "$ref": "#/$defs/AgreementTerms" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "basis": {
+          "description": "What the agreement cites as its basis (e.g. a permit).",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "block": {
+          "const": "propose_agreement"
+        },
+        "terms": {
+          "$ref": "#/$defs/AgreementTerms"
+        },
+        "speaks_for": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "visible_to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Visibility"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "sign_agreement": {
-      "description": "RECORD. Sign an agreement as one of its parties. Whether the signer really had authority to sign for that party is interpretation; the record shows which seat signed.",
+      "description": "RECORD. Sign an agreement as one of its parties. Whether the signer really had authority to sign for that party is interpretation; the record shows which participant signed, and in which position.",
       "type": "object",
-      "required": ["block", "agreement", "as"],
+      "required": [
+        "block",
+        "agreement",
+        "as"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "sign_agreement" },
-        "agreement": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "as": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "block": {
+          "const": "sign_agreement"
+        },
+        "agreement": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "as": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "give_notice": {
       "description": "RECORD. A party gives notice under (or in breach of) an agreement's termination terms. Whether the notice is valid is interpretation.",
       "type": "object",
-      "required": ["block", "agreement", "as"],
+      "required": [
+        "block",
+        "agreement",
+        "as"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "give_notice" },
-        "agreement": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "as": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "block": {
+          "const": "give_notice"
+        },
+        "agreement": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "as": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "text": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "publish": {
       "description": "RECORD. Publish a statement: a law, procedure, norm, decision, permit decision, judgment, ballot, report, budget, instruction (e.g. to a bank: pay this, keep paying this every month), dissolution notice, and so on. The kind is the world's vocabulary. Statements have no power of their own: a law is enforced, a procedure followed, an instruction executed only if some entity chooses to act on it.",
       "type": "object",
-      "required": ["block", "kind", "text"],
+      "required": [
+        "block",
+        "kind",
+        "text"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "publish" },
-        "kind": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
-        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
+        "block": {
+          "const": "publish"
+        },
+        "kind": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+        },
+        "text": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
         "data": {
           "description": "Structured content for whoever acts on it: an instruction's payment details, a ballot's options, a budget's lines.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject"
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
         },
-        "adico": { "$ref": "#/$defs/Adico" },
-        "formal": { "$ref": "#/$defs/Formal" },
+        "adico": {
+          "$ref": "#/$defs/Adico"
+        },
+        "formal": {
+          "$ref": "#/$defs/Formal"
+        },
         "basis": {
           "description": "What the statement claims its authority rests on (a vote, a constitution, a delegation).",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef"
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
         },
         "addressed_to": {
           "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+          },
           "minItems": 1,
           "maxItems": 256,
           "uniqueItems": true
         },
         "place": {
-          "description": "A parcel to put it up on (a sign, a notice on a fence). It's then seen by those whose channels look at that place, not through channels that look at no place. The kernel checks only that the parcel exists; whether it may be put there is for the world's laws.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id"
+          "description": "A cell to put it up on (a sign, a notice on a fence). It's then seen by those whose channels look at that place, not through channels that look at no place. The kernel checks only that the cell exists; whether it may be put there is for the world's laws.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
         },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "speaks_for": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "visible_to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Visibility"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "withdraw": {
       "description": "RECORD. Record that a statement (or any record) is withdrawn, repealed or cancelled. Append-only: the original stays.",
       "type": "object",
-      "required": ["block", "record"],
+      "required": [
+        "block",
+        "record"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "withdraw" },
-        "record": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
-        "basis": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" },
-        "ref": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/RefName" }
+        "block": {
+          "const": "withdraw"
+        },
+        "record": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "text": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "basis": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "speaks_for": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "visible_to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Visibility"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
       }
     },
     "vote": {
       "description": "RECORD. Cast a choice on a ballot (a published statement). Who may vote and what the result is are determined by whoever counts: the kernel only records.",
       "type": "object",
-      "required": ["block", "ballot", "choice"],
+      "required": [
+        "block",
+        "ballot",
+        "choice"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "vote" },
-        "ballot": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "choice": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "speaks_for": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-        "visible_to": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Visibility" }
+        "block": {
+          "const": "vote"
+        },
+        "ballot": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "choice": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "speaks_for": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "visible_to": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Visibility"
+        }
       }
     },
     "message": {
-      "description": "VOICE. Send text to seats or entities (an entity receives it through its seats). Delivered and logged verbatim, never interpreted.",
+      "description": "VOICE. Send text to participants, positions or entities (a position's holder receives it; an entity, through those who act for it). Delivered and logged verbatim, never interpreted.",
       "type": "object",
-      "required": ["block", "to", "text"],
+      "required": [
+        "block",
+        "to",
+        "text"
+      ],
       "additionalProperties": false,
       "properties": {
-        "block": { "const": "message" },
+        "block": {
+          "const": "message"
+        },
         "to": {
           "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" },
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          },
           "minItems": 1,
           "maxItems": 64,
           "uniqueItems": true
         },
-        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
-        "re": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" }
+        "text": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "re": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+        }
       }
     },
-
     "AgreementTerms": {
       "description": "An agreement as a bundle of commitments (REA). Everything here is data the parties agreed to; the kernel executes none of it.",
       "type": "object",
-      "required": ["parties", "commitments"],
+      "required": [
+        "parties",
+        "commitments"
+      ],
       "additionalProperties": false,
       "properties": {
         "template": {
           "description": "A label (lease, employment, loan, sale...) for the translator and researchers; the kernel never interprets it.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label"
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
         },
         "parties": {
           "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+          },
           "minItems": 2,
           "maxItems": 16,
           "uniqueItems": true
@@ -331,36 +708,56 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["who", "does"],
+            "required": [
+              "who",
+              "does"
+            ],
             "additionalProperties": false,
             "properties": {
-              "who": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-              "does": {
-                "description": "What the party commits to, in the world's vocabulary, e.g. {\"pay\": 180000, \"to\": \"devco\"} or {\"allow\": {\"occupy\": \"s-apts\", \"slots\": 1}}.",
-                "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject"
+              "who": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
               },
-              "every": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" }
+              "does": {
+                "description": "What the party commits to, in the world's vocabulary, e.g. {\"pay\": 180000, \"to\": \"devco\"} or {\"allow\": {\"occupy\": \"apts-3/dwelling.2\"}}.",
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+              },
+              "every": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+              }
             }
           },
           "minItems": 1,
           "maxItems": 64
         },
-        "term": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
+        "term": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+        },
         "termination": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["party", "notice"],
+            "required": [
+              "party",
+              "notice"
+            ],
             "additionalProperties": false,
             "properties": {
-              "party": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/IdOrRef" },
-              "notice": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" }
+              "party": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+              },
+              "notice": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+              }
             }
           },
           "maxItems": 16
         },
-        "text": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
-        "attrs": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/OpaqueObject" }
+        "text": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "attrs": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+        }
       }
     },
     "Adico": {
@@ -368,21 +765,262 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "attribute": { "description": "Who it applies to.", "type": "string", "maxLength": 2000 },
-        "deontic": { "enum": ["may", "must", "must_not"] },
-        "aim": { "description": "The action.", "type": "string", "maxLength": 2000 },
-        "condition": { "description": "When and where.", "type": "string", "maxLength": 2000 },
-        "or_else": { "description": "The stated consequence, which someone would have to impose.", "type": "string", "maxLength": 2000 }
+        "attribute": {
+          "description": "Who it applies to.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "deontic": {
+          "enum": [
+            "may",
+            "must",
+            "must_not"
+          ]
+        },
+        "aim": {
+          "description": "The action.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "condition": {
+          "description": "When and where.",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "or_else": {
+          "description": "The stated consequence, which someone would have to impose.",
+          "type": "string",
+          "maxLength": 2000
+        }
       }
     },
     "Formal": {
-      "description": "An optional machine-checkable form of a statement: a CEL condition (integer-only, allowlisted functions; see docs/research/cel-check). Never evaluated by the kernel. Code-run institutions use it to judge what they observe, measurement to find violations afterwards, the translator to warn a seat that a plan looks unlawful.",
+      "description": "An optional machine-checkable form of a statement: a CEL condition (integer-only, allowlisted functions; see docs/research/cel-check). Never evaluated by the kernel. Code-run institutions use it to judge what they observe, measurement to find violations afterwards, the translator to warn a participant that a plan looks unlawful.",
       "type": "object",
-      "required": ["language", "condition"],
+      "required": [
+        "language",
+        "condition"
+      ],
       "additionalProperties": false,
       "properties": {
-        "language": { "const": "cel" },
-        "condition": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        "language": {
+          "const": "cel"
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      }
+    },
+    "NewPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "role": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:world-config#/$defs/Channel"
+          },
+          "maxItems": 64
+        },
+        "role_module": {
+          "description": "How a code participant does this job (opaque to the kernel; the orchestrator runs it with the holder's traits).",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
+      }
+    },
+    "arrive": {
+      "description": "PHYSICAL. Someone crosses into the world from outside: a newcomer (name, born_at, template for their participant) or someone returning (person). Done in a position of the boundary: who comes is the outside world's business. 'carrying': money they bring, moved from the boundary's account into an account in their own custody.",
+      "type": "object",
+      "required": [
+        "block"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "arrive"
+        },
+        "person": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "name": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "born_at": {
+          "description": "When the newcomer was born (may be before the run: negative).",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "template": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "carrying": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
+      }
+    },
+    "leave": {
+      "description": "PHYSICAL. A body crosses out of the world: the acting person, or someone removed. It comes out of every space it's in; it keeps its accounts, claims and participant, and can come back.",
+      "type": "object",
+      "required": [
+        "block"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "leave"
+        },
+        "person": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        }
+      }
+    },
+    "birth": {
+      "description": "PHYSICAL. The acting person (as itself), alive, in the world and of an age to bear children (life.birth.ages), conceives a child, with another parent if named (who must be near: life.birth.reach). The child is born after life.birth.gestation, where the birthing parent is, occupying nothing; its participant comes from the template.",
+      "type": "object",
+      "required": [
+        "block",
+        "name",
+        "template"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "birth"
+        },
+        "name": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "template": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "with": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        }
+      }
+    },
+    "harm": {
+      "description": "PHYSICAL. The acting participant's own body harms someone near it (life.harm.reach). It causes an injury, whose severity, length and chance of death are drawn from life.harm. Whether anyone may do this is law.",
+      "type": "object",
+      "required": [
+        "block",
+        "person"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "harm"
+        },
+        "person": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        }
+      }
+    },
+    "create_position": {
+      "description": "A new position of the acting organisation (acting in one of its positions), vacant.",
+      "type": "object",
+      "required": [
+        "block"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "create_position"
+        },
+        "title": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "role": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:world-config#/$defs/Channel"
+          },
+          "maxItems": 64
+        },
+        "role_module": {
+          "description": "How a code participant does this job (opaque to the kernel; the orchestrator runs it with the holder's traits).",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
+      }
+    },
+    "appoint": {
+      "description": "Hand one of the acting organisation's positions to a participant, or to nobody (vacating it; stepping down is appointing nobody to one's own position). Only the organisation, through a position it has, can fill its own positions: the same physical rule as custody. Whether an appointment is legitimate (an election, a charter) is for the world's records and people.",
+      "type": "object",
+      "required": [
+        "block",
+        "position"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "appoint"
+        },
+        "position": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        },
+        "participant": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        }
+      }
+    },
+    "deploy": {
+      "description": "A new system participant belonging to the acting organisation, from a template (software, or an AI system). What it costs is an ordinary payment to whoever supplies it.",
+      "type": "object",
+      "required": [
+        "block",
+        "template"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "deploy"
+        },
+        "template": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "title": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "ref": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+        }
+      }
+    },
+    "retire": {
+      "description": "Switch off a system participant belonging to the acting organisation: it never acts again, and its positions fall vacant.",
+      "type": "object",
+      "required": [
+        "block",
+        "participant"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "retire"
+        },
+        "participant": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/IdOrRef"
+        }
       }
     }
   }

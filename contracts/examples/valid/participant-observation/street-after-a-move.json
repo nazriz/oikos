@@ -1,0 +1,86 @@
+{
+  "t": 7776000,
+  "status": "active",
+  "entity": "c0042",
+  "outcomes": [],
+  "inbox": [],
+  "drafts": [],
+  "channels": {
+    "street": {
+      "kind": "sites",
+      "as_of": 7776000,
+      "whole": true,
+      "cells": [
+        {
+          "cell": "cell.6.3",
+          "x": 6,
+          "y": 3
+        },
+        {
+          "cell": "cell.7.3",
+          "x": 7,
+          "y": 3,
+          "structure": {
+            "structure": "house-12",
+            "type": "house",
+            "at": "cell.7.3",
+            "w": 1,
+            "h": 1,
+            "complete": true,
+            "spaces": [
+              {
+                "space": "house-12/dwelling.1",
+                "kind": "dwelling",
+                "capacity": 12,
+                "count": 2,
+                "occupants": [
+                  "c0042",
+                  "c0107"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "cell": "cell.8.3",
+          "x": 8,
+          "y": 3,
+          "structure": {
+            "structure": "apts-3",
+            "type": "apartments",
+            "at": "cell.8.3",
+            "w": 1,
+            "h": 1,
+            "complete": true,
+            "spaces": [
+              {
+                "space": "apts-3/dwelling.1",
+                "kind": "dwelling",
+                "capacity": 12,
+                "count": 9
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "noticeboard": {
+      "kind": "records",
+      "whole": true,
+      "records": [
+        {
+          "id": "rec.9012",
+          "record": "statement",
+          "author": "landlord-1-office",
+          "at": 7700000,
+          "visible_to": "public",
+          "speaks_for": "landlord-1",
+          "kind": "notice",
+          "text": "Room to let in this house. Ask inside.",
+          "place": "cell.7.3"
+        }
+      ]
+    }
+  },
+  "participant": "c0042"
+}

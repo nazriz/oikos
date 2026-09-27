@@ -1,6 +1,6 @@
-// Language seats through the mock adapter (D34, D36): plain words → call →
-// the seat's own acts → a preview it confirms; the records that chain leaves;
-// and the seat's ways out (declining, opting out).
+// Language-model participants through the mock adapter (D34, D36): plain words
+// → call → its own acts → a preview it confirms; the records that chain leaves;
+// and its ways out (declining, opting out).
 
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
@@ -32,38 +32,38 @@ test("a mock-LLM mayor governs through words, calls and confirmation, and every 
   const s = await run("mayor", town(), 60 * DAY);
   const log = lines(s.logPath);
   const ann = log.filter((e) => e.kind === "annotation").map((e) => e.body);
-  expect(ann.find((a) => a.annotation === "orchestrator").data.llm.seats.mayor).toEqual({ configured: "anthropic/claude-sonnet-5", adapter: "mock/mock", mock_brain: "city.mayor_code" });
+  expect(ann.find((a) => a.annotation === "orchestrator").data.llm.participants["mayor-system"]).toEqual({ configured: "anthropic/claude-sonnet-5", adapter: "mock/mock", mock_brain: "city.mayor_code" });
 
   const usage = ann.filter((a) => a.annotation === "usage");
   expect(usage.length).toBeGreaterThan(5);
   expect(usage.every((u) => u.provider === "mock" && u.cost_microusd === 0 && u.input_tokens > 0)).toBe(true);
   expect(ann.filter((a) => a.annotation === "transcript").length).toBe(usage.length);
-  expect(new Set(usage.map((u) => u.purpose))).toEqual(new Set(["seat", "translator", "debrief"]));
+  expect(new Set(usage.map((u) => u.purpose))).toEqual(new Set(["participant", "translator", "debrief"]));
 
   // Each confirmed draft goes into the act with its whole chain: words, call, resolver, hash.
   const drafts = new Map(ann.filter((a) => a.annotation === "draft").map((a) => [a.draft.id, a.draft]));
-  const acts = log.filter((e) => e.kind === "command" && e.body.command === "act" && e.body.seat === "mayor").map((e) => e.body);
+  const acts = log.filter((e) => e.kind === "command" && e.body.command === "act" && e.body.participant === "mayor-system").map((e) => e.body);
   expect(acts.length).toBeGreaterThan(0);
   for (const a of acts) {
     expect(a.provenance.via).toBe("translator");
     const d = drafts.get(a.provenance.draft)!;
     expect(a.provenance.draft_hash).toBe(draftHash(d));
     expect(a.provenance.call).toBe(d.call);
-    expect(a.provenance.resolver).toEqual({ id: "resolver", version: "0.3.0" });
+    expect(a.provenance.resolver).toEqual({ id: "resolver", version: "0.4.0" });
     expect(canonical(a.blocks)).toBe(canonical(d.blocks));
     expect(ann.some((x) => x.annotation === "signoff" && x.draft === d.id && x.decision === "accept" && x.draft_hash === a.provenance.draft_hash)).toBe(true);
   }
   // The institutions carry it on: the mayor's budget proposal is adopted by the council.
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
-  const proposal = recs.find((r) => r.kind === "proposal" && r.author === "mayor");
+  const proposal = recs.find((r) => r.kind === "proposal" && r.author === "mayor-system");
   const ballot = recs.find((r) => r.kind === "ballot" && r.basis === proposal.id);
   expect(recs.some((r) => r.kind === "budget" && r.basis === ballot.id)).toBe(true);
   // The mayor applied for its park permit on the planning office's published form.
-  expect(recs.some((r) => r.kind === "permit_application" && r.author === "mayor" && r.basis === "form-permit")).toBe(true);
-  expect(ann.some((a) => a.annotation === "debrief" && a.subject === "mayor")).toBe(true);
+  expect(recs.some((r) => r.kind === "permit_application" && r.author === "mayor-system" && r.basis === "form-permit")).toBe(true);
+  expect(ann.some((a) => a.annotation === "debrief" && a.subject === "mayor-system")).toBe(true);
 
   // What the mayor read never shows the machinery (principle 14).
-  const read = ann.filter((a) => a.annotation === "transcript" && a.data.purpose === "seat").map((a) => `${a.data.system ?? ""}\n${JSON.stringify(a.data.input)}`).join("\n").toLowerCase();
+  const read = ann.filter((a) => a.annotation === "transcript" && a.data.purpose === "participant").map((a) => `${a.data.system ?? ""}\n${JSON.stringify(a.data.input)}`).join("\n").toLowerCase();
   for (const machinery of ["kernel", "translator", "resolver", "block", "channel", "refusal", "insufficient_funds", "provenance"]) expect(read).not.toContain(machinery);
 
   // Every log line is canonical JSON, as the TypeScript port writes it (draft hashes rely on this).
@@ -74,12 +74,12 @@ test("a mock-LLM mayor governs through words, calls and confirmation, and every 
   expect(bodies(again.logPath)).toEqual(bodies(s.logPath));
 }, 300_000);
 
-test("a seat is told when a request can't be done, declines an unfaithful preview, confirms a faithful one, and can opt out", async () => {
+test("a participant is told when a request can't be done, declines an unfaithful preview, confirms a faithful one, and can opt out", async () => {
   let calls = 0, translated = 0, confirmed = false;
   const seen: string[] = [];
   const tool = (name: string, input: object) => [{ type: "tool_use" as const, id: `t${++calls}`, name, input }];
   const adapter = new MockAdapter("mock", {
-    seat: (req: LlmRequest) => {
+    participant: (req: LlmRequest) => {
       const obs = req.context.observation;
       seen.push(JSON.stringify(req.messages.at(-1)!.content));
       if (calls === 0) return tool("do", { what: "Build a stadium by the river." });
@@ -106,23 +106,23 @@ test("a seat is told when a request can't be done, declines an unfaithful previe
   expect(seen[1]).toContain("A note on your request: It isn't clear what should happen.");
   expect(ann.filter((a) => a.annotation === "signoff").map((a) => a.decision)).toEqual(["reject", "accept"]);
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
-  expect(recs.filter((r) => r.author === "mayor").map((r) => r.text)).toEqual(["The town hall opens at nine."]);
-  expect(log.some((e) => e.kind === "event" && e.body.event === "seat_opted_out" && e.body.seat === "mayor")).toBe(true);
+  expect(recs.filter((r) => r.author === "mayor-system").map((r) => r.text)).toEqual(["The town hall opens at nine."]);
+  expect(log.some((e) => e.kind === "event" && e.body.event === "participant_opted_out" && e.body.participant === "mayor-system")).toBe(true);
   expect(ann.find((a) => a.annotation === "debrief")?.data.response).toBe("Thanks for asking.");
 }, 300_000);
 
-test("after opting out, a stand-in named in the world config carries the seat on", async () => {
+test("after opting out, a stand-in named in the world config carries the participant on", async () => {
   const config = town((c) => {
-    const mayor = c.seats.find((x: any) => x.id === "mayor");
+    const mayor = c.participants.find((x: any) => x.id === "mayor-system");
     mayor.controller.params.mock.opt_out_at = 20 * DAY;
     mayor.on_opt_out = { code: "city.mayor_code", params: { population: 80 } };
   });
   const s = await run("stand-in", config, 60 * DAY);
   const log = lines(s.logPath);
-  const out = log.find((e) => e.kind === "event" && e.body.event === "seat_opted_out");
+  const out = log.find((e) => e.kind === "event" && e.body.event === "participant_opted_out");
   expect(out.t).toBeGreaterThanOrEqual(20 * DAY);
-  // The code mayor now acts in the seat, through calls (no translator, no confirmation).
-  const after = log.filter((e) => e.kind === "command" && e.body.command === "act" && e.body.seat === "mayor" && e.t > out.t);
+  // The code mayor now acts for the participant, through calls (no translator, no confirmation).
+  const after = log.filter((e) => e.kind === "command" && e.body.command === "act" && e.body.participant === "mayor-system" && e.t > out.t);
   expect(after.length).toBeGreaterThan(0);
   expect(after.every((e) => e.body.provenance.via === "call")).toBe(true);
 }, 300_000);

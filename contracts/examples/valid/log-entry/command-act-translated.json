@@ -4,7 +4,6 @@
   "kind": "command",
   "body": {
     "command": "act",
-    "seat": "mayor",
     "blocks": [
       {
         "block": "publish",
@@ -37,7 +36,8 @@
         "version": "0.1.0"
       }
     },
-    "reasoning": "Let the council decide."
+    "reasoning": "Let the council decide.",
+    "participant": "mayor"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

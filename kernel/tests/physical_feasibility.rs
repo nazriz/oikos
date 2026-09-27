@@ -1,17 +1,18 @@
 //! INVARIANT: no act takes effect unless it is physically possible.
-//! (Replaces v0.1's "no action bypasses a mandate": authority is now a matter
-//! of records and people, D20. What the kernel must guarantee is physics.)
+//! (Replaces v0.1's "no action bypasses a mandate": authority is a matter of
+//! records and people, D20. What the kernel must guarantee is physics.)
 //!
 //! Checked two independent ways over random command sequences:
-//!   1. A MIRROR of the physical world, kept by this test from the events
-//!      alone, replays every physical event and checks it was possible at that
-//!      moment: buildings go only on empty parcels, occupants arrive only
-//!      within capacity and in finished buildings, only people who are present
-//!      leave or are removed. At the end of every command the mirror must equal
-//!      the kernel's state, so nothing physical changes without an event.
+//!   1. A MIRROR of the physical world and the cast, kept by this test from the
+//!      events alone, replays every physical event and checks it was possible at
+//!      that moment: buildings go only on free ground they can stand on, bodies
+//!      go only into finished spaces with room, only bodies that are alive and in
+//!      the world are in spaces, the dead stay dead, and positions change hands
+//!      only by events. At the end of every command the mirror must equal the
+//!      kernel's state, so nothing physical changes without an event.
 //!   2. An ORACLE, written here from the contract's wording, predicts the
-//!      outcome (applied, or the exact refusal code) of every single-block
-//!      physical act from the state before it.
+//!      outcome (applied, or the exact refusal code) of every single-block act it
+//!      knows, from the state before it.
 //!
 //! Also: a refused action changes nothing at all.
 
@@ -19,51 +20,80 @@ mod common;
 
 use common::*;
 use proptest::prelude::*;
+use proptest::strategy::ValueTree;
 use serde_json::json;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use terrarium_kernel::blocks::Block;
+use terrarium_kernel::config::{cell_xy, footprint_cells, split_space};
 use terrarium_kernel::events::{EventBody, RefusalCode};
 use terrarium_kernel::run::Run;
-use terrarium_kernel::state::{SeatStatus, State};
+use terrarium_kernel::state::{ParticipantStatus, State};
 use terrarium_kernel::Command;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Mirror {
-    /// structure -> (parcel, type, complete)
-    structures: BTreeMap<String, (String, String, bool)>,
-    /// (structure, occupant, slot) -> count
-    occupancy: BTreeMap<(String, String, String), u32>,
+    /// structure -> (cells, type, complete)
+    structures: BTreeMap<String, (Vec<String>, String, bool)>,
+    /// space -> bodies in it
+    occupancy: BTreeMap<String, BTreeSet<String>>,
+    /// person -> (present, alive)
+    bodies: BTreeMap<String, (bool, bool)>,
+    /// position -> holder
+    holders: BTreeMap<String, Option<String>>,
 }
 
 fn mirror_of(st: &State) -> Mirror {
     Mirror {
-        structures: st.structures.iter().map(|(id, x)| (id.clone(), (x.parcel.clone(), x.structure_type.clone(), x.complete))).collect(),
-        occupancy: st
-            .occupancy
-            .iter()
-            .flat_map(|(sid, occ)| {
-                occ.iter().flat_map(move |(o, slots)| slots.iter().map(move |(slot, c)| ((sid.clone(), o.clone(), slot.clone()), *c)))
-            })
-            .collect(),
+        structures: st.structures.iter().map(|(id, x)| (id.clone(), (x.cells.clone(), x.structure_type.clone(), x.complete))).collect(),
+        occupancy: st.occupancy.values().flat_map(|m| m.iter().map(|(sp, b)| (sp.clone(), b.clone()))).filter(|(_, b)| !b.is_empty()).collect(),
+        bodies: st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (id.clone(), (b.present, b.alive)))).collect(),
+        holders: st.positions.iter().map(|(id, x)| (id.clone(), x.holder.clone())).collect(),
     }
 }
 
-/// The oracle's prediction for a single physical block: Ok(()) or the refusal code.
-fn predict(run: &Run<Vec<u8>>, seat: &str, b: &Block) -> Option<Result<(), RefusalCode>> {
+fn living(st: &State, who: &str) -> Result<(), RefusalCode> {
+    match st.entities.get(who) {
+        None => Err(RefusalCode::UnknownEntity),
+        Some(e) => match &e.body {
+            None => Err(RefusalCode::NotAPerson),
+            Some(b) if !b.alive => Err(RefusalCode::Dead),
+            Some(b) if !b.present => Err(RefusalCode::NotPresent),
+            Some(_) => Ok(()),
+        },
+    }
+}
+
+/// The oracle's prediction for a single block: Ok(()) or the refusal code; None when it doesn't know the block.
+fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Block) -> Option<Result<(), RefusalCode>> {
     let k = run.kernel();
     let st = k.state();
-    let me = k.statics().entity_of(seat).unwrap();
-    // An opted-out seat can't act, unless the world names a stand-in that carries it on.
-    if st.seats[seat].status == SeatStatus::OptedOut && k.statics().seats[seat].vacant_after_opt_out() {
-        return Some(Err(RefusalCode::SeatOptedOut));
+    let s = k.statics();
+    // Who acts, in what capacity: it must be able to act, and hold the position it names.
+    let p = &st.participants[participant];
+    let active = match p.status {
+        ParticipantStatus::Active => true,
+        ParticipantStatus::OptedOut => !p.def.vacant_after_opt_out(),
+        ParticipantStatus::Ended => false,
+    };
+    if !active {
+        return Some(Err(RefusalCode::ParticipantInactive));
     }
-    let types = &k.statics().types;
+    let me = match position {
+        Some(pos) => match st.positions.get(pos) {
+            None => return Some(Err(RefusalCode::UnknownPosition)),
+            Some(x) if x.holder.as_deref() != Some(participant) => return Some(Err(RefusalCode::NotInPosition)),
+            Some(x) => x.entity.clone(),
+        },
+        None => p.person.clone()?,
+    };
+    let me_person = position.is_none();
+    let types = &s.types;
     Some(match b {
         Block::Transfer { from, to, amount, settles: None, per_instruction: None, .. } => {
             let (Some(f), Some(t)) = (st.accounts.get(from), st.accounts.get(to)) else { return Some(Err(RefusalCode::UnknownAccount)) };
             if f.custodian != me {
                 Err(RefusalCode::NotCustodian)
-            } else if f.holder == k.statics().boundary {
+            } else if f.holder == s.boundary {
                 let below = (f.balance as i128) - (*amount as i128) < -9_007_199_254_740_991;
                 let above = from != to && t.balance as i128 + *amount as i128 > 9_007_199_254_740_991;
                 if below || above {
@@ -79,78 +109,133 @@ fn predict(run: &Run<Vec<u8>>, seat: &str, b: &Block) -> Option<Result<(), Refus
                 Ok(())
             }
         }
-        Block::Construct { parcel, structure_type, materials_from, .. } => {
-            let Some(p) = st.parcels.get(parcel) else { return Some(Err(RefusalCode::UnknownParcel)) };
-            let Some(ty) = types.get(structure_type) else {
-                return Some(if p.structure.is_some() { Err(RefusalCode::ParcelOccupied) } else { Err(RefusalCode::UnknownStructureType) });
-            };
-            let Some(acc) = st.accounts.get(materials_from) else {
-                return Some(if p.structure.is_some() { Err(RefusalCode::ParcelOccupied) } else { Err(RefusalCode::UnknownAccount) });
-            };
-            if p.structure.is_some() {
-                Err(RefusalCode::ParcelOccupied)
-            } else if acc.holder != me {
+        Block::Construct { at, structure_type, materials_from, .. } => {
+            let Some(ty) = types.get(structure_type) else { return Some(Err(RefusalCode::UnknownStructureType)) };
+            let Some(cells) = footprint_cells(&s.config.world.ground, at, ty.footprint) else { return Some(Err(RefusalCode::UnknownCell)) };
+            for c in &cells {
+                let cell = &st.cells[c];
+                if cell.structure.is_some() {
+                    return Some(Err(RefusalCode::GroundOccupied));
+                }
+                let fits = match &ty.terrains {
+                    Some(ok) => cell.terrain.as_ref().is_some_and(|t| ok.contains(t)),
+                    None => cell.terrain.is_none(),
+                };
+                if !fits {
+                    return Some(Err(RefusalCode::UnsuitableTerrain));
+                }
+            }
+            let Some(acc) = st.accounts.get(materials_from) else { return Some(Err(RefusalCode::UnknownAccount)) };
+            if acc.holder != me {
                 Err(RefusalCode::NotHolder)
-            } else if acc.holder != k.statics().boundary && acc.balance < ty.materials_cost {
+            } else if acc.holder != s.boundary && acc.balance < ty.materials_cost {
                 // (The outside world pays materials to itself: a quirk of the temporary liberty.)
                 Err(RefusalCode::InsufficientFunds)
             } else {
                 Ok(())
             }
         }
-        Block::Occupy { structure, slot, count } => {
-            let Some(x) = st.structures.get(structure) else { return Some(Err(RefusalCode::UnknownStructure)) };
-            let Some(cap) = types[&x.structure_type].capacity.get(slot) else {
-                return Some(if !x.complete { Err(RefusalCode::StructureIncomplete) } else { Err(RefusalCode::UnknownSlot) });
+        Block::Occupy { space, who } => {
+            let who = match who {
+                Some(w) => w.clone(),
+                None if me_person => me.clone(),
+                None => return Some(Err(RefusalCode::NotAPerson)),
             };
+            if let Err(e) = living(st, &who) {
+                return Some(Err(e));
+            }
+            let Some((sid, local)) = split_space(space) else { return Some(Err(RefusalCode::UnknownSpace)) };
+            let Some(x) = st.structures.get(sid) else { return Some(Err(RefusalCode::UnknownStructure)) };
+            let Some(spec) = s.space(&x.structure_type, local) else { return Some(Err(RefusalCode::UnknownSpace)) };
+            let bodies = st.occupancy.get(sid).and_then(|m| m.get(space));
             if !x.complete {
                 Err(RefusalCode::StructureIncomplete)
-            } else if *count == 0 || st.occupied(structure, slot) + *count as u64 > *cap as u64 {
+            } else if bodies.is_some_and(|b| b.contains(&who)) {
+                Err(RefusalCode::AlreadyPresent)
+            } else if bodies.map_or(0, |b| b.len()) as u32 >= spec.capacity {
                 Err(RefusalCode::CapacityExceeded)
             } else {
                 Ok(())
             }
         }
-        Block::Vacate { occupant, structure } => {
+        Block::Vacate { occupant, from } => {
             if !st.entities.contains_key(occupant) {
                 Err(RefusalCode::UnknownEntity)
-            } else if st.occupancy.get(structure).is_some_and(|o| o.contains_key(occupant)) {
-                Ok(())
             } else {
-                Err(RefusalCode::NotPresent)
+                let sid = split_space(from).map_or(from.as_str(), |(s, _)| s);
+                let there = st.occupancy.get(sid).is_some_and(|m| m.iter().any(|(sp, b)| (sp == from || sid == from) && b.contains(occupant)));
+                if there {
+                    Ok(())
+                } else {
+                    Err(RefusalCode::NotPresent)
+                }
             }
         }
         Block::CloseAccount { account } => match st.accounts.get(account) {
             None => Err(RefusalCode::UnknownAccount),
             Some(a) if a.custodian != me => Err(RefusalCode::NotCustodian),
-            Some(_) if *account == k.statics().boundary_account => Err(RefusalCode::BoundaryProtected),
+            Some(_) if *account == s.boundary_account => Err(RefusalCode::BoundaryProtected),
             Some(a) if a.balance != 0 => Err(RefusalCode::AccountNotEmpty),
             Some(_) => Ok(()),
         },
+        Block::Leave { person } => {
+            let who = match person {
+                Some(w) => w.clone(),
+                None if me_person => me.clone(),
+                None => return Some(Err(RefusalCode::NotAPerson)),
+            };
+            living(st, &who)
+        }
+        Block::Appoint { position: target, participant: to } => {
+            if position.is_none() || st.entities.get(&me).is_some_and(|e| e.body.is_some()) {
+                Err(RefusalCode::NotTheirs)
+            } else {
+                match st.positions.get(target) {
+                    None => Err(RefusalCode::UnknownPosition),
+                    Some(x) if x.entity != me => Err(RefusalCode::NotTheirs),
+                    Some(_) => match to.as_ref().map(|t| st.participants.get(t)) {
+                        Some(None) => Err(RefusalCode::UnknownParticipant),
+                        Some(Some(q)) if q.status == ParticipantStatus::Ended => Err(RefusalCode::ParticipantInactive),
+                        _ => Ok(()),
+                    },
+                }
+            }
+        }
         _ => return None,
     })
 }
 
-fn check(ops: &[Op]) -> Result<(), TestCaseError> {
+fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
     let mut run = Run::start(world(&default_params()), "feasibility", Vec::new(), None).unwrap();
+    let mut outcomes: BTreeMap<String, usize> = BTreeMap::new();
     for op in ops {
         let Some(cmd) = concretize(&run, op) else { continue };
         let before = run.kernel().state().clone();
         let prediction = match &cmd {
-            Command::Act { seat, blocks, .. } if blocks.len() == 1 => predict(&run, seat, &blocks[0]),
+            Command::Act { participant, position, blocks, .. } if blocks.len() == 1 => predict(&run, participant, position.as_deref(), &blocks[0]),
             _ => None,
         };
         let Some(resp) = step(&mut run, &cmd) else { continue };
         let after = run.kernel().state();
-        let types = &run.kernel().statics().types;
+        let s = run.kernel().statics();
 
         // 1. Mirror every physical event and check it was possible.
         let mut m = mirror_of(&before);
+        let mut created: BTreeSet<String> = BTreeSet::new();
         for e in &resp.events {
+            *outcomes.entry(e.body.name().into()).or_default() += 1;
             match &e.body {
-                EventBody::StructureStarted { structure, parcel, structure_type, .. } => {
-                    prop_assert!(!m.structures.values().any(|(p, _, _)| p == parcel), "built on occupied parcel {}", parcel);
-                    m.structures.insert(structure.clone(), (parcel.clone(), structure_type.clone(), false));
+                EventBody::StructureStarted { structure, on, structure_type, .. } => {
+                    let ty = &s.types[structure_type];
+                    let cells = footprint_cells(&s.config.world.ground, on, ty.footprint).expect("a building stands on the ground");
+                    for c in &cells {
+                        prop_assert!(!m.structures.values().any(|(cs, _, _)| cs.contains(c)), "built on occupied ground {}", c);
+                        let (x, y) = cell_xy(c).unwrap();
+                        let t = terrarium_kernel::config::terrain_at(&s.config.world.ground, x, y);
+                        let fits = match &ty.terrains { Some(ok) => t.is_some_and(|t| ok.iter().any(|o| o == t)), None => t.is_none() };
+                        prop_assert!(fits, "a {} stood on {:?} terrain", structure_type, t);
+                    }
+                    m.structures.insert(structure.clone(), (cells, structure_type.clone(), false));
                 }
                 EventBody::StructureCompleted { structure } => {
                     let x = m.structures.get_mut(structure).expect("completed structure exists");
@@ -159,27 +244,71 @@ fn check(ops: &[Op]) -> Result<(), TestCaseError> {
                 }
                 EventBody::StructureDemolished { structure, .. } => {
                     prop_assert!(m.structures.remove(structure).is_some(), "demolished a structure that wasn't there");
-                    prop_assert!(!m.occupancy.keys().any(|(s, _, _)| s == structure), "demolished with occupants still recorded inside");
+                    let prefix = format!("{structure}/");
+                    prop_assert!(!m.occupancy.keys().any(|sp| sp.starts_with(&prefix)), "demolished with bodies still recorded inside");
                 }
-                EventBody::Occupied { occupant, structure, slot, count } => {
-                    let (_, ty, complete) = m.structures.get(structure).expect("occupied structure exists").clone();
+                EventBody::Occupied { occupant, space, .. } => {
+                    let (sid, local) = split_space(space).unwrap();
+                    let (_, ty, complete) = m.structures.get(sid).expect("occupied structure exists").clone();
                     prop_assert!(complete, "occupied an unfinished building");
-                    let cap = types[&ty].capacity[slot] as u64;
-                    *m.occupancy.entry((structure.clone(), occupant.clone(), slot.clone())).or_default() += count;
-                    let used: u64 = m.occupancy.iter().filter(|((s, _, sl), _)| s == structure && sl == slot).map(|(_, c)| *c as u64).sum();
-                    prop_assert!(used <= cap, "over capacity: {} > {}", used, cap);
+                    prop_assert!(m.bodies.get(occupant) == Some(&(true, true)), "{} went into a space without being alive and in the world", occupant);
+                    let cap = s.spaces[&ty][local].capacity as usize;
+                    let b = m.occupancy.entry(space.clone()).or_default();
+                    prop_assert!(b.insert(occupant.clone()), "{} was already in {}", occupant, space);
+                    prop_assert!(b.len() <= cap, "over capacity: {} > {}", b.len(), cap);
                 }
-                EventBody::Vacated { occupant, structure, .. } => {
-                    let keys: Vec<_> = m.occupancy.keys().filter(|(s, o, _)| s == structure && o == occupant).cloned().collect();
-                    prop_assert!(!keys.is_empty(), "{} vacated {} without being there", occupant, structure);
-                    for key in keys {
-                        m.occupancy.remove(&key);
+                EventBody::Vacated { occupant, space, .. } => {
+                    let b = m.occupancy.get_mut(space);
+                    prop_assert!(b.is_some_and(|b| b.remove(occupant)), "{} left {} without being there", occupant, space);
+                    m.occupancy.retain(|_, b| !b.is_empty());
+                }
+                EventBody::PersonCreated { person, parents, .. } => {
+                    // A newcomer is in the world; a child is where its birthing parent is.
+                    let present = parents.first().is_none_or(|p| m.bodies.get(p).is_some_and(|b| b.0));
+                    m.bodies.insert(person.clone(), (present, true));
+                    created.insert(person.clone());
+                }
+                EventBody::PersonArrived { person, .. } => {
+                    let b = m.bodies.get_mut(person).expect("arrived body exists");
+                    prop_assert!(b.1, "the dead arrived");
+                    prop_assert!(created.contains(person) || !b.0, "{} arrived while already in the world", person);
+                    b.0 = true;
+                }
+                EventBody::PersonLeft { person, .. } => {
+                    let b = m.bodies.get_mut(person).expect("body exists");
+                    prop_assert!(*b == (true, true), "{} left without being alive and in the world", person);
+                    b.0 = false;
+                    prop_assert!(!m.occupancy.values().any(|x| x.contains(person)), "{} left the world still in a space", person);
+                }
+                EventBody::PersonDied { person, .. } => {
+                    let b = m.bodies.get_mut(person).expect("body exists");
+                    prop_assert!(b.1, "{} died twice", person);
+                    b.1 = false;
+                    prop_assert!(!m.occupancy.values().any(|x| x.contains(person)), "{} died still in a space", person);
+                }
+                EventBody::Appointed { position, holder, .. } => {
+                    m.holders.insert(position.clone(), holder.clone());
+                }
+                EventBody::PositionCreated { position, .. } => {
+                    m.holders.insert(position.clone(), None);
+                }
+                EventBody::ActionApplied { participant, .. } => {
+                    // Only a participant that can act does.
+                    let p = &before.participants[participant];
+                    prop_assert!(p.status == ParticipantStatus::Active || (p.status == ParticipantStatus::OptedOut && !p.def.vacant_after_opt_out()), "{} acted though it can't", participant);
+                    if let Some(person) = &p.person {
+                        prop_assert!(before.body(person).is_some_and(|b| b.alive), "the dead acted");
                     }
                 }
                 _ => {}
             }
         }
-        prop_assert_eq!(&m, &mirror_of(after), "the physical world changed without matching events after {:?}", cmd);
+        prop_assert_eq!(&m, &mirror_of(after), "the physical world or the cast changed without matching events after {:?}", cmd);
+        for (_, spaces) in after.occupancy.iter() {
+            for b in spaces.values().flatten() {
+                prop_assert!(after.body(b).is_some_and(|x| x.alive && x.present), "{} is in a space without being alive and in the world", b);
+            }
+        }
 
         // 2. A refused action changes nothing (beyond minting its action id and queuing its outcome).
         if let Some(EventBody::ActionRefused { code, .. }) = resp.events.first().map(|e| &e.body) {
@@ -189,6 +318,8 @@ fn check(ops: &[Op]) -> Result<(), TestCaseError> {
             prop_assert_eq!(&before.occupancy, &after.occupancy);
             prop_assert_eq!(&before.entities, &after.entities);
             prop_assert_eq!(&before.records, &after.records);
+            prop_assert_eq!(&before.positions, &after.positions);
+            prop_assert_eq!(&before.schedule, &after.schedule);
             if let Some(p) = &prediction {
                 prop_assert_eq!(p, &Err(*code), "oracle disagreed on {:?}", cmd);
             }
@@ -196,7 +327,7 @@ fn check(ops: &[Op]) -> Result<(), TestCaseError> {
             prop_assert_eq!(p, &Ok(()), "oracle expected a refusal for {:?}", cmd);
         }
     }
-    Ok(())
+    Ok(outcomes)
 }
 
 proptest! {
@@ -208,34 +339,57 @@ proptest! {
     }
 }
 
+/// Life happens: over one long deterministic run, bodies arrive, leave, are born, fall ill,
+/// are injured and die, and positions change hands, all checked by the mirror.
+#[test]
+fn the_cast_changes_and_physics_holds() {
+    let mut runner = proptest::test_runner::TestRunner::deterministic();
+    let ops = proptest::collection::vec(op_strategy(), 600..601).new_tree(&mut runner).unwrap().current();
+    let seen = check(&ops).unwrap();
+    for e in ["person_created", "person_arrived", "person_left", "person_died", "birth_started", "condition_began", "condition_ended", "appointed", "occupied", "vacated", "structure_started"] {
+        assert!(seen.get(e).copied().unwrap_or(0) > 0, "{e} never happened: {seen:?}");
+    }
+}
+
 #[test]
 fn the_oracle_is_exercised() {
-    // Guard against a vacuous oracle: single physical blocks with each outcome occur.
+    // Guard against a vacuous oracle: single acts with each outcome occur.
     let mut run = Run::start(world(&default_params()), "oracle", Vec::new(), None).unwrap();
-    let act = |seat: &str, b: serde_json::Value| Command::Act {
-        seat: seat.into(),
+    let act = |p: &str, pos: Option<&str>, b: serde_json::Value| Command::Act {
+        participant: p.into(),
+        position: pos.map(String::from),
         blocks: vec![serde_json::from_value(b).unwrap()],
         provenance: json!({"via": "direct"}),
         reasoning: None,
     };
+    let bld = |b: serde_json::Value| act("builder-system", Some("builder"), b);
     let cases = [
-        (act("finance", json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 5})), Err(RefusalCode::NotCustodian)),
-        (act("bank-pay", json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 5})), Ok(())),
-        (
-            act("builder", json!({"block": "construct", "parcel": "p20", "structure_type": "park", "materials_from": "acc-buildco"})),
-            Err(RefusalCode::ParcelOccupied),
-        ),
-        (
-            act("builder", json!({"block": "construct", "parcel": "p12", "structure_type": "park", "materials_from": "acc-city"})),
-            Err(RefusalCode::NotHolder),
-        ),
-        (act("builder", json!({"block": "construct", "parcel": "p12", "structure_type": "park", "materials_from": "acc-buildco"})), Ok(())),
-        (act("developer", json!({"block": "vacate", "occupant": "carol", "structure": "s-house"})), Err(RefusalCode::NotPresent)),
-        (act("developer", json!({"block": "vacate", "occupant": "bob", "structure": "s-flats"})), Ok(())),
+        (act("finance-system", Some("finance"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 5})), Err(RefusalCode::NotCustodian)),
+        (act("bank-pay-system", Some("bank-pay"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 5})), Ok(())),
+        (act("alice-self", Some("mayor"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 5})), Err(RefusalCode::NotInPosition)),
+        (bld(json!({"block": "construct", "at": "cell.1.0", "structure_type": "park", "materials_from": "acc-buildco"})), Err(RefusalCode::GroundOccupied)),
+        (bld(json!({"block": "construct", "at": "cell.2.0", "structure_type": "jetty", "materials_from": "acc-buildco"})), Err(RefusalCode::UnsuitableTerrain)),
+        (bld(json!({"block": "construct", "at": "cell.2.2", "structure_type": "flats", "materials_from": "acc-buildco"})), Err(RefusalCode::UnsuitableTerrain)),
+        (bld(json!({"block": "construct", "at": "cell.3.0", "structure_type": "flats", "materials_from": "acc-buildco"})), Err(RefusalCode::UnknownCell)),
+        (bld(json!({"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_from": "acc-city"})), Err(RefusalCode::NotHolder)),
+        (bld(json!({"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_from": "acc-buildco"})), Ok(())),
+        (bld(json!({"block": "construct", "at": "cell.3.1", "structure_type": "jetty", "materials_from": "acc-buildco"})), Ok(())),
+        (act("developer-system", Some("developer"), json!({"block": "vacate", "occupant": "carol", "from": "s-house"})), Err(RefusalCode::NotPresent)),
+        (act("developer-system", Some("developer"), json!({"block": "vacate", "occupant": "bob", "from": "s-flats"})), Ok(())),
+        (act("alice-self", None, json!({"block": "occupy", "space": "s-house/dwelling.1"})), Err(RefusalCode::AlreadyPresent)),
+        (act("carol-self", None, json!({"block": "occupy", "space": "s-flats/dwelling.4"})), Ok(())),
+        (act("bob-self", None, json!({"block": "occupy", "space": "s-flats/dwelling.9"})), Err(RefusalCode::UnknownSpace)),
+        (act("mayor-system", Some("mayor"), json!({"block": "appoint", "position": "bank-pay", "participant": "alice-self"})), Err(RefusalCode::NotTheirs)),
+        (act("mayor-system", Some("mayor"), json!({"block": "appoint", "position": "clerk", "participant": "alice-self"})), Ok(())),
+        (act("alice-self", None, json!({"block": "appoint", "position": "clerk"})), Err(RefusalCode::NotTheirs)),
+        (act("alice-self", Some("clerk"), json!({"block": "appoint", "position": "clerk"})), Ok(())),
+        (act("alice-self", None, json!({"block": "leave"})), Ok(())),
+        (act("alice-self", None, json!({"block": "occupy", "space": "s-shop/dwelling.1"})), Err(RefusalCode::NotPresent)),
+        (act("mayor-system", Some("mayor"), json!({"block": "leave"})), Err(RefusalCode::NotAPerson)),
     ];
     for (cmd, expected) in cases {
-        let Command::Act { seat, blocks, .. } = &cmd else { unreachable!() };
-        assert_eq!(predict(&run, seat, &blocks[0]), Some(expected), "oracle on {cmd:?}");
+        let Command::Act { participant, position, blocks, .. } = &cmd else { unreachable!() };
+        assert_eq!(predict(&run, participant, position.as_deref(), &blocks[0]), Some(expected), "oracle on {cmd:?}");
         let resp = run.command(&cmd).unwrap();
         let got = match &resp.events[0].body {
             EventBody::ActionRefused { code, .. } => Err(*code),

@@ -40,7 +40,7 @@ fn live(params: &WorldParams, ops: &[Op], finish: bool) -> (Vec<u8>, Vec<u8>, Ve
                 continue;
             }
             if i % 3 == 0 {
-                run.annotate(json!({"annotation": "usage", "purpose": "seat", "subject": "mayor", "provider": "test", "model": "m", "input_tokens": i, "output_tokens": 3, "cost_microusd": 12})).unwrap();
+                run.annotate(json!({"annotation": "usage", "purpose": "participant", "subject": "mayor", "provider": "test", "model": "m", "input_tokens": i, "output_tokens": 3, "cost_microusd": 12})).unwrap();
             }
         }
     }
@@ -104,10 +104,10 @@ fn riverbend_replays_and_observations_are_reproducible() {
     let mut run = Run::start(riverbend(), "riverbend", Vec::new(), None).unwrap();
     let mut observations = vec![];
     for cmd in [
-        Command::Observe { seat: "mayor".into() },
+        Command::Observe { participant: "mayor-system".into(), only: None },
         Command::Advance { to: 40 * 86_400 },
-        Command::Observe { seat: "mayor".into() },
-        Command::Observe { seat: "developer".into() },
+        Command::Observe { participant: "mayor-system".into(), only: None },
+        Command::Observe { participant: "developer-system".into(), only: None },
     ] {
         if let Some(o) = run.command(&cmd).unwrap().observation {
             observations.push(terrarium_kernel::canon::canonical(&o).unwrap());
@@ -121,10 +121,10 @@ fn riverbend_replays_and_observations_are_reproducible() {
     let mut run2 = Run::start(riverbend(), "riverbend", Vec::new(), None).unwrap();
     let mut again = vec![];
     for cmd in [
-        Command::Observe { seat: "mayor".into() },
+        Command::Observe { participant: "mayor-system".into(), only: None },
         Command::Advance { to: 40 * 86_400 },
-        Command::Observe { seat: "mayor".into() },
-        Command::Observe { seat: "developer".into() },
+        Command::Observe { participant: "mayor-system".into(), only: None },
+        Command::Observe { participant: "developer-system".into(), only: None },
     ] {
         if let Some(o) = run2.command(&cmd).unwrap().observation {
             again.push(terrarium_kernel::canon::canonical(&o).unwrap());

@@ -5,8 +5,8 @@
     "city"
   ],
   "fields": {
-    "parcel": {
-      "type": "parcel",
+    "lot": {
+      "type": "lot",
       "required": true
     },
     "structure_type": {

@@ -15,24 +15,26 @@
 // Everything is done the way a person does it: applying, signing, moving in,
 // asking the bank to pay. Nothing happens to them automatically.
 
-import type { LookRequest, Observation, SeatAction, SiteParcel, StatementRecord } from "../contracts";
-import { params, wait, type BehaviourModule, type SeatContext } from "../module";
-import { Book, callAction, DAY, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, vote, withdraw, type Step } from "./common";
+import type { LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
+import { channels } from "../contracts";
+import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
+import { Book, callAction, DAY, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step } from "./common";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
 type Want = keyof typeof ASKING;
 
-interface Home { agreement: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean }
+/** A home is a unit (a space) in a building. */
+interface Home { agreement: string; space: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean }
 interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; endsAt: number }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.6.0",
+  version: "0.7.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const p = params(
     {
       rent_share_bps: 3300, // BoE: renters bid 33% of income
@@ -81,11 +83,10 @@ export const citizen: BehaviourModule = {
     // who asked us, and the buildings people told us about.
     const contacts = new Map<string, number>();
     const askedAt: { [w in Want]?: number } = {};
-    let asked: { seat: string; want: Want }[] = [];
+    let asked: { from: string; want: Want }[] = [];
     let leads: string[] = []; // buildings, most recent last
     let looking: "leads" | "market" | null = null; // which search the next observation answers
     const leadFound: { homes: StatementRecord[]; jobs: StatementRecord[] } = { homes: [], jobs: [] };
-    const capacity = new Map<string, { [slot: string]: number }>((ctx.world.config?.catalogue?.structure_types ?? []).map((t: any) => [t.id, t.capacity ?? {}]));
 
     const monthlyIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
 
@@ -99,7 +100,7 @@ export const citizen: BehaviourModule = {
           const lt = leaseTerms(r, me);
           const landlord = r.terms.parties.find((x) => x !== me)!;
           const order = [...book.records.values()].find((x) => x.record === "statement" && x.kind === "request" && x.basis === r.id && x.speaks_for === me)?.id;
-          home = { agreement: r.id, structure: lt.structure!, landlord, rent: lt.rent, order, endsAt: end, movedIn: true };
+          home = { agreement: r.id, space: lt.space!, structure: lt.structure!, landlord, rent: lt.rent, order, endsAt: end, movedIn: true };
         }
         if (r.terms.template === "employment" && !job) {
           const employer = r.terms.parties.find((x) => x !== me)!;
@@ -122,7 +123,7 @@ export const citizen: BehaviourModule = {
       // Words from people: someone asking around, or someone telling us where to look.
       for (const m of obs.inbox) {
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
-        if (want) asked.push({ seat: m.from, want });
+        if (want) asked.push({ from: m.from, want });
         // A place someone names in reply to our asking (not a reply about a record: those are institutions answering requests).
         else if (m.re && (askedAt.home !== undefined || askedAt.work !== undefined) && !book.records.has(m.re)) leads = [...leads.filter((x) => x !== m.re), m.re].slice(-5);
       }
@@ -150,8 +151,8 @@ export const citizen: BehaviourModule = {
       moveStep = null;
       // Are we in a building? Around us we see who's in our own buildings; without that view, assume we are.
       const street = obs.channels.street;
-      const inside = (structure: string) =>
-        street?.kind !== "sites" || street.parcels.some((l) => l.structure?.structure === structure && l.structure.occupancy.some((o) => o.occupant === me));
+      const inside = (space: string) =>
+        street?.kind !== "sites" || street.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === space && sp.occupants?.includes(me)));
 
       // Notices on our agreements move their end dates.
       for (const r of fresh) {
@@ -185,21 +186,21 @@ export const citizen: BehaviourModule = {
         if (r.record !== "agreement" || !r.terms.parties.includes(me) || book.signedBy(r.id, me)) continue;
         const other = r.terms.parties.find((x) => x !== me)!;
         if (r.terms.template === "lease" && !home) {
-          const { rent, rentTo, structure } = leaseTerms(r, me);
-          if (!structure || !rentTo || !affordable(rent, acc.balance)) continue;
+          const { rent, rentTo, space, structure } = leaseTerms(r, me);
+          if (!space || !structure || !rentTo || !affordable(rent, acc.balance)) continue;
           // Signing (a record) and moving in (physics) are separate acts: the
           // flat may not be free yet if the last tenant hasn't left.
           steps.push([
             sign(r.id),
-            ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: 0, basis: r.id, for: `Rent for ${structure}, monthly in advance.` })],
+            ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: 0, basis: r.id, for: `Rent for ${space}, monthly in advance.` })],
           ]);
-          home = { agreement: r.id, structure, landlord: other, rent, endsAt: t + (r.terms.term ?? 365 * DAY), movedIn: false };
+          home = { agreement: r.id, space, structure, landlord: other, rent, endsAt: t + (r.terms.term ?? 365 * DAY), movedIn: false };
           pendingRef = { kind: "rent", agreement: r.id };
           homelessSince = null;
         } else if (r.terms.template === "employment" && !job) {
           const terms = jobTerms(r, me);
           const s: Step = [sign(r.id)];
-          if (terms.workplace) s.push(moveIn(terms.workplace, "workplace"));
+          if (terms.workplace) s.push(moveIn(terms.workplace));
           steps.push(s);
           job = { agreement: r.id, employer: other, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER };
           joblessSince = null;
@@ -208,7 +209,7 @@ export const citizen: BehaviourModule = {
 
       // Moving into a home we hold a lease on, once there's physical room.
       if (home && !home.movedIn) {
-        moveStep = [moveIn(home.structure, "dwelling")];
+        moveStep = [moveIn(home.space)];
         steps.push(moveStep);
         moving = true;
       }
@@ -243,7 +244,7 @@ export const citizen: BehaviourModule = {
         const best = listings[0];
         if (best?.speaks_for) {
           applied.add(best.id);
-          steps.push([say("rental_application", `Application for ${best.data.structure}.`, { to: [best.speaks_for], visible: [me, best.speaks_for], data: { listing: best.id, account: acc.account } })]);
+          steps.push([say("rental_application", `Application for ${best.data.space ?? best.data.structure}.`, { to: [best.speaks_for], visible: [me, best.speaks_for], data: { listing: best.id, account: acc.account } })]);
         }
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
@@ -280,26 +281,23 @@ export const citizen: BehaviourModule = {
     // buildings we see who. Asked, we say where we can see room: where we live or next door for a
     // home, our own workplace for work (we're on the inside there). Hunting, we ask once per hunt.
     const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
-      const street = obs.channels.street;
-      const lots: SiteParcel[] = street?.kind === "sites" ? street.parcels : [];
-      for (const lot of lots) for (const o of lot.structure?.occupancy ?? []) if (o.occupant && o.occupant !== me) contacts.set(o.occupant, t);
+      // The buildings around us; in our own we see who's there (they're the people we know).
+      const around: SiteStructure[] = obs.channels.street?.kind === "sites" ? channels.structures({ ...obs, channels: { street: obs.channels.street } }) : [];
+      for (const st of around) for (const sp of st.spaces) for (const o of sp.occupants ?? []) if (o !== me) contacts.set(o, t);
       if (contacts.size > p.max_contacts) {
         const keep = [...contacts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, p.max_contacts);
         contacts.clear();
         for (const [k, v] of keep) contacts.set(k, v);
       }
-      const room = (lot: SiteParcel, slot: string) => {
-        const st = lot.structure;
-        if (!st?.complete) return false;
-        const taken = st.occupancy.filter((o) => o.slot === slot).reduce((a, o) => a + o.count, 0);
-        return taken < (capacity.get(st.type)?.[slot] ?? 0);
-      };
+      // Room we can see: a home standing empty, or a workplace with space in it.
+      const room = (st: SiteStructure, kind: string) =>
+        st.complete && st.spaces.some((sp) => sp.kind === kind && (kind === "dwelling" ? sp.count === 0 : sp.count < sp.capacity));
       for (const q of asked) {
         const lead = q.want === "home"
-          ? lots.find((l) => room(l, "dwelling"))?.structure?.structure
-          : job?.workplace && lots.some((l) => l.structure?.structure === job!.workplace && room(l, "workplace")) ? job.workplace : undefined;
-        if (lead && ctx.rng(`pass-on-${q.seat}-${t}`).below(10_000) < p.pass_on_bps)
-          steps.push([message([q.seat], q.want === "home" ? `There looks to be room at ${lead}, near me.` : `They have room at my work, ${lead}.`, lead)]);
+          ? around.find((st) => room(st, "dwelling"))?.structure
+          : job?.workplace && around.some((st) => st.structure === structureOf(job!.workplace!) && room(st, "workplace")) ? structureOf(job.workplace) : undefined;
+        if (lead && ctx.rng(`pass-on-${q.from}-${t}`).below(10_000) < p.pass_on_bps)
+          steps.push([message([q.from], q.want === "home" ? `There looks to be room at ${lead}, near me.` : `They have room at my work, ${lead}.`, lead)]);
       }
       asked = [];
       const known = [...contacts.keys()];
@@ -365,7 +363,7 @@ export const citizen: BehaviourModule = {
       job ? rent * 10_000 <= monthlyIncome() * p.rent_share_bps : rent * p.savings_rent_months <= balance;
 
     return {
-      step(obs): SeatAction {
+      step(obs): ParticipantAction {
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
         if (plannedAt !== obs.t) {

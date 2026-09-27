@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.3:common",
+  "$id": "urn:terrarium:contracts:0.4:common",
   "title": "Terrarium common types",
   "description": "Primitives shared by every Terrarium contract. Contract-wide rule: no floating-point numbers anywhere. Every number is an integer within the IEEE-754 safe range, so Rust, TypeScript and Python all read it exactly and canonical JSON is trivial.",
   "$defs": {
@@ -10,7 +10,11 @@
       "minimum": -9007199254740991,
       "maximum": 9007199254740991
     },
-    "Count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "Count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
     "Cents": {
       "description": "Money in integer cents. Only the boundary's account may be negative.",
       "$ref": "#/$defs/SafeInt"
@@ -39,12 +43,25 @@
       "pattern": "^[a-z][a-z0-9_-]{0,63}$"
     },
     "KernelId": {
-      "description": "Identifier minted by the kernel: '<prefix>.<counter>'. ent = entity, acc = account, str = structure, rec = record (claims, agreements, statements, signatures, votes, ...), act = action, msg = message.",
+      "description": "Identifier minted by the kernel: '<prefix>.<counter>'. ent = entity, acc = account, str = structure, rec = record, act = action, msg = message, par = participant, pos = position, cnd = condition (of a body).",
       "type": "string",
-      "pattern": "^(ent|acc|str|rec|act|msg)\\.[0-9]{1,15}$"
+      "pattern": "^(ent|acc|str|rec|act|msg|par|pos|cnd)\\.[0-9]{1,15}$"
     },
     "Id": {
-      "anyOf": [{ "$ref": "#/$defs/ConfigId" }, { "$ref": "#/$defs/KernelId" }]
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConfigId"
+        },
+        {
+          "$ref": "#/$defs/KernelId"
+        },
+        {
+          "$ref": "#/$defs/CellId"
+        },
+        {
+          "$ref": "#/$defs/SpaceId"
+        }
+      ]
     },
     "LocalRef": {
       "description": "A name bound earlier in the same action by a block's 'ref' field, e.g. '$trust'.",
@@ -52,7 +69,14 @@
       "pattern": "^\\$[a-z][a-z0-9_]{0,31}$"
     },
     "IdOrRef": {
-      "anyOf": [{ "$ref": "#/$defs/Id" }, { "$ref": "#/$defs/LocalRef" }]
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Id"
+        },
+        {
+          "$ref": "#/$defs/LocalRef"
+        }
+      ]
     },
     "RefName": {
       "description": "Declares a LocalRef; written without the '$'.",
@@ -60,7 +84,7 @@
       "pattern": "^[a-z][a-z0-9_]{0,31}$"
     },
     "Label": {
-      "description": "A vocabulary word defined by the world, not the kernel: an entity kind ('firm', 'bank'), a structure category ('residential'), an occupancy slot ('dwelling'), a statement kind ('law'), an agreement template ('lease'). The kernel treats labels as opaque, apart from the few reserved ones documented where they are used.",
+      "description": "A vocabulary word defined by the world, not the kernel: an entity kind ('firm', 'bank'), a structure category ('residential'), a kind of space ('dwelling'), a statement kind ('law'), an agreement template ('lease'). The kernel treats labels as opaque, apart from the few reserved ones documented where they are used.",
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,63}$"
     },
@@ -69,38 +93,103 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
-    "Name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "Name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
     "Text": {
       "description": "Free text (messages, statements, reasoning). Bounded to keep logs sane.",
       "type": "string",
       "maxLength": 16384
     },
     "Visibility": {
-      "description": "Who can perceive a record: 'public' (anyone whose channels include it), or only the listed entities' seats. The author's entity can always see its own records.",
+      "description": "Who can perceive a record: 'public' (anyone whose channels include it), or only the listed entities' participants (and positions' holders). The author's entity can always see its own records.",
       "anyOf": [
-        { "const": "public" },
-        { "type": "array", "items": { "$ref": "#/$defs/IdOrRef" }, "minItems": 1, "maxItems": 256, "uniqueItems": true }
+        {
+          "const": "public"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IdOrRef"
+          },
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true
+        }
       ]
     },
     "Opaque": {
       "description": "Free-form data the kernel stores and logs but never interprets (claim contents, commitment details, instruction payloads, controller params). Still integer-only: floats are forbidden even here, because they would break canonical hashing across languages. Encode fractions as strings or scaled integers (e.g. rate_bps: 1000).",
       "anyOf": [
-        { "type": "null" },
-        { "type": "boolean" },
-        { "$ref": "#/$defs/SafeInt" },
-        { "type": "string", "maxLength": 1048576 },
-        { "type": "array", "items": { "$ref": "#/$defs/Opaque" } },
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "$ref": "#/$defs/SafeInt"
+        },
+        {
+          "type": "string",
+          "maxLength": 1048576
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Opaque"
+          }
+        },
         {
           "type": "object",
-          "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$" },
-          "additionalProperties": { "$ref": "#/$defs/Opaque" }
+          "propertyNames": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/Opaque"
+          }
         }
       ]
     },
     "OpaqueObject": {
       "type": "object",
-      "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$" },
-      "additionalProperties": { "$ref": "#/$defs/Opaque" }
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_.-]{0,63}$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/Opaque"
+      }
+    },
+    "CellId": {
+      "description": "A cell of ground: 'cell.<x>.<y>'. Derived from coordinates, never chosen.",
+      "type": "string",
+      "pattern": "^cell\\.[0-9]{1,6}\\.[0-9]{1,6}$"
+    },
+    "SpaceId": {
+      "description": "A space inside a structure: '<structure>/<kind>.<n>', numbering each kind from 1 in the structure type's order (apts-3/dwelling.2).",
+      "type": "string",
+      "pattern": "^([a-z][a-z0-9_-]{0,63}|str\\.[0-9]{1,15})/[a-z][a-z0-9_-]{0,63}\\.[0-9]{1,6}$"
+    },
+    "ChannelPath": {
+      "description": "A channel as a participant names it: a personal channel's id, or '<position>/<channel>' for a channel of a position it holds.",
+      "type": "string",
+      "pattern": "^(([a-z][a-z0-9_-]{0,63}|pos\\.[0-9]{1,15})/)?[a-z][a-z0-9_-]{0,63}$"
+    },
+    "Capacity": {
+      "description": "What a participant acts or looks as: 'self' (a person's own), or a position it holds.",
+      "anyOf": [
+        {
+          "const": "self"
+        },
+        {
+          "$ref": "#/$defs/ConfigId"
+        },
+        {
+          "$ref": "#/$defs/KernelId"
+        }
+      ]
     }
   }
 }

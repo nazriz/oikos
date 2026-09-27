@@ -1,33 +1,37 @@
-//! The kernel (v0.2): the only writer of world state, and physics only.
+//! The kernel (v0.4): the only writer of world state, and physics only.
 //!
 //! It takes commands (the only inputs; see the Command definition in
 //! contracts/log.schema.json) and returns the events they caused. An act
 //! either takes effect, or is refused because it is physically impossible.
 //! There are no mandates, approvals or laws in here (D18-D20): authority and
-//! law are records, and they matter only through what seats choose to do.
+//! law are records, and they matter only through what participants choose to do.
 //!
 //! It never reads wall-clock time, never iterates a hash map, never touches a
 //! float, and draws randomness only from `Statics::randomness`.
 
 use crate::blocks::{Block, Id};
 use crate::canon;
-use crate::config::LoadedConfig;
+use crate::config::{cell_id, terrain_at, LoadedConfig, ParticipantKind, SELF};
 use crate::events::{EventBody, RefusalCode, Timed};
-use crate::exec::{exec_action, refuse, scheduled, Refusal};
+use crate::exec::{can_act, exec_action, refuse, schedule_birthday, scheduled, Refusal};
 use crate::observe::{self, Observation};
 use crate::rng::Randomness;
-use crate::state::{Account, Counters, Entity, Outcome, OutcomeStatus, Parcel, RefusalInfo, SeatState, SeatStatus, State, Structure};
+use crate::state::{Account, Body, Cell, Counters, Entity, Outcome, OutcomeStatus, Participant, ParticipantDef, ParticipantStatus, Position, RefusalInfo, State, Structure};
 use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Command {
     Act {
-        seat: Id,
+        participant: Id,
+        /// The position it acts in; absent: as itself (a person's only).
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
         blocks: Vec<Block>,
         /// Logged, never interpreted.
         provenance: Value,
@@ -38,22 +42,27 @@ pub enum Command {
         to: i64,
     },
     Observe {
-        seat: Id,
+        participant: Id,
+        /// Only this capacity ("self", or a position it holds); absent: all of them.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        only: Option<Id>,
     },
     /// An observation that also looks through the named channels now (attention): on-request
     /// channels are perceived only this way, and a look through a records channel can be a search.
     Look {
-        seat: Id,
+        participant: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        only: Option<Id>,
         looks: Vec<crate::config::LookRequest>,
     },
     OptOut {
-        seat: Id,
+        participant: Id,
         statement: String,
     },
 }
 
 /// A command the kernel will not accept at all. Unlike a refusal (a finding,
-/// logged and returned to the seat), a protocol error means the orchestrator
+/// logged and returned to the participant), a protocol error means the orchestrator
 /// sent something off-contract; it is never logged.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProtocolError(pub String);
@@ -107,45 +116,93 @@ impl Kernel {
             .ok_or("the boundary needs an account in its own custody")?;
         let s = Statics {
             types: c.catalogue.structure_types.iter().map(|t| (t.id.clone(), t.clone())).collect(),
-            seats: c.seats.iter().map(|x| (x.id.clone(), x.clone())).collect(),
+            spaces: c
+                .catalogue
+                .structure_types
+                .iter()
+                .map(|t| (t.id.clone(), crate::config::spaces_of(t).into_iter().map(|(l, sp)| (l, sp.clone())).collect()))
+                .collect(),
+            templates: c.templates.iter().map(|t| (t.id.clone(), t.clone())).collect(),
             boundary: w.boundary.clone(),
             boundary_account,
             tick: c.clock.tick_seconds,
             randomness: Randomness::new(c.seed),
             config: c.clone(),
         };
+        let person_of: BTreeMap<&str, &str> = c.participants.iter().filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
+        let mut cells = crate::state::Map::new();
+        for y in 0..w.ground.h {
+            for x in 0..w.ground.w {
+                cells.insert(cell_id(x, y), Cell { x, y, terrain: terrain_at(&w.ground, x, y).map(String::from), structure: None, changed: 0 });
+            }
+        }
         let mut st = State {
             t: 0,
             counters: Counters::default(),
-            entities: w.entities.iter().map(|e| (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0 })).collect(),
-            accounts: w
-                .accounts
+            entities: w
+                .entities
                 .iter()
-                .map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance, changed: 0 }))
+                .map(|e| {
+                    let body = (e.kind == crate::config::PERSON).then(|| Body {
+                        born_at: e.born_at.unwrap_or(0),
+                        present: e.present.unwrap_or(true),
+                        alive: true,
+                        parents: e.parents.clone().unwrap_or_default(),
+                        conditions: vec![],
+                        participant: person_of.get(e.id.as_str()).map(|p| p.to_string()),
+                    });
+                    (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0, body })
+                })
                 .collect(),
-            parcels: w
-                .parcels
-                .iter()
-                .map(|p| (p.id.clone(), Parcel { x: p.x, y: p.y, w: p.w.unwrap_or(1), h: p.h.unwrap_or(1), structure: None, changed: 0 }))
-                .collect(),
+            accounts: w.accounts.iter().map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance, changed: 0 })).collect(),
+            closed_accounts: crate::state::Map::new(),
+            cells,
             structures: crate::state::Map::new(),
             occupancy: crate::state::Map::new(),
             records: crate::state::Map::new(),
             record_order: imbl::Vector::new(),
-            closed_accounts: crate::state::Map::new(),
-            seats: c
-                .seats
+            participants: c
+                .participants
                 .iter()
-                .map(|x| {
+                .map(|p| {
                     (
-                        x.id.clone(),
-                        SeatState {
-                            status: SeatStatus::Active,
-                            new_outcomes: vec![],
-                            new_inbox: vec![],
-                            new_transactions: vec![],
+                        p.id.clone(),
+                        Participant {
+                            kind: p.kind,
+                            person: p.person.clone(),
+                            owner: p.owner.clone(),
+                            template: None,
+                            def: Arc::new(ParticipantDef {
+                                title: p.title.clone(),
+                                channels: p.channels.clone(),
+                                controller: p.controller.clone(),
+                                framing: p.framing.clone(),
+                                on_opt_out: p.on_opt_out.clone(),
+                            }),
+                            traits: p.traits.clone(),
+                            status: ParticipantStatus::Active,
                             status_changed: 0,
+                            pending: BTreeMap::new(),
+                            new_transactions: BTreeMap::new(),
                             looks: BTreeMap::new(),
+                        },
+                    )
+                })
+                .collect(),
+            positions: c
+                .positions
+                .iter()
+                .map(|p| {
+                    (
+                        p.id.clone(),
+                        Position {
+                            entity: p.entity.clone(),
+                            title: p.title.clone(),
+                            role: p.role.clone(),
+                            channels: Arc::new(p.channels.clone()),
+                            role_module: p.role_module.clone(),
+                            holder: p.holder.clone(),
+                            changed: 0,
                         },
                     )
                 })
@@ -153,29 +210,24 @@ impl Kernel {
             schedule: vec![],
         };
         for x in &w.structures {
-            st.structures.insert(
-                x.id.clone(),
-                Structure {
-                    parcel: x.parcel.clone(),
-                    structure_type: x.structure_type.clone(),
-                    built_by: x.built_by.clone(),
-                    complete: true,
-                    completes_at: None,
-                },
-            );
-            st.parcels.get_mut(&x.parcel).unwrap().structure = Some(x.id.clone());
+            let f = s.types[&x.structure_type].footprint;
+            let cells = crate::config::footprint_cells(&w.ground, &x.at, f).expect("validated");
+            for cell in &cells {
+                st.cells.get_mut(cell).unwrap().structure = Some(x.id.clone());
+            }
+            st.structures.insert(x.id.clone(), Structure { at: x.at.clone(), cells, structure_type: x.structure_type.clone(), built_by: x.built_by.clone(), complete: true, completes_at: None });
         }
         for o in &w.occupancy {
-            *st.occupancy
-                .entry(o.structure.clone())
-                .or_default()
-                .entry(o.occupant.clone())
-                .or_default()
-                .entry(o.slot.clone())
-                .or_default() += o.count;
+            let (sid, _) = crate::config::split_space(&o.space).expect("validated");
+            st.occupancy.entry(sid.to_string()).or_default().entry(o.space.clone()).or_default().insert(o.occupant.clone());
         }
         for r in &w.records {
             st.store(r.clone());
+        }
+        // Bodies age from the start.
+        let people: Vec<(Id, i64)> = st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (id.clone(), b.born_at))).collect();
+        for (id, born) in people {
+            schedule_birthday(&s, &mut st, &id, born);
         }
         let k = Kernel { s, state: st, index: Default::default() };
         k.state_hash().map_err(|e| format!("initial state is not canonical: {e}"))?;
@@ -203,23 +255,48 @@ impl Kernel {
         Ok(canon::hash_with_domain(canon::DOMAIN_STATE, &self.canonical_state()?))
     }
 
+    fn check_only(&self, participant: &str, only: &Option<Id>) -> Result<(), ProtocolError> {
+        if let Some(o) = only {
+            let p = &self.state.participants[participant];
+            let ok = if o == SELF { p.kind == ParticipantKind::Person } else { self.state.positions.contains_key(o) };
+            if !ok {
+                return perr(format!("{participant} has no capacity {o}"));
+            }
+        }
+        Ok(())
+    }
+
     /// Validate a command without applying it. A command that fails here is
     /// rejected before it reaches the log.
     pub fn precheck(&self, cmd: &Command) -> Result<(), ProtocolError> {
         let body = serde_json::to_value(cmd).map_err(|e| ProtocolError(e.to_string()))?;
         canon::check_integers(&body).map_err(|e| ProtocolError(e.to_string()))?;
         crate::contracts::check(&crate::contracts::contracts().command, &body).map_err(|e| ProtocolError(format!("command {e}")))?;
-        let seat_exists = |seat: &str| if self.s.seats.contains_key(seat) { Ok(()) } else { perr(format!("unknown seat {seat}")) };
+        let exists = |p: &str| if self.state.participants.contains_key(p) { Ok(()) } else { perr(format!("unknown participant {p}")) };
         match cmd {
-            Command::Act { seat, .. } | Command::Observe { seat } => seat_exists(seat)?,
-            Command::Look { seat, looks } => {
-                seat_exists(seat)?;
-                let cfg = &self.s.seats[seat];
+            Command::Act { participant, position, .. } => {
+                exists(participant)?;
+                if position.is_none() && self.state.participants[participant].kind == ParticipantKind::System {
+                    return perr(format!("{participant} is a system: it acts only in a position"));
+                }
+            }
+            Command::Observe { participant, only } => {
+                exists(participant)?;
+                self.check_only(participant, only)?;
+            }
+            Command::Look { participant, only, looks } => {
+                exists(participant)?;
+                self.check_only(participant, only)?;
                 if looks.is_empty() || looks.len() > 16 {
                     return perr("a look names 1..=16 channels");
                 }
                 for l in looks {
-                    let Some(ch) = cfg.channels.iter().find(|c| c.id == l.channel) else { return perr(format!("seat {seat} has no channel {}", l.channel)) };
+                    // A channel of a position it no longer holds is simply not there to look through.
+                    let ch = match l.channel.split_once('/') {
+                        None => self.state.participants[participant].def.channels.iter().find(|c| c.id == l.channel),
+                        Some((pos, id)) => self.state.positions.get(pos).and_then(|x| x.channels.iter().find(|c| c.id == id)),
+                    };
+                    let Some(ch) = ch else { return perr(format!("{participant} has no channel {}", l.channel)) };
                     if let Some(q) = &l.query {
                         if !matches!(ch.kind, crate::config::ChannelKind::Records { .. }) {
                             return perr(format!("channel {} isn't a records channel, so it can't be searched", l.channel));
@@ -246,10 +323,10 @@ impl Kernel {
                     return perr(format!("{to} is beyond the end of the run ({})", self.s.run_end()));
                 }
             }
-            Command::OptOut { seat, .. } => {
-                seat_exists(seat)?;
-                if self.state.seats[seat].status == SeatStatus::OptedOut {
-                    return perr(format!("seat {seat} has already opted out"));
+            Command::OptOut { participant, .. } => {
+                exists(participant)?;
+                if self.state.participants[participant].status != ParticipantStatus::Active {
+                    return perr(format!("{participant} has already left or ended"));
                 }
             }
         }
@@ -259,72 +336,78 @@ impl Kernel {
     pub fn apply(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         self.precheck(cmd)?;
         Ok(match cmd {
-            Command::Act { seat, blocks, .. } => self.act(seat, blocks),
+            Command::Act { participant, position, blocks, .. } => self.act(participant, position.as_deref(), blocks),
             Command::Advance { to } => self.advance(*to),
-            Command::Observe { seat } => self.observe(seat, &[]),
-            Command::Look { seat, looks } => self.observe(seat, looks),
-            Command::OptOut { seat, statement } => {
+            Command::Observe { participant, only } => self.observe(participant, only.as_deref(), &[]),
+            Command::Look { participant, only, looks } => self.observe(participant, only.as_deref(), looks),
+            Command::OptOut { participant, statement } => {
+                let t = self.state.t;
                 let c = self.state.stamp();
-                let ss = self.state.seats.get_mut(seat).unwrap();
-                ss.status = SeatStatus::OptedOut;
-                ss.status_changed = c;
-                Output {
-                    events: vec![Timed::new(self.state.t, EventBody::SeatOptedOut { seat: seat.clone(), statement: statement.clone() })],
-                    observation: None,
+                let p = self.state.participants.get_mut(participant).unwrap();
+                p.status = ParticipantStatus::OptedOut;
+                p.status_changed = c;
+                let vacant = p.def.vacant_after_opt_out();
+                let mut events = vec![Timed::new(t, EventBody::ParticipantOptedOut { participant: participant.clone(), statement: statement.clone() })];
+                // Without a stand-in, nobody is there to act in its positions any more.
+                if vacant {
+                    let held: Vec<Id> = self.state.positions.iter().filter(|(_, x)| x.holder.as_deref() == Some(participant.as_str())).map(|(id, _)| id.clone()).collect();
+                    for id in held {
+                        let c = self.state.stamp();
+                        let x = self.state.positions.get_mut(&id).unwrap();
+                        x.holder = None;
+                        x.changed = c;
+                        events.push(Timed::new(t, EventBody::Appointed { position: id, holder: None, by: None }));
+                    }
                 }
+                Output { events, observation: None }
             }
         })
     }
 
     /// Dry run: would physics allow this action right now?
-    pub fn check(&self, seat: &str, blocks: &[Block]) -> Result<Check, ProtocolError> {
-        if !self.s.seats.contains_key(seat) {
-            return perr(format!("unknown seat {seat}"));
+    pub fn check(&self, participant: &str, position: Option<&str>, blocks: &[Block]) -> Result<Check, ProtocolError> {
+        if !self.state.participants.contains_key(participant) {
+            return perr(format!("unknown participant {participant}"));
         }
         if blocks.is_empty() || blocks.len() > 32 {
             return perr("an action has 1..=32 blocks");
         }
         let mut scratch = self.state.clone();
-        scratch.mint("act");
-        Ok(match exec_action(&self.s, &mut scratch, seat, blocks) {
+        let action = scratch.mint("act");
+        Ok(match exec_action(&self.s, &mut scratch, participant, position, &action, blocks) {
             Ok(_) => Check { ok: true, refusal: None },
             Err(r) => Check { ok: false, refusal: Some(refusal_info(&r)) },
         })
     }
 
-    fn act(&mut self, seat: &str, blocks: &[Block]) -> Output {
+    fn act(&mut self, participant: &str, position: Option<&str>, blocks: &[Block]) -> Output {
         let action = self.state.mint("act");
         let t = self.state.t;
-        let result = if self.state.seats[seat].status == SeatStatus::OptedOut && self.s.seats[seat].vacant_after_opt_out() {
-            Err(refuse(RefusalCode::SeatOptedOut, format!("seat {seat} has opted out")))
+        let result = if !can_act(&self.state.participants[participant]) {
+            Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")))
         } else {
             let mut scratch = self.state.clone();
-            exec_action(&self.s, &mut scratch, seat, blocks).map(|res| (scratch, res))
+            exec_action(&self.s, &mut scratch, participant, position, &action, blocks).map(|res| (scratch, res))
         };
+        let pos = position.map(String::from);
         let (events, outcome) = match result {
             Ok((scratch, res)) => {
                 self.state = scratch;
                 let created = (!res.created.is_empty()).then_some(res.created);
-                let mut events =
-                    vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), seat: seat.into(), created: created.clone() })];
+                let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), created: created.clone() })];
                 events.extend(res.events);
                 (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None })
             }
             Err(r) => (
                 vec![Timed::new(
                     t,
-                    EventBody::ActionRefused {
-                        action: action.clone(),
-                        seat: seat.into(),
-                        block: r.block,
-                        code: r.code,
-                        detail: r.detail.clone(),
-                    },
+                    EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: r.block, code: r.code, detail: r.detail.clone() },
                 )],
                 Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)) },
             ),
         };
-        self.state.seats.get_mut(seat).unwrap().new_outcomes.push(outcome);
+        let key = pos.unwrap_or_else(|| SELF.into());
+        self.state.participants.get_mut(participant).unwrap().pending.entry(key).or_default().outcomes.push(outcome);
         Output { events, observation: None }
     }
 
@@ -333,23 +416,20 @@ impl Kernel {
         while self.state.schedule.first().is_some_and(|x| x.at <= to) {
             let item = self.state.schedule.remove(0);
             self.state.t = item.at;
-            events.extend(scheduled(&mut self.state, item));
+            events.extend(scheduled(&self.s, &mut self.state, item));
         }
         self.state.t = to;
         Output { events, observation: None }
     }
 
-    /// The full picture a seat's channels cover right now; changes nothing.
-    pub fn full_view(&mut self, seat: &str) -> Option<observe::Observation> {
-        self.s.seats.contains_key(seat).then(|| observe::full_view(&self.s, &self.state, &mut self.index, seat))
+    /// The full picture a participant's channels cover right now; changes nothing.
+    pub fn full_view(&mut self, participant: &str) -> Option<observe::Observation> {
+        self.state.participants.contains_key(participant).then(|| observe::full_view(&self.s, &self.state, &mut self.index, participant))
     }
 
-    fn observe(&mut self, seat: &str, looks: &[crate::config::LookRequest]) -> Output {
-        let obs = observe::observe(&self.s, &mut self.state, &mut self.index, seat, looks);
+    fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[crate::config::LookRequest]) -> Output {
+        let obs = observe::observe(&self.s, &mut self.state, &mut self.index, participant, only, looks);
         let hash = canon::hash_value(canon::DOMAIN_OBSERVATION, &obs).expect("observations are canonical");
-        Output {
-            events: vec![Timed::new(self.state.t, EventBody::Observation { seat: seat.into(), observation_hash: hash })],
-            observation: Some(obs),
-        }
+        Output { events: vec![Timed::new(self.state.t, EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs) }
     }
 }

@@ -1,6 +1,6 @@
 {
   "block": "construct",
-  "parcel": "p12",
+  "at": "cell.2.1",
   "structure_type": "apartments",
   "materials_from": "acc-devco",
   "ref": "flats"

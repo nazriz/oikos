@@ -38,11 +38,9 @@ fn sample_log() -> (Vec<u8>, Vec<u8>) {
     let mut config = riverbend();
     config["log"]["anchor_every_entries"] = json!(5);
     let mut run = Run::start(config, "chain", Vec::new(), Some(Box::new(anchors.clone()))).unwrap();
-    let act = |seat: &str, blocks: Value| terrarium_kernel::Command::Act {
-        seat: seat.into(),
-        blocks: serde_json::from_value(blocks).unwrap(),
-        provenance: json!({"via": "direct"}),
-        reasoning: Some("because".into()),
+    let act = |seat: &str, blocks: Value| {
+        let (participant, position) = rb(seat);
+        terrarium_kernel::Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: Some("because".into()) }
     };
     run.command(&act(
         "bank-payments",
@@ -54,7 +52,7 @@ fn sample_log() -> (Vec<u8>, Vec<u8>) {
     run.annotate(json!({"annotation": "note", "subject": "test", "data": {"x": [1, "y", null]}})).unwrap();
     for m in 1..=4 {
         run.command(&terrarium_kernel::Command::Advance { to: m * MONTH }).unwrap();
-        run.command(&terrarium_kernel::Command::Observe { seat: "mayor".into() }).unwrap();
+        run.command(&terrarium_kernel::Command::Observe { participant: "mayor-system".into(), only: None }).unwrap();
     }
     run.finish("completed", None).unwrap();
     let log = run.into_log();

@@ -1,4 +1,4 @@
-// Language-model seats: adapters, prompt rendering, the seat controller, and the mock.
+// Language-model participants: adapters, prompt rendering, the participant controller, and the mock.
 export * from "./adapter";
 export * from "./call";
 export * from "./render";

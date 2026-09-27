@@ -32,14 +32,18 @@ Each run's log is exported to Parquet, one file per table per run (`measure/<tab
 | Table | One row per | Columns |
 |---|---|---|
 | `runs` | run | `run_id`, `seed`, `world`, `contracts`, `config_hash`, `kernel_version`, `kernel_build`, `run_seconds`, `end_reason`, `end_t`, `state_hash`, `entries`, `orchestrator_version` |
-| `seats` | seat | `seat`, `entity`, `entity_kind`, `title`, `role`, `controller` (code or llm), `impl`, `model`, `adapter` (what actually answered), `configured` (the model the world names) |
+| `participants` | participant: the world config's (`created_t` = 0) and those created during the run from a template | `participant`, `kind` (person or system), `person`, `owner`, `title`, `template`, `created_t`, `created_seq`, `controller` (code or llm), `impl`, `model`, `adapter` (what actually answered), `configured` (the model the world names) |
+| `entities` | entity: the world config's (`created_t` = 0) and those created or born during the run | `entity`, `kind`, `name`, `born_at` (people), `parents` (the newborn), `created_t` |
+| `positions` | position: the world config's (`created_t` = 0) and those created during the run | `position`, `entity` (the organisation), `title`, `role`, `role_module` (the code module a code holder runs), `created_t` |
+| `appointments` | the world config's holders (`t` = 0, `by` = genesis), then every appointment | `position`, `holder` (null: left vacant), `by` (the participant who appointed, or null when it fell vacant because its holder ended) |
+| `life` | a body's coming, going and health | `event` (person_created, person_arrived, person_left, person_died, birth_started, condition_began, condition_ended, harmed), `person`, `by`, `detail` (the cause of death, or illness or injury), `severity`, `condition`, `until`, `parents` |
 | `events` | kernel event | `seq`, `t`, `event`, `cause` (the command's seq), `body` (JSON) |
 | `transfers` | money movement | `from`, `to`, `amount` (cents), `reason`, `by`, `settles`, `per_instruction`, `memo` |
-| `occupancy` | arrival or departure, including the world's starting occupancy (`t` = 0, `by` = genesis). A departure's `slot` and `count` are those its occupant arrived into | `event` (occupied or vacated), `occupant`, `structure`, `slot`, `count`, `reason`, `by` |
-| `records` | record, including the world's genesis records (`t` = 0) | `id`, `record`, `kind` (a statement's kind), `author`, `speaks_for`, `at`, `basis`, `place`, `template` (an agreement's), `withdraws`, `body` |
-| `commands` | command (not observations) | `command`, `seat`, `body` |
-| `acts` | act | `seat`, `via` (direct, call or translator), `blocks`, `reasoning`, `applied`, `action`, `refusal`, `refused_block`, `detail`, `blocks_json` |
-| `messages` | message sent | `seat`, `to` (list), `text`, `re` |
+| `occupancy` | a body going into or out of a space, including the world's starting occupancy (`t` = 0, `by` = genesis) | `event` (occupied or vacated), `occupant` (a person), `space`, `structure` and `space_kind` (split out of the space id, `<structure>/<kind>.<n>`), `reason` (a departure's: departed, died, evicted…), `by` |
+| `records` | record, including the world's genesis records (`t` = 0) | `id`, `record`, `kind` (a statement's kind), `author` (a participant), `in_position` (the position it was made in, if any), `speaks_for`, `at`, `basis`, `place`, `template` (an agreement's), `withdraws`, `body` |
+| `commands` | command (not observations) | `command`, `participant`, `as` (the position, if any), `body` |
+| `acts` | act | `participant`, `as`, `via` (direct, call or translator), `blocks`, `reasoning`, `applied`, `action`, `refusal`, `refused_block`, `detail`, `blocks_json` |
+| `messages` | message sent | `participant`, `as`, `to` (list), `text`, `re` |
 | `annotations` | annotation other than usage and transcripts | `annotation`, `subject`, `body` |
 | `usage` | model call | `purpose`, `subject`, `provider`, `model`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_microusd` |
 | `transcripts` | model call | `subject`, `purpose`, `data` (what was sent and what came back) |
@@ -55,7 +59,7 @@ terrarium measure runs/llm-mayor --sql "select run_id, count(*) from acts where 
 ```
 
 The standing queries live in `measure/queries/`, one SQL file each, with a one-line description on the first line. Add a file and it's listed.
-- **Generic:** `overview`, `activity`, `refusals`, `usage`, `language-seats`.
+- **Generic:** `overview`, `activity`, `refusals`, `usage`, `language-participants`, `cast` (people at the start, births, arrivals, departures, deaths by cause, illness, injury, harm, participants created, appointments).
 - **About the generated town:** `town/economy`, `town/word-of-mouth`. These know the town's vocabulary (leases, `acc-city`, the citizens' own phrasing), which is fine: measurement is outside the world.
 
 From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@terrarium/measure`.
@@ -65,12 +69,12 @@ From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@terr
 Every model call leaves a usage annotation in the log: tokens, and the cost at the price of the model that actually answered. The report (`terrarium cost <dir>`, also written with every batch) shows two figures and never mixes them:
 
 - **Recorded:** what was actually spent. On the mock adapter that's $0.00.
-- **Projected:** what the same calls would have cost if each had gone to its seat's configured model, at published prices (`orchestrator/prices.json`, with its source and the date it was retrieved). The translator's model isn't set by the world, so it's priced as the seats' model, or as `--translator-model`.
+- **Projected:** what the same calls would have cost if each had gone to its participant's configured model, at published prices (`orchestrator/prices.json`, with its source and the date it was retrieved). The translator's model isn't set by the world, so it's priced as the participants' model, or as `--translator-model`.
 
-While seats run on the mock, the projection is an order of magnitude, not a budget. The report says why:
+While participants run on the mock, the projection is an order of magnitude, not a budget. The report says why:
 - the token counts are estimates (about 4 characters a token);
 - a real model's replies are longer (it also writes its reasoning);
-- how often a seat acts comes from the mock's code brain;
+- how often a participant acts comes from the mock's code brain;
 - no prompt caching is assumed.
 
 ## First batches (2026-09-27; generator 0.8.0, citizen 0.6.0)

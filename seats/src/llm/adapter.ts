@@ -25,11 +25,11 @@ export interface ToolSpec {
   input_schema: object;
 }
 
-export type Purpose = "seat" | "translator" | "debrief";
+export type Purpose = "participant" | "translator" | "debrief";
 
 export interface LlmRequest {
   purpose: Purpose;
-  /** The seat or translator this call is for (usage annotations name it). */
+  /** The participant or translator this call is for (usage annotations name it). */
   subject: string;
   system: string;
   messages: LlmMessage[];

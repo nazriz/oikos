@@ -1,8 +1,8 @@
-// What a seat knows: everything it has observed, indexed for the resolver.
+// What a participant knows: everything it has observed, indexed for the resolver.
 // The resolver fills gaps and turns names into ids only from this (P8): it
-// never looks at the world beyond what the seat has seen.
+// never looks at the world beyond what the participant has seen.
 
-import type { Observation, Record, StatementRecord } from "@terrarium/seats";
+import type { Observation, Record, SiteSpace, StatementRecord } from "@terrarium/seats";
 
 export interface AccountFact {
   account: string;
@@ -10,16 +10,32 @@ export interface AccountFact {
   custodian: string;
 }
 
+/** A building the participant has seen: its type, corner cell and the spaces inside. */
+export interface StructureFact {
+  type: string;
+  at: string;
+  spaces: SiteSpace[];
+}
+
 export class Knowledge {
   readonly withdrawn = new Set<string>();
-  readonly accounts = new Map<string, AccountFact>(); // accounts the seat can see directly
+  readonly accounts = new Map<string, AccountFact>(); // accounts the participant can see directly
   /** entity -> accounts it has asked to be paid into (the shared outcome language: a money outcome with no `from`, in a statement it speaks for). */
   readonly stated = new Map<string, Set<string>>();
   readonly names = new Map<string, string>(); // entity -> name
-  readonly seatEntity = new Map<string, string>();
-  readonly structures = new Map<string, string>(); // structure -> type
+  /** participant -> the person it acts as. */
+  readonly participantPerson = new Map<string, string>();
+  /** position -> the organisation it acts for. */
+  readonly positions = new Map<string, string>();
+  /** Positions the participant has held (the observation lists those it holds now). */
+  readonly held = new Set<string>();
+  readonly structures = new Map<string, StructureFact>();
+  /** Cells seen, with their terrain and whether a building stands on them. */
+  readonly cells = new Map<string, { x: number; y: number; terrain?: string; built: boolean }>();
+  /** Lots in a registry the participant has seen (statements of kind "lot"): lot -> its cells. */
+  readonly lots = new Map<string, string[]>();
   private readonly formsById = new Map<string, StatementRecord>();
-  /** Laws and claims the seat has seen: what law warnings are judged against (§10). */
+  /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
   readonly laws = new Map<string, StatementRecord>();
   readonly claims: Record[] = [];
   private readonly claimIds = new Set<string>();
@@ -29,6 +45,10 @@ export class Knowledge {
   absorb(obs: Observation): void {
     this.entity = obs.entity;
     this.t = obs.t;
+    for (const p of obs.positions ?? []) {
+      this.positions.set(p.position, p.entity);
+      this.held.add(p.position);
+    }
     for (const ch of Object.values(obs.channels)) {
       if (ch.kind === "accounts") {
         for (const a of ch.accounts) {
@@ -36,10 +56,16 @@ export class Knowledge {
           else this.accounts.set(a.account, { account: a.account, holder: a.holder, custodian: a.custodian });
         }
       } else if (ch.kind === "sites") {
-        for (const p of ch.parcels) if (p.structure) this.structures.set(p.structure.structure, p.structure.type);
+        for (const c of ch.cells) {
+          this.cells.set(c.cell, { x: c.x, y: c.y, ...(c.terrain ? { terrain: c.terrain } : {}), built: !!c.structure });
+          if (c.structure) this.structures.set(c.structure.structure, { type: c.structure.type, at: c.structure.at, spaces: c.structure.spaces });
+        }
       } else if (ch.kind === "directory") {
-        for (const e of ch.entities) this.names.set(e.entity, e.name);
-        for (const s of ch.seats) this.seatEntity.set(s.seat, s.entity);
+        for (const e of ch.entities) {
+          this.names.set(e.entity, e.name);
+          if (e.participant) this.participantPerson.set(e.participant, e.entity);
+        }
+        for (const p of ch.positions) this.positions.set(p.position, p.entity);
       } else if (ch.kind === "records") {
         for (const r of ch.records) this.add(r);
       }
@@ -47,7 +73,10 @@ export class Knowledge {
   }
 
   private add(r: Record): void {
-    if (r.record === "withdrawal") this.withdrawn.add(r.withdraws);
+    if (r.record === "withdrawal") {
+      this.withdrawn.add(r.withdraws);
+      this.lots.delete(r.withdraws);
+    }
     if ((r.record === "claim" || r.record === "claim_release" || r.record === "withdrawal") && !this.claimIds.has(r.id)) {
       this.claimIds.add(r.id);
       this.claims.push(r);
@@ -56,6 +85,7 @@ export class Knowledge {
     if (r.record === "statement") {
       if (r.kind === "form") this.formsById.set(r.id, r);
       if (r.kind === "law" && r.formal?.condition) this.laws.set(r.id, r);
+      if (r.kind === "lot" && Array.isArray(r.data?.cells)) this.lots.set(r.id, r.data.cells as string[]);
       // Someone asking to be paid names where the money should go: that's where they receive money.
       const who = r.speaks_for;
       const m = r.data?.outcome?.money;
@@ -63,12 +93,22 @@ export class Knowledge {
     }
   }
 
-  /** The entity a seat id or entity id refers to. */
+  /** The entity an id refers to: a participant's person, a position's organisation, or the entity itself. */
   entityOf(id: string): string {
-    return this.seatEntity.get(id) ?? id;
+    return this.participantPerson.get(id) ?? this.positions.get(id) ?? id;
   }
 
-  /** Accounts the seat knows to be held by an entity. */
+  /** The entity acting in a capacity: a position's organisation, or (as itself) the participant's own. */
+  actingFor(as?: string): string {
+    return (as && this.positions.get(as)) || this.entity;
+  }
+
+  /** The building a space is in, and whether the id names a space at all (`apts-3/dwelling.2`). */
+  static structureOf(space: string): string {
+    return space.split("/")[0]!;
+  }
+
+  /** Accounts the participant knows to be held by an entity. */
   accountsOf(entity: string): string[] {
     const own = [...this.accounts.values()].filter((a) => a.holder === entity).map((a) => a.account);
     return [...new Set([...own, ...(this.stated.get(entity) ?? [])])].sort();
@@ -78,7 +118,7 @@ export class Knowledge {
     return this.accounts.has(id) || [...this.stated.values()].some((s) => s.has(id));
   }
 
-  /** An entity id for a name the seat wrote, if exactly one matches. */
+  /** An entity id for a name the participant wrote, if exactly one matches. */
   byName(name: string): string[] {
     const n = name.trim().toLowerCase();
     return [...this.names].filter(([, v]) => v.toLowerCase() === n).map(([k]) => k).sort();
@@ -90,16 +130,16 @@ export class Knowledge {
     return n && n !== e ? `${n} (${e})` : e;
   }
 
-  /** Forms the seat has seen and that still stand. */
+  /** Forms the participant has seen and that still stand. */
   get forms(): StatementRecord[] {
     return [...this.formsById.values()].filter((f) => !this.withdrawn.has(f.id));
   }
 
-  /** The standing forms published by an institution a seat or entity id names. */
+  /** The standing forms published by an institution a participant, position or entity id names. */
   form(to: string, name: string): StatementRecord | undefined {
     const ent = this.entityOf(to);
     return [...this.formsById.values()]
-      .filter((f) => !this.withdrawn.has(f.id) && f.data?.form === name && (f.author === to || f.speaks_for === ent || (f.data?.submit_to ?? []).includes(ent)))
+      .filter((f) => !this.withdrawn.has(f.id) && f.data?.form === name && (f.author === to || f.in_position === to || f.speaks_for === ent || (f.data?.submit_to ?? []).includes(ent)))
       .sort((a, b) => b.at - a.at)[0];
   }
 }

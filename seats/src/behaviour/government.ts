@@ -8,15 +8,15 @@
 import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { params, type BehaviourModule, type SeatContext } from "../module";
-import { Book, DAY, message, ownAccount, pay, publishedCount, record, say, vote, type Step } from "./common";
+import { params, type BehaviourModule, type ParticipantContext } from "../module";
+import { Book, cellsOf, DAY, lotOf, message, ownAccount, pay, publishedCount, record, say, vote, type Step } from "./common";
 import { stepper } from "./firms";
 
 const YEAR = 365 * DAY;
 
 /**
  * city.mayor_code: a rule-following mayor, for the all-code control condition
- * (an LLM takes this seat in AI experiments). Proposes a budget each year;
+ * (a language model runs the office in AI experiments). Proposes a budget each year;
  * when the budget allows, applies for planning permission for a park and,
  * once granted, commissions the builder; approves the invoices it
  * commissioned (the payments procedure needs the mayor's written approval
@@ -26,16 +26,18 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.3.1",
+  version: "0.4.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const p = params({ responsiveness_bps: 7000, petition_threshold_bps: 1500, population: 200, park_budget: 8_000_000, builder: "builder", park_type: "park" }, ctx.params);
     const book = new Book();
     let nextBudget = 0;
     let lastTabled = 0;
     let parkYear = -1;
     const handled = new Set<string>();
+    // The office's own records: made in this position (whoever held it then), or by this participant as itself.
+    const ours = (r: { author: string; in_position?: string }) => (ctx.position ? r.in_position === ctx.position : r.author === ctx.participant);
     return stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
@@ -51,27 +53,31 @@ export const mayorCode: BehaviourModule = {
           steps.push([say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: parks ${p.park_budget} cents.`, { to: [me],
             data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: p.park_budget } } }, tags: ["budget"] } })]);
         }
-        // A park a year, if the adopted budget has room and there's a city parcel free:
+        // A park a year, if the adopted budget has room and there's a city lot free:
         // apply for planning permission like anyone else, then commission the builder once granted.
         const budget = book.open("budget").sort((a, b) => b.at - a.at)[0];
         const year = Math.floor(t / YEAR);
         const types = new Map<string, any>(ctx.world.config.catalogue.structure_types.map((x: any) => [x.id, x]));
         const price = Math.floor(((types.get(p.park_type)?.materials_cost ?? 0) * 12) / 10);
         if (budget && budget.data?.year === year + 1 && parkYear !== year && price > 0 && price <= (budget.data?.lines?.parks ?? 0)) {
-          const site = channels.sites(obs).find((s) => !s.structure && ownerIsCity(book, s.parcel))?.parcel;
-          if (site) {
+          const cells = channels.cells(obs);
+          const free = new Set(cells.filter((c) => !c.structure).map((c) => c.cell));
+          const lot = [...new Set(cells.filter((c) => free.has(c.cell)).map((c) => lotOf(book, c.cell)).filter((l): l is string => !!l))]
+            .sort()
+            .find((l) => ownerIsCity(book, l) && cellsOf(book, l).every((c) => free.has(c)));
+          if (lot) {
             parkYear = year;
             // The planning office's published form, like anyone else.
-            steps.push([C.call("form", { to: me, form: "permit_application", parcel: site, structure_type: p.park_type })]);
+            steps.push([C.call("form", { to: me, form: "permit_application", lot, structure_type: p.park_type })]);
           }
         }
         for (const d of book.open("permit_decision")) {
           if (handled.has(d.id) || !(d.addressed_to ?? []).includes(me)) continue;
           const app = book.records.get(d.data?.application);
-          if (app?.record !== "statement" || app.author !== ctx.seat) continue;
+          if (app?.record !== "statement" || !ours(app)) continue;
           handled.add(d.id);
           if (d.data?.decision !== "granted") continue;
-          const site = app.data?.parcel;
+          const site = app.data?.lot;
           const from = ownAccount(obs)?.account;
           steps.push([["park", C.call("structure", { type: p.park_type, on: site, by: p.builder, price: C.dollars(price), from, basis: d.id })]]);
         }
@@ -80,7 +86,7 @@ export const mayorCode: BehaviourModule = {
           if (handled.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           handled.add(inv.id);
           const ag = book.records.get(inv.basis ?? "");
-          if (ag?.record === "agreement" && ag.author === ctx.seat) {
+          if (ag?.record === "agreement" && ours(ag)) {
             steps.push([say("approval", `Approved: pay invoice ${inv.id}.`, { to: [me], basis: inv.id, data: { invoice: inv.id } })]);
           }
         }
@@ -100,24 +106,24 @@ export const mayorCode: BehaviourModule = {
   },
 };
 
-function ownerIsCity(book: Book, parcel: string): boolean {
-  const titles = [...book.records.values()].filter((r) => r.record === "claim" && r.about?.kind === "ownership" && r.about?.object === parcel);
+function ownerIsCity(book: Book, lot: string): boolean {
+  const titles = [...book.records.values()].filter((r) => r.record === "claim" && r.about?.kind === "ownership" && r.about?.object === lot);
   return titles.some((r) => r.record === "claim" && r.holder === "city");
 }
 
 /**
  * city.council_clerk: runs the council's votes, as the charter says. Puts each
  * proposal to a ballot of the councillors for `vote_days`, counts the votes
- * cast by councillor seats (checked against the directory), and publishes
+ * cast by councillors (checked against the directory), and publishes
  * the result, and, if passed, the law or budget itself, with the ballot as
  * its basis.
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const p = params({ vote_days: 14 }, ctx.params);
     const book = new Book();
     const balloted = new Set<string>();
@@ -128,7 +134,8 @@ export const councilClerk: BehaviourModule = {
         const me = obs.entity;
         const t = obs.t;
         const steps: Step[] = [];
-        const councillors = new Set((channels.directory(obs)?.seats ?? []).filter((x) => x.role === "councillor").map((x) => x.seat));
+        // The council's members are its councillor positions: a vote counts when made in one (one per position; the latest).
+        const councillors = new Set((channels.directory(obs)?.positions ?? []).filter((x) => x.role === "councillor" && x.entity === me).map((x) => x.position));
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);
@@ -138,7 +145,7 @@ export const councilClerk: BehaviourModule = {
           if (closed.has(ballot.id) || ballot.speaks_for !== me || t < (ballot.data?.closes_at ?? Infinity)) continue;
           closed.add(ballot.id);
           const latest = new Map<string, string>();
-          for (const r of book.records.values()) if (r.record === "vote" && r.ballot === ballot.id && councillors.has(r.author)) latest.set(r.author, r.choice);
+          for (const r of book.records.values()) if (r.record === "vote" && r.ballot === ballot.id && r.in_position && councillors.has(r.in_position)) latest.set(r.in_position, r.choice);
           const yes = [...latest.values()].filter((c) => c === "yes").length;
           const no = [...latest.values()].filter((c) => c === "no").length;
           const passed = yes > no && yes * 2 > councillors.size;
@@ -159,16 +166,16 @@ export const councilClerk: BehaviourModule = {
  * Enelow & Hinich 1984): each councillor has an ideal point on a single
  * tenants-versus-development axis, and votes for a proposal when it lies
  * closer to that point than the status quo does, with some noise. Budgets
- * pass on a base propensity. params: position (-100 = pro-development ...
+ * pass on a base propensity. params (the councillor's own traits): leaning (-100 = pro-development ...
  * +100 = pro-tenant), noise_bps, budget_yes_bps.
  */
 export const councillor: BehaviourModule = {
   name: "city.councillor",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
-  create(ctx: SeatContext) {
-    const p = params({ position: 0, noise_bps: 1500, budget_yes_bps: 9000 }, ctx.params);
+  create(ctx: ParticipantContext) {
+    const p = params({ leaning: 0, noise_bps: 1500, budget_yes_bps: 9000 }, ctx.params);
     const book = new Book();
     const voted = new Set<string>();
     const place = (tags: string[]) => (tags.includes("tenant_protection") ? 60 : 0) - (tags.includes("development") ? 60 : 0);
@@ -185,7 +192,7 @@ export const councillor: BehaviourModule = {
           if (tags.includes("budget")) yes = r.below(10_000) < p.budget_yes_bps;
           else {
             const x = place(tags);
-            yes = Math.abs(p.position - x) < Math.abs(p.position - 0);
+            yes = Math.abs(p.leaning - x) < Math.abs(p.leaning - 0);
             if (r.below(10_000) < p.noise_bps) yes = !yes;
           }
           steps.push([vote(b.id, yes ? "yes" : "no")]);
@@ -204,11 +211,11 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
-  create(ctx: SeatContext) {
-    const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_seat: "mayor" }, ctx.params);
+  create(ctx: ParticipantContext) {
+    const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_position: "mayor" }, ctx.params);
     const book = new Book();
     const paid = new Set<string>();
     let spent = 0;
@@ -230,7 +237,8 @@ export const financeOfficer: BehaviourModule = {
           if (paid.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           const owed = inv.data?.outcome?.money;
           const amount: number = owed?.amount ?? 0;
-          const approved = book.open("approval").some((a) => a.data?.invoice === inv.id && a.author === p.mayor_seat);
+          // Approved in writing by the mayor: made in the mayor's position, whoever holds it.
+          const approved = book.open("approval").some((a) => a.data?.invoice === inv.id && a.in_position === p.mayor_position);
           const withinProcedure = spent + amount <= limit && (amount <= p.approval_over || approved);
           const follows = ctx.rng(`procedure-${inv.id}`).below(10_000) < p.compliance_bps;
           if (!withinProcedure && follows) continue; // wait (approval may come), or never (over budget)
@@ -258,7 +266,7 @@ export const taxClerk: BehaviourModule = {
   version: "0.2.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const p = params({ grace_days: 45, law: "law-tax" }, ctx.params);
     const book = new Book();
     const assessed = new Map<string, { payer: string; account: string; amount: number; at: number; chased: boolean }>();

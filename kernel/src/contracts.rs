@@ -11,7 +11,7 @@ const SCHEMAS: [&str; 6] = [
     include_str!("../../contracts/blocks.schema.json"),
     include_str!("../../contracts/records.schema.json"),
     include_str!("../../contracts/world-config.schema.json"),
-    include_str!("../../contracts/seat-api.schema.json"),
+    include_str!("../../contracts/participant-api.schema.json"),
     include_str!("../../contracts/log.schema.json"),
 ];
 
@@ -34,9 +34,9 @@ fn validator(reference: &str) -> jsonschema::Validator {
 pub fn contracts() -> &'static Contracts {
     static C: OnceLock<Contracts> = OnceLock::new();
     C.get_or_init(|| Contracts {
-        config: validator("urn:terrarium:contracts:0.3:world-config"),
-        command: validator("urn:terrarium:contracts:0.3:log#/$defs/Command"),
-        annotation: validator("urn:terrarium:contracts:0.3:log#/$defs/Annotation"),
+        config: validator("urn:terrarium:contracts:0.4:world-config"),
+        command: validator("urn:terrarium:contracts:0.4:log#/$defs/Command"),
+        annotation: validator("urn:terrarium:contracts:0.4:log#/$defs/Annotation"),
     })
 }
 

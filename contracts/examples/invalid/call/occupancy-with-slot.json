@@ -1,0 +1,5 @@
+{
+  "lines": [
+    { "call": { "fn": "occupancy", "args": { "in": { "id": "str.3" }, "slot": { "id": "dwelling" }, "count": { "text": "1" } } } }
+  ]
+}

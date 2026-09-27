@@ -6,8 +6,8 @@
     "event": "action_refused",
     "cause": 46,
     "action": "act.21",
-    "seat": "developer",
-    "code": "zoning_violation"
+    "code": "zoning_violation",
+    "participant": "developer"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

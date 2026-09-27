@@ -5,7 +5,8 @@
 //! Requests:
 //!   {"op":"start","config":{..},"run_id":"..","log_path":"..","anchors_path":".."}
 //!   {"op":"command","command":{..}}        -> {"ok":true,"seq":n,"events":[..],"observation":{..}?}
-//!   {"op":"check","seat":"..","blocks":[..]} -> {"ok":true,"check":{"ok":..,"level":..,"refusal":..}}
+//!   {"op":"check","participant":"..","as":".."?,"blocks":[..]} -> {"ok":true,"check":{"ok":..,"refusal":..}}
+//!   {"op":"view","participant":".."}      -> {"ok":true,"observation":{..}} (the full picture; not logged)
 //!   {"op":"annotate","annotation":{..}}    -> {"ok":true,"seq":n}
 //!   {"op":"state"}                         -> {"ok":true,"t":..,"state_hash":..,"head":..}
 //!   {"op":"finish","reason":"completed","detail":".."?} -> {"ok":true,"seq":n,"state_hash":..}
@@ -71,7 +72,7 @@ fn handle(run: &mut Option<Run<BufWriter<File>>>, req: &Value) -> Result<Value, 
         "check" => {
             let blocks: Vec<Block> =
                 serde_json::from_value(req.get("blocks").cloned().ok_or("missing blocks")?).map_err(|e| format!("bad blocks: {e}"))?;
-            let check = r.kernel().check(str_field("seat")?, &blocks).map_err(|e| e.to_string())?;
+            let check = r.kernel().check(str_field("participant")?, req.get("as").and_then(Value::as_str), &blocks).map_err(|e| e.to_string())?;
             Ok(json!({ "ok": true, "check": check }))
         }
         "annotate" => {
@@ -79,8 +80,8 @@ fn handle(run: &mut Option<Run<BufWriter<File>>>, req: &Value) -> Result<Value, 
             Ok(json!({ "ok": true, "seq": seq }))
         }
         "view" => {
-            // What a seat's channels cover right now, in full: for checking a seat runtime's view. Not logged; changes nothing.
-            let obs = r.full_view(str_field("seat")?).ok_or("unknown seat")?;
+            // What a participant's channels cover right now, in full: for checking a runtime's view. Not logged; changes nothing.
+            let obs = r.full_view(str_field("participant")?).ok_or("unknown participant")?;
             Ok(json!({ "ok": true, "observation": obs }))
         }
         "state" => {

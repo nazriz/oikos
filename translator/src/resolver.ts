@@ -1,23 +1,30 @@
 // The resolver (docs/design/translator-and-resolver.md §8): a call → the
-// seat's own acts. Deterministic, platform-side, and bound by four rules:
-//   - it never chooses how: the route is what the seat supplied; a missing
-//     decision is a question back to the seat (P6);
-//   - it fills in only single physical answers (the one account the seat
+// participant's own acts. Deterministic, platform-side, and bound by four rules:
+//   - it never chooses how: the route is what the participant supplied; a missing
+//     decision is a question back to the participant (P6);
+//   - it fills in only single physical answers (the one account the participant
 //     holds; who keeps an account);
 //   - it never acts for anyone else: whoever must physically act is asked
 //     (a request) or offered an agreement, and decides (P7);
-//   - it uses only what the seat knows (P8). Ids the seat states outright
+//   - it uses only what the participant knows (P8). Ids the participant states outright
 //     are passed through: if one doesn't exist, physics says so.
 
 import { calls, type Block } from "@terrarium/seats";
-import type { Knowledge } from "./knowledge";
+import { Knowledge } from "./knowledge";
 
 type Call = calls.Call;
 type Value = calls.Value;
 
-export const RESOLVER = { id: "resolver", version: "0.3.0" };
+export const RESOLVER = { id: "resolver", version: "0.4.0" };
 
-/** A resolution: the seat's acts, or questions for the seat (and, when the call itself broke the contract, what was wrong, for the log). */
+/** What the resolver reads from a structure type in the world's catalogue (which is public): its footprint, the terrains it can stand on, and its spaces. */
+export interface StructureTypeInfo {
+  footprint?: { w: number; h: number };
+  terrains?: string[];
+  spaces?: { kind: string; count: number; capacity: number }[];
+}
+
+/** A resolution: the participant's acts, or questions for the participant (and, when the call itself broke the contract, what was wrong, for the log). */
 export type Resolution = { ok: true; blocks: Block[] } | { ok: false; questions: string[]; invalid?: string[] };
 
 /** Fixed texts for the translator's refusal labels (§11.1). */
@@ -33,14 +40,14 @@ class Ask extends Error {}
 
 const $ = (cents: number) => `$${Math.floor(cents / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${String(cents % 100).padStart(2, "0")}`;
 
-/** Resolve a program. `capacity` gives a structure type's spaces (from the world's catalogue, which is public), for occupancy. */
-export function resolve(program: calls.Program, k: Knowledge, capacity: (type: string) => { [slot: string]: number } = () => ({})): Resolution {
+/** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
+export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string): Resolution {
   if ("none" in program) return { ok: false, questions: [LABEL_TEXT[program.none]] };
   if (calls.programText(program).length > 65536) return { ok: false, questions: [LABEL_TEXT.too_much] };
   const invalid = calls.contractErrors(program);
   if (invalid.length) return { ok: false, questions: [LABEL_TEXT.unclear], invalid };
-  const r = new Resolver(k, program);
-  r.capacity = capacity;
+  const r = new Resolver(k, program, k.actingFor(as));
+  r.typeOf = typeOf;
   const blocks: Block[] = [];
   const questions: string[] = [];
   for (const line of program.lines) {
@@ -60,12 +67,8 @@ export function resolve(program: calls.Program, k: Knowledge, capacity: (type: s
 class Resolver {
   private refs = new Set<string>();
   private n = 0;
-  constructor(private k: Knowledge, program: { lines: calls.Line[] }) {
+  constructor(private k: Knowledge, program: { lines: calls.Line[] }, private readonly me: string) {
     for (const l of program.lines) if (l.bind) this.refs.add(l.bind);
-  }
-
-  private get me() {
-    return this.k.entity;
   }
 
   private fresh(stem: string): string {
@@ -84,7 +87,7 @@ class Resolver {
   private has(c: Call, key: string) {
     return c.args[key] !== undefined;
   }
-  /** An id (or a variable, as "$name", or a name the seat wrote that it knows). */
+  /** An id (or a variable, as "$name", or a name the participant wrote that it knows). */
   private id(c: Call, key: string, what = key): string | undefined {
     const v = this.raw(c, key);
     if (v === undefined) return undefined;
@@ -144,14 +147,14 @@ class Resolver {
     const s = this.str(c, key);
     return s !== undefined && /^(yes|true)$/i.test(s);
   }
-  /** Whose name a record is in: the seat's own entity, unless the call says otherwise. */
+  /** Whose name a record is in: the participant's own entity, unless the call says otherwise. */
   private speaksFor(c: Call): { speaks_for: string } {
     return { speaks_for: this.id(c, "for") ?? this.me };
   }
 
   // --- single physical answers
 
-  /** The account to pay from: the one given, or the only one the seat's entity holds. */
+  /** The account to pay from: the one given, or the only one the participant's entity holds. */
   private payer(c: Call, purpose: string): string {
     const given = this.id(c, "from");
     if (given) return given;
@@ -161,14 +164,14 @@ class Resolver {
     throw new Ask(`Which account should ${purpose} come from: ${own.join(" or ")}?`);
   }
   /**
-   * Where money goes: an account, or the only account the seat knows an entity holds.
+   * Where money goes: an account, or the only account the participant knows an entity holds.
    * For a payment made now, an entity with no known account is a question; in a
    * commitment ("we'll pay the builder") the entity itself is enough.
    */
   private payee(to: string, commitment = false): string {
     if (to.startsWith("$") || this.k.isAccount(to)) return to;
     const e = this.k.entityOf(to);
-    const known = this.k.names.has(e) || this.k.seatEntity.has(to) || this.k.stated.has(e);
+    const known = this.k.names.has(e) || e !== to || this.k.stated.has(e);
     const accts = this.k.accountsOf(e);
     if (accts.length === 1) return accts[0]!;
     if (accts.length > 1) throw new Ask(`Which of ${this.k.name(e)}'s accounts: ${accts.join(" or ")}?`);
@@ -194,6 +197,11 @@ class Resolver {
       case "vote": return [{ block: "vote", ballot: this.need(c, "ballot", "Which ballot?"), choice: this.str(c, "choice")!, ...this.speaksFor(c), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}) }];
       case "message": return [{ block: "message", to: this.ids(c, "to")!, text: this.str(c, "text")!, ...(this.id(c, "re") ? { re: this.id(c, "re") } : {}) }];
       case "form": return this.form(c, bind);
+      case "presence": return this.presence(c, bind);
+      case "birth": return [{ block: "birth", name: this.str(c, "name")!, template: this.str(c, "template")!, ...(this.has(c, "with") ? { with: this.k.entityOf(this.id(c, "with")!) } : {}) }];
+      case "harm": return [{ block: "harm", person: this.k.entityOf(this.need(c, "who", "Whom?")) }];
+      case "position": return this.position(c, bind);
+      case "system": return this.system(c, bind);
     }
   }
 
@@ -215,7 +223,7 @@ class Resolver {
     const keeper = this.keeper(from);
     if (keeper === undefined) throw new Ask(`You don't know who keeps account ${from}, so you can't ask them to pay from it.`);
     if (keeper === this.me) {
-      // The seat's own entity keeps the money (a bank, or someone keeping their own): it moves it itself.
+      // The participant's own entity keeps the money (a bank, or someone keeping their own): it moves it itself.
       if (every) throw new Ask("You keep this money yourself, so a repeating payment means paying each time. Say when to pay this one.");
       const per = this.id(c, "per_request");
       return [{ block: "transfer", from, to: out.to, amount: out.amount, ...(out.settles ? { settles: out.settles } : {}), ...(per ? { per_instruction: per } : {}), ...(out.for ? { memo: out.for.slice(0, 500) } : {}) }];
@@ -253,15 +261,15 @@ class Resolver {
     const place = remove ? `demolish ${remove}` : `build a ${this.str(c, "type") ?? "?"} on ${this.str(c, "on") ?? "?"}`;
     if (!by) throw new Ask(`Who should ${place}${this.has(c, "price") || this.has(c, "from") ? "" : ", and from which account is it paid"}?`);
     const type = remove ? undefined : this.need(c, "type", "What should be built?");
-    const on = remove ? undefined : this.need(c, "on", "On which lot?");
+    const on = remove ? undefined : this.need(c, "on", "On which lot or cell?");
     const basis = this.id(c, "basis");
     if (this.k.entityOf(by) === this.me) {
       const from = this.payer(c, remove ? "the demolition" : "the materials");
       return remove
         ? [{ block: "demolish", structure: remove, costs_from: from }]
-        : [{ block: "construct", parcel: on, structure_type: type, materials_from: from, ...(bind ? { ref: bind } : {}) }];
+        : [{ block: "construct", at: this.corner(on!, type!), structure_type: type, materials_from: from, ...(bind ? { ref: bind } : {}) }];
     }
-    // Someone else builds: offer them an agreement, signed on the seat's side. They decide.
+    // Someone else builds: offer them an agreement, signed on its side. They decide.
     const builder = this.k.entityOf(by);
     const price = this.amount(c, "price");
     if (price === undefined) throw new Ask(`For what price should ${this.k.name(builder)} ${place}?`);
@@ -283,34 +291,110 @@ class Resolver {
     ];
   }
 
-  private slot(structure: string): string {
-    const type = this.k.structures.get(structure);
-    const cap = type ? this.capacity(type) : {};
-    const kinds = Object.keys(cap);
-    if (kinds.length === 1) return kinds[0]!;
-    throw new Ask(`Which kind of space in ${structure}${kinds.length ? `: ${kinds.join(" or ")}` : ""}?`);
+  typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined;
+
+  /**
+   * Where a building goes: a cell stated outright is its corner; on a lot, the one corner from which the type's
+   * footprint fits on the lot's unbuilt cells of a terrain it can stand on. Several corners are a choice, for the
+   * participant; none is a question too (physics would refuse, but the participant can say what it meant).
+   */
+  private corner(on: string, type: string): string {
+    if (on.startsWith("$") || !this.k.lots.has(on)) return on; // a cell, or an id stated outright: physics decides
+    const t = this.typeOf(type);
+    if (!t) throw new Ask(`You don't know what a ${type} is.`);
+    const { w, h } = t.footprint ?? { w: 1, h: 1 };
+    const lot = new Set(this.k.lots.get(on)!);
+    const at = (x: number, y: number) => [...lot].find((id) => this.k.cells.get(id)?.x === x && this.k.cells.get(id)?.y === y);
+    const fits = (id: string) => {
+      const c0 = this.k.cells.get(id);
+      if (!c0) return false;
+      for (let dx = 0; dx < w; dx++)
+        for (let dy = 0; dy < h; dy++) {
+          const cell = at(c0.x + dx, c0.y + dy);
+          const info = cell ? this.k.cells.get(cell) : undefined;
+          if (!info || info.built) return false;
+          // As physics has it: a type that lists terrains stands only on those; one that lists none, only on unlabelled ground.
+          if (t.terrains ? !(info.terrain && t.terrains.includes(info.terrain)) : info.terrain !== undefined) return false;
+        }
+      return true;
+    };
+    const corners = [...lot].filter(fits).sort();
+    if (corners.length === 1) return corners[0]!;
+    if (corners.length === 0) throw new Ask(`A ${type} (${w} by ${h}) doesn't fit on the open ground of ${on} as far as you've seen. Which cell should its corner be?`);
+    throw new Ask(`Which cell of ${on} should the ${type}'s corner be on: ${corners.slice(0, 12).join(", ")}${corners.length > 12 ? ", …" : ""}?`);
   }
-  capacity: (type: string) => { [slot: string]: number } = () => ({});
+
+  /** The space meant by `in`: a space stated outright, or the only space in a building the participant has seen. */
+  private space(inside: string): string {
+    if (inside.startsWith("$") || inside.includes("/")) return inside;
+    const s = this.k.structures.get(inside);
+    if (s && s.spaces.length === 1) return s.spaces[0]!.space;
+    if (!s) throw new Ask(`Which space in ${inside}? You haven't seen inside it.`);
+    const list = s.spaces.map((x) => x.space);
+    throw new Ask(`Which space in ${inside}: ${list.slice(0, 12).join(", ")}${list.length > 12 ? ", …" : ""}?`);
+  }
+
+  /** Whose body: the participant's own person unless the call names someone. */
+  private body(c: Call): string {
+    const who = this.id(c, "who");
+    return who === undefined || who.startsWith("$") ? (who ?? this.k.entity) : this.k.entityOf(who);
+  }
 
   private occupancy(c: Call): Block[] {
     const inside = this.need(c, "in", "Where?");
-    const who = this.id(c, "who") ?? this.me;
-    if (this.yes(c, "leave")) return [{ block: "vacate", occupant: who, structure: inside }];
-    const slot = this.str(c, "slot") ?? this.slot(inside);
-    const count = this.has(c, "count") ? calls.parseCount(this.str(c, "count")!) : 1;
-    return [{ block: "occupy", structure: inside, slot, count }];
+    const who = this.body(c);
+    if (this.yes(c, "leave")) return [{ block: "vacate", occupant: who, from: inside }];
+    return [{ block: "occupy", space: this.space(inside), ...(who !== this.k.entity ? { who } : {}) }];
   }
 
   private occupancyOutcome(c: Call): { occupancy: object } {
     const inside = this.need(c, "in", "Where?");
-    const who = this.id(c, "who") ?? this.me;
-    const slot = this.str(c, "slot");
-    const count = this.has(c, "count") ? calls.parseCount(this.str(c, "count")!) : 1;
-    return { occupancy: { who, in: inside, ...(slot ? { slot } : {}), count, ...(this.yes(c, "leave") ? { leave: true } : {}) } };
+    return { occupancy: { who: this.body(c), in: inside, ...(this.yes(c, "leave") ? { leave: true } : {}) } };
   }
 
   private entity(c: Call, bind?: string): Block[] {
-    return [{ block: "create_entity", kind: this.str(c, "kind")!, name: this.str(c, "name")!, ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) }];
+    const position = this.str(c, "position");
+    return [{ block: "create_entity", kind: this.str(c, "kind")!, name: this.str(c, "name")!, ...(position ? { first_position: { title: position } } : {}), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) }];
+  }
+
+  /** Coming into the world (a newcomer, or someone returning: done at the boundary) or leaving it. */
+  private presence(c: Call, bind?: string): Block[] {
+    const who = this.id(c, "who");
+    const person = who === undefined || who.startsWith("$") ? who : this.k.entityOf(who);
+    if (this.yes(c, "leave")) return [{ block: "leave", ...(person && person !== this.k.entity ? { person } : {}) }];
+    if (person) return [{ block: "arrive", person }];
+    const name = this.str(c, "name");
+    const template = this.str(c, "template");
+    if (!name || !template) throw new Ask("Who is coming: someone returning (who), or a newcomer (their name, age and template)?");
+    const age = this.seconds(c, "age");
+    const carrying = this.amount(c, "carrying");
+    return [{ block: "arrive", name, template, ...(age !== undefined ? { born_at: this.k.t - age } : {}), ...(carrying ? { carrying } : {}), ...(bind ? { ref: bind } : {}) }];
+  }
+
+  /** An organisation's positions: create one, appoint someone to one, or leave one empty. */
+  private position(c: Call, bind?: string): Block[] {
+    const vacate = this.id(c, "vacate");
+    if (vacate) return [{ block: "appoint", position: vacate }];
+    const appoint = this.id(c, "appoint");
+    if (appoint) {
+      const to = this.need(c, "to", `Whom should ${appoint} go to?`);
+      // A person named for the post means the participant that is that person.
+      const participant = [...this.k.participantPerson].find(([, e]) => e === to)?.[0] ?? to;
+      return [{ block: "appoint", position: appoint, participant }];
+    }
+    const title = this.str(c, "title");
+    if (!title) throw new Ask("What is the new position called?");
+    const channels = this.json(c, "channels");
+    const module = this.json(c, "role_module");
+    return [{ block: "create_position", title, ...(this.str(c, "role") ? { role: this.str(c, "role") } : {}), ...(channels !== undefined ? { channels } : {}), ...(module !== undefined ? { role_module: module } : {}), ...(bind ? { ref: bind } : {}) }];
+  }
+
+  private system(c: Call, bind?: string): Block[] {
+    const retire = this.id(c, "retire");
+    if (retire) return [{ block: "retire", participant: retire }];
+    const template = this.str(c, "template");
+    if (!template) throw new Ask("Which kind of system (its template)?");
+    return [{ block: "deploy", template, ...(this.str(c, "title") ? { title: this.str(c, "title") } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   private claim(c: Call, bind?: string): Block[] {
@@ -403,6 +487,7 @@ class Resolver {
         : t.type === "count" ? calls.parseCount(this.str(c, field)!)
         : t.type === "text" ? this.str(c, field)
         : t.type === "choice" ? this.choice(c, field, t.options ?? [])
+        : t.type === "space" ? this.space(this.id(c, field)!)
         : this.id(c, field);
     }
     const unknown = Object.keys(c.args).filter((a) => !["to", "form", "for"].includes(a) && !(a in spec.fields));

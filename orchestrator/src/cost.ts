@@ -4,9 +4,9 @@
 //
 // Two figures, never mixed:
 //   recorded:  what was actually spent, priced when each call was made;
-//   projected: what the same calls would have cost on each seat's configured
+//   projected: what the same calls would have cost on each participant's configured
 //              model, at published prices (orchestrator/prices.json). While
-//              seats run on the mock, token counts are the mock's estimates,
+//              participants run on the mock, token counts are the mock's estimates,
 //              so this is an order of magnitude, not a budget.
 
 import { readFileSync } from "node:fs";
@@ -65,8 +65,8 @@ export async function costReport(dir: string, o: { translatorModel?: string; pri
       sum(input_tokens) as input_tokens, sum(output_tokens) as output_tokens, sum(cache_read_tokens) as cache_read_tokens, sum(cache_write_tokens) as cache_write_tokens,
       sum(cost_microusd) as recorded_microusd
     from usage group by all order by run_id, subject, purpose`).catch(() => [])) as any[];
-  const configured = (await query(dir, "select run_id, seat, configured from seats where controller = 'llm'").catch(() => [])) as any[];
-  const modelOf = new Map(configured.map((r) => [`${r.run_id} ${r.seat}`, r.configured as string]));
+  const configured = (await query(dir, "select run_id, participant, configured from participants where controller = 'llm'").catch(() => [])) as any[];
+  const modelOf = new Map(configured.map((r) => [`${r.run_id} ${r.participant}`, r.configured as string]));
 
   const unpriced = new Set<string>();
   const price = (model: string, u: any) => {
@@ -78,8 +78,8 @@ export async function costReport(dir: string, o: { translatorModel?: string; pri
     return Math.ceil((u.input_tokens * p.input + u.output_tokens * p.output + u.cache_read_tokens * (p.cache_read ?? p.input) + u.cache_write_tokens * (p.cache_write ?? p.input)) / 1e6);
   };
 
-  // What each call would have gone to: a seat's own configured model; the translator's isn't in the world
-  // config, so it's the one given, or the seats' model when they all share one.
+  // What each call would have gone to: a participant's own configured model; the translator's isn't in the world
+  // config, so it's the one given, or the participants' model when they all share one.
   const rows = new Map<string, CostRow>();
   const perRun = new Map<string, number>();
   for (const u of usage) {
@@ -113,24 +113,24 @@ export async function costReport(dir: string, o: { translatorModel?: string; pri
 
   const out: string[] = [];
   out.push(`Cost report: ${runs.length} run${runs.length === 1 ? "" : "s"}, ${years.toFixed(1)} simulated years in all.`, "");
-  if (!calls) out.push("No model calls: every seat was run by code. Recorded: $0.00.");
+  if (!calls) out.push("No model calls: every participant was run by code. Recorded: $0.00.");
   else {
     out.push(`Recorded: ${usd(recorded)} over ${n(calls)} model calls${mock ? " (every call went to the mock adapter, which costs nothing)" : ""}.`, "");
     const table = [["subject", "purpose", "priced as", "calls", "input tokens", "output tokens", "projected"]];
     for (const r of list) table.push([r.subject, r.purpose, r.projected ? `${r.projected}${r.assumed ? " *" : ""}` : "(no model configured)", n(r.calls), n(r.input_tokens), n(r.output_tokens), r.projected_microusd !== undefined ? usd(r.projected_microusd) : "not priced"]);
     const w = table[0]!.map((_, i) => Math.max(...table.map((row) => row[i]!.length)));
-    out.push(`Projected, had each call gone to its seat's configured model (prices: ${prices.source}, retrieved ${prices.retrieved}):`);
+    out.push(`Projected, had each call gone to its participant's configured model (prices: ${prices.source}, retrieved ${prices.retrieved}):`);
     for (const row of table) out.push(`  ${row.map((c, i) => (i >= 3 ? c.padStart(w[i]!) : c.padEnd(w[i]!))).join("  ")}`);
     if (projected !== undefined) {
       out.push("", `  Total: ${usd(projected)}.${perRunStats ? ` Per run: ${usd(perRunStats.mean)} on average (${usd(perRunStats.min)} to ${usd(perRunStats.max)}).` : ""} Per simulated year: ${usd(years ? projected / years : 0)}.`);
     }
-    if (list.some((r) => r.assumed && r.projected)) out.push("  * The translator's model isn't set by the world; it's priced as the seats' model (--translator-model to choose another).");
+    if (list.some((r) => r.assumed && r.projected)) out.push("  * The translator's model isn't set by the world; it's priced as the participants' model (--translator-model to choose another).");
     if (unpriced.size) out.push(`  Not priced (no published price recorded in orchestrator/prices.json): ${[...unpriced].join(", ")}.`);
     if (mock) {
       out.push("", "How far to trust the projection:",
         "  - Token counts are the mock's estimates (about 4 characters a token), not a provider's count.",
         "  - The mock answers with bare tool calls. A real model also writes its reasoning, so output tokens are an underestimate.",
-        "  - How often a seat acts, and how much it asks, came from the mock's code brain. A real model will act differently.",
+        "  - How often a participant acts, and how much it asks, came from the mock's code brain. A real model will act differently.",
         "  - No prompt caching is assumed. Each call re-sends the instructions and the report, so caching would cut the input cost.");
     }
   }

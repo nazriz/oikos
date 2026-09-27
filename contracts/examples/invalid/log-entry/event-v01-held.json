@@ -6,12 +6,12 @@
     "event": "action_held",
     "cause": 46,
     "action": "act.21",
-    "seat": "mayor",
     "level": "approval",
     "proposal": "prp.1",
     "awaiting": [
       "council-seat"
-    ]
+    ],
+    "participant": "mayor"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

@@ -12,7 +12,7 @@ use common::*;
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use std::collections::BTreeMap;
-use terrarium_kernel::observe::{AccountItem, ChannelData, EntityItem, SeatItem, SiteParcel};
+use terrarium_kernel::observe::{AccountItem, ChannelData, EntityItem, PositionItem, SiteCell};
 use terrarium_kernel::run::Run;
 use terrarium_kernel::Command;
 
@@ -20,9 +20,9 @@ use terrarium_kernel::Command;
 struct View {
     accounts: BTreeMap<String, AccountItem>,
     records: Vec<String>,
-    parcels: BTreeMap<String, SiteParcel>,
+    cells: BTreeMap<String, SiteCell>,
     entities: BTreeMap<String, EntityItem>,
-    seats: BTreeMap<String, SeatItem>,
+    positions: BTreeMap<String, PositionItem>,
 }
 
 impl View {
@@ -43,20 +43,20 @@ impl View {
                 }
                 self.records.extend(records.iter().map(|r| r.id.clone()))
             }
-            ChannelData::Sites { parcels, whole, .. } => {
+            ChannelData::Sites { cells, whole, .. } => {
                 if *whole == Some(true) {
-                    self.parcels.clear();
+                    self.cells.clear();
                 }
-                for p in parcels {
-                    self.parcels.insert(p.parcel.clone(), p.clone());
+                for c in cells {
+                    self.cells.insert(c.cell.clone(), c.clone());
                 }
             }
-            ChannelData::Directory { entities, seats } => {
+            ChannelData::Directory { entities, positions } => {
                 for e in entities {
                     self.entities.insert(e.entity.clone(), e.clone());
                 }
-                for s in seats {
-                    self.seats.insert(s.seat.clone(), s.clone());
+                for p in positions {
+                    self.positions.insert(p.position.clone(), p.clone());
                 }
             }
         }
@@ -76,7 +76,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
     for op in ops {
         let Some(cmd) = concretize(&run, op) else { continue };
         let Some(resp) = step(&mut run, &cmd) else { continue };
-        let (Command::Observe { seat }, Some(obs)) = (&cmd, resp.observation) else { continue };
+        let (Command::Observe { participant: seat, .. }, Some(obs)) = (&cmd, resp.observation) else { continue };
         let reference = run.full_view(seat).unwrap();
         for (ch, data) in &obs.channels {
             let v = views.entry((seat.clone(), ch.clone())).or_default();
@@ -87,10 +87,10 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
             match data {
                 ChannelData::Accounts { .. } => have.accounts = v.accounts.clone(),
                 ChannelData::Records { .. } => have.records = v.records.clone(),
-                ChannelData::Sites { .. } => have.parcels = v.parcels.clone(),
+                ChannelData::Sites { .. } => have.cells = v.cells.clone(),
                 ChannelData::Directory { .. } => {
                     have.entities = v.entities.clone();
-                    have.seats = v.seats.clone();
+                    have.positions = v.positions.clone();
                 }
             }
             prop_assert_eq!(&have, &want, "seat {} channel {} drifted from the full picture", seat, ch);
@@ -114,16 +114,16 @@ proptest! {
 fn many_looks_over_a_long_run() {
     let mut runner = proptest::test_runner::TestRunner::deterministic();
     let ops = proptest::collection::vec(op_strategy(), 400..401).new_tree(&mut runner).unwrap().current();
-    let with_looks: Vec<Op> = ops.into_iter().flat_map(|o| [o, Op::Observe { seat: 0 }, Op::Observe { seat: 3 }]).collect();
+    let with_looks: Vec<Op> = ops.into_iter().flat_map(|o| [o, Op::Observe { actor: 0 }, Op::Observe { actor: 3 }, Op::Observe { actor: 6 }]).collect();
     check_run(&default_params(), &with_looks).unwrap();
 }
 
-/// Closing an account the seat has seen reaches its view (random runs rarely manage an empty account to close).
+/// Closing an account the participant has seen reaches its view (random runs rarely manage an empty account to close).
 #[test]
 fn a_closed_account_leaves_the_view() {
     let mut run = Run::start(riverbend(), "perception-close", Vec::new(), None).unwrap();
     let act = |run: &mut Run<Vec<u8>>, blocks: serde_json::Value| {
-        run.command(&Command::Act { seat: "bank-payments".into(), blocks: serde_json::from_value(blocks).unwrap(), provenance: serde_json::json!({"via": "direct"}), reasoning: None }).unwrap()
+        run.command(&rb_act("bank-payments", blocks)).unwrap()
     };
     let r = act(&mut run, serde_json::json!([{"block": "open_account", "holder": "alice", "ref": "a"}]));
     let acc = match &r.events[0].body {
@@ -132,7 +132,7 @@ fn a_closed_account_leaves_the_view() {
     };
     let mut view = View::default();
     let look = |run: &mut Run<Vec<u8>>, view: &mut View| {
-        let obs = run.command(&Command::Observe { seat: "bank-payments".into() }).unwrap().observation.unwrap();
+        let obs = run.command(&Command::Observe { participant: "bank-payments-system".into(), only: None }).unwrap().observation.unwrap();
         for data in obs.channels.values() {
             if matches!(data, ChannelData::Accounts { .. }) {
                 view.apply(data);
@@ -144,7 +144,7 @@ fn a_closed_account_leaves_the_view() {
     act(&mut run, serde_json::json!([{"block": "close_account", "account": acc}]));
     look(&mut run, &mut view);
     assert!(!view.accounts.contains_key(&acc), "the closure reached the view");
-    let reference = run.full_view("bank-payments").unwrap();
+    let reference = run.full_view("bank-payments-system").unwrap();
     let want: Vec<String> = reference.channels.values().flat_map(|c| match c { ChannelData::Accounts { accounts, .. } => accounts.iter().map(|a| a.account.clone()).collect(), _ => vec![] }).collect();
     assert_eq!(view.accounts.keys().cloned().collect::<Vec<_>>(), want);
 }

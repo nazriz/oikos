@@ -1,8 +1,9 @@
 //! Guards against vacuous property tests: the random operations used by the
 //! invariant tests must actually reach the interesting parts of the world
 //! (payments by banks and by people holding their own money, building,
-//! demolition with people inside, eviction, every kind of record, refusals of
-//! every physical kind), not just pile up refusals.
+//! demolition with people inside, eviction, arrivals, departures, births,
+//! illness, injury, harm, death, appointments, every kind of record, refusals
+//! of every physical kind), not just pile up refusals.
 
 mod common;
 
@@ -49,6 +50,7 @@ fn random_operations_reach_the_interesting_states() {
         "transfer/payment",
         "transfer/materials",
         "transfer/demolition",
+        "transfer/carried",
         "account_opened",
         "account_closed",
         "structure_started",
@@ -58,10 +60,23 @@ fn random_operations_reach_the_interesting_states() {
         "vacated/left",
         "vacated/removed",
         "vacated/demolition",
+        "vacated/departed",
         "entity_created",
         "message_delivered",
         "observation",
-        "seat_opted_out",
+        "participant_opted_out",
+        "person_created",
+        "person_arrived",
+        "person_left",
+        "person_died",
+        "birth_started",
+        "condition_began",
+        "condition_ended",
+        "harmed",
+        "participant_created",
+        "participant_ended",
+        "position_created",
+        "appointed",
         "recorded/claim",
         "recorded/claim_transfer",
         "recorded/claim_release",
@@ -75,14 +90,21 @@ fn random_operations_reach_the_interesting_states() {
         "refused/not_custodian",
         "refused/not_holder",
         "refused/insufficient_funds",
-        "refused/parcel_occupied",
+        "refused/ground_occupied",
+        "refused/unsuitable_terrain",
+        "refused/unknown_cell",
         "refused/capacity_exceeded",
         "refused/structure_incomplete",
-        "refused/unknown_slot",
+        "refused/unknown_space",
+        "refused/already_present",
         "refused/not_present",
+        "refused/not_a_person",
+        "refused/not_in_position",
+        "refused/not_theirs",
+        "refused/too_far",
         "refused/reserved_kind",
         "refused/wrong_record_kind",
-        "refused/seat_opted_out",
+        "refused/participant_inactive",
         "refused/account_not_empty",
         "refused/boundary_protected",
     ] {

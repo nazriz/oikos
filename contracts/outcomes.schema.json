@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.3:outcomes",
+  "$id": "urn:terrarium:contracts:0.4:outcomes",
   "title": "Outcomes, requests, commitments and forms",
-  "description": "The shared encodings the resolver writes and institutions read (docs/design/translator-and-resolver.md §9). They live inside records' opaque data, and the kernel never checks them (records are never judged, D22). They are a platform standard, like the message formats banks exchange, so that code seats, language seats and institutions all read and write one language.",
+  "description": "The shared encodings the resolver writes and institutions read (docs/design/translator-and-resolver.md §9). They live inside records' opaque data, and the kernel never checks them (records are never judged, D22). They are a platform standard, like the message formats banks exchange, so that code participants, language participants and institutions all read and write one language.",
   "$defs": {
-    "Amount": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Amount" },
-    "Id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Id" },
+    "Amount": { "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount" },
+    "Id": { "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id" },
     "Seconds": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
     "Outcome": {
       "description": "A physical outcome someone is asked or committed to bring about: exactly one key.",
@@ -37,7 +37,7 @@
           "additionalProperties": false,
           "properties": {
             "type": { "$ref": "#/$defs/Id" },
-            "on": { "$ref": "#/$defs/Id" },
+            "on": { "description": "A lot (a registry record over cells), or a cell: where the builder is to put it.", "$ref": "#/$defs/Id" },
             "remove": { "$ref": "#/$defs/Id" }
           }
         },
@@ -46,10 +46,11 @@
           "required": ["who", "in"],
           "additionalProperties": false,
           "properties": {
-            "who": { "$ref": "#/$defs/Id" },
-            "in": { "$ref": "#/$defs/Id" },
-            "slot": { "type": "string", "maxLength": 64 },
-            "count": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+            "who": { "description": "A person (whose body goes in or comes out).", "$ref": "#/$defs/Id" },
+            "in": {
+              "description": "A space (apts-3/dwelling.2), or a building (for leaving it: every space the person is in there).",
+              "$ref": "#/$defs/Id"
+            },
             "leave": { "type": "boolean" }
           }
         }
@@ -73,15 +74,17 @@
       "additionalProperties": false,
       "properties": { "outcome": { "$ref": "#/$defs/Outcome" } }
     },
-    "FieldType": { "enum": ["parcel", "structure_type", "account", "entity", "structure", "record", "amount", "duration", "count", "text", "choice"] },
+    "FieldType": {
+      "enum": ["lot", "cell", "space", "structure_type", "account", "entity", "structure", "record", "amount", "duration", "count", "text", "choice"]
+    },
     "FormData": {
       "description": "The data of a statement of kind 'form': the input an institution expects. Filling it in publishes a statement of kind 'submit_as', addressed to 'submit_to', with the fields as its data, citing the form as its basis.",
       "type": "object",
       "required": ["form", "submit_as", "submit_to", "fields"],
       "additionalProperties": false,
       "properties": {
-        "form": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
-        "submit_as": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
+        "form": { "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label" },
+        "submit_as": { "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label" },
         "submit_to": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } },
         "fields": {
           "type": "object",

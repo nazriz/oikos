@@ -100,7 +100,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const started = new Date();
   log(`${seeds.length} run${seeds.length === 1 ? "" : "s"} of ${o.world}${sets.length ? ` (${sets.join(", ")})` : ""}, ${parallel} at a time, into ${out}`);
 
-  // Each seed in its own process: the kernel and the seats of one run never share a process with another's.
+  // Each seed in its own process: the kernel and the participants of one run never share a process with another's.
   const runs: RunRecord[] = [];
   const queue = [...seeds];
   const worker = async () => {

@@ -6,10 +6,10 @@
     "event": "action_refused",
     "cause": 46,
     "action": "act.21",
-    "seat": "mayor",
     "block": 0,
     "code": "not_custodian",
-    "detail": "acc-city is held by bank"
+    "detail": "acc-city is held by bank",
+    "participant": "mayor"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

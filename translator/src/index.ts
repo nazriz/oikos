@@ -1,14 +1,14 @@
-// Plain language → call → the seat's own acts → a draft to confirm
+// Plain language → call → the participant's own acts → a draft to confirm
 // (docs/design/translator-and-resolver.md).
 //
 //   translator: language → a program in the call language (contracts/calls.md).
 //     General, world-agnostic, zero arithmetic. Its only context is the forms
-//     the seat knows (a form's fields are the shape its answer must take).
-//   resolver:   the call → the seat's own blocks, from what the seat knows.
+//     the participant knows (a form's fields are the shape its answer must take).
+//   resolver:   the call → the participant's own blocks, from what the participant knows.
 //   preview:    the blocks → exactly what will happen, in world words, generated
 //     mechanically (never by the translator).
 // A draft carries the call, the blocks, the preview, the kernel's dry run and
-// law warnings; its hash is what the seat confirms, and it goes into the act.
+// law warnings; its hash is what the participant confirms, and it goes into the act.
 //
 // The model is anything behind an LlmAdapter: the mock during development.
 
@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
-import { LABEL_TEXT, RESOLVER, resolve } from "./resolver";
+import { LABEL_TEXT, RESOLVER, resolve, type StructureTypeInfo } from "./resolver";
 
 export const TRANSLATOR_VERSION = "0.3.1";
 
@@ -30,7 +30,9 @@ export interface TranslatorId {
 
 export interface Draft {
   id: string;
-  seat: string;
+  participant: string;
+  /** The position the acts are made in (absent: as itself). */
+  as?: string;
   proposal: string;
   call: string;
   resolver: { id: string; version: string };
@@ -43,15 +45,17 @@ export interface Draft {
 
 export interface TranslateRequest {
   draftId: string;
-  seat: string;
+  participant: string;
+  /** The position it acts in (absent: as itself). */
+  as?: string;
   proposal: string;
-  /** What the seat knows (the resolver and the preview use it; the translator sees only its forms). */
+  /** What the participant knows (the resolver and the preview use it; the translator sees only its forms). */
   knowledge: Knowledge;
 }
 
 export type Translation = { ok: true; draft: Draft; hash: string } | { ok: false; notices: string[]; call?: string; raw?: unknown; invalid?: string[] };
 
-export type KernelCheck = (seat: string, blocks: Block[]) => Promise<{ ok: boolean; refusal?: any; error?: string }>;
+export type KernelCheck = (participant: string, position: string | undefined, blocks: Block[]) => Promise<{ ok: boolean; refusal?: any; error?: string }>;
 
 const CALLS_MD = readFileSync(join(import.meta.dir, "../../contracts/calls.md"), "utf8");
 
@@ -101,25 +105,38 @@ function context(req: TranslateRequest): string {
   return [`Request: ${req.proposal}`, ...(forms.length ? ["", "Forms this person knows of:", ...forms] : [])].join("\n");
 }
 
-/** Laws the seat knows of, with a formal "must not" condition, that the blocks appear to breach. Informational (D19). */
-export function lawWarnings(blocks: Block[], k: Knowledge): string[] {
+/**
+ * Laws the participant knows of, with a formal "must not" condition, that the blocks appear to breach. Informational (D19).
+ * A construct is seen with its footprint (`block.cells`, the cells known to it) and the lot its corner is in (`block.lot`,
+ * by the registry as the participant has seen it), since laws speak of lots and cells.
+ */
+export function lawWarnings(blocks: Block[], k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string): string[] {
   const claims = standingClaims(k.claims);
   const out: string[] = [];
   for (const law of k.laws.values()) {
     if (k.withdrawn.has(law.id) || law.adico?.deontic !== "must_not") continue;
     blocks.forEach((b, i) => {
-      const v = evaluate(law.formal!.condition, { block: b, actor: k.entity, now: k.t }, claims);
+      const v = evaluate(law.formal!.condition, { block: lawView(b, k, typeOf), actor: k.actingFor(as), now: k.t }, claims);
       if ("value" in v && v.value) out.push(`${blocks.length > 1 ? `Item ${i + 1}` : "This"} appears to go against ${law.id}: "${law.text.slice(0, 300)}"`);
     });
   }
   return out.slice(0, 32);
 }
 
+function lawView(b: Block, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined): Block {
+  if (b.block !== "construct" || typeof b.at !== "string") return b;
+  const c0 = k.cells.get(b.at);
+  const { w, h } = typeOf(b.structure_type)?.footprint ?? { w: 1, h: 1 };
+  const cells = c0 ? [...k.cells].filter(([, c]) => c.x >= c0.x && c.x < c0.x + w && c.y >= c0.y && c.y < c0.y + h).map(([id]) => id).sort() : [b.at];
+  const lot = [...k.lots].find(([, cs]) => cs.includes(b.at))?.[0];
+  return { ...b, cells, ...(lot ? { lot } : {}) };
+}
+
 export function draftHash(d: Draft): string {
   return hashWithDomain(DOMAIN_DRAFT, canonical(d));
 }
 
-export function createTranslator(io: LlmIO, check: KernelCheck, capacity: (type: string) => { [slot: string]: number }, id = "translator") {
+export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator") {
   const tid: TranslatorId = { id, version: TRANSLATOR_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` };
   const seen = new Set<string>();
   return {
@@ -128,7 +145,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, capacity: (type:
       const res = await callModel(io, {
         purpose: "translator", subject: id, system: translatorSystem(), maxTokens: 1000, tools: TOOLS,
         messages: [{ role: "user", content: context(req) }],
-        context: { proposal: req.proposal, seat: req.seat },
+        context: { proposal: req.proposal, participant: req.participant },
       }, seen);
       const out = res.content.find((b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use" && b.name === "call");
       const text = typeof out?.input?.program === "string" ? out.input.program : undefined;
@@ -140,14 +157,14 @@ export function createTranslator(io: LlmIO, check: KernelCheck, capacity: (type:
         return { ok: false, notices: [LABEL_TEXT.unclear], call: text };
       }
       const call = calls.programText(program);
-      const r = resolve(program, req.knowledge, capacity);
+      const r = resolve(program, req.knowledge, typeOf, req.as);
       if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}) };
-      const k = await check(req.seat, r.blocks);
+      const k = await check(req.participant, req.as, r.blocks);
       if (k.error) return { ok: false, notices: [LABEL_TEXT.unclear], call };
-      const warnings = lawWarnings(r.blocks, req.knowledge);
+      const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
       const draft: Draft = {
-        id: req.draftId, seat: req.seat, proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
-        blocks: r.blocks, summary: new Preview(req.knowledge).of(r.blocks).slice(0, 16384),
+        id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
+        blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as)).of(r.blocks).slice(0, 16384),
         check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
         translator: tid,
       };
@@ -156,7 +173,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, capacity: (type:
   };
 }
 
-/** How a draft reads to the seat confirming it. */
+/** How a draft reads to the participant confirming it. */
 export function draftText(d: Draft): string {
   return [
     `Before this goes ahead (${d.id}), here is exactly what will happen:`,

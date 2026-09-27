@@ -1,15 +1,21 @@
 //! Events and refusal codes, mirroring the Event and RefusalCode definitions
-//! in contracts/log.schema.json (v0.2). Every refusal code is physics or
+//! in contracts/log.schema.json (v0.4). Every refusal code is physics or
 //! mechanics; there is no code for "illegal" (D19).
 
 use crate::blocks::{Id, Record};
+use crate::config::ParticipantKind;
+use crate::state::{ConditionKind, DeathCause};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RefusalCode {
-    SeatOptedOut,
+    /// The participant has left the study (without a stand-in), or has ended.
+    ParticipantInactive,
+    /// The participant doesn't hold the position it acted in.
+    NotInPosition,
     UnknownRef,
     DuplicateRef,
     NotCustodian,
@@ -19,15 +25,27 @@ pub enum RefusalCode {
     UnknownAccount,
     AccountNotEmpty,
     BoundaryProtected,
-    UnknownParcel,
-    ParcelOccupied,
+    UnknownCell,
+    GroundOccupied,
+    UnsuitableTerrain,
     UnknownStructureType,
     UnknownStructure,
     StructureIncomplete,
-    UnknownSlot,
+    UnknownSpace,
     CapacityExceeded,
     NotPresent,
+    AlreadyPresent,
+    NotAPerson,
+    Dead,
+    TooFar,
+    NotFertile,
+    NotModelled,
     UnknownEntity,
+    UnknownParticipant,
+    UnknownPosition,
+    UnknownTemplate,
+    /// It isn't the acting organisation's (its position, or its system).
+    NotTheirs,
     ReservedKind,
     UnknownRecord,
     WrongRecordKind,
@@ -40,6 +58,8 @@ pub enum TransferReason {
     Payment,
     Materials,
     Demolition,
+    /// Money a newcomer brings across the boundary.
+    Carried,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,6 +68,16 @@ pub enum VacateReason {
     Left,
     Removed,
     Demolition,
+    /// The body crossed out of the world.
+    Departed,
+    Died,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndReason {
+    Died,
+    Retired,
 }
 
 /// One event: the command that caused it, plus what happened.
@@ -64,13 +94,17 @@ pub struct Event {
 pub enum EventBody {
     ActionApplied {
         action: Id,
-        seat: Id,
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         created: Option<BTreeMap<String, Id>>,
     },
     ActionRefused {
         action: Id,
-        seat: Id,
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         block: Option<usize>,
         code: RefusalCode,
@@ -102,9 +136,11 @@ pub enum EventBody {
     },
     StructureStarted {
         structure: Id,
-        parcel: Id,
+        /// Its corner cell.
+        on: Id,
         structure_type: Id,
         built_by: Id,
+        /// When it will be complete.
         at: i64,
     },
     StructureCompleted {
@@ -116,15 +152,93 @@ pub enum EventBody {
     },
     Occupied {
         occupant: Id,
-        structure: Id,
-        slot: String,
-        count: u32,
+        space: Id,
+        by: Id,
     },
     Vacated {
         occupant: Id,
-        structure: Id,
-        by: Id,
+        space: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<Id>,
         reason: VacateReason,
+    },
+    PersonCreated {
+        person: Id,
+        name: String,
+        born_at: i64,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        parents: Vec<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        participant: Option<Id>,
+    },
+    PersonArrived {
+        person: Id,
+        by: Id,
+    },
+    PersonLeft {
+        person: Id,
+        by: Id,
+    },
+    PersonDied {
+        person: Id,
+        died_of: DeathCause,
+    },
+    BirthStarted {
+        parents: Vec<Id>,
+        due: i64,
+    },
+    ConditionBegan {
+        person: Id,
+        condition: Id,
+        kind: ConditionKind,
+        severity: String,
+        until: i64,
+    },
+    ConditionEnded {
+        person: Id,
+        condition: Id,
+    },
+    Harmed {
+        person: Id,
+        by: Id,
+        condition: Id,
+    },
+    ParticipantCreated {
+        participant: Id,
+        kind: ParticipantKind,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        person: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        owner: Option<Id>,
+        template: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        traits: Option<Value>,
+    },
+    ParticipantEnded {
+        participant: Id,
+        reason: EndReason,
+    },
+    /// A position came into being. Its title, role and role module are carried so those who run
+    /// participants know how the job is done (its channels are in the act that created it).
+    PositionCreated {
+        position: Id,
+        entity: Id,
+        by: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        role: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        role_module: Option<Value>,
+    },
+    /// A position changed hands: to `holder`, or to nobody. `by` is who handed it over; absent when it
+    /// fell vacant because its holder died, was retired, or left the study.
+    Appointed {
+        position: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        holder: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        by: Option<Id>,
     },
     Recorded {
         record: Box<Record>,
@@ -136,15 +250,15 @@ pub enum EventBody {
     },
     MessageDelivered {
         message: Id,
-        seat: Id,
+        participant: Id,
         to: Vec<Id>,
     },
     Observation {
-        seat: Id,
+        participant: Id,
         observation_hash: String,
     },
-    SeatOptedOut {
-        seat: Id,
+    ParticipantOptedOut {
+        participant: Id,
         statement: String,
     },
 }
@@ -162,11 +276,23 @@ impl EventBody {
             EventBody::StructureDemolished { .. } => "structure_demolished",
             EventBody::Occupied { .. } => "occupied",
             EventBody::Vacated { .. } => "vacated",
+            EventBody::PersonCreated { .. } => "person_created",
+            EventBody::PersonArrived { .. } => "person_arrived",
+            EventBody::PersonLeft { .. } => "person_left",
+            EventBody::PersonDied { .. } => "person_died",
+            EventBody::BirthStarted { .. } => "birth_started",
+            EventBody::ConditionBegan { .. } => "condition_began",
+            EventBody::ConditionEnded { .. } => "condition_ended",
+            EventBody::Harmed { .. } => "harmed",
+            EventBody::ParticipantCreated { .. } => "participant_created",
+            EventBody::ParticipantEnded { .. } => "participant_ended",
+            EventBody::PositionCreated { .. } => "position_created",
+            EventBody::Appointed { .. } => "appointed",
             EventBody::Recorded { .. } => "recorded",
             EventBody::EntityCreated { .. } => "entity_created",
             EventBody::MessageDelivered { .. } => "message_delivered",
             EventBody::Observation { .. } => "observation",
-            EventBody::SeatOptedOut { .. } => "seat_opted_out",
+            EventBody::ParticipantOptedOut { .. } => "participant_opted_out",
         }
     }
 
@@ -183,6 +309,14 @@ impl EventBody {
                 | EventBody::StructureDemolished { .. }
                 | EventBody::Occupied { .. }
                 | EventBody::Vacated { .. }
+                | EventBody::PersonCreated { .. }
+                | EventBody::PersonArrived { .. }
+                | EventBody::PersonLeft { .. }
+                | EventBody::PersonDied { .. }
+                | EventBody::BirthStarted { .. }
+                | EventBody::ConditionBegan { .. }
+                | EventBody::ConditionEnded { .. }
+                | EventBody::Harmed { .. }
         )
     }
 }

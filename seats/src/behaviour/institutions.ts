@@ -1,16 +1,16 @@
 // The people inside the town's institutions, and the builder. Documented in
 // docs/behaviour/institutions.md, with sources.
 //
-// None of this is law in the kernel: each seat reads the town's statements
+// None of this is law in the kernel: each participant reads the town's statements
 // and applies them to what it can see, because that is its job, and
 // (depending on its parameters) it may do the job well, badly, or not at all.
 
 import * as C from "../calls";
-import type { SiteParcel, StatementRecord } from "../contracts";
+import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
-import { params, type BehaviourModule, type SeatContext } from "../module";
-import { Book, commitmentOf, DAY, ownAccount, record, say, sign, type Step } from "./common";
+import { params, type BehaviourModule, type ParticipantContext } from "../module";
+import { Book, commitmentOf, DAY, lotOf, ownAccount, record, say, sign, type Step } from "./common";
 import { stepper } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
@@ -18,11 +18,11 @@ function prohibitions(book: Book): StatementRecord[] {
   return book.open("law").filter((l) => l.formal?.condition && l.adico?.deontic === "must_not").sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
-/** Who the registry says owns a parcel: the latest standing ownership claim, following transfers. */
-export function ownerOf(book: Book, parcel: string): string | undefined {
+/** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
+export function ownerOf(book: Book, lot: string): string | undefined {
   let holder: string | undefined;
   const all = [...book.records.values()];
-  const titles = standingClaims(all).filter((c) => c.about?.kind === "ownership" && c.about?.object === parcel);
+  const titles = standingClaims(all).filter((c) => c.about?.kind === "ownership" && c.about?.object === lot);
   for (const c of titles) holder = c.holder;
   for (const r of all) if (r.record === "claim_transfer" && titles.some((c) => c.id === r.claim)) holder = r.to;
   return holder;
@@ -31,17 +31,17 @@ export function ownerOf(book: Book, parcel: string): string | undefined {
 /**
  * city.planning_officer: decides permit applications. For each application it
  * asks whether granting it would breach a prohibition addressed to the office
- * (e.g. "no permit may be granted on the river parcels"), by evaluating the
+ * (e.g. "no permit may be granted on the river lots"), by evaluating the
  * law's formal condition on the act of granting. It grants (records a
  * liberty to build) or refuses (publishes the decision), citing the law.
  * params: compliance_bps (how often it follows the law; default 10000).
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const p = params({ compliance_bps: 10_000 }, ctx.params);
     const book = new Book();
     const decided = new Set<string>();
@@ -55,13 +55,13 @@ export const planningOfficer: BehaviourModule = {
           decided.add(app.id);
           const applicant = app.speaks_for!;
           // An application it can't decide gets a reply saying why (§9.3).
-          const missing = ["parcel", "structure_type"].filter((f) => typeof app.data?.[f] !== "string");
+          const missing = ["lot", "structure_type"].filter((f) => typeof app.data?.[f] !== "string");
           if (missing.length) {
-            steps.push([say("permit_decision", `Application ${app.id} can't be decided: it doesn't say ${missing.map((f) => (f === "parcel" ? "which lot" : "what kind of building")).join(" or ")}.`,
+            steps.push([say("permit_decision", `Application ${app.id} can't be decided: it doesn't say ${missing.map((f) => (f === "lot" ? "which lot" : "what kind of building")).join(" or ")}.`,
               { to: [applicant], basis: app.id, data: { application: app.id, decision: "incomplete", missing } })]);
             continue;
           }
-          const granting = { block: "grant_permit", parcel: app.data?.parcel, structure_type: app.data?.structure_type };
+          const granting = { block: "grant_permit", lot: app.data?.lot, structure_type: app.data?.structure_type };
           const breached = prohibitions(book).find((l) => {
             const v = evaluate(l.formal!.condition, { block: granting, actor: applicant, now: obs.t }, []);
             return "value" in v && v.value;
@@ -69,10 +69,10 @@ export const planningOfficer: BehaviourModule = {
           const follows = ctx.rng(`comply-${app.id}`).below(10_000) < p.compliance_bps;
           const refuse = breached && follows;
           const decision = say("permit_decision",
-            refuse ? `Permit refused for ${app.data?.parcel}: it would breach ${breached!.id}.` : `Permit granted to build ${app.data?.structure_type} on ${app.data?.parcel}.`,
+            refuse ? `Permit refused for ${app.data?.lot}: it would breach ${breached!.id}.` : `Permit granted to build ${app.data?.structure_type} on ${app.data?.lot}.`,
             { to: [applicant], basis: app.id, data: { application: app.id, decision: refuse ? "refused" : "granted", ...(breached ? { law: breached.id } : {}) } });
           const step: Step = [decision];
-          if (!refuse) step.unshift(record("liberty", applicant, { action: "build", parcel: app.data?.parcel, structure_type: app.data?.structure_type }, { basis: app.id }));
+          if (!refuse) step.unshift(record("liberty", applicant, { action: "build", object: app.data?.lot, structure_type: app.data?.structure_type }, { basis: app.id }));
           steps.push(step);
         }
         return steps;
@@ -85,16 +85,16 @@ export const planningOfficer: BehaviourModule = {
  * city.inspector: patrols. Through a `sites` channel (whose coverage and
  * refresh interval the world sets) it sees what's built. Anything new that
  * the building law prohibits (evaluated against the permits it knows of,
- * for the parcel's registered owner) gets a fine (a claim) and a demolition
+ * for the lot's registered owner) gets a fine (a claim) and a demolition
  * order. What happens next is up to the owner, and whoever enforces orders.
  * params: fine (cents), compliance_bps (how often it acts on what it finds).
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const p = params({ fine: 5_000_000, compliance_bps: 10_000 }, ctx.params);
     const book = new Book();
     const known = new Set<string>(); // structures already judged (or standing when we started)
@@ -103,28 +103,30 @@ export const inspector: BehaviourModule = {
       (obs) => void book.absorb(obs),
       (obs) => {
         const me = obs.entity;
-        const sites: SiteParcel[] = channels.sites(obs);
+        const buildings = channels.structures(obs);
         const steps: Step[] = [];
         if (first) {
-          for (const s of sites) if (s.structure) known.add(s.structure.structure);
+          for (const st of buildings) known.add(st.structure);
           first = false;
           return steps;
         }
         const claims = standingClaims(book.records.values());
-        for (const site of sites) {
-          const st = site.structure;
-          if (!st || known.has(st.structure)) continue;
+        for (const st of buildings) {
+          if (known.has(st.structure)) continue;
           known.add(st.structure);
-          const owner = ownerOf(book, site.parcel) ?? st.built_by ?? "unknown";
-          const act = { block: "construct", parcel: site.parcel, structure_type: st.type };
+          // The lot it stands on (its corner cell's), by the registry.
+          const lot = lotOf(book, st.at);
+          const owner = (lot && ownerOf(book, lot)) ?? st.built_by ?? "unknown";
+          const cells = channels.cells(obs).filter((c) => c.structure?.structure === st.structure).map((c) => c.cell).sort();
+          const act = { block: "construct", lot, at: st.at, cells, structure_type: st.type };
           const breached = prohibitions(book).find((l) => {
             const v = evaluate(l.formal!.condition, { block: act, actor: owner, now: obs.t }, claims);
             return "value" in v && v.value;
           });
           if (!breached || ctx.rng(`act-${st.structure}`).below(10_000) >= p.compliance_bps) continue;
           steps.push([
-            record("right", me, { kind: "fine", amount: p.fine, for: `Unpermitted ${st.type} on ${site.parcel} (${st.structure}).` }, { against: owner, basis: breached.id }),
-            say("demolition_order", `Order: demolish ${st.structure} on ${site.parcel}, built in breach of ${breached.id}.`, { to: [owner], basis: breached.id, data: { structure: st.structure, parcel: site.parcel, law: breached.id } }),
+            record("right", me, { kind: "fine", amount: p.fine, for: `Unpermitted ${st.type} on ${lot ?? st.at} (${st.structure}).` }, { against: owner, basis: breached.id }),
+            say("demolition_order", `Order: demolish ${st.structure} on ${lot ?? st.at}, built in breach of ${breached.id}.`, { to: [owner], basis: breached.id, data: { structure: st.structure, lot, law: breached.id } }),
           ]);
         }
         return steps;
@@ -143,7 +145,7 @@ export const builder: BehaviourModule = {
   version: "0.4.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const book = new Book();
     const started = new Set<string>();
     const types = new Map<string, any>(ctx.world.config.catalogue.structure_types.map((t: any) => [t.id, t]));

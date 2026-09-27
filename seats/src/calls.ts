@@ -1,12 +1,12 @@
 // The call language (contracts/calls.md): parsing, canonical serialisation,
-// typed builders for code seats, and the parser's unit tables (amounts and
+// typed builders for code participants, and the parser's unit tables (amounts and
 // durations). Zero arithmetic happens in the translator: it copies text, and
 // these tables convert it, deterministically.
 
 import { canonical } from "./canon";
 import CALLS_SCHEMA from "../../contracts/calls.schema.json";
 
-export const FUNCTIONS = ["money", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form"] as const;
+export const FUNCTIONS = ["money", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
 export const LABELS = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form"] as const;
 export type Label = (typeof LABELS)[number];
@@ -26,7 +26,7 @@ export class CallSyntaxError extends Error {}
 
 // ---------------------------------------------------------------- parsing
 
-const ID = /^[A-Za-z0-9_.:-]+/;
+const ID = /^[A-Za-z0-9_.:\/-]+/;
 const NAME = /^[a-z][a-z0-9_]{0,31}$/;
 
 class Reader {
@@ -202,7 +202,7 @@ export function programText(p: Program): string {
   return p.lines.map((l) => (l.bind ? `${l.bind} = ${callText(l.call)}` : callText(l.call))).join("\n");
 }
 
-// ---------------------------------------------------------------- builders (for code seats)
+// ---------------------------------------------------------------- builders (for code participants)
 
 type Arg = string | number | { text: string } | { json: unknown } | { var: string } | Call | undefined;
 

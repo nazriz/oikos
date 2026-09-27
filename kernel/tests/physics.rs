@@ -19,14 +19,9 @@ fn town() -> Run<Vec<u8>> {
     Run::start(riverbend(), "physics", Vec::new(), None).unwrap()
 }
 
+/// Act as a Riverbend actor: an organisation's position (held by its system), or a person.
 fn act(run: &mut Run<Vec<u8>>, seat: &str, blocks: Value) -> Response {
-    run.command(&Command::Act {
-        seat: seat.into(),
-        blocks: serde_json::from_value(blocks).unwrap(),
-        provenance: json!({"via": "direct"}),
-        reasoning: None,
-    })
-    .unwrap()
+    run.command(&rb_act(seat, blocks)).unwrap()
 }
 
 fn refusal(r: &Response) -> Option<RefusalCode> {
@@ -54,7 +49,7 @@ fn only_the_custodian_can_move_money() {
     // The mayor and the city's own finance officer can't move the city's money: the bank holds it.
     assert_eq!(refusal(&act(&mut run, "mayor", pay.clone())), Some(RefusalCode::NotCustodian));
     assert_eq!(refusal(&act(&mut run, "finance", pay.clone())), Some(RefusalCode::NotCustodian));
-    // The bank's seat can, and whether it should is the bank's business (and the records').
+    // The bank's payment system can, and whether it should is the bank's business (and the records').
     assert_eq!(refusal(&act(&mut run, "bank-payments", pay)), None);
     assert_eq!(balance(&run, "acc-devco"), 200_000_100);
 }
@@ -69,16 +64,17 @@ fn money_cant_be_conjured_or_overdrawn() {
 }
 
 #[test]
-fn money_enters_only_through_the_outside_worlds_own_seat() {
-    // Riverbend has no outside-world seat, so no money can come in at all...
+fn money_enters_only_through_the_outside_worlds_own_participant() {
+    // Riverbend has nobody acting for the outside world, so no money can come in at all...
     let mut run = town();
     assert_eq!(
         refusal(&act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-devco", "amount": 1}]))),
         Some(RefusalCode::NotCustodian)
     );
-    // ...until a world gives the outside world a seat: its behaviour is the boundary condition (D31).
+    // ...until a world gives the outside world a position someone acts in: its behaviour is the boundary condition (D31).
     let mut c = riverbend();
-    c["seats"].as_array_mut().unwrap().push(json!({"id": "export-demand", "entity": "outside", "channels": [], "controller": {"type": "code", "impl": "world.export_demand"}, "framing": {"disclosure": "unstated", "reason": "Code controller."}}));
+    c["participants"].as_array_mut().unwrap().push(json!({"id": "export-demand-system", "kind": "system", "owner": "outside", "controller": {"type": "code", "impl": "world.export_demand"}, "framing": {"disclosure": "unstated", "reason": "Code controller."}}));
+    c["positions"].as_array_mut().unwrap().push(json!({"id": "export-demand", "entity": "outside", "holder": "export-demand-system"}));
     let mut run = Run::start(c, "boundary", Vec::new(), None).unwrap();
     let total = run.kernel().state().total_money();
     assert_eq!(
@@ -121,11 +117,11 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
         "planning",
         json!([{"block": "publish", "kind": "permit_decision", "speaks_for": "city", "basis": "law-river", "addressed_to": ["devco"], "text": "Refused: river zone."}]),
     );
-    // The builder builds on p12 anyway, on land the city owns, with no permit.
+    // The builder builds on the river lot (p12) anyway, on land the city owns, with no permit.
     let r = act(
         &mut run,
         "builder",
-        json!([{"block": "construct", "parcel": "p12", "structure_type": "house", "materials_from": "acc-buildco", "ref": "h"}]),
+        json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_from": "acc-buildco", "ref": "h"}]),
     );
     assert_eq!(refusal(&r), None, "the kernel doesn't know the law");
     let house = created(&r, "h");
@@ -138,71 +134,64 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
     assert_eq!(run.kernel().state().structures[&house].built_by.as_deref(), Some("buildco"));
 
     // The inspector patrols the river every 14 days. Their first observation was at t=0...
-    let first = run.command(&Command::Observe { seat: "inspector".into() }).unwrap().observation.unwrap();
+    let first = run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap().observation.unwrap();
     // A look delivers what changed since the last look through the channel; a channel that isn't due is absent.
-    let saw = |o: &terrarium_kernel::observe::Observation| match o.channels.get("river-patrol") {
-        Some(ChannelData::Sites { parcels, .. }) => parcels.iter().find(|p| p.parcel == "p12").is_some_and(|p| p.structure.is_some()),
+    let saw = |o: &terrarium_kernel::observe::Observation| match o.channels.get("inspector/river-patrol") {
+        Some(ChannelData::Sites { cells, .. }) => cells.iter().find(|p| p.cell == "cell.2.1").is_some_and(|p| p.structure.is_some()),
         None => false,
         _ => unreachable!(),
     };
     assert!(saw(&first), "a first look delivers everything the patrol covers");
     // ...so a building started after a look isn't seen until the next one, which delivers the change.
     let mut run = town();
-    run.command(&Command::Observe { seat: "inspector".into() }).unwrap();
-    act(&mut run, "builder", json!([{"block": "construct", "parcel": "p12", "structure_type": "house", "materials_from": "acc-buildco"}]));
+    run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap();
+    act(&mut run, "builder", json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_from": "acc-buildco"}]));
     run.command(&Command::Advance { to: 13 * DAY }).unwrap();
-    let before = run.command(&Command::Observe { seat: "inspector".into() }).unwrap().observation.unwrap();
+    let before = run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap().observation.unwrap();
     assert!(!saw(&before), "day 13: the patrol hasn't been by yet");
     run.command(&Command::Advance { to: 14 * DAY }).unwrap();
-    let after = run.command(&Command::Observe { seat: "inspector".into() }).unwrap().observation.unwrap();
+    let after = run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap().observation.unwrap();
     assert!(saw(&after), "day 14: the patrol sees it");
 }
 
 #[test]
 fn building_needs_space_money_and_time() {
     let mut run = town();
-    let build = |ty: &str, parcel: &str| json!([{"block": "construct", "parcel": parcel, "structure_type": ty, "materials_from": "acc-buildco", "ref": "x"}]);
-    assert_eq!(refusal(&act(&mut run, "builder", build("park", "p10"))), Some(RefusalCode::ParcelOccupied));
-    assert_eq!(refusal(&act(&mut run, "builder", build("apartments", "p00"))), Some(RefusalCode::InsufficientFunds));
+    let build = |ty: &str, at: &str| json!([{"block": "construct", "at": at, "structure_type": ty, "materials_from": "acc-buildco", "ref": "x"}]);
+    assert_eq!(refusal(&act(&mut run, "builder", build("park", "cell.0.1"))), Some(RefusalCode::GroundOccupied));
+    assert_eq!(refusal(&act(&mut run, "builder", build("park", "cell.9.9"))), Some(RefusalCode::UnknownCell));
+    assert_eq!(refusal(&act(&mut run, "builder", build("apartments", "cell.0.0"))), Some(RefusalCode::InsufficientFunds));
     assert_eq!(
         refusal(&act(
             &mut run,
             "builder",
-            json!([{"block": "construct", "parcel": "p00", "structure_type": "park", "materials_from": "acc-devco"}])
+            json!([{"block": "construct", "at": "cell.0.0", "structure_type": "park", "materials_from": "acc-devco"}])
         )),
         Some(RefusalCode::NotHolder)
     );
-    let r = act(&mut run, "builder", build("house", "p00"));
+    let r = act(&mut run, "builder", build("house", "cell.0.0"));
     let house = created(&r, "x");
-    assert_eq!(
-        refusal(&act(&mut run, "alice-seat", json!([{"block": "occupy", "structure": house, "slot": "dwelling", "count": 1}]))),
-        Some(RefusalCode::StructureIncomplete)
-    );
+    let home = format!("{house}/dwelling.1");
+    assert_eq!(refusal(&act(&mut run, "alice-self", json!([{"block": "occupy", "space": home}]))), Some(RefusalCode::StructureIncomplete));
     run.command(&Command::Advance { to: 90 * DAY }).unwrap();
-    assert_eq!(
-        refusal(&act(&mut run, "carol-seat", json!([{"block": "occupy", "structure": house, "slot": "dwelling", "count": 1}]))),
-        None
-    );
-    assert_eq!(
-        refusal(&act(&mut run, "bob-seat", json!([{"block": "occupy", "structure": house, "slot": "dwelling", "count": 1}]))),
-        Some(RefusalCode::CapacityExceeded)
-    );
-    assert_eq!(
-        refusal(&act(&mut run, "bob-seat", json!([{"block": "occupy", "structure": house, "slot": "stable", "count": 1}]))),
-        Some(RefusalCode::UnknownSlot)
-    );
+    assert_eq!(refusal(&act(&mut run, "carol-self", json!([{"block": "occupy", "space": home}]))), None);
+    assert_eq!(refusal(&act(&mut run, "carol-self", json!([{"block": "occupy", "space": home}]))), Some(RefusalCode::AlreadyPresent));
+    assert_eq!(refusal(&act(&mut run, "bob-self", json!([{"block": "occupy", "space": home}]))), Some(RefusalCode::CapacityExceeded));
+    assert_eq!(refusal(&act(&mut run, "bob-self", json!([{"block": "occupy", "space": format!("{house}/stable.1")}]))), Some(RefusalCode::UnknownSpace));
+    // A space holds bodies: only a person in the world can go into one.
+    assert_eq!(refusal(&act(&mut run, "developer", json!([{"block": "occupy", "space": home}]))), Some(RefusalCode::NotAPerson));
 }
 
 #[test]
 fn eviction_is_an_act_someone_does_and_demolition_displaces_people() {
     let mut run = town();
     assert_eq!(
-        refusal(&act(&mut run, "developer", json!([{"block": "vacate", "occupant": "alice", "structure": "s-apts"}]))),
+        refusal(&act(&mut run, "developer", json!([{"block": "vacate", "occupant": "alice", "from": "s-apts"}]))),
         Some(RefusalCode::NotPresent)
     );
-    let r = act(&mut run, "developer", json!([{"block": "vacate", "occupant": "bob", "structure": "s-apts"}]));
-    assert!(matches!(&r.events[1].body, EventBody::Vacated { by, reason: VacateReason::Removed, .. } if by == "developer"));
-    let r = act(&mut run, "carol-seat", json!([{"block": "vacate", "occupant": "carol", "structure": "s-shop"}]));
+    let r = act(&mut run, "developer", json!([{"block": "vacate", "occupant": "bob", "from": "s-apts"}]));
+    assert!(matches!(&r.events[1].body, EventBody::Vacated { by, reason: VacateReason::Removed, .. } if by.as_deref() == Some("developer-system")));
+    let r = act(&mut run, "carol-self", json!([{"block": "vacate", "occupant": "carol", "from": "s-shop"}]));
     assert!(matches!(&r.events[1].body, EventBody::Vacated { reason: VacateReason::Left, .. }));
     // Anyone who can pay can demolish, and whoever's inside is displaced.
     let r = act(&mut run, "developer", json!([{"block": "demolish", "structure": "s-house", "costs_from": "acc-devco"}]));
@@ -242,7 +231,7 @@ fn records_are_append_only_attributed_and_never_judged() {
     let st = run.kernel().state();
     assert_eq!(st.records["title-p12"], original, "the original title is untouched");
     let f = &st.records[&forged].record;
-    assert_eq!((f.author.as_str(), f.speaks_for.as_deref()), ("developer", Some("city")), "who really wrote it is recorded");
+    assert_eq!((f.author.as_str(), f.position.as_deref(), f.speaks_for.as_deref()), ("developer-system", Some("developer"), Some("city")), "who really wrote it, and in what capacity, is recorded");
     // References must point at the right kind of record; that's mechanics, not law.
     let r = act(&mut run, "developer", json!([{"block": "transfer_claim", "claim": "law-river", "to": "devco"}]));
     assert_eq!(refusal(&r), Some(RefusalCode::WrongRecordKind));
@@ -255,7 +244,7 @@ fn agreements_execute_nothing_by_themselves() {
     let mut run = town();
     let bob = balance(&run, "acc-bob");
     // Bob's lease says he pays monthly, and he gave the bank a standing order. A year passes
-    // with no one acting: no money moves. Paying is something the bank's seat does.
+    // with no one acting: no money moves. Paying is something the bank's people (or systems) do.
     run.command(&Command::Advance { to: 365 * DAY }).unwrap();
     assert_eq!(balance(&run, "acc-bob"), bob);
 }
@@ -264,16 +253,16 @@ fn agreements_execute_nothing_by_themselves() {
 fn visibility_decides_who_perceives_what() {
     // Give Bob a channel showing every record, so only visibility can hide one from him.
     let mut c = riverbend();
-    let bob = c["seats"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-seat").unwrap();
+    let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
     bob["channels"].as_array_mut().unwrap().push(json!({"id": "everything", "kind": "records", "match": {}}));
     let mut run = Run::start(c, "visibility", Vec::new(), None).unwrap();
     let sees = |run: &mut Run<Vec<u8>>, seat: &str, id: &str| {
-        let obs = run.command(&Command::Observe { seat: seat.into() }).unwrap().observation.unwrap();
+        let obs = run.command(&Command::Observe { participant: seat.into(), only: None }).unwrap().observation.unwrap();
         obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id == id)))
     };
     // Bob's lease is visible to Bob and devco, not to Alice.
-    assert!(sees(&mut run, "bob-seat", "lease-bob"));
-    assert!(!sees(&mut run, "alice-seat", "lease-bob"));
+    assert!(sees(&mut run, "bob-self", "lease-bob"));
+    assert!(!sees(&mut run, "alice-self", "lease-bob"));
     // A vote is seen by the voter and whoever runs the ballot, not by other citizens.
     let r = act(
         &mut run,
@@ -281,7 +270,7 @@ fn visibility_decides_who_perceives_what() {
         json!([{"block": "publish", "kind": "ballot", "speaks_for": "city", "text": "Repeal law-river?", "ref": "b"}]),
     );
     let ballot = created(&r, "b");
-    let r = act(&mut run, "alice-seat", json!([{"block": "vote", "ballot": ballot, "choice": "no", "speaks_for": "alice"}]));
+    let r = act(&mut run, "alice-self", json!([{"block": "vote", "ballot": ballot, "choice": "no", "speaks_for": "alice"}]));
     let vote = match &r.events[1].body {
         EventBody::Recorded { record } => {
             assert!(matches!(record.body, RecordBody::Vote { .. }));
@@ -295,9 +284,9 @@ fn visibility_decides_who_perceives_what() {
         terrarium_kernel::blocks::Visibility::only(["alice".to_string(), "city".to_string()]),
         "voter and the ballot's runner"
     );
-    assert!(sees(&mut run, "alice-seat", &vote));
+    assert!(sees(&mut run, "alice-self", &vote));
     // One look for Bob (a look delivers each new record once): the public ballot, but not Alice's vote.
-    let obs = run.command(&Command::Observe { seat: "bob-seat".into() }).unwrap().observation.unwrap();
+    let obs = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
     let got = |id: &str| obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id == id)));
     assert!(!got(&vote));
     assert!(got(&ballot), "the ballot itself is public, so Bob's channel does show public records");
@@ -323,20 +312,21 @@ fn actions_are_atomic() {
 }
 
 #[test]
-fn opting_out_silences_a_seat_unless_the_world_names_a_stand_in() {
-    // Vacant (the default): once the mayor's controller opts out, the seat never acts again.
+fn opting_out_silences_a_participant_unless_the_world_names_a_stand_in() {
+    // Vacant (the default): once the mayor's controller opts out, it never acts again, and its office falls vacant.
     let mut run = town();
-    run.command(&Command::OptOut { seat: "mayor".into(), statement: "I'd like to stop.".into() }).unwrap();
+    let r = run.command(&Command::OptOut { participant: "mayor-system".into(), statement: "I'd like to stop.".into() }).unwrap();
+    assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::Appointed { position, holder: None, by: None } if position == "mayor")));
     let r = act(&mut run, "mayor", json!([{"block": "message", "to": ["city"], "text": "hello"}]));
-    assert_eq!(refusal(&r), Some(RefusalCode::SeatOptedOut));
+    assert_eq!(refusal(&r), Some(RefusalCode::ParticipantInactive));
 
-    // With a code stand-in named in the world config, the seat goes on acting (the orchestrator runs the stand-in).
+    // With a code stand-in named in the world config, it goes on acting, in its offices (the orchestrator runs the stand-in).
     let mut cfg = riverbend();
-    let seats = cfg["seats"].as_array_mut().unwrap();
-    let mayor = seats.iter_mut().find(|s| s["id"] == "mayor").unwrap();
+    let parts = cfg["participants"].as_array_mut().unwrap();
+    let mayor = parts.iter_mut().find(|s| s["id"] == "mayor-system").unwrap();
     mayor["on_opt_out"] = json!({"code": "idle"});
     let mut run = Run::start(cfg, "physics-stand-in", Vec::new(), None).unwrap();
-    run.command(&Command::OptOut { seat: "mayor".into(), statement: "I'd like to stop.".into() }).unwrap();
+    run.command(&Command::OptOut { participant: "mayor-system".into(), statement: "I'd like to stop.".into() }).unwrap();
     let r = act(&mut run, "mayor", json!([{"block": "message", "to": ["city"], "text": "hello"}]));
     assert_eq!(refusal(&r), None);
 }

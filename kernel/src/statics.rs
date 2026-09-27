@@ -1,6 +1,6 @@
 //! Facts fixed for the whole run, derived from the config.
 
-use crate::config::{Config, Seat, StructureType};
+use crate::config::{Config, Life, SpaceSpec, StructureType, Template};
 use crate::rng::Randomness;
 use std::collections::BTreeMap;
 
@@ -8,9 +8,11 @@ use std::collections::BTreeMap;
 pub struct Statics {
     pub config: Config,
     pub types: BTreeMap<String, StructureType>,
-    pub seats: BTreeMap<String, Seat>,
+    /// Each structure type's spaces, in order: local id (`dwelling.3`) -> spec.
+    pub spaces: BTreeMap<String, BTreeMap<String, SpaceSpec>>,
+    pub templates: BTreeMap<String, Template>,
     /// The boundary entity, and the account (in its own custody) that
-    /// construction materials are paid into.
+    /// construction materials are paid into and newcomers' money comes from.
     pub boundary: String,
     pub boundary_account: String,
     pub tick: i64,
@@ -28,8 +30,12 @@ impl Statics {
         self.span(self.config.clock.run_seconds)
     }
 
-    /// The entity a seat acts as.
-    pub fn entity_of(&self, seat: &str) -> Option<&str> {
-        self.seats.get(seat).map(|s| s.entity.as_str())
+    pub fn life(&self) -> Option<&Life> {
+        self.config.life.as_ref()
+    }
+
+    /// A space's spec, from its full id.
+    pub fn space(&self, structure_type: &str, local: &str) -> Option<&SpaceSpec> {
+        self.spaces.get(structure_type)?.get(local)
     }
 }

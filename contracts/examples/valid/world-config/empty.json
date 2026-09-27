@@ -1,5 +1,5 @@
 {
-  "contracts": "0.3",
+  "contracts": "0.4",
   "meta": {
     "name": "Empty world",
     "description": "An empty world is valid (D23).",
@@ -22,9 +22,17 @@
         "materials_cost": 30000000,
         "build_time": 7776000,
         "demolition_cost": 2000000,
-        "capacity": {
-          "dwelling": 1
-        }
+        "footprint": {
+          "w": 1,
+          "h": 1
+        },
+        "spaces": [
+          {
+            "kind": "dwelling",
+            "count": 1,
+            "capacity": 1
+          }
+        ]
       },
       {
         "id": "apartments",
@@ -32,9 +40,17 @@
         "materials_cost": 250000000,
         "build_time": 15552000,
         "demolition_cost": 10000000,
-        "capacity": {
-          "dwelling": 12
-        }
+        "footprint": {
+          "w": 1,
+          "h": 1
+        },
+        "spaces": [
+          {
+            "kind": "dwelling",
+            "count": 1,
+            "capacity": 12
+          }
+        ]
       },
       {
         "id": "shop",
@@ -42,10 +58,22 @@
         "materials_cost": 60000000,
         "build_time": 7776000,
         "demolition_cost": 3000000,
-        "capacity": {
-          "workplace": 8,
-          "dwelling": 1
-        }
+        "footprint": {
+          "w": 1,
+          "h": 1
+        },
+        "spaces": [
+          {
+            "kind": "workplace",
+            "count": 1,
+            "capacity": 8
+          },
+          {
+            "kind": "dwelling",
+            "count": 1,
+            "capacity": 1
+          }
+        ]
       },
       {
         "id": "park",
@@ -53,13 +81,20 @@
         "materials_cost": 5000000,
         "build_time": 2592000,
         "demolition_cost": 500000,
-        "capacity": {}
+        "footprint": {
+          "w": 1,
+          "h": 1
+        },
+        "spaces": []
       }
     ]
   },
   "world": {
     "boundary": "outside",
-    "parcels": [],
+    "ground": {
+      "w": 1,
+      "h": 1
+    },
     "entities": [
       {
         "id": "outside",
@@ -79,7 +114,8 @@
     "occupancy": [],
     "records": []
   },
-  "seats": [],
+  "participants": [],
+  "positions": [],
   "caps": {
     "max_created_entities": 50
   },

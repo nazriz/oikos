@@ -4,7 +4,6 @@
   "kind": "command",
   "body": {
     "command": "act",
-    "seat": "bank-payments",
     "blocks": [
       {
         "block": "transfer",
@@ -17,7 +16,8 @@
     ],
     "provenance": {
       "via": "direct"
-    }
+    },
+    "participant": "bank-payments"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

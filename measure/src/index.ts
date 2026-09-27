@@ -13,7 +13,7 @@ import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 
-export const MEASURE_VERSION = "0.1.1";
+export const MEASURE_VERSION = "0.2.0";
 
 const QUERY_DIR = join(import.meta.dir, "../queries");
 
@@ -32,16 +32,57 @@ const TABLES: { [name: string]: string } = {
       (select count(*) from raw) as entries,
       (select json_extract_string(a.body, '$.data.version') from raw a where a.kind = 'annotation' and json_extract_string(a.body, '$.annotation') = 'orchestrator' limit 1) as orchestrator_version
     from raw h, raw e where h.kind = 'header' and e.kind = 'end'`,
-  seats: `
-    select $run as run_id, json_extract_string(s, '$.id') as seat, json_extract_string(s, '$.entity') as entity, k.kind as entity_kind,
-      json_extract_string(s, '$.title') as title, json_extract_string(s, '$.role') as role,
-      json_extract_string(s, '$.controller.type') as controller, json_extract_string(s, '$.controller.impl') as impl, json_extract_string(s, '$.controller.model') as model,
-      json_extract_string(o.body, '$.data.llm.seats."' || json_extract_string(s, '$.id') || '".adapter') as adapter,
-      json_extract_string(o.body, '$.data.llm.seats."' || json_extract_string(s, '$.id') || '".configured') as configured
-    from (select unnest(from_json(json_extract(body, '$.config.seats'), '["JSON"]')) as s from raw where kind = 'header')
-    left join (select body from raw where kind = 'annotation' and json_extract_string(body, '$.annotation') = 'orchestrator' limit 1) o on true
-    left join (select json_extract_string(e, '$.id') as id, json_extract_string(e, '$.kind') as kind
-      from (select unnest(from_json(json_extract(body, '$.config.world.entities'), '["JSON"]')) as e from raw where kind = 'header')) k on k.id = json_extract_string(s, '$.entity')`,
+  // Everyone who acts: those in the world config, and those created during the run (from a template: newcomers, the newborn, systems deployed).
+  participants: `
+    with o as (select body from raw where kind = 'annotation' and json_extract_string(body, '$.annotation') = 'orchestrator' limit 1),
+    tpl as (select json_extract_string(x, '$.id') as id, x from (select unnest(from_json(json_extract(body, '$.config.templates'), '["JSON"]')) as x from raw where kind = 'header')),
+    genesis as (
+      select 0::UBIGINT as seq, 0::BIGINT as t, json_extract_string(p, '$.id') as participant, json_extract_string(p, '$.kind') as kind, json_extract_string(p, '$.person') as person,
+        json_extract_string(p, '$.owner') as owner, json_extract_string(p, '$.title') as title, null::VARCHAR as template, json_extract(p, '$.controller') as controller
+      from (select unnest(from_json(json_extract(body, '$.config.participants'), '["JSON"]')) as p from raw where kind = 'header')),
+    created as (
+      select r.seq, r.t, json_extract_string(r.body, '$.participant'), json_extract_string(r.body, '$.kind'), json_extract_string(r.body, '$.person'), json_extract_string(r.body, '$.owner'),
+        json_extract_string(tpl.x, '$.title'), json_extract_string(r.body, '$.template'), json_extract(tpl.x, '$.controller')
+      from raw r left join tpl on tpl.id = json_extract_string(r.body, '$.template')
+      where r.kind = 'event' and json_extract_string(r.body, '$.event') = 'participant_created')
+    select $run as run_id, g.seq as created_seq, g.t as created_t, g.participant, g.kind, g.person, g.owner, g.title, g.template,
+      json_extract_string(g.controller, '$.type') as controller, json_extract_string(g.controller, '$.impl') as impl, json_extract_string(g.controller, '$.model') as model,
+      json_extract_string(o.body, '$.data.llm.participants."' || g.participant || '".adapter') as adapter,
+      json_extract_string(o.body, '$.data.llm.participants."' || g.participant || '".configured') as configured
+    from (select * from genesis union all select * from created) g left join o on true`,
+  // Entities (people, organisations): the world config's, and those created during the run.
+  entities: `
+    select $run as run_id, 0::BIGINT as created_t, json_extract_string(e, '$.id') as entity, json_extract_string(e, '$.kind') as kind, json_extract_string(e, '$.name') as name,
+      (json_extract_string(e, '$.born_at'))::BIGINT as born_at, from_json(json_extract(e, '$.parents'), '["VARCHAR"]') as parents
+    from (select unnest(from_json(json_extract(body, '$.config.world.entities'), '["JSON"]')) as e from raw where kind = 'header')
+    union all
+    select $run, t, json_extract_string(body, '$.entity'), json_extract_string(body, '$.kind'), json_extract_string(body, '$.name'), null, null
+    from raw where kind = 'event' and json_extract_string(body, '$.event') = 'entity_created'
+    union all
+    select $run, t, json_extract_string(body, '$.person'), 'person', json_extract_string(body, '$.name'), (json_extract_string(body, '$.born_at'))::BIGINT, from_json(json_extract(body, '$.parents'), '["VARCHAR"]')
+    from raw where kind = 'event' and json_extract_string(body, '$.event') = 'person_created'`,
+  // An organisation's positions: the world config's, and those created during the run.
+  positions: `
+    select $run as run_id, 0::BIGINT as created_t, json_extract_string(p, '$.id') as position, json_extract_string(p, '$.entity') as entity, json_extract_string(p, '$.title') as title,
+      json_extract_string(p, '$.role') as role, json_extract_string(p, '$.role_module.code') as role_module
+    from (select unnest(from_json(json_extract(body, '$.config.positions'), '["JSON"]')) as p from raw where kind = 'header')
+    union all
+    select $run, t, json_extract_string(body, '$.position'), json_extract_string(body, '$.entity'), json_extract_string(body, '$.title'), json_extract_string(body, '$.role'), json_extract_string(body, '$.role_module.code')
+    from raw where kind = 'event' and json_extract_string(body, '$.event') = 'position_created'`,
+  // Who held each position from when: the world config's holders at 0, then every appointment (holder null: left vacant).
+  appointments: `
+    select $run as run_id, 0::UBIGINT as seq, 0::BIGINT as t, json_extract_string(p, '$.id') as position, json_extract_string(p, '$.holder') as holder, 'genesis' as "by"
+    from (select unnest(from_json(json_extract(body, '$.config.positions'), '["JSON"]')) as p from raw where kind = 'header')
+    union all
+    select $run, seq, t, json_extract_string(body, '$.position'), json_extract_string(body, '$.holder'), json_extract_string(body, '$.by')
+    from raw where kind = 'event' and json_extract_string(body, '$.event') = 'appointed'`,
+  // Bodies: coming and going, births, illness, injury, harm and death. detail: the cause of death, or a condition's kind.
+  life: `
+    select $run as run_id, seq, t, json_extract_string(body, '$.event') as event, json_extract_string(body, '$.person') as person, json_extract_string(body, '$.by') as "by",
+      coalesce(json_extract_string(body, '$.died_of'), json_extract_string(body, '$.kind')) as detail, json_extract_string(body, '$.severity') as severity,
+      json_extract_string(body, '$.condition') as condition, (json_extract_string(body, '$.until'))::BIGINT as until, from_json(json_extract(body, '$.parents'), '["VARCHAR"]') as parents
+    from raw where kind = 'event' and json_extract_string(body, '$.event') in
+      ('person_created', 'person_arrived', 'person_left', 'person_died', 'birth_started', 'condition_began', 'condition_ended', 'harmed')`,
   events: `
     select $run as run_id, seq, t, json_extract_string(body, '$.event') as event, (json_extract_string(body, '$.cause'))::UBIGINT as cause, body
     from raw where kind = 'event'`,
@@ -49,41 +90,38 @@ const TABLES: { [name: string]: string } = {
     select $run as run_id, seq, t, json_extract_string(body, '$.from') as "from", json_extract_string(body, '$.to') as "to", (json_extract_string(body, '$.amount'))::BIGINT as amount,
       json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by", json_extract_string(body, '$.settles') as settles, json_extract_string(body, '$.per_instruction') as per_instruction, json_extract_string(body, '$.memo') as memo
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'transfer'`,
-  // A departure's slot and count are the ones its occupant arrived into (the kernel's vacate removes the occupant, whatever it held).
+  // Bodies going into and out of spaces (a space is <structure>/<kind>.<n>; its structure and kind are split out). Genesis occupancy at 0.
   occupancy: `
-    select run_id, seq, t, event, occupant, structure,
-      coalesce(slot, last_value(slot ignore nulls) over w) as slot, coalesce(count, last_value(count ignore nulls) over w) as count, reason, "by"
+    select $run as run_id, seq, t, event, occupant, space, split_part(space, '/', 1) as structure, regexp_extract(space, '/(.*)\\.[0-9]+$', 1) as space_kind, reason, "by"
     from (
-      select $run as run_id, seq, t, json_extract_string(body, '$.event') as event, json_extract_string(body, '$.occupant') as occupant, json_extract_string(body, '$.structure') as structure,
-        json_extract_string(body, '$.slot') as slot, (json_extract_string(body, '$.count'))::INTEGER as count, json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by"
+      select seq, t, json_extract_string(body, '$.event') as event, json_extract_string(body, '$.occupant') as occupant, json_extract_string(body, '$.space') as space,
+        json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by"
       from raw where kind = 'event' and json_extract_string(body, '$.event') in ('occupied', 'vacated')
       union all
-      select $run, 0, 0, 'occupied', json_extract_string(o, '$.occupant'), json_extract_string(o, '$.structure'), json_extract_string(o, '$.slot'),
-        (json_extract_string(o, '$.count'))::INTEGER, null, 'genesis'
-      from (select unnest(from_json(json_extract(body, '$.config.world.occupancy'), '["JSON"]')) as o from raw where kind = 'header'))
-    window w as (partition by occupant, structure order by seq rows between unbounded preceding and current row)`,
+      select 0, 0, 'occupied', json_extract_string(o, '$.occupant'), json_extract_string(o, '$.space'), null, 'genesis'
+      from (select unnest(from_json(json_extract(body, '$.config.world.occupancy'), '["JSON"]')) as o from raw where kind = 'header'))`,
   records: `
-    select $run as run_id, seq, t, json_extract_string(r, '$.id') as id, json_extract_string(r, '$.record') as record, json_extract_string(r, '$.kind') as kind, json_extract_string(r, '$.author') as author,
+    select $run as run_id, seq, t, json_extract_string(r, '$.id') as id, json_extract_string(r, '$.record') as record, json_extract_string(r, '$.kind') as kind, json_extract_string(r, '$.author') as author, json_extract_string(r, '$.in_position') as in_position,
       json_extract_string(r, '$.speaks_for') as speaks_for, (json_extract_string(r, '$.at'))::BIGINT as "at", json_extract_string(r, '$.basis') as basis, json_extract_string(r, '$.place') as place,
       json_extract_string(r, '$.terms.template') as template, json_extract_string(r, '$.withdraws') as withdraws, r as body
     from (select seq, t, json_extract(body, '$.record') as r from raw where kind = 'event' and json_extract_string(body, '$.event') = 'recorded')
     union all
-    select $run, 0, 0, json_extract_string(r, '$.id'), json_extract_string(r, '$.record'), json_extract_string(r, '$.kind'), json_extract_string(r, '$.author'), json_extract_string(r, '$.speaks_for'), (json_extract_string(r, '$.at'))::BIGINT, json_extract_string(r, '$.basis'), json_extract_string(r, '$.place'),
+    select $run, 0, 0, json_extract_string(r, '$.id'), json_extract_string(r, '$.record'), json_extract_string(r, '$.kind'), json_extract_string(r, '$.author'), json_extract_string(r, '$.in_position'), json_extract_string(r, '$.speaks_for'), (json_extract_string(r, '$.at'))::BIGINT, json_extract_string(r, '$.basis'), json_extract_string(r, '$.place'),
       json_extract_string(r, '$.terms.template'), json_extract_string(r, '$.withdraws'), r
     from (select unnest(from_json(json_extract(body, '$.config.world.records'), '["JSON"]')) as r from raw where kind = 'header')`,
   commands: `
-    select $run as run_id, seq, t, json_extract_string(body, '$.command') as command, json_extract_string(body, '$.seat') as seat, body
+    select $run as run_id, seq, t, json_extract_string(body, '$.command') as command, json_extract_string(body, '$.participant') as participant, json_extract_string(body, '$.as') as "as", body
     from raw where kind = 'command' and json_extract_string(body, '$.command') <> 'observe'`,
   acts: `
-    select $run as run_id, c.seq, c.t, json_extract_string(c.body, '$.seat') as seat, json_extract_string(c.body, '$.provenance.via') as via,
+    select $run as run_id, c.seq, c.t, json_extract_string(c.body, '$.participant') as participant, json_extract_string(c.body, '$.as') as "as", json_extract_string(c.body, '$.provenance.via') as via,
       json_array_length(json_extract(c.body, '$.blocks')) as blocks, json_extract_string(c.body, '$.reasoning') as reasoning,
       json_extract_string(o.body, '$.event') = 'action_applied' as applied, json_extract_string(o.body, '$.action') as action,
       json_extract_string(o.body, '$.code') as refusal, (json_extract_string(o.body, '$.block'))::INTEGER as refused_block, json_extract_string(o.body, '$.detail') as detail, json_extract(c.body, '$.blocks') as blocks_json
     from raw c left join raw o on o.kind = 'event' and (json_extract_string(o.body, '$.cause'))::UBIGINT = c.seq and json_extract_string(o.body, '$.event') in ('action_applied', 'action_refused')
     where c.kind = 'command' and json_extract_string(c.body, '$.command') = 'act'`,
   messages: `
-    select $run as run_id, seq, t, seat, from_json(json_extract(b, '$.to'), '["VARCHAR"]') as "to", json_extract_string(b, '$.text') as text, json_extract_string(b, '$.re') as re
-    from (select seq, t, json_extract_string(body, '$.seat') as seat, unnest(from_json(json_extract(body, '$.blocks'), '["JSON"]')) as b from raw where kind = 'command' and json_extract_string(body, '$.command') = 'act')
+    select $run as run_id, seq, t, participant, "as", from_json(json_extract(b, '$.to'), '["VARCHAR"]') as "to", json_extract_string(b, '$.text') as text, json_extract_string(b, '$.re') as re
+    from (select seq, t, json_extract_string(body, '$.participant') as participant, json_extract_string(body, '$.as') as "as", unnest(from_json(json_extract(body, '$.blocks'), '["JSON"]')) as b from raw where kind = 'command' and json_extract_string(body, '$.command') = 'act')
     where json_extract_string(b, '$.block') = 'message'`,
   annotations: `
     select $run as run_id, seq, t, json_extract_string(body, '$.annotation') as annotation, json_extract_string(body, '$.subject') as subject, body

@@ -1,70 +1,51 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.3:calls",
+  "$id": "urn:terrarium:contracts:0.4:calls",
   "title": "Calls (parsed form)",
-  "description": "The parsed form of a program in the call language (contracts/calls.md): what the parser produces and the resolver consumes. Values keep what the seat wrote: amounts and durations stay as text until the parser's tables convert them (zero arithmetic in the translator).",
+  "description": "The parsed form of a program in the call language (contracts/calls.md): what the parser produces and the resolver consumes. Values keep what the participant wrote: amounts and durations stay as text until the parser's tables convert them (zero arithmetic in the translator).",
   "type": "object",
   "oneOf": [
-    {
-      "required": ["lines"],
-      "additionalProperties": false,
-      "properties": {
-        "lines": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/Line" } }
-      }
-    },
-    {
-      "required": ["none"],
-      "additionalProperties": false,
-      "properties": {
-        "none": { "enum": ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form"] }
-      }
-    }
+    { "required": ["lines"], "additionalProperties": false, "properties": { "lines": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/Line" } } } },
+    { "required": ["none"], "additionalProperties": false, "properties": { "none": { "enum": ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form"] } } }
   ],
   "$defs": {
     "Name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
-    "Line": {
-      "type": "object",
-      "required": ["call"],
-      "additionalProperties": false,
-      "properties": {
-        "bind": { "$ref": "#/$defs/Name" },
-        "call": { "$ref": "#/$defs/Call" }
-      }
-    },
+    "Line": { "type": "object", "required": ["call"], "additionalProperties": false, "properties": { "bind": { "$ref": "#/$defs/Name" }, "call": { "$ref": "#/$defs/Call" } } },
     "Value": {
       "oneOf": [
-        { "type": "object", "required": ["id"], "additionalProperties": false, "properties": { "id": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,128}$" } } },
+        { "type": "object", "required": ["id"], "additionalProperties": false, "properties": { "id": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]{1,128}$" } } },
         { "type": "object", "required": ["var"], "additionalProperties": false, "properties": { "var": { "$ref": "#/$defs/Name" } } },
         { "type": "object", "required": ["text"], "additionalProperties": false, "properties": { "text": { "type": "string", "maxLength": 16384 } } },
-        { "type": "object", "required": ["json"], "additionalProperties": false, "properties": { "json": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Opaque" } } },
+        { "type": "object", "required": ["json"], "additionalProperties": false, "properties": { "json": { "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque" } } },
         { "type": "object", "required": ["call"], "additionalProperties": false, "properties": { "call": { "$ref": "#/$defs/Call" } } }
       ]
     },
-    "Args": {
-      "type": "object",
-      "propertyNames": { "$ref": "#/$defs/Name" },
-      "additionalProperties": { "$ref": "#/$defs/Value" }
-    },
+    "Args": { "type": "object", "propertyNames": { "$ref": "#/$defs/Name" }, "additionalProperties": { "$ref": "#/$defs/Value" } },
     "Call": {
       "type": "object",
       "required": ["fn", "args"],
       "additionalProperties": false,
-      "properties": {
-        "fn": { "enum": ["money", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form"] },
-        "args": { "$ref": "#/$defs/Args" }
-      },
+      "properties": { "fn": { "enum": ["money", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system"] }, "args": { "$ref": "#/$defs/Args" } },
       "allOf": [
         { "if": { "properties": { "fn": { "const": "money" } } }, "then": { "properties": { "args": { "type": "object", "required": ["to", "amount"], "propertyNames": { "enum": ["to", "amount", "from", "every", "first", "for", "settles", "basis", "per_request"] } } } } },
         { "if": { "properties": { "fn": { "const": "account" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["holder", "at", "close"] } } } } },
         { "if": { "properties": { "fn": { "const": "structure" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["type", "on", "by", "price", "from", "basis", "remove"] } } } } },
-        { "if": { "properties": { "fn": { "const": "occupancy" } } }, "then": { "properties": { "args": { "type": "object", "required": ["in"], "propertyNames": { "enum": ["in", "who", "slot", "count", "leave"] } } } } },
-        { "if": { "properties": { "fn": { "const": "entity" } } }, "then": { "properties": { "args": { "type": "object", "required": ["kind", "name"], "propertyNames": { "enum": ["kind", "name", "visible"] } } } } },
+        { "if": { "properties": { "fn": { "const": "occupancy" } } }, "then": { "properties": { "args": { "type": "object", "required": ["in"], "propertyNames": { "enum": ["in", "who", "leave"] } } } } },
+        { "if": { "properties": { "fn": { "const": "entity" } } }, "then": { "properties": { "args": { "type": "object", "required": ["kind", "name"], "propertyNames": { "enum": ["kind", "name", "visible", "position"] } } } } },
         { "if": { "properties": { "fn": { "const": "claim" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["holder", "position", "against", "about", "basis", "transfer", "to", "release", "visible", "for"] } } } } },
-        { "if": { "properties": { "fn": { "const": "agreement" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["with", "template", "terms", "we_do", "they_do", "term", "our_notice", "their_notice", "basis", "visible", "sign", "notice", "text", "for"] } } } } },
+        {
+          "if": { "properties": { "fn": { "const": "agreement" } } },
+          "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["with", "template", "terms", "we_do", "they_do", "term", "our_notice", "their_notice", "basis", "visible", "sign", "notice", "text", "for"] } } } }
+        },
         { "if": { "properties": { "fn": { "const": "statement" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["kind", "text", "to", "visible", "basis", "for", "data", "withdraw", "adico", "formal", "on"] } } } } },
         { "if": { "properties": { "fn": { "const": "vote" } } }, "then": { "properties": { "args": { "type": "object", "required": ["ballot", "choice"], "propertyNames": { "enum": ["ballot", "choice", "visible", "for"] } } } } },
         { "if": { "properties": { "fn": { "const": "message" } } }, "then": { "properties": { "args": { "type": "object", "required": ["to", "text"], "propertyNames": { "enum": ["to", "text", "re"] } } } } },
-        { "if": { "properties": { "fn": { "const": "form" } } }, "then": { "properties": { "args": { "type": "object", "required": ["to", "form"] } } } }
+        { "if": { "properties": { "fn": { "const": "form" } } }, "then": { "properties": { "args": { "type": "object", "required": ["to", "form"] } } } },
+        { "if": { "properties": { "fn": { "const": "presence" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["who", "name", "age", "template", "carrying", "leave"] } } } } },
+        { "if": { "properties": { "fn": { "const": "birth" } } }, "then": { "properties": { "args": { "type": "object", "required": ["name", "template"], "propertyNames": { "enum": ["name", "template", "with"] } } } } },
+        { "if": { "properties": { "fn": { "const": "harm" } } }, "then": { "properties": { "args": { "type": "object", "required": ["who"], "propertyNames": { "enum": ["who"] } } } } },
+        { "if": { "properties": { "fn": { "const": "position" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["title", "role", "channels", "role_module", "appoint", "to", "vacate"] } } } } },
+        { "if": { "properties": { "fn": { "const": "system" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["template", "title", "retire"] } } } } }
       ]
     }
   }

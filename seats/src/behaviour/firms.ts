@@ -13,13 +13,13 @@
 // revenue, and lays off when it can't cover a pay period.
 
 import * as C from "../calls";
-import type { Observation, SeatAction } from "../contracts";
+import type { Observation, ParticipantAction } from "../contracts";
 import { channels } from "../contracts";
-import { params, wait, type BehaviourModule, type SeatContext } from "../module";
-import { between, Book, callAction, DAY, leaseTerms, MONTH, notice, offer, ownAccount, pay, say, withdraw, type Step } from "./common";
+import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
+import { between, Book, callAction, cellsOf, DAY, leaseTerms, MONTH, notice, offer, ownAccount, pay, say, structureOf, withdraw, type Step } from "./common";
 
 /**
- * A seat observes after every action, not just when it wakes: `absorb` takes
+ * A participant observes after every action, not just when it wakes: `absorb` takes
  * in every observation (new records, payments received, ids just created),
  * and `plan` decides what to do once per wake.
  */
@@ -27,7 +27,7 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
   let todo: Step[] = [];
   let plannedAt = -1;
   return {
-    step(obs: Observation): SeatAction {
+    step(obs: Observation): ParticipantAction {
       absorb(obs);
       if (plannedAt !== obs.t) {
         todo = plan(obs).filter((s) => s.length);
@@ -48,11 +48,11 @@ function receipts(obs: Observation, account: string): Map<string, number> {
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.3.2",
+  version: "0.4.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const p = params(
     {
       markup_bps: 500,
@@ -80,7 +80,8 @@ export const landlord: BehaviourModule = {
     const book = new Book();
     const cfg = ctx.world.config;
     const types = new Map<string, any>(cfg.catalogue.structure_types.map((t: any) => [t.id, t]));
-    const owned: { structure: string; type: string; units: number }[] = [];
+    // The homes we own: each a unit (a dwelling space) in a finished building on one of our lots.
+    const owned: { structure: string; type: string; space: string; bedrooms?: number }[] = [];
     const received = new Map<string, number>(); // tenant account -> total received
     const listedAt = new Map<string, number>();
     const noticeGiven = new Map<string, number>(); // agreement -> when we gave notice
@@ -89,7 +90,7 @@ export const landlord: BehaviourModule = {
     let nextSpend = MONTH;
 
     const vacancyHistory: { t: number; vacant: number; units: number }[] = [];
-    let dev: { parcel: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string } | null = null;
+    let dev: { lot: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string } | null = null;
     let devCooldownUntil = 0;
     const answered = new Set<string>(); // fines and orders we've responded to
     const obeys = (key: string) => ctx.rng(`comply-${key}`).below(10_000) < p.compliance_bps;
@@ -107,15 +108,18 @@ export const landlord: BehaviourModule = {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
-      // What we own: completed homes on parcels our ownership records name
-      // (seen through our own sites), including anything we've since built.
-      const ownParcels = new Set([...book.records.values()].flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object] : [])));
-      const sites = channels.sites(obs).filter((s) => ownParcels.has(s.parcel));
+      // What we own: the lots our ownership records name, the cells they cover (seen through our own sites),
+      // and the homes (dwelling units) in finished buildings on them, including anything we've since built.
+      const ownLots = [...book.records.values()].flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object as string] : [])).sort();
+      const ownCells = new Set(ownLots.flatMap((l) => cellsOf(book, l)));
+      const sites = channels.cells(obs).filter((c) => ownCells.has(c.cell));
       owned.length = 0;
+      const seenStructures = new Set<string>();
       for (const site of sites) {
         const st = site.structure;
-        const ty = st && types.get(st.type);
-        if (st?.complete && ty?.capacity?.dwelling) owned.push({ structure: st.structure, type: st.type, units: ty.capacity.dwelling });
+        if (!st?.complete || seenStructures.has(st.structure)) continue;
+        seenStructures.add(st.structure);
+        for (const sp of st.spaces) if (sp.kind === "dwelling") owned.push({ structure: st.structure, type: st.type, space: sp.space, bedrooms: sp.attrs?.bedrooms });
       }
       // Our leases, and when each ends.
       // Our leases: in force, or offered by us and still awaiting the tenant's
@@ -130,7 +134,7 @@ export const landlord: BehaviourModule = {
         return t < ends;
       }) as any[];
       const steps: Step[] = [];
-      const offeredNow: string[] = []; // structures offered this wake (they hold a unit too)
+      const offeredNow: string[] = []; // units offered this wake (they're held too)
       const tenantOf = (a: any) => a.terms.parties.find((x: string) => x !== me);
 
       // Applications: pick one at random per listing, offer a lease, withdraw the listing.
@@ -138,14 +142,14 @@ export const landlord: BehaviourModule = {
       const byListing = new Map<string, typeof apps>();
       for (const a of apps) byListing.set(a.data?.listing, [...(byListing.get(a.data?.listing) ?? []), a]);
       const lettingNow = new Set<string>(); // listings being let (or withdrawn) in this plan: never also relisted
-      const unitsIn = (structure: string) => owned.find((o) => o.structure === structure)?.units ?? 0;
-      const takenIn = (structure: string) => [...active, ...awaiting].filter((a) => leaseTerms(a, tenantOf(a)).structure === structure).length + offeredNow.filter((x) => x === structure).length;
+      // A unit is taken while a lease for it is in force or awaiting signature, or we've just offered one.
+      const taken = (space: string) => [...active, ...awaiting].some((a) => leaseTerms(a, tenantOf(a)).space === space) || offeredNow.includes(space);
       for (const [listingId, as] of byListing) {
         for (const a of as) handled.add(a.id);
         const listing = book.records.get(listingId);
         if (listing?.record !== "statement" || book.withdrawn.has(listingId)) continue;
         // Only let a home that's still free; a stale listing is taken down instead.
-        if (takenIn(listing.data.structure) >= unitsIn(listing.data.structure)) {
+        if (!listing.data.space || taken(listing.data.space) || !owned.some((o) => o.space === listing.data.space)) {
           lettingNow.add(listingId);
           steps.push([withdraw(listingId, "No longer available.")]);
           continue;
@@ -157,40 +161,31 @@ export const landlord: BehaviourModule = {
         steps.push([
           ["lease", offer(tenant, {
             template: "lease", term: months * MONTH, ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
-            we: C.call("occupancy", { who: tenant, in: listing.data.structure, slot: "dwelling", count: 1 }),
+            we: C.call("occupancy", { who: tenant, in: listing.data.space }),
             they: pay(acc.account, listing.data.rent, { every: MONTH, for: "rent" }),
-            text: `${tenant} rents a home in ${listing.data.structure} from ${me} for ${listing.data.rent} cents a month, for ${months} months.`,
+            text: `${tenant} rents home ${listing.data.space} from ${me} for ${listing.data.rent} cents a month, for ${months} months.`,
           })],
           withdraw(listingId, "Let."),
         ]);
-        offeredNow.push(listing.data.structure);
+        offeredNow.push(listing.data.space);
       }
 
-      // Vacancies: list them, at a markup over what we currently get for that kind of home.
+      // Vacancies: list each free unit, at a markup over what we currently get for homes in that building.
       const openListings = book.open("rental_listing").filter((l) => l.speaks_for === me);
+      const listing = (o: (typeof owned)[number], rent: number) =>
+        say("rental_listing", `Home to let: ${o.space}${o.bedrooms ? `, ${o.bedrooms} bedrooms` : ""}, ${rent} cents a month.`, { data: { structure: o.structure, space: o.space, type: o.type, ...(o.bedrooms ? { bedrooms: o.bedrooms } : {}), rent } });
       for (const o of owned) {
-        const homeOf = (a: any) => leaseTerms(a, tenantOf(a)).structure;
-        const let_ = [...active, ...awaiting].filter((a) => homeOf(a) === o.structure).length;
-        const listed = openListings.filter((l) => l.data?.structure === o.structure && !lettingNow.has(l.id));
-        const pendingOffers = offeredNow.filter((x) => x === o.structure).length;
-        const vacant = o.units - let_ - listed.length - pendingOffers;
-        for (let i = 0; i < vacant; i++) {
-          const going = active.filter((a) => types.get(o.type) && homeOf(a) === o.structure).map((a) => leaseTerms(a, tenantOf(a)).rent);
+        const listed = openListings.filter((l) => l.data?.space === o.space && !lettingNow.has(l.id));
+        if (!taken(o.space) && listed.length === 0) {
+          const going = active.filter((a) => leaseTerms(a, tenantOf(a)).structure === o.structure).map((a) => leaseTerms(a, tenantOf(a)).rent);
           const ref = going.length ? Math.floor(going.reduce((x, y) => x + y, 0) / going.length) : p.base_rent[o.type] ?? 100_000;
-          const noise = 9_750 + ctx.rng(`price-${o.structure}-${i}`).below(501); // +/-2.5%
-          const rent = Math.floor((((ref * (10_000 + p.markup_bps)) / 10_000) * noise) / 10_000);
-          steps.push([say("rental_listing", `Home to let in ${o.structure}: ${rent} cents a month.`, { data: { structure: o.structure, type: o.type, rent } })]);
+          const noise = 9_750 + ctx.rng(`price-${o.space}`).below(501); // +/-2.5%
+          steps.push([listing(o, Math.floor((((ref * (10_000 + p.markup_bps)) / 10_000) * noise) / 10_000))]);
         }
         // Unlet for a month: cut the asking rent (BoE: 5% a month).
         for (const l of listed) {
           const since = listedAt.get(l.id) ?? l.at;
-          if (t - since >= MONTH) {
-            const rent = Math.floor((l.data.rent * (10_000 - p.cut_bps)) / 10_000);
-            steps.push([
-              withdraw(l.id, "Relisting at a lower rent."),
-              say("rental_listing", `Home to let in ${o.structure}: ${rent} cents a month.`, { data: { structure: o.structure, type: o.type, rent } }),
-            ]);
-          }
+          if (t - since >= MONTH) steps.push([withdraw(l.id, "Relisting at a lower rent."), listing(o, Math.floor((l.data.rent * (10_000 - p.cut_bps)) / 10_000))]);
         }
       }
 
@@ -235,19 +230,20 @@ export const landlord: BehaviourModule = {
       // Development: once every home we have has been let for a while, build
       // on a site we own. Apply for a permit; if refused, comply, or (with
       // probability 1 - compliance) build anyway.
-      const units = owned.reduce((n, o) => n + o.units, 0);
+      const units = owned.length;
       vacancyHistory.push({ t, vacant: Math.max(0, units - active.length), units });
       while (vacancyHistory.length && vacancyHistory[0]!.t < t - p.develop_window_days * DAY) vacancyHistory.shift();
       const vacantSum = vacancyHistory.reduce((n, h) => n + h.vacant, 0);
       const unitSum = vacancyHistory.reduce((n, h) => n + h.units, 0);
       const occupiedEnough = t >= p.develop_window_days * DAY && unitSum > 0 && vacantSum * 10_000 <= unitSum * p.develop_max_vacancy_bps;
-      const emptySites = sites.filter((s) => !s.structure).map((s) => s.parcel).sort();
+      // A lot of ours with nothing on it yet.
+      const emptyLots = ownLots.filter((l) => cellsOf(book, l).length > 0 && cellsOf(book, l).every((c) => sites.some((s) => s.cell === c && !s.structure)));
       const devType = types.get(p.develop_type);
       const price = devType ? Math.floor((devType.materials_cost * (10_000 + p.build_markup_bps)) / 10_000) : Infinity;
-      if (p.develop && !dev && t >= devCooldownUntil && occupiedEnough && emptySites.length && acc.balance >= price + price / 2 && p.city && p.builder) {
-        dev = { parcel: emptySites[0]!, stage: "applying" };
+      if (p.develop && !dev && t >= devCooldownUntil && occupiedEnough && emptyLots.length && acc.balance >= price + price / 2 && p.city && p.builder) {
+        dev = { lot: emptyLots[0]!, stage: "applying" };
         // The planning office's published form (it's in the world's genesis records).
-        steps.push([["app", C.call("form", { to: p.city, form: "permit_application", parcel: dev.parcel, structure_type: p.develop_type })]]);
+        steps.push([["app", C.call("form", { to: p.city, form: "permit_application", lot: dev.lot, structure_type: p.develop_type })]]);
       }
       if (dev?.stage === "applied") {
         const decision = book.open("permit_decision").find((d) => d.data?.application === dev!.app);
@@ -260,11 +256,11 @@ export const landlord: BehaviourModule = {
         }
       }
       if (dev && (dev.stage === "granted" || dev.stage === "refused") && acc.balance >= price) {
-        const parcel = dev.parcel;
+        const lot = dev.lot;
         dev.stage = "contracted";
-        steps.push([["build", C.call("structure", { type: p.develop_type, on: parcel, by: p.builder, price: C.dollars(price), from: acc.account })]]);
+        steps.push([["build", C.call("structure", { type: p.develop_type, on: lot, by: p.builder, price: C.dollars(price), from: acc.account })]]);
       }
-      if (dev?.stage === "contracted" && sites.some((s) => s.parcel === dev!.parcel && s.structure)) dev = null;
+      if (dev?.stage === "contracted" && sites.some((s) => cellsOf(book, dev!.lot).includes(s.cell) && s.structure)) dev = null;
 
       // Invoices addressed to us (from the builder): pay them.
       for (const inv of book.open("invoice")) {
@@ -293,11 +289,11 @@ export const landlord: BehaviourModule = {
 
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
-  create(ctx: SeatContext) {
+  create(ctx: ParticipantContext) {
     const p = params(
     {
       wage: 140_000, // cents per period
@@ -368,7 +364,7 @@ export const employer: BehaviourModule = {
           ["job", offer(worker, {
             template: "employment", ourNotice: p.notice_days * DAY, theirNotice: p.notice_days * DAY,
             we: pay(chosen.data?.account ?? worker, p.wage, { every: p.period, for: "wages" }),
-            they: p.workplace ? C.call("occupancy", { who: worker, in: p.workplace, slot: "workplace", count: 1 }) : undefined,
+            they: p.workplace ? C.call("occupancy", { who: worker, in: p.workplace }) : undefined,
             text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${p.wage} cents every ${p.period / DAY} days.`,
           })],
           withdraw(post.id, "Filled."),
@@ -379,7 +375,7 @@ export const employer: BehaviourModule = {
       // Post a job if short-staffed and the wage bill is affordable.
       const bill = (staff.length + 1) * p.wage;
       if (staff.length + offered.length + offersNow < p.target_staff && posts.length === 0 && acc.balance >= p.buffer_periods * bill) {
-        steps.push([say("job_posting", `Hiring: ${p.wage} cents every ${p.period / DAY} days.`, { data: { wage: p.wage, period: p.period, role: p.role ?? "staff", ...(p.workplace ? { workplace: p.workplace } : {}) } })]);
+        steps.push([say("job_posting", `Hiring: ${p.wage} cents every ${p.period / DAY} days.`, { data: { wage: p.wage, period: p.period, role: p.role ?? "staff", ...(p.workplace ? { workplace: structureOf(p.workplace), space: p.workplace } : {}) } })]);
       }
 
       // Can't cover the next pay period: lay off the most recent hire.

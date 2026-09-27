@@ -23,11 +23,11 @@ fn serve_then_verify_then_replay() {
 
     let requests = [
         json!({"op": "start", "config": common::riverbend(), "run_id": "cli-test", "log_path": log, "anchors_path": anchors}),
-        json!({"op": "command", "command": {"command": "observe", "seat": "mayor"}}),
-        json!({"op": "check", "seat": "builder", "blocks": [{"block": "construct", "parcel": "p12", "structure_type": "park", "materials_from": "acc-buildco"}]}),
-        json!({"op": "command", "command": {"command": "act", "seat": "bank-payments", "blocks": [{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": 180000, "per_instruction": "so-bob-rent"}], "provenance": {"via": "direct"}}}),
-        json!({"op": "command", "command": {"command": "act", "seat": "bank-payments", "blocks": [{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 0}], "provenance": {"via": "direct"}}}),
-        json!({"op": "annotate", "annotation": {"annotation": "usage", "purpose": "seat", "subject": "mayor", "provider": "anthropic", "model": "claude-sonnet-5", "input_tokens": 900, "output_tokens": 120, "cost_microusd": 4500}}),
+        json!({"op": "command", "command": {"command": "observe", "participant": "mayor-system"}}),
+        json!({"op": "check", "participant": "builder-system", "as": "builder", "blocks": [{"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_from": "acc-buildco"}]}),
+        json!({"op": "command", "command": {"command": "act", "participant": "bank-payments-system", "as": "bank-payments", "blocks": [{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": 180000, "per_instruction": "so-bob-rent"}], "provenance": {"via": "direct"}}}),
+        json!({"op": "command", "command": {"command": "act", "participant": "bank-payments-system", "as": "bank-payments", "blocks": [{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 0}], "provenance": {"via": "direct"}}}),
+        json!({"op": "annotate", "annotation": {"annotation": "usage", "purpose": "participant", "subject": "mayor", "provider": "anthropic", "model": "claude-sonnet-5", "input_tokens": 900, "output_tokens": 120, "cost_microusd": 4500}}),
         json!({"op": "command", "command": {"command": "advance", "to": 5_184_000}}),
         json!({"op": "state"}),
         json!({"op": "finish", "reason": "completed"}),
@@ -42,7 +42,7 @@ fn serve_then_verify_then_replay() {
     let out = child.wait_with_output().unwrap();
     let replies: Vec<Value> = String::from_utf8(out.stdout).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
     assert_eq!(replies.len(), requests.len());
-    assert!(replies[1]["observation"]["seat"] == "mayor");
+    assert!(replies[1]["observation"]["participant"] == "mayor-system");
     assert_eq!(replies[2]["check"]["ok"], true);
     assert_eq!(replies[3]["events"][0]["event"], "action_applied");
     // An off-contract command is rejected and never logged.

@@ -1,6 +1,5 @@
 {
   "type": "act",
-  "seat": "finance",
   "blocks": [
     {
       "block": "transfer",
@@ -10,5 +9,6 @@
       "per_instruction": "so-bob-rent",
       "memo": "Rent, month 2"
     }
-  ]
+  ],
+  "participant": "finance"
 }

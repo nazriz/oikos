@@ -19,25 +19,27 @@ async function run(compliance: number, name: string) {
   const out = join(root, "runs", `test-river-${name}`);
   rmSync(out, { recursive: true, force: true });
   const config = generate({ ...tight, landlord_compliance_bps: compliance });
-  const riverSite = config.world.records.find((r: any) => r.record === "claim" && r.holder === "landlord-1" && !config.world.structures.some((s: any) => s.parcel === r.about.object)).about.object;
+  // A lot of landlord-1's with nothing on it (lots are registry records over cells).
+  const cellsOf = (lot: string): string[] => config.world.records.find((r: any) => r.id === lot)?.data?.cells ?? [];
+  const riverSite = config.world.records.find((r: any) => r.record === "claim" && r.holder === "landlord-1" && !config.world.structures.some((s: any) => cellsOf(r.about.object).includes(s.at))).about.object;
   const s = await runWorld({ config, runId: name, outDir: out, until: 240 * DAY });
   const ev = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const recs = ev.filter((e) => e.event === "recorded").map((e) => e.record);
-  return { riverSite, ev, recs };
+  return { riverSite, riverCells: cellsOf(riverSite), ev, recs };
 }
 
 test("a refused permit, a landlord who builds anyway, and an inspector who notices", async () => {
-  const { riverSite, ev, recs } = await run(0, "defiant");
-  const app = recs.find((r) => r.kind === "permit_application" && r.data.parcel === riverSite);
+  const { riverSite, riverCells, ev, recs } = await run(0, "defiant");
+  const app = recs.find((r) => r.kind === "permit_application" && r.data.lot === riverSite);
   expect(app).toBeDefined();
   const decision = recs.find((r) => r.kind === "permit_decision" && r.data.application === app.id);
   expect(decision.data).toMatchObject({ decision: "refused", law: "law-river" });
   // Physics doesn't care about the refusal: the house goes up.
-  const built = ev.find((e) => e.event === "structure_started" && e.parcel === riverSite);
+  const built = ev.find((e) => e.event === "structure_started" && riverCells.includes(e.on));
   expect(built).toBeDefined();
   // The inspector's patrol (every 14 days) sees it and acts under law-planning.
   const fine = recs.find((r) => r.record === "claim" && r.about?.kind === "fine" && r.counterparty === "landlord-1");
-  const order = recs.find((r) => r.kind === "demolition_order" && r.data.parcel === riverSite);
+  const order = recs.find((r) => r.kind === "demolition_order" && r.data.lot === riverSite);
   expect(fine?.basis).toBe("law-planning");
   expect(order).toBeDefined();
   expect(order.at - built.t).toBeLessThanOrEqual(21 * DAY);
@@ -46,9 +48,9 @@ test("a refused permit, a landlord who builds anyway, and an inspector who notic
 }, 300_000);
 
 test("a compliant landlord abandons the river site after the refusal", async () => {
-  const { riverSite, ev, recs } = await run(10_000, "compliant");
+  const { riverCells, ev, recs } = await run(10_000, "compliant");
   expect(recs.some((r) => r.kind === "permit_decision" && r.data.decision === "refused")).toBe(true);
-  expect(ev.some((e) => e.event === "structure_started" && e.parcel === riverSite)).toBe(false);
+  expect(ev.some((e) => e.event === "structure_started" && riverCells.includes(e.on))).toBe(false);
   // Elsewhere, permits are granted and building happens lawfully, unfined.
   expect(ev.some((e) => e.event === "structure_started")).toBe(true);
   expect(recs.some((r) => r.record === "claim" && r.about?.kind === "fine")).toBe(false);

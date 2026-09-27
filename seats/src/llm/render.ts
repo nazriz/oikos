@@ -1,10 +1,11 @@
-// What a language seat reads (principle 14: the platform is invisible to the
-// seats). An Observation becomes the reports a person in that role would
+// What a language-model participant reads (principle 14: the platform is
+// invisible to participants). An Observation becomes the reports a person in that role would
 // read, in the world's own terms: accounts, letters, filings, titles,
 // agreements, a survey of the town. No blocks, records, channels or refusal
 // codes. Deterministic: the same observation always reads the same.
 
-import type { Observation, Record, SiteParcel, Transaction } from "../contracts";
+import type { Body, Observation, Record, SiteStructure, Transaction } from "../contracts";
+import { channels } from "../contracts";
 import { refusalText } from "./words";
 
 const DAY = 86_400;
@@ -40,8 +41,8 @@ const details = (x: unknown, max = 400) => {
 export function outcomeWords(o: any, every?: number): string {
   const rep = every ? ` every ${duration(every)}` : "";
   if (o?.money) return `pay ${money(o.money.amount)}${o.money.from ? ` from ${o.money.from}` : ""} to ${o.money.to}${rep}${o.money.for ? ` (${o.money.for})` : ""}`;
-  if (o?.structure) return o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on lot ${o.structure.on}`;
-  if (o?.occupancy) return o.occupancy.leave ? `have ${o.occupancy.who} leave ${o.occupancy.in}` : `give ${o.occupancy.who} a ${o.occupancy.slot ?? "place"} in ${o.occupancy.in}`;
+  if (o?.structure) return o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`;
+  if (o?.occupancy) return o.occupancy.leave ? `have ${o.occupancy.who} leave ${o.occupancy.in}` : `let ${o.occupancy.who} live or be in ${o.occupancy.in}`;
   if (o?.account) return o.account.close ? `close account ${o.account.close}` : `open an account for ${o.account.holder}`;
   return "do what the terms say";
 }
@@ -119,47 +120,66 @@ function recordLines(records: Record[]): string[] {
   });
 }
 
-/** A few lots, one by one: what's on each, and who's there where the seat can tell. */
-function describeLots(parcels: SiteParcel[], me: string, capacity: (type: string) => { [slot: string]: number }): string[] {
-  return parcels.map((p) => {
-    const s = p.structure;
-    if (!s) return `- ${p.parcel}: empty`;
-    const what = `${words(s.type)} (${s.structure})${s.complete ? "" : `, being built${s.completes_at ? ` until ${when(s.completes_at)}` : ""}`}`;
-    const named = s.occupancy.filter((o) => o.occupant).map((o) => (o.occupant === me ? "you" : o.occupant!));
-    const counted = [...new Set(s.occupancy.map((o) => o.slot))].map((slot) => {
-      const n = s.occupancy.filter((o) => o.slot === slot).reduce((a, o) => a + o.count, 0);
-      const cap = capacity(s.type)[slot];
-      return `${n}${cap ? ` of ${cap}` : ""} ${words(slot)} places taken`;
-    });
-    return `- ${p.parcel}: ${what}${named.length ? `; here: ${named.join(", ")}` : ""}${s.complete && counted.length ? `; ${counted.join(", ")}` : ""}`;
+const attrWords = (a: unknown) => (a && typeof a === "object" && Object.keys(a).length ? ` (${details(a, 120)})` : "");
+
+/** A few buildings, one by one: their spaces, how full each is, and who's there where the participant can tell. */
+function describeBuildings(structures: SiteStructure[], me: string): string[] {
+  return structures.map((s) => {
+    const head = `- ${words(s.type)} ${s.structure}, at ${s.at}${s.w * s.h > 1 ? ` (${s.w} by ${s.h} cells)` : ""}${s.complete ? "" : `, being built${s.completes_at ? ` until ${when(s.completes_at)}` : ""}`}`;
+    if (!s.complete) return head;
+    const lines = s.spaces.length <= 8
+      ? s.spaces.map((x) => {
+          const who = (x.occupants ?? []).map((o) => (o === me ? "you" : o));
+          return `  - ${x.space}, a ${words(x.kind)}${attrWords(x.attrs)}: ${x.count} ${x.count === 1 ? "person" : "people"} (room for ${x.capacity})${who.length ? `: ${who.join(", ")}` : ""}`;
+        })
+      : [...groupSpaces(s.spaces).values()].map((g) => `  - ${g.n} ${words(g.kind)}s${g.attrs}: ${g.used} in use, ${g.people} people${g.mine.length ? `; yours: ${g.mine.join(", ")}` : ""}`);
+    return [head, ...lines].join("\n");
   });
+
+  function groupSpaces(spaces: SiteStructure["spaces"]) {
+    const m = new Map<string, { kind: string; n: number; used: number; people: number; attrs: string; mine: string[] }>();
+    for (const x of spaces) {
+      const key = `${x.kind}${attrWords(x.attrs)}`;
+      const g = m.get(key) ?? { kind: x.kind, n: 0, used: 0, people: 0, attrs: attrWords(x.attrs), mine: [] };
+      g.n++;
+      if (x.count) g.used++;
+      g.people += x.count;
+      if ((x.occupants ?? []).includes(me)) g.mine.push(x.space);
+      m.set(key, g);
+    }
+    return m;
+  }
 }
 
-/** A town survey: counts, not raw parcels. */
-function describeSites(parcels: SiteParcel[], asOf: number, capacity: (type: string) => { [slot: string]: number }): string {
+/** A town survey: counts, not raw cells. */
+function describeSurvey(cells: number, open: number, structures: SiteStructure[], asOf: number): string {
   const byType = new Map<string, { done: number; building: number }>();
-  const slots = new Map<string, { used: number; total: number }>();
-  let empty = 0;
-  for (const p of parcels) {
-    const s = p.structure;
-    if (!s) {
-      empty++;
-      continue;
-    }
+  const spaces = new Map<string, { kind: string; attrs: string; used: number; total: number; people: number }>();
+  for (const s of structures) {
     const c = byType.get(s.type) ?? { done: 0, building: 0 };
     s.complete ? c.done++ : c.building++;
     byType.set(s.type, c);
     if (!s.complete) continue;
-    for (const [slot, n] of Object.entries(capacity(s.type))) {
-      const u = slots.get(slot) ?? { used: 0, total: 0 };
-      u.total += n;
-      u.used += s.occupancy.filter((o) => o.slot === slot).reduce((a, o) => a + o.count, 0);
-      slots.set(slot, u);
+    for (const x of s.spaces) {
+      const key = `${x.kind}${attrWords(x.attrs)}`;
+      const u = spaces.get(key) ?? { kind: x.kind, attrs: attrWords(x.attrs), used: 0, total: 0, people: 0 };
+      u.total++;
+      if (x.count) u.used++;
+      u.people += x.count;
+      spaces.set(key, u);
     }
   }
   const types = [...byType].sort().map(([t, c]) => `${c.done} ${words(t)}${c.building ? ` (and ${c.building} being built)` : ""}`).join(", ");
-  const use = [...slots].sort().map(([s, u]) => `${u.used} of ${u.total} ${words(s)} places taken`).join("; ");
-  return `As of ${when(asOf)}: ${parcels.length} lots, ${empty} of them empty. Buildings: ${types || "none"}. ${use ? `${use}.` : ""}`.trim();
+  const use = [...spaces].sort().map(([, u]) => `${u.used} of ${u.total} ${words(u.kind)}s${u.attrs} in use, ${u.people} people`).join("; ");
+  return `As of ${when(asOf)}: ${cells} cells of ground, ${open} of them open. Buildings: ${types || "none"}. ${use ? `${use}.` : ""}`.trim();
+}
+
+/** The participant's own body, in plain words. */
+function describeBody(b: Body, t: number): string[] {
+  const age = Math.floor((t - b.born_at) / YEAR);
+  const out = [`You are ${age} year${age === 1 ? "" : "s"} old${b.present ? "" : ", and away from here"}.`];
+  for (const c of b.conditions ?? []) out.push(`You have ${c.severity === "mild" ? "a mild" : `a ${words(c.severity)}`} ${c.kind === "injury" ? "injury" : "illness"}, since ${when(c.since)}; it should pass by ${when(c.until)}.`);
+  return out;
 }
 
 function describeTransactions(txs: Transaction[], mine: Set<string>): string[] {
@@ -181,23 +201,26 @@ function describeTransactions(txs: Transaction[], mine: Set<string>): string[] {
 export interface RenderOptions {
   /** Items shown per report before earlier ones are only counted. */
   maxRecords?: number;
-  /** Spaces in a kind of building (from the world's catalogue), for the survey. */
-  capacity?: (type: string) => { [slot: string]: number };
   /** Reports whose items are standing documents (shown separately, in full). */
   standing?: Set<string>;
-  /** What the seat's reports are called (Channel.title). */
+  /** What the participant's reports are called (Channel.title). */
   titles?: Map<string, string>;
-  /** What the seat's last action was, in words ("What you confirmed", "Your letter to …"). */
+  /** What the participant's last action was, in words ("What you confirmed", "Your letter to …"). */
   lastAction?: string;
   /** How a draft awaiting confirmation reads. */
   draftText?: (d: any) => string;
 }
 
-/** What's new since the seat last looked. */
+/** What's new since the participant last looked. */
 export function renderObservation(obs: Observation, o: RenderOptions = {}): string {
   const max = o.maxRecords ?? 40;
-  const title = (id: string) => o.titles?.get(id) ?? words(id).replace(/^./, (c) => c.toUpperCase());
+  const cap = (x: string) => words(x).replace(/^./, (c) => c.toUpperCase());
+  const postTitle = new Map((obs.positions ?? []).map((p) => [p.position, p.title ?? words(p.role ?? p.position)]));
+  // A post's reports are named after the post (`mayor/budget` reads "Mayor: Budget").
+  const title = (id: string) => o.titles?.get(id) ?? (id.includes("/") ? `${cap(postTitle.get(id.split("/")[0]!) ?? id.split("/")[0]!)}: ${cap(id.split("/").slice(1).join("/"))}` : cap(id));
   const out: string[] = [`It is ${when(obs.t)}.`];
+  if (obs.body) out.push(...describeBody(obs.body, obs.t));
+  if (obs.positions?.length) out.push(`You hold ${obs.positions.length === 1 ? "a post" : "these posts"}: ${obs.positions.map((p) => `${p.title ?? words(p.role ?? p.position)} (${p.position}), for ${p.entity}`).join("; ")}.`);
   for (const x of obs.outcomes) {
     const what = o.lastAction ?? "What you did";
     out.push(x.status === "applied" ? `Done: ${what.charAt(0).toLowerCase()}${what.slice(1)}.` : `${what} couldn't be done: ${refusalText(x.refusal?.code)}.`);
@@ -223,13 +246,23 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       if (lines.length > max) out.push(`(${lines.length - max} earlier ${lines.length - max === 1 ? "item" : "items"} not listed.)`);
       for (const l of lines.slice(-max)) out.push(`- ${l}`);
     } else if (ch.kind === "sites") {
-      // A handful of lots (the seat's surroundings) one by one; a whole town as a survey.
-      if (ch.parcels.length <= 30) out.push("", `## ${title(id)}`, ...(ch.parcels.length ? describeLots(ch.parcels, obs.entity, o.capacity ?? (() => ({}))) : ["Nothing to see here."]));
-      else out.push("", `## ${title(id)}`, describeSites(ch.parcels, ch.as_of, o.capacity ?? (() => ({}))));
+      // A few buildings (the participant's surroundings) one by one; a whole town as a survey.
+      const structures = channels.structures({ ...obs, channels: { [id]: ch } });
+      const open = ch.cells.filter((c) => !c.structure).length;
+      if (structures.length <= 30) {
+        out.push("", `## ${title(id)}`, ...(structures.length ? describeBuildings(structures, obs.entity) : ["No buildings here."]));
+        if (open) out.push(`Open ground: ${open} cell${open === 1 ? "" : "s"}${open <= 12 ? ` (${ch.cells.filter((c) => !c.structure).map((c) => `${c.cell}${c.terrain ? `, ${words(c.terrain)}` : ""}`).join("; ")})` : ""}.`);
+      } else out.push("", `## ${title(id)}`, describeSurvey(ch.cells.length, open, structures, ch.as_of));
     } else if (ch.kind === "directory") {
       const orgs = ch.entities.filter((e) => e.kind !== "person").map((e) => `${e.name} (${e.entity})`);
-      const offices = ch.seats.filter((s) => s.role).map((s) => `${s.seat}: ${words(s.role!)}, for ${s.entity}${s.status === "active" ? "" : " (gone)"}`);
-      out.push("", `## ${title(id)}`, `Organisations: ${orgs.join(", ") || "none"}.`, ...(offices.length ? [`Office holders: ${offices.slice(0, 60).join("; ")}${offices.length > 60 ? "; …" : ""}.`] : []), `People: ${ch.entities.filter((e) => e.kind === "person").length}.`);
+      const nameOf = new Map(ch.entities.filter((e) => e.participant).map((e) => [e.participant!, `${e.name} (${e.entity})`]));
+      // Posts with a public role (mayor, councillor…) are listed with who holds them; the rest are only counted.
+      const roled = ch.positions.filter((p) => p.role);
+      const offices = roled.map((p) => `${p.title ?? words(p.role!)} (${p.position}), for ${p.entity}: ${p.holder ? (nameOf.get(p.holder) ?? p.held_by ?? "filled") : "vacant"}`);
+      const others = ch.positions.length - roled.length;
+      out.push("", `## ${title(id)}`, `Organisations: ${orgs.join(", ") || "none"}.`,
+        ...(offices.length ? [`Posts: ${offices.slice(0, 60).join("; ")}${offices.length > 60 ? "; …" : ""}${others ? `; and ${others} other post${others === 1 ? "" : "s"} in organisations' own offices` : ""}.`] : []),
+        `People: ${ch.entities.filter((e) => e.kind === "person").length}.`);
     }
   }
   if (obs.drafts.length) {

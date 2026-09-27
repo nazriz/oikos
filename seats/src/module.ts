@@ -1,18 +1,19 @@
-// The behaviour-module interface: how code seats plug in (D30).
+// The behaviour-module interface: how code participants plug in (D30).
 //
 // A module is world CONTENT: a swappable, documented, cited rule set (see
-// docs/behaviour/). It sees exactly what any other seat sees (an Observation)
-// and answers with exactly what any other seat answers (a SeatAction), so an
-// LLM or a human can take over any code seat without special cases (VISION
+// docs/behaviour/). It sees exactly what any other participant sees (an
+// Observation) and answers with exactly what any other participant answers (a
+// ParticipantAction), so an LLM or a human can take over any code participant
+// without special cases (VISION
 // principle 4).
 //
 // Determinism rules for modules (so re-runs are reproducible):
 //   - randomness only from ctx.rng(...) (the kernel's keyed streams);
 //   - no clocks, no Math.random, no I/O;
 //   - memory is allowed (people remember), but must depend only on what the
-//     seat has observed and drawn.
+//     participant has observed and drawn.
 
-import type { Block, Observation, SeatAction } from "./contracts";
+import type { Block, Observation, ParticipantAction } from "./contracts";
 import type { Rng } from "./rng";
 
 export interface WorldInfo {
@@ -22,18 +23,24 @@ export interface WorldInfo {
   config: any;
 }
 
-export interface SeatContext {
-  seat: string;
+/**
+ * What a module knows about where it's running: which participant, acting for which entity, in which position (absent:
+ * as itself). For a role module (a job's procedures), `params` are the position's role parameters with the
+ * participant's own traits on top: the same job, done by different people, differently.
+ */
+export interface ParticipantContext {
+  participant: string;
   entity: string;
-  /** A deterministic stream for this seat, this moment and this purpose. */
+  position?: string;
+  /** A deterministic stream for this participant, this moment and this purpose. */
   rng(purpose: string): Rng;
   world: WorldInfo;
   params: { [k: string]: any };
 }
 
 export interface Controller {
-  /** Called repeatedly while the seat is awake; return {type: "wait"} to sleep. Code modules answer synchronously; model-backed seats return a promise. */
-  step(obs: Observation, ctx: SeatContext): SeatAction | Promise<SeatAction>;
+  /** Called repeatedly while the participant is awake; return {type: "wait"} to sleep. Code modules answer synchronously; model-backed participants return a promise. */
+  step(obs: Observation, ctx: ParticipantContext): ParticipantAction | Promise<ParticipantAction>;
 }
 
 export interface BehaviourModule {
@@ -43,15 +50,15 @@ export interface BehaviourModule {
   version: string;
   /** Where the module's rules are documented, with their sources. */
   doc: string;
-  /** How long the seat sleeps when it waits without saying until when (seconds). */
-  cadence(ctx: SeatContext): number;
-  /** When the seat first wakes (seconds from the start). */
-  firstWake?(ctx: SeatContext): number;
-  create(ctx: SeatContext): Controller;
+  /** How long it sleeps when it waits without saying until when (seconds). */
+  cadence(ctx: ParticipantContext): number;
+  /** When it first wakes (seconds from the start). */
+  firstWake?(ctx: ParticipantContext): number;
+  create(ctx: ParticipantContext): Controller;
 }
 
-export const wait = (until?: number): SeatAction => (until === undefined ? { type: "wait" } : { type: "wait", until });
-export const act = (blocks: Block[], reasoning?: string): SeatAction => (reasoning ? { type: "act", blocks, reasoning } : { type: "act", blocks });
+export const wait = (until?: number): ParticipantAction => (until === undefined ? { type: "wait" } : { type: "wait", until });
+export const act = (blocks: Block[], reasoning?: string): ParticipantAction => (reasoning ? { type: "act", blocks, reasoning } : { type: "act", blocks });
 
 export const DAY = 86_400;
 

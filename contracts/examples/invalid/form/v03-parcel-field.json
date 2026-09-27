@@ -1,0 +1,6 @@
+{
+  "form": "permit_application",
+  "submit_as": "permit_application",
+  "submit_to": ["city"],
+  "fields": { "parcel": { "type": "parcel", "required": true } }
+}

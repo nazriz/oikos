@@ -47,8 +47,9 @@ export type Verdict = { value: boolean } | { error: string };
 export function evaluate(condition: string, vars: { block: object; actor: string; now: number }, claims: Extract<Record, { record: "claim" }>[]): Verdict {
   const bad = violations(condition);
   if (bad.length) return { error: `condition not allowed: ${bad.join(", ")}` };
-  const has = (position: string) => (who: string, action: string, parcel: string) =>
-    claims.some((c) => c.position === position && c.holder === who && c.about?.action === action && c.about?.parcel === parcel);
+  // holds_liberty(who, action, object): a standing claim of that position, to that action, about that object (a lot, a building, ...).
+  const has = (position: string) => (who: string, action: string, object: string) =>
+    claims.some((c) => c.position === position && c.holder === who && c.about?.action === action && c.about?.object === object);
   const env = celEnv({
     funcs: [
       celFunc("holds_liberty", [CelScalar.STRING, CelScalar.STRING, CelScalar.STRING], CelScalar.BOOL, has("liberty")),

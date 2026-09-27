@@ -6,9 +6,9 @@
     "event": "vacated",
     "cause": 49,
     "occupant": "bob",
-    "structure": "s-apts",
     "by": "developer",
-    "reason": "removed"
+    "reason": "removed",
+    "space": "s-apts/dwelling.1"
   },
   "prev": "abababababababababababababababababababababababababababababababab",
   "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"

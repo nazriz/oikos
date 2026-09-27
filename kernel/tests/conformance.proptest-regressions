@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 1ca6e1467026fc1dd210fcdd91ef86a013787608cf127c4e7f32130cb2ab83d6 # shrinks to ops = [Act { seat: 0, blocks: [Transfer { from: 0, to: 0, amount: 1 }] }]
+cc e8e4c3636a0c4ee9444f5dd0fa80891eacc62ecf4a7ee82bead3bbefccc513ed # shrinks to ops = [Act { actor: 0, blocks: [Birth { with: None }] }, Smart { kind: 215, a: 0, b: 160, flag: false }, Act { actor: 0, blocks: [Birth { with: None }] }, Act { actor: 0, blocks: [Notice { record: 40, party: 128 }] }, Act { actor: 108, blocks: [Arrive { person: None, carrying: false }] }, Smart { kind: 51, a: 119, b: 8, flag: true }, Smart { kind: 125, a: 118, b: 83, flag: true }, Act { actor: 177, blocks: [Occupy { space: 35, who: None }, Transfer { from: 234, to: 247, amount: 795089 }, CreateEntity { kind: 105, bind: false, position: false }] }]

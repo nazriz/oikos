@@ -1,5 +1,5 @@
 //! Building blocks and records, mirroring contracts/blocks.schema.json and
-//! contracts/records.schema.json (v0.2). Field names and shapes must match
+//! contracts/records.schema.json (v0.4). Field names and shapes must match
 //! the schemas exactly; tests/conformance.rs checks that the contract
 //! examples round-trip through these types.
 //!
@@ -7,6 +7,7 @@
 //! data, the Institutional Grammar breakdown, formal conditions) stay as JSON
 //! values: the kernel stores them and never interprets them.
 
+use crate::config::Channel;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -38,7 +39,8 @@ pub enum Block {
         account: IdOrRef,
     },
     Construct {
-        parcel: Id,
+        /// The corner cell of the footprint.
+        at: Id,
         structure_type: Id,
         materials_from: IdOrRef,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
@@ -48,19 +50,89 @@ pub enum Block {
         structure: IdOrRef,
         costs_from: IdOrRef,
     },
+    /// A body goes into a space: the acting person, or someone they bring (`who`).
     Occupy {
-        structure: IdOrRef,
-        slot: String,
-        count: u32,
+        space: IdOrRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        who: Option<IdOrRef>,
     },
+    /// A body comes out of a structure (every space it's in there) or one space.
     Vacate {
         occupant: IdOrRef,
-        structure: IdOrRef,
+        from: IdOrRef,
+    },
+    // ---- bodies ----
+    /// Someone crosses into the world from outside: a newcomer (name, born_at, template) or someone
+    /// returning (person). Done in a position of the boundary. `carrying`: money they bring.
+    Arrive {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        person: Option<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        born_at: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        template: Option<Id>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        carrying: Option<i64>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    /// A body crosses out of the world: the acting person, or someone removed.
+    Leave {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        person: Option<IdOrRef>,
+    },
+    /// The acting person conceives a child (with another parent, if named); the child is born after gestation.
+    Birth {
+        name: String,
+        template: Id,
+        #[serde(default, rename = "with", skip_serializing_if = "Option::is_none")]
+        other_parent: Option<IdOrRef>,
+    },
+    /// The acting person harms someone near them.
+    Harm {
+        person: IdOrRef,
+    },
+    // ---- participants and positions ----
+    /// A new position of the acting organisation, vacant.
+    CreatePosition {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        role: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        channels: Vec<Channel>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        role_module: Option<Value>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    /// Hand one of the acting organisation's positions to a participant, or to nobody.
+    Appoint {
+        position: IdOrRef,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        participant: Option<IdOrRef>,
+    },
+    /// A new system participant belonging to the acting organisation, from a template.
+    Deploy {
+        template: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        bind: Option<String>,
+    },
+    /// Switch off a system participant belonging to the acting organisation.
+    Retire {
+        participant: IdOrRef,
     },
     // ---- records ----
     CreateEntity {
         kind: String,
         name: String,
+        /// The new organisation's first position, held by the acting participant.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        first_position: Option<NewPosition>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         speaks_for: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -146,7 +218,7 @@ pub enum Block {
         basis: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<IdOrRef>>,
-        /// A parcel it's put up on: then it's seen by being near there.
+        /// A cell it's put up on: then it's seen by being near there.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         place: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -195,6 +267,14 @@ impl Block {
             Block::Demolish { .. } => "demolish",
             Block::Occupy { .. } => "occupy",
             Block::Vacate { .. } => "vacate",
+            Block::Arrive { .. } => "arrive",
+            Block::Leave { .. } => "leave",
+            Block::Birth { .. } => "birth",
+            Block::Harm { .. } => "harm",
+            Block::CreatePosition { .. } => "create_position",
+            Block::Appoint { .. } => "appoint",
+            Block::Deploy { .. } => "deploy",
+            Block::Retire { .. } => "retire",
             Block::CreateEntity { .. } => "create_entity",
             Block::RecordClaim { .. } => "record_claim",
             Block::TransferClaim { .. } => "transfer_claim",
@@ -252,6 +332,22 @@ impl Visibility {
     }
 }
 
+/// A position to create: its title and role (presentation), what it sees, and how a code participant does the job.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NewPosition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub channels: Vec<Channel>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role_module: Option<Value>,
+    #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+    pub bind: Option<String>,
+}
+
 /// An agreement's terms. Apart from who the parties are, all of it is opaque data.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -295,8 +391,12 @@ pub const GENESIS: &str = "genesis";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Record {
     pub id: Id,
-    /// A seat id, or "genesis".
+    /// A participant id, or "genesis".
     pub author: String,
+    /// The position the author made it in (absent: as themselves). Not `position`: a claim's
+    /// Hohfeld position has that name.
+    #[serde(default, rename = "in_position", skip_serializing_if = "Option::is_none")]
+    pub position: Option<Id>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speaks_for: Option<Id>,
     pub at: i64,
@@ -350,7 +450,7 @@ pub enum RecordBody {
         formal: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<Id>>,
-        /// The parcel it's put up on, if any.
+        /// The cell it's put up on, if any.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         place: Option<Id>,
     },

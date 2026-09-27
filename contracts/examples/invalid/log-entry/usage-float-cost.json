@@ -4,7 +4,7 @@
   "kind": "annotation",
   "body": {
     "annotation": "usage",
-    "purpose": "seat",
+    "purpose": "participant",
     "subject": "mayor",
     "provider": "p",
     "model": "m",

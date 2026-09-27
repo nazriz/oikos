@@ -1,15 +1,15 @@
-// Shared helpers for behaviour modules: turning what a seat has seen into
-// memory. Records arrive as what's new since the seat last looked, so each module keeps
+// Shared helpers for behaviour modules: turning what a participant has seen into
+// memory. Records arrive as what's new since the participant last looked, so each module keeps
 // its own book of the records relevant to it, as a person would.
 
 import * as C from "../calls";
-import type { Observation, Record, SeatAction, StatementRecord } from "../contracts";
+import type { Observation, Record, ParticipantAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 
 export const DAY = 86_400;
 export const MONTH = 30 * DAY;
 
-/** Everything a seat has perceived so far, indexed. */
+/** Everything a participant has perceived so far, indexed. */
 export class Book {
   readonly records = new Map<string, Record>();
   readonly withdrawn = new Set<string>();
@@ -17,9 +17,12 @@ export class Book {
   readonly notices = new Map<string, { as: string; at: number }[]>(); // agreement -> notices
   readonly signedTimes = new Map<string, number[]>(); // agreement -> signature times
   private readonly byKind = new Map<string, StatementRecord[]>(); // statement kind -> statements, in the order seen
-  readonly seatEntity = new Map<string, string>();
+  /** participant -> the person it acts as (from a directory). */
+  readonly participantPerson = new Map<string, string>();
+  /** position -> its organisation, role and holder (from a directory). */
+  readonly positions = new Map<string, { entity: string; role?: string; holder?: string }>();
   readonly entityKind = new Map<string, string>();
-  private lastDirectory: unknown; // the directory list last read (the seat's view hands back the same list until it changes)
+  private lastDirectory: unknown; // the directory lists last read (the view hands back the same lists until they change)
 
   absorb(obs: Observation): Record[] {
     const fresh: Record[] = [];
@@ -42,10 +45,13 @@ export class Book {
       if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
     }
     const dir = channels.directory(obs);
-    if (dir && dir.seats !== this.lastDirectory) {
-      this.lastDirectory = dir.seats;
-      for (const s of dir.seats) this.seatEntity.set(s.seat, s.entity);
-      for (const e of dir.entities) this.entityKind.set(e.entity, e.kind);
+    if (dir && dir.positions !== this.lastDirectory) {
+      this.lastDirectory = dir.positions;
+      for (const p of dir.positions) this.positions.set(p.position, { entity: p.entity, role: p.role, holder: p.holder });
+      for (const e of dir.entities) {
+        this.entityKind.set(e.entity, e.kind);
+        if (e.participant) this.participantPerson.set(e.participant, e.entity);
+      }
     }
     return fresh;
   }
@@ -71,12 +77,19 @@ export class Book {
     return Math.max(...(this.signedTimes.get(agreement) ?? []));
   }
 
+  /** The entity a record was made for: the organisation of the position it was made in, or its author's person. */
+  authorEntity(r: Record): string | undefined {
+    if (r.author === "genesis") return r.speaks_for;
+    if (r.in_position) return this.positions.get(r.in_position)?.entity;
+    return this.participantPerson.get(r.author);
+  }
+
   entitiesOfKind(kind: string): string[] {
     return [...this.entityKind].filter(([, k]) => k === kind).map(([e]) => e).sort();
   }
 }
 
-/** Signatures on a petition this seat can see: votes with choice "sign", one per signing entity (the organiser sees them all). */
+/** Signatures on a petition this participant can see: votes with choice "sign", one per signing entity (the organiser sees them all). */
 export function petitionSignatures(book: Book, petition: string): number {
   const who = new Set<string>();
   for (const r of book.records.values()) if (r.record === "vote" && r.ballot === petition && r.choice === "sign" && r.speaks_for) who.add(r.speaks_for);
@@ -89,21 +102,21 @@ export function publishedCount(book: Book, petition: StatementRecord): number {
   return counts.length ? (counts.at(-1)!.data.signatures as number) : 0;
 }
 
-/** The seat's own account (held by its entity). */
+/** Its own account (held by the entity it acts for). */
 export function ownAccount(obs: Observation): { account: string; balance: number; custodian: string } | undefined {
   return channels.accounts(obs).find((a) => a.holder === obs.entity);
 }
 
 // ------------------------------------------------------------------ acting through calls
 //
-// Code seats act the way every seat does (D36, P14): they say what they want
-// brought about, as calls, and the resolver turns each into the seat's own
-// acts. Paying someone is money(...): the resolver asks the account's bank.
+// Code participants act the way every participant does (D36, P14): they say
+// what they want brought about, as calls, and the resolver turns each into
+// their own acts. Paying someone is money(...): the resolver asks the account's bank.
 
 /** One atomic act: lines of calls, optionally binding a name (whose id comes back in the outcome's `created`). */
 export type Step = (C.Call | [string, C.Call])[];
 
-export const callAction = (step: Step): SeatAction => ({ type: "call", call: C.program(...step) });
+export const callAction = (step: Step): ParticipantAction => ({ type: "call", call: C.program(...step) });
 
 /** Money to an account: a one-off or repeating payment. */
 export function pay(to: string, amount: number, o: { from?: string; for?: string; settles?: string; every?: number; first?: number; basis?: string; per_request?: string } = {}): C.Call {
@@ -126,8 +139,10 @@ export const withdraw = (record: string, text?: string): C.Call => C.call("state
 export const sign = (agreement: string): C.Call => C.call("agreement", { sign: agreement });
 export const notice = (agreement: string, text: string): C.Call => C.call("agreement", { notice: agreement, text: C.text(text) });
 export const message = (to: string[], text: string, re?: string): C.Call => C.call("message", { to: C.json(to), text: C.text(text), re });
-export const moveIn = (structure: string, slot: string, count = 1): C.Call => C.call("occupancy", { in: structure, slot, count });
-export const moveOut = (structure: string, who: string): C.Call => C.call("occupancy", { in: structure, who, leave: "yes" });
+/** Go into a space (a home, a workplace floor). */
+export const moveIn = (space: string): C.Call => C.call("occupancy", { in: space });
+/** Come out of a space, or a whole building. */
+export const moveOut = (from: string, who: string): C.Call => C.call("occupancy", { in: from, who, leave: "yes" });
 export const vote = (ballot: string, choice: string, visible?: "public"): C.Call => C.call("vote", { ballot, choice, visible });
 export const record = (position: "right" | "liberty", holder: string, about: unknown, o: { against?: string; basis?: string } = {}): C.Call =>
   C.call("claim", { position, holder, about: C.json(about), against: o.against, basis: o.basis });
@@ -143,7 +158,10 @@ export function offer(withWhom: string, o: { template: string; we?: C.Call; they
 
 // ------------------------------------------------------------------ reading agreements (the standard encoding, §9.2)
 
-export type Outcome = { money?: { from?: string; to: string; amount: number; for?: string }; occupancy?: { who: string; in: string; slot?: string; count?: number }; structure?: { type?: string; on?: string; remove?: string } };
+export type Outcome = { money?: { from?: string; to: string; amount: number; for?: string }; occupancy?: { who: string; in: string; leave?: boolean }; structure?: { type?: string; on?: string; remove?: string } };
+
+/** The structure a space is in (`apts-3/dwelling.2` -> `apts-3`). */
+export const structureOf = (space: string) => space.split("/")[0]!;
 
 /** What a party commits to bring about in an agreement, and how often. */
 export function commitmentOf(a: Record | undefined, who: string): { outcome?: Outcome; every?: number } {
@@ -152,15 +170,16 @@ export function commitmentOf(a: Record | undefined, who: string): { outcome?: Ou
   return { outcome: c?.does?.outcome, every: c?.every };
 }
 
-/** A lease's rent (paid by the tenant, into which account) and home (given by the other party). */
-export function leaseTerms(a: Record | undefined, tenant: string): { rent: number; rentTo?: string; structure?: string } {
+/** A lease's rent (paid by the tenant, into which account) and home: the space given by the other party, and its building. */
+export function leaseTerms(a: Record | undefined, tenant: string): { rent: number; rentTo?: string; space?: string; structure?: string } {
   if (a?.record !== "agreement") return { rent: 0 };
   const other = a.terms.parties.find((x) => x !== tenant)!;
   const pays = commitmentOf(a, tenant).outcome?.money;
-  return { rent: pays?.amount ?? 0, rentTo: pays?.to, structure: commitmentOf(a, other).outcome?.occupancy?.in };
+  const space = commitmentOf(a, other).outcome?.occupancy?.in;
+  return { rent: pays?.amount ?? 0, rentTo: pays?.to, space, structure: space ? structureOf(space) : undefined };
 }
 
-/** A job's wage and pay period (from the employer) and workplace (where the worker commits to be). */
+/** A job's wage and pay period (from the employer) and workplace (the space the worker commits to be in). */
 export function jobTerms(a: Record | undefined, worker: string): { wage: number; period: number; workplace?: string } {
   if (a?.record !== "agreement") return { wage: 0, period: 14 * DAY };
   const employer = a.terms.parties.find((x) => x !== worker)!;
@@ -169,3 +188,16 @@ export function jobTerms(a: Record | undefined, worker: string): { wage: number;
 }
 
 export const between = (lo: number, hi: number, u: number) => lo + Math.floor(u * (hi - lo + 1));
+
+// ------------------------------------------------------------------ land: lots are registry records over cells
+
+/** The cells a lot covers, from its registry record (a statement of kind "lot"). */
+export function cellsOf(book: Book, lot: string): string[] {
+  const r = book.records.get(lot);
+  return r?.record === "statement" && r.kind === "lot" && !book.withdrawn.has(lot) ? ((r.data?.cells as string[]) ?? []) : [];
+}
+
+/** The standing lot a cell is in, if the registry has one. */
+export function lotOf(book: Book, cell: string): string | undefined {
+  return book.open("lot").find((l) => (l.data?.cells as string[] | undefined)?.includes(cell))?.id;
+}

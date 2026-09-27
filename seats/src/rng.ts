@@ -1,7 +1,7 @@
 // The kernel's randomness, ported exactly (kernel/src/rng.rs): one seed, keyed
 // streams. stream(key) derives an independent xoshiro256** stream from
 // SHA-256("terrarium.rng.v1\n" || seed_le || for each part: len_le || utf8).
-// Code seats draw randomness only from here, so re-runs are reproducible
+// Code participants draw randomness only from here, so re-runs are reproducible
 // (D30). Checked against the Rust known-answer vectors in test/rng.test.ts.
 
 const MASK = (1n << 64n) - 1n;

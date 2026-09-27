@@ -1,7 +1,7 @@
 //! Terrarium kernel: the world's laws of physics and its only writer.
 //!
-//! Physics, plus a place to keep records (contracts v0.2, D18-D22). Inputs are
-//! commands (act / advance / observe / resign); outputs are events,
+//! Physics, plus a place to keep records (contracts v0.4, D18-D22, D47). Inputs are
+//! commands (act / advance / observe / look / opt_out); outputs are events,
 //! observations and a hash-chained log that replays byte-identically. The
 //! kernel refuses only what is physically impossible; laws, ownership and
 //! authority are records it stores and never judges. The contracts in
@@ -17,6 +17,7 @@ pub mod config;
 pub mod contracts;
 pub mod events;
 pub mod exec;
+pub mod geo;
 pub mod kernel;
 pub mod log;
 pub mod observe;

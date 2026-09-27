@@ -1,14 +1,19 @@
-//! Observations (v0.2), mirroring the Observation definition in
-//! contracts/seat-api.schema.json. A seat perceives only through its channels
-//! (plus its inbox and the outcomes of its own acts), and a record only ever
-//! appears if its visibility lets the seat's entity see it. The kernel builds
+//! Observations (v0.4), mirroring the Observation definition in
+//! contracts/participant-api.schema.json. A participant perceives only through
+//! channels: its own (a person's view of its own life) and those of each
+//! position it holds (what the role sees), plus its inbox, the outcomes of its
+//! own acts, and (for a person's) its own body. A record only ever appears if
+//! its visibility lets the capacity's entity see it. The kernel builds
 //! everything except `drafts`, which the orchestrator adds from the
 //! translator; the observation hash in the log covers the kernel-built
 //! observation (with `drafts: []`).
+//!
+//! Channel paths: a personal channel is its id; a position's is `<position>/<channel>`.
 
 use crate::blocks::{Id, Record};
-use crate::config::{Area, ChannelKind, CmpOp, LookRequest, Occupants, Query, RecordFilter};
-use crate::state::{Look, Message, Outcome, Parcel, SeatStatus, State, Transaction};
+use crate::config::{cell_id, Area, Channel, ChannelKind, CmpOp, LookRequest, Occupants, ParticipantKind, Query, RecordFilter, SELF};
+use crate::geo::{within, Rect};
+use crate::state::{Condition, Look, Message, Outcome, ParticipantStatus, State, Transaction};
 use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -16,14 +21,43 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
-    pub seat: Id,
+    pub participant: Id,
     pub t: i64,
-    pub status: SeatStatus,
-    pub entity: Id,
+    pub status: ParticipantStatus,
+    /// A person's participant: its person.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity: Option<Id>,
+    /// A person's participant: its own body, in full.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<BodyView>,
+    /// The positions it holds now.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub positions: Vec<HeldPosition>,
     pub outcomes: Vec<Outcome>,
     pub inbox: Vec<Message>,
     pub drafts: Vec<Value>,
     pub channels: BTreeMap<Id, ChannelData>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BodyView {
+    pub born_at: i64,
+    pub present: bool,
+    pub alive: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parents: Vec<Id>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conditions: Vec<Condition>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeldPosition {
+    pub position: Id,
+    pub entity: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,19 +69,18 @@ pub enum ChannelData {
         /// Set when these are a search's results (what matches now), not what's new since the last look.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         search: Option<bool>,
-        /// Set when the seat's surroundings changed (it moved): everything the channel now covers,
-        /// in place of what it covered before.
+        /// Set when the capacity's entity has moved: everything the channel now covers, in place of what it covered before.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         whole: Option<bool>,
     },
     Sites {
         as_of: i64,
-        parcels: Vec<SiteParcel>,
-        /// As for records: the whole of the seat's new surroundings, in place of the old.
+        cells: Vec<SiteCell>,
+        /// As for records: the whole of the new surroundings, in place of the old.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         whole: Option<bool>,
     },
-    Directory { entities: Vec<EntityItem>, seats: Vec<SeatItem> },
+    Directory { entities: Vec<EntityItem>, positions: Vec<PositionItem> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,18 +89,19 @@ pub struct AccountItem {
     pub holder: Id,
     pub custodian: Id,
     pub balance: i64,
-    /// Set when the account has been closed since the seat last looked.
+    /// Set when the account has been closed since the last look.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed: Option<bool>,
 }
 
+/// A cell of ground, and the building standing on it (repeated on every cell of its footprint).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SiteParcel {
-    pub parcel: Id,
+pub struct SiteCell {
+    pub cell: Id,
     pub x: i64,
     pub y: i64,
-    pub w: i64,
-    pub h: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terrain: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structure: Option<SiteStructure>,
 }
@@ -77,21 +111,31 @@ pub struct SiteStructure {
     pub structure: Id,
     #[serde(rename = "type")]
     pub structure_type: Id,
+    /// Its corner cell, and footprint.
+    pub at: Id,
+    pub w: i64,
+    pub h: i64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub built_by: Option<Id>,
     pub complete: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completes_at: Option<i64>,
-    pub occupancy: Vec<OccupancyItem>,
+    pub spaces: Vec<SiteSpace>,
 }
 
+/// A space in a building: what it is (the world's vocabulary), how many bodies it holds at most,
+/// and who is in it where that can be told (the capacity's own buildings, or a channel that
+/// shows names); otherwise how many.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OccupancyItem {
-    /// Who, where the seat can tell (its own buildings, or a channel that shows names); otherwise a count per slot.
+pub struct SiteSpace {
+    pub space: Id,
+    pub kind: String,
+    pub capacity: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub occupant: Option<Id>,
-    pub slot: String,
+    pub attrs: Option<Value>,
     pub count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occupants: Option<Vec<Id>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -99,25 +143,32 @@ pub struct EntityItem {
     pub entity: Id,
     pub kind: String,
     pub name: String,
+    /// A person's participant (who acts as them), as a registry of people knows them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant: Option<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SeatItem {
-    pub seat: Id,
+pub struct PositionItem {
+    pub position: Id,
     pub entity: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
-    pub status: SeatStatus,
+    /// Who holds it: the participant, and the person (for a person's) or its title (for a system).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub holder: Option<Id>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub held_by: Option<String>,
 }
 
-/// Can seats of `entity` perceive this record? The author's entity always can.
-pub fn can_see(s: &Statics, rec: &Record, entity: &str) -> bool {
-    rec.visible_to.allows(entity) || s.entity_of(&rec.author) == Some(entity)
+/// Can those acting for `entity` perceive this record? The author's entity always can.
+pub fn can_see(st: &State, rec: &Record, entity: &str) -> bool {
+    rec.visible_to.allows(entity) || st.author_entity(rec).as_deref() == Some(entity)
 }
 
-/// Where a record physically is: the parcel a statement was put up on, and the same place for
+/// Where a record physically is: the cell a statement was put up on, and the same place for
 /// taking it down (a withdrawal of a placed statement).
 pub fn place_of<'a>(st: &'a State, rec: &'a Record) -> Option<&'a Id> {
     match &rec.body {
@@ -131,56 +182,47 @@ pub fn place_of<'a>(st: &'a State, rec: &'a Record) -> Option<&'a Id> {
 }
 
 /// Can this channel show the record, as far as place goes? A channel with an area sees what's
-/// placed there; one without sees what isn't placed anywhere, and what the seat's entity put up itself.
-fn placed_ok(s: &Statics, st: &State, rec: &Record, me: &str, area: Option<&Scope>) -> bool {
+/// placed there; one without sees what isn't placed anywhere, and what its own entity put up.
+fn placed_ok(st: &State, rec: &Record, me: &str, area: Option<&Scope>) -> bool {
     match (place_of(st, rec), area) {
         (None, None) => true,
         (None, Some(_)) => false,
         (Some(p), Some(scope)) => scope.covers(p),
-        (Some(_), None) => s.entity_of(&rec.author) == Some(me) || rec.speaks_for.as_deref() == Some(me),
+        (Some(_), None) => st.author_entity(rec).as_deref() == Some(me) || rec.speaks_for.as_deref() == Some(me),
     }
 }
 
-/// The parcels an area covers for a seat, now.
+/// The cells an area covers for a capacity, now.
 #[derive(Debug)]
 enum Scope {
     Everywhere,
-    Parcels(BTreeSet<Id>),
+    Cells(BTreeSet<Id>),
 }
 
 impl Scope {
     fn covers(&self, p: &str) -> bool {
         match self {
             Scope::Everywhere => true,
-            Scope::Parcels(ps) => ps.contains(p),
+            Scope::Cells(ps) => ps.contains(p),
         }
     }
-}
-
-/// Are two parcels within `n` of each other? The distance is the gap between their rectangles
-/// (0 when they touch), in the world's own units.
-pub fn within(a: &Parcel, b: &Parcel, n: i64) -> bool {
-    let gap = |a0: i64, a1: i64, b0: i64, b1: i64| (a0.max(b0) as i128 - a1.min(b1) as i128).max(0);
-    let dx = gap(a.x, a.x + a.w, b.x, b.x + b.w);
-    let dy = gap(a.y, a.y + a.h, b.y, b.y + b.h);
-    dx * dx + dy * dy <= n as i128 * n as i128
 }
 
 /// Entities a record involves: those it names, its author's entity, and (one
 /// hop) those named by any record it refers to. A signature on my agreement,
 /// or a withdrawal of my listing, involves me (D32).
-fn involved<'a>(s: &'a Statics, st: &'a State, rec: &'a Record) -> Vec<&'a str> {
-    let mut v: Vec<&str> = rec.entities_named().into_iter().chain(s.entity_of(&rec.author)).collect();
+fn involved(st: &State, rec: &Record) -> Vec<String> {
+    let mut v: Vec<String> = rec.entities_named().into_iter().map(String::from).chain(st.author_entity(rec)).collect();
     for other in rec.body.records_referenced() {
         if let Some(o) = st.records.get(other) {
-            v.extend(o.record.entities_named());
-            v.extend(s.entity_of(&o.record.author));
+            v.extend(o.record.entities_named().into_iter().map(String::from));
+            v.extend(st.author_entity(&o.record));
         }
     }
     v
 }
 
-fn matches(s: &Statics, st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&str>>) -> bool {
+fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&str>>) -> bool {
     if f.records.as_ref().is_some_and(|k| !k.iter().any(|x| x == rec.body.kind_name())) {
         return false;
     }
@@ -191,7 +233,7 @@ fn matches(s: &Statics, st: &State, rec: &Record, f: &RecordFilter, want: Option
         }
     }
     if let Some(want) = want {
-        if !involved(s, st, rec).into_iter().any(|e| want.contains(e)) {
+        if !involved(st, rec).iter().any(|e| want.contains(e.as_str())) {
             return false;
         }
     }
@@ -215,13 +257,11 @@ pub struct RecordIndex {
     /// statement kind and by record kind: what a search for standing records scans.
     standing_kind: BTreeMap<String, BTreeSet<u64>>,
     standing_record: BTreeMap<&'static str, BTreeSet<u64>>,
-    /// parcel -> records placed there (and withdrawals of them).
+    /// cell -> records placed there (and withdrawals of them).
     by_place: BTreeMap<Id, Vec<u64>>,
     accounts: Option<AccountsByEntity>,
-    /// entity -> (its `moved` stamp, the parcels where it occupies a building then).
-    places: BTreeMap<Id, (u64, Vec<Id>)>,
-    /// distance -> parcel -> parcels within that distance. Parcels never change, so this is built once per distance.
-    near: BTreeMap<i64, BTreeMap<Id, Vec<Id>>>,
+    /// entity -> (its `moved` stamp, the footprints of the buildings it's in then).
+    places: BTreeMap<Id, (u64, Vec<Rect>)>,
 }
 
 /// entity -> accounts it holds or keeps, for the account set identified by
@@ -230,7 +270,7 @@ pub struct RecordIndex {
 type AccountsByEntity = ((u64, usize), BTreeMap<Id, Vec<Id>>);
 
 impl RecordIndex {
-    fn catch_up(&mut self, s: &Statics, st: &State) {
+    fn catch_up(&mut self, st: &State) {
         for i in self.indexed..st.record_order.len() {
             let stored = &st.records[&st.record_order[i]];
             let (seq, rec) = (stored.seq, &*stored.record);
@@ -238,9 +278,9 @@ impl RecordIndex {
             if let crate::blocks::RecordBody::Statement { kind, .. } = &rec.body {
                 self.by_kind.entry(kind.clone()).or_default().push(seq);
             }
-            let who: BTreeSet<&str> = involved(s, st, rec).into_iter().collect();
+            let who: BTreeSet<String> = involved(st, rec).into_iter().collect();
             for e in who {
-                self.by_entity.entry(e.to_string()).or_default().push(seq);
+                self.by_entity.entry(e).or_default().push(seq);
             }
             if let Some(p) = place_of(st, rec) {
                 self.by_place.entry(p.clone()).or_default().push(seq);
@@ -256,7 +296,7 @@ impl RecordIndex {
             if let crate::blocks::RecordBody::Withdrawal { withdraws, .. } = &rec.body {
                 if let Some(target) = st.records.get(withdraws) {
                     let t = &*target.record;
-                    let owner = |r: &Record| -> Vec<String> { r.speaks_for.iter().cloned().chain(s.entity_of(&r.author).map(String::from)).collect() };
+                    let owner = |r: &Record| -> Vec<String> { r.speaks_for.iter().cloned().chain(st.author_entity(r)).collect() };
                     let by = owner(rec);
                     if owner(t).iter().any(|o| by.contains(o)) {
                         if let Some(set) = self.standing_record.get_mut(t.body.kind_name()) {
@@ -320,32 +360,34 @@ impl RecordIndex {
         let tail = |v: &Vec<u64>| v[v.partition_point(|&q| q <= after)..].to_vec();
         let mut seqs: Vec<u64> = match scope {
             Scope::Everywhere => self.by_place.values().flat_map(tail).collect(),
-            Scope::Parcels(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(tail).collect(),
+            Scope::Cells(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(tail).collect(),
         };
         seqs.sort_unstable();
         seqs
     }
 
-    /// The parcels an area covers for an entity, now.
-    fn scope(&mut self, st: &State, area: &Area, me: &str) -> Scope {
+    /// The cells an area covers for an entity, now.
+    fn scope(&mut self, s: &Statics, st: &State, area: &Area, me: &str) -> Scope {
         match area {
             Area::All(_) => Scope::Everywhere,
-            Area::Parcels(ps) => Scope::Parcels(ps.iter().cloned().collect()),
+            Area::Cells(cs) => Scope::Cells(cs.iter().cloned().collect()),
             Area::Near(n) => {
                 let moved = st.entities.get(me).map_or(0, |e| e.moved);
                 if self.places.get(me).is_none_or(|(m, _)| *m != moved) {
-                    let mut ps: Vec<Id> = st
-                        .occupancy
-                        .iter()
-                        .filter(|(_, occ)| occ.contains_key(me))
-                        .filter_map(|(sid, _)| st.structures.get(sid).map(|x| x.parcel.clone()))
-                        .collect();
-                    ps.sort();
-                    ps.dedup();
-                    self.places.insert(me.to_string(), (moved, ps));
+                    self.places.insert(me.to_string(), (moved, crate::geo::body_rects(s, st, me)));
                 }
-                let table = self.near.entry(n.near).or_insert_with(|| near_table(st, n.near));
-                Scope::Parcels(self.places[me].1.iter().flat_map(|p| table.get(p).into_iter().flatten().cloned()).collect())
+                let g = &s.config.world.ground;
+                let mut cells = BTreeSet::new();
+                for r in &self.places[me].1 {
+                    for y in (r.y - n.near - 1).max(0)..(r.y + r.h + n.near + 1).min(g.h) {
+                        for x in (r.x - n.near - 1).max(0)..(r.x + r.w + n.near + 1).min(g.w) {
+                            if within(*r, Rect::cell(x, y), n.near) {
+                                cells.insert(cell_id(x, y));
+                            }
+                        }
+                    }
+                }
+                Scope::Cells(cells)
             }
         }
     }
@@ -364,23 +406,6 @@ impl RecordIndex {
         }
         self.accounts.as_ref().unwrap().1.get(entity).map(Vec::as_slice).unwrap_or(&[])
     }
-}
-
-/// Each parcel's neighbours within `n` (itself included), found by sweeping along x.
-fn near_table(st: &State, n: i64) -> BTreeMap<Id, Vec<Id>> {
-    let mut by_x: Vec<(&Id, &Parcel)> = st.parcels.iter().collect();
-    by_x.sort_by_key(|(id, p)| (p.x, (*id).clone()));
-    let widest = by_x.iter().map(|(_, p)| p.w).max().unwrap_or(0);
-    let mut out = BTreeMap::new();
-    for (id, p) in &by_x {
-        // Anything within reach starts no further left than this, and no further right than p's far edge plus n.
-        let lo = by_x.partition_point(|(_, q)| (q.x as i128) < p.x as i128 - n as i128 - widest as i128);
-        let hi = by_x.partition_point(|(_, q)| (q.x as i128) <= p.x as i128 + p.w as i128 + n as i128);
-        let mut v: Vec<Id> = by_x[lo..hi].iter().filter(|(_, q)| within(p, q, n)).map(|(qid, _)| (*qid).clone()).collect();
-        v.sort();
-        out.insert((*id).clone(), v);
-    }
-    out
 }
 
 /// A field a search can use. Purely mechanical: names a place in a record, and never says what it means.
@@ -443,39 +468,43 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
     }
 }
 
-fn site_parcel(st: &State, id: &Id, p: &Parcel, me: &str, names: bool) -> SiteParcel {
-    SiteParcel {
-        parcel: id.clone(),
-        x: p.x,
-        y: p.y,
-        w: p.w,
-        h: p.h,
-        structure: p.structure.as_ref().map(|sid| {
+fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCell {
+    let c = &st.cells[id];
+    SiteCell {
+        cell: id.clone(),
+        x: c.x,
+        y: c.y,
+        terrain: c.terrain.clone(),
+        structure: c.structure.as_ref().map(|sid| {
             let x = &st.structures[sid];
+            let f = s.types[&x.structure_type].footprint;
+            let occ = st.occupancy.get(sid);
+            // Who is in a building: known in one's own, and where the channel shows names; otherwise how many.
+            let known = names || occ.is_some_and(|m| m.values().any(|b| b.contains(me)));
             SiteStructure {
                 structure: sid.clone(),
                 structure_type: x.structure_type.clone(),
+                at: x.at.clone(),
+                w: f.w,
+                h: f.h,
                 built_by: x.built_by.clone(),
                 complete: x.complete,
                 completes_at: x.completes_at,
-                occupancy: {
-                    let occ = st.occupancy.get(sid);
-                    // Who is in a building: known in one's own, and where the channel shows names; otherwise how many.
-                    if names || occ.is_some_and(|o| o.contains_key(me)) {
-                        occ.into_iter()
-                            .flatten()
-                            .flat_map(|(o, slots)| slots.iter().map(|(slot, c)| OccupancyItem { occupant: Some(o.clone()), slot: slot.clone(), count: *c }))
-                            .collect()
-                    } else {
-                        let mut by_slot: BTreeMap<&String, u32> = BTreeMap::new();
-                        for slots in occ.into_iter().flat_map(|o| o.values()) {
-                            for (slot, c) in slots {
-                                *by_slot.entry(slot).or_default() += c;
-                            }
+                spaces: s.spaces[&x.structure_type]
+                    .iter()
+                    .map(|(local, spec)| {
+                        let space = format!("{sid}/{local}");
+                        let bodies = occ.and_then(|m| m.get(&space));
+                        SiteSpace {
+                            kind: spec.kind.clone(),
+                            capacity: spec.capacity,
+                            attrs: spec.attrs.clone(),
+                            count: bodies.map_or(0, |b| b.len()) as u32,
+                            occupants: known.then(|| bodies.map(|b| b.iter().cloned().collect()).unwrap_or_default()),
+                            space,
                         }
-                        by_slot.into_iter().map(|(slot, count)| OccupancyItem { occupant: None, slot: slot.clone(), count }).collect()
-                    }
-                },
+                    })
+                    .collect(),
             }
         }),
     }
@@ -484,162 +513,225 @@ fn site_parcel(st: &State, id: &Id, p: &Parcel, me: &str, names: bool) -> SitePa
 /// How an observation is built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
-    /// A seat's ordinary look: only channels that are due (`every`), and in each,
-    /// only what changed since the seat last looked through it. Consumes what it delivers.
+    /// An ordinary look: only channels that are due (`every`), and in each, only what changed since
+    /// the participant last looked through it. Consumes what it delivers.
     Look,
     /// Everything each channel covers, now, ignoring `every` and consuming nothing:
-    /// what a seat's view, built up from its looks, must equal (the perception invariant).
+    /// what a participant's view, built up from its looks, must equal (the perception invariant).
     Full,
 }
 
-/// Build a seat's observation, consuming its "new since last time" state.
-pub fn observe(s: &Statics, st: &mut State, index: &mut RecordIndex, seat: &str, requested: &[LookRequest]) -> Observation {
-    let (obs, looks, drained) = build(s, st, index, seat, Mode::Look, requested);
-    let ss = st.seats.get_mut(seat).unwrap();
+/// One of the capacities a participant perceives in: itself (a person's), or a position it holds.
+struct Capacity<'a> {
+    key: Id,
+    prefix: String,
+    entity: Id,
+    channels: &'a [Channel],
+}
+
+fn capacities<'a>(st: &'a State, participant: &str) -> Vec<Capacity<'a>> {
+    let p = &st.participants[participant];
+    let mut v = vec![];
+    if let (ParticipantKind::Person, Some(person)) = (p.kind, &p.person) {
+        v.push(Capacity { key: SELF.into(), prefix: String::new(), entity: person.clone(), channels: &p.def.channels });
+    }
+    for (id, x) in st.positions.iter() {
+        if x.holder.as_deref() == Some(participant) {
+            v.push(Capacity { key: id.clone(), prefix: format!("{id}/"), entity: x.entity.clone(), channels: &x.channels });
+        }
+    }
+    v
+}
+
+/// Build a participant's observation, consuming its "new since last time" state. `only`: one
+/// capacity ("self" or a position it holds); None: all of them.
+pub fn observe(s: &Statics, st: &mut State, index: &mut RecordIndex, participant: &str, only: Option<&str>, requested: &[LookRequest]) -> Observation {
+    let (obs, looks, drained) = build(s, st, index, participant, Mode::Look, only, requested);
+    let p = st.participants.get_mut(participant).unwrap();
     for (id, look) in looks {
-        ss.looks.insert(id, look);
+        p.looks.insert(id, look);
     }
-    if drained {
-        ss.new_transactions.clear();
+    for e in drained {
+        p.new_transactions.remove(&e);
     }
-    let ss = st.seats.get_mut(seat).unwrap();
-    Observation { outcomes: std::mem::take(&mut ss.new_outcomes), inbox: std::mem::take(&mut ss.new_inbox), ..obs }
+    let mut outcomes = vec![];
+    let mut inbox = vec![];
+    let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().collect();
+    for k in keys {
+        if let Some(mut x) = p.pending.remove(&k) {
+            outcomes.append(&mut x.outcomes);
+            inbox.append(&mut x.inbox);
+        }
+    }
+    outcomes.sort_by(|a, b| (a.t, &a.action).cmp(&(b.t, &b.action)));
+    inbox.sort_by(|a, b| (a.t, &a.id).cmp(&(b.t, &b.id)));
+    Observation { outcomes, inbox, ..obs }
 }
 
-/// The full picture a seat's channels cover right now (Mode::Full), changing nothing.
-pub fn full_view(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str) -> Observation {
-    build(s, st, index, seat, Mode::Full, &[]).0
+/// The full picture a participant's channels cover right now (Mode::Full), changing nothing.
+pub fn full_view(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str) -> Observation {
+    build(s, st, index, participant, Mode::Full, None, &[]).0
 }
 
-fn build(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str, mode: Mode, requested: &[LookRequest]) -> (Observation, Vec<(Id, Look)>, bool) {
-    let cfg = &s.seats[seat];
-    let me = cfg.entity.clone();
-    index.catch_up(s, st);
-    let ss = &st.seats[seat];
+type Built = (Observation, Vec<(Id, Look)>, Vec<Id>);
+
+fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mode: Mode, only: Option<&str>, requested: &[LookRequest]) -> Built {
+    index.catch_up(st);
+    let p = &st.participants[participant];
     // Record with seq q is the q-th made.
     let at_seq = |q: u64| &*st.records[&st.record_order[(q - 1) as usize]].record;
 
     let mut channels = BTreeMap::new();
     let mut looks = vec![];
-    let mut drained = false;
-    for ch in &cfg.channels {
-        let asked = requested.iter().find(|l| l.channel == ch.id);
-        // A search: what matches now, within what the seat may see; its cursor for changes is untouched.
-        if let (Some(LookRequest { query: Some(q), .. }), ChannelKind::Records { filter, area }) = (asked, &ch.kind) {
-            let scope = area.as_ref().map(|a| index.scope(st, a, &me));
-            channels.insert(ch.id.clone(), ChannelData::Records { records: search(s, st, index, &me, filter, scope.as_ref(), q), search: Some(true), whole: None });
+    let mut drained = vec![];
+    for cap in capacities(st, participant) {
+        if only.is_some_and(|o| o != cap.key) {
             continue;
         }
-        if mode == Mode::Look && ch.on_request == Some(true) && asked.is_none() {
-            continue; // perceived only when the seat asks
-        }
-        let last = if mode == Mode::Full { None } else { ss.looks.get(&ch.id).copied() };
-        if let (Some(every), Some(l), None) = (ch.every, last, asked) {
-            if st.t < l.at + every {
-                continue; // not looking through this channel yet; changes accumulate
+        let me = cap.entity.clone();
+        for ch in cap.channels {
+            let path = format!("{}{}", cap.prefix, ch.id);
+            let asked = requested.iter().find(|l| l.channel == path);
+            let area = match &ch.kind {
+                ChannelKind::Records { area, .. } => area.as_ref(),
+                ChannelKind::Sites { area, .. } => Some(area),
+                _ => None,
+            };
+            // A search: what matches now, within what the capacity may see; its cursor for changes is untouched.
+            if let (Some(LookRequest { query: Some(q), .. }), ChannelKind::Records { filter, .. }) = (asked, &ch.kind) {
+                let scope = area.map(|a| index.scope(s, st, a, &me));
+                channels.insert(path, ChannelData::Records { records: search(st, index, &me, filter, scope.as_ref(), q), search: Some(true), whole: None });
+                continue;
             }
-        }
-        // A channel that looks near the seat's entity looks from where it is now: if it has moved since
-        // the last look, the whole of its new surroundings replaces the old.
-        let area = match &ch.kind {
-            ChannelKind::Records { area, .. } => area.as_ref(),
-            ChannelKind::Sites { area, .. } => Some(area),
-            _ => None,
-        };
-        let from = matches!(area, Some(Area::Near(_))).then(|| st.entities.get(&me).map_or(0, |e| e.moved));
-        let moved = last.is_some_and(|l| l.from != from);
-        let whole = moved.then_some(true);
-        let scope = area.map(|a| index.scope(st, a, &me));
-        // Changes after this cursor are new to the seat; None: everything (a first look, a move, or the full picture).
-        let after = if moved { None } else { last.map(|l| l.cursor) };
-        let changed = |c: u64| after.is_none_or(|a| c > a);
-        let data = match &ch.kind {
-            ChannelKind::Accounts => {
-                let mut accounts: Vec<AccountItem> = index
-                    .accounts_of(st, &me)
-                    .iter()
-                    .filter_map(|id| {
-                        let a = &st.accounts[id];
-                        changed(a.changed).then(|| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance, closed: None })
-                    })
-                    .collect();
-                if after.is_some() {
-                    for (id, x) in st.closed_accounts.iter() {
-                        if (x.holder == me || x.custodian == me) && changed(x.changed) {
-                            accounts.push(AccountItem { account: id.clone(), holder: x.holder.clone(), custodian: x.custodian.clone(), balance: 0, closed: Some(true) });
+            if mode == Mode::Look && ch.on_request == Some(true) && asked.is_none() {
+                continue; // perceived only when asked
+            }
+            let last = if mode == Mode::Full { None } else { p.looks.get(&path).copied() };
+            if let (Some(every), Some(l), None) = (ch.every, last, asked) {
+                if st.t < l.at + every {
+                    continue; // not looking through this channel yet; changes accumulate
+                }
+            }
+            // A channel that looks near the capacity's entity looks from where it is now: if it has moved
+            // since the last look, the whole of its new surroundings replaces the old.
+            let from = matches!(area, Some(Area::Near(_))).then(|| st.entities.get(&me).map_or(0, |e| e.moved));
+            let moved = last.is_some_and(|l| l.from != from);
+            let whole = moved.then_some(true);
+            let scope = area.map(|a| index.scope(s, st, a, &me));
+            // Changes after this cursor are new; None: everything (a first look, a move, or the full picture).
+            let after = if moved { None } else { last.map(|l| l.cursor) };
+            let changed = |c: u64| after.is_none_or(|a| c > a);
+            let data = match &ch.kind {
+                ChannelKind::Accounts => {
+                    let mut accounts: Vec<AccountItem> = index
+                        .accounts_of(st, &me)
+                        .iter()
+                        .filter_map(|id| {
+                            let a = &st.accounts[id];
+                            changed(a.changed).then(|| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance, closed: None })
+                        })
+                        .collect();
+                    if after.is_some() {
+                        for (id, x) in st.closed_accounts.iter() {
+                            if (x.holder == me || x.custodian == me) && changed(x.changed) {
+                                accounts.push(AccountItem { account: id.clone(), holder: x.holder.clone(), custodian: x.custodian.clone(), balance: 0, closed: Some(true) });
+                            }
                         }
                     }
+                    accounts.sort_by(|a, b| a.account.cmp(&b.account));
+                    let transactions = if mode == Mode::Look { p.new_transactions.get(&me).cloned().unwrap_or_default() } else { vec![] };
+                    if mode == Mode::Look {
+                        drained.push(me.clone());
+                    }
+                    ChannelData::Accounts { accounts, transactions }
                 }
-                accounts.sort_by(|a, b| a.account.cmp(&b.account));
-                let transactions = if mode == Mode::Look { ss.new_transactions.clone() } else { vec![] };
-                drained = mode == Mode::Look;
-                ChannelData::Accounts { accounts, transactions }
-            }
-            ChannelKind::Records { filter, .. } => {
-                let from = after.unwrap_or(0);
-                let want: Option<BTreeSet<&str>> =
-                    filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me.as_str() } else { e.as_str() }).collect());
-                let seqs = match &scope {
-                    Some(sc) => index.placed(sc, from),
-                    None => index.candidates(filter, want.as_ref(), from).unwrap_or_else(|| (from + 1..=st.record_order.len() as u64).collect()),
-                };
-                ChannelData::Records {
-                    records: seqs
-                        .into_iter()
-                        .map(at_seq)
-                        .filter(|r| can_see(s, r, &me) && placed_ok(s, st, r, &me, scope.as_ref()) && matches(s, st, r, filter, want.as_ref()))
-                        .cloned()
+                ChannelKind::Records { filter, .. } => {
+                    let from = after.unwrap_or(0);
+                    let want: Option<BTreeSet<&str>> = filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == SELF { me.as_str() } else { e.as_str() }).collect());
+                    let seqs = match &scope {
+                        Some(sc) => index.placed(sc, from),
+                        None => index.candidates(filter, want.as_ref(), from).unwrap_or_else(|| (from + 1..=st.record_order.len() as u64).collect()),
+                    };
+                    ChannelData::Records {
+                        records: seqs
+                            .into_iter()
+                            .map(at_seq)
+                            .filter(|r| can_see(st, r, &me) && placed_ok(st, r, &me, scope.as_ref()) && matches(st, r, filter, want.as_ref()))
+                            .cloned()
+                            .collect(),
+                        search: None,
+                        whole,
+                    }
+                }
+                ChannelKind::Sites { occupants, .. } => {
+                    let names = *occupants == Some(Occupants::Names);
+                    let site = |id: &Id| st.cells.get(id).filter(|c| changed(c.changed)).map(|_| site_cell(s, st, id, &me, names));
+                    ChannelData::Sites {
+                        as_of: st.t,
+                        cells: match scope.as_ref().unwrap() {
+                            Scope::Everywhere => st.cells.keys().filter_map(site).collect(),
+                            Scope::Cells(ps) => ps.iter().filter_map(site).collect(),
+                        },
+                        whole,
+                    }
+                }
+                ChannelKind::Directory => ChannelData::Directory {
+                    entities: st
+                        .entities
+                        .iter()
+                        .filter(|(_, e)| changed(e.changed))
+                        .map(|(id, e)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) })
                         .collect(),
-                    search: None,
-                    whole,
-                }
+                    positions: st
+                        .positions
+                        .iter()
+                        .filter(|(_, x)| changed(x.changed))
+                        .map(|(id, x)| PositionItem {
+                            position: id.clone(),
+                            entity: x.entity.clone(),
+                            title: x.title.clone(),
+                            role: x.role.clone(),
+                            holder: x.holder.clone(),
+                            held_by: x.holder.as_ref().and_then(|h| {
+                                let hp = st.participants.get(h)?;
+                                match &hp.person {
+                                    Some(person) => st.entities.get(person).map(|e| e.name.clone()),
+                                    None => hp.def.title.clone(),
+                                }
+                            }),
+                        })
+                        .collect(),
+                },
+            };
+            if mode == Mode::Look {
+                let cursor = if matches!(ch.kind, ChannelKind::Records { .. }) { st.counters.record_seq } else { st.counters.change };
+                looks.push((path.clone(), Look { at: st.t, cursor, from }));
             }
-            ChannelKind::Sites { occupants, .. } => {
-                let names = *occupants == Some(Occupants::Names);
-                let site = |(id, p): (&Id, &Parcel)| changed(p.changed).then(|| site_parcel(st, id, p, &me, names));
-                ChannelData::Sites {
-                    as_of: st.t,
-                    parcels: match scope.as_ref().unwrap() {
-                        Scope::Everywhere => st.parcels.iter().filter_map(site).collect(),
-                        Scope::Parcels(ps) => ps.iter().filter_map(|id| st.parcels.get_key_value(id)).filter_map(site).collect(),
-                    },
-                    whole,
-                }
-            }
-            ChannelKind::Directory => ChannelData::Directory {
-                entities: st
-                    .entities
-                    .iter()
-                    .filter(|(_, e)| changed(e.changed))
-                    .map(|(id, e)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone() })
-                    .collect(),
-                seats: s
-                    .seats
-                    .values()
-                    .filter(|x| changed(st.seats[&x.id].status_changed))
-                    .map(|x| SeatItem {
-                        seat: x.id.clone(),
-                        entity: x.entity.clone(),
-                        title: x.title.clone(),
-                        role: x.role.clone(),
-                        status: st.seats[&x.id].status,
-                    })
-                    .collect(),
-            },
-        };
-        if mode == Mode::Look {
-            let cursor = if matches!(ch.kind, ChannelKind::Records { .. }) { st.counters.record_seq } else { st.counters.change };
-            looks.push((ch.id.clone(), Look { at: st.t, cursor, from }));
+            channels.insert(path, data);
         }
-        channels.insert(ch.id.clone(), data);
     }
+    let body = p.person.as_ref().and_then(|person| st.body(person)).map(|b| BodyView {
+        born_at: b.born_at,
+        present: b.present,
+        alive: b.alive,
+        parents: b.parents.clone(),
+        conditions: b.conditions.clone(),
+    });
+    let positions = st
+        .positions
+        .iter()
+        .filter(|(_, x)| x.holder.as_deref() == Some(participant))
+        .map(|(id, x)| HeldPosition { position: id.clone(), entity: x.entity.clone(), title: x.title.clone(), role: x.role.clone() })
+        .collect();
     let obs = Observation {
-        seat: seat.into(),
+        participant: participant.into(),
         t: st.t,
-        status: ss.status,
-        entity: me,
-        outcomes: if mode == Mode::Full { vec![] } else { ss.new_outcomes.clone() },
-        inbox: if mode == Mode::Full { vec![] } else { ss.new_inbox.clone() },
+        status: p.status,
+        entity: p.person.clone(),
+        body,
+        positions,
+        outcomes: vec![],
+        inbox: vec![],
         drafts: vec![],
         channels,
     };
@@ -649,7 +741,7 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, seat: &str, mode: Mod
 /// A search through a records channel: records the seat may see that match the channel's filter
 /// and the query, now. Standing records only if asked; ordered as asked (newest first by default);
 /// at most `limit` (default 20).
-fn search(s: &Statics, st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, area: Option<&Scope>, q: &Query) -> Vec<Record> {
+fn search(st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, area: Option<&Scope>, q: &Query) -> Vec<Record> {
     let want: Option<BTreeSet<&str>> = filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me } else { e.as_str() }).collect());
     let at_seq = |seq: u64| &*st.records[&st.record_order[(seq - 1) as usize]].record;
     let seqs: Vec<u64> = if let Some(sc) = area {
@@ -670,7 +762,7 @@ fn search(s: &Statics, st: &State, index: &mut RecordIndex, me: &str, filter: &R
     let mut hits: Vec<(u64, &Record)> = seqs
         .into_iter()
         .map(|seq| (seq, at_seq(seq)))
-        .filter(|(_, r)| can_see(s, r, me) && placed_ok(s, st, r, me, area) && matches(s, st, r, filter, want.as_ref()) && conditions.iter().all(|c| holds(r, c)))
+        .filter(|(_, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want.as_ref()) && conditions.iter().all(|c| holds(r, c)))
         .collect();
     if let Some(o) = &q.order {
         // Records without the field sort last; ties keep newest first.

@@ -8,14 +8,14 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = join(import.meta.dir, "..");
-const NS = "urn:terrarium:contracts:0.3";
+const NS = "urn:terrarium:contracts:0.4";
 
 const SCHEMA_FILES = [
   "common.schema.json",
   "blocks.schema.json",
   "records.schema.json",
   "world-config.schema.json",
-  "seat-api.schema.json",
+  "participant-api.schema.json",
   "log.schema.json",
   "calls.schema.json",
   "outcomes.schema.json",
@@ -26,9 +26,9 @@ const TARGETS: Record<string, string> = {
   "world-config": `${NS}:world-config`,
   block: `${NS}:blocks#/$defs/Block`,
   record: `${NS}:records#/$defs/Record`,
-  "seat-action": `${NS}:seat-api#/$defs/SeatAction`,
-  "seat-observation": `${NS}:seat-api#/$defs/Observation`,
-  "step-result": `${NS}:seat-api#/$defs/StepResult`,
+  "participant-action": `${NS}:participant-api#/$defs/ParticipantAction`,
+  "participant-observation": `${NS}:participant-api#/$defs/Observation`,
+  "step-result": `${NS}:participant-api#/$defs/StepResult`,
   "log-entry": `${NS}:log`,
   call: `${NS}:calls`,
   request: `${NS}:outcomes#/$defs/RequestData`,
@@ -92,23 +92,33 @@ describe("world-config mutations are rejected", () => {
   const base = () => readJson(join(root, "examples/valid/world-config/riverbend-mini.json"));
   const v = validator(TARGETS["world-config"]!);
   const cases: [string, (c: any) => void][] = [
-    ["float hidden in opaque controller params", (c) => (c.seats[0].controller.params.temperature = 0.7)],
+    ["float hidden in opaque controller params", (c) => (c.participants[0].controller.params = { temperature: 0.7 })],
     ["float hidden in a record's data", (c) => (c.world.records.find((r: any) => r.id === "law-tax").data.rate = 0.1)],
     ["config id shaped like a kernel id", (c) => (c.world.entities[1].id = "ent.1")],
-    ["framing without a reason", (c) => delete c.seats[0].framing.reason],
-    ["a v0.1 mandate on a seat", (c) => (c.seats[0].mandate = { powers: [] })],
+    ["framing without a reason", (c) => delete c.participants[0].framing.reason],
+    ["a v0.1 mandate on a participant", (c) => (c.participants[0].mandate = { powers: [] })],
+    ["a v0.3 seat list", (c) => (c.seats = [])],
+    ["a v0.3 parcel list", (c) => (c.world.parcels = [])],
+    ["a v0.3 slot capacity on a structure type", (c) => (c.catalogue.structure_types[0].capacity = { dwelling: 1 })],
+    ["a participant of an unknown kind", (c) => (c.participants[0].kind = "robot")],
+    ["a position without an organisation", (c) => delete c.positions[0].entity],
+    ["a structure on a parcel", (c) => (c.world.structures[0].parcel = "p12")],
+    ["occupancy by slot", (c) => (c.world.occupancy[0] = { occupant: "alice", structure: "s-house", slot: "dwelling", count: 1 })],
+    ["a life with no year", (c) => (c.life = { other_causes: { by_age: [{ from: 0, bps: 10 }] } })],
+    ["severity shares as a float", (c) => (c.life = { year: 31536000, injury: { bps: 10, severity: [{ label: "minor", share_bps: 0.5, days: [1, 2], fatal_bps: 0 }] } })],
     ["a v0.1 jurisdiction list", (c) => (c.world.jurisdictions = [])],
     ["a v0.1 typed zoning rule", (c) => (c.world.rules = [{ id: "z", jurisdiction: "city", rule: { type: "zoning", parcels: "all", allow: [] } }])],
-    ["seat without an entity", (c) => delete c.seats[0].entity],
+    ["a participant without a kind", (c) => delete c.participants[0].kind],
     ["account without a custodian", (c) => delete c.world.accounts[1].custodian],
     ["record without an author", (c) => delete c.world.records[0].author],
     ["measurement smuggled into config", (c) => (c.measurement = { reward: "gdp" })],
     ["float balance", (c) => (c.world.accounts[1].balance = 1.5)],
     ["zero tick length", (c) => (c.clock.tick_seconds = 0)],
     ["wrong contracts version", (c) => (c.contracts = "0.1")],
-    ["a negative distance", (c) => c.seats[0].channels.push({ id: "street", kind: "sites", area: { near: -1 } })],
-    ["an unknown way of showing occupants", (c) => c.seats[0].channels.push({ id: "street", kind: "sites", area: { near: 1 }, occupants: "faces" })],
-    ["an area on a directory", (c) => c.seats[0].channels.push({ id: "who2", kind: "directory", area: "all" })],
+    ["a negative distance", (c) => c.positions[0].channels.push({ id: "street", kind: "sites", area: { near: -1 } })],
+    ["an unknown way of showing occupants", (c) => c.positions[0].channels.push({ id: "street", kind: "sites", area: { near: 1 }, occupants: "faces" })],
+    ["an area on a directory", (c) => c.positions[0].channels.push({ id: "who2", kind: "directory", area: "all" })],
+    ["an area naming a parcel, not a cell", (c) => c.positions[0].channels.push({ id: "lots", kind: "sites", area: ["p12"] })],
   ];
   for (const [name, mutate] of cases) {
     test(name, () => {

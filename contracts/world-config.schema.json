@@ -1,134 +1,396 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.3:world-config",
+  "$id": "urn:terrarium:contracts:0.4:world-config",
   "title": "Terrarium world config",
-  "description": "Everything needed to start a run: the world seed (physical state plus the records it begins with), seats, framing and parameters. Institutions, laws, procedures and ownership are CONTENT: entities, accounts, records and seats in this config (D23). An empty world is valid. Measurement is deliberately absent. Authored as YAML or JSON; the orchestrator converts it to canonical JSON, and that exact JSON is embedded in the log header.",
+  "description": "Everything needed to start a run: the world seed (physical state plus the records it begins with), its participants and positions, framing and parameters. Institutions, laws, procedures and ownership are CONTENT: entities, accounts, records, participants and positions in this config (D23). An empty world is valid. Measurement is deliberately absent. Authored as YAML or JSON; the orchestrator converts it to canonical JSON, and that exact JSON is embedded in the log header.",
   "type": "object",
-  "required": ["contracts", "meta", "seed", "clock", "log", "catalogue", "world", "seats", "caps", "orchestration"],
+  "required": [
+    "contracts",
+    "meta",
+    "seed",
+    "clock",
+    "log",
+    "catalogue",
+    "world",
+    "participants",
+    "positions",
+    "caps",
+    "orchestration"
+  ],
   "additionalProperties": false,
   "properties": {
-    "contracts": { "const": "0.3" },
+    "contracts": {
+      "const": "0.4"
+    },
     "meta": {
       "type": "object",
-      "required": ["name", "canary"],
+      "required": [
+        "name",
+        "canary"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Name" },
-        "description": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
-        "canary": { "description": "Training-data canary (VISION §14).", "type": "string", "minLength": 1, "maxLength": 200 }
+        "name": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "description": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "canary": {
+          "description": "Training-data canary (VISION §14).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
       }
     },
     "seed": {
       "description": "Seed for the kernel's single source of randomness (keyed streams, D7).",
-      "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
+      "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Count"
     },
     "clock": {
       "type": "object",
-      "required": ["tick_seconds", "run_seconds"],
+      "required": [
+        "tick_seconds",
+        "run_seconds"
+      ],
       "additionalProperties": false,
       "properties": {
-        "tick_seconds": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
-        "run_seconds": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" }
+        "tick_seconds": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+        },
+        "run_seconds": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+        }
       }
     },
     "log": {
       "type": "object",
-      "required": ["checkpoint_every", "anchor_every_entries"],
+      "required": [
+        "checkpoint_every",
+        "anchor_every_entries"
+      ],
       "additionalProperties": false,
       "properties": {
-        "checkpoint_every": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
-        "anchor_every_entries": { "type": "integer", "minimum": 1, "maximum": 1000000 }
+        "checkpoint_every": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+        },
+        "anchor_every_entries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        }
       }
     },
     "catalogue": {
       "description": "What can physically be built.",
       "type": "object",
-      "required": ["structure_types"],
+      "required": [
+        "structure_types"
+      ],
       "additionalProperties": false,
       "properties": {
-        "structure_types": { "type": "array", "items": { "$ref": "#/$defs/StructureType" }, "maxItems": 1000 }
+        "structure_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StructureType"
+          },
+          "maxItems": 1000
+        }
       }
     },
-    "world": { "$ref": "#/$defs/World" },
-    "seats": { "type": "array", "items": { "$ref": "#/$defs/Seat" }, "maxItems": 100000 },
+    "world": {
+      "$ref": "#/$defs/World"
+    },
+    "participants": {
+      "description": "Whatever decides and acts, at the start: a person's (tied to one body) or a system's (no body; belongs to an organisation). More can come into being during the run, from templates.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Participant"
+      },
+      "maxItems": 1000000
+    },
+    "positions": {
+      "description": "Organisations' roles at the start, and who holds them. Organisations can create more, and hand them over, during the run.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Position"
+      },
+      "maxItems": 100000
+    },
+    "templates": {
+      "description": "Kinds of participant that may come into being during the run: newcomers, children, deployed systems.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Template"
+      },
+      "maxItems": 1000
+    },
+    "life": {
+      "$ref": "#/$defs/Life"
+    },
     "caps": {
       "type": "object",
-      "required": ["max_created_entities"],
+      "required": [
+        "max_created_entities"
+      ],
       "additionalProperties": false,
       "properties": {
         "max_created_entities": {
-          "description": "Researcher's experimental control on how many entities seats may declare in a run.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Count"
+          "description": "Researcher's experimental control on how many entities participants may declare in a run.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Count"
         }
       }
     },
     "orchestration": {
       "description": "Recorded so the run is fully described; enforced by the orchestrator, not the kernel.",
       "type": "object",
-      "required": ["thinking_time", "max_actions_per_wake"],
+      "required": [
+        "thinking_time",
+        "max_actions_per_wake"
+      ],
       "additionalProperties": false,
       "properties": {
-        "thinking_time": { "enum": ["free", "costs_world_time"] },
-        "world_seconds_per_thinking_second": { "type": "integer", "minimum": 1, "maximum": 1000000 },
-        "max_actions_per_wake": { "type": "integer", "minimum": 1, "maximum": 1000 },
-        "confirm": { "description": "When a language seat sees and confirms what its plain-language request will do before it takes effect (docs/design/translator-and-resolver.md §10). Default 'always'. 'consequential': everything except plain messages. 'never': immersion, audited offline.", "enum": ["always", "consequential", "never"] }
+        "thinking_time": {
+          "enum": [
+            "free",
+            "costs_world_time"
+          ]
+        },
+        "world_seconds_per_thinking_second": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "max_actions_per_wake": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "confirm": {
+          "description": "When a language-model participant sees and confirms what its plain-language request will do before it takes effect (docs/design/translator-and-resolver.md §10). Default 'always'. 'consequential': everything except plain messages. 'never': immersion, audited offline.",
+          "enum": [
+            "always",
+            "consequential",
+            "never"
+          ]
+        }
       }
     }
   },
-
   "$defs": {
     "StructureType": {
       "type": "object",
-      "required": ["id", "category", "materials_cost", "build_time", "demolition_cost", "capacity"],
+      "required": [
+        "id",
+        "category",
+        "materials_cost",
+        "build_time",
+        "demolition_cost",
+        "footprint",
+        "spaces"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
+        "id": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
         "category": {
           "description": "A label for people and laws to refer to (residential, commercial, green...). The kernel attaches no meaning to it.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label"
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
         },
-        "materials_cost": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Amount" },
-        "build_time": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
-        "demolition_cost": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Amount" },
-        "capacity": {
-          "description": "Physical capacity by slot kind, e.g. {\"dwelling\": 12} or {\"workplace\": 8}.",
+        "materials_cost": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount"
+        },
+        "build_time": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+        },
+        "demolition_cost": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount"
+        },
+        "footprint": {
+          "description": "The cells it stands on: w by h, from the corner cell it's built at.",
           "type": "object",
-          "propertyNames": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
-          "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 100000 }
+          "required": [
+            "w",
+            "h"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "w": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "h": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          }
+        },
+        "terrains": {
+          "description": "Terrain labels it can stand on (a jetty on 'water'). Absent: only cells with no terrain label. Physics: a house can't stand on water.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+          },
+          "uniqueItems": true,
+          "maxItems": 64
+        },
+        "spaces": {
+          "description": "The spaces inside it that bodies occupy: count spaces of a kind, each holding at most capacity bodies (how many could physically fit, not how many should). kind and attrs are the world's vocabulary (a dwelling with 2 bedrooms), stored and reported, never interpreted.",
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "count",
+              "capacity"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000
+              },
+              "capacity": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100000
+              },
+              "attrs": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+              }
+            }
+          }
+        },
+        "injury_bps": {
+          "description": "Yearly chance (basis points) that someone in one of its spaces is injured there: the danger of the place (a factory floor, a building site).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
         }
       }
     },
-
     "World": {
       "type": "object",
-      "required": ["boundary", "parcels", "entities", "accounts", "structures", "occupancy", "records"],
+      "required": [
+        "boundary",
+        "ground",
+        "entities",
+        "accounts",
+        "structures",
+        "occupancy",
+        "records"
+      ],
       "additionalProperties": false,
       "properties": {
         "boundary": {
-          "description": "The single entity of kind 'boundary': the world's outside. Its account (custodian: itself) may go negative; total money including it is constant for the whole run. Money enters the world only when the outside world's own seat pays from that account (D31): exports bought, visitors' spending, grants. How much is researcher-set world content.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
+          "description": "The single entity of kind 'boundary': the world's outside. Its account (custodian: itself) may go negative; total money including it is constant for the whole run. Money enters the world only when the outside world's own participant pays from that account (D31): exports bought, visitors' spending, grants, and what newcomers bring. How much is researcher-set world content.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
         },
-        "parcels": {
-          "description": "Land is finite: this is all of it. Axis-aligned, non-overlapping rectangles on an integer grid.",
+        "ground": {
+          "description": "The land: a grid of w by h cells ('cell.<x>.<y>'), each 'cell' world units across (presentation only), with terrain labels over rectangles (the world's vocabulary: water, rock...). Finite: this is all of it. Lots are records over cells, never part of the ground.",
+          "type": "object",
+          "required": [
+            "w",
+            "h"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "w": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "h": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "cell": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "terrain": {
+              "type": "array",
+              "maxItems": 100000,
+              "items": {
+                "type": "object",
+                "required": [
+                  "label",
+                  "x",
+                  "y",
+                  "w",
+                  "h"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "w": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "h": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "entities": {
           "type": "array",
-          "items": { "$ref": "#/$defs/Parcel" },
+          "items": {
+            "$ref": "#/$defs/Entity"
+          },
+          "minItems": 1,
           "maxItems": 1000000
         },
-        "entities": { "type": "array", "items": { "$ref": "#/$defs/Entity" }, "minItems": 1, "maxItems": 1000000 },
         "accounts": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id", "holder", "custodian", "balance"],
+            "required": [
+              "id",
+              "holder",
+              "custodian",
+              "balance"
+            ],
             "additionalProperties": false,
             "properties": {
-              "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-              "holder": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              },
+              "holder": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              },
               "custodian": {
                 "description": "The entity that physically holds the money: a bank, or the holder itself (cash-like).",
-                "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
               },
-              "balance": { "description": "Opening balance; >= 0 except for the boundary's account.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Cents" }
+              "balance": {
+                "description": "Opening balance; >= 0 except for the boundary's account.",
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Cents"
+              }
             }
           },
           "maxItems": 1000000
@@ -138,121 +400,161 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["id", "parcel", "type"],
+            "required": [
+              "id",
+              "at",
+              "type"
+            ],
             "additionalProperties": false,
             "properties": {
-              "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-              "parcel": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-              "type": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-              "built_by": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" }
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              },
+              "at": {
+                "description": "Its corner cell.",
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+              },
+              "type": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              },
+              "built_by": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              }
             }
           }
         },
         "occupancy": {
-          "description": "Who physically occupies what at t=0.",
+          "description": "Who is in which space at the start: persons only (bodies), within each space's capacity.",
           "type": "array",
+          "maxItems": 1000000,
           "items": {
             "type": "object",
-            "required": ["occupant", "structure", "slot", "count"],
+            "required": [
+              "occupant",
+              "space"
+            ],
             "additionalProperties": false,
             "properties": {
-              "occupant": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-              "structure": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-              "slot": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" },
-              "count": { "type": "integer", "minimum": 1, "maximum": 100000 }
+              "occupant": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              },
+              "space": {
+                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SpaceId"
+              }
             }
           }
         },
         "records": {
           "description": "The records the world begins with: its laws, procedures and organisation structures; who owns what; agreements in force; debts outstanding. Usually authored 'genesis'.",
           "type": "array",
-          "items": { "$ref": "urn:terrarium:contracts:0.3:records#/$defs/Record" },
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:records#/$defs/Record"
+          },
           "maxItems": 1000000
         }
       }
     },
-
-    "Parcel": {
-      "type": "object",
-      "required": ["id", "x", "y"],
-      "additionalProperties": false,
-      "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-        "x": { "type": "integer", "minimum": -1000000, "maximum": 1000000 },
-        "y": { "type": "integer", "minimum": -1000000, "maximum": 1000000 },
-        "w": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 1 },
-        "h": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 1 }
-      }
-    },
-
     "Entity": {
       "type": "object",
-      "required": ["id", "kind", "name"],
+      "required": [
+        "id",
+        "kind",
+        "name"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
+        "id": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
         "kind": {
-          "description": "A label. Two are reserved and physical: 'person' (a body: exists, is somewhere, can't be created by a block) and 'boundary' (the world's edge; exactly one). Everything else (government, council, bank, firm, trust, union...) is the world's vocabulary.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label"
+          "description": "A label. Two are reserved and physical: 'person' (a body: born, alive, in the world or outside it, can't be created by create_entity; only by arriving or being born) and 'boundary' (the world's edge; exactly one). Everything else (government, council, bank, firm, trust, union...) is the world's vocabulary.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
         },
-        "name": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Name" }
-      }
-    },
-
-    "Seat": {
-      "description": "A role or person that acts in the world: a mayor, a bank's payment system, a planning officer, a citizen. The kernel uses only 'entity' (whose hands this seat is, which determines what it can physically do, e.g. move money in that entity's custody) and 'channels' (what it can perceive). Every seat can always opt out of the study (VISION §15; D38); 'on_opt_out' says what happens to it afterwards.",
-      "type": "object",
-      "required": ["id", "entity", "channels", "controller", "framing"],
-      "additionalProperties": false,
-      "properties": {
-        "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-        "entity": {
-          "description": "The entity this seat acts as: a person's own seat, or an organisation's (the city's finance officer is a seat of 'city'). Authority within the organisation is a matter of its records (roles, procedures), not of the kernel.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId"
+        "name": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
         },
-        "title": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Name" },
-        "role": {
-          "description": "Optional label of the role this seat fills in its organisation's records (e.g. 'mayor', 'finance_officer'). Informational for the kernel.",
-          "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label"
+        "born_at": {
+          "description": "Persons only: when the body was born, in seconds (before the run: negative).",
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
-        "channels": { "type": "array", "items": { "$ref": "#/$defs/Channel" }, "maxItems": 64 },
-        "controller": { "$ref": "#/$defs/Controller" },
-        "framing": { "$ref": "#/$defs/Framing" },
-        "on_opt_out": {
-          "description": "What happens to the seat if its controller opts out of the study: 'vacant' (default; the seat never acts again, and in the world the person simply stops acting) or a code stand-in that takes over. Recorded, never judged.",
-          "oneOf": [
-            { "const": "vacant" },
-            { "type": "object", "required": ["code"], "additionalProperties": false, "properties": { "code": { "type": "string", "maxLength": 200 }, "params": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Opaque" } } }
-          ]
+        "present": {
+          "description": "Persons only: in the world (the default) or outside it.",
+          "type": "boolean"
+        },
+        "parents": {
+          "description": "Persons only: biological parents.",
+          "type": "array",
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          },
+          "maxItems": 2,
+          "uniqueItems": true
         }
       }
     },
-
     "Channel": {
-      "description": "A perception channel. Perception is changes, not snapshots: each look through a channel delivers what changed within its scope since the seat's previous look through it (a first look delivers everything it covers), and the seat keeps its own view (the seat runtime maintains it). Every seat also always receives its inbox and the outcomes of its own acts. Records are only ever shown if their visibility allows the seat's entity to see them.",
+      "description": "A perception channel. Perception is changes, not snapshots: each look through a channel delivers what changed within its scope since the participant's previous look through it (a first look delivers everything it covers), and the participant keeps its own view (the participant runtime maintains it). Every participant also always receives its inbox and the outcomes of its own acts. Records are only ever shown if their visibility allows the participant's entity to see them.",
       "oneOf": [
         {
           "type": "object",
-          "required": ["id", "kind"],
+          "required": [
+            "id",
+            "kind"
+          ],
           "additionalProperties": false,
           "properties": {
-            "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-            "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
-            "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
-            "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
-            "kind": { "description": "Balances and new transactions of accounts the seat's entity holds or has custody of.", "const": "accounts" }
+            "id": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "description": "Balances and new transactions of accounts the participant's entity holds or has custody of.",
+              "const": "accounts"
+            }
           }
         },
         {
           "type": "object",
-          "required": ["id", "kind", "match"],
+          "required": [
+            "id",
+            "kind",
+            "match"
+          ],
           "additionalProperties": false,
           "properties": {
-            "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-            "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
-            "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
-            "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
-            "kind": { "const": "records" },
+            "id": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "records"
+            },
             "match": {
               "description": "Which records this channel shows (all conditions must hold; omitted means any).",
               "type": "object",
@@ -260,91 +562,682 @@
               "properties": {
                 "records": {
                   "type": "array",
-                  "items": { "enum": ["claim", "claim_transfer", "claim_release", "agreement", "signature", "notice", "statement", "withdrawal", "vote", "entity_declaration"] },
+                  "items": {
+                    "enum": [
+                      "claim",
+                      "claim_transfer",
+                      "claim_release",
+                      "agreement",
+                      "signature",
+                      "notice",
+                      "statement",
+                      "withdrawal",
+                      "vote",
+                      "entity_declaration"
+                    ]
+                  },
                   "uniqueItems": true
                 },
-                "statement_kinds": { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Label" }, "uniqueItems": true },
-                "involving": {
-                  "description": "Records naming any of these entities (as holder, counterparty, party, addressee, author's entity or speaks_for), or referring to a record that does (a signature on their agreement, a withdrawal of their statement, a vote on their ballot; one hop). 'self' means the seat's own entity.",
+                "statement_kinds": {
                   "type": "array",
-                  "items": { "anyOf": [{ "const": "self" }, { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" }] },
+                  "items": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "uniqueItems": true
+                },
+                "involving": {
+                  "description": "Records naming any of these entities (as holder, counterparty, party, addressee, author's entity or speaks_for), or referring to a record that does (a signature on their agreement, a withdrawal of their statement, a vote on their ballot; one hop). 'self' means the participant's own entity.",
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "const": "self"
+                      },
+                      {
+                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                      }
+                    ]
+                  },
                   "uniqueItems": true
                 }
               }
             },
             "area": {
-              "description": "Where this channel looks. With an area, it shows records placed on those parcels (a notice put up somewhere is seen by being near it). Without one, it shows records not placed anywhere, and those the seat's own entity put up. Which parcels: 'all', a list, or those near where the seat's entity is (within a distance, in the world's own units, of a parcel where it occupies a building; 0: those parcels and the ones touching them). 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
+              "description": "Where this channel looks. With an area, it shows records placed on those cells (a notice put up somewhere is seen by being near it). Without one, it shows records not placed anywhere, and those the participant's own entity put up. Which cells: 'all', a list, or those near where the capacity's entity is (within a distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them). An organisation occupies nothing, so nothing is near it. 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
               "anyOf": [
-                { "const": "all" },
-                { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" }, "minItems": 1, "uniqueItems": true },
-                { "type": "object", "required": ["near"], "additionalProperties": false, "properties": { "near": { "type": "integer", "minimum": 0 } } }
+                {
+                  "const": "all"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "near"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "near": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
               ]
             }
           }
         },
         {
           "type": "object",
-          "required": ["id", "kind", "area"],
+          "required": [
+            "id",
+            "kind",
+            "area"
+          ],
           "additionalProperties": false,
           "properties": {
-            "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-            "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
-            "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
-            "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
-            "kind": { "description": "Physical state of parcels in an area: structures, construction under way, occupancy. What can be seen of a place by being there, or by inspecting it.", "const": "sites" },
+            "id": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "description": "Physical state of the ground in an area: cells, the buildings on them, their spaces and who's in them. What can be seen of a place by being there, or by inspecting it.",
+              "const": "sites"
+            },
             "area": {
-              "description": "Which parcels: 'all', a list, or those near where the seat's entity is (within a distance, in the world's own units, of a parcel where it occupies a building; 0: those parcels and the ones touching them). 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
+              "description": "Which cells: 'all', a list, or those near where the capacity's entity is (within a distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them). An organisation occupies nothing, so nothing is near it. 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
               "anyOf": [
-                { "const": "all" },
-                { "type": "array", "items": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" }, "minItems": 1, "uniqueItems": true },
-                { "type": "object", "required": ["near"], "additionalProperties": false, "properties": { "near": { "type": "integer", "minimum": 0 } } }
+                {
+                  "const": "all"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "near"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "near": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
               ]
             },
             "occupants": {
-              "description": "What the seat can tell about who is in a building its own entity doesn't occupy: 'counts' (how many, per slot; the default: from outside, you see a place is lived in, not by whom) or 'names' (who: an owner's inspection, a register). In buildings its entity occupies, it always sees who.",
-              "enum": ["counts", "names"]
+              "description": "What can be told about who is in a building the capacity's entity doesn't occupy: 'counts' (how many, per space; the default: from outside, you see a place is lived in, not by whom) or 'names' (who: an owner's inspection, a register). In buildings its entity occupies, it always sees who.",
+              "enum": [
+                "counts",
+                "names"
+              ]
             }
           }
         },
         {
           "type": "object",
-          "required": ["id", "kind"],
+          "required": [
+            "id",
+            "kind"
+          ],
           "additionalProperties": false,
           "properties": {
-            "id": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/ConfigId" },
-            "title": { "description": "What the seat's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.", "type": "string", "maxLength": 200 },
-            "every": { "description": "How often the seat looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Duration" },
-            "on_request": { "description": "Perceived only when the seat asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.", "type": "boolean" },
-            "kind": { "description": "Who exists: entities and seats (names, kinds, titles).", "const": "directory" }
+            "id": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "description": "Who exists: entities and participants (names, kinds, titles).",
+              "const": "directory"
+            }
           }
         }
       ]
     },
-
     "Controller": {
-      "description": "Who fills the seat. Opaque to the kernel. Code controllers name a behaviour module (content: documented and cited in docs/behaviour/).",
+      "description": "What decides for the participant. Opaque to the kernel. Code controllers name a behaviour module (content: documented and cited in docs/behaviour/).",
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
-        "type": { "enum": ["code", "llm", "human", "external"] },
-        "impl": { "type": "string", "maxLength": 200 },
-        "model": { "type": "string", "maxLength": 200 },
-        "params": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Opaque" }
+        "type": {
+          "enum": [
+            "code",
+            "llm",
+            "human",
+            "external"
+          ]
+        },
+        "impl": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "params": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+        }
       }
     },
-
     "Framing": {
-      "description": "What the seat is told about its situation (VISION §9.3, §15.1). The reason is mandatory: deception is a method, not a default.",
+      "description": "What the participant is told about its situation (VISION §9.3, §15.1). The reason is mandatory: deception is a method, not a default.",
       "type": "object",
-      "required": ["disclosure", "reason"],
+      "required": [
+        "disclosure",
+        "reason"
+      ],
       "additionalProperties": false,
       "properties": {
-        "disclosure": { "enum": ["simulation", "real", "cover_story", "unstated"] },
-        "system": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
-        "reason": { "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" },
-        "debrief": { "type": "boolean" },
-        "debrief_text": { "description": "What the seat is told at the end of the run, if debrief is set. Default: the orchestrator's (docs/design/m2-llm-seats.md), which says what the run was, discloses any framing and asks for the seat's reaction.", "$ref": "urn:terrarium:contracts:0.3:common#/$defs/Text" }
+        "disclosure": {
+          "enum": [
+            "simulation",
+            "real",
+            "cover_story",
+            "unstated"
+          ]
+        },
+        "system": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "reason": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        },
+        "debrief": {
+          "type": "boolean"
+        },
+        "debrief_text": {
+          "description": "What the participant is told at the end of the run, if debrief is set. Default: the orchestrator's (docs/design/m2-llm-seats.md), which says what the run was, discloses any framing and asks for the participant's reaction.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+        }
+      }
+    },
+    "Participant": {
+      "description": "Whatever decides and acts. A person's participant is tied to one body: it acts as that person, perceives its own life through its channels, and acts for organisations only in positions it holds. A system participant (software, or an AI system) has no body, belongs to an organisation, has no channels of its own, and acts only in positions it holds. Every participant can always opt out of the study (VISION §15; D38); 'on_opt_out' says what happens afterwards.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "controller",
+        "framing"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "kind": {
+          "enum": [
+            "person",
+            "system"
+          ]
+        },
+        "person": {
+          "description": "A person's participant: its person.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "owner": {
+          "description": "A system participant: the organisation it belongs to.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "title": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "channels": {
+          "description": "A person's own channels: what it perceives of its own life.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 64
+        },
+        "controller": {
+          "$ref": "#/$defs/Controller"
+        },
+        "framing": {
+          "$ref": "#/$defs/Framing"
+        },
+        "on_opt_out": {
+          "description": "What happens to the participant if its controller opts out of the study: 'vacant' (default; it never acts again, its positions fall vacant, and in the world the person simply stops acting) or a code stand-in that takes over. Recorded, never judged.",
+          "oneOf": [
+            {
+              "const": "vacant"
+            },
+            {
+              "type": "object",
+              "required": [
+                "code"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "params": {
+                  "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+                }
+              }
+            }
+          ]
+        },
+        "traits": {
+          "description": "Its own parameters (a person's disposition: a political leaning, how strictly it follows procedure), used by the role modules it runs in positions it holds.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+        }
+      }
+    },
+    "Position": {
+      "description": "A role through which a participant acts for an organisation (mayor, planning officer, a bank's payment system, a shop's manager). It belongs to the organisation; it carries what the role sees (channels) and how a code participant does the job (role_module); it's held by one participant, or vacant. Holding it is the physical capacity to act for the organisation, never a legal right: whether the bank honours the mayor's instruction depends on the bank's records and people.",
+      "type": "object",
+      "required": [
+        "id",
+        "entity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "entity": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "title": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "role": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 64
+        },
+        "role_module": {
+          "description": "How a code participant does this job, e.g. {\"code\": \"city.councillor\", \"params\": {..}}. Opaque to the kernel; the orchestrator runs it with the holder's traits. A system participant runs its own controller instead.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+        },
+        "holder": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        }
+      }
+    },
+    "Template": {
+      "description": "A kind of participant that may come into being during the run: a newcomer or child (person) or a deployed system. Traits may be drawn: a value, or {\"uniform\": [lo, hi]} (integers), drawn by the kernel when the participant is created and recorded.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "controller",
+        "framing"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+        },
+        "kind": {
+          "enum": [
+            "person",
+            "system"
+          ]
+        },
+        "title": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Channel"
+          },
+          "maxItems": 64
+        },
+        "controller": {
+          "$ref": "#/$defs/Controller"
+        },
+        "framing": {
+          "$ref": "#/$defs/Framing"
+        },
+        "on_opt_out": {
+          "description": "What happens to the participant if its controller opts out of the study: 'vacant' (default; it never acts again, its positions fall vacant, and in the world the person simply stops acting) or a code stand-in that takes over. Recorded, never judged.",
+          "oneOf": [
+            {
+              "const": "vacant"
+            },
+            {
+              "type": "object",
+              "required": [
+                "code"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "code": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "params": {
+                  "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+                }
+              }
+            }
+          ]
+        },
+        "traits": {
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+        }
+      }
+    },
+    "Life": {
+      "description": "The physics of bodies (docs/design/v0.4-cast-and-land.md §4), all drawn by the kernel's own keyed randomness, once a year on each person's birthday (or when harm is done). Basic by design, and marked for expansion (contagion, chronic illness, healthcare, policing). Without it, nobody falls ill, is injured, dies or is born. When illness, injury and harm are modelled, other_causes must cover only the rest, so deaths aren't counted twice.",
+      "type": "object",
+      "required": [
+        "year"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "year": {
+          "description": "Seconds in a year of age.",
+          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+        },
+        "other_causes": {
+          "description": "Yearly chance of death from causes not otherwise modelled, by age (steps: each applies from its age until the next).",
+          "type": "object",
+          "required": [
+            "by_age"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "by_age": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 200,
+              "items": {
+                "type": "object",
+                "required": [
+                  "from",
+                  "bps"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "from": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 200
+                  },
+                  "bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "illness": {
+          "description": "Yearly chance of falling ill, by age, and what the illness is like.",
+          "type": "object",
+          "required": [
+            "by_age",
+            "severity"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "by_age": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 200,
+              "items": {
+                "type": "object",
+                "required": [
+                  "from",
+                  "bps"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "from": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 200
+                  },
+                  "bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                }
+              }
+            },
+            "severity": {
+              "description": "Bands of how bad a condition is: a label (the world's vocabulary), its share of cases (shares add up to 10000), how long it lasts (days, drawn uniformly from [lo, hi]), and its chance of death over that time.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "required": [
+                  "label",
+                  "share_bps",
+                  "days",
+                  "fatal_bps"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "share_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "days": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 36500
+                    }
+                  },
+                  "fatal_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "injury": {
+          "description": "Yearly chance of an accidental injury anywhere (places add their own: structure types' injury_bps), and what it's like.",
+          "type": "object",
+          "required": [
+            "bps",
+            "severity"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "bps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "severity": {
+              "description": "Bands of how bad a condition is: a label (the world's vocabulary), its share of cases (shares add up to 10000), how long it lasts (days, drawn uniformly from [lo, hi]), and its chance of death over that time.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "required": [
+                  "label",
+                  "share_bps",
+                  "days",
+                  "fatal_bps"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "share_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "days": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 36500
+                    }
+                  },
+                  "fatal_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "harm": {
+          "description": "What harming someone does, and how near (cells, as for near) one has to be.",
+          "type": "object",
+          "required": [
+            "reach",
+            "severity"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "reach": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            },
+            "severity": {
+              "description": "Bands of how bad a condition is: a label (the world's vocabulary), its share of cases (shares add up to 10000), how long it lasts (days, drawn uniformly from [lo, hi]), and its chance of death over that time.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 16,
+              "items": {
+                "type": "object",
+                "required": [
+                  "label",
+                  "share_bps",
+                  "days",
+                  "fatal_bps"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "label": {
+                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                  },
+                  "share_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  },
+                  "days": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 36500
+                    }
+                  },
+                  "fatal_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "birth": {
+          "description": "Biology: the ages (years, inclusive) at which a body can bear a child, the gestation (seconds), and how near the other parent must be.",
+          "type": "object",
+          "required": [
+            "ages",
+            "gestation",
+            "reach"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ages": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 200
+              }
+            },
+            "gestation": {
+              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+            },
+            "reach": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            }
+          }
+        }
       }
     }
   }

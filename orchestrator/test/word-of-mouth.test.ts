@@ -18,27 +18,27 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 test("people ask the people they know, and are told only what those people could see", async () => {
   const out = join(root, "runs", "test-word-of-mouth");
   rmSync(out, { recursive: true, force: true });
-  // What each citizen could see around it, at each look.
+  // What each citizen could see around them, at each look.
   const seen = new Map<string, { t: number; structures: Set<string>; people: Set<string> }[]>();
   const s = await runWorld({
     config: generate({ ...spec, citizens: 120 }), runId: "word-of-mouth", outDir: out, until: 240 * DAY,
-    inspect: async (seat, obs) => {
+    inspect: async (participant, obs) => {
       const street = obs.channels.street;
       if (street?.kind !== "sites") return;
-      const lots = street.parcels.flatMap((l) => (l.structure ? [l.structure] : []));
-      const people = new Set(lots.flatMap((x) => x.occupancy.flatMap((o) => (o.occupant ? [o.occupant] : []))));
-      seen.set(seat, [...(seen.get(seat) ?? []), { t: obs.t, structures: new Set(lots.map((x) => x.structure)), people }]);
+      const buildings = street.cells.flatMap((c) => (c.structure ? [c.structure] : []));
+      const people = new Set<string>(buildings.flatMap((x) => x.spaces.flatMap((sp) => sp.occupants ?? [])));
+      seen.set(participant, [...(seen.get(participant) ?? []), { t: obs.t, structures: new Set(buildings.map((x) => x.structure)), people }]);
     },
   });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
-  const said = log.filter((e) => e.kind === "command" && e.body.command === "act" && /^c\d+-seat$/.test(e.body.seat))
-    .flatMap((e) => e.body.blocks.filter((b: any) => b.block === "message").map((b: any) => ({ t: e.t, seat: e.body.seat, ...b })));
+  const said = log.filter((e) => e.kind === "command" && e.body.command === "act" && /^c\d+-self$/.test(e.body.participant))
+    .flatMap((e) => e.body.blocks.filter((b: any) => b.block === "message").map((b: any) => ({ t: e.t, seat: e.body.participant, ...b })));
   const asks = said.filter((m) => m.text === ASKING.home || m.text === ASKING.work);
   const tips = said.filter((m) => m.re);
   expect(asks.length).toBeGreaterThan(5);
   expect(tips.length).toBeGreaterThan(5);
 
-  // What a seat could see when it decided: every look at that moment (it may move later in the same wake), and the one before.
+  // What a participant could see when it decided: every look at that moment (it may move later in the same wake), and the one before.
   const couldSee = (seat: string, t: number) => {
     const looks = seen.get(seat) ?? [];
     const now = looks.filter((x) => x.t === t);
@@ -55,6 +55,6 @@ test("people ask the people they know, and are told only what those people could
   for (const tip of tips) expect(couldSee(tip.seat, tip.t).has(tip.re)).toBe(true);
   // And someone followed a tip up: searched the building they were told about.
   const told = new Map(tips.flatMap((m) => m.to.map((to: string) => [to, m.re] as const)));
-  const followed = log.filter((e) => e.kind === "command" && e.body.command === "look" && e.body.looks.some((l: any) => l.query?.where?.some((w: any) => ["data.structure", "data.workplace"].includes(w.field) && w.value === told.get(e.body.seat))));
+  const followed = log.filter((e) => e.kind === "command" && e.body.command === "look" && e.body.looks.some((l: any) => l.query?.where?.some((w: any) => ["data.structure", "data.workplace"].includes(w.field) && w.value === (told.get(e.body.participant) ?? told.get(e.body.participant.replace(/-self$/, ""))))));
   expect(followed.length).toBeGreaterThan(0);
 }, 300_000);

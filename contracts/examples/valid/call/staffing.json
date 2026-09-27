@@ -1,0 +1,7 @@
+{
+  "lines": [
+    { "bind": "f", "call": { "fn": "entity", "args": { "kind": { "id": "firm" }, "name": { "text": "Riverside Bakery" }, "position": { "text": "Owner" } } } },
+    { "call": { "fn": "position", "args": { "title": { "text": "Baker" }, "role": { "id": "staff" } } } },
+    { "call": { "fn": "position", "args": { "appoint": { "id": "pos.4" }, "to": { "id": "par.12" } } } }
+  ]
+}

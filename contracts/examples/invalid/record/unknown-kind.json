@@ -17,6 +17,6 @@
   },
   "formal": {
     "language": "cel",
-    "condition": "block.block == 'construct' && block.parcel in ['p10','p11','p12'] && !holds_liberty(actor, 'build', block.parcel)"
+    "condition": "block.block == 'construct' && block.cells.exists(c, c in ['cell.0.1','cell.1.1','cell.2.1']) && !holds_liberty(actor, 'build', block.at)"
   }
 }
