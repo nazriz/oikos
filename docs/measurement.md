@@ -35,7 +35,7 @@ Each run's log is exported to Parquet, one file per table per run (`measure/<tab
 | `seats` | seat | `seat`, `entity`, `entity_kind`, `title`, `role`, `controller` (code or llm), `impl`, `model`, `adapter` (what actually answered), `configured` (the model the world names) |
 | `events` | kernel event | `seq`, `t`, `event`, `cause` (the command's seq), `body` (JSON) |
 | `transfers` | money movement | `from`, `to`, `amount` (cents), `reason`, `by`, `settles`, `per_instruction`, `memo` |
-| `occupancy` | arrival or departure | `event` (occupied or vacated), `occupant`, `structure`, `slot`, `count`, `reason`, `by` |
+| `occupancy` | arrival or departure, including the world's starting occupancy (`t` = 0, `by` = genesis). A departure's `slot` and `count` are those its occupant arrived into | `event` (occupied or vacated), `occupant`, `structure`, `slot`, `count`, `reason`, `by` |
 | `records` | record, including the world's genesis records (`t` = 0) | `id`, `record`, `kind` (a statement's kind), `author`, `speaks_for`, `at`, `basis`, `place`, `template` (an agreement's), `withdraws`, `body` |
 | `commands` | command (not observations) | `command`, `seat`, `body` |
 | `acts` | act | `seat`, `via` (direct, call or translator), `blocks`, `reasoning`, `applied`, `action`, `refusal`, `refused_block`, `detail`, `blocks_json` |

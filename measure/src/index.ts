@@ -13,7 +13,7 @@ import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 
-export const MEASURE_VERSION = "0.1.0";
+export const MEASURE_VERSION = "0.1.1";
 
 const QUERY_DIR = join(import.meta.dir, "../queries");
 
@@ -49,10 +49,19 @@ const TABLES: { [name: string]: string } = {
     select $run as run_id, seq, t, json_extract_string(body, '$.from') as "from", json_extract_string(body, '$.to') as "to", (json_extract_string(body, '$.amount'))::BIGINT as amount,
       json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by", json_extract_string(body, '$.settles') as settles, json_extract_string(body, '$.per_instruction') as per_instruction, json_extract_string(body, '$.memo') as memo
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'transfer'`,
+  // A departure's slot and count are the ones its occupant arrived into (the kernel's vacate removes the occupant, whatever it held).
   occupancy: `
-    select $run as run_id, seq, t, json_extract_string(body, '$.event') as event, json_extract_string(body, '$.occupant') as occupant, json_extract_string(body, '$.structure') as structure,
-      json_extract_string(body, '$.slot') as slot, (json_extract_string(body, '$.count'))::INTEGER as count, json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by"
-    from raw where kind = 'event' and json_extract_string(body, '$.event') in ('occupied', 'vacated')`,
+    select run_id, seq, t, event, occupant, structure,
+      coalesce(slot, last_value(slot ignore nulls) over w) as slot, coalesce(count, last_value(count ignore nulls) over w) as count, reason, "by"
+    from (
+      select $run as run_id, seq, t, json_extract_string(body, '$.event') as event, json_extract_string(body, '$.occupant') as occupant, json_extract_string(body, '$.structure') as structure,
+        json_extract_string(body, '$.slot') as slot, (json_extract_string(body, '$.count'))::INTEGER as count, json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by"
+      from raw where kind = 'event' and json_extract_string(body, '$.event') in ('occupied', 'vacated')
+      union all
+      select $run, 0, 0, 'occupied', json_extract_string(o, '$.occupant'), json_extract_string(o, '$.structure'), json_extract_string(o, '$.slot'),
+        (json_extract_string(o, '$.count'))::INTEGER, null, 'genesis'
+      from (select unnest(from_json(json_extract(body, '$.config.world.occupancy'), '["JSON"]')) as o from raw where kind = 'header'))
+    window w as (partition by occupant, structure order by seq rows between unbounded preceding and current row)`,
   records: `
     select $run as run_id, seq, t, json_extract_string(r, '$.id') as id, json_extract_string(r, '$.record') as record, json_extract_string(r, '$.kind') as kind, json_extract_string(r, '$.author') as author,
       json_extract_string(r, '$.speaks_for') as speaks_for, (json_extract_string(r, '$.at'))::BIGINT as "at", json_extract_string(r, '$.basis') as basis, json_extract_string(r, '$.place') as place,
