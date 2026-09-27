@@ -10,7 +10,7 @@ import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { Book, commitmentOf, DAY, lotOf, ownAccount, record, say, sign, type Step } from "./common";
+import { because, Book, commitmentOf, DAY, lotOf, ownAccount, record, say, sign, type Step } from "./common";
 import { stepper } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
@@ -57,8 +57,8 @@ export const planningOfficer: BehaviourModule = {
           // An application it can't decide gets a reply saying why (§9.3).
           const missing = ["lot", "structure_type"].filter((f) => typeof app.data?.[f] !== "string");
           if (missing.length) {
-            steps.push([say("permit_decision", `Application ${app.id} can't be decided: it doesn't say ${missing.map((f) => (f === "lot" ? "which lot" : "what kind of building")).join(" or ")}.`,
-              { to: [applicant], basis: app.id, data: { application: app.id, decision: "incomplete", missing } })]);
+            steps.push(because("An application missing what it needs: saying so.", say("permit_decision", `Application ${app.id} can't be decided: it doesn't say ${missing.map((f) => (f === "lot" ? "which lot" : "what kind of building")).join(" or ")}.`,
+              { to: [applicant], basis: app.id, data: { application: app.id, decision: "incomplete", missing } })));
             continue;
           }
           const granting = { block: "grant_permit", lot: app.data?.lot, structure_type: app.data?.structure_type };
@@ -71,7 +71,9 @@ export const planningOfficer: BehaviourModule = {
           const decision = say("permit_decision",
             refuse ? `Permit refused for ${app.data?.lot}: it would breach ${breached!.id}.` : `Permit granted to build ${app.data?.structure_type} on ${app.data?.lot}.`,
             { to: [applicant], basis: app.id, data: { application: app.id, decision: refuse ? "refused" : "granted", ...(breached ? { law: breached.id } : {}) } });
-          const step: Step = [decision];
+          const step: Step = because(
+            refuse ? `Refusing: granting it would breach ${breached!.id}, and we follow the law.` : breached ? `Granting, although it breaches ${breached.id} (we don't always follow the law).` : "Granting: no law we know of forbids it.",
+            decision);
           if (!refuse) step.unshift(record("liberty", applicant, { action: "build", object: app.data?.lot, structure_type: app.data?.structure_type }, { basis: app.id }));
           steps.push(step);
         }
@@ -124,10 +126,10 @@ export const inspector: BehaviourModule = {
             return "value" in v && v.value;
           });
           if (!breached || ctx.rng(`act-${st.structure}`).below(10_000) >= p.compliance_bps) continue;
-          steps.push([
+          steps.push(because(`On patrol: ${st.structure} was built in breach of ${breached.id}; fining the owner and ordering it demolished.`,
             record("right", me, { kind: "fine", amount: p.fine, for: `Unpermitted ${st.type} on ${lot ?? st.at} (${st.structure}).` }, { against: owner, basis: breached.id }),
             say("demolition_order", `Order: demolish ${st.structure} on ${lot ?? st.at}, built in breach of ${breached.id}.`, { to: [owner], basis: breached.id, data: { structure: st.structure, lot, law: breached.id } }),
-          ]);
+          ));
         }
         return steps;
       },
@@ -167,11 +169,11 @@ export const builder: BehaviourModule = {
           started.add(r.id);
           balance -= cost;
           const price = commitmentOf(r, client).outcome?.money?.amount;
-          steps.push([
+          steps.push(because("A client has signed a construction contract and we can pay for materials: building, and invoicing the price.",
             ...(book.signedBy(r.id, me) ? [] : [sign(r.id)]),
             C.call("structure", { type: job.type, on: job.on, by: me, from: acc.account }),
             ...(price ? [say("invoice", `Invoice: ${price} cents for building a ${job.type} on ${job.on}.`, { to: [client], basis: r.id, data: { outcome: { money: { to: acc.account, amount: price, for: `building a ${job.type} on ${job.on}` } }, agreement: r.id } })] : []),
-          ]);
+          ));
         }
         return steps;
       },

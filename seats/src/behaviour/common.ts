@@ -113,10 +113,20 @@ export function ownAccount(obs: Observation): { account: string; balance: number
 // what they want brought about, as calls, and the resolver turns each into
 // their own acts. Paying someone is money(...): the resolver asks the account's bank.
 
-/** One atomic act: lines of calls, optionally binding a name (whose id comes back in the outcome's `created`). */
-export type Step = (C.Call | [string, C.Call])[];
+/**
+ * One atomic act: lines of calls, optionally binding a name (whose id comes back in the outcome's `created`), and
+ * optionally why: the rule that fired, in plain words, which goes into the log with the act (its `reasoning`).
+ */
+export type Step = (C.Call | [string, C.Call])[] & { why?: string };
 
-export const callAction = (step: Step): ParticipantAction => ({ type: "call", call: C.program(...step) });
+/** A step with its reason: `because("Rent is due", pay(...))`. */
+export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): Step => Object.assign(lines, { why });
+
+export const callAction = (step: Step): ParticipantAction => ({ type: "call", call: C.program(...step), ...(step.why ? { reasoning: step.why } : {}) });
+
+/** Dollars, for reasons: 123456 -> "$1,234.56". */
+export const usd = (cents: number) =>
+  `${cents < 0 ? "-" : ""}$${Math.floor(Math.abs(cents) / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${String(Math.abs(cents) % 100).padStart(2, "0")}`;
 
 /** Money to an account: a one-off or repeating payment. */
 export function pay(to: string, amount: number, o: { from?: string; for?: string; settles?: string; every?: number; first?: number; basis?: string; per_request?: string } = {}): C.Call {

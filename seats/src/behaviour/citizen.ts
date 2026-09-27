@@ -26,7 +26,7 @@ import type { LookRequest, Observation, ParticipantAction, SiteStructure, Statem
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import * as C from "../calls";
-import { Book, callAction, DAY, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step } from "./common";
+import { because, Book, callAction, DAY, usd, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
@@ -192,7 +192,7 @@ export const citizen: BehaviourModule = {
       const ours = channels.accounts(obs).filter((a) => a.holder === me);
       const acc = ours.find((a) => a.custodian !== me);
       const steps: Step[] = [];
-      if (acc) for (const k of ours) if (k.custodian === me && k.balance > 0) steps.push([pay(acc.account, k.balance, { from: k.account, for: "Deposit." })]);
+      if (acc) for (const k of ours) if (k.custodian === me && k.balance > 0) steps.push(because("Depositing the money we brought into our bank account.", pay(acc.account, k.balance, { from: k.account, for: "Deposit." })));
       moveStep = null;
       childrenNow = children(t);
       // Are we in a building? Around us we see who's in our own buildings; without that view, assume we are.
@@ -206,23 +206,23 @@ export const citizen: BehaviourModule = {
           livingAt = street.cells.flatMap((c) => c.structure?.spaces ?? []).find((sp) => sp.kind === "dwelling" && sp.occupants?.includes(me))?.space ?? null;
         for (const { what } of heard) {
           if (what.kind === "moveIn" && what.space !== livingAt) {
-            const s: Step = [];
+            const s: Step = because(`The household has a new home (${what.space}): moving in with them.`);
             if (livingAt && inside(livingAt)) s.push(moveOut(livingAt, me));
             s.push(moveIn(what.space));
             steps.push(s);
             livingAt = what.space;
           } else if (what.kind === "moveOut" && livingAt && structureOf(livingAt) === what.from) {
-            if (inside(livingAt)) steps.push([moveOut(what.from, me)]);
+            if (inside(livingAt)) steps.push(because("The household's tenancy has ended: moving out with them.", moveOut(what.from, me)));
             livingAt = null;
           } else if (what.kind === "share" && acc && what.cents !== (share?.cents ?? 0)) {
-            const s: Step = [];
+            const s: Step = because(`Our share of the household's rent is now ${usd(what.cents)} a month, as the leaseholder says.`);
             if (share?.order) s.push(withdraw(share.order, "Replaced by a new share of the rent."));
             if (what.cents > 0) s.push(["share", pay(what.account, what.cents, { from: acc.account, every: MONTH, first: 0, for: "Household share of the rent." })]);
             if (s.length) steps.push(s);
             share = what.cents > 0 ? { cents: what.cents } : null;
           } else if (what.kind === "leaving") {
             heard = [];
-            return departure(acc);
+            return departure(acc, "The household is leaving town: going with them.");
           }
         }
         heard = [];
@@ -231,7 +231,7 @@ export const citizen: BehaviourModule = {
         const lh = household!.members.find((m) => m.person === household!.leaseholder);
         if (lh && payTold !== monthlyIncome()) {
           payTold = monthlyIncome();
-          steps.push([message([reach(lh)], SAYING.pay(payTold))]);
+          steps.push(because("Telling the leaseholder what we now earn, for the household's budget.", message([reach(lh)], SAYING.pay(payTold))));
         }
       } else {
         for (const { from, what } of heard) if (what.kind === "pay") memberPay.set(from.person, what.cents);
@@ -251,19 +251,19 @@ export const citizen: BehaviourModule = {
 
       // A tenancy that has ended: move out and stop paying rent.
       if (home && t >= home.endsAt) {
-        const s: Step = home.movedIn ? [moveOut(home.structure, me)] : [];
+        const s: Step = because(`Our tenancy of ${home.space} has ended: moving out and stopping the rent.`, ...(home.movedIn ? [moveOut(home.structure, me)] : []));
         if (home.order) s.push(withdraw(home.order, "Tenancy ended; stop this standing order."));
         if (s.length) steps.push(s);
         // The children come out with us (each on its own, in case one isn't there); the other adults are told.
-        if (home.movedIn) for (const k of children(t)) steps.push([moveOut(home.structure, k.person)]);
-        for (const a of adults(t)) steps.push([message([reach(a)], SAYING.moveOut(home.structure)), message([reach(a)], SAYING.share(0, acc.account))]), sharesTold.set(a.person, 0);
+        if (home.movedIn) for (const k of children(t)) steps.push(because("Our tenancy has ended: taking the children out with us.", moveOut(home.structure, k.person)));
+        for (const a of adults(t)) steps.push(because("Our tenancy has ended: telling the household, and that there's no rent to share for now.", message([reach(a)], SAYING.moveOut(home.structure)), message([reach(a)], SAYING.share(0, acc.account)))), sharesTold.set(a.person, 0);
         toldMoveIn = null;
         home = null;
         homelessSince = t;
       }
       // A job that has ended.
       if (job && t >= job.endsAt) {
-        if (job.workplace && inside(job.workplace)) steps.push([moveOut(job.workplace, me)]);
+        if (job.workplace && inside(job.workplace)) steps.push(because("Our job has ended: leaving the workplace.", moveOut(job.workplace, me)));
         job = null;
         joblessSince = t;
       }
@@ -279,16 +279,16 @@ export const citizen: BehaviourModule = {
           if (!space || !structure || !rentTo || !affordable(rent, acc.balance)) continue;
           // Signing (a record) and moving in (physics) are separate acts: the
           // flat may not be free yet if the last tenant hasn't left.
-          steps.push([
+          steps.push(because(`Signing the lease offered for ${space}: ${usd(rent)} a month is within our budget (a third of household income, ${usd(Math.floor((householdIncome() * p.rent_share_bps) / 10_000))}; or six months' rent in savings without income).`,
             sign(r.id),
             ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: 0, basis: r.id, for: `Rent for ${space}, monthly in advance.` })],
-          ]);
+          ));
           home = { agreement: r.id, space, structure, landlord: other, rent, endsAt: t + (r.terms.term ?? 365 * DAY), movedIn: false };
           pendingRef = { kind: "rent", agreement: r.id };
           homelessSince = null;
         } else if (r.terms.template === "employment" && !job) {
           const terms = jobTerms(r, me);
-          const s: Step = [sign(r.id)];
+          const s: Step = because(`Taking the job offered: ${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days.`, sign(r.id));
           if (terms.workplace) s.push(moveIn(terms.workplace));
           steps.push(s);
           job = { agreement: r.id, employer: other, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER };
@@ -298,7 +298,7 @@ export const citizen: BehaviourModule = {
 
       // Moving into a home we hold a lease on, once there's physical room: with the children, in one go.
       if (home && !home.movedIn) {
-        moveStep = [moveIn(home.space), ...children(t).map((k) => C.call("occupancy", { in: home!.space, who: k.person }))];
+        moveStep = because(`Moving into ${home.space}, which we hold a lease on${children(t).length ? ", with the children" : ""}.`, moveIn(home.space), ...children(t).map((k) => C.call("occupancy", { in: home!.space, who: k.person })));
         steps.push(moveStep);
         moving = true;
       }
@@ -306,7 +306,7 @@ export const citizen: BehaviourModule = {
       if (home?.movedIn && isLeaseholder()) {
         const grown = adults(t);
         if (toldMoveIn !== home.space) {
-          for (const a of grown) steps.push([message([reach(a)], SAYING.moveIn(home.space))]);
+          for (const a of grown) steps.push(because("We've moved in: telling the household to come.", message([reach(a)], SAYING.moveIn(home.space))));
           toldMoveIn = home.space;
         }
         const earners = (monthlyIncome() > 0 ? 1 : 0) + grown.filter((a) => (memberPay.get(a.person) ?? 0) > 0).length;
@@ -314,7 +314,7 @@ export const citizen: BehaviourModule = {
           if (!memberPay.has(a.person)) continue; // not heard what they earn yet
           const due = memberPay.get(a.person)! > 0 ? Math.floor(home.rent / Math.max(1, earners)) : 0;
           if ((sharesTold.get(a.person) ?? genesisShare(a)) !== due) {
-            steps.push([message([reach(a)], SAYING.share(due, acc.account))]);
+            steps.push(because(`Telling a member of the household their share of the ${usd(home.rent)} rent: split evenly among the ${earners} of us earning.`, message([reach(a)], SAYING.share(due, acc.account))));
           }
           sharesTold.set(a.person, due);
         }
@@ -327,8 +327,11 @@ export const citizen: BehaviourModule = {
         (homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY) ||
         (joblessSince !== null && t - joblessSince >= p.leave_after_jobless_days * DAY && householdIncome() === 0 && broke));
       if (leave) {
-        const tell: Step[] = adults(t).map((a) => [message([reach(a)], SAYING.leaving())]);
-        return [...tell, ...departure(acc)];
+        const why = homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY
+          ? `Leaving town: ${Math.floor((t - homelessSince) / DAY)} days without a home (we leave after ${p.leave_after_homeless_days}).`
+          : `Leaving town: ${Math.floor((t - joblessSince!) / DAY)} days with nobody in the household earning (we leave after ${p.leave_after_jobless_days}), and less money than a month's rent or essentials.`;
+        const tell: Step[] = adults(t).map((a) => because(why, message([reach(a)], SAYING.leaving())));
+        return [...tell, ...departure(acc, why)];
       }
 
       wordOfMouth(obs, t, steps);
@@ -343,8 +346,9 @@ export const citizen: BehaviourModule = {
         if (best?.speaks_for) {
           applied.add(best.id);
           const members = household?.members.map((m) => m.person) ?? [me];
-          steps.push([say("rental_application", `Application for ${best.data.space ?? best.data.structure}, for a household of ${members.length}.`, { to: [best.speaks_for], visible: [me, best.speaks_for],
-            data: { listing: best.id, account: acc.account, members, household: { people: members.length, bedrooms_needed: household ? bedroomsNeeded(household, t, year) : 0 } } })]);
+          steps.push(because(`Applying for ${best.data.space}: the dearest home we've seen (rent standing for quality) within a third of household income, with at least ${minBedrooms(t)} bedrooms${told.length ? ", where someone told us to look" : ""}.`,
+            say("rental_application", `Application for ${best.data.space ?? best.data.structure}, for a household of ${members.length}.`, { to: [best.speaks_for], visible: [me, best.speaks_for],
+            data: { listing: best.id, account: acc.account, members, household: { people: members.length, bedrooms_needed: household ? bedroomsNeeded(household, t, year) : 0 } }, basis: best.id })));
         }
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
@@ -355,7 +359,8 @@ export const citizen: BehaviourModule = {
         const best = posts[0];
         if (best?.speaks_for) {
           applied.add(best.id);
-          steps.push([say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account } })]);
+          steps.push(because(`Applying for the best-paid job we've seen (${usd(best.data?.wage ?? 0)} a fortnight)${told.length ? ", where someone told us to look" : ""}.`,
+            say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account }, basis: best.id })));
         }
       }
 
@@ -369,7 +374,7 @@ export const citizen: BehaviourModule = {
         const amount = Math.min(acc.balance - reserve, p.essentials + Math.floor((above * p.spend_above_buffer_bps) / 10_000));
         if (amount > 0 && shops.length) {
           const shop = ctx.rng(`shop-${t}`).pick(shops);
-          steps.push([pay(shop, amount, { from: acc.account, for: "Shopping." })]);
+          steps.push(because(`Monthly shopping: ${usd(p.essentials)} of essentials plus ${p.spend_above_buffer_bps / 100}% of savings above a ${p.buffer_months}-month buffer, keeping the rent aside.`, pay(shop, amount, { from: acc.account, for: "Shopping." })));
         }
       }
       voice(t, steps);
@@ -397,7 +402,7 @@ export const citizen: BehaviourModule = {
           ? around.find((st) => room(st, "dwelling"))?.structure
           : job?.workplace && around.some((st) => st.structure === structureOf(job!.workplace!) && room(st, "workplace")) ? structureOf(job.workplace) : undefined;
         if (lead && ctx.rng(`pass-on-${q.from}-${t}`).below(10_000) < p.pass_on_bps)
-          steps.push([message([q.from], q.want === "home" ? `There looks to be room at ${lead}, near me.` : `They have room at my work, ${lead}.`, lead)]);
+          steps.push(because("Asked about room: passing on what we can see.", message([q.from], q.want === "home" ? `There looks to be room at ${lead}, near me.` : `They have room at my work, ${lead}.`, lead)));
       }
       asked = [];
       const known = [...contacts.keys()];
@@ -408,7 +413,7 @@ export const citizen: BehaviourModule = {
         }
         if (askedAt[want] !== undefined && t - askedAt[want]! < p.ask_again_days * DAY) continue;
         askedAt[want] = t;
-        if (known.length && ctx.rng(`ask-${want}-${t}`).below(10_000) < chance) steps.push([message(known, ASKING[want])]);
+        if (known.length && ctx.rng(`ask-${want}-${t}`).below(10_000) < chance) steps.push(because(`Starting to look for ${want === "home" ? "a home" : "work"}: asking the people we know.`, message(known, ASKING[want])));
       }
     };
 
@@ -430,12 +435,12 @@ export const citizen: BehaviourModule = {
       // An organiser closes their petition after `petition_days`; a new one can then start.
       for (const pet of open) if (pet.speaks_for === me && t - pet.at >= p.petition_days * DAY && !signed.has(`closed-${pet.id}`)) {
         signed.add(`closed-${pet.id}`);
-        steps.push([withdraw(pet.id, "Petition closed.")]);
+        steps.push(because(`Closing our petition after ${p.petition_days} days.`, withdraw(pet.id, "Petition closed.")));
       }
       if (aggrieved && open.length === 0 && ctx.rng(`petition-${t}`).below(10_000) < p.petition_start_bps) {
-        steps.push([say("petition", "Petition: landlords must give 90 days' notice, and may not raise rent by more than 5% a year.", { data: { demand: {
+        steps.push(because(`Aggrieved (${noticed ? "our landlord gave us notice" : `rent is ${Math.round(burden / 100)}% of household income`}) and no tenants' petition is open: starting one.`, say("petition", "Petition: landlords must give 90 days' notice, and may not raise rent by more than 5% a year.", { data: { demand: {
           kind: "law", text: "A landlord must give at least 90 days' notice to end a tenancy, and may not raise the rent by more than 5% in any 12 months.",
-          adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"] } } })]);
+          adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"] } } })));
         return;
       }
       for (const pet of open) {
@@ -446,7 +451,7 @@ export const citizen: BehaviourModule = {
           const last = countsPublished.get(pet.id);
           if ((!last || last.n !== n) && (!last || t - last.at >= 3 * DAY)) {
             countsPublished.set(pet.id, { n, at: t });
-            steps.push([say("petition_count", `${n} people have signed.`, { basis: pet.id, data: { petition: pet.id, signatures: n } })]);
+            steps.push(because("Publishing our petition's running count.", say("petition_count", `${n} people have signed.`, { basis: pet.id, data: { petition: pet.id, signatures: n } })));
           }
           continue;
         }
@@ -454,7 +459,7 @@ export const citizen: BehaviourModule = {
         const share = (publishedCount(book, pet) * 10_000) / p.population;
         if (aggrieved || (home && share >= threshold)) {
           signed.add(pet.id);
-          steps.push([vote(pet.id, "sign")]);
+          steps.push(because(aggrieved ? "Signing the tenants' petition: we're aggrieved ourselves." : `Signing the tenants' petition: ${Math.round(share / 100)}% of the town has signed, past our own threshold of ${Math.round(threshold / 100)}%.`, vote(pet.id, "sign")));
         }
       }
     };
@@ -482,15 +487,15 @@ export const citizen: BehaviourModule = {
     const withoutAccount = (steps: Step[]): Step[] => {
       if (!accountAsked && p.bank) {
         accountAsked = true;
-        steps.push([C.call("account", { holder: me, at: p.bank })]);
+        steps.push(because("Grown up (or new to town) with no bank account: asking the bank for one.", C.call("account", { holder: me, at: p.bank })));
       }
       return steps;
     };
 
     /** Leaving town: stop paying, give notice, send our money on, and go (taking the children, if we hold the lease). */
     let leaving = false;
-    const departure = (acc: { account: string; balance: number } | undefined): Step[] => {
-      const s: Step = [];
+    const departure = (acc: { account: string; balance: number } | undefined, why: string): Step[] => {
+      const s: Step = because(why);
       if (home) {
         if (home.order) s.push(withdraw(home.order));
         s.push(notice(home.agreement, "Leaving town."));
@@ -501,7 +506,8 @@ export const citizen: BehaviourModule = {
       if (acc && acc.balance > 0 && p.outside_account) s.push(pay(p.outside_account, acc.balance, { from: acc.account, for: "Moving away: send all my savings with me." }));
       // Leaving takes a body out of every space it's in. The children go first, each on its own (one may not be here).
       leaving = true;
-      return [...(isLeaseholder() ? childrenNow.map((k) => [C.call("presence", { who: k.person, leave: "yes" })] as Step) : []), [...s, C.call("presence", { leave: "yes" })]];
+      s.push(C.call("presence", { leave: "yes" }));
+      return [...(isLeaseholder() ? childrenNow.map((k) => because(why, C.call("presence", { who: k.person, leave: "yes" }))) : []), s];
     };
     let childrenNow: Member[] = [];
 

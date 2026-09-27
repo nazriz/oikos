@@ -32,3 +32,5 @@ Rules every module follows (so re-runs are reproducible):
 | `idle` | does nothing (placeholder, and a control condition) | this page |
 
 The town these modules run in is made by the [generator](generator.md).
+
+**Every act says why.** A module wraps each act's calls in `because("…", ...)` (`seats/src/behaviour/common.ts`): the rule that fired, in plain words, with the numbers it used ("Applying for apts-3/dwelling.2: the dearest home we've seen within a third of household income, with at least 2 bedrooms"). It goes into the log as the act's `reasoning`, and records cite what they rest on (`basis`) where there is something to cite. The renderer's causal trace (Stage 3) reads both. `measure … why` shows the coverage.

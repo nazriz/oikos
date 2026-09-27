@@ -16,7 +16,7 @@ import * as C from "../calls";
 import type { Observation, ParticipantAction } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
-import { between, Book, callAction, cellsOf, DAY, leaseTerms, MONTH, notice, offer, ownAccount, pay, say, structureOf, withdraw, type Step } from "./common";
+import { because, between, Book, callAction, usd, cellsOf, DAY, leaseTerms, MONTH, notice, offer, ownAccount, pay, say, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -154,7 +154,7 @@ export const landlord: BehaviourModule = {
         // Only let a home that's still free; a stale listing is taken down instead.
         if (!listing.data.space || taken(listing.data.space) || !owned.some((o) => o.space === listing.data.space)) {
           lettingNow.add(listingId);
-          steps.push([withdraw(listingId, "No longer available.")]);
+          steps.push(because("An application for a home that's no longer free: taking the listing down.", withdraw(listingId, "No longer available.")));
           continue;
         }
         lettingNow.add(listingId);
@@ -173,15 +173,16 @@ export const landlord: BehaviourModule = {
         const tenant = pick.speaks_for!;
         const household = ((pick.data?.members as string[] | undefined) ?? []).filter((m) => m !== tenant);
         const months = between(p.min_term_months, p.max_term_months, ctx.rng(`term-${listingId}`).below(1_000_000) / 1_000_000);
-        steps.push([
+        steps.push(because(`Letting ${listing.data.space}: an applicant picked at random among the ${eligible.length} it fits (at most ${p.max_people_per_bedroom || "any number of"} people per bedroom), for ${months} months.`,
           ["lease", offer(tenant, {
             template: "lease", term: months * MONTH, ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
             we: C.call("occupancy", { who: tenant, in: listing.data.space }),
             they: pay(acc.account, listing.data.rent, { every: MONTH, for: "rent" }),
             text: `${tenant} rents home ${listing.data.space} from ${me} for ${listing.data.rent} cents a month, for ${months} months${household.length ? `, to live there with their household: ${household.join(", ")}` : ""}.`,
+            basis: pick.id,
           })],
           withdraw(listingId, "Let."),
-        ]);
+        ));
         offeredNow.push(listing.data.space);
       }
 
@@ -202,12 +203,12 @@ export const landlord: BehaviourModule = {
           const baseRent = typeof base === "number" ? base : (base?.find((b) => b.bedrooms === o.bedrooms)?.rent ?? 100_000);
           const ref = going.length ? Math.floor(going.reduce((x, y) => x + y, 0) / going.length) : baseRent;
           const noise = 9_750 + ctx.rng(`price-${o.space}`).below(501); // +/-2.5%
-          steps.push([listing(o, Math.floor((((ref * (10_000 + p.markup_bps)) / 10_000) * noise) / 10_000))]);
+          steps.push(because(`Listing a vacant home at ${p.markup_bps / 100}% over ${going.length ? `what similar homes in the building let for (${usd(ref)})` : `the base rent for its size (${usd(ref)})`}.`, listing(o, Math.floor((((ref * (10_000 + p.markup_bps)) / 10_000) * noise) / 10_000))));
         }
         // Unlet for a month: cut the asking rent (BoE: 5% a month).
         for (const l of listed) {
           const since = listedAt.get(l.id) ?? l.at;
-          if (t - since >= MONTH) steps.push([withdraw(l.id, "Relisting at a lower rent."), listing(o, Math.floor((l.data.rent * (10_000 - p.cut_bps)) / 10_000))]);
+          if (t - since >= MONTH) steps.push(because(`Unlet for a month: cutting the asking rent ${p.cut_bps / 100}%.`, withdraw(l.id, "Relisting at a lower rent."), listing(o, Math.floor((l.data.rent * (10_000 - p.cut_bps)) / 10_000))));
         }
       }
 
@@ -222,7 +223,7 @@ export const landlord: BehaviourModule = {
         const paid = paying ? received.get(paying) ?? 0 : 0;
         if ((due * rent - paid) >= p.arrears_months_before_notice * rent && t - since >= p.arrears_months_before_notice * MONTH) {
           noticeGiven.set(a.id, t);
-          steps.push([notice(a.id, "Notice: rent is in arrears.")]);
+          steps.push(because(`Rent is ${p.arrears_months_before_notice} or more months in arrears: giving notice.`, notice(a.id, "Notice: rent is in arrears.")));
         }
       }
 
@@ -236,15 +237,15 @@ export const landlord: BehaviourModule = {
         if (p.city && p.city_account && p.tax_rate_bps && income > 0) {
           const reported = obeys(`tax-${t}`) ? income : Math.floor(income / 2);
           tax = Math.min(acc.balance, Math.floor((reported * p.tax_rate_bps) / 10_000));
-          steps.push([
+          steps.push(because(reported === income ? "Monthly: reporting rent received to the town, and paying tax at the rate the law sets." : "Monthly: reporting rent received to the town (only half of it), and paying tax on that.",
             say("tax_report", `Rent received this month: ${reported} cents.`, { to: [p.city], data: { period_end: t, rent_received: reported, account: acc.account } }),
             ...(tax > 0 ? [pay(p.city_account, tax, { from: acc.account, for: "Tax on rent received." })] : []),
-          ]);
+          ));
         }
         const spend = Math.min(acc.balance - tax, Math.floor((income * p.spend_share_bps) / 10_000));
         const upkeep = Math.min(acc.balance - tax - spend, Math.floor((income * p.upkeep_share_bps) / 10_000));
         income = 0;
-        const s: Step = [];
+        const s: Step = because(`Monthly: the owners spend ${p.spend_share_bps / 100}% of rent received locally, and ${p.upkeep_share_bps / 100}% goes on upkeep.`);
         if (spend > 0 && shops.length) s.push(pay(ctx.rng(`spend-${t}`).pick(shops), spend, { from: acc.account, for: "Owners' spending." }));
         if (upkeep > 0 && p.outside_account) s.push(pay(p.outside_account, upkeep, { from: acc.account, for: "Maintenance and repairs." }));
         if (s.length) steps.push(s);
@@ -265,7 +266,7 @@ export const landlord: BehaviourModule = {
       if (p.develop && !dev && t >= devCooldownUntil && occupiedEnough && emptyLots.length && acc.balance >= price + price / 2 && p.city && p.builder) {
         dev = { lot: emptyLots[0]!, stage: "applying" };
         // The planning office's published form (it's in the world's genesis records).
-        steps.push([["app", C.call("form", { to: p.city, form: "permit_application", lot: dev.lot, structure_type: p.develop_type })]]);
+        steps.push(because(`Our homes have been ${Math.round(100 - (vacantSum * 100) / Math.max(1, unitSum))}% let over ${p.develop_window_days} days: applying to build on an empty lot of ours.`, ["app", C.call("form", { to: p.city, form: "permit_application", lot: dev.lot, structure_type: p.develop_type })]));
       }
       if (dev?.stage === "applied") {
         const decision = book.open("permit_decision").find((d) => d.data?.application === dev!.app);
@@ -279,8 +280,9 @@ export const landlord: BehaviourModule = {
       }
       if (dev && (dev.stage === "granted" || dev.stage === "refused") && acc.balance >= price) {
         const lot = dev.lot;
+        const refused = dev.stage === "refused";
         dev.stage = "contracted";
-        steps.push([["build", C.call("structure", { type: p.develop_type, on: lot, by: p.builder, price: C.dollars(price), from: acc.account })]]);
+        steps.push(because(refused ? "The permit was refused: building anyway." : "The permit was granted: commissioning the builder.", ["build", C.call("structure", { type: p.develop_type, on: lot, by: p.builder, price: C.dollars(price), from: acc.account })]));
       }
       if (dev?.stage === "contracted" && sites.some((s) => cellsOf(book, dev!.lot).includes(s.cell) && s.structure)) dev = null;
 
@@ -289,7 +291,7 @@ export const landlord: BehaviourModule = {
         if (answered.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
         answered.add(inv.id);
         const owed = inv.data?.outcome?.money;
-        if (owed && acc.balance >= owed.amount) steps.push([pay(owed.to, owed.amount, { from: acc.account, for: "Paying an invoice.", settles: inv.id })]);
+        if (owed && acc.balance >= owed.amount) steps.push(because("Paying an invoice addressed to us.", pay(owed.to, owed.amount, { from: acc.account, for: "Paying an invoice.", settles: inv.id })));
       }
 
       // Fines recorded against us, and demolition orders addressed to us.
@@ -297,11 +299,11 @@ export const landlord: BehaviourModule = {
         if (answered.has(r.id)) continue;
         if (r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty"].includes(r.about?.kind)) {
           answered.add(r.id);
-          if (obeys(`fine-${r.id}`) && p.city_account && acc.balance >= r.about.amount) steps.push([pay(p.city_account, r.about.amount, { from: acc.account, for: "Paying a fine.", settles: r.id })]);
+          if (obeys(`fine-${r.id}`) && p.city_account && acc.balance >= r.about.amount) steps.push(because("Paying a fine recorded against us.", pay(p.city_account, r.about.amount, { from: acc.account, for: "Paying a fine.", settles: r.id })));
         }
         if (r.record === "statement" && r.kind === "demolition_order" && (r.addressed_to ?? []).includes(me)) {
           answered.add(r.id);
-          if (obeys(`order-${r.id}`)) steps.push([C.call("structure", { remove: r.data?.structure, by: me, from: acc.account })]);
+          if (obeys(`order-${r.id}`)) steps.push(because("Obeying a demolition order.", C.call("structure", { remove: r.data?.structure, by: me, from: acc.account })));
         }
       }
       return steps;
@@ -365,11 +367,11 @@ export const employer: BehaviourModule = {
         if (!account) continue;
         const ref = `wo${n++}`;
         pendingOrder.set(ref, a.id);
-        steps.push([[ref, pay(account, p.wage, { from: acc.account, every: p.period, first: p.period, basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })]]);
+        steps.push(because("A new hire has signed: starting their wages by standing order.", [ref, pay(account, p.wage, { from: acc.account, every: p.period, first: p.period, basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })]));
       }
       // Ended (notice served): stop the wages.
       for (const a of contracts) if (book.inForce(a.id) && t >= endOf(a) && orders.has(a.id)) {
-        steps.push([withdraw(orders.get(a.id)!, "Employment ended; stop wages.")]);
+        steps.push(because("Employment has ended: stopping the wages.", withdraw(orders.get(a.id)!, "Employment ended; stop wages.")));
         orders.delete(a.id);
       }
 
@@ -382,22 +384,23 @@ export const employer: BehaviourModule = {
         if (!mine.length) continue;
         const chosen = ctx.rng(`hire-${post.id}`).pick(mine);
         const worker = chosen.speaks_for!;
-        steps.push([
+        steps.push(because(`Hiring for our posting: an applicant picked at random among ${mine.length}.`,
           ["job", offer(worker, {
             template: "employment", ourNotice: p.notice_days * DAY, theirNotice: p.notice_days * DAY,
             we: pay(chosen.data?.account ?? worker, p.wage, { every: p.period, for: "wages" }),
             they: p.workplace ? C.call("occupancy", { who: worker, in: p.workplace }) : undefined,
             text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${p.wage} cents every ${p.period / DAY} days.`,
+            basis: chosen.id,
           })],
           withdraw(post.id, "Filled."),
-        ]);
+        ));
         offersNow++;
       }
 
       // Post a job if short-staffed and the wage bill is affordable.
       const bill = (staff.length + 1) * p.wage;
       if (staff.length + offered.length + offersNow < p.target_staff && posts.length === 0 && acc.balance >= p.buffer_periods * bill) {
-        steps.push([say("job_posting", `Hiring: ${p.wage} cents every ${p.period / DAY} days.`, { data: { wage: p.wage, period: p.period, role: p.role ?? "staff", ...(p.workplace ? { workplace: structureOf(p.workplace), space: p.workplace } : {}) } })]);
+        steps.push(because(`Short-staffed (${staff.length + offered.length + offersNow} of ${p.target_staff}) with ${p.buffer_periods} pay periods of the wage bill in hand: posting a job.`, say("job_posting", `Hiring: ${p.wage} cents every ${p.period / DAY} days.`, { data: { wage: p.wage, period: p.period, role: p.role ?? "staff", ...(p.workplace ? { workplace: structureOf(p.workplace), space: p.workplace } : {}) } })));
       }
 
       // Can't cover the next pay period: lay off the most recent hire.
@@ -405,7 +408,7 @@ export const employer: BehaviourModule = {
         const last = staff.filter((a) => !noticed.has(a.id)).sort((x, y) => (book.signedAt(y.id)! - book.signedAt(x.id)!))[0];
         if (last) {
           noticed.set(last.id, t);
-          steps.push([notice(last.id, "Redundancy: we can't cover the wage bill.")]);
+          steps.push(because(`Can't cover the next pay period (${usd(acc.balance)} for ${staff.length} staff): laying off the most recent hire.`, notice(last.id, "Redundancy: we can't cover the wage bill.")));
         }
       }
 
@@ -414,7 +417,7 @@ export const employer: BehaviourModule = {
         nextSuppliers = t + MONTH;
         const due = Math.min(acc.balance, Math.floor((revenue * p.supplier_share_bps) / 10_000));
         revenue = 0;
-        if (due > 0 && p.outside_account) steps.push([pay(p.outside_account, due, { from: acc.account, for: "Suppliers." })]);
+        if (due > 0 && p.outside_account) steps.push(because(`Monthly: paying suppliers ${p.supplier_share_bps / 100}% of revenue.`, pay(p.outside_account, due, { from: acc.account, for: "Suppliers." })));
       }
       return steps;
     });

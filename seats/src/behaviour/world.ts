@@ -5,7 +5,7 @@
 import * as C from "../calls";
 import { channels, type ParticipantAction, type StatementRecord } from "../contracts";
 import { DAY, params, wait, type BehaviourModule } from "../module";
-import { Book, callAction, pay, say, type Step } from "./common";
+import { because, Book, callAction, pay, say, usd, type Step } from "./common";
 import { DEFAULT_HOUSEHOLDS, drawHousehold, type HouseholdSpec } from "./household";
 
 export const exportDemand: BehaviourModule = {
@@ -28,7 +28,7 @@ export const exportDemand: BehaviourModule = {
             next[i]! += p.every;
           }
         });
-        return blocks.length ? callAction(blocks) : wait();
+        return blocks.length ? callAction(Object.assign(blocks, { why: "The outside world's purchases due on the researcher's schedule." })) : wait();
       },
     };
   },
@@ -108,10 +108,10 @@ export const migration: BehaviourModule = {
           pending.splice(i, 1);
           const members = h.persons!.map((person, j) => ({ person, participant: reachOf.get(person)!, born_at: h.born_at[j]!, sex: h.sex[j]! }));
           const lh = h.persons![h.leaseholder]!;
-          todo.unshift([say("household", `Household: ${h.persons!.join(", ")}.`, {
+          todo.unshift(because("Newcomers' paperwork: the household they came as.", say("household", `Household: ${h.persons!.join(", ")}.`, {
             to: h.persons, visible: h.persons, for: lh,
             data: { leaseholder: lh, members, couples: h.couples.map(([a, b]) => [h.persons![a], h.persons![b]]) },
-          })]);
+          })));
         }
         if (looked !== obs.t && todo.length === 0 && !expecting) {
           looked = obs.t;
@@ -135,7 +135,7 @@ export const migration: BehaviourModule = {
               name: C.text(`m${++arrivals}`), age: C.text(`${m.age * 365 + m.day} days`), template: p.templates[m.sex],
               ...(m.age >= 18 ? { carrying: C.dollars(Math.floor(((p.savings_months[0] + r.below(p.savings_months[1] - p.savings_months[0] + 1)) * p.outside_monthly_income))) } : {}),
             }));
-            todo.push(blocks.map((b, j) => [refs[j]!, b] as [string, C.Call]));
+            todo.push(because(`A household moves here: the town's expected wage (${usd(Math.floor(mean))} a month x a ${Math.round(chance * 100)}% chance of a job) beats ${usd(p.outside_monthly_income)} elsewhere.`, ...blocks.map((b, j) => [refs[j]!, b] as [string, C.Call])));
             brought.push({ t: obs.t, adults: d.members.filter((m) => m.age >= 18).length });
             (todo.at(-1) as any).household = { refs, sex: d.members.map((m) => m.sex), born_at, couples: d.couples, leaseholder: d.leaseholder };
           }

@@ -13,7 +13,7 @@ import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
-import { Book, callAction, message, pay, type Step } from "./common";
+import { because, Book, callAction, message, pay, type Step } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
@@ -126,8 +126,8 @@ export const bankPaymentSystem: BehaviourModule = {
           if (holder) refusals.push(message([holder], `Payment of ${p.amount} cents to ${p.to} (request ${p.instruction}) couldn't be made: ${refusalText(last.refusal?.code)}.`, p.instruction));
         }
         inFlight = [];
-        if (refusals.length) return callAction(refusals.splice(0, 32));
-        if (opens.length) return callAction(opens.splice(0, 32));
+        if (refusals.length) return callAction(because("Telling account holders about requests we couldn't carry out.", ...refusals.splice(0, 32)));
+        if (opens.length) return callAction(because("Opening accounts people asked for.", ...opens.splice(0, 32)));
         if (queue.length === 0) return wait();
 
         const balance = new Map(channels.accounts(obs).map((a) => [a.account, a.balance]));
@@ -147,7 +147,7 @@ export const bankPaymentSystem: BehaviourModule = {
           }
           if ((p as any).single) break;
         }
-        return blocks.length ? callAction(blocks) : wait();
+        return blocks.length ? callAction(Object.assign(blocks, { why: "Carrying out the payment requests due (each names its request), in order." })) : wait();
       },
     };
   },

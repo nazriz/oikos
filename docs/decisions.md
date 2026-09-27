@@ -359,6 +359,13 @@ See the design note, §16.
   - Once decided: fertility behaviour from ABS Births age-specific fertility rates, a child template, parents bringing a newborn home and updating the household record.
 - **Revisit if:** the town needs deaths by cause (set `fatal_bps` and subtract from other causes), or migration's placeholders prove far from ABS internal migration rates once calibrated.
 
+**D50. Every code act says why; records cite what they rest on.** *(Stage 2 checkpoint, decision 4: "code modules name the rule that fired, and institutions use `basis` for the record they act on", recommended before Stage 3.)*
+- Each code act carries `reasoning`: the rule that fired, with its numbers. `because(...)` in common.ts; no contract change (acts already had it).
+- Applications cite the listing or posting (`basis`); offers cite the application; everything else already linked or has nothing to cite (a shopping payment, a listing).
+- Reasons are built with deterministic formatting (no locale data), since they're hashed into the log.
+- **Measured** (town.yaml, 2 years): 100% of acts have a reason (up from 0%); 27% of records made during the run cite a basis. The rest have nothing to cite: one-off payment requests, listings and postings, reports. Signatures, withdrawals, votes and notices link through what they refer to.
+- **Revisit if:** the log grows too much (each act gains a sentence), or the renderer's trace needs reasons as structured data (a rule id and its inputs) rather than words. That would be a contract addition.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

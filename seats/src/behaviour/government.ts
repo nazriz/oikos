@@ -9,7 +9,7 @@ import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { Book, cellsOf, DAY, lotOf, message, ownAccount, pay, publishedCount, record, say, vote, type Step } from "./common";
+import { because, Book, cellsOf, DAY, lotOf, message, ownAccount, pay, publishedCount, record, say, type Step, usd, vote } from "./common";
 import { stepper } from "./firms";
 
 const YEAR = 365 * DAY;
@@ -48,10 +48,11 @@ export const mayorCode: BehaviourModule = {
         const thisYear = Math.floor(t / YEAR) + 1;
         const adopted = book.open("budget").some((b) => b.data?.year === thisYear);
         if (t >= nextBudget || (!adopted && t >= lastTabled + 45 * DAY)) {
-          if (t >= nextBudget) nextBudget = t + YEAR;
+          const newYear = t >= nextBudget;
+          if (newYear) nextBudget = t + YEAR;
           lastTabled = t;
-          steps.push([say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: parks ${p.park_budget} cents.`, { to: [me],
-            data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: p.park_budget } } }, tags: ["budget"] } })]);
+          steps.push(because(newYear ? "A new year: tabling the town's budget." : "No budget adopted for this year yet: tabling it again.", say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: parks ${p.park_budget} cents.`, { to: [me],
+            data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: p.park_budget } } }, tags: ["budget"] } })));
         }
         // A park a year, if the adopted budget has room and there's a city lot free:
         // apply for planning permission like anyone else, then commission the builder once granted.
@@ -68,7 +69,7 @@ export const mayorCode: BehaviourModule = {
           if (lot) {
             parkYear = year;
             // The planning office's published form, like anyone else.
-            steps.push([C.call("form", { to: me, form: "permit_application", lot, structure_type: p.park_type })]);
+            steps.push(because(`The adopted budget has ${usd(budget.data?.lines?.parks ?? 0)} for parks and ${lot} is free: applying for a permit for a park, as anyone would.`, C.call("form", { to: me, form: "permit_application", lot, structure_type: p.park_type })));
           }
         }
         for (const d of book.open("permit_decision")) {
@@ -79,7 +80,7 @@ export const mayorCode: BehaviourModule = {
           if (d.data?.decision !== "granted") continue;
           const site = app.data?.lot;
           const from = ownAccount(obs)?.account;
-          steps.push([["park", C.call("structure", { type: p.park_type, on: site, by: p.builder, price: C.dollars(price), from, basis: d.id })]]);
+          steps.push(because("The park's permit was granted: commissioning the builder.", ["park", C.call("structure", { type: p.park_type, on: site, by: p.builder, price: C.dollars(price), from, basis: d.id })]));
         }
         // Approve invoices for work we commissioned (the payments procedure requires it over $50k).
         for (const inv of book.open("invoice")) {
@@ -87,7 +88,7 @@ export const mayorCode: BehaviourModule = {
           handled.add(inv.id);
           const ag = book.records.get(inv.basis ?? "");
           if (ag?.record === "agreement" && ours(ag)) {
-            steps.push([say("approval", `Approved: pay invoice ${inv.id}.`, { to: [me], basis: inv.id, data: { invoice: inv.id } })]);
+            steps.push(because("An invoice for work we commissioned: approving it in writing, as the payments procedure requires.", say("approval", `Approved: pay invoice ${inv.id}.`, { to: [me], basis: inv.id, data: { invoice: inv.id } })));
           }
         }
         // Petitions with enough signatures become proposals (sometimes).
@@ -97,8 +98,8 @@ export const mayorCode: BehaviourModule = {
           handled.add(pet.id);
           if (ctx.rng(`respond-${pet.id}`).below(10_000) >= p.responsiveness_bps) continue;
           const d = pet.data?.demand ?? {};
-          steps.push([say("proposal", `Proposal (from petition ${pet.id}): ${d.text}`, { to: [me], basis: pet.id,
-            data: { enact: { kind: "law", text: d.text, ...(d.adico ? { adico: d.adico } : {}), ...(d.formal ? { formal: d.formal } : {}) }, tags: d.tags ?? [] } })]);
+          steps.push(because(`A petition passed ${p.petition_threshold_bps / 100}% of the town: putting its demand to the council (we respond to ${p.responsiveness_bps / 100}% of such petitions).`, say("proposal", `Proposal (from petition ${pet.id}): ${d.text}`, { to: [me], basis: pet.id,
+            data: { enact: { kind: "law", text: d.text, ...(d.adico ? { adico: d.adico } : {}), ...(d.formal ? { formal: d.formal } : {}) }, tags: d.tags ?? [] } })));
         }
         return steps;
       },
@@ -139,7 +140,7 @@ export const councilClerk: BehaviourModule = {
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);
-          steps.push([say("ballot", `Council ballot: ${prop.text}`, { basis: prop.id, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? [] } })]);
+          steps.push(because("A proposal addressed to the council: opening a ballot.", say("ballot", `Council ballot: ${prop.text}`, { basis: prop.id, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? [] } })));
         }
         for (const ballot of book.open("ballot")) {
           if (closed.has(ballot.id) || ballot.speaks_for !== me || t < (ballot.data?.closes_at ?? Infinity)) continue;
@@ -149,7 +150,7 @@ export const councilClerk: BehaviourModule = {
           const yes = [...latest.values()].filter((c) => c === "yes").length;
           const no = [...latest.values()].filter((c) => c === "no").length;
           const passed = yes > no && yes * 2 > councillors.size;
-          const step: Step = [say("ballot_result", `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.`, { basis: ballot.id, data: { ballot: ballot.id, yes, no, passed } })];
+          const step: Step = because(`The ballot closed: counting the councillors' latest votes (${passed ? "a majority for" : "no majority for"}).`, say("ballot_result", `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.`, { basis: ballot.id, data: { ballot: ballot.id, yes, no, passed } }));
           const prop = book.records.get(ballot.data?.proposal) as StatementRecord | undefined;
           const enact = prop?.data?.enact;
           if (passed && enact) step.push(say(enact.kind, enact.text, { basis: ballot.id, adico: enact.adico, formal: enact.formal?.condition, data: enact.data }));
@@ -195,7 +196,7 @@ export const councillor: BehaviourModule = {
             yes = Math.abs(p.leaning - x) < Math.abs(p.leaning - 0);
             if (r.below(10_000) < p.noise_bps) yes = !yes;
           }
-          steps.push([vote(b.id, yes ? "yes" : "no")]);
+          steps.push(because(tags.includes("budget") ? "A budget: voting on our usual propensity to pass budgets." : `Voting by our leaning (${p.leaning}) against the proposal's place on the tenants-development axis (${place(tags)})${yes !== Math.abs(p.leaning - place(tags)) < Math.abs(p.leaning) ? ", this time the other way (noise)" : ""}.`, vote(b.id, yes ? "yes" : "no")));
         }
         return steps;
       },
@@ -245,7 +246,7 @@ export const financeOfficer: BehaviourModule = {
           if (acc.balance < amount) continue;
           paid.add(inv.id);
           spent += amount;
-          steps.push([pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })]);
+          steps.push(because(withinProcedure ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : "Paying an invoice outside the procedure.", pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })));
         }
         return steps;
       },
@@ -288,7 +289,7 @@ export const taxClerk: BehaviourModule = {
           if (assessed.has(rep.id) || !(rep.addressed_to ?? []).includes(me)) continue;
           const amount = Math.floor(((rep.data?.rent_received ?? 0) * rate) / 10_000);
           assessed.set(rep.id, { payer: rep.speaks_for!, account: rep.data?.account, amount, at: t, chased: false });
-          if (amount > 0) steps.push([record("right", me, { kind: "tax", amount, period_end: rep.data?.period_end }, { against: rep.speaks_for, basis: rep.id })]);
+          if (amount > 0) steps.push(because(`A tax report: recording the tax owed at the law's rate (${rate / 100}%).`, record("right", me, { kind: "tax", amount, period_end: rep.data?.period_end }, { against: rep.speaks_for, basis: rep.id })));
         }
         // Chase: apply what's arrived from each account to its assessments, oldest
         // first; chase an assessment still unpaid after the grace period.
@@ -300,10 +301,10 @@ export const taxClerk: BehaviourModule = {
           if ((received.get(a.account) ?? 0) >= upTo) continue;
           a.chased = true;
           const fine = Math.floor((a.amount * penalty) / 10_000);
-          steps.push([
+          steps.push(because(`Tax still unpaid after ${p.grace_days} days: recording the law's penalty (${penalty / 100}%) and writing to the payer.`,
             record("right", me, { kind: "tax_penalty", amount: fine }, { against: a.payer, basis: id }),
             message([a.payer], `Tax of ${a.amount} cents on report ${id} is overdue; a penalty of ${fine} cents has been recorded.`, id),
-          ]);
+          ));
         }
         return steps;
       },
