@@ -6,9 +6,10 @@ export * from "./canon";
 export * as calls from "./calls";
 export { View } from "./view";
 export { ASKING } from "./behaviour/citizen";
+export { DEFAULT_HOUSEHOLDS, drawHousehold, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
-import { exportDemand, idle } from "./behaviour/world";
+import { exportDemand, idle, migration } from "./behaviour/world";
 import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
 import { builder, inspector, planningOfficer } from "./behaviour/institutions";
@@ -21,6 +22,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [bankPaymentSystem, "behaviour/bank.ts"],
       [exportDemand, "behaviour/world.ts"],
       [idle, "behaviour/world.ts"],
+      [migration, "behaviour/world.ts"],
       [citizen, "behaviour/citizen.ts"],
       [landlord, "behaviour/firms.ts"],
       [employer, "behaviour/firms.ts"],

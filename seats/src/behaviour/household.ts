@@ -96,3 +96,103 @@ export function hear(text: string): Heard | undefined {
   if ((m = /^My pay is now \$(\d+\.\d\d) a month\.$/.exec(text))) return { kind: "pay", cents: cents(m[1]!) };
   return undefined;
 }
+
+// ------------------------------------------------------------------ drawing households, as the census counts them
+
+/**
+ * Households, as the census counts them. Shares are of households (basis points); see docs/behaviour/households.md
+ * for the sources and what's simplified.
+ */
+export interface HouseholdSpec {
+  lone_bps: number;
+  group_bps: number; // unrelated adults, and "other" families (e.g. siblings)
+  couple_bps: number; // a couple, no children at home
+  couple_children_bps: number;
+  one_parent_bps: number;
+  /** Children in a couple family, and in a one-parent family: shares with 1, 2 and 3. */
+  children_couple: [number, number, number];
+  children_one_parent: [number, number, number];
+  same_sex_couple_bps: number;
+  lone_parent_female_bps: number;
+  adult_female_bps: number; // adults living alone or in groups
+  child_male_bps: number; // the sex ratio at birth
+  adult_ages: [number, number];
+  mother_age_at_first_birth: [number, number];
+  group_size: [number, number];
+}
+
+export const DEFAULT_HOUSEHOLDS: HouseholdSpec = {
+  // ABS Census 2021 (QuickStats, Australia): lone person 25.6%, group 3.9%, family 70.5% of households; of families,
+  // couple without children 38.8%, couple with children 43.7%, one parent 15.9%, other 1.6% (counted here with groups).
+  lone_bps: 2560,
+  group_bps: 503,
+  couple_bps: 2735,
+  couple_children_bps: 3081,
+  one_parent_bps: 1121,
+  // AIFS, from the 2021 Census: couples with dependent children had 1 (35-36%), 2 (43-44%), 3+ (20-22%);
+  // one-parent families 1 (51-52%), 2 (32-34%), 3+ (15-16%). "3+" is taken as 3.
+  children_couple: [3550, 4350, 2100],
+  children_one_parent: [5150, 3300, 1550],
+  same_sex_couple_bps: 140, // ABS Census 2021: 1.4% of couples living together
+  lone_parent_female_bps: 8000, // ABS Census 2021: one in five lone parents was male
+  adult_female_bps: 5000, // about half (placeholder)
+  child_male_bps: 5131, // ABS Births 2022: 105.4 boys per 100 girls
+  adult_ages: [18, 64], // a working-age town: no retirees yet (there's no pension income to live on)
+  mother_age_at_first_birth: [22, 36], // placeholder around ABS Births' median age of mothers (about 31)
+  group_size: [2, 3], // placeholder
+};
+
+/** A drawn household: members by age (whole years), days since their last birthday and sex; couples by index; the leaseholder's index. */
+export interface DrawnHousehold {
+  members: { age: number; day: number; sex: "female" | "male" }[];
+  couples: [number, number][];
+  leaseholder: number;
+}
+
+/** Draw one household from the shares. `below(n)` is a uniform draw from 0..n-1 (the caller's keyed stream). */
+export function drawHousehold(H: HouseholdSpec, below: (n: number) => number): DrawnHousehold {
+  const within = ([lo, hi]: [number, number]) => lo + below(hi - lo + 1);
+  const chance = (bps: number) => below(10_000) < bps;
+  const byShare = (shares: number[]) => {
+    let r = below(shares.reduce((a, b) => a + b, 0));
+    for (let i = 0; i < shares.length; i++) if ((r -= shares[i]!) < 0) return i;
+    return shares.length - 1;
+  };
+  const members: DrawnHousehold["members"] = [];
+  const person = (age: number, sex: "female" | "male") => members.push({ age, day: below(365), sex }) - 1;
+  const clampAge = (a: number) => Math.max(H.adult_ages[0], Math.min(H.adult_ages[1], a));
+  const adultSex = () => (chance(H.adult_female_bps) ? "female" : "male");
+  const couple = (age: number): [number, number] => {
+    const other = clampAge(age + below(11) - 5);
+    if (chance(H.same_sex_couple_bps)) {
+      const sex = chance(5000) ? "female" : "male";
+      return [person(age, sex), person(other, sex)];
+    }
+    return [person(age, "female"), person(other, "male")];
+  };
+  const kind = byShare([H.lone_bps, H.group_bps, H.couple_bps, H.couple_children_bps, H.one_parent_bps]);
+  if (kind === 0) return { members, couples: [], leaseholder: person(within(H.adult_ages), adultSex()) };
+  if (kind === 1) {
+    const n = within(H.group_size);
+    for (let i = 0; i < n; i++) person(within(H.adult_ages), adultSex());
+    return { members, couples: [], leaseholder: 0 };
+  }
+  if (kind === 2) {
+    const c = couple(within(H.adult_ages));
+    return { members, couples: [c], leaseholder: c[0] };
+  }
+  // Children first (the eldest sets the parents' ages: older by the mother's age at a first birth).
+  const n = 1 + byShare(kind === 3 ? H.children_couple : H.children_one_parent);
+  const eldest = below(18);
+  let age = eldest;
+  for (let i = 0; i < n; i++) {
+    person(age, chance(H.child_male_bps) ? "male" : "female");
+    age = Math.max(0, age - 1 - below(4));
+  }
+  const parentAge = clampAge(eldest + within(H.mother_age_at_first_birth));
+  if (kind === 3) {
+    const c = couple(parentAge);
+    return { members, couples: [c], leaseholder: c[0] };
+  }
+  return { members, couples: [], leaseholder: person(parentAge, chance(H.lone_parent_female_bps) ? "female" : "male") };
+}

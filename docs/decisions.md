@@ -338,6 +338,27 @@ See the design note, §16.
 - **Not yet** (households.md): partnering and separating, adult children leaving home, succession when a leaseholder dies, moving early to fit a grown household, flatmates leaving on their own, renter-specific shares, retirees.
 - **Revisit if:** renters' bedroom use (ABS *Housing Occupancy and Costs*) shows the spare-bedroom share is far off, or language-model citizens make the code phrasing between household members a bottleneck.
 
+**D49. Life and migration in the town (Pass B, content); births wait on a contract question.** *(Naz, 2026-09-27: violence, accidents and illness "very basic, but would be good if it's in there with a note to expand"; arrivals only through the boundary. Details: docs/behaviour/life.md, docs/behaviour/boundary.md.)*
+- **Life** (the town's `life` config):
+  - **Deaths:** from the ABS life table 2021–2023, by single year of age, male and female averaged, since bodies don't model sex. Life expectancy from the table as set: 82.9.
+  - **Illness:** an overnight hospital stay. A placeholder shaped by AIHW's age gradient; to replace with AIHW's age-specific overnight rates.
+  - **Injury anywhere:** 2.1% a year (AIHW).
+  - **Injury at work:** factories 1.6%, shops 1.2% a year (Safe Work Australia serious claims).
+  - **No death is counted twice:** illness and injury are set not to kill, and the life table covers all causes.
+  - **Harm:** not set until there's a sourced severity table.
+  - **Observed** (1,000 people, two years): 1–3 deaths, 80–103 illnesses, 34–42 injuries per run, as the rates imply. Nobody acts on a condition yet (sick leave, succession after a death: life.md).
+- **Migration (`world.migration`, held by the outside world's `migration` position):**
+  - Harris–Todaro: households come when the town's expected wage beats income elsewhere. The expected wage is the mean posted wage times the chance of a job (postings against recent newcomers).
+  - Newcomers are drawn from the census shares, bring savings in their own keeping, and bank them: the bank opens accounts on request, and citizens deposit money they hold themselves.
+  - It writes the newcomers' household record.
+  - **Observed:** on the 1,000-person town almost nobody comes, because locals out of work fill postings within the month. With vacancies standing, households arrive and settle (a test).
+  - The outside income and response rate are placeholders to calibrate against ABS regional internal migration.
+- **Births: waiting for Naz.** A newborn's sex is needed by the occupancy standard (and a household records its children). With sex as a trait, the parent can't know it.
+  - **The clean fix is physical:** bodies get an optional `sex`. The kernel draws a newborn's from a world sex ratio (`life.birth`), birth checks who can bear a child, and a parent sees their children (and their sex) in their body's view.
+  - That's a contract change (world-config entities, `life.birth`, the Observation's `body`), so it's proposed here, not made.
+  - Once decided: fertility behaviour from ABS Births age-specific fertility rates, a child template, parents bringing a newborn home and updating the household record.
+- **Revisit if:** the town needs deaths by cause (set `fatal_bps` and subtract from other causes), or migration's placeholders prove far from ABS internal migration rates once calibrated.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

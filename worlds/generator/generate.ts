@@ -3,7 +3,8 @@
 // streams). The kernel never generates anything; it receives this output.
 // Everything generated here is example CONTENT (D23).
 
-import { Randomness } from "@terrarium/seats";
+import { DEFAULT_HOUSEHOLDS, drawHousehold, Randomness, type HouseholdSpec } from "@terrarium/seats";
+export { DEFAULT_HOUSEHOLDS };
 import law from "../law/basic.json";
 
 export const GENERATOR_VERSION = "0.10.0";
@@ -43,50 +44,46 @@ export interface TownSpec {
   house_types?: { id: string; bedrooms: number; share_bps: number; rent: number }[];
   /** Who lives together (docs/behaviour/households.md). Default: DEFAULT_HOUSEHOLDS (ABS Census 2021). */
   households?: Partial<HouseholdSpec>;
+  /** Bodies' physics: death, illness and injury (docs/behaviour/life.md). Default true; false: nobody falls ill, is hurt or dies. */
+  life?: boolean;
+  /** People moving in from elsewhere (world.migration, docs/behaviour/boundary.md): its parameters, or false for none. Default: on. */
+  migration?: false | Record<string, unknown>;
 }
 
 /**
- * Households, as the census counts them. Shares are of households (basis points); see docs/behaviour/households.md
- * for the sources and what's simplified.
+ * The probability of dying within a year at each age 0-100, from ABS Life Tables 2021-2023 (Table 9, Australia),
+ * in units of 1e-5: males and females. The world's bodies don't have a sex, so the town uses their mean.
  */
-export interface HouseholdSpec {
-  lone_bps: number;
-  group_bps: number; // unrelated adults, and "other" families (e.g. siblings)
-  couple_bps: number; // a couple, no children at home
-  couple_children_bps: number;
-  one_parent_bps: number;
-  /** Children in a couple family, and in a one-parent family: shares with 1, 2 and 3. */
-  children_couple: [number, number, number];
-  children_one_parent: [number, number, number];
-  same_sex_couple_bps: number;
-  lone_parent_female_bps: number;
-  adult_female_bps: number; // adults living alone or in groups
-  child_male_bps: number; // the sex ratio at birth
-  adult_ages: [number, number];
-  mother_age_at_first_birth: [number, number];
-  group_size: [number, number];
+const QX_MALE = [343, 22, 15, 13, 11, 10, 9, 8, 8, 8, 8, 9, 10, 13, 17, 24, 32, 40, 46, 51, 54, 56, 58, 59, 61, 63, 64, 66, 69, 71, 73, 76, 79, 83, 87, 90, 94, 99, 106, 115,
+  125, 136, 149, 163, 178, 191, 205, 221, 240, 261, 284, 309, 334, 361, 391, 423, 458, 497, 540, 586, 636, 692, 754, 822, 895, 974, 1060, 1155, 1260, 1372,
+  1496, 1637, 1804, 1998, 2221, 2476, 2767, 3104, 3492, 3934, 4434, 4987, 5609, 6322, 7147, 8095, 9179, 10402, 11767, 13296, 14971, 16789, 18921, 21233, 23269,
+  25522, 28320, 31443, 34410, 37938, 41442];
+const QX_FEMALE = [301, 20, 12, 10, 9, 8, 7, 7, 6, 6, 6, 7, 8, 9, 11, 13, 16, 17, 19, 21, 23, 24, 25, 25, 25, 25, 26, 27, 28, 30, 32, 34, 37, 39, 43, 46, 51, 55, 61, 66,
+  72, 79, 86, 95, 104, 113, 123, 133, 145, 158, 172, 186, 201, 219, 237, 256, 277, 299, 324, 351, 379, 410, 444, 484, 529, 577, 629, 687, 752, 827,
+  909, 1001, 1108, 1238, 1392, 1571, 1778, 2021, 2305, 2631, 3004, 3435, 3933, 4509, 5166, 5925, 6807, 7827, 9010, 10357, 11870, 13565, 15456, 17431, 19730,
+  21847, 24026, 26707, 29375, 31900, 34407];
+
+/** The town's life physics (docs/behaviour/life.md, with sources). */
+export function townLife() {
+  // Mean of the sexes, in basis points (1e-4), rounded half up; at least 1 where it's above 0.
+  const byAge = QX_MALE.map((m, age) => ({ from: age, bps: Math.max(1, Math.floor((m + QX_FEMALE[age]!) / 20 + 0.5)) }));
+  return {
+    year: 365 * DAY,
+    // All deaths come from the life table, which covers every cause: illness and injury below are set not to kill, so no death is counted twice.
+    other_causes: { by_age: byAge },
+    // An illness serious enough to put someone in hospital overnight. Placeholder, shaped by AIHW's age gradient (hospitalisations
+    // per 1,000: 99 at 5-14, 1,511 at 85+; 153 overnight per 1,000 overall, 2022-23); to be replaced by the age-specific overnight rates.
+    illness: {
+      by_age: [{ from: 0, bps: 600 }, { from: 5, bps: 350 }, { from: 15, bps: 600 }, { from: 45, bps: 900 }, { from: 65, bps: 1800 }, { from: 85, bps: 4500 }],
+      severity: [{ label: "serious", share_bps: 8000, days: [3, 14], fatal_bps: 0 }, { label: "severe", share_bps: 2000, days: [14, 60], fatal_bps: 0 }],
+    },
+    // Injuries anywhere: AIHW, 2,100 injury hospitalisations per 100,000 people (2022-23). Places add their own (structure types' injury_bps).
+    injury: { bps: 210, severity: [{ label: "minor", share_bps: 6000, days: [3, 14], fatal_bps: 0 }, { label: "serious", share_bps: 4000, days: [14, 90], fatal_bps: 0 }] },
+  };
 }
 
-export const DEFAULT_HOUSEHOLDS: HouseholdSpec = {
-  // ABS Census 2021 (QuickStats, Australia): lone person 25.6%, group 3.9%, family 70.5% of households; of families,
-  // couple without children 38.8%, couple with children 43.7%, one parent 15.9%, other 1.6% (counted here with groups).
-  lone_bps: 2560,
-  group_bps: 503,
-  couple_bps: 2735,
-  couple_children_bps: 3081,
-  one_parent_bps: 1121,
-  // AIFS, from the 2021 Census: couples with dependent children had 1 (35-36%), 2 (43-44%), 3+ (20-22%);
-  // one-parent families 1 (51-52%), 2 (32-34%), 3+ (15-16%). "3+" is taken as 3.
-  children_couple: [3550, 4350, 2100],
-  children_one_parent: [5150, 3300, 1550],
-  same_sex_couple_bps: 140, // ABS Census 2021: 1.4% of couples living together
-  lone_parent_female_bps: 8000, // ABS Census 2021: one in five lone parents was male
-  adult_female_bps: 5000, // about half (placeholder)
-  child_male_bps: 5131, // ABS Births 2022: 105.4 boys per 100 girls
-  adult_ages: [18, 64], // a working-age town: no retirees yet (there's no pension income to live on)
-  mother_age_at_first_birth: [22, 36], // placeholder around ABS Births' median age of mothers (about 31)
-  group_size: [2, 3], // placeholder
-};
+/** Work injuries (serious claims: a week or more off), Safe Work Australia, Key WHS Statistics 2024 (2023-24), at about 1,700 hours a year. */
+const INJURY_BPS = { factory: 160 /* manufacturing: 9.4 per million hours */, shop: 116 /* all industries: 6.8 per million hours (placeholder for retail) */ };
 
 /** An apartment block's 12 units (placeholder mix, smaller than the census's all-dwellings mix, as renters' homes are). */
 export const DEFAULT_APARTMENT_UNITS = [
@@ -207,62 +204,15 @@ export function generate(spec: TownSpec): any {
   // Households first (docs/behaviour/households.md): who lives together, their ages and sexes, as the census counts them.
   const H: HouseholdSpec = { ...DEFAULT_HOUSEHOLDS, ...spec.households };
   const hr = rng("households");
-  const within = ([lo, hi]: [number, number]) => lo + hr.below(hi - lo + 1);
-  const chance = (bps: number) => hr.below(10_000) < bps;
-  const byShare = (shares: number[]) => {
-    let r = hr.below(shares.reduce((a, b) => a + b, 0));
-    for (let i = 0; i < shares.length; i++) if ((r -= shares[i]!) < 0) return i;
-    return shares.length - 1;
-  };
   interface Person { id: string; born_at: number; sex: "female" | "male"; adult: boolean }
   interface Household { members: Person[]; couples: [string, string][]; leaseholder: string }
   const households: Household[] = [];
   let count = 0;
-  const person = (age: number, sex: "female" | "male"): Person => {
-    const id = `c${pad(++count, 4)}`;
-    // Born `age` whole years ago, on a random day of the year before that.
-    return { id, born_at: -(age * YEAR + hr.below(365) * DAY), sex, adult: age >= 18 };
-  };
-  const clampAge = (a: number) => Math.max(H.adult_ages[0], Math.min(H.adult_ages[1], a));
-  const couple = (age: number): [Person, Person] => {
-    const other = clampAge(age + hr.below(11) - 5);
-    if (chance(H.same_sex_couple_bps)) {
-      const sex = chance(5000) ? "female" : "male";
-      return [person(age, sex), person(other, sex)];
-    }
-    return [person(age, "female"), person(other, "male")];
-  };
-  const kids = (n: number): { people: Person[]; eldest: number } => {
-    const eldest = hr.below(18);
-    const out: Person[] = [];
-    let age = eldest;
-    for (let i = 0; i < n; i++) {
-      out.push(person(age, chance(H.child_male_bps) ? "male" : "female"));
-      age = Math.max(0, age - 1 - hr.below(4));
-    }
-    return { people: out, eldest };
-  };
   while (count < spec.citizens) {
-    const kind = byShare([H.lone_bps, H.group_bps, H.couple_bps, H.couple_children_bps, H.one_parent_bps]);
-    const adultSex = () => (chance(H.adult_female_bps) ? "female" : "male");
-    if (kind === 0) {
-      const p = person(within(H.adult_ages), adultSex());
-      households.push({ members: [p], couples: [], leaseholder: p.id });
-    } else if (kind === 1) {
-      const n = within(H.group_size);
-      const ms = Array.from({ length: n }, () => person(within(H.adult_ages), adultSex()));
-      households.push({ members: ms, couples: [], leaseholder: ms[0]!.id });
-    } else if (kind === 2) {
-      const [a, b] = couple(within(H.adult_ages));
-      households.push({ members: [a, b], couples: [[a.id, b.id]], leaseholder: a.id });
-    } else {
-      const n = 1 + byShare(kind === 3 ? H.children_couple : H.children_one_parent);
-      const k = kids(n);
-      // Parents are older than their eldest by the mother's age at a first birth (within the town's adult ages).
-      const parentAge = clampAge(k.eldest + within(H.mother_age_at_first_birth));
-      const parents = kind === 3 ? couple(parentAge) : [person(parentAge, chance(H.lone_parent_female_bps) ? "female" : "male")];
-      households.push({ members: [...parents, ...k.people], couples: kind === 3 ? [[parents[0]!.id, parents[1]!.id]] : [], leaseholder: parents[0]!.id });
-    }
+    const d = drawHousehold(H, (n) => hr.below(n));
+    // Born `age` whole years ago, on a day of the year before that.
+    const members = d.members.map((m) => ({ id: `c${pad(++count, 4)}`, born_at: -(m.age * YEAR + m.day * DAY), sex: m.sex, adult: m.age >= 18 }));
+    households.push({ members, couples: d.couples.map(([a, b]) => [members[a]!.id, members[b]!.id]), leaseholder: members[d.leaseholder]!.id });
   }
   const everyone = households.flatMap((h) => h.members);
   for (const m of everyone) entities.push({ id: m.id, kind: "person", name: m.id, born_at: m.born_at });
@@ -430,7 +380,15 @@ export function generate(spec: TownSpec): any {
   // Position: what a citizen can see around where it lives and works (the cells touching them), who shares its home and
   // workplace by name, and elsewhere only how full a place is. It moves with them.
   const street = { id: "street", title: "Around you", kind: "sites", area: { near: 0 } };
-  for (const m of everyone) participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, traits: { sex: m.sex }, channels: [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street], controller: code("citizen.default", { shop_accounts: shopAccounts, outside_account: "acc-outside", bank: "bank", population: everyone.length }), framing: unstated });
+  const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street];
+  const citizenController = code("citizen.default", { shop_accounts: shopAccounts, outside_account: "acc-outside", bank: "bank", population: everyone.length });
+  for (const m of everyone) participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, traits: { sex: m.sex }, channels: citizenChannels, controller: citizenController, framing: unstated });
+  // People who may come later: newcomers from elsewhere (their sex is the migration office's draw, so a template each).
+  const templates = (["female", "male"] as const).map((sex) => ({ id: `newcomer-${sex}`, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated, traits: { sex } }));
+  if (spec.migration !== false) {
+    office("migration", "outside", "People moving from elsewhere", undefined, [{ id: "jobs", kind: "records", match: { statement_kinds: ["job_posting"] }, on_request: true }, { id: "who", kind: "directory" }],
+      code("world.migration", { households: spec.households ?? {}, ...(spec.migration ?? {}) }));
+  }
 
   return {
     contracts: "0.4",
@@ -444,14 +402,16 @@ export function generate(spec: TownSpec): any {
         spaces: [{ kind: "dwelling", count: 1, capacity: capacityFor(h.bedrooms), attrs: { bedrooms: h.bedrooms } }] })),
       { id: "apartments", category: "residential", materials_cost: 250_000_000, build_time: 180 * DAY, demolition_cost: 10_000_000, footprint: { w: 1, h: 1 },
         spaces: units.map((u) => ({ kind: "dwelling", count: u.count, capacity: capacityFor(u.bedrooms), attrs: { bedrooms: u.bedrooms } })) },
-      { id: "shop", category: "commercial", materials_cost: 60_000_000, build_time: 90 * DAY, demolition_cost: 3_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 6 }] },
-      { id: "factory", category: "industrial", materials_cost: 400_000_000, build_time: 240 * DAY, demolition_cost: 20_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }] },
+      { id: "shop", category: "commercial", materials_cost: 60_000_000, build_time: 90 * DAY, demolition_cost: 3_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 6 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.shop }) },
+      { id: "factory", category: "industrial", materials_cost: 400_000_000, build_time: 240 * DAY, demolition_cost: 20_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.factory }) },
       { id: "civic", category: "civic", materials_cost: 80_000_000, build_time: 120 * DAY, demolition_cost: 4_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }] },
       { id: "park", category: "green", materials_cost: 5_000_000, build_time: 30 * DAY, demolition_cost: 500_000, footprint: { w: 1, h: 1 }, spaces: [] },
     ] },
     world: { boundary: "outside", ground: { w: spec.grid.w, h: spec.grid.h }, entities, accounts, structures, occupancy, records },
     participants,
     positions,
+    templates,
+    ...(spec.life === false ? {} : { life: townLife() }),
     caps: { max_created_entities: 50 },
     orchestration: { thinking_time: "free", max_actions_per_wake: 12 },
   };

@@ -188,8 +188,11 @@ export const citizen: BehaviourModule = {
     const plan = (obs: Observation): Step[] => {
       if (plannedAt === -1) learnFromInitialRecords(obs);
       const t = obs.t;
-      const acc = ownAccount(obs);
+      // Our account at a bank (standing orders need one). Money brought from elsewhere is in our own keeping until we deposit it.
+      const ours = channels.accounts(obs).filter((a) => a.holder === me);
+      const acc = ours.find((a) => a.custodian !== me);
       const steps: Step[] = [];
+      if (acc) for (const k of ours) if (k.custodian === me && k.balance > 0) steps.push([pay(acc.account, k.balance, { from: k.account, for: "Deposit." })]);
       moveStep = null;
       childrenNow = children(t);
       // Are we in a building? Around us we see who's in our own buildings; without that view, assume we are.
@@ -509,7 +512,7 @@ export const citizen: BehaviourModule = {
         // A child does nothing on their own (their parents house them) until they're 18.
         if (obs.body && obs.t - obs.body.born_at < ADULT_YEARS * year) return wait(Math.min(obs.body.born_at + ADULT_YEARS * year, ctx.world.runEnd + DAY));
         if (plannedAt !== obs.t) {
-          const acc = ownAccount(obs);
+          const acc = channels.accounts(obs).find((a) => a.holder === me && a.custodian !== me);
           const budget = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
           const needHome = isLeaseholder() && !home;
           const rooms = minBedrooms(obs.t);

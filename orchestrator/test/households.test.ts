@@ -22,6 +22,7 @@ test("households live, move and pay together", async () => {
   const households = config.world.records.filter((r: any) => r.kind === "household").map((r: any) => r.data);
   const householdOf = new Map<string, any>(households.flatMap((h: any) => h.members.map((m: any) => [m.person, h])));
   const adult = (person: string, t: number) => t - householdOf.get(person).members.find((m: any) => m.person === person).born_at >= 18 * 365 * DAY;
+  const known = (person: string) => householdOf.has(person); // people of the town's own households (not newcomers)
 
   // Where each person lives, replaying the occupancy (a dwelling at a time).
   const home = new Map<string, string>(config.world.occupancy.filter((o: any) => o.space.includes("/dwelling.")).map((o: any) => [o.occupant, o.space]));
@@ -29,9 +30,9 @@ test("households live, move and pay together", async () => {
   for (const e of ev) {
     if (e.event === "occupied" && e.space.includes("/dwelling.")) home.set(e.occupant, e.space);
     if (e.event === "vacated" && home.get(e.occupant) === e.space) home.delete(e.occupant);
-    if (e.event === "person_left") left.add(e.person);
+    if (e.event === "person_left" || e.event === "person_died") left.add(e.person);
   }
-  // At the end, each household still in town lives in one home (or none), bar one caught mid-move.
+  // At the end, each household still in town (the living) lives in one home (or none), bar one caught mid-move.
   let split = 0;
   for (const h of households) {
     const here = h.members.filter((m: any) => !left.has(m.person));
@@ -41,11 +42,11 @@ test("households live, move and pay together", async () => {
   expect(split).toBeLessThanOrEqual(1);
 
   // Children are brought by a parent (the leaseholder), never move themselves.
-  const childMoves = ev.filter((e) => e.event === "occupied" && e.space.includes("/dwelling.") && !adult(e.occupant, e.t));
+  const childMoves = ev.filter((e) => e.event === "occupied" && e.space.includes("/dwelling.") && known(e.occupant) && !adult(e.occupant, e.t));
   expect(childMoves.length).toBeGreaterThan(0);
   for (const e of childMoves) expect(e.by).toBe(`${householdOf.get(e.occupant).leaseholder}-self`);
   // Other adults move themselves.
-  const adultMoves = ev.filter((e) => e.event === "occupied" && e.space.includes("/dwelling.") && adult(e.occupant, e.t) && householdOf.get(e.occupant).leaseholder !== e.occupant);
+  const adultMoves = ev.filter((e) => e.event === "occupied" && e.space.includes("/dwelling.") && known(e.occupant) && adult(e.occupant, e.t) && householdOf.get(e.occupant).leaseholder !== e.occupant);
   expect(adultMoves.length).toBeGreaterThan(0);
   for (const e of adultMoves) expect(e.by).toBe(`${e.occupant}-self`);
   // Shares of the rent reach leaseholders.
