@@ -6,6 +6,10 @@
 //!   terrarium-kernel version
 
 use std::process::ExitCode;
+
+/// A faster allocator for the kernel binary (the kernel allocates heavily; no result depends on the allocator).
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use terrarium_kernel::{log, protocol, run};
 
 fn read(path: &str) -> Result<Vec<u8>, String> {
