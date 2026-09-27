@@ -171,7 +171,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   for (const x of cfg.positions) positions.set(x.id, { id: x.id, entity: x.entity, title: x.title, role: x.role, channels: x.channels ?? [], role_module: x.role_module, holder: x.holder });
   const personalChannels = (p: Part) => (cfg.participants.find((x: any) => x.id === p.id)?.channels ?? templates.get((p as any).template)?.channels ?? []) as any[];
 
-  const units = new Map<string, Unit>();
+  const units = new Units();
   const debriefs = new Map<string, { part: Part; controller: LlmController }>();
   const used: { [name: string]: { version: string; sha256?: string } } = {};
   const bindings: { [participant: string]: object } = {};
@@ -298,7 +298,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_SEAT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(PRICES).map(([key, price]) => ({ model: key, ...price })), participants: bindings } } : {}),
   } } });
 
-  const unitsOf = (pid: string) => [...units.values()].filter((u) => u.participant === pid);
+  const unitsOf = (pid: string) => units.of(pid);
   const wakeParticipant = (pid: string) => {
     for (const u of unitsOf(pid)) if (u.nextWake > t) u.nextWake = t;
   };
@@ -388,7 +388,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   const maxActions: number = cfg.orchestration.max_actions_per_wake;
   for (;;) {
     let next: Unit | undefined;
-    for (const u of units.values()) if (!next || u.nextWake < next.nextWake || (u.nextWake === next.nextWake && u.key < next.key)) next = u;
+    next = units.next();
     if (!next || next.nextWake > until) break;
     if (next.nextWake > t) {
       await command({ command: "advance", to: next.nextWake });
@@ -531,4 +531,79 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}`);
   return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs) };
+}
+
+/**
+ * The scheduled units, indexed by participant, with a priority queue of wake times: the next unit is the one with the
+ * earliest wake, ties by key (exactly the order a scan of every unit would give). Every change to a unit's `nextWake`
+ * queues it again; entries that no longer match (a later change, or the unit gone) are skipped.
+ */
+class Units extends Map<string, Unit> {
+  private byParticipant = new Map<string, Set<Unit>>();
+  private heap: { w: number; k: string; u: Unit }[] = [];
+
+  override set(key: string, u: Unit): this {
+    const old = super.get(key);
+    if (old) this.byParticipant.get(old.participant)?.delete(old);
+    super.set(key, u);
+    const set = this.byParticipant.get(u.participant) ?? new Set();
+    set.add(u);
+    this.byParticipant.set(u.participant, set);
+    let w = u.nextWake;
+    Object.defineProperty(u, "nextWake", { get: () => w, set: (v: number) => { w = v; this.push(v, u.key, u); }, enumerable: true, configurable: true });
+    this.push(w, key, u);
+    return this;
+  }
+
+  override delete(key: string): boolean {
+    const u = super.get(key);
+    if (u) this.byParticipant.get(u.participant)?.delete(u);
+    return super.delete(key);
+  }
+
+  /** A participant's units, in key order. */
+  of(participant: string): Unit[] {
+    return [...(this.byParticipant.get(participant) ?? [])].sort((a, b) => (a.key < b.key ? -1 : 1));
+  }
+
+  /** The unit to wake next (not removed from the queue). */
+  next(): Unit | undefined {
+    for (;;) {
+      const top = this.heap[0];
+      if (!top) return undefined;
+      if (this.get(top.k) === top.u && top.u.nextWake === top.w) return top.u;
+      this.pop();
+    }
+  }
+
+  private less(a: { w: number; k: string }, b: { w: number; k: string }) {
+    return a.w < b.w || (a.w === b.w && a.k < b.k);
+  }
+  private push(w: number, k: string, u: Unit) {
+    const h = this.heap;
+    h.push({ w, k, u });
+    let i = h.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (!this.less(h[i]!, h[parent]!)) break;
+      [h[i], h[parent]] = [h[parent]!, h[i]!];
+      i = parent;
+    }
+  }
+  private pop() {
+    const h = this.heap;
+    const last = h.pop()!;
+    if (!h.length) return;
+    h[0] = last;
+    let i = 0;
+    for (;;) {
+      const l = 2 * i + 1, r = l + 1;
+      let m = i;
+      if (l < h.length && this.less(h[l]!, h[m]!)) m = l;
+      if (r < h.length && this.less(h[r]!, h[m]!)) m = r;
+      if (m === i) break;
+      [h[i], h[m]] = [h[m]!, h[i]!];
+      i = m;
+    }
+  }
 }

@@ -46,9 +46,7 @@ export const bankPaymentSystem: BehaviourModule = {
       const me = obs.entity;
       const withdrawn = book.withdrawn;
       const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, a]));
-      const instructions = [...book.records.values()]
-        .filter((r): r is StatementRecord => r.record === "statement" && r.kind === "request" && (r.addressed_to ?? []).includes(me))
-        .sort((a, b) => (a.id < b.id ? -1 : 1));
+      const instructions = book.all("request").filter((r) => (r.addressed_to ?? []).includes(me)).sort((a, b) => (a.id < b.id ? -1 : 1));
       const out: Payment[] = [];
       for (const ins of instructions) {
         if (withdrawn.has(ins.id)) continue;

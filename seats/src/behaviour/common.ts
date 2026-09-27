@@ -56,6 +56,11 @@ export class Book {
     return fresh;
   }
 
+  /** Every statement of a kind seen, withdrawn or not, in the order seen. */
+  all(kind: string): StatementRecord[] {
+    return this.byKind.get(kind) ?? [];
+  }
+
   /** Statements of a kind that are still standing (not withdrawn). */
   open(kind: string): StatementRecord[] {
     return (this.byKind.get(kind) ?? []).filter((r) => !this.withdrawn.has(r.id));

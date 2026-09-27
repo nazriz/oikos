@@ -212,14 +212,18 @@ export const landlord: BehaviourModule = {
         }
       }
 
-      // Arrears: give notice after enough unpaid months (rent is due monthly in advance).
+      // Arrears: give notice after enough unpaid months (rent is due monthly in advance). Each tenant pays from the
+      // account on their first application, or the one the world started them with.
+      const payingAccount = new Map<string, string>();
+      for (const r of book.all("rental_application")) if (r.speaks_for && !payingAccount.has(r.speaks_for)) payingAccount.set(r.speaks_for, r.data?.account);
+      for (const x of cfg.world.accounts) if (!payingAccount.get(x.holder)) payingAccount.set(x.holder, x.id);
       for (const a of active) {
         if (noticeGiven.has(a.id)) continue;
         const tenant = tenantOf(a);
         const rent = leaseTerms(a, tenant).rent;
         const since = book.signedAt(a.id)!;
         const due = Math.floor((t - since) / MONTH) + 1;
-        const paying = ([...book.records.values()].find((r) => r.record === "statement" && r.kind === "rental_application" && r.speaks_for === tenant) as any)?.data?.account ?? cfg.world.accounts.find((x: any) => x.holder === tenant)?.id;
+        const paying = payingAccount.get(tenant);
         const paid = paying ? received.get(paying) ?? 0 : 0;
         if ((due * rent - paid) >= p.arrears_months_before_notice * rent && t - since >= p.arrears_months_before_notice * MONTH) {
           noticeGiven.set(a.id, t);
