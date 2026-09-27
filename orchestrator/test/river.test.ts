@@ -13,7 +13,7 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 // Tight housing and rich landlords, so everyone wants to build.
-const tight = { ...base, citizens: 120, apartment_blocks: 4, houses: 20, landlord_capital: 300_000_000 };
+const tight = { ...base, citizens: 120, apartment_blocks: 2, houses: 16, landlord_capital: 300_000_000 }; // about 48 households for 40 homes
 
 async function run(compliance: number, name: string) {
   const out = join(root, "runs", `test-river-${name}`);

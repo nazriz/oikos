@@ -315,3 +315,28 @@ fn a_new_organisation_gets_its_first_position_and_its_founder_acts_for_it() {
     let rec = rec.unwrap();
     assert_eq!((rec.author.as_str(), rec.position.as_deref()), ("bob-self", Some(m.as_str())));
 }
+
+#[test]
+fn picked_traits_follow_their_weights() {
+    // 2,000 newcomers: the share drawn "female" is the template's 48.69% within about four standard errors (±4.5 points).
+    let mut run = town();
+    let mut female = 0;
+    for i in 0..2_000 {
+        let r = act(&mut run, "outside-system", Some("outside-trade"), json!([{"block": "arrive", "name": format!("N{i}"), "born_at": -30 * YEAR, "template": "newcomer"}]));
+        assert_eq!(refusal(&r), None);
+        let (_, par) = created(&r)[0].clone();
+        let sex = run.kernel().state().participants[&par].traits.as_ref().unwrap()["sex"].as_str().unwrap().to_string();
+        assert!(sex == "female" || sex == "male");
+        female += (sex == "female") as usize;
+    }
+    assert!((884..=1064).contains(&female), "{female} of 2000 drawn female");
+}
+
+#[test]
+fn a_pick_needs_positive_integer_weights() {
+    for bad in [json!({"pick": {}}), json!({"pick": {"a": 0}}), json!({"pick": {"a": -1}}), json!({"pick": {"a": 1.5}}), json!({"pick": [1, 2]})] {
+        let t = Some(json!({ "x": bad }));
+        assert!(terrarium_kernel::config::check_traits("t", &t).is_err(), "{t:?}");
+    }
+    assert!(terrarium_kernel::config::check_traits("t", &Some(json!({"x": {"pick": {"a": 0, "b": 3}}}))).is_ok());
+}

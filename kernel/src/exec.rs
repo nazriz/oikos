@@ -206,18 +206,33 @@ fn die(st: &mut State, person: &str, cause: DeathCause) -> Vec<Timed> {
     events
 }
 
-/// Draw a template's traits: values as given, `{"uniform": [lo, hi]}` drawn.
+/// Draw a template's traits: values as given; `{"uniform": [lo, hi]}` and `{"pick": {value: weight}}` drawn
+/// (a pick's values in key order, each with its share of the total weight).
 fn draw_traits(s: &Statics, traits: &Option<Value>, participant: &str) -> Option<Value> {
     let Value::Object(m) = traits.as_ref()? else { return traits.clone() };
     let mut out = serde_json::Map::new();
     for (k, v) in m {
-        let drawn = match v.as_object().and_then(|o| o.get("uniform")).and_then(|u| u.as_array()) {
-            Some(a) => {
-                let (lo, hi) = (a[0].as_i64().unwrap_or(0), a[1].as_i64().unwrap_or(0));
-                let mut rng = s.randomness.stream(&["traits", participant, k]);
-                Value::from(lo + rng.below((hi - lo + 1) as u64) as i64)
+        let obj = v.as_object();
+        let drawn = if let Some(a) = obj.and_then(|o| o.get("uniform")).and_then(|u| u.as_array()) {
+            let (lo, hi) = (a[0].as_i64().unwrap_or(0), a[1].as_i64().unwrap_or(0));
+            let mut rng = s.randomness.stream(&["traits", participant, k]);
+            Value::from(lo + rng.below((hi - lo + 1) as u64) as i64)
+        } else if let Some(w) = obj.and_then(|o| o.get("pick")).and_then(|p| p.as_object()) {
+            let mut weights: Vec<(&String, u64)> = w.iter().map(|(x, n)| (x, n.as_u64().unwrap_or(0))).collect();
+            weights.sort_by(|a, b| a.0.cmp(b.0));
+            let total: u64 = weights.iter().map(|x| x.1).sum();
+            let mut r = s.randomness.stream(&["traits", participant, k]).below(total);
+            let mut chosen = weights[0].0;
+            for (x, n) in weights {
+                if r < n {
+                    chosen = x;
+                    break;
+                }
+                r -= n;
             }
-            None => v.clone(),
+            Value::from(chosen.clone())
+        } else {
+            v.clone()
         };
         out.insert(k.clone(), drawn);
     }

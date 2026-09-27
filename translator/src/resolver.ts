@@ -367,8 +367,9 @@ class Resolver {
     const template = this.str(c, "template");
     if (!name || !template) throw new Ask("Who is coming: someone returning (who), or a newcomer (their name, age and template)?");
     const age = this.seconds(c, "age");
+    if (age === undefined) throw new Ask(`How old is ${name}?`);
     const carrying = this.amount(c, "carrying");
-    return [{ block: "arrive", name, template, ...(age !== undefined ? { born_at: this.k.t - age } : {}), ...(carrying ? { carrying } : {}), ...(bind ? { ref: bind } : {}) }];
+    return [{ block: "arrive", name, template, born_at: this.k.t - age, ...(carrying ? { carrying } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   /** An organisation's positions: create one, appoint someone to one, or leave one empty. */

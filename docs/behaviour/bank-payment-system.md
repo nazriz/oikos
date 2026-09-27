@@ -1,4 +1,4 @@
-# `bank.payment_system` (v0.4.0)
+# `bank.payment_system` (v0.5.0)
 
 **Seat:** a bank's automated payment system (acts as the bank). **Source:** `seats/src/behaviour/bank.ts`.
 
@@ -8,6 +8,7 @@ Once a day it reads the **payment requests** addressed to its bank: statements o
 - **One-off payments:** `data: { outcome: { money: { from, to, amount, for?, settles? } } }`. Paid once.
 - **Standing orders and direct debits:** the same, plus `every` and optionally `first`. Due first at the request's time plus `first` (or `every`), then every `every` seconds. If the bank wakes late, it pays each missed due date once.
 - **Withdrawn requests** (a withdrawal record the bank can see) are no longer carried out.
+- **Opening an account:** a request whose outcome is `account: { holder }`, from the holder themselves (someone turning 18 in a household, for instance). The bank opens it, with no other checks yet (real banks verify identity; that's content to add).
 
 The bank's own procedure, applied before paying:
 - **Only the account holder may instruct.** The instruction must speak for the holder of the paying account and, if `verify_author` is set, be written by one of the holder's own seats (checked via the directory). A forged instruction is ignored.

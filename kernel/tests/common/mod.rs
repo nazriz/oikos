@@ -203,7 +203,7 @@ pub fn world(p: &WorldParams) -> Value {
         "participants": participants,
         "positions": positions,
         "templates": [
-            {"id": "newcomer", "kind": "person", "channels": channels(), "controller": code, "framing": framing, "traits": {"thrift": {"uniform": [0, 100]}, "lean": -20}},
+            {"id": "newcomer", "kind": "person", "channels": channels(), "controller": code, "framing": framing, "traits": {"thrift": {"uniform": [0, 100]}, "lean": -20, "sex": {"pick": {"female": 4869, "male": 5131}}}},
             {"id": "child", "kind": "person", "channels": [{"id": "mine", "kind": "records", "match": {"involving": ["self"]}}], "controller": code, "framing": framing},
             {"id": "clerk-bot", "kind": "system", "title": "Clerk bot", "controller": code, "framing": framing}
         ],

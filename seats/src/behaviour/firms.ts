@@ -48,7 +48,7 @@ function receipts(obs: Observation, account: string): Map<string, number> {
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -64,7 +64,7 @@ export const landlord: BehaviourModule = {
       arrears_months_before_notice: 2,
       spend_share_bps: 6000, // owners' spending of rental income, at local shops
       upkeep_share_bps: 2000, // maintenance bought from outside
-      base_rent: {} as { [type: string]: number },
+      base_rent: {} as { [type: string]: number | { bedrooms: number; rent: number }[] }, // a rent per type, or per type and bedrooms
       // Development (see docs/behaviour/firms.md).
       develop: true,
       develop_type: "house",
@@ -73,6 +73,9 @@ export const landlord: BehaviourModule = {
       build_markup_bps: 2000, // the builder's price over materials
       compliance_bps: 10_000, // how often it obeys a refusal, a fine, an order, or reports rent honestly
       tax_rate_bps: 0, // the rate it believes the tax law sets (the world supplies it)
+      // Occupancy policy: turn down a household with more than this many people per bedroom (0: no limit). Two is the
+      // occupancy standard's own ceiling (CNOS); whether a landlord applies it is the landlord's choice (placeholder).
+      max_people_per_bedroom: 2,
     },
     ctx.params,
   );
@@ -155,15 +158,27 @@ export const landlord: BehaviourModule = {
           continue;
         }
         lettingNow.add(listingId);
-        const pick = ctx.rng(`pick-${listingId}`).pick(as.sort((x, y) => (x.id < y.id ? -1 : 1)));
+        // Households the home is big enough for, by our policy (someone living alone fits anywhere).
+        const beds = listing.data.bedrooms as number | undefined;
+        const fits = (a: (typeof as)[number]) => {
+          const people = (a.data?.household?.people as number | undefined) ?? 1;
+          return !p.max_people_per_bedroom || beds === undefined || people <= Math.max(1, beds * p.max_people_per_bedroom);
+        };
+        const eligible = as.filter(fits).sort((x, y) => (x.id < y.id ? -1 : 1));
+        if (!eligible.length) {
+          lettingNow.delete(listingId); // still to let: wait for another applicant
+          continue;
+        }
+        const pick = ctx.rng(`pick-${listingId}`).pick(eligible);
         const tenant = pick.speaks_for!;
+        const household = ((pick.data?.members as string[] | undefined) ?? []).filter((m) => m !== tenant);
         const months = between(p.min_term_months, p.max_term_months, ctx.rng(`term-${listingId}`).below(1_000_000) / 1_000_000);
         steps.push([
           ["lease", offer(tenant, {
             template: "lease", term: months * MONTH, ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
             we: C.call("occupancy", { who: tenant, in: listing.data.space }),
             they: pay(acc.account, listing.data.rent, { every: MONTH, for: "rent" }),
-            text: `${tenant} rents home ${listing.data.space} from ${me} for ${listing.data.rent} cents a month, for ${months} months.`,
+            text: `${tenant} rents home ${listing.data.space} from ${me} for ${listing.data.rent} cents a month, for ${months} months${household.length ? `, to live there with their household: ${household.join(", ")}` : ""}.`,
           })],
           withdraw(listingId, "Let."),
         ]);
@@ -177,8 +192,15 @@ export const landlord: BehaviourModule = {
       for (const o of owned) {
         const listed = openListings.filter((l) => l.data?.space === o.space && !lettingNow.has(l.id));
         if (!taken(o.space) && listed.length === 0) {
-          const going = active.filter((a) => leaseTerms(a, tenantOf(a)).structure === o.structure).map((a) => leaseTerms(a, tenantOf(a)).rent);
-          const ref = going.length ? Math.floor(going.reduce((x, y) => x + y, 0) / going.length) : p.base_rent[o.type] ?? 100_000;
+          // What we get now for homes like it: the same building, the same number of bedrooms.
+          const like = (a: any) => {
+            const lt = leaseTerms(a, tenantOf(a));
+            return lt.structure === o.structure && owned.find((x) => x.space === lt.space)?.bedrooms === o.bedrooms;
+          };
+          const going = active.filter(like).map((a) => leaseTerms(a, tenantOf(a)).rent);
+          const base = p.base_rent[o.type];
+          const baseRent = typeof base === "number" ? base : (base?.find((b) => b.bedrooms === o.bedrooms)?.rent ?? 100_000);
+          const ref = going.length ? Math.floor(going.reduce((x, y) => x + y, 0) / going.length) : baseRent;
           const noise = 9_750 + ctx.rng(`price-${o.space}`).below(501); // +/-2.5%
           steps.push([listing(o, Math.floor((((ref * (10_000 + p.markup_bps)) / 10_000) * noise) / 10_000))]);
         }

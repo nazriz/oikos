@@ -12,13 +12,22 @@
 // start hunting ask the people they live and work with, now and before; those
 // who can see room where they live, or at their own work, say where.
 //
+// Households (docs/behaviour/households.md): people live in households, as
+// the census counts them. The leaseholder hunts for the bedrooms the
+// household needs by the occupancy standard (CNOS), within a third of the
+// household's income, applies, signs and brings the children; the other
+// adults move when told, and pay their share of the rent to the leaseholder.
+// Children do nothing on their own until they're 18.
+//
 // Everything is done the way a person does it: applying, signing, moving in,
 // asking the bank to pay. Nothing happens to them automatically.
 
 import type { LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
+import * as C from "../calls";
 import { Book, callAction, DAY, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step } from "./common";
+import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
@@ -30,7 +39,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.7.0",
+  version: "0.8.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -58,6 +67,8 @@ export const citizen: BehaviourModule = {
       ask_again_days: 60, // still hunting after this long: a new hunt, asked about again (placeholder)
       max_contacts: 15, // people remembered from homes and workplaces shared, most recent first (placeholder; Dunbar's ~15 "sympathy group")
       pass_on_bps: 10_000, // chance a contact who can see a lead passes it on (placeholder)
+      // Households (docs/behaviour/households.md).
+      accept_fewer_bedrooms_after_days: 60, // still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)
     },
     ctx.params,
   );
@@ -90,6 +101,23 @@ export const citizen: BehaviourModule = {
 
     const monthlyIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
 
+    // The household (a record the members keep; none: living alone, as the leaseholder of one).
+    const year: number = ctx.world.config?.life?.year ?? 365 * DAY;
+    let household: HouseholdData | undefined;
+    const isLeaseholder = () => !household || household.leaseholder === me;
+    const others = () => (household?.members ?? []).filter((m) => m.person !== me);
+    const reach = (m: Member) => m.participant ?? m.person;
+    let heard: { from: Member; what: Heard }[] = [];
+    // As leaseholder: what the other adults earn (they tell us), and the shares of the rent we've told them.
+    const memberPay = new Map<string, number>();
+    const sharesTold = new Map<string, number>();
+    let toldMoveIn: string | null = null; // the space we've told the household to move into
+    // As another adult: where we live, our share of the rent, and the pay we last told the leaseholder.
+    let livingAt: string | null = null;
+    let share: { cents: number; order?: string } | null = null;
+    let payTold = -1;
+    const householdIncome = () => monthlyIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0);
+
     const learnFromInitialRecords = (obs: Observation) => {
       // Agreements already in force when we first look (the world's genesis records).
       for (const r of book.records.values()) {
@@ -107,6 +135,9 @@ export const citizen: BehaviourModule = {
           job = { agreement: r.id, employer, ...jobTerms(r, me), endsAt: end };
         }
       }
+      // Another adult's share of the rent, if one is already standing.
+      const mine = [...book.records.values()].find((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.data?.outcome?.money?.for === "Household share of the rent.");
+      if (mine && !share) share = { cents: (mine as any).data.outcome.money.amount, order: mine.id };
       void obs;
     };
 
@@ -121,7 +152,14 @@ export const citizen: BehaviourModule = {
         else found[k] = ch.records as StatementRecord[];
       }
       // Words from people: someone asking around, or someone telling us where to look.
+      household = householdOf(book, me)?.data;
       for (const m of obs.inbox) {
+        const from = household?.members.find((x) => x.participant === m.from && x.person !== me);
+        const what = from ? hear(m.text) : undefined;
+        if (from && what) {
+          heard.push({ from, what });
+          continue;
+        }
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
         if (want) asked.push({ from: m.from, want });
         // A place someone names in reply to our asking (not a reply about a record: those are institutions answering requests).
@@ -131,6 +169,11 @@ export const citizen: BehaviourModule = {
       if (moving && lastWasMove && obs.outcomes.length) {
         if (obs.outcomes.at(-1)!.status === "applied" && home) home.movedIn = true;
         moving = false;
+      }
+      // The id of a rent-share standing order we just set up.
+      if (share && !share.order) {
+        const created = obs.outcomes.flatMap((o) => (o.created?.share ? [o.created.share] : []));
+        if (created.length) share.order = created.at(-1);
       }
       // The id of a rent standing order we just set up.
       if (pendingRef && home && home.agreement === pendingRef.agreement) {
@@ -146,13 +189,52 @@ export const citizen: BehaviourModule = {
       if (plannedAt === -1) learnFromInitialRecords(obs);
       const t = obs.t;
       const acc = ownAccount(obs);
-      if (!acc) return [];
       const steps: Step[] = [];
       moveStep = null;
+      childrenNow = children(t);
       // Are we in a building? Around us we see who's in our own buildings; without that view, assume we are.
       const street = obs.channels.street;
       const inside = (space: string) =>
         street?.kind !== "sites" || street.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === space && sp.occupants?.includes(me)));
+
+      if (!isLeaseholder()) {
+        // Another adult in the household: we live where the household lives, and move when the leaseholder says.
+        if (livingAt === null && street?.kind === "sites")
+          livingAt = street.cells.flatMap((c) => c.structure?.spaces ?? []).find((sp) => sp.kind === "dwelling" && sp.occupants?.includes(me))?.space ?? null;
+        for (const { what } of heard) {
+          if (what.kind === "moveIn" && what.space !== livingAt) {
+            const s: Step = [];
+            if (livingAt && inside(livingAt)) s.push(moveOut(livingAt, me));
+            s.push(moveIn(what.space));
+            steps.push(s);
+            livingAt = what.space;
+          } else if (what.kind === "moveOut" && livingAt && structureOf(livingAt) === what.from) {
+            if (inside(livingAt)) steps.push([moveOut(what.from, me)]);
+            livingAt = null;
+          } else if (what.kind === "share" && acc && what.cents !== (share?.cents ?? 0)) {
+            const s: Step = [];
+            if (share?.order) s.push(withdraw(share.order, "Replaced by a new share of the rent."));
+            if (what.cents > 0) s.push(["share", pay(what.account, what.cents, { from: acc.account, every: MONTH, first: 0, for: "Household share of the rent." })]);
+            if (s.length) steps.push(s);
+            share = what.cents > 0 ? { cents: what.cents } : null;
+          } else if (what.kind === "leaving") {
+            heard = [];
+            return departure(acc);
+          }
+        }
+        heard = [];
+        if (!acc) return withoutAccount(steps);
+        // The leaseholder budgets with what we earn: we tell them when it changes.
+        const lh = household!.members.find((m) => m.person === household!.leaseholder);
+        if (lh && payTold !== monthlyIncome()) {
+          payTold = monthlyIncome();
+          steps.push([message([reach(lh)], SAYING.pay(payTold))]);
+        }
+      } else {
+        for (const { from, what } of heard) if (what.kind === "pay") memberPay.set(from.person, what.cents);
+        heard = [];
+        if (!acc) return withoutAccount(steps);
+      }
 
       // Notices on our agreements move their end dates.
       for (const r of fresh) {
@@ -169,6 +251,10 @@ export const citizen: BehaviourModule = {
         const s: Step = home.movedIn ? [moveOut(home.structure, me)] : [];
         if (home.order) s.push(withdraw(home.order, "Tenancy ended; stop this standing order."));
         if (s.length) steps.push(s);
+        // The children come out with us (each on its own, in case one isn't there); the other adults are told.
+        if (home.movedIn) for (const k of children(t)) steps.push([moveOut(home.structure, k.person)]);
+        for (const a of adults(t)) steps.push([message([reach(a)], SAYING.moveOut(home.structure)), message([reach(a)], SAYING.share(0, acc.account))]), sharesTold.set(a.person, 0);
+        toldMoveIn = null;
         home = null;
         homelessSince = t;
       }
@@ -207,44 +293,55 @@ export const citizen: BehaviourModule = {
         }
       }
 
-      // Moving into a home we hold a lease on, once there's physical room.
+      // Moving into a home we hold a lease on, once there's physical room: with the children, in one go.
       if (home && !home.movedIn) {
-        moveStep = [moveIn(home.space)];
+        moveStep = [moveIn(home.space), ...children(t).map((k) => C.call("occupancy", { in: home!.space, who: k.person }))];
         steps.push(moveStep);
         moving = true;
       }
-
-      // Leaving town (exit): long without a home, or without work and money.
-      const broke = acc.balance < Math.max(home?.rent ?? 0, p.essentials);
-      const leave =
-        (homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY) ||
-        (joblessSince !== null && t - joblessSince >= p.leave_after_jobless_days * DAY && broke);
-      if (leave) {
-        const s: Step = [];
-        if (home) {
-          if (home.movedIn) s.push(moveOut(home.structure, me));
-          if (home.order) s.push(withdraw(home.order));
-          s.push(notice(home.agreement, "Leaving town."));
+      // Moved in: the other adults are told to come, and what their share of the rent is (split evenly among those earning).
+      if (home?.movedIn && isLeaseholder()) {
+        const grown = adults(t);
+        if (toldMoveIn !== home.space) {
+          for (const a of grown) steps.push([message([reach(a)], SAYING.moveIn(home.space))]);
+          toldMoveIn = home.space;
         }
-        if (job?.workplace && inside(job.workplace)) s.push(moveOut(job.workplace, me));
-        if (job) s.push(notice(job.agreement, "Leaving town."));
-        s.push(say("departure", `${me} has left town.`));
-        if (acc.balance > 0 && p.outside_account) s.push(pay(p.outside_account, acc.balance, { from: acc.account, for: "Moving away: send all my savings with me." }));
-        departed = true;
-        return [s];
+        const earners = (monthlyIncome() > 0 ? 1 : 0) + grown.filter((a) => (memberPay.get(a.person) ?? 0) > 0).length;
+        for (const a of grown) {
+          if (!memberPay.has(a.person)) continue; // not heard what they earn yet
+          const due = memberPay.get(a.person)! > 0 ? Math.floor(home.rent / Math.max(1, earners)) : 0;
+          if ((sharesTold.get(a.person) ?? genesisShare(a)) !== due) {
+            steps.push([message([reach(a)], SAYING.share(due, acc.account))]);
+          }
+          sharesTold.set(a.person, due);
+        }
+      }
+
+      // Leaving town (exit), decided by the leaseholder for the household: long without a home, or without
+      // anyone earning and without money.
+      const broke = acc.balance < Math.max(home?.rent ?? 0, p.essentials);
+      const leave = isLeaseholder() && (
+        (homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY) ||
+        (joblessSince !== null && t - joblessSince >= p.leave_after_jobless_days * DAY && householdIncome() === 0 && broke));
+      if (leave) {
+        const tell: Step[] = adults(t).map((a) => [message([reach(a)], SAYING.leaving())]);
+        return [...tell, ...departure(acc)];
       }
 
       wordOfMouth(obs, t, steps);
 
       // Looking for a home: what someone told us about first, then the best one we can afford among the listings we've seen.
-      if (!home) {
-        const told = leadFound.homes.filter((l) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance));
-        const listings = (told.length ? told : found.homes).filter((l) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance));
+      if (isLeaseholder() && !home) {
+        const fits = (l: StatementRecord) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance) && (l.data?.bedrooms ?? 0) >= minBedrooms(t);
+        const told = leadFound.homes.filter(fits);
+        const listings = (told.length ? told : found.homes).filter(fits);
         listings.sort((a, b) => b.data.rent - a.data.rent || (a.id < b.id ? -1 : 1));
         const best = listings[0];
         if (best?.speaks_for) {
           applied.add(best.id);
-          steps.push([say("rental_application", `Application for ${best.data.space ?? best.data.structure}.`, { to: [best.speaks_for], visible: [me, best.speaks_for], data: { listing: best.id, account: acc.account } })]);
+          const members = household?.members.map((m) => m.person) ?? [me];
+          steps.push([say("rental_application", `Application for ${best.data.space ?? best.data.structure}, for a household of ${members.length}.`, { to: [best.speaks_for], visible: [me, best.speaks_for],
+            data: { listing: best.id, account: acc.account, members, household: { people: members.length, bedrooms_needed: household ? bedroomsNeeded(household, t, year) : 0 } } })]);
         }
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
@@ -263,7 +360,7 @@ export const citizen: BehaviourModule = {
       if (t >= nextSpend) {
         nextSpend = t + MONTH;
         const shops: string[] = p.shop_accounts ?? [];
-        const reserve = home?.rent ?? 0;
+        const reserve = home?.rent ?? share?.cents ?? 0;
         const buffer = p.buffer_months * monthlyIncome();
         const above = Math.max(0, acc.balance - reserve - buffer);
         const amount = Math.min(acc.balance - reserve, p.essentials + Math.floor((above * p.spend_above_buffer_bps) / 10_000));
@@ -301,7 +398,7 @@ export const citizen: BehaviourModule = {
       }
       asked = [];
       const known = [...contacts.keys()];
-      for (const [want, needed, chance] of [["home", !home, p.ask_home_bps], ["work", !job, p.ask_work_bps]] as [Want, boolean, number][]) {
+      for (const [want, needed, chance] of [["home", isLeaseholder() && !home, p.ask_home_bps], ["work", !job, p.ask_work_bps]] as [Want, boolean, number][]) {
         if (!needed) {
           delete askedAt[want];
           continue;
@@ -322,7 +419,7 @@ export const citizen: BehaviourModule = {
     const countsPublished = new Map<string, { n: number; at: number }>();
     let aggrievedUntil = 0;
     const voice = (t: number, steps: Step[]) => {
-      const burden = home && monthlyIncome() > 0 ? (home.rent * 10_000) / monthlyIncome() : 0;
+      const burden = home && householdIncome() > 0 ? (home.rent * 10_000) / householdIncome() : 0;
       const noticed = [...book.notices.entries()].some(([ag, ns]) => ag === home?.agreement && ns.some((n) => n.as !== me));
       if (home && (noticed || burden >= p.rent_burden_grievance_bps)) aggrievedUntil = t + 90 * DAY;
       const aggrieved = t < aggrievedUntil;
@@ -360,20 +457,68 @@ export const citizen: BehaviourModule = {
     };
 
     const affordable = (rent: number, balance: number) =>
-      job ? rent * 10_000 <= monthlyIncome() * p.rent_share_bps : rent * p.savings_rent_months <= balance;
+      householdIncome() > 0 ? rent * 10_000 <= householdIncome() * p.rent_share_bps : rent * p.savings_rent_months <= balance;
+
+    // The household's members by age now (a child is under 18).
+    const children = (t: number) => others().filter((m) => ageAt(m, t, year) < ADULT_YEARS);
+    const adults = (t: number) => others().filter((m) => ageAt(m, t, year) >= ADULT_YEARS);
+    /** Fewest bedrooms to look for: what the standard asks, less one for each stretch spent hunting without finding it. */
+    const minBedrooms = (t: number) => {
+      if (!household) return 0;
+      const relax = homelessSince === null ? 0 : Math.floor((t - homelessSince) / (p.accept_fewer_bedrooms_after_days * DAY));
+      return Math.max(0, bedroomsNeeded(household, t, year) - relax);
+    };
+    /** At the start, the share of the rent another adult already pays us (a standing order in the world's genesis records). */
+    const genesisShare = (a: Member) => {
+      const o = [...book.records.values()].find((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === a.person && r.data?.outcome?.money?.for === "Household share of the rent.");
+      return (o as any)?.data?.outcome?.money?.amount ?? -1;
+    };
+
+    /** Grown up with no account of our own (children have none): ask the bank for one, once. */
+    let accountAsked = false;
+    const withoutAccount = (steps: Step[]): Step[] => {
+      if (!accountAsked && p.bank) {
+        accountAsked = true;
+        steps.push([C.call("account", { holder: me, at: p.bank })]);
+      }
+      return steps;
+    };
+
+    /** Leaving town: stop paying, give notice, send our money on, and go (taking the children, if we hold the lease). */
+    let leaving = false;
+    const departure = (acc: { account: string; balance: number } | undefined): Step[] => {
+      const s: Step = [];
+      if (home) {
+        if (home.order) s.push(withdraw(home.order));
+        s.push(notice(home.agreement, "Leaving town."));
+      }
+      if (share?.order) s.push(withdraw(share.order, "Leaving town."));
+      if (job) s.push(notice(job.agreement, "Leaving town."));
+      s.push(say("departure", `${me} has left town.`));
+      if (acc && acc.balance > 0 && p.outside_account) s.push(pay(p.outside_account, acc.balance, { from: acc.account, for: "Moving away: send all my savings with me." }));
+      // Leaving takes a body out of every space it's in. The children go first, each on its own (one may not be here).
+      leaving = true;
+      return [...(isLeaseholder() ? childrenNow.map((k) => [C.call("presence", { who: k.person, leave: "yes" })] as Step) : []), [...s, C.call("presence", { leave: "yes" })]];
+    };
+    let childrenNow: Member[] = [];
 
     return {
       step(obs): ParticipantAction {
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
+        // A child does nothing on their own (their parents house them) until they're 18.
+        if (obs.body && obs.t - obs.body.born_at < ADULT_YEARS * year) return wait(Math.min(obs.body.born_at + ADULT_YEARS * year, ctx.world.runEnd + DAY));
         if (plannedAt !== obs.t) {
           const acc = ownAccount(obs);
-          const budget = acc ? (job ? Math.floor((monthlyIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
+          const budget = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
+          const needHome = isLeaseholder() && !home;
+          const rooms = minBedrooms(obs.t);
+          const roomy = rooms > 0 ? [{ field: "data.bedrooms", op: ">=" as const, value: rooms }] : [];
           // Told about a building? Look there first: what's on offer in it now.
-          if (looking === null && lookedAt !== obs.t && acc && leads.length && (!home || !job)) {
+          if (looking === null && lookedAt !== obs.t && acc && leads.length && (needHome || !job)) {
             const lead = leads.pop()!;
             const looks: LookRequest[] = [];
-            if (!home) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }], limit: p.search_limit } });
+            if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }, ...roomy], limit: p.search_limit } });
             if (!job) looks.push({ channel: "jobs", query: { standing: true, where: [{ field: "data.workplace", op: "=", value: lead }], limit: p.search_limit } });
             leadFound.homes = [];
             leadFound.jobs = [];
@@ -383,7 +528,7 @@ export const citizen: BehaviourModule = {
           // Hunting? Look at what's on offer (the next step, at once, has the results).
           const looks: LookRequest[] = [];
           if (lookedAt !== obs.t && acc) {
-            if (!home) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }], order: { field: "data.rent", desc: true }, limit: p.search_limit } });
+            if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], order: { field: "data.rent", desc: true }, limit: p.search_limit } });
             if (!job) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
             // A glance at the petitions board: what's standing now.
             looks.push({ channel: "petitions", query: { standing: true, limit: 10 } });
@@ -405,6 +550,7 @@ export const citizen: BehaviourModule = {
         }
         const next = todo.shift();
         lastWasMove = !!next && next === moveStep;
+        if (leaving && todo.length === 0) departed = true; // the last of leaving is under way
         return next ? callAction(next) : wait();
       },
     };

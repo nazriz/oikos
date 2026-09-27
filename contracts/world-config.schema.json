@@ -906,7 +906,7 @@
       }
     },
     "Template": {
-      "description": "A kind of participant that may come into being during the run: a newcomer or child (person) or a deployed system. Traits may be drawn: a value, or {\"uniform\": [lo, hi]} (integers), drawn by the kernel when the participant is created and recorded.",
+      "description": "A kind of participant that may come into being during the run: a newcomer or child (person) or a deployed system. Traits may be drawn: a value, {\"uniform\": [lo, hi]} (integers), or {\"pick\": {value: weight}} (a value chosen with its share of the integer weights, e.g. {\"female\": 4869, \"male\": 5131}), drawn by the kernel when the participant is created and recorded.",
       "type": "object",
       "required": [
         "id",

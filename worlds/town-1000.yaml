@@ -3,19 +3,18 @@
 generate: town
 name: Millbrook
 seed: 1
-citizens: 1000
+citizens: 1000                # people, in households (docs/behaviour/households.md)
 years: 2
 grid: { w: 40, h: 30 }
-apartment_blocks: 50      # 600 homes
-houses: 275               # 875 homes for 1,000 people: housing is tight
-shops: 40                 # 240 jobs
-factories: 15             # 600 jobs
+apartment_blocks: 15      # 12 units each: 3 one-bedroom, 7 two, 2 three
+houses: 200               # 55% three-bedroom, 45% four (380 homes for about 400 households: housing is tight)
+shops: 30                  # 180 jobs
+factories: 10              # 400 jobs
 landlords: 20
-rents: { apartment: 85000, house: 130000 }     # cents a month
 wages: { shop: 120000, factory: 150000 }       # cents every 14 days
-exports_per_month: 300000000                   # $3,000,000 a month bought from the factories
-housed_bps: 9500
-employed_bps: 9000
+exports_per_month: 200000000                   # $2,000,000 a month bought from the factories
+housed_bps: 9500                               # of households
+employed_bps: 7800                             # of adults (placeholder near the working-age employment rate)
 savings_months: [1, 6]
 landlord_compliance_bps: 5000                  # landlords obey a refusal, fine or order half the time
 mayor: code                                    # the all-code control; "llm" puts an AI in the seat

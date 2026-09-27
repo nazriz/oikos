@@ -40,6 +40,7 @@ Each run's log is exported to Parquet, one file per table per run (`measure/<tab
 | `events` | kernel event | `seq`, `t`, `event`, `cause` (the command's seq), `body` (JSON) |
 | `transfers` | money movement | `from`, `to`, `amount` (cents), `reason`, `by`, `settles`, `per_instruction`, `memo` |
 | `occupancy` | a body going into or out of a space, including the world's starting occupancy (`t` = 0, `by` = genesis) | `event` (occupied or vacated), `occupant` (a person), `space`, `structure` and `space_kind` (split out of the space id, `<structure>/<kind>.<n>`), `reason` (a departure's: departed, died, evicted…), `by` |
+| `spaces` | space in a building, the world's and those built during the run (`built_t`) | `space`, `structure`, `type`, `kind`, `capacity`, `bedrooms` (a dwelling's, from its attributes), `attrs` |
 | `records` | record, including the world's genesis records (`t` = 0) | `id`, `record`, `kind` (a statement's kind), `author` (a participant), `in_position` (the position it was made in, if any), `speaks_for`, `at`, `basis`, `place`, `template` (an agreement's), `withdraws`, `body` |
 | `commands` | command (not observations) | `command`, `participant`, `as` (the position, if any), `body` |
 | `acts` | act | `participant`, `as`, `via` (direct, call or translator), `blocks`, `reasoning`, `applied`, `action`, `refusal`, `refused_block`, `detail`, `blocks_json` |
@@ -60,7 +61,7 @@ terrarium measure runs/llm-mayor --sql "select run_id, count(*) from acts where 
 
 The standing queries live in `measure/queries/`, one SQL file each, with a one-line description on the first line. Add a file and it's listed.
 - **Generic:** `overview`, `activity`, `refusals`, `usage`, `language-participants`, `cast` (people at the start, births, arrivals, departures, deaths by cause, illness, injury, harm, participants created, appointments).
-- **About the generated town:** `town/economy`, `town/word-of-mouth`. These know the town's vocabulary (leases, `acc-city`, the citizens' own phrasing), which is fine: measurement is outside the world.
+- **About the generated town:** `town/economy`, `town/word-of-mouth`, `town/households` (at the end of each run: households living together, apart or unhoused, and overcrowded by the occupancy standard, CNOS). These know the town's vocabulary (leases, `acc-city`, the citizens' own phrasing), which is fine: measurement is outside the world.
 
 From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@terrarium/measure`.
 

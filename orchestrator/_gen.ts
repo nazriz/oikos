@@ -1,0 +1,12 @@
+import { readFileSync } from "node:fs";
+import { generate } from "@terrarium/worlds/generator/generate";
+const spec = Bun.YAML.parse(readFileSync(process.argv[2]!, "utf8")) as any;
+const c = generate(spec);
+console.log(c.meta.description);
+const hh = c.world.records.filter((r: any) => r.kind === "household");
+const sizes = new Map<number, number>();
+for (const h of hh) sizes.set(h.data.members.length, (sizes.get(h.data.members.length) ?? 0) + 1);
+console.log("household sizes", [...sizes].sort((a, b) => a[0] - b[0]));
+const kids = hh.flatMap((h: any) => h.data.members).filter((m: any) => m.born_at > -18 * 365 * 86400).length;
+console.log("children", kids, "adults", hh.reduce((a: number, h: any) => a + h.data.members.length, 0) - kids);
+console.log("leases", c.world.records.filter((r: any) => r.terms?.template === "lease").length, "jobs", c.world.records.filter((r: any) => r.terms?.template === "employment").length, "shares", c.world.records.filter((r: any) => r.id?.startsWith("share-")).length);

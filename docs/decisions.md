@@ -313,6 +313,31 @@ See the design note, §16.
   - corner-filling on lots proves too literal for developers assembling land (they'd name cells);
   - the per-capacity views get expensive for participants holding many positions.
 
+**D48. Households (Pass B, content).** *(Naz, 2026-09-27: "really need to nail that down"; "if a house has 2 bedrooms, probably can't have a family of 6 in there… need some kind of simple mechanism for that, nothing too crazy". Details: docs/behaviour/households.md.)*
+- **What:**
+  - A household is a record (kind `household`): its members (birth date, sex, how to reach them), its couples, and who holds the lease.
+  - The starting town is drawn from ABS Census 2021 household shares and AIFS children-per-family shares.
+  - Homes are units with bedrooms, with a generous physical capacity (2 per bedroom plus 2).
+  - Households look for the bedrooms the **Canadian National Occupancy Standard** asks for (as the ABS applies it), within a third of household income, and accept fewer after hunting long enough.
+  - The leaseholder applies, signs and brings the children; the other adults move when told, and pay an even share of the rent to the leaseholder.
+  - Landlords turn down households with more than two people per bedroom (a policy parameter).
+  - A child turning 18 opens a bank account (the bank now opens accounts on request) and looks for work.
+  - Measurement counts overcrowding with the same standard (`town/households`, with a new `spaces` table).
+- **The "nothing too crazy" mechanism:** physics only says how many bodies fit. The standard is what households and landlords choose by, and what measurement counts. Overcrowding happens when housing is short, and is measured, never blocked.
+- **Checked** (1,000 people, five seeds, two years):
+  - about 405 households (sizes 1–5: 25%, 35%, 16%, 17%, 7%; mean 2.5, as the census);
+  - no household ends split, bar a few caught mid-move in the run's last week;
+  - 5–15 unhoused and 2–8 overcrowded per run;
+  - no refusals.
+  - **About 45% of households have two or more spare bedrooms.** Households take the dearest home they can afford (the BoE rule: rent stands in for quality), so couples rent four-bedroom houses. A finding to calibrate against renters' actual bedroom use, not tuned away.
+- **Two choices to review:**
+  - **Sex is a trait, not physics.** The occupancy standard and fertility need it; the kernel's bodies don't model it. People carry it as a trait (`sex`), and households record it. A newborn's is drawn by the kernel from the template.
+    - For that, **template traits gain `{"pick": {value: weight}}`** (a categorical draw) beside `{"uniform": [lo, hi]}`. It's an addition to the v0.4 draft, tested for its shares.
+    - Whether sex should become a body attribute, so birth checks who can bear a child, is a contract question for you. Until then, the kernel lets anyone of fertile age give birth, and only behaviour restricts it.
+  - **A newcomer's age is required** by the resolver's `presence` call. It asks "How old is …?" rather than sending an act physics will refuse.
+- **Not yet** (households.md): partnering and separating, adult children leaving home, succession when a leaseholder dies, moving early to fit a grown household, flatmates leaving on their own, renter-specific shares, retirees.
+- **Revisit if:** renters' bedroom use (ABS *Housing Occupancy and Costs*) shows the spare-bedroom share is far off, or language-model citizens make the code phrasing between household members a bottleneck.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

@@ -290,7 +290,7 @@ pub struct Template {
     pub framing: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_opt_out: Option<Value>,
-    /// Trait values, or `{"uniform": [lo, hi]}` (integers) drawn when the participant is created.
+    /// Trait values, `{"uniform": [lo, hi]}` (integers) or `{"pick": {value: weight}}`, drawn when the participant is created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traits: Option<Value>,
 }
@@ -548,7 +548,8 @@ pub fn check_channels(owner: &str, channels: &[Channel], entity_exists: &dyn Fn(
     Ok(())
 }
 
-/// Check a template's traits: values, or `{"uniform": [lo, hi]}` with lo <= hi.
+/// Check a template's traits: values, `{"uniform": [lo, hi]}` with lo <= hi, or `{"pick": {value: weight, ...}}`
+/// with non-negative integer weights, at least one positive.
 pub fn check_traits(owner: &str, traits: &Option<Value>) -> Result<(), String> {
     let Some(t) = traits else { return Ok(()) };
     let Value::Object(m) = t else { return Err(format!("{owner}: traits must be an object")) };
@@ -557,6 +558,14 @@ pub fn check_traits(owner: &str, traits: &Option<Value>) -> Result<(), String> {
             let ok = u.as_array().is_some_and(|a| a.len() == 2 && a[0].as_i64().zip(a[1].as_i64()).is_some_and(|(lo, hi)| lo <= hi));
             if !ok {
                 return Err(format!("{owner}: trait {k}: uniform needs [lo, hi] integers with lo <= hi"));
+            }
+        }
+        if let Some(p) = v.as_object().and_then(|o| o.get("pick")) {
+            let ok = p.as_object().is_some_and(|w| {
+                !w.is_empty() && w.values().all(|x| x.as_u64().is_some_and(|n| n <= 1_000_000_000)) && w.values().any(|x| x.as_u64().unwrap_or(0) > 0)
+            });
+            if !ok {
+                return Err(format!("{owner}: trait {k}: pick needs {{value: weight}} with non-negative integer weights, at least one positive"));
             }
         }
     }

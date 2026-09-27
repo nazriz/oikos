@@ -13,7 +13,7 @@ import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 
-export const MEASURE_VERSION = "0.2.0";
+export const MEASURE_VERSION = "0.3.0";
 
 const QUERY_DIR = join(import.meta.dir, "../queries");
 
@@ -100,6 +100,26 @@ const TABLES: { [name: string]: string } = {
       union all
       select 0, 0, 'occupied', json_extract_string(o, '$.occupant'), json_extract_string(o, '$.space'), null, 'genesis'
       from (select unnest(from_json(json_extract(body, '$.config.world.occupancy'), '["JSON"]')) as o from raw where kind = 'header'))`,
+  // Every space in every building (the world's and those built during the run): its kind, capacity and attributes
+  // (a dwelling's bedrooms), numbered as the kernel numbers them (per kind, in the type's order).
+  spaces: `
+    with types as (
+      select json_extract_string(t, '$.id') as type, from_json(json_extract(t, '$.spaces'), '["JSON"]') as sps
+      from (select unnest(from_json(json_extract(body, '$.config.catalogue.structure_types'), '["JSON"]')) as t from raw where kind = 'header')),
+    specs as (select type, i, sps[i] as sp from types, range(1, len(sps) + 1) r(i)),
+    units as (
+      select type, i, n, json_extract_string(sp, '$.kind') as kind, (json_extract_string(sp, '$.capacity'))::INTEGER as capacity, json_extract(sp, '$.attrs') as attrs
+      from specs, range(1, (json_extract_string(sp, '$.count'))::INTEGER + 1) c(n)),
+    numbered as (select type, kind, capacity, attrs, row_number() over (partition by type, kind order by i, n) as k from units),
+    buildings as (
+      select json_extract_string(x, '$.id') as structure, json_extract_string(x, '$.type') as type, 0::BIGINT as built_t
+      from (select unnest(from_json(json_extract(body, '$.config.world.structures'), '["JSON"]')) as x from raw where kind = 'header')
+      union all
+      select json_extract_string(body, '$.structure'), json_extract_string(body, '$.structure_type'), t
+      from raw where kind = 'event' and json_extract_string(body, '$.event') = 'structure_started')
+    select $run as run_id, b.structure || '/' || u.kind || '.' || u.k as space, b.structure, b.type, u.kind, u.capacity,
+      (json_extract_string(u.attrs, '$.bedrooms'))::INTEGER as bedrooms, u.attrs, b.built_t
+    from buildings b join numbered u on u.type = b.type`,
   records: `
     select $run as run_id, seq, t, json_extract_string(r, '$.id') as id, json_extract_string(r, '$.record') as record, json_extract_string(r, '$.kind') as kind, json_extract_string(r, '$.author') as author, json_extract_string(r, '$.in_position') as in_position,
       json_extract_string(r, '$.speaks_for') as speaks_for, (json_extract_string(r, '$.at'))::BIGINT as "at", json_extract_string(r, '$.basis') as basis, json_extract_string(r, '$.place') as place,

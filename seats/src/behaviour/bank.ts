@@ -12,13 +12,14 @@ import type { Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
+import * as C from "../calls";
 import { Book, callAction, message, pay, type Step } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -35,6 +36,7 @@ export const bankPaymentSystem: BehaviourModule = {
     // (its channel can show only what's new; it doesn't reread the archive).
     const book = new Book();
     let refusals: Step = [];
+    const opens: Step = []; // accounts to open, as asked
     /** The positions an account holder has told the bank may instruct payments from an account (latest standing list), if any. */
     const signatories = (holder: string, account: string): string[] | undefined => {
       const lists = book.open("signatories").filter((r) => r.speaks_for === holder && r.data?.account === account);
@@ -56,9 +58,18 @@ export const bankPaymentSystem: BehaviourModule = {
           done.add(ins.id);
           refusals.push(message([ins.author === "genesis" ? ins.speaks_for ?? me : ins.in_position ?? ins.author], `Request ${ins.id} not carried out: ${why}`, ins.id));
         };
+        // Opening an account: for whoever asks, in their own name (the bank's procedure; no checks beyond that yet).
+        const opening = ins.data?.outcome?.account;
+        if (opening && !opening.close) {
+          if (done.has(ins.id)) continue;
+          done.add(ins.id);
+          if (opening.holder !== ins.speaks_for || book.authorEntity(ins) !== ins.speaks_for) cannot("an account can only be opened by the person or organisation it's for.");
+          else opens.push(C.call("account", { holder: opening.holder, at: me }));
+          continue;
+        }
         const m = ins.data?.outcome?.money;
         if (!m) {
-          cannot("this bank only makes payments.");
+          cannot("this bank only makes payments and opens accounts.");
           continue;
         }
         const d = { from: m.from, to: m.to, pay: m.amount, settles: m.settles, every: ins.data.every, first: ins.data.first };
@@ -116,6 +127,7 @@ export const bankPaymentSystem: BehaviourModule = {
         }
         inFlight = [];
         if (refusals.length) return callAction(refusals.splice(0, 32));
+        if (opens.length) return callAction(opens.splice(0, 32));
         if (queue.length === 0) return wait();
 
         const balance = new Map(channels.accounts(obs).map((a) => [a.account, a.balance]));
