@@ -457,7 +457,7 @@ export const citizen: BehaviourModule = {
         }
         if (signed.has(pet.id)) continue;
         const share = (publishedCount(book, pet) * 10_000) / p.population;
-        if (aggrieved || (home && share >= threshold)) {
+        if (aggrieved || ((home || livingAt) && share >= threshold)) {
           signed.add(pet.id);
           steps.push(because(aggrieved ? "Signing the tenants' petition: we're aggrieved ourselves." : `Signing the tenants' petition: ${Math.round(share / 100)}% of the town has signed, past our own threshold of ${Math.round(threshold / 100)}%.`, vote(pet.id, "sign")));
         }
