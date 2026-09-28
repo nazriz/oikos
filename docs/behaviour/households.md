@@ -1,4 +1,4 @@
-# Households (content: `seats/src/behaviour/household.ts`, `citizen.default` 0.8.0, `firm.landlord` 0.5.0, generator 0.10.0)
+# Households (content: `participants/src/behaviour/household.ts`, `citizen.default` 0.8.0, `firm.landlord` 0.5.0, generator 0.10.0)
 
 People live in households, as the census counts them. **A household is a record, never physics.** It's a statement of kind `household` that lists:
 - its members, with the birth date and sex the household knows each by, and how to reach them (their participant);

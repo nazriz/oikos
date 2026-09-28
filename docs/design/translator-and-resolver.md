@@ -1,6 +1,6 @@
 # From plain language to acts: the translator, the resolver and a local translation model
 
-*Design note, 2026-09-26. Status: **signed off by Naz and built** (2026-09-26, D41), against the mock adapter. It supersedes the translator and sign-off parts of docs/design/m2-llm-seats.md. §21 records what building it refined. The contract changes in §15 are in contracts v0.3 (draft).*
+*Design note, 2026-09-26. Status: **signed off by Naz and built** (2026-09-26, D41), against the mock adapter. It supersedes the translator and sign-off parts of docs/design/m2-llm-participants.md. §21 records what building it refined. The contract changes in §15 are in contracts v0.3 (draft).*
 
 This note records a long discussion in which the design changed several times. Many of the details matter, so it errs on the side of saying too much. §18 is a chronological record of how each position was reached, including the wrong turns, so the reasoning isn't lost.
 
@@ -34,7 +34,7 @@ This note records a long discussion in which the design changed several times. M
 
 ## 1. The problem
 
-Language-model seats act in plain language (VISION §6; V0 Stage 2). Something has to turn "pay the builder $500" into the kernel's acts. The first M2 build (docs/design/m2-llm-seats.md) had three problems, which Naz identified.
+Language-model seats act in plain language (VISION §6; V0 Stage 2). Something has to turn "pay the builder $500" into the kernel's acts. The first M2 build (docs/design/m2-llm-participants.md) had three problems, which Naz identified.
 
 1. **The machinery was visible to the seat.** The mayor's prompt talked about "the translator", "formal acts", "blocks", "physics checks", refusal codes like `insufficient_funds`, and "records have no force of their own". Naz: "why is the mayor interacting with the kernel directly? like, he should just go about doing his day to day, and the kernel is invisible."
 2. **My first fix was wrong.** I proposed presenting the translator as "the mayor's office" that prepares papers for signature. Naz: "the translator is not the mayors office… the translator is also abstract. Like, what if we have multiple llms in the world, in different seats interacting, they most likely will not interact via the mayors office." An in-world fiction for a platform component is false, doesn't generalise across seats, and smuggles design choices into the world.
@@ -512,7 +512,7 @@ Step 3 depends on someone else acting first, so it can't be one request even in 
 ## 13. Code seats use the same calls (P14)
 
 - **Behaviour modules emit calls** (`money(...)`, `form(...)`) through a new seat action (§15), skipping only the translator. The resolver turns them into acts exactly as for language-model seats. Code seats don't need the preview: their "confirmation" is the code itself.
-- **Helper functions go away.** Today's helpers (`payInstruction`, `standingOrder` in seats/src/behaviour/common.ts) and their ad hoc record shapes are replaced, and institutions read the standard request, commitment and form encodings (§9).
+- **Helper functions go away.** Today's helpers (`payInstruction`, `standingOrder` in participants/src/behaviour/common.ts) and their ad hoc record shapes are replaced, and institutions read the standard request, commitment and form encodings (§9).
 - **Why:** code and language-model seats then differ only in what they decide, never in how their acts take effect. That's VISION principle 4, and it makes all-code control runs directly comparable to AI runs.
 - **Raw blocks** (the existing `act`): kept in the contract as an escape hatch for researchers, RL controllers and tests, but not offered to language-model seats. Whether code modules may still use it is open (§19).
 

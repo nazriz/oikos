@@ -1,6 +1,6 @@
 # The outside world as a boundary condition: `world.export_demand` (v0.2.0) and `world.migration` (v0.1.0)
 
-**Seat:** the outside world (entity of kind `boundary`). **Source:** `seats/src/behaviour/world.ts`.
+**Seat:** the outside world (entity of kind `boundary`). **Source:** `participants/src/behaviour/world.ts`.
 
 ## What it does
 
@@ -24,7 +24,7 @@ VISION §5: "boundary conditions: the world has an outside, with external market
 
 ## `world.migration` (v0.1.0): people moving in from elsewhere
 
-**Participant:** the outside world's `migration` position ("People moving from elsewhere"), held by a system. **Source:** `seats/src/behaviour/world.ts`. People cross into the world only through the boundary (the `arrive` block; contracts v0.4), so arrivals are the outside world's act. Who comes is the outside world's business.
+**Participant:** the outside world's `migration` position ("People moving from elsewhere"), held by a system. **Source:** `participants/src/behaviour/world.ts`. People cross into the world only through the boundary (the `arrive` block; contracts v0.4), so arrivals are the outside world's act. Who comes is the outside world's business.
 
 | Rule | Detail | Source |
 |---|---|---|

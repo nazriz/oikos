@@ -17,8 +17,8 @@ fn town() -> Run<Vec<u8>> {
     Run::start(c, "attention", Vec::new(), None).unwrap()
 }
 
-fn post(run: &mut Run<Vec<u8>>, seat: &str, blocks: serde_json::Value) -> String {
-    let r = run.command(&rb_act(seat, blocks)).unwrap();
+fn post(run: &mut Run<Vec<u8>>, participant: &str, blocks: serde_json::Value) -> String {
+    let r = run.command(&rb_act(participant, blocks)).unwrap();
     match &r.events[0].body {
         terrarium_kernel::events::EventBody::ActionApplied { created: Some(c), .. } => c.values().next().unwrap().clone(),
         other => panic!("{other:?}"),

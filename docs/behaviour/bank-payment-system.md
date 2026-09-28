@@ -1,6 +1,6 @@
 # `bank.payment_system` (v0.5.0)
 
-**Seat:** a bank's automated payment system (acts as the bank). **Source:** `seats/src/behaviour/bank.ts`.
+**Seat:** a bank's automated payment system (acts as the bank). **Source:** `participants/src/behaviour/bank.ts`.
 
 ## What it does
 

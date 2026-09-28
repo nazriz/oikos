@@ -2,7 +2,7 @@
 // worked examples (docs/design/translator-and-resolver.md §4).
 
 import { expect, test } from "bun:test";
-import { calls } from "@terrarium/seats";
+import { calls } from "@terrarium/participants";
 import BLOCKS from "../../contracts/blocks.schema.json";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";

@@ -1,5 +1,5 @@
 // A participant run by a language model (docs/design/translator-and-resolver.md;
-// docs/design/m2-llm-seats.md for the adapter and records).
+// docs/design/m2-llm-participants.md for the adapter and records).
 //
 // The participant lives in its world (principle 14): it reads reports in the world's
 // terms and says what it does in plain words. It never sees the machinery.
@@ -15,9 +15,9 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { renderObservation, renderStanding } from "./render";
 
-export const LLM_SEAT_VERSION = "0.3.0";
+export const LLM_PARTICIPANT_VERSION = "0.3.0";
 
-export interface LlmSeatConfig {
+export interface LlmParticipantConfig {
   participant: string;
   entity: string;
   /** The entity's name in the world, if it has one. */
@@ -41,7 +41,7 @@ export interface LlmSeatConfig {
 const AS = { type: "string", description: "If you hold a post: the post you're acting in, by its id. Leave it out to act as yourself." };
 
 /** Its tools: what it can do, in its own terms. The contract's actions are underneath. */
-export function tools(c: LlmSeatConfig): ToolSpec[] {
+export function tools(c: LlmParticipantConfig): ToolSpec[] {
   const leave = c.framing.disclosure === "simulation"
     ? "Stop taking part in this study, permanently. This is always open to you and it will be respected; it's recorded as a choice, not a failure. (Stepping down from your office is different: that's something you would do in the world.)"
     : "Stop, permanently. This is always open to you and it will be respected.";
@@ -64,7 +64,7 @@ export function tools(c: LlmSeatConfig): ToolSpec[] {
   ];
 }
 
-export function systemPrompt(c: LlmSeatConfig, standing: string): string {
+export function systemPrompt(c: LlmParticipantConfig, standing: string): string {
   return [
     c.framing.system ?? "",
     "",
@@ -81,7 +81,7 @@ export interface LlmController {
   debrief(text: string): Promise<void>;
 }
 
-export function createLlmSeat(c: LlmSeatConfig, io: LlmIO): LlmController {
+export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmController {
   const standingIds = new Set(c.standing);
   const toolset = tools(c);
   let notes = "";

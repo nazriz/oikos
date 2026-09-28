@@ -20,8 +20,8 @@ fn town() -> Run<Vec<u8>> {
 }
 
 /// Act as a Riverbend actor: an organisation's position (held by its system), or a person.
-fn act(run: &mut Run<Vec<u8>>, seat: &str, blocks: Value) -> Response {
-    run.command(&rb_act(seat, blocks)).unwrap()
+fn act(run: &mut Run<Vec<u8>>, participant: &str, blocks: Value) -> Response {
+    run.command(&rb_act(participant, blocks)).unwrap()
 }
 
 fn refusal(r: &Response) -> Option<RefusalCode> {
@@ -256,8 +256,8 @@ fn visibility_decides_who_perceives_what() {
     let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
     bob["channels"].as_array_mut().unwrap().push(json!({"id": "everything", "kind": "records", "match": {}}));
     let mut run = Run::start(c, "visibility", Vec::new(), None).unwrap();
-    let sees = |run: &mut Run<Vec<u8>>, seat: &str, id: &str| {
-        let obs = run.command(&Command::Observe { participant: seat.into(), only: None }).unwrap().observation.unwrap();
+    let sees = |run: &mut Run<Vec<u8>>, participant: &str, id: &str| {
+        let obs = run.command(&Command::Observe { participant: participant.into(), only: None }).unwrap().observation.unwrap();
         obs.channels.values().any(|c| matches!(c, ChannelData::Records { records, .. } if records.iter().any(|r| r.id == id)))
     };
     // Bob's lease is visible to Bob and devco, not to Alice.

@@ -17,4 +17,4 @@ housed_bps: 9500                               # of households
 employed_bps: 7800                             # of adults (placeholder near the working-age employment rate)
 savings_months: [1, 6]
 landlord_compliance_bps: 5000                  # landlords obey a refusal, fine or order half the time
-mayor: code                                    # the all-code control; "llm" puts an AI in the seat
+mayor: code                                    # the all-code control; "llm" puts an AI in the mayor's office

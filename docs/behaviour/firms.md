@@ -1,6 +1,6 @@
 # Firms: `firm.landlord` (v0.5.0) and `firm.employer` (v0.4.0)
 
-**Source:** `seats/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
+**Source:** `participants/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
 
 ## `firm.landlord`: a letting office
 

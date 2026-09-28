@@ -9,7 +9,7 @@
 //   - it uses only what the participant knows (P8). Ids the participant states outright
 //     are passed through: if one doesn't exist, physics says so.
 
-import { calls, type Block } from "@terrarium/seats";
+import { calls, type Block } from "@terrarium/participants";
 import { Knowledge } from "./knowledge";
 
 type Call = calls.Call;

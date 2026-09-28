@@ -3,9 +3,9 @@
 //! Take a world, and the same world with extra records added at genesis:
 //! laws forbidding things, procedures, instructions to the bank, court
 //! orders, permits, contradictory ownership claims. Run exactly the same
-//! commands in both. Everything must come out the same, apart from what seats
+//! commands in both. Everything must come out the same, apart from what participants
 //! perceive: same outcomes, same refusals, same payments, same buildings,
-//! same occupants. Records only matter through what seats *choose* to do,
+//! same occupants. Records only matter through what participants *choose* to do,
 //! and a replayed command list is a fixed set of choices.
 
 mod common;
@@ -52,7 +52,7 @@ fn extra_record(i: usize, kind: u8, target: u8) -> Value {
 }
 
 fn physical_and_outcomes(events: &[terrarium_kernel::events::Event]) -> Vec<Value> {
-    // Everything except what seats perceive.
+    // Everything except what participants perceive.
     events.iter().filter(|e| !matches!(e.body, EventBody::Observation { .. })).map(|e| serde_json::to_value(e).unwrap()).collect()
 }
 

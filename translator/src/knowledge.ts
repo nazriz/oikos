@@ -2,7 +2,7 @@
 // The resolver fills gaps and turns names into ids only from this (P8): it
 // never looks at the world beyond what the participant has seen.
 
-import type { Observation, Record, SiteSpace, StatementRecord } from "@terrarium/seats";
+import type { Observation, Record, SiteSpace, StatementRecord } from "@terrarium/participants";
 
 export interface AccountFact {
   account: string;

@@ -1,8 +1,8 @@
 //! INVARIANT: perception is changes, and nothing is lost.
 //!
 //! Each look through a channel delivers only what changed within its scope
-//! since the seat last looked through it. A seat that applies those changes to
-//! its own view (as the seat runtime does) must, right after every look, hold
+//! since the participant last looked through it. A participant that applies those changes to
+//! its own view (as the participant runtime does) must, right after every look, hold
 //! exactly the full picture the channel covers. Over random worlds and random
 //! command sequences, for every channel delivered in every observation.
 
@@ -76,10 +76,10 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
     for op in ops {
         let Some(cmd) = concretize(&run, op) else { continue };
         let Some(resp) = step(&mut run, &cmd) else { continue };
-        let (Command::Observe { participant: seat, .. }, Some(obs)) = (&cmd, resp.observation) else { continue };
-        let reference = run.full_view(seat).unwrap();
+        let (Command::Observe { participant, .. }, Some(obs)) = (&cmd, resp.observation) else { continue };
+        let reference = run.full_view(participant).unwrap();
         for (ch, data) in &obs.channels {
-            let v = views.entry((seat.clone(), ch.clone())).or_default();
+            let v = views.entry((participant.clone(), ch.clone())).or_default();
             v.apply(data);
             let want = full(&reference.channels[ch]);
             let mut have = View::default();
@@ -93,7 +93,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
                     have.positions = v.positions.clone();
                 }
             }
-            prop_assert_eq!(&have, &want, "seat {} channel {} drifted from the full picture", seat, ch);
+            prop_assert_eq!(&have, &want, "participant {} channel {} drifted from the full picture", participant, ch);
             looks += 1;
         }
     }

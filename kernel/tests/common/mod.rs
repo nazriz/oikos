@@ -25,16 +25,16 @@ pub fn riverbend() -> Value {
 }
 
 /// Riverbend's actors: an organisation's position and the system participant holding it, or a person's own participant.
-pub fn rb(seat: &str) -> (String, Option<String>) {
-    match seat {
-        "alice-self" | "bob-self" | "carol-self" => (seat.into(), None),
+pub fn rb(participant: &str) -> (String, Option<String>) {
+    match participant {
+        "alice-self" | "bob-self" | "carol-self" => (participant.into(), None),
         other => (format!("{other}-system"), Some(other.into())),
     }
 }
 
 /// An act command for a Riverbend actor (see `rb`).
-pub fn rb_act(seat: &str, blocks: Value) -> Command {
-    let (participant, position) = rb(seat);
+pub fn rb_act(participant: &str, blocks: Value) -> Command {
+    let (participant, position) = rb(participant);
     Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: None }
 }
 

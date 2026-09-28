@@ -1,6 +1,6 @@
 // TypeScript views of the contract types code participants handle (contracts
 // v0.4: participant-api, blocks, records). The JSON Schemas are the source of
-// truth; seats/test/contracts.test.ts validates these shapes against them.
+// truth; participants/test/contracts.test.ts validates these shapes against them.
 
 export type Id = string;
 

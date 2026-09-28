@@ -39,12 +39,12 @@ test("canonical JSON sorts keys by UTF-16 code units and escapes like the kernel
 });
 
 test("a language-model participant with on-request reports can look at them, in its own words", async () => {
-  const { createLlmSeat } = await import("../src/llm/seat");
+  const { createLlmParticipant } = await import("../src/llm/participant");
   const { MockAdapter } = await import("../src/llm/adapter");
   const adapter = new MockAdapter("mock", { participant: () => [{ type: "tool_use", id: "1", name: "look", input: { report: "board", current_only: true } }] });
-  const seat = createLlmSeat({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["board", "Noticeboard"]]), onRequest: ["board"], cadenceDays: 7, draftText: () => "" },
+  const participant = createLlmParticipant({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["board", "Noticeboard"]]), onRequest: ["board"], cadenceDays: 7, draftText: () => "" },
     { adapter, annotate: async () => {}, now: () => 0 });
-  const a = await seat.step(obs({}), { world: { config: {} } } as any);
+  const a = await participant.step(obs({}), { world: { config: {} } } as any);
   expect(a).toEqual({ type: "look", looks: [{ channel: "board", query: { standing: true, limit: 20 } }] });
 });
 

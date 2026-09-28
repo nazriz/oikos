@@ -1,6 +1,6 @@
 //! Orchestrator <-> kernel transport: newline-delimited JSON over stdio.
 //! One request line in, one response line out. Not a contract (the log and
-//! seat API are); kept deliberately small.
+//! participant API are); kept deliberately small.
 //!
 //! Requests:
 //!   {"op":"start","config":{..},"run_id":"..","log_path":"..","anchors_path":".."}

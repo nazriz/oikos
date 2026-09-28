@@ -299,7 +299,7 @@ pub enum Position {
     Immunity,
 }
 
-/// `"public"`, or the entities whose seats may perceive the record.
+/// `"public"`, or the entities whose participants may perceive the record.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Visibility {

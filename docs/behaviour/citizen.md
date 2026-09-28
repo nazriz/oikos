@@ -1,6 +1,6 @@
 # `citizen.default` (v0.8.0)
 
-**Seat:** a townsperson (acts as themselves). **Source:** `seats/src/behaviour/citizen.ts`. Wakes weekly, and whenever something names them (an offer, a notice, a message).
+**Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`. Wakes weekly, and whenever something names them (an offer, a notice, a message).
 
 Everything happens the way a person does it: they apply, sign, move in, and ask their bank to pay. Nothing happens to them automatically.
 

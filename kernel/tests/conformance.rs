@@ -99,7 +99,7 @@ fn assert_valid(v: &jsonschema::Validator, instance: &Value, what: &str) -> Resu
 
 fn check_outputs(
     config: Value,
-    seats: &[&str],
+    participants: &[&str],
     cmds: impl Fn(&Run<Vec<u8>>, usize) -> Option<Option<Command>>,
     s: &Schemas,
 ) -> Result<(), TestCaseError> {
@@ -113,8 +113,8 @@ fn check_outputs(
             assert_valid(&s.observation, &serde_json::to_value(&o).unwrap(), "observation")?;
         }
     }
-    for seat in seats {
-        let o = run.command(&Command::Observe { participant: seat.to_string(), only: None }).unwrap().observation.unwrap();
+    for participant in participants {
+        let o = run.command(&Command::Observe { participant: participant.to_string(), only: None }).unwrap().observation.unwrap();
         assert_valid(&s.observation, &serde_json::to_value(&o).unwrap(), "observation")?;
     }
     run.annotate(json!({"annotation": "usage", "purpose": "translator", "subject": "translator", "provider": "p", "model": "m", "input_tokens": 1, "output_tokens": 2, "cost_microusd": 3})).unwrap();
@@ -132,14 +132,14 @@ proptest! {
     #[test]
     fn kernel_outputs_validate_against_the_contracts(ops in proptest::collection::vec(op_strategy(), 1..50)) {
         thread_local!(static S: Schemas = schemas());
-        let seats: Vec<&str> = ACTORS.iter().map(|(p, _, _)| *p).collect();
-        S.with(|s| check_outputs(world(&default_params()), &seats, |run, i| ops.get(i).map(|op| concretize(run, op)), s))?;
+        let participants: Vec<&str> = ACTORS.iter().map(|(p, _, _)| *p).collect();
+        S.with(|s| check_outputs(world(&default_params()), &participants, |run, i| ops.get(i).map(|op| concretize(run, op)), s))?;
     }
 }
 
 /// The river scenario, scripted, on the Riverbend contract example.
 pub fn river_script() -> Vec<Command> {
-    let act = |seat: &str, blocks: Value| rb_act(seat, blocks);
+    let act = |participant: &str, blocks: Value| rb_act(participant, blocks);
     vec![
         Command::Observe { participant: "inspector-system".into(), only: None },
         act(
@@ -187,8 +187,8 @@ pub fn river_script() -> Vec<Command> {
 fn riverbend_outputs_validate_against_the_contracts() {
     let s = schemas();
     let script = river_script();
-    let seats = [
+    let participants = [
         "mayor-system", "finance-system", "planning-system", "inspector-system", "bank-payments-system", "developer-system", "builder-system", "alice-self", "bob-self", "carol-self",
     ];
-    check_outputs(riverbend(), &seats, |_, i| script.get(i).cloned().map(Some), &s).unwrap();
+    check_outputs(riverbend(), &participants, |_, i| script.get(i).cloned().map(Some), &s).unwrap();
 }

@@ -4,7 +4,7 @@
   "type": "module",
   "workspaces": [
     "contracts",
-    "seats",
+    "participants",
     "translator",
     "orchestrator",
     "worlds",

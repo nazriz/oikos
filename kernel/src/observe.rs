@@ -738,7 +738,7 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
     (obs, looks, drained)
 }
 
-/// A search through a records channel: records the seat may see that match the channel's filter
+/// A search through a records channel: records the participant may see that match the channel's filter
 /// and the query, now. Standing records only if asked; ordered as asked (newest first by default);
 /// at most `limit` (default 20).
 fn search(st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, area: Option<&Scope>, q: &Query) -> Vec<Record> {

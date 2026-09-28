@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { query } from "@terrarium/measure";
-import type { Price } from "@terrarium/seats/llm";
+import type { Price } from "@terrarium/participants/llm";
 
 export interface PriceFile {
   source: string;

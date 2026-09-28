@@ -788,7 +788,7 @@
           "type": "boolean"
         },
         "debrief_text": {
-          "description": "What the participant is told at the end of the run, if debrief is set. Default: the orchestrator's (docs/design/m2-llm-seats.md), which says what the run was, discloses any framing and asks for the participant's reaction.",
+          "description": "What the participant is told at the end of the run, if debrief is set. Default: the orchestrator's (docs/design/m2-llm-participants.md), which says what the run was, discloses any framing and asks for the participant's reaction.",
           "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
         }
       }

@@ -9,7 +9,7 @@
     "terrarium": "./src/cli.ts"
   },
   "dependencies": {
-    "@terrarium/seats": "workspace:*",
+    "@terrarium/participants": "workspace:*",
     "@terrarium/worlds": "workspace:*",
     "@terrarium/translator": "workspace:*",
     "@terrarium/measure": "workspace:*"

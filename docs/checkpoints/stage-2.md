@@ -42,9 +42,9 @@ Every figure below comes from the measurement tables (docs/measurement.md), and 
 | V0.md, Stage 2 | Status | Where |
 |---|---|---|
 | A procedurally generated town from a config file | Done | `worlds/generator`, `worlds/town.yaml`, `worlds/town-1000.yaml` |
-| ~1,000 code citizens with home, job, income and rent; vote, petition, move away; cited rules as parameters | Done, with the calibration issues below. Voting is councillors' ballots, not elections. | `seats/src/behaviour/citizen.ts`, `docs/behaviour/citizen.md` |
+| ~1,000 code citizens with home, job, income and rent; vote, petition, move away; cited rules as parameters | Done, with the calibration issues below. Voting is councillors' ballots, not elections. | `participants/src/behaviour/citizen.ts`, `docs/behaviour/citizen.md` |
 | A council approving or rejecting proposals | Done as a council clerk and five councillors with positions (D19–D23: institutions are content) | `government.ts`, `docs/behaviour/government.md` |
-| An LLM mayor acting through the translator, draft → sign-off → kernel; refusals returned and logged | Done on the mock (D34–D41) | `translator/`, `seats/src/llm/`, `docs/design/translator-and-resolver.md` |
+| An LLM mayor acting through the translator, draft → sign-off → kernel; refusals returned and logged | Done on the mock (D34–D41) | `translator/`, `participants/src/llm/`, `docs/design/translator-and-resolver.md` |
 | Role-limited perception channels | Done, and extended: changes (D42), attention (D43), position (D44) | contracts v0.3 |
 | Configurable framing, recorded in the run config | Done, with disclosure, reason and debrief | world config `framing` |
 | Opt-out: the mayor can decline or resign, recorded | Done: decline a draft, opt out (with an optional stand-in), or step down as an act in the world | D36, VISION §15 |

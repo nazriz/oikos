@@ -72,8 +72,8 @@ fn street() -> Run<Vec<u8>> {
     Run::start(config, "position", Vec::new(), None).unwrap()
 }
 
-fn act(run: &mut Run<Vec<u8>>, seat: &str, blocks: Value) -> Result<Option<String>, RefusalCode> {
-    let r = run.command(&rb_act(seat, blocks)).unwrap();
+fn act(run: &mut Run<Vec<u8>>, participant: &str, blocks: Value) -> Result<Option<String>, RefusalCode> {
+    let r = run.command(&rb_act(participant, blocks)).unwrap();
     match &r.events[0].body {
         EventBody::ActionApplied { created, .. } => Ok(created.as_ref().and_then(|c| c.values().next().cloned())),
         EventBody::ActionRefused { code, .. } => Err(*code),
@@ -81,8 +81,8 @@ fn act(run: &mut Run<Vec<u8>>, seat: &str, blocks: Value) -> Result<Option<Strin
     }
 }
 
-fn observe(run: &mut Run<Vec<u8>>, seat: &str) -> Observation {
-    run.command(&Command::Observe { participant: seat.into(), only: None }).unwrap().observation.unwrap()
+fn observe(run: &mut Run<Vec<u8>>, participant: &str) -> Observation {
+    run.command(&Command::Observe { participant: participant.into(), only: None }).unwrap().observation.unwrap()
 }
 
 fn sites(o: &Observation, ch: &str) -> (Vec<SiteCell>, bool) {

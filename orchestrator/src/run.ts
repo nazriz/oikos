@@ -16,7 +16,7 @@
 // participant, or (for code units) a record naming or addressed to the entity
 // it acts for.
 //
-// Language-model participants (docs/design/m2-llm-seats.md) wake on their
+// Language-model participants (docs/design/m2-llm-participants.md) wake on their
 // cadence and on messages. A `propose` goes to the translator and comes back in
 // the next observation as a draft; `sign` submits it with translator
 // provenance, or discards it. Until a real model is configured, every model
@@ -24,8 +24,8 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/seats";
-import { createLlmSeat, LLM_SEAT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, type LlmAdapter, type LlmController, type LlmIO, type MockBrain } from "@terrarium/seats/llm";
+import { calls, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
+import { createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, type LlmAdapter, type LlmController, type LlmIO, type MockBrain } from "@terrarium/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
 
@@ -241,8 +241,8 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     const entity = p.person ?? office?.entity ?? p.owner!;
     const entityName = (cfg.world?.entities ?? []).find((e: any) => e.id === entity)?.name;
     const config = { participant: p.id, entity, entityName, onRequest, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText };
-    const controller = createLlmSeat(config, io);
-    const module: BehaviourModule = { name: "llm.participant", version: LLM_SEAT_VERSION, doc: "docs/design/m2-llm-seats.md", cadence: () => cadence, create: () => controller as unknown as Controller };
+    const controller = createLlmParticipant(config, io);
+    const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});
     debriefs.set(p.id, { part: p, controller });
     bindings[p.id] = { configured: `${c.impl ?? "?"}/${c.model ?? "?"}`, adapter: `${io.adapter.provider}/${io.adapter.model}` };
@@ -295,7 +295,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {
     version: ORCHESTRATOR_VERSION, modules: used, thinking_time: cfg.orchestration.thinking_time, max_actions_per_wake: cfg.orchestration.max_actions_per_wake, confirm,
-    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_SEAT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(PRICES).map(([key, price]) => ({ model: key, ...price })), participants: bindings } } : {}),
+    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(PRICES).map(([key, price]) => ({ model: key, ...price })), participants: bindings } } : {}),
   } } });
 
   const unitsOf = (pid: string) => units.of(pid);

@@ -2,7 +2,7 @@
 // world words, generated mechanically from the blocks, never written by the
 // translator. The participant reads this before confirming.
 
-import type { Block } from "@terrarium/seats";
+import type { Block } from "@terrarium/participants";
 import type { Knowledge } from "./knowledge";
 
 const DAY = 86_400;

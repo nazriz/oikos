@@ -9,7 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@terrarium/seats": "workspace:*",
+    "@terrarium/participants": "workspace:*",
     "ajv": "^8.17.1"
   }
 }

@@ -38,8 +38,8 @@ fn sample_log() -> (Vec<u8>, Vec<u8>) {
     let mut config = riverbend();
     config["log"]["anchor_every_entries"] = json!(5);
     let mut run = Run::start(config, "chain", Vec::new(), Some(Box::new(anchors.clone()))).unwrap();
-    let act = |seat: &str, blocks: Value| {
-        let (participant, position) = rb(seat);
+    let act = |participant: &str, blocks: Value| {
+        let (participant, position) = rb(participant);
         terrarium_kernel::Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: Some("because".into()) }
     };
     run.command(&act(

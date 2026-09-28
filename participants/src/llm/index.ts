@@ -2,6 +2,6 @@
 export * from "./adapter";
 export * from "./call";
 export * from "./render";
-export * from "./seat";
+export * from "./participant";
 export * from "./mock";
 export * from "./words";

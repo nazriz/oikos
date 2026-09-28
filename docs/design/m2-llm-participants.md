@@ -27,12 +27,12 @@ Replay needs no model: annotations are copied verbatim, and the acts are re-appl
 
 | Where | What |
 |---|---|
-| `seats/src/llm/adapter.ts` | The adapter interface (Anthropic Messages-shaped, tool use), the mock adapter, the price table (mock only), the cost function |
-| `seats/src/llm/call.ts` | Every model call goes through `callModel`, which writes the usage and transcript annotations. A model with no recorded price throws. |
-| `seats/src/llm/render.ts` | Observation → report; blocks → plain words (`describeBlocks`); drafts for sign-off |
-| `seats/src/llm/seat.ts` | The seat controller: tools, per-wake conversation, notes as memory, debrief |
-| `seats/src/llm/mock.ts` | Mock policies: a code "brain" behind the seat; a registry-backed translator |
-| `seats/src/canon.ts` | Canonical JSON in TypeScript, byte-identical to the kernel's. It's tested against every line of a kernel-written log. |
+| `participants/src/llm/adapter.ts` | The adapter interface (Anthropic Messages-shaped, tool use), the mock adapter, the price table (mock only), the cost function |
+| `participants/src/llm/call.ts` | Every model call goes through `callModel`, which writes the usage and transcript annotations. A model with no recorded price throws. |
+| `participants/src/llm/render.ts` | Observation → report; blocks → plain words (`describeBlocks`); drafts for sign-off |
+| `participants/src/llm/seat.ts` | The seat controller: tools, per-wake conversation, notes as memory, debrief |
+| `participants/src/llm/mock.ts` | Mock policies: a code "brain" behind the seat; a registry-backed translator |
+| `participants/src/canon.ts` | Canonical JSON in TypeScript, byte-identical to the kernel's. It's tested against every line of a kernel-written log. |
 | `translator/` | The translator: prompt (block reference generated from the contract), contract validation, kernel dry run, law warnings, draft hashing |
 | `orchestrator/src/run.ts` | Wakes, propose/sign handling, pending drafts, notices, debriefs, bindings in the orchestrator annotation |
 

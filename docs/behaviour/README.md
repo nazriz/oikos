@@ -1,6 +1,6 @@
 # Behaviour modules
 
-Every code seat in a world runs a **behaviour module**: a documented, cited, swappable rule set in `seats/src/behaviour/` (D30). Modules are **world content**. They are not part of the platform, and none of them is "the" behaviour: a researcher can replace any of them, retune its parameters, or hand the seat to an LLM or a human.
+Every code seat in a world runs a **behaviour module**: a documented, cited, swappable rule set in `participants/src/behaviour/` (D30). Modules are **world content**. They are not part of the platform, and none of them is "the" behaviour: a researcher can replace any of them, retune its parameters, or hand the seat to an LLM or a human.
 
 Each module's doc gives:
 1. **What it does**, in plain words.
@@ -9,7 +9,7 @@ Each module's doc gives:
 4. **What it deliberately leaves out.**
 
 Rules every module follows (so re-runs are reproducible):
-- It sees only its Observation and acts only through SeatActions, like any other seat. Modules act through **calls** (contracts/calls.md): they say what they want brought about (`money(...)`, `form(...)`, `agreement(...)`), and the resolver turns that into the seat's own acts, exactly as for a language seat, only without the translator or a preview (D36). Paying someone is `money(...)`, and the resolver asks the account's bank. Agreements carry their commitments as outcomes, and payment requests are `request` statements (contracts/outcomes.schema.json). Helpers for all of this are in `seats/src/behaviour/common.ts`. A module reads its seat's **view** (D42): accounts, sites and the directory as their current picture, records as what's new since the seat last looked (each module keeps its own book of them).
+- It sees only its Observation and acts only through SeatActions, like any other seat. Modules act through **calls** (contracts/calls.md): they say what they want brought about (`money(...)`, `form(...)`, `agreement(...)`), and the resolver turns that into the seat's own acts, exactly as for a language seat, only without the translator or a preview (D36). Paying someone is `money(...)`, and the resolver asks the account's bank. Agreements carry their commitments as outcomes, and payment requests are `request` statements (contracts/outcomes.schema.json). Helpers for all of this are in `participants/src/behaviour/common.ts`. A module reads its seat's **view** (D42): accounts, sites and the directory as their current picture, records as what's new since the seat last looked (each module keeps its own book of them).
 - Randomness comes only from `ctx.rng(purpose)`: the kernel's keyed streams, keyed by seat, time and purpose.
 - No clocks and no I/O. Memory is allowed, as long as it depends only on what the seat has observed and drawn.
 - Its `version` is bumped whenever its rules change. Each run's log records every module's version and source hash (the `orchestrator` annotation).
@@ -33,4 +33,4 @@ Rules every module follows (so re-runs are reproducible):
 
 The town these modules run in is made by the [generator](generator.md).
 
-**Every act says why.** A module wraps each act's calls in `because("…", ...)` (`seats/src/behaviour/common.ts`): the rule that fired, in plain words, with the numbers it used ("Applying for apts-3/dwelling.2: the dearest home we've seen within a third of household income, with at least 2 bedrooms"). It goes into the log as the act's `reasoning`, and records cite what they rest on (`basis`) where there is something to cite. The renderer's causal trace (Stage 3) reads both. `measure … why` shows the coverage.
+**Every act says why.** A module wraps each act's calls in `because("…", ...)` (`participants/src/behaviour/common.ts`): the rule that fired, in plain words, with the numbers it used ("Applying for apts-3/dwelling.2: the dearest home we've seen within a third of household income, with at least 2 bedrooms"). It goes into the log as the act's `reasoning`, and records cite what they rest on (`basis`) where there is something to cite. The renderer's causal trace (Stage 3) reads both. `measure … why` shows the coverage.
