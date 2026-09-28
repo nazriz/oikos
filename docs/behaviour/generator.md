@@ -16,7 +16,7 @@ Turns a short spec (`worlds/town.yaml`) into a full, explicit contracts v0.4 wor
   - the standing orders that pay rent, the other adults' shares of the rent, and wages;
   - the town's `signatories` list for its account (the finance officer's position) and its payments procedure.
 - **Positions and participants:** every organisation acts through positions, each held at the start by a system participant running the job's module:
-  - the mayor: with `mayor: llm`, a language-model participant (weekly cadence; the laws as standing documents; until a real model is used, the mock, with `city.mayor_code` as its brain, see docs/design/m2-llm-participants.md), or with `mayor: code` the rule-following code mayor (the all-code control);
+  - the mayor: with `mayor: llm`, a language-model participant (weekly cadence; the laws and the forms on file as standing documents; until a real model is used, the mock, with `city.mayor_code` as its brain, see docs/design/m2-llm-participants.md), or with `mayor: code` the rule-following code mayor (the all-code control);
   - the finance officer's budget brief (`budget_lines`): one line, parks, at the builder's price for a park (materials plus the builder's 20%, the same constants the builder uses);
   - the city's finance officer, planning officer, inspector, tax clerk, council clerk, and five councillors at positions −80, −40, 0, 40 and 80 ([government.md](government.md));
   - the bank's payment system and the outside world's export demand;

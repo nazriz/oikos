@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.3.1";
+export const TRANSLATOR_VERSION = "0.3.2";
 
 export interface TranslatorId {
   id: string;
@@ -105,9 +105,11 @@ export function translatorSystem(): string {
   ].join("\n");
 }
 
-function context(req: TranslateRequest): string {
-  // Who published it: the office (the position it was made in), or its author's organisation.
-  const forms = req.knowledge.forms.map((f) => `- ${f.data?.form} (published by ${f.in_position ?? f.speaks_for ?? f.author}): fields ${Object.entries(f.data?.fields ?? {}).map(([k, v]: [string, any]) => `${k} (${v.type}${v.required ? ", required" : ""})`).join(", ")}`);
+/** What the translator is given: the request, and the forms this person knows of (where each goes, and its fields). */
+export function translatorContext(req: TranslateRequest): string {
+  // Where it goes (the `to` to write): the office it was made in, or its author's organisation. A choice field lists its options.
+  const field = ([k, v]: [string, any]) => `${k} (${v.type === "choice" && v.options?.length ? `one of ${v.options.join(" | ")}` : v.type}${v.required ? ", required" : ""})`;
+  const forms = req.knowledge.forms.map((f) => `- ${f.data?.form}, to=${f.in_position ?? f.speaks_for ?? f.author}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`);
   return [`Request: ${req.proposal}`, ...(forms.length ? ["", "Forms this person knows of:", ...forms] : [])].join("\n");
 }
 
@@ -150,7 +152,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     async translate(req: TranslateRequest): Promise<Translation> {
       const res = await callModel(io, {
         purpose: "translator", subject: id, system: translatorSystem(), maxTokens: 1000, tools: TOOLS,
-        messages: [{ role: "user", content: context(req) }],
+        messages: [{ role: "user", content: translatorContext(req) }],
         context: { proposal: req.proposal, participant: req.participant },
       }, seen);
       const out = res.content.find((b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use" && b.name === "call");

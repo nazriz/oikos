@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { MockAdapter } from "@terrarium/participants/llm";
-import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, translatorSystem } from "../src/index";
+import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, translatorContext, translatorSystem } from "../src/index";
 
 const law = { id: "law-planning", record: "statement", author: "genesis", at: 0, visible_to: "public", kind: "law", text: "No building without a permit.",
   adico: { deontic: "must_not" }, formal: { language: "cel", condition: "block.block == 'construct' && !holds_liberty(actor, 'build', block.lot)" } } as any;
@@ -47,4 +47,13 @@ test("a draft carries the call, the resolver, a mechanical preview, the dry run 
   expect(text).toContain("here is exactly what will happen");
   expect(text).toContain("This can't be done right now: the account doesn't have enough money.");
   expect(text).toContain("Legal note:");
+});
+
+test("the translator is shown where each form goes (the `to` to write) and a choice field's options", () => {
+  const k = knows();
+  k.absorb({ participant: "mayor-system", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: {
+    forms: { kind: "records", records: [{ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form", text: "Council proposal.",
+      data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: { proposal: { type: "text", required: true }, kind: { type: "choice", required: true, options: ["law", "budget", "other"] }, parks: { type: "amount" } } } }] } } } as any);
+  expect(translatorContext({ draftId: "d1", participant: "mayor-system", proposal: "Table the budget.", knowledge: k }))
+    .toContain("- council_proposal, to=city: fields proposal (text, required), kind (one of law | budget | other, required), parks (amount)");
 });
