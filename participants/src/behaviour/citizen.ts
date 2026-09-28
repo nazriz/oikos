@@ -436,6 +436,28 @@ export const citizen: BehaviourModule = {
         }
       }
 
+      // A rent increase on our home (the landlord's notice, as the tenancy law allows): if we can still afford it, we pay
+      // the new rent from when it starts; if not, we give notice and look for somewhere else.
+      if (home && isLeaseholder()) for (const r of fresh) {
+        if (r.record !== "statement" || r.kind !== "rent_increase" || r.data?.lease !== home.agreement || !(r.addressed_to ?? []).includes(me)) continue;
+        const rent = cents(r.data.rent);
+        const lease = book.records.get(home.agreement);
+        const rentTo = lease ? leaseTerms(lease, me).rentTo : undefined;
+        if (affordable(rent, acc.balance) && rentTo) {
+          const s: Step = because(`Our rent goes up to ${usd(rent)} a month (from ${usd(home.rent)}): still within our budget, so we'll pay it from when it starts.`);
+          if (home.order) s.push(withdraw(home.order, "Rent increased; replaced by a new standing order."));
+          s.push(["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: Math.max(0, r.data.from - t), basis: home.agreement, for: `Rent for ${home.space}, monthly in advance.` })]);
+          steps.push(s);
+          home.rent = rent;
+          home.order = undefined;
+          pendingRef = { kind: "rent", agreement: home.agreement };
+        } else {
+          steps.push(because(`Our rent goes up to ${usd(rent)} a month, beyond what we can afford (a third of household income, ${usd(Math.floor((householdIncome() * p.rent_share_bps) / 10_000))}): giving notice, to find somewhere else.`,
+            notice(home.agreement, "We can't afford the new rent.")));
+          home.endsAt = Math.min(home.endsAt, t + 30 * DAY);
+        }
+      }
+
       // Moving into a home we hold a lease on, once there's physical room: with the children, in one go.
       if (home && !home.movedIn && livingAt && livingAt !== home.space) {
         // We still live where the household used to (the lease there wasn't ours): leave it first.

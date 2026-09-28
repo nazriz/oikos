@@ -45,11 +45,14 @@ export const exportDemand: BehaviourModule = {
  *   own goods, which may go negative: they come from elsewhere);
  * - each month it publishes a buying offer for each kind it `buys` (a unit price and that month's quantity: in all, or
  *   for each seller it buys from, `from`), and pays invoices for goods shipped to it under the offer, once the goods
- *   have arrived; goods beyond the month's quantity (the seller's, or all sellers') are sent back, unpaid.
+ *   have arrived; goods beyond the month's quantity (the seller's, or all sellers') are sent back, unpaid;
+ * - world prices move: each month a kind's price level takes a random step and drifts back towards where it started
+ *   (`price_process`), and scripted shocks multiply a kind's price or the demand for it from a day on (`shocks`). It
+ *   republishes its price list when its prices change.
  */
 export const trade: BehaviourModule = {
   name: "world.trade",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -61,13 +64,30 @@ export const trade: BehaviourModule = {
         buys: {} as { [kind: string]: { unit_price: number; per_month: number; from?: { [seller: string]: number } } },
         wait_days: 14, // how long an invoice waits for its goods before it's declined
         min_order: 100, // the least it sells in one order (it sells wholesale)
+        // How a kind's world price moves each month: a random step (sd, basis points of its starting price) and how much of
+        // its distance from the start it keeps (persistence, basis points). None: it doesn't move.
+        price_process: {} as { [kind: string]: { sd_bps: number; persistence_bps: number } },
+        shocks: [] as { from_day: number; kind: string; what: "price" | "demand"; factor_bps: number }[],
       },
       ctx.params,
     );
     const me = ctx.entity;
     const book = new Book();
     const orders = new OrderBook(me);
-    let published = false;
+    let publishedKey = "";
+    let listId: string | undefined;
+    const level = new Map<string, number>(); // kind -> its price level, basis points of its starting price
+    // A kind's scripted factor on its price or demand now (basis points; the latest shock that has started).
+    const shocked = (kind: string, what: "price" | "demand", t: number) =>
+      [...p.shocks].filter((s) => s.kind === kind && s.what === what && s.from_day * DAY <= t).sort((a, b) => b.from_day - a.from_day)[0]?.factor_bps ?? 10_000;
+    const priceOf = (kind: string, base: number, t: number) => Math.max(1, Math.round((((base * (level.get(kind) ?? 10_000)) / 10_000) * shocked(kind, "price", t)) / 10_000));
+    const sellsNow = (t: number) => Object.fromEntries(Object.entries(p.sells).map(([k, x]) => [k, priceOf(k, x, t)]));
+    // What it buys this month: its price moved as world prices move; its quantity scaled by any demand shock.
+    const buyingNow = (kind: string, b: { unit_price: number; per_month: number; from?: { [seller: string]: number } }, t: number) => {
+      const f = shocked(kind, "demand", t);
+      const scale = (q: number) => Math.floor((q * f) / 10_000);
+      return { unit_price: priceOf(kind, b.unit_price, t), per_month: scale(b.per_month), ...(b.from ? { from: Object.fromEntries(Object.entries(b.from).map(([s, q]) => [s, scale(q)])) } : {}) };
+    };
     const offers = new Map<string, string>(); // kind -> this month's buying offer
     let month = -1;
     const bought = new Map<string, number>(); // kind (and kind|seller) -> quantity accepted this month
@@ -85,15 +105,31 @@ export const trade: BehaviourModule = {
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
-        if (!published && Object.keys(p.sells).length) {
-          published = true;
-          const list = Object.entries(p.sells).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => `${k} ${usd(x)}`).join("; ");
-          steps.push(because("The world market's prices, for anyone in the town who buys from outside.", priceList(p.sells, p.account, `Sold from outside, delivered, at world prices (each): ${list}; at least ${p.min_order} to an order. Order and pay with the order.`, { min_order: p.min_order })));
+        // A new month: world prices take their step (a random step, drifting back towards where they started).
+        const m0 = Math.floor(t / MONTH);
+        if (m0 !== month && month >= 0) for (const [kind, pr] of Object.entries(p.price_process).sort(([a], [b]) => (a < b ? -1 : 1))) {
+          const r = ctx.rng(`price-${kind}-${m0}`);
+          let z = -60_000; // a normal draw in basis points of a standard deviation: 12 uniforms less 6 (Irwin-Hall)
+          for (let i = 0; i < 12; i++) z += r.below(10_000);
+          const now = level.get(kind) ?? 10_000;
+          level.set(kind, Math.max(1_000, 10_000 + Math.trunc(((now - 10_000) * pr.persistence_bps) / 10_000) + Math.trunc((z * pr.sd_bps) / 10_000)));
+        }
+        const sells = sellsNow(t);
+        const key = JSON.stringify(sells);
+        if (key !== publishedKey && Object.keys(sells).length) {
+          const first = !publishedKey;
+          publishedKey = key;
+          const list = Object.entries(sells).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => `${k} ${usd(x)}`).join("; ");
+          const st = because(first ? "The world market's prices, for anyone in the town who buys from outside." : "World prices have moved: republishing ours.",
+            ...(listId ? [withdraw(listId, "Superseded: world prices have moved.")] : []),
+            ["list", priceList(sells, p.account, `Sold from outside, delivered, at world prices (each): ${list}; at least ${p.min_order} to an order. Order and pay with the order.`, { min_order: p.min_order })]);
+          st.then = (out) => { if (out.created?.list) listId = out.created.list; };
+          steps.push(st);
         }
         // Orders paid in full: deliver from outside. An order below the world price, or for something not sold, is refunded.
         const { paid, unpaid } = orders.due(book, t);
         for (const o of paid) {
-          const price = p.sells[o.kind];
+          const price = sells[o.kind];
           const ok = price !== undefined && o.unitPrice >= price && o.quantity >= p.min_order;
           const step = fill(o, ok ? o.quantity : 0, me, p.account, ok ? `An order paid in full: delivering ${o.quantity} ${o.kind} from outside.` : `An order ${price === undefined ? `for ${o.kind}, which isn't sold from outside` : o.quantity < p.min_order ? `for fewer than ${p.min_order}` : "below the world price"}: refunding it.`);
           const refundIfRefused = step.then;
@@ -114,8 +150,9 @@ export const trade: BehaviourModule = {
         if (m !== month) {
           month = m;
           bought.clear();
-          for (const [kind, b] of Object.entries(p.buys)) {
+          for (const [kind, b0] of Object.entries(p.buys)) {
             const old = offers.get(kind);
+            const b = buyingNow(kind, b0, t);
             steps.push(because(`A new month: the world market's demand for the town's ${kind}.`,
               ...(old ? [withdraw(old, "Superseded by this month's offer.")] : []),
               ["offer", say("buying_offer", `Buying ${kind} from the town this month: up to ${b.from ? Object.entries(b.from).map(([s, q]) => `${q} from ${s}`).join(", ") : b.per_month} at ${usd(b.unit_price)} each. Ship to us (the outside) and invoice us; we pay once the goods arrive.`, {
@@ -133,7 +170,7 @@ export const trade: BehaviourModule = {
           const kind = String(inv.data?.kind);
           const q = Math.floor(Number(inv.data?.quantity) || 0);
           const owed = inv.data?.outcome?.money;
-          const offer = p.buys[kind];
+          const offer = p.buys[kind] ? buyingNow(kind, p.buys[kind]!, t) : undefined;
           const from = inv.speaks_for!;
           if (!offer || q <= 0 || !owed?.to) {
             answered.add(inv.id);

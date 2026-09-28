@@ -30,6 +30,8 @@ export interface Profile {
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number };
     retirement_age: number;
     labour_force_participation_bps: number;
+    tenancy: { rent_review_months: number; rent_increase_notice_days: number };
+    world_price_process: { [kind: string]: { sd_bps: number; persistence_bps: number } };
     retiree_savings: [number, number];
     support: { pension: { amount: number; every_days: number; from_age: number }; unemployment: { amount: number; every_days: number; from_age: number } };
     wealth_quintile_shares_bps: [number, number, number, number, number];

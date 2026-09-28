@@ -60,7 +60,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.7.0",
+  version: "0.8.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -87,6 +87,10 @@ export const landlord: BehaviourModule = {
       // Occupancy policy: turn down a household with more than this many people per bedroom (0: no limit). Two is the
       // occupancy standard's own ceiling (CNOS); whether a landlord applies it is the landlord's choice (placeholder).
       max_people_per_bedroom: 2,
+      // Reviewing rents (docs/behaviour/firms.md): how often a tenancy's rent may rise, and the notice due, are the
+      // world's tenancy law (from its profile); none unless the world says.
+      rent_review_months: null as number | null,
+      rent_increase_notice_days: 60,
     },
     ctx.params,
   );
@@ -105,6 +109,8 @@ export const landlord: BehaviourModule = {
     let dev: { lot: string; stage: "applying" | "applied" | "granted" | "refused" | "contracted"; app?: string } | null = null;
     let devCooldownUntil = 0;
     const answered = new Set<string>(); // fines and orders we've responded to
+    const rentChanges = new Map<string, { from: number; rent: number }[]>(); // lease -> rent increases we've given notice of
+    const lastReview = new Map<string, number>(); // lease -> when its rent was last reviewed
     const obeys = (key: string) => ctx.rng(`comply-${key}`).below(10_000) < p.compliance_bps;
 
     const absorb = (obs: Observation) => {
@@ -148,6 +154,8 @@ export const landlord: BehaviourModule = {
       const steps: Step[] = [];
       const offeredNow: string[] = []; // units offered this wake (they're held too)
       const tenantOf = (a: any) => a.terms.parties.find((x: string) => x !== me);
+      // A lease's rent at a time: as agreed, or as we've since raised it.
+      const rentAt = (a: any, at: number) => [...(rentChanges.get(a.id) ?? [])].reverse().find((c) => c.from <= at)?.rent ?? leaseTerms(a, tenantOf(a)).rent;
 
       // Applications: pick one at random per listing, offer a lease, withdraw the listing.
       const apps = book.open("rental_application").filter((a) => (a.addressed_to ?? []).includes(me) && !handled.has(a.id));
@@ -207,7 +215,7 @@ export const landlord: BehaviourModule = {
             const lt = leaseTerms(a, tenantOf(a));
             return lt.structure === o.structure && owned.find((x) => x.space === lt.space)?.bedrooms === o.bedrooms;
           };
-          const going = active.filter(like).map((a) => leaseTerms(a, tenantOf(a)).rent);
+          const going = active.filter(like).map((a) => rentAt(a, t));
           const base = p.base_rent[o.type];
           const baseRent = typeof base === "number" ? base : (base?.find((b) => b.bedrooms === o.bedrooms)?.rent ?? 100_000);
           const ref = going.length ? Math.floor(going.reduce((x, y) => x + y, 0) / going.length) : baseRent;
@@ -250,15 +258,40 @@ export const landlord: BehaviourModule = {
       for (const a of active) {
         if (noticeGiven.has(a.id)) continue;
         const tenant = tenantOf(a);
-        const rent = leaseTerms(a, tenant).rent;
+        const rent = rentAt(a, t);
         const since = book.signedAt(a.id)!;
         const due = Math.floor((t - since) / MONTH) + 1;
+        let owed = 0;
+        for (let k = 0; k < due; k++) owed += rentAt(a, since + k * MONTH);
         const paying = payingAccount.get(tenant);
         const paid = paying ? received.get(paying) ?? 0 : 0;
-        if ((due * rent - paid) >= p.arrears_months_before_notice * rent && t - since >= p.arrears_months_before_notice * MONTH) {
+        if ((owed - paid) >= p.arrears_months_before_notice * rent && t - since >= p.arrears_months_before_notice * MONTH) {
           noticeGiven.set(a.id, t);
           steps.push(because(`Rent is ${p.arrears_months_before_notice} or more months in arrears: giving notice.`, notice(a.id, "Notice: rent is in arrears.")));
         }
+      }
+
+      // Rent reviews: once a review period (the world's tenancy law), a tenancy's rent goes up to what we'd ask for the
+      // home now, if that's more, with the notice the law requires. (It never goes down: an unlet home's asking rent does.)
+      if (p.rent_review_months) for (const a of active) {
+        if (noticeGiven.has(a.id)) continue;
+        const since = lastReview.get(a.id) ?? book.signedAt(a.id)!;
+        if (t - since < p.rent_review_months * MONTH) continue;
+        lastReview.set(a.id, t);
+        const tenant = tenantOf(a);
+        const unit = owned.find((o) => o.space === leaseTerms(a, tenant).space);
+        if (!unit) continue;
+        const now = rentAt(a, t);
+        const others = active.filter((x) => x.id !== a.id && leaseTerms(x, tenantOf(x)).structure === unit.structure && owned.find((o) => o.space === leaseTerms(x, tenantOf(x)).space)?.bedrooms === unit.bedrooms).map((x) => rentAt(x, t));
+        const base = p.base_rent[unit.type];
+        const baseRent = typeof base === "number" ? base : (base?.find((b) => b.bedrooms === unit.bedrooms)?.rent ?? now);
+        const ref = others.length ? Math.floor(others.reduce((x, y) => x + y, 0) / others.length) : Math.max(now, baseRent);
+        const market = Math.floor((ref * (10_000 + p.markup_bps)) / 10_000);
+        if (market <= now) continue;
+        const from = t + p.rent_increase_notice_days * DAY;
+        rentChanges.set(a.id, [...(rentChanges.get(a.id) ?? []), { from, rent: market }]);
+        steps.push(because(`A rent review (every ${p.rent_review_months} months, by law): what we'd ask for ${unit.space} now is ${usd(market)} a month (${p.markup_bps / 100}% over ${others.length ? "what similar homes in the building let for" : "the base rent"}), above the ${usd(now)} it lets for: raising it, with ${p.rent_increase_notice_days} days' notice.`,
+          say("rent_increase", `Notice of rent increase for ${unit.space}: ${usd(market)} a month from ${Math.floor(from / DAY)} (day), up from ${usd(now)}.`, { to: [tenant], visible: [me, tenant], basis: a.id, data: { lease: a.id, rent: market, from, was: now } })));
       }
 
       // Monthly: owners spend part of the income locally; upkeep is bought from outside.

@@ -52,23 +52,31 @@ test("goods are made from inputs by workers' hours, exported within each factory
     perDay.set(k, (perDay.get(k) ?? 0) + Math.ceil(w.labour / w.performers.length));
   }
   expect(Math.max(...perDay.values())).toBeLessThanOrEqual(config.catalogue.working_day);
-  // Inputs come from outside at the world price.
+  // Inputs come from outside at the world price the world market lists when they're ordered, paid with the order.
   const inputs = ev.filter((e) => e.event === "goods_moved" && e.kind === "inputs");
   expect(inputs.length).toBeGreaterThan(0);
-  for (const g of inputs) expect(ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${g.to}` && e.amount === String(Number(g.quantity) * trader.sells.inputs) && e.t <= g.t)).toBe(true);
-  // Exports: paid for at the world price, never beyond a factory's share of a month's demand.
-  const paid = new Map<string, number>();
+  const lists = recs.filter((r) => r.kind === "price_list" && r.speaks_for === "outside");
+  for (const o of recs.filter((r) => r.kind === "order" && r.speaks_for.startsWith("factory-") && r.data.kind === "inputs")) {
+    // (The list in force, or the one just before: a list republished in the same moment isn't seen yet, D58; an order
+    // at the old price is refunded, and made again.)
+    const inForce = lists.filter((l) => l.at <= o.at).slice(-2).map((l) => l.data.goods.inputs);
+    expect(inForce).toContain(o.data.unit_price);
+    expect(ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${o.speaks_for}` && e.amount === String(o.data.quantity * o.data.unit_price) && e.t >= o.at)).toBe(true);
+  }
+  // Exports: paid for at the month's offer price (world prices move), never beyond a factory's share of that month's demand.
+  const offersBy = recs.filter((r) => r.kind === "buying_offer" && r.speaks_for === "outside");
+  const units = new Map<string, number>();
   // (Payments for exports settle the factory's invoice; other payments from outside are refunds.)
   for (const e of ev.filter((x) => x.event === "transfer" && x.from === "acc-outside" && x.to.startsWith("acc-factory") && x.settles)) {
-    const k = `${e.to}|${Math.floor(e.t / MONTH)}`;
-    paid.set(k, (paid.get(k) ?? 0) + Number(e.amount));
+    const offer = offersBy.filter((o) => o.at <= e.t).at(-1)!;
+    expect(Number(e.amount) % offer.data.unit_price).toBe(0);
+    const f = e.to.replace("acc-", "");
+    const k = `${f}|${offer.id}`;
+    units.set(k, (units.get(k) ?? 0) + Number(e.amount) / offer.data.unit_price);
+    expect(units.get(k)!).toBeLessThanOrEqual(offer.data.quantities[f]);
   }
-  expect(paid.size).toBeGreaterThan(0);
-  for (const [k, x] of paid) {
-    const f = k.split("|")[0]!.replace("acc-", "");
-    expect(x % trader.buys.goods.unit_price).toBe(0);
-    expect(x / trader.buys.goods.unit_price).toBeLessThanOrEqual(share[f]!);
-  }
+  expect(units.size).toBeGreaterThan(0);
+  void share;
   // Dividends, out of a month's earnings: in proportion to the shares on the register.
   const asked = recs.filter((r) => r.kind === "request" && r.speaks_for?.startsWith("factory-") && r.data?.outcome?.money?.for === "Dividend.");
   expect(asked.length).toBeGreaterThan(0);

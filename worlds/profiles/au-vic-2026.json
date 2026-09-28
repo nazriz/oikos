@@ -453,7 +453,25 @@
         "rate": 0
       }
     ],
-    "labour_force_participation_bps": 8000
+    "labour_force_participation_bps": 8000,
+    "tenancy": {
+      "rent_review_months": 12,
+      "rent_increase_notice_days": 60
+    },
+    "world_price_process": {
+      "goods": {
+        "sd_bps": 150,
+        "persistence_bps": 9000
+      },
+      "inputs": {
+        "sd_bps": 400,
+        "persistence_bps": 9000
+      },
+      "materials": {
+        "sd_bps": 300,
+        "persistence_bps": 9000
+      }
+    }
   },
   "sources": {
     "currency": "Australian dollars, in cents.",
@@ -478,7 +496,9 @@
     "prices": "Placeholders: an item of goods worth $100 at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs $2.50 a kg; building materials $1.25 a kg (docs/behaviour/building.md).",
     "ordinary_hours_per_week": "Maximum ordinary hours for a full-time employee, 38 a week (Fair Work Act 2009, s 62, the National Employment Standards).",
     "fertility_per_10000": "ABS, Births, Australia 2024: births per 10,000 women (the published rates per 1,000, times 10: configs are integers) a year, by age.",
-    "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80%; to confirm against ABS, Labour Force, Australia, Table 16 (15-64 year olds). Those outside it (studying, caring, other reasons) don't look for work."
+    "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80%; to confirm against ABS, Labour Force, Australia, Table 16 (15-64 year olds). Those outside it (studying, caring, other reasons) don't look for work.",
+    "tenancy": "Residential Tenancies Act 1997 (Vic), s 44: a residential rent may be increased no more than once every 12 months, with at least 60 days' written notice.",
+    "world_price_process": "Placeholder: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from ABS, International Trade Price Indexes (import and export price indexes by commodity)."
   },
   "targets": [
     {

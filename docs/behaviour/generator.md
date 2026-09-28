@@ -4,6 +4,7 @@ Turns a short spec (`worlds/town.yaml`) and a **profile** (`worlds/profiles/`, d
 - **a factory's item:** its labour share of the world price, as hours at the factory wage; its input share, as kg of inputs;
 - **a shop's item:** its retail price from the purchases share; its serving time from the labour share, at the shop wage;
 - **shops' opening staff:** from the sales the town's expected incomes would make;
+- **world prices** move as the profile's `world_price_process` says; a spec's `shocks` script changes to a price or to demand (docs/behaviour/boundary.md);
 - **the world market's demand**, if the spec doesn't set it: what the factories' opening staff make, less the town's own purchases (a boundary condition, set by rule). It's deterministic from the spec's seed, using the kernel's keyed randomness. The kernel never generates anything; it receives this output. Everything generated is example **content** (D23).
 
 **What it makes:**

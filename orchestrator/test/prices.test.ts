@@ -1,0 +1,74 @@
+// Prices that bite, and shocks (phase C, stage C1): landlords review rents to what they'd ask now, within the world's
+// tenancy law, and tenants pay it or leave; world prices move, and scripted shocks change a price or the demand for
+// the town's goods.
+
+import { expect, test } from "bun:test";
+import { readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { generate } from "@terrarium/worlds/generator/generate";
+import { runWorld } from "../src/run";
+
+const root = join(import.meta.dir, "../..");
+const DAY = 86_400;
+const MONTH = 30 * DAY;
+const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+
+async function run(name: string, config: any, until: number) {
+  const out = join(root, "runs", `test-prices-${name}`);
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config, runId: name, outDir: out, until });
+  const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);
+  const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
+  const cmds = log.filter((e) => e.kind === "command").map((e) => ({ t: e.t, ...e.body }));
+  return { ev, cmds, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
+}
+
+test("rents are reviewed within the tenancy law, never down, and tenants pay the new rent or leave", async () => {
+  const config = generate(base);
+  const law = { months: config.participants.find((p: any) => p.controller?.impl === "firm.landlord").controller.params.rent_review_months, notice: config.participants.find((p: any) => p.controller?.impl === "firm.landlord").controller.params.rent_increase_notice_days };
+  const { ev, recs } = await run("rents", config, 15 * MONTH);
+  const increases = recs.filter((r) => r.kind === "rent_increase");
+  expect(increases.length).toBeGreaterThan(5);
+  const byLease = new Map<string, any[]>();
+  for (const r of increases) byLease.set(r.data.lease, [...(byLease.get(r.data.lease) ?? []), r]);
+  for (const [, rs] of byLease) for (let i = 1; i < rs.length; i++) expect(rs[i].at - rs[i - 1].at).toBeGreaterThanOrEqual(law.months * MONTH);
+  for (const r of increases) {
+    expect(r.data.from - r.at).toBeGreaterThanOrEqual(law.notice * DAY);
+    expect(Number(r.data.rent)).toBeGreaterThan(Number(r.data.was));
+    // The tenant answers: a standing order for the new rent, or notice on the lease.
+    const tenant = r.addressed_to[0];
+    const pays = recs.some((x) => x.kind === "request" && x.speaks_for === tenant && x.basis === r.data.lease && x.data?.outcome?.money?.amount === String(r.data.rent) && x.at >= r.at);
+    const leaves = recs.some((x) => x.record === "notice" && x.agreement === r.data.lease && x.as === tenant && x.at >= r.at);
+    expect(pays || leaves).toBe(true);
+    // And pays it from when it starts (if still there then).
+    if (pays && r.data.from < 15 * MONTH - 35 * DAY) {
+      const landlordAccount = `acc-${r.speaks_for}`;
+      expect(ev.some((e) => e.event === "transfer" && e.to === landlordAccount && e.amount === String(r.data.rent) && e.t >= r.data.from)).toBe(true);
+    }
+  }
+}, 600_000);
+
+test("world prices move month to month, and scripted shocks change a price and the demand for the town's goods", async () => {
+  const config = generate({ ...base, citizens: 80, shocks: [
+    { from_day: 90, kind: "inputs", what: "price", factor_bps: 15_000 },
+    { from_day: 60, kind: "goods", what: "demand", factor_bps: 5_000 },
+  ] });
+  const { recs } = await run("shocks", config, 5 * MONTH);
+  const lists = recs.filter((r) => r.kind === "price_list" && r.speaks_for === "outside").map((r) => ({ t: r.at, goods: r.data.goods }));
+  expect(lists.length).toBeGreaterThanOrEqual(4); // republished as prices move
+  const start = lists[0]!.goods;
+  // Before the price shock, inputs stay near their start; after it, about half as much again.
+  const before = lists.filter((l) => l.t < 90 * DAY).at(-1)!.goods.inputs;
+  const after = lists.filter((l) => l.t >= 90 * DAY)[0]!.goods.inputs;
+  expect(Math.abs(before - start.inputs) / start.inputs).toBeLessThan(0.2);
+  expect(after / before).toBeGreaterThan(1.3);
+  // The buying offers: from the demand shock's month on, the factories' shares are halved (give or take the rounding).
+  const offers = recs.filter((r) => r.kind === "buying_offer");
+  const first = offers.find((o) => o.at < 60 * DAY)!;
+  const later = offers.find((o) => o.at >= 60 * DAY)!;
+  for (const [f, q] of Object.entries(first.data.quantities as { [f: string]: number })) expect(Math.abs(later.data.quantities[f] - Math.floor(q / 2))).toBeLessThanOrEqual(1);
+  // Factories buy their inputs at the price the world market asks now.
+  const inputOrders = recs.filter((r) => r.kind === "order" && r.speaks_for.startsWith("factory-") && r.data.kind === "inputs" && r.at >= 90 * DAY);
+  for (const o of inputOrders) expect(o.data.unit_price).toBeGreaterThanOrEqual(after);
+}, 600_000);

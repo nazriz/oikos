@@ -1,4 +1,4 @@
-# The outside world as a boundary condition: `world.trade` (v0.1.0), `world.export_demand` (v0.2.0) and `world.migration` (v0.1.0)
+# The outside world as a boundary condition: `world.trade` (v0.2.0), `world.export_demand` (v0.2.0) and `world.migration` (v0.1.0)
 
 `world.export_demand` (money on a schedule) is kept for worlds that want exports as money alone. The generated town uses `world.trade`.
 
@@ -47,8 +47,12 @@ This replaces `world.export_demand` in the town. Selling goods to shops comes wi
 
 A first-come-first-served quantity, shared by two factories, made the demand each factory saw swing from month to month: whoever shipped first took most of it. Named shares (a factory's own export customers) are steadier and closer to how a town's factories actually sell abroad.
 
+**World prices move (0.2.0):**
+- **The random process.** Each month a kind's price level (as a share of its starting price) takes a random step and drifts back towards where it started. It's a mean-reverting process: the standard deviation of a month's step, and how much of the gap from the start it keeps (`price_process`, from the world's profile: placeholders until estimated from international trade price indexes). The step is drawn from the world's seeded randomness, in integers (a normal draw from twelve uniforms).
+- **Scripted shocks** (`shocks`, a researcher's scenario: `{ from_day, kind, what: price | demand, factor_bps }`) multiply a kind's price, or the demand for it, from a day on, until another shock to the same thing.
+- **What moves with them.** The price list is republished when prices change. Buying offers carry the month's price and quantity. An order below the price now is refunded, and the buyer orders again. Invoices are paid at the month's price.
+
 **Leaves out:**
-- world prices that move;
 - delivery times;
 - exchange rates (one currency);
 - trade policy (tariffs, quotas): these would be laws, as records, applied by an office.

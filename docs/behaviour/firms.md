@@ -1,4 +1,4 @@
-# Firms: `firm.landlord` (v0.7.0) and `firm.employer` (v0.6.0)
+# Firms: `firm.landlord` (v0.8.0) and `firm.employer` (v0.6.0)
 
 **Source:** `participants/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
 
@@ -20,6 +20,14 @@
 | **Owners' spending** | Monthly: 60% of rental income spent at local shops, 20% on upkeep bought from outside | A placeholder to stop money pooling at landlords (see the calibration notes below) |
 
 **Differs from the BoE model on purpose:** that model injects cash so tenants never miss rent. Here arrears happen, and what follows is up to the landlord.
+
+**Rent reviews (landlord 0.8.0):** where the world's tenancy law allows rent to rise (`rent_review_months`, and the notice due, `rent_increase_notice_days`: from the world's profile; none unless it's set), a landlord reviews each tenancy's rent once a review period:
+- it raises the rent to what it would ask for that home now (its markup over what similar homes in the building let for, or its base rent), if that's more;
+- it gives the notice the law requires, with a `rent_increase` statement to the tenant (`data: { lease, rent, from, was }`);
+- it never lowers a tenancy's rent (an unlet home's asking rent falls instead);
+- the rent it expects, for arrears, follows the increases.
+
+The tenant pays the new rent from when it starts, or gives notice (docs/behaviour/citizen.md). This is where tight housing reaches sitting tenants, the counterpart of the BoE model's cut for unlet homes. Victoria's law (the first profile): once in 12 months, 60 days' notice.
 
 **The owners' draw (landlord 0.7.0):** monthly, 60% of rent received goes to the landlord's owners. With a `shareholders` register (the generated town's: its households), it's paid to them by their shares, and they spend it as they will. Without one, the old money-only stand-in (spent at a local shop) remains. 20% goes on upkeep bought from outside (maintenance comes in phase C).
 

@@ -63,6 +63,9 @@ export interface TownSpec {
   households?: Partial<HouseholdSpec>;
   /** Bodies' physics: death, illness and injury (docs/behaviour/life.md). Default true; false: nobody falls ill, is hurt or dies. */
   life?: boolean;
+  /** Scripted shocks to the world market (docs/behaviour/boundary.md): from a day, a kind's world price or the demand for it
+   * is multiplied (basis points: 10000 is unchanged), until another shock to the same thing. */
+  shocks?: { from_day: number; kind: string; what: "price" | "demand"; factor_bps: number }[];
   /** People moving in from elsewhere (world.migration, docs/behaviour/boundary.md): its parameters, or false for none. Default: on. */
   migration?: false | Record<string, unknown>;
 }
@@ -437,6 +440,7 @@ export function generate(spec: TownSpec): any {
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
   office("outside-trade", "outside", "The world market", undefined, [{ id: "ledger", kind: "accounts" }, mine("orders"), { id: "stock", kind: "holdings" }],
     code("world.trade", { account: "acc-outside", sells: { materials: MATERIALS_PRICE, inputs: WORLD.inputs, goods: WORLD.goods_import },
+      price_process: V.world_price_process, shocks: spec.shocks ?? [],
       // The world market's demand for the town's goods, split among the factories by the size of their works (each
       // factory's export customers).
       buys: { goods: { unit_price: WORLD.goods_export, per_month: exportUnits, from: exportShares } } }));
@@ -489,7 +493,8 @@ export function generate(spec: TownSpec): any {
     const theirCells = records.filter((r) => r.record === "claim" && r.holder === l).map((r) => cellOf.get(r.about.object)!);
     office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "own-sites", kind: "sites", area: theirCells.length ? theirCells : "all", occupants: "names" }, deaths],
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
-        city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, tax_rate_bps: 1000 }));
+        city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, tax_rate_bps: 1000,
+        rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days }));
   }
   // What the town's firms sell and buy: their price lists, and the world market's buying offers.
   const market = { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"] } };

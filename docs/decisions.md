@@ -658,6 +658,18 @@ See the design note, §16.
     - read prices from what the builder publishes rather than fixed amounts;
     - the stock-band test checks the property itself (no day's making beyond the band's top).
 
+- **Phase C, stage C1: prices that bite, and shocks.**
+  - **Rents:** landlords review a tenancy's rent once a review period, to what they'd ask for the home now, with the notice the world's tenancy law requires (its profile; Victoria: 12 months, 60 days). Rent never goes down; the arrears they reckon follow the increases. Tenants pay the new rent if it's within their budget, or give notice and look elsewhere. In two years of the 200-person town: 56 increases, and about one in five households leaving over one.
+  - **World prices** move monthly by a mean-reverting random process (the profile's, placeholder volatility), in integers from the seeded randomness. Researchers script shocks to a kind's price or demand (`shocks` in a spec).
+  - Where shortage reaches shop prices, Lengnick's price rule does it, within its bounds.
+  - **Tests** (`orchestrator/test/prices.test.ts`):
+    - rents are reviewed no more often than the law allows, with its notice, never down, and tenants answer by paying or leaving;
+    - world prices are republished as they move;
+    - a price shock and a demand shock arrive as scripted;
+    - factories pay what the world market lists.
+
+    Earlier tests that assumed fixed world prices now check the order's price against the list in force, or the one just before, since a list republished in the same moment isn't seen yet (D58).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

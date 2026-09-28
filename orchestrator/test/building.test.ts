@@ -38,10 +38,14 @@ test("the builder buys materials from outside, and its crew's hours finish each 
   // Materials come from outside, to the yard, paid for at the world price with the order.
   const bought = ev.filter((e) => e.event === "goods_moved" && e.from === "outside" && e.to === "builder");
   expect(bought.length).toBeGreaterThan(0);
-  for (const g of bought) {
-    expect(g).toMatchObject({ kind: "materials", to_at: "builder-yard" });
-    expect(ev.some((e) => e.event === "transfer" && e.from === "acc-builder" && e.to === "acc-outside" && e.amount === String(Number(g.quantity) * price) && e.t <= g.t)).toBe(true);
+  for (const g of bought) expect(g).toMatchObject({ kind: "materials", to_at: "builder-yard" });
+  // Each order at the price the world market lists when it's made (world prices move), paid with the order.
+  const lists = recs.filter((r) => r.kind === "price_list" && r.speaks_for === "outside");
+  for (const o of recs.filter((r) => r.kind === "order" && r.speaks_for === "builder")) {
+    expect(lists.filter((l) => l.at <= o.at).slice(-2).map((l) => l.data.goods.materials)).toContain(o.data.unit_price); // or the one just before (D58)
+    expect(ev.some((e) => e.event === "transfer" && e.from === "acc-builder" && e.to === "acc-outside" && e.amount === String(o.data.quantity * o.data.unit_price) && e.t >= o.at)).toBe(true);
   }
+  void price;
   expect(recs.filter((r) => r.kind === "delivery_note" && r.speaks_for === "outside" && r.addressed_to.includes("builder")).length).toBe(bought.length);
   // Every building finished took exactly its hours of the crew's work (and no more), from the yard.
   const started = new Map(ev.filter((e) => e.event === "structure_started").map((e) => [e.structure, e]));
