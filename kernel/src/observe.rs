@@ -147,7 +147,26 @@ pub struct SiteStructure {
     pub complete: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completes_at: Option<i64>,
+    /// Being brought down (phase B).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coming_down: Option<bool>,
+    /// Its state variables (phase B): wear, and the like, each as a value as of a day, with its rate now and its
+    /// bounds. Seen with its trend, the way wear shows how fast it's coming on: the value on any later day follows
+    /// (until something about the building changes, which is then seen afresh). No daily re-sending of every building.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variables: Option<BTreeMap<Id, VariableView>>,
     pub spaces: Vec<SiteSpace>,
+}
+
+/// A state variable as perceived: its value on `as_of_day`, how much it changes each whole day since (at the
+/// building's present occupancy), and its bounds. Today's value: value + per_day x (days since), within bounds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VariableView {
+    pub value: i64,
+    pub as_of_day: i64,
+    pub per_day: i64,
+    pub min: i64,
+    pub max: i64,
 }
 
 /// A space in a building: what it is (the world's vocabulary), how many bodies it holds at most,
@@ -536,6 +555,22 @@ fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCel
                 built_by: x.built_by.clone(),
                 complete: x.complete,
                 completes_at: x.completes_at,
+                coming_down: x.demolition.is_some().then_some(true),
+                variables: {
+                    let occupants = occ.map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
+                    let v: BTreeMap<Id, VariableView> = s
+                        .config
+                        .catalogue
+                        .variables
+                        .iter()
+                        .filter_map(|c| {
+                            let (value, as_of_day) = *x.variables.get(&c.id)?;
+                            let per_day = c.per_day.saturating_add(c.per_occupant_per_day.saturating_mul(occupants));
+                            Some((c.id.clone(), VariableView { value, as_of_day, per_day, min: c.min, max: c.max }))
+                        })
+                        .collect();
+                    (!v.is_empty()).then_some(v)
+                },
                 spaces: s.spaces[&x.structure_type]
                     .iter()
                     .map(|(local, spec)| {

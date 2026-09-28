@@ -321,16 +321,16 @@ export function generate(spec: TownSpec): any {
   // The catalogue: what can be built, and what its materials cost (physics). The builder's materials costs are its own business knowledge, from the same figures.
   const structureTypes = [
     // A home is a unit with bedrooms; its capacity is how many bodies could physically live in it (what's suitable is content).
-    ...houseTypes.map((h) => ({ id: h.id, category: "residential", materials_cost: 30_000_000 + (h.bedrooms - 3) * 5_000_000, build_time: 90 * DAY, demolition_cost: 2_000_000, footprint: { w: 1, h: 1 },
+    ...houseTypes.map((h) => ({ id: h.id, category: "residential", materials_value: 30_000_000 + (h.bedrooms - 3) * 5_000_000, build_time: 90 * DAY, footprint: { w: 1, h: 1 },
       spaces: [{ kind: "dwelling", count: 1, capacity: capacityFor(h.bedrooms), attrs: { bedrooms: h.bedrooms } }] })),
-    { id: "apartments", category: "residential", materials_cost: 250_000_000, build_time: 180 * DAY, demolition_cost: 10_000_000, footprint: { w: 1, h: 1 },
+    { id: "apartments", category: "residential", materials_value: 250_000_000, build_time: 180 * DAY, footprint: { w: 1, h: 1 },
       spaces: units.map((u) => ({ kind: "dwelling", count: u.count, capacity: capacityFor(u.bedrooms), attrs: { bedrooms: u.bedrooms } })) },
-    { id: "shop", category: "commercial", materials_cost: 60_000_000, build_time: 90 * DAY, demolition_cost: 3_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 6 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.shop }) },
-    { id: "factory", category: "industrial", materials_cost: 400_000_000, build_time: 240 * DAY, demolition_cost: 20_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.factory }) },
-    { id: "civic", category: "civic", materials_cost: 80_000_000, build_time: 120 * DAY, demolition_cost: 4_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }] },
-    { id: "park", category: "green", materials_cost: PARK_MATERIALS, build_time: 30 * DAY, demolition_cost: 500_000, footprint: { w: 1, h: 1 }, spaces: [] },
+    { id: "shop", category: "commercial", materials_value: 60_000_000, build_time: 90 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 6 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.shop }) },
+    { id: "factory", category: "industrial", materials_value: 400_000_000, build_time: 240 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.factory }) },
+    { id: "civic", category: "civic", materials_value: 80_000_000, build_time: 120 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }] },
+    { id: "park", category: "green", materials_value: PARK_MATERIALS, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [] },
   ];
-  const MATERIALS = Object.fromEntries(structureTypes.map((t) => [t.id, t.materials_cost]));
+  const MATERIALS = Object.fromEntries(structureTypes.map((t) => [t.id, t.materials_value]));
   const forms = { id: "forms", kind: "records", match: { statement_kinds: ["form"] } };
   // Builders' published prices (firm.builder publishes its own).
   const priceLists = { id: "prices", kind: "records", match: { statement_kinds: ["price_list"] } };
@@ -441,7 +441,9 @@ export function generate(spec: TownSpec): any {
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
     // Amounts on the wire are decimal strings (D58); the generator counts in numbers.
-    catalogue: { structure_types: structureTypes.map((t) => ({ ...t, materials_cost: String(t.materials_cost), demolition_cost: String(t.demolition_cost) })) },
+    // Interim (phase B stage B2): the types carry no materials yet, so building takes only time, until the builder has a
+    // yard and a supplier (stage B4). `materials_value` is the builder's own reckoning of materials, for its prices.
+    catalogue: { structure_types: structureTypes.map(({ materials_value: _, ...t }) => t) },
     world: { boundaries: ["outside"], currencies: [{ code: "AUD", minor_units: 2 }], ground: { w: spec.grid.w, h: spec.grid.h },
       // One place (D58): the town, detailed, covering its ground.
       places: [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }], entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records },

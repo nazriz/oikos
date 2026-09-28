@@ -32,8 +32,8 @@ fn street() -> Run<Vec<u8>> {
         "clock": {"tick_seconds": 3600, "run_seconds": 86_400 * 30},
         "log": {"checkpoint_every": 86_400 * 30, "anchor_every_entries": 100},
         "catalogue": {"structure_types": [
-            {"id": "house", "category": "residential", "materials_cost": "1", "build_time": 86_400, "demolition_cost": "1", "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 2}]},
-            {"id": "flats", "category": "residential", "materials_cost": "1", "build_time": 86_400, "demolition_cost": "1", "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 4}]}
+            {"id": "house", "category": "residential", "build_time": 86_400, "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 2}]},
+            {"id": "flats", "category": "residential", "build_time": 86_400, "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 4}]}
         ]},
         "world": {
             "boundaries": ["outside"],

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 177d17f27819691a45c5148dae8a3e11f55711a37af6148700d9dd5569aaa6be # shrinks to ops = [Act { actor: 0, blocks: [Transfer { from: 0, to: 0, amount: 1 }] }]

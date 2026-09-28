@@ -19,9 +19,10 @@
       {
         "id": "house",
         "category": "residential",
-        "materials_cost": "30000000",
+        "materials": {
+          "materials": "30000"
+        },
         "build_time": 7776000,
-        "demolition_cost": "2000000",
         "footprint": {
           "w": 1,
           "h": 1
@@ -37,9 +38,10 @@
       {
         "id": "apartments",
         "category": "residential",
-        "materials_cost": "250000000",
+        "materials": {
+          "materials": "250000"
+        },
         "build_time": 15552000,
-        "demolition_cost": "10000000",
         "footprint": {
           "w": 1,
           "h": 1
@@ -55,9 +57,10 @@
       {
         "id": "shop",
         "category": "commercial",
-        "materials_cost": "60000000",
+        "materials": {
+          "materials": "60000"
+        },
         "build_time": 7776000,
-        "demolition_cost": "3000000",
         "footprint": {
           "w": 1,
           "h": 1
@@ -78,14 +81,21 @@
       {
         "id": "park",
         "category": "green",
-        "materials_cost": "5000000",
+        "materials": {
+          "materials": "5000"
+        },
         "build_time": 2592000,
-        "demolition_cost": "500000",
         "footprint": {
           "w": 1,
           "h": 1
         },
         "spaces": []
+      }
+    ],
+    "resources": [
+      {
+        "id": "materials",
+        "unit": "kg"
       }
     ]
   },
@@ -759,6 +769,14 @@
           "every": 1209600,
           "first": 1209600
         }
+      }
+    ],
+    "holdings": [
+      {
+        "kind": "materials",
+        "holder": "buildco",
+        "at": "s-shop",
+        "quantity": "100000"
       }
     ]
   },

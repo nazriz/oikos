@@ -179,15 +179,25 @@ pub fn world(p: &WorldParams) -> Value {
         "seed": 7,
         "clock": {"tick_seconds": TICK, "run_seconds": 40 * MONTH},
         "log": {"checkpoint_every": MONTH, "anchor_every_entries": 7},
-        "catalogue": {"resources": [{"id": "goods", "unit": "items"}, {"id": "materials", "unit": "kg"}], "structure_types": [
-            {"id": "house", "category": "residential", "materials_cost": "300000", "build_time": 20 * 86_400, "demolition_cost": "20000",
+        "catalogue": {
+            "resources": [{"id": "goods", "unit": "items"}, {"id": "materials", "unit": "kg"}],
+            // Phase B: making goods from materials at a workplace, eating them, mending wear.
+            "tasks": [
+                {"id": "make", "labour": 1800, "in": "workplace", "consumes": {"materials": "10"}, "produces": {"goods": "5"}},
+                {"id": "eat", "labour": 0, "consumes": {"goods": "1"}},
+                {"id": "mend", "labour": 900, "changes": {"wear": -50}}
+            ],
+            "variables": [{"id": "wear", "min": 0, "max": 10000, "initial": 100, "per_day": 1, "per_occupant_per_day": 2}],
+            "working_day": 8 * 3600,
+            "structure_types": [
+            {"id": "house", "category": "residential", "materials": {"materials": "300"}, "build_time": 20 * 86_400, "build_labour": 4 * 3600, "demolition_labour": 3600,
              "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 5, "attrs": {"bedrooms": 3}}]},
-            {"id": "flats", "category": "residential", "materials_cost": "900000", "build_time": 40 * 86_400, "demolition_cost": "50000",
+            {"id": "flats", "category": "residential", "materials": {"materials": "900"}, "build_time": 40 * 86_400,
              "footprint": {"w": 2, "h": 1}, "spaces": [{"kind": "dwelling", "count": 3, "capacity": 4, "attrs": {"bedrooms": 2}}, {"kind": "dwelling", "count": 1, "capacity": 1, "attrs": {"bedrooms": 1}}]},
-            {"id": "shop", "category": "commercial", "materials_cost": "500000", "build_time": 30 * 86_400, "demolition_cost": "30000", "injury_bps": 800,
+            {"id": "shop", "category": "commercial", "materials": {"materials": "500"}, "build_time": 30 * 86_400, "build_labour": 2 * 3600, "injury_bps": 800,
              "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "workplace", "count": 1, "capacity": 2}, {"kind": "dwelling", "count": 1, "capacity": 1, "attrs": {"bedrooms": 1}}]},
-            {"id": "park", "category": "green", "materials_cost": "50000", "build_time": 10 * 86_400, "demolition_cost": "5000", "footprint": {"w": 1, "h": 1}, "spaces": []},
-            {"id": "jetty", "category": "marine", "materials_cost": "80000", "build_time": 10 * 86_400, "demolition_cost": "5000", "footprint": {"w": 1, "h": 1},
+            {"id": "park", "category": "green", "materials": {"materials": "50"}, "build_time": 10 * 86_400, "footprint": {"w": 1, "h": 1}, "spaces": []},
+            {"id": "jetty", "category": "marine", "build_time": 10 * 86_400, "footprint": {"w": 1, "h": 1},
              "terrains": ["water"], "spaces": [{"kind": "mooring", "count": 2, "capacity": 1}]}
         ]},
         "world": {
@@ -212,7 +222,8 @@ pub fn world(p: &WorldParams) -> Value {
             "holdings": [
                 {"kind": "goods", "holder": "devco", "at": "s-shop", "quantity": "200"},
                 {"kind": "goods", "holder": "alice", "at": "s-house", "quantity": "10"},
-                {"kind": "materials", "holder": "buildco", "at": "s-flats", "quantity": "5000"}
+                {"kind": "materials", "holder": "buildco", "at": "s-flats", "quantity": "5000"},
+                {"kind": "materials", "holder": "devco", "at": "s-shop", "quantity": "1000"}
             ]
         },
         "participants": participants,
@@ -251,7 +262,8 @@ pub enum B {
     OpenAccount { holder: u8, to_new: bool },
     CloseAccount { account: u8 },
     Construct { cell: u8, ty: u8, from: u8 },
-    Demolish { structure: u8, from: u8 },
+    Demolish { structure: u8 },
+    Work { task: u8, units: u8, at: u8, performers: Vec<u8>, on: Option<u8> },
     Occupy { space: u8, who: Option<u8> },
     Vacate { occupant: u8, structure: u8 },
     CreateEntity { kind: u8, bind: bool, position: bool },
@@ -288,7 +300,8 @@ pub fn block_strategy() -> impl Strategy<Value = B> {
         1 => (u(), any::<bool>()).prop_map(|(holder, to_new)| B::OpenAccount { holder, to_new }),
         1 => u().prop_map(|account| B::CloseAccount { account }),
         2 => (u(), u(), u()).prop_map(|(cell, ty, from)| B::Construct { cell, ty, from }),
-        1 => (u(), u()).prop_map(|(structure, from)| B::Demolish { structure, from }),
+        1 => u().prop_map(|structure| B::Demolish { structure }),
+        3 => (u(), u(), u(), proptest::collection::vec(u(), 0..3), proptest::option::of(u())).prop_map(|(task, units, at, performers, on)| B::Work { task, units, at, performers, on }),
         2 => (u(), proptest::option::of(u())).prop_map(|(space, who)| B::Occupy { space, who }),
         2 => (u(), u()).prop_map(|(occupant, structure)| B::Vacate { occupant, structure }),
         1 => (u(), any::<bool>(), any::<bool>()).prop_map(|(kind, bind, position)| B::CreateEntity { kind, bind, position }),
@@ -383,7 +396,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             let edge = ["outside-system", "upriver-system"].contains(&p.as_str());
             (!edge && st.participants[&p].status == ParticipantStatus::Active).then(|| Command::OptOut { participant: p, statement: "leaving the study".into() })
         }
-        Op::Smart { kind, a, b, flag } => match kind % 12 {
+        Op::Smart { kind, a, b, flag } => match kind % 13 {
             0 => {
                 // The bank executes a customer's payment.
                 let banked: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == "bank" && x.balance > 0).map(|(id, _)| id.clone()).collect();
@@ -400,9 +413,10 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             }
             1 => {
                 // A builder builds on free ground, whoever's lot it is.
-                let (p, pos, ent) = if *flag { ("builder-system", "builder", "buildco") } else { ("developer-system", "developer", "devco") };
+                // Each builds from its own materials: the builder's at the flats, the developer's at the shop.
+                let (p, pos, yard) = if *flag { ("builder-system", "builder", "s-flats") } else { ("developer-system", "developer", "s-shop") };
                 let free: Vec<String> = st.cells.iter().filter(|(_, c)| c.structure.is_none()).map(|(id, _)| id.clone()).collect();
-                direct(p, Some(pos), vec![Block::Construct { at: pick(&free, *a)?, structure_type: types[*b as usize % 5].into(), materials_from: format!("acc-{ent}"), bind: None }])
+                direct(p, Some(pos), vec![Block::Construct { at: pick(&free, *a)?, structure_type: types[*b as usize % 5].into(), materials_at: Some(yard.into()), bind: None }])
             }
             2 => {
                 // Someone alive in the world moves into a space with room.
@@ -452,7 +466,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         memo: None,
                     }])
                 } else {
-                    direct("developer-system", Some("developer"), vec![Block::Demolish { structure: pick(&structures, *a)?, costs_from: "acc-devco".into() }])
+                    direct("developer-system", Some("developer"), vec![Block::Demolish { structure: pick(&structures, *a)? }])
                 }
             }
             5 => {
@@ -499,6 +513,20 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 let theirs: Vec<String> = st.positions.iter().filter(|(_, x)| x.entity == org).map(|(id, _)| id.clone()).collect();
                 let to = if *flag { pick(&participants, *b) } else { None };
                 direct(&p, pos.as_deref(), vec![Block::Appoint { position: pick(&theirs, *b)?, participant: to }])
+            }
+            12 => {
+                // Work (phase B): carol makes goods at the shop for the developer; the builder's crew (bob, at the flats)
+                // builds or demolishes; alice eats; someone mends a building.
+                match a % 4 {
+                    0 => direct("developer-system", Some("developer"), vec![Block::Work { task: "make".into(), units: 1 + (*b as u64 % 6), at: "s-shop".into(), performers: vec!["carol".into()], on: None }]),
+                    1 => {
+                        let site = st.structures.iter().find(|(_, x)| (!x.complete && x.demolition.is_none()) || x.demolition.is_some()).map(|(id, x)| (id.clone(), x.demolition.is_some()))?;
+                        let task = if site.1 { "demolish" } else { "build" };
+                        direct("builder-system", Some("builder"), vec![Block::Work { task: task.into(), units: 600 + (*b as u64) * 150, at: "s-flats".into(), performers: vec!["bob".into()], on: Some(site.0) }])
+                    }
+                    2 => direct("alice-self", None, vec![Block::Work { task: "eat".into(), units: 1 + (*b as u64 % 3), at: "s-house".into(), performers: vec![], on: None }]),
+                    _ => direct("developer-system", Some("developer"), vec![Block::Work { task: "mend".into(), units: 1, at: "s-shop".into(), performers: vec!["carol".into()], on: if *flag { Some("s-house".into()) } else { None } }]),
+                }
             }
             11 => {
                 // The bank closes an empty account it keeps: one it has just opened (closure was otherwise too rare to
@@ -561,10 +589,20 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                     B::Construct { cell, ty, from } => Block::Construct {
                         at: if cell % 7 == 0 { "cell.9.9".into() } else { pick(&cells, *cell).unwrap() },
                         structure_type: types[*ty as usize % types.len()].into(),
-                        materials_from: my(*from),
+                        materials_at: (from % 5 != 0).then(|| if from % 2 == 0 { "s-flats".into() } else { pick(&structures, *from).unwrap_or_else(|| "s-none".into()) }),
                         bind: None,
                     },
-                    B::Demolish { structure, from } => Block::Demolish { structure: pick(&structures, *structure).unwrap_or_else(|| "s-none".into()), costs_from: my(*from) },
+                    B::Demolish { structure } => Block::Demolish { structure: pick(&structures, *structure).unwrap_or_else(|| "s-none".into()) },
+                    B::Work { task, units, at, performers, on } => {
+                        let tasks = ["make", "eat", "mend", "build", "demolish", "juggle"];
+                        Block::Work {
+                            task: tasks[*task as usize % tasks.len()].into(),
+                            units: 1 + (*units as u64 % 5),
+                            at: pick(&structures, *at).unwrap_or_else(|| "s-none".into()),
+                            performers: performers.iter().map(|p| pick(&persons, *p).unwrap()).collect(),
+                            on: on.and_then(|o| pick(&structures, o)),
+                        }
+                    }
                     B::Occupy { space, who } => Block::Occupy {
                         space: match space % 9 {
                             0 => pick(&structures, *space).map_or_else(|| "s-none/dwelling.1".into(), |s| format!("{s}/stable.1")),

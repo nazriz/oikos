@@ -161,7 +161,7 @@ pub fn river_script() -> Vec<Command> {
         ),
         act(
             "builder",
-            json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_from": "acc-buildco", "ref": "h"}]),
+            json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_at": "s-shop", "ref": "h"}]),
         ),
         Command::Advance { to: 20 * 86_400 },
         Command::Observe { participant: "inspector-system".into(), only: None },

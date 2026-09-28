@@ -43,6 +43,12 @@ const REFUSAL: Record<string, string> = {
   unknown_resource: "there's no such thing here",
   insufficient_quantity: "there isn't that much of it there",
   unknown_place: "that isn't somewhere things can be kept",
+  unknown_task: "that isn't a kind of work anyone knows how to do here",
+  not_at_work: "the people named aren't there to do it",
+  no_time_left: "there aren't enough working hours left today for that",
+  not_being_built: "that isn't being built",
+  not_coming_down: "that isn't being demolished",
+  coming_down: "it's being demolished",
 };
 
 /**

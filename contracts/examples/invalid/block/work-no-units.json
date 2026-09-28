@@ -1,0 +1,9 @@
+{
+  "block": "work",
+  "task": "make",
+  "units": 0,
+  "at": "factory-1",
+  "performers": [
+    "c0012"
+  ]
+}

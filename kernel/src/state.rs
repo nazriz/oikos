@@ -31,6 +31,9 @@ pub struct State {
     /// Holdings of resources (phase B), keyed `holder|at|kind` (holding_key): who holds how much of what, where.
     #[serde(default)]
     pub holdings: Map<String, Holding>,
+    /// Work time each person has used on a day (phase B): person -> (day, seconds).
+    #[serde(default)]
+    pub labour_used: Map<Id, (i64, i64)>,
     /// Accounts that have been closed, kept so those who keep or hold them perceive the closure.
     pub closed_accounts: Map<Id, ClosedAccount>,
     pub cells: Map<Id, Cell>,
@@ -192,8 +195,23 @@ pub struct Structure {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub built_by: Option<Id>,
     pub complete: bool,
+    /// While being built: when its build time is up (None once it has passed, if it's still waiting on labour).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completes_at: Option<i64>,
+    /// Seconds of building work done on it (phase B).
+    #[serde(default, skip_serializing_if = "is_zero_i64")]
+    pub labour_done: i64,
+    /// Coming down (phase B): seconds of demolition work done so far.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub demolition: Option<i64>,
+    /// Its state variables (phase B): each one's value as of a day (the start of it), settled when occupancy changes
+    /// or work changes it; read at any later time by adding the whole days since.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub variables: std::collections::BTreeMap<Id, (i64, i64)>,
+}
+
+fn is_zero_i64(x: &i64) -> bool {
+    *x == 0
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

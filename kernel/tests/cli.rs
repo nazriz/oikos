@@ -24,7 +24,7 @@ fn serve_then_verify_then_replay() {
     let requests = [
         json!({"op": "start", "config": common::riverbend(), "run_id": "cli-test", "log_path": log, "anchors_path": anchors}),
         json!({"op": "command", "command": {"command": "observe", "participant": "mayor-system"}}),
-        json!({"op": "check", "participant": "builder-system", "as": "builder", "blocks": [{"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_from": "acc-buildco"}]}),
+        json!({"op": "check", "participant": "builder-system", "as": "builder", "blocks": [{"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_at": "s-shop"}]}),
         json!({"op": "command", "command": {"command": "act", "participant": "bank-payments-system", "as": "bank-payments", "blocks": [{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": "180000", "per_instruction": "so-bob-rent"}], "provenance": {"via": "direct"}}}),
         json!({"op": "command", "command": {"command": "act", "participant": "bank-payments-system", "as": "bank-payments", "blocks": [{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "0"}], "provenance": {"via": "direct"}}}),
         json!({"op": "annotate", "annotation": {"annotation": "usage", "purpose": "participant", "subject": "mayor", "provider": "anthropic", "model": "claude-sonnet-5", "input_tokens": 900, "output_tokens": 120, "cost_microusd": 4500}}),

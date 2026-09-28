@@ -24,14 +24,14 @@ test("the translator is told the call language and nothing about any world", () 
 });
 
 test("law warnings flag an act that a known prohibition's formal condition matches", () => {
-  expect(lawWarnings([{ block: "construct", at: "cell.0.0", structure_type: "park", materials_from: "a" }], knows())).toEqual(['This appears to go against law-planning: "No building without a permit."']);
+  expect(lawWarnings([{ block: "construct", at: "cell.0.0", structure_type: "park" }], knows())).toEqual(['This appears to go against law-planning: "No building without a permit."']);
 });
 
 test("an unreadable answer, or a question from the resolver, comes back as notices", async () => {
   const bad = await createTranslator(io("pay(to=x)"), ok, () => ({ footprint: { w: 2, h: 1 } })).translate({ draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "p", knowledge: knows() });
   expect(bad).toMatchObject({ ok: false, notices: ["It isn't clear what should happen. Could you say it more plainly?"] });
   const ask = await createTranslator(io("structure(type=park, on=p1)"), ok, () => ({ footprint: { w: 2, h: 1 } })).translate({ draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "Build a park on p1.", knowledge: knows() });
-  expect(ask).toMatchObject({ ok: false, notices: ["Who should build a park on p1, and from which account is it paid?"] });
+  expect(ask).toMatchObject({ ok: false, notices: ["Who should build a park on p1?"] });
 });
 
 test("a draft carries the call, the resolver, a mechanical preview, the dry run and warnings, and a stable hash", async () => {
@@ -39,8 +39,8 @@ test("a draft carries the call, the resolver, a mechanical preview, the dry run 
   const r = await t.translate({ draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "We'll build a park on p1 ourselves.", knowledge: knows() });
   if (!r.ok) throw new Error(r.notices.join(" "));
   expect(r.draft.call).toBe("structure(by=city, on=p1, type=park)");
-  expect(r.draft.blocks).toEqual([{ block: "construct", at: "cell.0.0", structure_type: "park", materials_from: "acc-city" }]);
-  expect(r.draft.summary).toBe("You will start building a park with its corner at cell.0.0 yourself, paying for materials from your account (acc-city).");
+  expect(r.draft.blocks).toEqual([{ block: "construct", at: "cell.0.0", structure_type: "park" }]);
+  expect(r.draft.summary).toBe("You will start building a park with its corner at cell.0.0 yourself.");
   expect(r.draft.check).toEqual({ ok: false, refusal: { code: "insufficient_funds" }, warnings: ['This appears to go against law-planning: "No building without a permit."'] });
   expect(r.hash).toBe(draftHash(r.draft));
   const text = draftText(r.draft);
@@ -67,7 +67,7 @@ test("a request the translator can't turn into a working call is tried once more
   };
   // Refused, then a call the resolver has a question about: two attempts, the last one's question comes back, the first is kept.
   const r = await createTranslator(scripted(answers), ok, () => ({ footprint: { w: 2, h: 1 } })).translate({ draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "Build a park on p1.", knowledge: knows() });
-  expect(r).toMatchObject({ ok: false, notices: ["Who should build a park on p1, and from which account is it paid?"], retries: [{ call: "none(unclear)", reason: "It isn't clear what should happen. Could you say it more plainly?" }] });
+  expect(r).toMatchObject({ ok: false, notices: ["Who should build a park on p1?"], retries: [{ call: "none(unclear)", reason: "It isn't clear what should happen. Could you say it more plainly?" }] });
   expect(asked).toHaveLength(2);
   const feedback = asked[1].at(-1).content[0];
   expect(feedback).toMatchObject({ type: "tool_result", tool_use_id: "c0" });

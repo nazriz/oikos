@@ -131,11 +131,50 @@ fn begin_condition(s: &Statics, st: &mut State, person: &str, kind: ConditionKin
     (id.clone(), vec![Timed::new(t, EventBody::ConditionBegan { person: person.into(), condition: id, kind, severity, until })])
 }
 
+/// The whole day a time falls in.
+pub fn day_of(t: i64) -> i64 {
+    t.div_euclid(86_400)
+}
+
+/// The state variables that apply to a structure type (phase B).
+fn vars_for<'a>(s: &'a Statics, ty: &'a str) -> impl Iterator<Item = &'a crate::config::VariableCfg> + 'a {
+    s.config.catalogue.variables.iter().filter(move |v| v.types.as_ref().is_none_or(|ts| ts.iter().any(|x| x == ty)))
+}
+
+/// A structure's variable at time `t`: its settled value, plus the whole days since at today's occupancy, within
+/// bounds. Exact integers; the same whenever it's read.
+pub fn variable_at(st: &State, sid: &str, var: &crate::config::VariableCfg, t: i64) -> Option<i64> {
+    let x = st.structures.get(sid)?;
+    let (v, since) = *x.variables.get(&var.id)?;
+    let days = (day_of(t) - since).max(0);
+    let occupants = st.occupancy.get(sid).map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
+    let rate = var.per_day.saturating_add(var.per_occupant_per_day.saturating_mul(occupants));
+    Some(v.saturating_add(rate.saturating_mul(days)).clamp(var.min, var.max))
+}
+
+/// Settle a structure's variables to now: before its occupancy changes, or work changes one.
+fn settle(s: &Statics, st: &mut State, sid: &str) {
+    let t = st.t;
+    let Some(ty) = st.structures.get(sid).map(|x| x.structure_type.clone()) else { return };
+    let now: Vec<(Id, i64)> = vars_for(s, &ty).filter_map(|v| variable_at(st, sid, v, t).map(|x| (v.id.clone(), x))).collect();
+    if let Some(x) = st.structures.get_mut(sid) {
+        for (id, v) in now {
+            x.variables.insert(id, (v, day_of(t)));
+        }
+    }
+}
+
+/// A structure's variables at their initial values, from a time (when it's begun, or at genesis).
+pub fn init_variables(s: &Statics, ty: &str, t: i64) -> std::collections::BTreeMap<Id, (i64, i64)> {
+    vars_for(s, ty).map(|v| (v.id.clone(), (v.initial, day_of(t)))).collect()
+}
+
 /// Take a body out of every space it's in.
-fn vacate_all(st: &mut State, person: &str, reason: VacateReason, by: Option<&str>) -> Vec<Timed> {
+fn vacate_all(s: &Statics, st: &mut State, person: &str, reason: VacateReason, by: Option<&str>) -> Vec<Timed> {
     let t = st.t;
     let mut events = vec![];
     for sid in st.structures_of(person) {
+        settle(s, st, &sid);
         let mut spaces: Vec<Id> = vec![];
         if let Some(m) = st.occupancy.get_mut(&sid) {
             for (space, bodies) in m.iter_mut() {
@@ -189,14 +228,14 @@ fn end_participant(st: &mut State, participant: &str, reason: EndReason) -> Vec<
     events
 }
 
-fn die(st: &mut State, person: &str, cause: DeathCause) -> Vec<Timed> {
+fn die(s: &Statics, st: &mut State, person: &str, cause: DeathCause) -> Vec<Timed> {
     let t = st.t;
     let Some(b) = st.body(person) else { return vec![] };
     if !b.alive {
         return vec![];
     }
     let participant = b.participant.clone();
-    let mut events = vacate_all(st, person, VacateReason::Died, None);
+    let mut events = vacate_all(s, st, person, VacateReason::Died, None);
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
         b.alive = false;
         b.conditions.clear();
@@ -325,8 +364,14 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
     match item.what {
         Sched::StructureComplete { structure } => match st.structures.get_mut(&structure) {
             Some(x) if !x.complete && x.completes_at == Some(item.at) => {
-                x.complete = true;
+                // Its time is up; it's complete if its building work is done too (phase B), or else as soon as it is.
                 x.completes_at = None;
+                let needed = s.types.get(&x.structure_type).map_or(0, |ty| ty.build_labour);
+                if x.labour_done < needed {
+                    st.touch_structure(&structure);
+                    return vec![];
+                }
+                x.complete = true;
                 st.touch_structure(&structure);
                 vec![Timed::new(t, EventBody::StructureCompleted { structure })]
             }
@@ -401,7 +446,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             }
             vec![Timed::new(t, EventBody::ConditionEnded { person, condition })]
         }
-        Sched::Death { person, cause } => die(st, &person, cause),
+        Sched::Death { person, cause } => die(s, st, &person, cause),
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
             if !b.alive {
@@ -504,6 +549,152 @@ impl<'a> Exec<'a> {
             return Err(refuse(RefusalCode::NotTheirs, "only an organisation, acting through one of its positions, can do this"));
         }
         Ok(self.entity.clone())
+    }
+
+    /// A structure comes down: off the ground, and gone (what was held there stays held there, to be moved out).
+    fn bring_down(&mut self, sid: &str) {
+        let Some(x) = self.st.structures.remove(sid) else { return };
+        let c = self.st.stamp();
+        for cell in &x.cells {
+            let p = self.st.cells.get_mut(cell).unwrap();
+            p.structure = None;
+            p.changed = c;
+        }
+        self.emit(EventBody::StructureDemolished { structure: sid.to_string(), by: self.participant.into() });
+    }
+
+    /// Work (phase B): performers at a structure spend their time on units of a task. The kernel checks only physics:
+    /// that they're there, alive, and have time left today; that the inputs are held there; that what's worked on can
+    /// be. Who works for whom is content (D20).
+    fn work(&mut self, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>) -> R<()> {
+        use crate::config::{TASK_BUILD, TASK_DEMOLISH};
+        let (at, on) = (self.r(at)?, self.ro(on)?);
+        let builtin = task == TASK_BUILD || task == TASK_DEMOLISH;
+        let spec = if builtin {
+            None
+        } else {
+            Some(self.s.config.catalogue.tasks.iter().find(|x| x.id == task).cloned().ok_or_else(|| refuse(RefusalCode::UnknownTask, format!("no task {task}")))?)
+        };
+        if units == 0 || units > 1_000_000_000_000 {
+            return Err(refuse(RefusalCode::Overflow, "units out of range"));
+        }
+        let per_unit = spec.as_ref().map_or(1, |x| x.labour);
+        let total = per_unit.checked_mul(units as i64).ok_or_else(|| refuse(RefusalCode::Overflow, "too much work"))?;
+        // Where: a standing structure (the workplace, depot or home).
+        let place = self.st.structures.get(&at).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {at}")))?;
+        if !place.complete {
+            return Err(refuse(RefusalCode::StructureIncomplete, format!("{at} is still being built")));
+        }
+        // Who: people there (in a space of the task's kind), alive and present, each with time left today.
+        let mut who: Vec<Id> = vec![];
+        for p in performers {
+            let p = self.r(p)?;
+            if who.contains(&p) {
+                return Err(refuse(RefusalCode::DuplicateRef, format!("{p} is named twice")));
+            }
+            who.push(p);
+        }
+        if total > 0 && who.is_empty() {
+            return Err(refuse(RefusalCode::NotAtWork, format!("{task} takes time: say who does it")));
+        }
+        let kind = spec.as_ref().and_then(|x| x.in_space.clone());
+        for p in &who {
+            self.living_present(p)?;
+            let there = self.st.occupancy.get(&at).is_some_and(|m| {
+                m.iter().any(|(space, bodies)| bodies.contains(p) && kind.as_ref().is_none_or(|k| split_space(space).is_some_and(|(_, local)| local.split('.').next() == Some(k.as_str()))))
+            });
+            if !there {
+                return Err(refuse(RefusalCode::NotAtWork, format!("{p} isn't at {at}{}", kind.as_ref().map_or(String::new(), |k| format!(" (in a {k})")))));
+            }
+        }
+        let today = day_of(self.now());
+        let share = if who.is_empty() { 0 } else { (total + who.len() as i64 - 1) / who.len() as i64 };
+        if total > 0 {
+            let day = self.s.config.catalogue.working_day.ok_or_else(|| refuse(RefusalCode::NotModelled, "this world has no working day: work that takes time isn't modelled"))?;
+            for p in &who {
+                let used = self.st.labour_used.get(p).filter(|(d, _)| *d == today).map_or(0, |(_, u)| *u);
+                if used + share > day {
+                    return Err(refuse(RefusalCode::NoTimeLeft, format!("{p} has {} s of work left today; this needs {share}", (day - used).max(0))));
+                }
+            }
+        }
+        // What's used up must be here, held by the actor.
+        let me = self.entity.clone();
+        let need = |per: &crate::money::Money| per.checked_mul(units as i128).filter(|x| *x <= MAX_MONEY);
+        if let Some(x) = &spec {
+            for (k, per) in &x.consumes {
+                let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an input"))?;
+                let have = self.st.holding(&me, &at, k);
+                if have < q {
+                    return Err(refuse(RefusalCode::InsufficientQuantity, format!("{me} has {have} {k} at {at}; {units} {task} needs {q}")));
+                }
+            }
+            for per in x.produces.values() {
+                need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
+            }
+        }
+        // What's worked on.
+        let target = on.clone().unwrap_or_else(|| at.clone());
+        if builtin || spec.as_ref().is_some_and(|x| !x.changes.is_empty()) {
+            let t = self.st.structures.get(&target).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {target}")))?;
+            if task == TASK_BUILD && (t.complete || t.demolition.is_some()) {
+                return Err(refuse(RefusalCode::NotBeingBuilt, format!("{target} isn't being built")));
+            }
+            if task == TASK_DEMOLISH && t.demolition.is_none() {
+                return Err(refuse(RefusalCode::NotComingDown, format!("{target} isn't being demolished")));
+            }
+        }
+        // Done: time spent, inputs used, outputs made, changes applied, progress made.
+        for p in &who {
+            let used = self.st.labour_used.get(p).filter(|(d, _)| *d == today).map_or(0, |(_, u)| *u);
+            self.st.labour_used.insert(p.clone(), (today, used + share));
+        }
+        let c = self.st.stamp();
+        if let Some(x) = &spec {
+            for (k, per) in &x.consumes {
+                self.add_holding(&me, &at, k, -(per * units as i128), c);
+            }
+            for (k, per) in &x.produces {
+                self.add_holding(&me, &at, k, per * units as i128, c);
+            }
+            if !x.changes.is_empty() {
+                settle(self.s, self.st, &target);
+                let ty = self.st.structures[&target].structure_type.clone();
+                let vars: Vec<crate::config::VariableCfg> = vars_for(self.s, &ty).cloned().collect();
+                let s = self.st.structures.get_mut(&target).unwrap();
+                for (v, by) in &x.changes {
+                    if let (Some(cfg), Some(cur)) = (vars.iter().find(|c| &c.id == v), s.variables.get(v).copied()) {
+                        s.variables.insert(v.clone(), (cur.0.saturating_add(by.saturating_mul(units as i64)).clamp(cfg.min, cfg.max), cur.1));
+                    }
+                }
+                self.st.touch_structure(&target);
+            }
+        }
+        self.emit(EventBody::Worked { task: task.into(), units, at: at.clone(), on: on.clone(), performers: who, labour: total, by: self.participant.into() });
+        if task == TASK_BUILD {
+            let needed = self.s.types[&self.st.structures[&target].structure_type].build_labour;
+            let s = self.st.structures.get_mut(&target).unwrap();
+            s.labour_done = s.labour_done.saturating_add(total);
+            // Complete once the work is done, if its build time has passed (else when it does).
+            if s.labour_done >= needed && s.completes_at.is_none() {
+                s.complete = true;
+                self.st.touch_structure(&target);
+                self.emit(EventBody::StructureCompleted { structure: target });
+            } else {
+                self.st.touch_structure(&target);
+            }
+        } else if task == TASK_DEMOLISH {
+            let needed = self.s.types[&self.st.structures[&target].structure_type].demolition_labour;
+            let s = self.st.structures.get_mut(&target).unwrap();
+            let done = s.demolition.unwrap_or(0).saturating_add(total);
+            s.demolition = Some(done);
+            if done >= needed {
+                self.bring_down(&target);
+            } else {
+                self.st.touch_structure(&target);
+            }
+        }
+        Ok(())
     }
 
     /// Add to (or take from) a holding, stamping the change.
@@ -829,7 +1020,7 @@ impl<'a> Exec<'a> {
                 Ok(())
             }
 
-            Block::Construct { at, structure_type, materials_from, bind } => {
+            Block::Construct { at, structure_type, materials_at, bind } => {
                 let ty = self
                     .s
                     .types
@@ -851,15 +1042,29 @@ impl<'a> Exec<'a> {
                         return Err(refuse(RefusalCode::UnsuitableTerrain, format!("a {structure_type} can't stand on {cell}")));
                     }
                 }
-                let from = self.r(materials_from)?;
-                if self.account(&from)?.holder != self.entity {
-                    return Err(refuse(RefusalCode::NotHolder, format!("{from} isn't held by the builder {}", self.entity)));
+                // Its materials come from the builder's own holding where it keeps them (phase B: no more money paid to
+                // nowhere for them).
+                let me = self.entity.clone();
+                let yard = match materials_at {
+                    Some(m) => Some(self.r(m)?),
+                    None if ty.materials.is_empty() => None,
+                    None => return Err(refuse(RefusalCode::InsufficientQuantity, format!("a {structure_type} needs materials: say where the builder keeps them"))),
+                };
+                if let Some(yard) = &yard {
+                    for (kind, q) in &ty.materials {
+                        let have = self.st.holding(&me, yard, kind);
+                        if have < *q {
+                            return Err(refuse(RefusalCode::InsufficientQuantity, format!("{me} has {have} {kind} at {yard}; a {structure_type} needs {q}")));
+                        }
+                    }
                 }
                 let completes = self.later(ty.build_time)?;
-                // Documented liberty (D25, accepted temporarily): materials are paid
-                // straight to the outside world, not through the builder's bank.
-                let boundary = self.s.boundary_account(self.s.boundary()).to_string();
-                self.move_money(&from, &boundary, ty.materials_cost, TransferReason::Materials, None, None, None)?;
+                let c = self.st.stamp();
+                if let Some(yard) = &yard {
+                    for (kind, q) in &ty.materials {
+                        self.add_holding(&me, yard, kind, -*q, c);
+                    }
+                }
                 let id = self.st.mint("str");
                 self.st.structures.insert(
                     id.clone(),
@@ -870,6 +1075,9 @@ impl<'a> Exec<'a> {
                         built_by: Some(self.entity.clone()),
                         complete: false,
                         completes_at: Some(completes),
+                        labour_done: 0,
+                        demolition: None,
+                        variables: init_variables(self.s, structure_type, self.now()),
                     },
                 );
                 let c = self.st.stamp();
@@ -889,32 +1097,30 @@ impl<'a> Exec<'a> {
                 self.bind(bind, &id)
             }
 
-            Block::Demolish { structure, costs_from } => {
+            Block::Demolish { structure } => {
                 let sid = self.r(structure)?;
                 let x = self.st.structures.get(&sid).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {sid}")))?.clone();
-                let from = self.r(costs_from)?;
-                if self.account(&from)?.holder != self.entity {
-                    return Err(refuse(RefusalCode::NotHolder, format!("{from} isn't held by {}", self.entity)));
+                if x.demolition.is_some() {
+                    return Err(refuse(RefusalCode::ComingDown, format!("{sid} is already being demolished")));
                 }
-                let cost = self.s.types[&x.structure_type].demolition_cost;
-                let boundary = self.s.boundary_account(self.s.boundary()).to_string();
-                self.move_money(&from, &boundary, cost, TransferReason::Demolition, None, None, None)?;
+                // Its occupants leave at once. Then it comes down: now, or once its demolition labour is done (phase B).
                 for (space, bodies) in self.st.occupancy.remove(&sid).unwrap_or_default() {
                     for occupant in bodies {
                         self.st.moved(&occupant);
                         self.emit(EventBody::Vacated { occupant, space: space.clone(), by: Some(self.participant.into()), reason: VacateReason::Demolition });
                     }
                 }
-                self.st.structures.remove(&sid);
-                let c = self.st.stamp();
-                for cell in &x.cells {
-                    let p = self.st.cells.get_mut(cell).unwrap();
-                    p.structure = None;
-                    p.changed = c;
+                if self.s.types[&x.structure_type].demolition_labour > 0 {
+                    self.st.structures.get_mut(&sid).unwrap().demolition = Some(0);
+                    self.st.touch_structure(&sid);
+                    self.emit(EventBody::DemolitionStarted { structure: sid, by: self.participant.into() });
+                } else {
+                    self.bring_down(&sid);
                 }
-                self.emit(EventBody::StructureDemolished { structure: sid, by: self.participant.into() });
                 Ok(())
             }
+
+            Block::Work { task, units, at, performers, on } => self.work(task, *units, at, performers, on),
 
             Block::Occupy { space, who } => {
                 let space = self.r(space)?;
@@ -937,7 +1143,11 @@ impl<'a> Exec<'a> {
                 if used >= spec.capacity {
                     return Err(refuse(RefusalCode::CapacityExceeded, format!("{space} holds {} at most, and has {used}", spec.capacity)));
                 }
+                if x.demolition.is_some() {
+                    return Err(refuse(RefusalCode::ComingDown, format!("{sid} is being demolished")));
+                }
                 let sid = sid.to_string();
+                settle(self.s, self.st, &sid);
                 self.st.occupancy.entry(sid.clone()).or_default().entry(space.clone()).or_default().insert(who.clone());
                 self.st.touch_structure(&sid);
                 self.st.moved(&who);
@@ -949,6 +1159,7 @@ impl<'a> Exec<'a> {
                 let (occupant, from) = (self.r(occupant)?, self.r(from)?);
                 self.entity_exists(&occupant)?;
                 let sid = split_space(&from).map_or(from.as_str(), |(s, _)| s).to_string();
+                settle(self.s, self.st, &sid);
                 let mut left = vec![];
                 if let Some(m) = self.st.occupancy.get_mut(&sid) {
                     for (space, bodies) in m.iter_mut() {
@@ -1032,7 +1243,7 @@ impl<'a> Exec<'a> {
                     None => self.s.boundary().to_string(),
                 };
                 self.living_present(&who)?;
-                let events = vacate_all(self.st, &who, VacateReason::Departed, Some(self.participant));
+                let events = vacate_all(self.s, self.st, &who, VacateReason::Departed, Some(self.participant));
                 self.emit_all(events);
                 self.st.entities.get_mut(&who).unwrap().body.as_mut().unwrap().present = false;
                 self.st.moved(&who);

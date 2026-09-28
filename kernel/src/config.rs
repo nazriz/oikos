@@ -77,6 +77,63 @@ pub struct Catalogue {
     /// isn't one: it stays in accounts.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resources: Vec<ResourceCfg>,
+    /// Kinds of work (phase B): what a unit takes (performers' time, inputs) and gives (outputs, changes).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tasks: Vec<TaskCfg>,
+    /// State variables of structures (phase B): wear, and later waste, habitat quality. The kernel keeps them exactly
+    /// and attaches no meaning to them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<VariableCfg>,
+    /// The most a person can work in a day (seconds): a physical limit on a body. Required when any work takes time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub working_day: Option<i64>,
+}
+
+/// The built-in task that builds a structure begun with `construct` (one unit: one second of work).
+pub const TASK_BUILD: &str = "build";
+/// The built-in task that brings down a structure whose demolition has begun (one unit: one second of work).
+pub const TASK_DEMOLISH: &str = "demolish";
+
+/// A kind of work.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TaskCfg {
+    pub id: Id,
+    /// Seconds of performers' time per unit (0: using things up, e.g. eating).
+    pub labour: i64,
+    /// The kind of space performers must be in, at the structure (e.g. `workplace`); absent: any space there.
+    #[serde(default, rename = "in", skip_serializing_if = "Option::is_none")]
+    pub in_space: Option<String>,
+    /// Per unit: taken from the actor's holding at the structure.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "crate::money::amount_map")]
+    pub consumes: BTreeMap<Id, crate::money::Money>,
+    /// Per unit: added to the actor's holding at the structure.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "crate::money::amount_map")]
+    pub produces: BTreeMap<Id, crate::money::Money>,
+    /// Per unit: added to state variables of the structure worked on (`on`, or the structure itself).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub changes: BTreeMap<Id, i64>,
+}
+
+/// A state variable of structures, with its dynamics: it changes by `per_day`, and `per_occupant_per_day` for each
+/// body inside, every whole day, within [min, max]. `types`: the structure types it applies to (absent: all).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VariableCfg {
+    pub id: Id,
+    pub min: i64,
+    pub max: i64,
+    pub initial: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub per_day: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub per_occupant_per_day: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub types: Option<Vec<Id>>,
+}
+
+fn is_zero(x: &i64) -> bool {
+    *x == 0
 }
 
 /// A kind of resource: its id and the unit its quantities count (items, kg...: the world's vocabulary).
@@ -103,11 +160,17 @@ pub struct HoldingCfg {
 pub struct StructureType {
     pub id: Id,
     pub category: String,
-    #[serde(with = "crate::money::amount")]
-    pub materials_cost: crate::money::Money,
+    /// What it's made of (phase B): quantities of resource kinds, taken from the builder's holding when it's begun.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "crate::money::amount_map")]
+    pub materials: BTreeMap<Id, crate::money::Money>,
+    /// The least time it takes to build, whatever the crew (some processes take time).
     pub build_time: i64,
-    #[serde(with = "crate::money::amount")]
-    pub demolition_cost: crate::money::Money,
+    /// Seconds of work (the task `build`, on it) before it's complete; 0: it completes when build_time has passed.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub build_labour: i64,
+    /// Seconds of work (the task `demolish`, on it) before it comes down; 0: it comes down at once.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub demolition_labour: i64,
     /// The cells it stands on: `w` by `h`, from the corner cell it's built at.
     pub footprint: Footprint,
     /// Terrain labels it can stand on; absent: any cell with no terrain label.
@@ -889,6 +952,64 @@ pub fn validate(c: &Config) -> Result<(), String> {
     let kinds: BTreeSet<&str> = c.catalogue.resources.iter().map(|r| r.id.as_str()).collect();
     if kinds.len() != c.catalogue.resources.len() {
         return Err("a resource kind is declared twice".into());
+    }
+    // Tasks, variables and materials (phase B): what they name exists; bounds hold; a working day wherever work takes time.
+    let var_ids: BTreeSet<&str> = c.catalogue.variables.iter().map(|v| v.id.as_str()).collect();
+    if var_ids.len() != c.catalogue.variables.len() {
+        return Err("a variable is declared twice".into());
+    }
+    for v in &c.catalogue.variables {
+        if !(v.min <= v.initial && v.initial <= v.max) {
+            return Err(format!("variable {}: needs min <= initial <= max", v.id));
+        }
+        for ty in v.types.iter().flatten() {
+            if !types.contains_key(ty.as_str()) {
+                return Err(format!("variable {} names unknown structure type {ty}", v.id));
+            }
+        }
+    }
+    let task_ids: BTreeSet<&str> = c.catalogue.tasks.iter().map(|t| t.id.as_str()).collect();
+    if task_ids.len() != c.catalogue.tasks.len() {
+        return Err("a task is declared twice".into());
+    }
+    let mut work_takes_time = false;
+    for t in &c.catalogue.tasks {
+        if t.id == TASK_BUILD || t.id == TASK_DEMOLISH {
+            return Err(format!("task id {} is built in", t.id));
+        }
+        if t.labour < 0 {
+            return Err(format!("task {}: labour can't be negative", t.id));
+        }
+        work_takes_time |= t.labour > 0;
+        for k in t.consumes.keys().chain(t.produces.keys()) {
+            if !kinds.contains(k.as_str()) {
+                return Err(format!("task {} names unknown resource {k}", t.id));
+            }
+        }
+        for (k, q) in t.consumes.iter().chain(t.produces.iter()) {
+            if *q < 1 {
+                return Err(format!("task {}: {k} must be a positive quantity", t.id));
+            }
+        }
+        for v in t.changes.keys() {
+            if !var_ids.contains(v.as_str()) {
+                return Err(format!("task {} changes unknown variable {v}", t.id));
+            }
+        }
+    }
+    for ty in &c.catalogue.structure_types {
+        if ty.build_labour < 0 || ty.demolition_labour < 0 {
+            return Err(format!("structure type {}: labour can't be negative", ty.id));
+        }
+        work_takes_time |= ty.build_labour > 0 || ty.demolition_labour > 0;
+        for (k, q) in &ty.materials {
+            if !kinds.contains(k.as_str()) || *q < 1 {
+                return Err(format!("structure type {}: materials must be positive quantities of declared resources ({k})", ty.id));
+            }
+        }
+    }
+    if work_takes_time && c.catalogue.working_day.is_none() {
+        return Err("work takes time in this world (a task or a building's labour), so catalogue.working_day is needed".into());
     }
     let mut holding_keys = BTreeSet::new();
     for st in &w.holdings {

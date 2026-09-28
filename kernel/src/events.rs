@@ -61,14 +61,24 @@ pub enum RefusalCode {
     InsufficientQuantity,
     /// A place goods can't be at: not a structure (or, for an edge, not itself).
     UnknownPlace,
+    /// A task the world doesn't declare.
+    UnknownTask,
+    /// A performer isn't at the place of work (in a space of the task's kind there).
+    NotAtWork,
+    /// A performer has no time left today (the world's working day).
+    NoTimeLeft,
+    /// Building work on something that isn't being built.
+    NotBeingBuilt,
+    /// Demolition work on something that isn't being demolished.
+    NotComingDown,
+    /// It's being demolished.
+    ComingDown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransferReason {
     Payment,
-    Materials,
-    Demolition,
     /// Money a newcomer brings across the boundary.
     Carried,
 }
@@ -136,6 +146,22 @@ pub enum EventBody {
         per_instruction: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         memo: Option<String>,
+    },
+    /// Work done (phase B): units of a task at a structure, by performers, taking `labour` seconds of their time.
+    Worked {
+        task: Id,
+        units: u64,
+        at: Id,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        on: Option<Id>,
+        performers: Vec<Id>,
+        labour: i64,
+        by: Id,
+    },
+    /// A structure is being brought down (its type needs demolition labour): its occupants have left.
+    DemolitionStarted {
+        structure: Id,
+        by: Id,
     },
     GoodsMoved {
         kind: Id,
@@ -300,6 +326,8 @@ impl EventBody {
             EventBody::ActionRefused { .. } => "action_refused",
             EventBody::Transfer { .. } => "transfer",
             EventBody::GoodsMoved { .. } => "goods_moved",
+            EventBody::Worked { .. } => "worked",
+            EventBody::DemolitionStarted { .. } => "demolition_started",
             EventBody::AccountOpened { .. } => "account_opened",
             EventBody::AccountClosed { .. } => "account_closed",
             EventBody::StructureStarted { .. } => "structure_started",
@@ -334,6 +362,8 @@ impl EventBody {
             self,
             EventBody::Transfer { .. }
                 | EventBody::GoodsMoved { .. }
+                | EventBody::Worked { .. }
+                | EventBody::DemolitionStarted { .. }
                 | EventBody::AccountOpened { .. }
                 | EventBody::AccountClosed { .. }
                 | EventBody::StructureStarted { .. }

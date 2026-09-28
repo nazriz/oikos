@@ -121,14 +121,13 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
     let r = act(
         &mut run,
         "builder",
-        json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_from": "acc-buildco", "ref": "h"}]),
+        json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_at": "s-shop", "ref": "h"}]),
     );
     assert_eq!(refusal(&r), None, "the kernel doesn't know the law");
     let house = created(&r, "h");
-    assert!(r
-        .events
-        .iter()
-        .any(|e| matches!(&e.body, EventBody::Transfer { to, amount, .. } if to == "acc-outside" && *amount == 30_000_000)));
+    // Phase B: the house took its materials from the builder's yard (no money paid to nowhere for them).
+    assert_eq!(run.kernel().state().holding("buildco", "s-shop", "materials"), 100_000 - 30_000);
+    assert!(!r.events.iter().any(|e| matches!(&e.body, EventBody::Transfer { .. })));
     // Ownership is untouched: the city's title record still says what it said.
     assert!(run.kernel().state().records.contains_key("title-p12"));
     assert_eq!(run.kernel().state().structures[&house].built_by.as_deref(), Some("buildco"));
@@ -145,7 +144,7 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
     // ...so a building started after a look isn't seen until the next one, which delivers the change.
     let mut run = town();
     run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap();
-    act(&mut run, "builder", json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_from": "acc-buildco"}]));
+    act(&mut run, "builder", json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_at": "s-shop"}]));
     run.command(&Command::Advance { to: 13 * DAY }).unwrap();
     let before = run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap().observation.unwrap();
     assert!(!saw(&before), "day 13: the patrol hasn't been by yet");
@@ -155,19 +154,20 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
 }
 
 #[test]
-fn building_needs_space_money_and_time() {
+fn building_needs_space_materials_and_time() {
     let mut run = town();
-    let build = |ty: &str, at: &str| json!([{"block": "construct", "at": at, "structure_type": ty, "materials_from": "acc-buildco", "ref": "x"}]);
+    let build = |ty: &str, at: &str| json!([{"block": "construct", "at": at, "structure_type": ty, "materials_at": "s-shop", "ref": "x"}]);
     assert_eq!(refusal(&act(&mut run, "builder", build("park", "cell.0.1"))), Some(RefusalCode::GroundOccupied));
     assert_eq!(refusal(&act(&mut run, "builder", build("park", "cell.9.9"))), Some(RefusalCode::UnknownCell));
-    assert_eq!(refusal(&act(&mut run, "builder", build("apartments", "cell.0.0"))), Some(RefusalCode::InsufficientFunds));
+    // Phase B: a building needs its materials, from the builder's own holding where it says they are.
+    assert_eq!(refusal(&act(&mut run, "builder", build("apartments", "cell.0.0"))), Some(RefusalCode::InsufficientQuantity));
     assert_eq!(
         refusal(&act(
             &mut run,
             "builder",
-            json!([{"block": "construct", "at": "cell.0.0", "structure_type": "park", "materials_from": "acc-devco"}])
+            json!([{"block": "construct", "at": "cell.0.0", "structure_type": "park", "materials_at": "s-house"}])
         )),
-        Some(RefusalCode::NotHolder)
+        Some(RefusalCode::InsufficientQuantity)
     );
     let r = act(&mut run, "builder", build("house", "cell.0.0"));
     let house = created(&r, "x");
@@ -194,7 +194,7 @@ fn eviction_is_an_act_someone_does_and_demolition_displaces_people() {
     let r = act(&mut run, "carol-self", json!([{"block": "vacate", "occupant": "carol", "from": "s-shop"}]));
     assert!(matches!(&r.events[1].body, EventBody::Vacated { reason: VacateReason::Left, .. }));
     // Anyone who can pay can demolish, and whoever's inside is displaced.
-    let r = act(&mut run, "developer", json!([{"block": "demolish", "structure": "s-house", "costs_from": "acc-devco"}]));
+    let r = act(&mut run, "developer", json!([{"block": "demolish", "structure": "s-house"}]));
     assert!(r
         .events
         .iter()

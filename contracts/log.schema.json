@@ -491,11 +491,9 @@
               "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
             },
             "reason": {
-              "description": "payment: a transfer block. materials / demolition: the documented construction liberty (D25). carried: money a newcomer brings across the boundary.",
+              "description": "payment: a transfer block. carried: money a newcomer brings across an edge. (Materials and demolition no longer move money: phase B, D58.)",
               "enum": [
                 "payment",
-                "materials",
-                "demolition",
                 "carried"
               ]
             },
@@ -549,6 +547,83 @@
               "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
             },
             "to_at": {
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+            },
+            "by": {
+              "description": "The participant that physically executed it.",
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "task",
+            "units",
+            "at",
+            "performers",
+            "labour",
+            "by"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "worked"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count"
+            },
+            "task": {
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+            },
+            "units": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "at": {
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+            },
+            "on": {
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+            },
+            "performers": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+              }
+            },
+            "labour": {
+              "description": "Seconds of performers' time, all told.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "by": {
+              "description": "The participant that physically executed it.",
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "structure",
+            "by"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "demolition_started"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count"
+            },
+            "structure": {
               "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
             },
             "by": {
@@ -1393,7 +1468,13 @@
         "not_a_boundary",
         "unknown_resource",
         "insufficient_quantity",
-        "unknown_place"
+        "unknown_place",
+        "unknown_task",
+        "not_at_work",
+        "no_time_left",
+        "not_being_built",
+        "not_coming_down",
+        "coming_down"
       ]
     },
     "AnnotationEntry": {

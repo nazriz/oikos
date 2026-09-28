@@ -162,6 +162,7 @@ impl Kernel {
                 })
                 .collect(),
             accounts: w.accounts.iter().map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), currency: cur_of(a), balance: a.balance, changed: 0 })).collect(),
+            labour_used: crate::state::Map::new(),
             holdings: w
                 .holdings
                 .iter()
@@ -228,7 +229,17 @@ impl Kernel {
             for cell in &cells {
                 st.cells.get_mut(cell).unwrap().structure = Some(x.id.clone());
             }
-            st.structures.insert(x.id.clone(), Structure { at: x.at.clone(), cells, structure_type: x.structure_type.clone(), built_by: x.built_by.clone(), complete: true, completes_at: None });
+            st.structures.insert(x.id.clone(), Structure {
+                    at: x.at.clone(),
+                    cells,
+                    structure_type: x.structure_type.clone(),
+                    built_by: x.built_by.clone(),
+                    complete: true,
+                    completes_at: None,
+                    labour_done: 0,
+                    demolition: None,
+                    variables: crate::exec::init_variables(&s, &x.structure_type, 0),
+                });
         }
         for o in &w.occupancy {
             let (sid, _) = crate::config::split_space(&o.space).expect("validated");

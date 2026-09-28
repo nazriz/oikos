@@ -30,6 +30,9 @@
           "$ref": "#/$defs/move_goods"
         },
         {
+          "$ref": "#/$defs/work"
+        },
+        {
           "$ref": "#/$defs/open_account"
         },
         {
@@ -213,13 +216,12 @@
       }
     },
     "construct": {
-      "description": "PHYSICAL. The entity acted for (the builder) starts building a catalogue structure on open ground, its footprint's corner at a cell. The catalogue's materials cost is paid from an account the builder holds, straight to the boundary. DOCUMENTED LIBERTY (D25), ACCEPTED TEMPORARILY: material purchases aren't modelled, and this one payment doesn't go through the builder's bank. To be replaced by supplier purchases through banks, or construction as a task with inputs (see docs/decisions.md, under Open). The structure completes after the build time. No ownership is assigned: who owns it is a record. Not refused for lacking a permit or for building on someone else's land; those are matters of law.",
+      "description": "PHYSICAL. The entity acted for (the builder) begins a catalogue structure on open ground, its footprint's corner at a cell. Its materials (phase B) are taken from the builder's own holding at `materials_at` (its yard); a type with materials can't be begun without them. It completes once its build labour has been worked on it (the task `build`) and its build time has passed. No ownership is assigned: who owns it is a record. Not refused for lacking a permit or for building on someone else's land; those are matters of law.",
       "type": "object",
       "required": [
         "block",
         "at",
-        "structure_type",
-        "materials_from"
+        "structure_type"
       ],
       "additionalProperties": false,
       "properties": {
@@ -233,7 +235,8 @@
         "structure_type": {
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
-        "materials_from": {
+        "materials_at": {
+          "description": "Where the builder keeps its materials: a structure it holds them at. Required when the type has materials.",
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
         },
         "ref": {
@@ -242,12 +245,11 @@
       }
     },
     "demolish": {
-      "description": "PHYSICAL. The entity acted for demolishes a structure, paying the catalogue demolition cost from an account it holds (same liberty as construct). Anyone still occupying it is displaced (recorded as vacated). Whose building it is doesn't matter to physics.",
+      "description": "PHYSICAL. The entity acted for begins bringing a structure down. Anyone still in it is displaced at once (recorded as vacated). It comes down when its type's demolition labour has been worked on it (the task `demolish`), or at once if its type needs none. Whose building it is doesn't matter to physics.",
       "type": "object",
       "required": [
         "block",
-        "structure",
-        "costs_from"
+        "structure"
       ],
       "additionalProperties": false,
       "properties": {
@@ -255,9 +257,6 @@
           "const": "demolish"
         },
         "structure": {
-          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
-        },
-        "costs_from": {
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
         }
       }
@@ -1072,6 +1071,44 @@
         },
         "to_at": {
           "description": "Where they go: a structure, or for an edge, itself.",
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
+        }
+      }
+    },
+    "work": {
+      "description": "PHYSICAL (phase B). Work: `units` of a task, at a structure, by performers who are there (in a space of the task's kind), alive and present, each with time left in today's working day; the units' labour is shared evenly among them. The task's inputs come from the actor's holding at the structure, its outputs go to it, and its changes to state variables of `on` (or of `at`). The built-in tasks `build` and `demolish` work on a structure (`on`) begun or coming down. Who works for whom is content (agreements), never physics (D20): the kernel checks only that the performers are there, and their hours exist.",
+      "type": "object",
+      "required": [
+        "block",
+        "task",
+        "units",
+        "at",
+        "performers"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "work"
+        },
+        "task": {
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+        },
+        "units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000000
+        },
+        "at": {
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
+        },
+        "performers": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
+          },
+          "maxItems": 1000
+        },
+        "on": {
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
         }
       }

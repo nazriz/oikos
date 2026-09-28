@@ -1,0 +1,147 @@
+//! Work (contracts v0.5, phase B): performers at a place spend their time on a task; a person has only so many
+//! working hours in a day; inputs are used up and outputs made; state variables (wear) change with time, occupancy
+//! and work, exactly; a building completes only with its materials, its labour and its time; demolition takes labour.
+
+mod common;
+
+use common::*;
+use serde_json::{json, Value};
+use terrarium_kernel::events::{EventBody, RefusalCode};
+use terrarium_kernel::observe::ChannelData;
+use terrarium_kernel::run::Run;
+use terrarium_kernel::Command;
+
+const DAY: i64 = 86_400;
+
+fn town() -> Run<Vec<u8>> {
+    Run::start(world(&default_params()), "work", Vec::new(), None).unwrap()
+}
+
+fn act(run: &mut Run<Vec<u8>>, participant: &str, position: Option<&str>, blocks: Value) -> Result<Vec<EventBody>, RefusalCode> {
+    let blocks = serde_json::from_value(blocks).unwrap();
+    let cmd = direct(participant, position, blocks).unwrap();
+    let r = step(run, &cmd).unwrap();
+    match &r.events[0].body {
+        EventBody::ActionApplied { .. } => Ok(r.events.into_iter().map(|e| e.body).collect()),
+        EventBody::ActionRefused { code, .. } => Err(*code),
+        other => panic!("{other:?}"),
+    }
+}
+
+fn make(run: &mut Run<Vec<u8>>, units: u64, performers: &[&str]) -> Result<Vec<EventBody>, RefusalCode> {
+    act(run, "developer-system", Some("developer"), json!([{"block": "work", "task": "make", "units": units, "at": "s-shop", "performers": performers}]))
+}
+
+fn advance(run: &mut Run<Vec<u8>>, to: i64) {
+    run.command(&Command::Advance { to }).unwrap();
+}
+
+#[test]
+fn work_needs_people_at_work_with_time_left_and_the_inputs() {
+    let mut run = town();
+    let st = |run: &Run<Vec<u8>>, kind: &str| run.kernel().state().holding("devco", "s-shop", kind);
+    // Carol works at the shop (a workplace there): 4 units take 2 hours of hers, 40 kg of materials, and make 20 goods.
+    make(&mut run, 4, &["carol"]).unwrap();
+    assert_eq!((st(&run, "materials"), st(&run, "goods")), (1000 - 40, 200 + 20));
+    // Nobody named, for work that takes time; someone who isn't there; someone there but not in a workplace.
+    assert_eq!(make(&mut run, 1, &[]), Err(RefusalCode::NotAtWork));
+    assert_eq!(make(&mut run, 1, &["alice"]), Err(RefusalCode::NotAtWork));
+    // Her working day is 8 hours: 2 used, 12 more units (6 hours) fit, then no more today.
+    make(&mut run, 12, &["carol"]).unwrap();
+    assert_eq!(make(&mut run, 1, &["carol"]), Err(RefusalCode::NoTimeLeft));
+    // Tomorrow she has a whole day again.
+    advance(&mut run, DAY + 3600);
+    make(&mut run, 1, &["carol"]).unwrap();
+    // Asking more of her than a day holds is refused on time, before anything's used.
+    assert_eq!(make(&mut run, 200, &["carol"]), Err(RefusalCode::NoTimeLeft));
+    // With the materials moved away (all but 5 kg), one unit (10 kg) can't be made: refused, and nothing used.
+    let away = st(&run, "materials") - 5;
+    act(&mut run, "developer-system", Some("developer"), json!([{"block": "move_goods", "kind": "materials", "quantity": away.to_string(), "from_at": "s-shop", "to": "devco", "to_at": "s-flats"}])).unwrap();
+    assert_eq!(make(&mut run, 1, &["carol"]), Err(RefusalCode::InsufficientQuantity));
+    assert_eq!(st(&run, "materials"), 5);
+    // An unknown task, a place that isn't there.
+    assert_eq!(act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "juggle", "units": 1, "at": "s-shop", "performers": ["carol"]}])), Err(RefusalCode::UnknownTask));
+    // Using things up takes no one's time: alice eats at home.
+    act(&mut run, "alice-self", None, json!([{"block": "work", "task": "eat", "units": 3, "at": "s-house", "performers": []}])).unwrap();
+    assert_eq!(run.kernel().state().holding("alice", "s-house", "goods"), 10 - 3);
+}
+
+#[test]
+fn wear_rises_by_the_day_and_with_occupants_and_mending_lowers_it_exactly() {
+    let mut run = town();
+    let wear = |run: &Run<Vec<u8>>, sid: &str| {
+        let st = run.kernel().state();
+        let cfg = &run.kernel().statics().config.catalogue.variables[0];
+        terrarium_kernel::exec::variable_at(st, sid, cfg, st.t).unwrap()
+    };
+    // The house (alice inside): 100 at the start, +1 a day and +2 per occupant a day: 3 a day.
+    assert_eq!(wear(&run, "s-house"), 100);
+    advance(&mut run, 10 * DAY);
+    assert_eq!(wear(&run, "s-house"), 130);
+    // Alice leaves: from then on, 1 a day.
+    act(&mut run, "alice-self", None, json!([{"block": "vacate", "occupant": "alice", "from": "s-house"}])).unwrap();
+    advance(&mut run, 20 * DAY);
+    assert_eq!(wear(&run, "s-house"), 140);
+    // Mending (carol, from the shop) takes 50 off a unit, down to the minimum and no further.
+    act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap();
+    assert_eq!(wear(&run, "s-house"), 40);
+    act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap();
+    assert_eq!(wear(&run, "s-house"), 0);
+    // Seen with its trend: a look shows the value on a day and the rate, and today's value follows from them.
+    let o = run.command(&Command::Observe { participant: "mayor-system".into(), only: None }).unwrap().observation.unwrap();
+    let ChannelData::Sites { cells, .. } = &o.channels["mayor/town"] else { panic!() };
+    let v = &cells.iter().find(|c| c.cell == "cell.1.1").unwrap().structure.as_ref().unwrap().variables.as_ref().unwrap()["wear"];
+    assert_eq!((v.value, v.per_day, v.min, v.max), (0, 1, 0, 10_000));
+}
+
+#[test]
+fn a_building_completes_only_with_its_materials_its_labour_and_its_time() {
+    let mut run = town();
+    // A house needs 300 kg of materials (the builder's, at the flats), 4 hours' building, and 20 days.
+    let r = act(&mut run, "builder-system", Some("builder"), json!([{"block": "construct", "at": "cell.2.1", "structure_type": "house", "materials_at": "s-flats", "ref": "h"}])).unwrap();
+    let house = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(structure.clone()), _ => None }).unwrap();
+    assert_eq!(run.kernel().state().holding("buildco", "s-flats", "materials"), 5000 - 300);
+    let build = |run: &mut Run<Vec<u8>>, seconds: u64| act(run, "builder-system", Some("builder"), json!([{"block": "work", "task": "build", "units": seconds, "at": "s-flats", "performers": ["bob"], "on": house}]));
+    // Its time passes, but it isn't built: it waits for its labour.
+    advance(&mut run, 21 * DAY);
+    assert!(!run.kernel().state().structures[&house].complete);
+    // Bob works 3 hours today, 1 more tomorrow: it completes with the last hour.
+    build(&mut run, 3 * 3600).unwrap();
+    assert!(!run.kernel().state().structures[&house].complete);
+    advance(&mut run, 22 * DAY);
+    let r = build(&mut run, 3600).unwrap();
+    assert!(r.iter().any(|e| matches!(e, EventBody::StructureCompleted { .. })));
+    // No more building work on it.
+    assert_eq!(build(&mut run, 60), Err(RefusalCode::NotBeingBuilt));
+    // Without materials where the builder says they are, nothing is begun.
+    assert_eq!(
+        act(&mut run, "builder-system", Some("builder"), json!([{"block": "construct", "at": "cell.2.2", "structure_type": "house", "materials_at": "s-house"}])),
+        Err(RefusalCode::InsufficientQuantity)
+    );
+}
+
+#[test]
+fn labour_done_first_completes_when_its_time_is_up() {
+    let mut run = town();
+    let r = act(&mut run, "builder-system", Some("builder"), json!([{"block": "construct", "at": "cell.2.1", "structure_type": "shop", "materials_at": "s-flats", "ref": "s"}])).unwrap();
+    let shop = r.iter().find_map(|e| match e { EventBody::StructureStarted { structure, .. } => Some(structure.clone()), _ => None }).unwrap();
+    act(&mut run, "builder-system", Some("builder"), json!([{"block": "work", "task": "build", "units": 7200, "at": "s-flats", "performers": ["bob"], "on": shop}])).unwrap();
+    assert!(!run.kernel().state().structures[&shop].complete, "labour done, but not its 30 days");
+    advance(&mut run, 31 * DAY);
+    assert!(run.kernel().state().structures[&shop].complete);
+}
+
+#[test]
+fn demolition_takes_labour_and_nobody_moves_in_meanwhile() {
+    let mut run = town();
+    // The house needs an hour's demolition: its occupant leaves at once, and it stands until the work is done.
+    let r = act(&mut run, "developer-system", Some("developer"), json!([{"block": "demolish", "structure": "s-house"}])).unwrap();
+    assert!(r.iter().any(|e| matches!(e, EventBody::DemolitionStarted { .. })));
+    assert!(run.kernel().state().structures.contains_key("s-house"));
+    assert_eq!(act(&mut run, "carol-self", None, json!([{"block": "occupy", "space": "s-house/dwelling.1"}])), Err(RefusalCode::ComingDown));
+    let r = act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "demolish", "units": 3600, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap();
+    assert!(r.iter().any(|e| matches!(e, EventBody::StructureDemolished { .. })));
+    assert!(!run.kernel().state().structures.contains_key("s-house"));
+    // What was held there stays held there (alice's goods), to be moved out.
+    assert_eq!(run.kernel().state().holding("alice", "s-house", "goods"), 10);
+}

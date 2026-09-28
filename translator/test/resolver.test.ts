@@ -111,11 +111,11 @@ test("4.4: filling in a published form, checked against its fields", () => {
 });
 
 test("4.5: a missing decision comes back as a question; the resolver never chooses", () => {
-  expect(run("structure(type=park, on=lot-00)")).toEqual({ ok: false, questions: ["Who should build a park on lot-00, and from which account is it paid?"] });
+  expect(run("structure(type=park, on=lot-00)")).toEqual({ ok: false, questions: ["Who should build a park on lot-00?"] });
   expect(run('structure(type=park, on=lot-00, by=greenco)')).toEqual({ ok: false, questions: ["For what price should GreenCo (greenco) build a park on lot-00?"] });
   // "We'll build it ourselves" is also the participant's choice, and physics may allow it.
   const self = run("structure(type=park, on=lot-00, by=city)"); // one account, so which pays is a single answer; one cell, so where too
-  expect(self.ok && self.blocks).toEqual([{ block: "construct", at: "cell.1.0", structure_type: "park", materials_from: "acc-city" }]);
+  expect(self.ok && self.blocks).toEqual([{ block: "construct", at: "cell.1.0", structure_type: "park" }]);
   expect(run("none(not_yours)")).toEqual({ ok: false, questions: ["That's for someone else to decide. You could write to them, or propose something."] });
 });
 
@@ -149,14 +149,14 @@ test("occupancy fills the only space a building has, and asks otherwise", () => 
 
 test("building on a lot: the one corner that fits is filled in; a choice or a misfit is a question", () => {
   const b = (type: string, on: string) => run(`structure(type=${type}, on=${on}, by=city)`);
-  expect(b("park", "lot-00")).toEqual({ ok: true, blocks: [{ block: "construct", at: "cell.1.0", structure_type: "park", materials_from: "acc-city" }] });
+  expect(b("park", "lot-00")).toEqual({ ok: true, blocks: [{ block: "construct", at: "cell.1.0", structure_type: "park" }] });
   // lot-01 is one dry cell and one of water: a park fits only on the dry one, a jetty only on the water.
   expect(b("park", "lot-01").ok && (b("park", "lot-01") as any).blocks[0].at).toBe("cell.2.0");
   expect(b("jetty", "lot-01").ok && (b("jetty", "lot-01") as any).blocks[0].at).toBe("cell.3.0");
   // A plaza is two cells wide: it would need the water cell too.
   expect(b("plaza", "lot-01")).toEqual({ ok: false, questions: ["A plaza (2 by 1) doesn't fit on the open ground of lot-01 as far as you've seen. Which cell should its corner be?"] });
   // A cell stated outright is taken as the corner: physics decides.
-  expect(b("plaza", "cell.1.0")).toEqual({ ok: true, blocks: [{ block: "construct", at: "cell.1.0", structure_type: "plaza", materials_from: "acc-city" }] });
+  expect(b("plaza", "cell.1.0")).toEqual({ ok: true, blocks: [{ block: "construct", at: "cell.1.0", structure_type: "plaza" }] });
 });
 
 test("a language-model participant sees all its capacities: the one it acts in decides whose name it's in", () => {

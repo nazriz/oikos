@@ -261,15 +261,17 @@ class Resolver {
     const remove = this.id(c, "remove");
     const by = this.id(c, "by");
     const place = remove ? `demolish ${remove}` : `build a ${this.str(c, "type") ?? "?"} on ${this.str(c, "on") ?? "?"}`;
-    if (!by) throw new Ask(`Who should ${place}${this.has(c, "price") || this.has(c, "from") ? "" : ", and from which account is it paid"}?`);
+    if (!by) throw new Ask(`Who should ${place}?`);
     const type = remove ? undefined : this.need(c, "type", "What should be built?");
     const on = remove ? undefined : this.need(c, "on", "On which lot or cell?");
     const basis = this.id(c, "basis");
     if (this.k.entityOf(by) === this.me) {
-      const from = this.payer(c, remove ? "the demolition" : "the materials");
+      // Building it yourself (phase B): the materials come from your own holding where you keep them (`materials_at`),
+      // and the building work is work (`work`); demolition begins, and its work follows.
+      const yard = this.id(c, "materials_at");
       return remove
-        ? [{ block: "demolish", structure: remove, costs_from: from }]
-        : [{ block: "construct", at: this.corner(on!, type!), structure_type: type, materials_from: from, ...(bind ? { ref: bind } : {}) }];
+        ? [{ block: "demolish", structure: remove }]
+        : [{ block: "construct", at: this.corner(on!, type!), structure_type: type, ...(yard ? { materials_at: yard } : {}), ...(bind ? { ref: bind } : {}) }];
     }
     // Someone else builds: offer them an agreement, signed on its side. They decide.
     const builder = this.k.entityOf(by);

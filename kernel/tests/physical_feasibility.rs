@@ -115,7 +115,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 Ok(())
             }
         }
-        Block::Construct { at, structure_type, materials_from, .. } => {
+        Block::Construct { at, structure_type, materials_at, .. } => {
             let Some(ty) = types.get(structure_type) else { return Some(Err(RefusalCode::UnknownStructureType)) };
             let Some(cells) = footprint_cells(&s.detailed, at, ty.footprint) else { return Some(Err(RefusalCode::UnknownCell)) };
             for c in &cells {
@@ -131,14 +131,12 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                     return Some(Err(RefusalCode::UnsuitableTerrain));
                 }
             }
-            let Some(acc) = st.accounts.get(materials_from) else { return Some(Err(RefusalCode::UnknownAccount)) };
-            if acc.holder != me {
-                Err(RefusalCode::NotHolder)
-            } else if !s.is_boundary(&acc.holder) && acc.balance < ty.materials_cost {
-                // (The outside world pays materials to itself: a quirk of the temporary liberty.)
-                Err(RefusalCode::InsufficientFunds)
-            } else {
-                Ok(())
+            // Phase B: its materials, from the builder's own holding where it says they are.
+            match materials_at {
+                None if !ty.materials.is_empty() => Err(RefusalCode::InsufficientQuantity),
+                None => Ok(()),
+                Some(yard) if ty.materials.iter().any(|(k, q)| st.holding(&me, yard, k) < *q) => Err(RefusalCode::InsufficientQuantity),
+                Some(_) => Ok(()),
             }
         }
         Block::Occupy { space, who } => {
@@ -160,6 +158,8 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 Err(RefusalCode::AlreadyPresent)
             } else if bodies.map_or(0, |b| b.len()) as u32 >= spec.capacity {
                 Err(RefusalCode::CapacityExceeded)
+            } else if x.demolition.is_some() {
+                Err(RefusalCode::ComingDown)
             } else {
                 Ok(())
             }
@@ -184,6 +184,60 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             Some(a) if a.balance != 0 => Err(RefusalCode::AccountNotEmpty),
             Some(_) => Ok(()),
         },
+        Block::Work { task, units, at, performers, on } => {
+            // Phase B: performers there, alive and present, with time left today; inputs held there; what's worked on.
+            let builtin = task == "build" || task == "demolish";
+            let spec = s.config.catalogue.tasks.iter().find(|x| &x.id == task);
+            if !builtin && spec.is_none() {
+                return Some(Err(RefusalCode::UnknownTask));
+            }
+            let total = spec.map_or(1, |x| x.labour) * *units as i64;
+            let Some(place) = st.structures.get(at) else { return Some(Err(RefusalCode::UnknownStructure)) };
+            if !place.complete {
+                return Some(Err(RefusalCode::StructureIncomplete));
+            }
+            let mut seen = std::collections::BTreeSet::new();
+            if performers.iter().any(|p| !seen.insert(p)) {
+                return Some(Err(RefusalCode::DuplicateRef));
+            }
+            if total > 0 && performers.is_empty() {
+                return Some(Err(RefusalCode::NotAtWork));
+            }
+            let kind = spec.and_then(|x| x.in_space.clone());
+            for p in performers {
+                if let Err(e) = living(st, p) {
+                    return Some(Err(e));
+                }
+                let there = st.occupancy.get(at).is_some_and(|m| {
+                    m.iter().any(|(space, bodies)| bodies.contains(p) && kind.as_ref().is_none_or(|k| split_space(space).is_some_and(|(_, l)| l.split('.').next() == Some(k.as_str()))))
+                });
+                if !there {
+                    return Some(Err(RefusalCode::NotAtWork));
+                }
+            }
+            if total > 0 {
+                let day = s.config.catalogue.working_day.unwrap();
+                let share = (total + performers.len() as i64 - 1) / performers.len() as i64;
+                let today = terrarium_kernel::exec::day_of(st.t);
+                if performers.iter().any(|p| st.labour_used.get(p).filter(|(d, _)| *d == today).map_or(0, |(_, u)| *u) + share > day) {
+                    return Some(Err(RefusalCode::NoTimeLeft));
+                }
+            }
+            if spec.is_some_and(|x| x.consumes.iter().any(|(k, per)| st.holding(&me, at, k) < per * *units as i128)) {
+                return Some(Err(RefusalCode::InsufficientQuantity));
+            }
+            if builtin || spec.is_some_and(|x| !x.changes.is_empty()) {
+                let target = on.clone().unwrap_or_else(|| at.clone());
+                let Some(t) = st.structures.get(&target) else { return Some(Err(RefusalCode::UnknownStructure)) };
+                if task == "build" && (t.complete || t.demolition.is_some()) {
+                    return Some(Err(RefusalCode::NotBeingBuilt));
+                }
+                if task == "demolish" && t.demolition.is_none() {
+                    return Some(Err(RefusalCode::NotComingDown));
+                }
+            }
+            Ok(())
+        }
         Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
             // Possession (phase B): the actor moves its own holding; an edge's may go negative.
             let max = terrarium_kernel::money::MAX_MONEY;
@@ -410,13 +464,13 @@ fn the_oracle_is_exercised() {
         (act("finance-system", Some("finance"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "5"})), Err(RefusalCode::NotCustodian)),
         (act("bank-pay-system", Some("bank-pay"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "5"})), Ok(())),
         (act("alice-self", Some("mayor"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "5"})), Err(RefusalCode::NotInPosition)),
-        (bld(json!({"block": "construct", "at": "cell.1.0", "structure_type": "park", "materials_from": "acc-buildco"})), Err(RefusalCode::GroundOccupied)),
-        (bld(json!({"block": "construct", "at": "cell.2.0", "structure_type": "jetty", "materials_from": "acc-buildco"})), Err(RefusalCode::UnsuitableTerrain)),
-        (bld(json!({"block": "construct", "at": "cell.2.2", "structure_type": "flats", "materials_from": "acc-buildco"})), Err(RefusalCode::UnsuitableTerrain)),
-        (bld(json!({"block": "construct", "at": "cell.3.0", "structure_type": "flats", "materials_from": "acc-buildco"})), Err(RefusalCode::UnknownCell)),
-        (bld(json!({"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_from": "acc-city"})), Err(RefusalCode::NotHolder)),
-        (bld(json!({"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_from": "acc-buildco"})), Ok(())),
-        (bld(json!({"block": "construct", "at": "cell.3.1", "structure_type": "jetty", "materials_from": "acc-buildco"})), Ok(())),
+        (bld(json!({"block": "construct", "at": "cell.1.0", "structure_type": "park", "materials_at": "s-flats"})), Err(RefusalCode::GroundOccupied)),
+        (bld(json!({"block": "construct", "at": "cell.2.0", "structure_type": "jetty", "materials_at": "s-flats"})), Err(RefusalCode::UnsuitableTerrain)),
+        (bld(json!({"block": "construct", "at": "cell.2.2", "structure_type": "flats", "materials_at": "s-flats"})), Err(RefusalCode::UnsuitableTerrain)),
+        (bld(json!({"block": "construct", "at": "cell.3.0", "structure_type": "flats", "materials_at": "s-flats"})), Err(RefusalCode::UnknownCell)),
+        (bld(json!({"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_at": "s-house"})), Err(RefusalCode::InsufficientQuantity)),
+        (bld(json!({"block": "construct", "at": "cell.2.1", "structure_type": "park", "materials_at": "s-flats"})), Ok(())),
+        (bld(json!({"block": "construct", "at": "cell.3.1", "structure_type": "jetty", "materials_at": "s-flats"})), Ok(())),
         (act("developer-system", Some("developer"), json!({"block": "vacate", "occupant": "carol", "from": "s-house"})), Err(RefusalCode::NotPresent)),
         (act("developer-system", Some("developer"), json!({"block": "vacate", "occupant": "bob", "from": "s-flats"})), Ok(())),
         (act("alice-self", None, json!({"block": "occupy", "space": "s-house/dwelling.1"})), Err(RefusalCode::AlreadyPresent)),

@@ -58,13 +58,29 @@ pub enum Block {
         /// The corner cell of the footprint.
         at: Id,
         structure_type: Id,
-        materials_from: IdOrRef,
+        /// Where the builder's materials are (a structure it holds them at: its yard). Required when the type has
+        /// materials (phase B).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        materials_at: Option<IdOrRef>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },
+    /// Begin bringing a structure down: its occupants leave at once; it comes down when its type's demolition labour
+    /// has been worked (the task `demolish`, on it), or at once if its type needs none.
     Demolish {
         structure: IdOrRef,
-        costs_from: IdOrRef,
+    },
+    /// Work (phase B): `units` of a task, at a structure, by performers who are there (in a space of the task's
+    /// kind). Their time comes from each one's working day; the task's inputs from the actor's holding there; its
+    /// outputs go to that holding; its changes to a structure's variables (`on`, or `at`). The built-in tasks `build`
+    /// and `demolish` work `on` a structure begun or coming down.
+    Work {
+        task: Id,
+        units: u64,
+        at: IdOrRef,
+        performers: Vec<IdOrRef>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        on: Option<IdOrRef>,
     },
     /// A body goes into a space: the acting person, or someone they bring (`who`).
     Occupy {
@@ -284,6 +300,7 @@ impl Block {
         match self {
             Block::Transfer { .. } => "transfer",
             Block::MoveGoods { .. } => "move_goods",
+            Block::Work { .. } => "work",
             Block::OpenAccount { .. } => "open_account",
             Block::CloseAccount { .. } => "close_account",
             Block::Construct { .. } => "construct",

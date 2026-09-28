@@ -69,9 +69,13 @@ export class Preview {
       case "close_account":
         return `You will close account ${b.account}.`;
       case "construct":
-        return `You will start building a ${b.structure_type} with its corner at ${b.at} yourself, paying for materials from ${this.acct(b.materials_from)}.`;
+        return `You will start building a ${b.structure_type} with its corner at ${b.at} yourself${b.materials_at ? `, with materials from what you hold at ${b.materials_at}` : ""}.`;
       case "demolish":
-        return `You will demolish ${b.structure} yourself, paying from ${this.acct(b.costs_from)}.`;
+        return `You will begin demolishing ${b.structure}: anyone inside will have to leave.`;
+      case "work":
+        return `${(b.performers ?? []).length ? `${(b.performers as string[]).map((p) => this.who(p)).join(" and ")} will do` : "You will do"} ${b.units} of ${b.task} at ${b.at}${b.on ? `, on ${b.on}` : ""}.`;
+      case "move_goods":
+        return `You will move ${b.quantity} ${b.kind} from ${b.from_at} to ${b.to === this.me ? "yourself" : this.who(b.to)} at ${b.to_at}.`;
       case "occupy":
         return b.who ? `You will bring ${this.who(b.who)} into ${b.space}.` : `You will move into ${b.space}.`;
       case "vacate":

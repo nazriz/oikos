@@ -120,6 +120,130 @@
               }
             }
           }
+        },
+        "tasks": {
+          "description": "Kinds of work (phase B). A unit of a task takes `labour` seconds of performers' time (0: using things up, e.g. eating), takes `consumes` from the actor's holding where it's done, adds `produces` to it, and adds `changes` to state variables of the structure worked on. Built-in tasks `build` and `demolish` (1 second a unit) work on a structure begun or coming down; their ids are reserved.",
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "labour"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId",
+                "not": {
+                  "enum": [
+                    "build",
+                    "demolish"
+                  ]
+                }
+              },
+              "labour": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "in": {
+                "description": "The kind of space performers must be in at the structure (e.g. workplace); absent: any space there.",
+                "type": "string",
+                "maxLength": 64
+              },
+              "consumes": {
+                "type": "object",
+                "propertyNames": {
+                  "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+                },
+                "additionalProperties": {
+                  "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Quantity"
+                },
+                "maxProperties": 100
+              },
+              "produces": {
+                "type": "object",
+                "propertyNames": {
+                  "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+                },
+                "additionalProperties": {
+                  "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Quantity"
+                },
+                "maxProperties": 100
+              },
+              "changes": {
+                "type": "object",
+                "propertyNames": {
+                  "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "maxProperties": 100
+              }
+            }
+          }
+        },
+        "variables": {
+          "description": "State variables of structures (phase B): wear, and later waste or habitat quality. Each changes by per_day, and per_occupant_per_day for each body inside, every whole day, within [min, max]; work can change it too. The kernel keeps them exactly and attaches no meaning to them. `types`: the structure types it applies to (absent: all).",
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "min",
+              "max",
+              "initial"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+              },
+              "min": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "max": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "initial": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "per_day": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "per_occupant_per_day": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "types": {
+                "type": "array",
+                "items": {
+                  "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+                },
+                "maxItems": 1000
+              }
+            }
+          }
+        },
+        "working_day": {
+          "description": "The most a person can work in a day (seconds): a physical limit on a body (phase B). Required when any work takes time.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
         }
       }
     },
@@ -208,9 +332,7 @@
       "required": [
         "id",
         "category",
-        "materials_cost",
         "build_time",
-        "demolition_cost",
         "footprint",
         "spaces"
       ],
@@ -223,14 +345,31 @@
           "description": "A label for people and laws to refer to (residential, commercial, green...). The kernel attaches no meaning to it.",
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
         },
-        "materials_cost": {
-          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Amount"
+        "materials": {
+          "description": "What it's made of (phase B): quantities of resource kinds, taken from the builder's holding (at `materials_at`) when it's begun. Replaces materials_cost (money paid to nowhere, the liberty D58 retires).",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+          },
+          "additionalProperties": {
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Quantity"
+          },
+          "maxProperties": 100
         },
         "build_time": {
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
         },
-        "demolition_cost": {
-          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Amount"
+        "build_labour": {
+          "description": "Seconds of work (the built-in task `build`, on it) before it's complete (phase B); 0 or absent: it completes when build_time has passed. build_time stays the least time it takes, whatever the crew.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "demolition_labour": {
+          "description": "Seconds of work (the built-in task `demolish`, on it) before it comes down; 0 or absent: at once. Replaces demolition_cost.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "footprint": {
           "description": "The cells it stands on: w by h, from the corner cell it's built at.",

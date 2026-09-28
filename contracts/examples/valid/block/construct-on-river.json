@@ -2,6 +2,6 @@
   "block": "construct",
   "at": "cell.2.1",
   "structure_type": "apartments",
-  "materials_from": "acc-devco",
-  "ref": "flats"
+  "ref": "flats",
+  "materials_at": "s-shop"
 }

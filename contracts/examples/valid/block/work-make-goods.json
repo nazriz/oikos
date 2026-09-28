@@ -1,0 +1,10 @@
+{
+  "block": "work",
+  "task": "make",
+  "units": 48,
+  "at": "str.7",
+  "performers": [
+    "c0012",
+    "c0040"
+  ]
+}

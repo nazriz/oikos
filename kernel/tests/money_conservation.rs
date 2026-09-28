@@ -13,7 +13,7 @@ mod common;
 use common::*;
 use proptest::prelude::*;
 use std::collections::BTreeMap;
-use terrarium_kernel::events::{EventBody, TransferReason};
+use terrarium_kernel::events::EventBody;
 use terrarium_kernel::run::Run;
 
 fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
@@ -32,15 +32,14 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
             _ => None,
         });
         for e in &resp.events {
-            if let EventBody::Transfer { from, to, amount, reason, .. } = &e.body {
+            if let EventBody::Transfer { from, to, amount, .. } = &e.body {
                 prop_assert!(*amount > 0);
                 // An account opened earlier in this same action isn't in `before`.
                 let src = before.get(from).or_else(|| run.kernel().state().accounts.get(from)).expect("paying account existed");
                 let by_entity = acting.clone().expect("money moves only in an applied action");
-                match reason {
-                    TransferReason::Payment | TransferReason::Carried => prop_assert_eq!(by_entity.as_str(), src.custodian.as_str(), "payment not executed by the custodian"),
-                    _ => prop_assert_eq!(by_entity.as_str(), src.holder.as_str(), "construction cost not paid by the builder"),
-                }
+                // Every movement of money is executed by the custodian of the account it leaves (construction no longer
+                // moves money: phase B).
+                prop_assert_eq!(by_entity.as_str(), src.custodian.as_str(), "payment not executed by the custodian");
                 *ledger.entry(from.clone()).or_insert(0) -= *amount;
                 *ledger.entry(to.clone()).or_insert(0) += *amount;
             }

@@ -42,7 +42,7 @@ fn cells_seen(run: &mut Run<Vec<u8>>) -> impl Fn(&str) -> Vec<String> {
 }
 
 fn build(run: &mut Run<Vec<u8>>, at: &str) -> Result<(), RefusalCode> {
-    let cmd = direct("builder-system", Some("builder"), vec![Block::Construct { at: at.into(), structure_type: "park".into(), materials_from: "acc-buildco".into(), bind: None }]).unwrap();
+    let cmd = direct("builder-system", Some("builder"), vec![Block::Construct { at: at.into(), structure_type: "park".into(), materials_at: Some("s-flats".into()), bind: None }]).unwrap();
     match &step(run, &cmd).unwrap().events[0].body {
         EventBody::ActionApplied { .. } => Ok(()),
         EventBody::ActionRefused { code, .. } => Err(*code),

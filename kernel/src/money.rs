@@ -48,6 +48,24 @@ pub mod opt_amount {
     }
 }
 
+/// Serde for a map of quantities (kind -> decimal string), as in tasks' inputs and outputs and buildings' materials.
+pub mod amount_map {
+    use super::*;
+    use std::collections::BTreeMap;
+    pub fn serialize<S: Serializer>(v: &BTreeMap<String, Money>, s: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let mut m = s.serialize_map(Some(v.len()))?;
+        for (k, x) in v {
+            m.serialize_entry(k, &x.to_string())?;
+        }
+        m.end()
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<BTreeMap<String, Money>, D::Error> {
+        let m = BTreeMap::<String, String>::deserialize(d)?;
+        m.into_iter().map(|(k, x)| parse(&x).map(|v| (k, v)).map_err(serde::de::Error::custom)).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

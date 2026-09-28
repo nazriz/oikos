@@ -1,6 +1,7 @@
 //! Goods (contracts v0.5, phase B): possession is physics (D20). Over any sequence of operations, every resource
-//! kind's total over the world and its edges is unchanged (only work changes it, and there is none here); nobody but
-//! an edge ever holds a negative quantity; and goods move only by their holder's own act.
+//! kind's total over the world and its edges changes only as work (a task's inputs and outputs) and construction (a
+//! building's materials) account for; nobody but an edge ever holds a negative quantity; and goods move only by
+//! their holder's own act.
 
 mod common;
 
@@ -12,7 +13,9 @@ use terrarium_kernel::run::Run;
 
 fn check_run(ops: &[Op]) -> Result<usize, TestCaseError> {
     let mut run = Run::start(world(&default_params()), "goods", Vec::new(), None).unwrap();
-    let opening = run.kernel().state().total_goods();
+    let mut expected = run.kernel().state().total_goods();
+    let tasks = run.kernel().statics().config.catalogue.tasks.clone();
+    let types = run.kernel().statics().types.clone();
     let edges = run.kernel().statics().boundaries.clone();
     let mut moved = 0;
     for op in ops {
@@ -23,14 +26,37 @@ fn check_run(ops: &[Op]) -> Result<usize, TestCaseError> {
             _ => None,
         });
         for e in &resp.events {
-            if let EventBody::GoodsMoved { from, quantity, .. } = &e.body {
-                prop_assert!(*quantity > 0);
-                prop_assert_eq!(Some(from), acting.as_ref(), "goods moved by someone other than their holder");
-                moved += 1;
+            match &e.body {
+                EventBody::GoodsMoved { from, quantity, .. } => {
+                    prop_assert!(*quantity > 0);
+                    prop_assert_eq!(Some(from), acting.as_ref(), "goods moved by someone other than their holder");
+                    moved += 1;
+                }
+                // What work and construction account for: inputs used up, outputs made, materials built in.
+                EventBody::Worked { task, units, .. } => {
+                    if let Some(t) = tasks.iter().find(|x| &x.id == task) {
+                        for (k, per) in &t.consumes {
+                            *expected.entry(k.clone()).or_insert(0) -= per * *units as i128;
+                        }
+                        for (k, per) in &t.produces {
+                            *expected.entry(k.clone()).or_insert(0) += per * *units as i128;
+                        }
+                    }
+                }
+                EventBody::StructureStarted { structure_type, .. } => {
+                    for (k, q) in &types[structure_type].materials {
+                        *expected.entry(k.clone()).or_insert(0) -= q;
+                    }
+                }
+                _ => {}
             }
         }
         let st = run.kernel().state();
-        prop_assert_eq!(&st.total_goods(), &opening, "goods created or destroyed by {:?}", cmd);
+        let mut have = st.total_goods();
+        for k in expected.keys() {
+            have.entry(k.clone()).or_insert(0);
+        }
+        prop_assert_eq!(&have, &expected, "goods not accounted for after {:?}", cmd);
         for h in st.holdings.values() {
             prop_assert!(h.quantity >= 0 || edges.contains(&h.holder), "{} holds {} of {} at {}", h.holder, h.quantity, h.kind, h.at);
         }

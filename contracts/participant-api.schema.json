@@ -821,6 +821,45 @@
                       "completes_at": {
                         "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
                       },
+                      "coming_down": {
+                        "description": "Being brought down (phase B).",
+                        "const": true
+                      },
+                      "variables": {
+                        "description": "Its state variables (phase B), each as a value on a day with its rate now and bounds: today's value is value + per_day x (days since), within bounds.",
+                        "type": "object",
+                        "propertyNames": {
+                          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+                        },
+                        "additionalProperties": {
+                          "type": "object",
+                          "required": [
+                            "value",
+                            "as_of_day",
+                            "per_day",
+                            "min",
+                            "max"
+                          ],
+                          "additionalProperties": false,
+                          "properties": {
+                            "value": {
+                              "type": "integer"
+                            },
+                            "as_of_day": {
+                              "type": "integer"
+                            },
+                            "per_day": {
+                              "type": "integer"
+                            },
+                            "min": {
+                              "type": "integer"
+                            },
+                            "max": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      },
                       "spaces": {
                         "type": "array",
                         "items": {
