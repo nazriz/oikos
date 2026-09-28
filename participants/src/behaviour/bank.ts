@@ -20,7 +20,7 @@ interface Payment { instruction: string; from: string; to: string; amount: numbe
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.6.0",
+  version: "0.7.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -28,7 +28,7 @@ export const bankPaymentSystem: BehaviourModule = {
     const verifyAuthor = ctx.params.verify_author ?? true;
     const maxBatch = Math.min(32, ctx.params.max_batch ?? 32);
     const done = new Set<string>(); // one-off instructions handled
-    const settled = new Set<string>(); // death registrations whose estates we've settled
+    const settled = new Map<string, string[]>(); // death registration -> the heirs' accounts its estate goes to
     const p = { town: (ctx.params.town as string | undefined) ?? "city" };
     const nextDue = new Map<string, number>(); // standing order -> next due time
     let queue: Payment[] = [];
@@ -110,13 +110,16 @@ export const bankPaymentSystem: BehaviourModule = {
         }
       }
       // Settling an estate, as law-succession says: to the partner; else equally to the adult children; else the town.
+      // The heirs are settled once; what comes into the estate later (a dividend, a refund) is passed on to them too,
+      // as an estate's administrator does.
       const accountOf = (holder: string) => [...custody.values()].find((a) => a.holder === holder && !dead.has(holder))?.account;
       for (const r of deaths) {
-        if (settled.has(r.id)) continue;
-        settled.add(r.id);
-        const heirs = [r.data?.partner].filter((x): x is string => !!x && !!accountOf(x));
-        if (!heirs.length) heirs.push(...((r.data?.adult_children ?? []) as string[]).filter((x) => !!accountOf(x)));
-        const to = heirs.length ? heirs.map((h) => accountOf(h)!) : [accountOf(p.town)].filter((x): x is string => !!x);
+        if (!settled.has(r.id)) {
+          const heirs = [r.data?.partner].filter((x): x is string => !!x && !!accountOf(x));
+          if (!heirs.length) heirs.push(...((r.data?.adult_children ?? []) as string[]).filter((x) => !!accountOf(x)));
+          settled.set(r.id, heirs.length ? heirs.map((h) => accountOf(h)!) : [accountOf(p.town)].filter((x): x is string => !!x));
+        }
+        const to = settled.get(r.id)!;
         if (!to.length) continue;
         for (const acc of custody.values()) {
           if (acc.holder !== r.data?.deceased || acc.balance <= 0) continue;

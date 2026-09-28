@@ -256,7 +256,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     ...(cap === "self" ? {} : { position: cap }),
     rng: (purpose) => randomness.stream(["participant", pid, cap, String(t), purpose]),
     world: { tickSeconds: tick, runEnd },
-    params: (params ?? {}) as any,
+    // Keys sorted: the log keeps the config in canonical form, so a resumed run must see its parameters exactly as the
+    // original did, whatever order the world's author wrote them in.
+    params: sortedKeys(params ?? {}) as any,
   });
   const isLlm = (p: Part) => p.controller?.type === "llm";
 
@@ -322,7 +324,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (b && !brainModule) throw new Error(`participant ${p.id}: no behaviour module "${b}" for its mock brain`);
       if (brainModule) {
         await hashSource(brainModule);
-        const bctx = { ...ctx, params: (pp.mock?.params ?? {}) as any };
+        const bctx = { ...ctx, params: sortedKeys(pp.mock?.params ?? {}) as any };
         brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", rejectBps: pp.mock?.reject_bps, optOutAt: pp.mock?.opt_out_at });
         bindings[p.id] = { ...bindings[p.id], mock_brain: b };
       }
@@ -787,4 +789,11 @@ class Units extends Map<string, Unit> {
       i = m;
     }
   }
+}
+
+/** A copy of a JSON value with every object's keys in sorted order. */
+function sortedKeys(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(sortedKeys);
+  if (v && typeof v === "object") return Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortedKeys((v as { [k: string]: unknown })[k])]));
+  return v;
 }

@@ -1,5 +1,7 @@
 # The outside world as a boundary condition: `world.trade` (v0.1.0), `world.export_demand` (v0.2.0) and `world.migration` (v0.1.0)
 
+`world.export_demand` (money on a schedule) is kept for worlds that want exports as money alone. The generated town uses `world.trade`.
+
 **Seat:** the outside world (entity of kind `boundary`). **Source:** `participants/src/behaviour/world.ts`.
 
 ## What it does
@@ -26,7 +28,7 @@ VISION §5: "boundary conditions: the world has an outside, with external market
 
 The outside world as a trader (phase B). The world market is large next to a town, so it takes the town's prices as given in the other direction too: it sells whatever is ordered at world prices, and buys at world prices up to a demand. Both are researcher-set.
 - **Selling (imports).** It publishes a price list (`sells`: a unit price for each kind) and fills paid orders from outside ([trade.md](trade.md)). The goods come from the edge's own holding, which may go negative: they come from elsewhere (D31). An order below the world price, or for something it doesn't sell, is refunded.
-- **Buying (exports).** At the start of each month it publishes a `buying_offer` for each kind it `buys`: a unit price, and that month's quantity. A town firm ships goods to the outside (`goods(..., to = outside, at = outside)`) and invoices it. The `invoice` data names the kind, the quantity, where the goods came from (`from_at`) and the payment asked for.
+- **Buying (exports).** At the start of each month it publishes a `buying_offer` for each kind it `buys`: a unit price, and that month's quantity. The quantity is either shared by all sellers, first come first served, or split among named sellers (`from`: each seller's quantity, like a factory's own export customers). A town firm ships goods to the outside (`goods(..., to = outside, at = outside)`) and invoices it. The `invoice` data names the kind, the quantity, where the goods came from (`from_at`) and the payment asked for.
 - **Paying invoices.** It pays an invoice once the goods have arrived: its own holding shows what came in, less what it has sent out itself. It pays at the offer's price, up to the month's quantity. Goods beyond that are sent back to where they came from, with a note (`invoice_declined`, `returned`). An invoice whose goods haven't come within `wait_days` (14) is declined.
 
 **Where the rule comes from:** VISION §5 (boundary conditions: external markets, prices and demand, set by the researcher). A small open economy is a price-taker on world markets. Demand for its exports is capped here, rather than infinite at the world price, so the researcher sets how much of the town's output the world takes.
@@ -34,10 +36,16 @@ The outside world as a trader (phase B). The world market is large next to a tow
 **Parameters:**
 - `account` (the edge's own account);
 - `sells` (`{ kind: cents each }`);
-- `buys` (`{ kind: { unit_price, per_month } }`);
+- `buys` (`{ kind: { unit_price, per_month, from? } }`);
 - `wait_days`.
 
-In the generated town (generator 0.12.0) it sells building materials at $1.25 a kg ([building.md](building.md)). Selling inputs and goods, and buying exports, come with the factories and shops (phase B, stage B4 steps 2–3), when they replace `world.export_demand`.
+In the generated town (generator 0.12.0):
+- it sells building materials at $1.25 a kg ([building.md](building.md)) and factory inputs at $2.50 a kg;
+- it buys the factories' goods at $60 each. Its monthly quantity is the spec's `exports_per_month` (money at the world price) divided by that price, split between the factories by the size of their works (each factory's export customers).
+
+This replaces `world.export_demand` in the town. Selling goods to shops comes with step 3.
+
+A first-come-first-served quantity, shared by two factories, made the demand each factory saw swing from month to month: whoever shipped first took most of it. Named shares (a factory's own export customers) are steadier and closer to how a town's factories actually sell abroad.
 
 **Leaves out:**
 - world prices that move;

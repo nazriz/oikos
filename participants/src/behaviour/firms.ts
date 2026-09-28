@@ -17,7 +17,7 @@ import * as C from "../calls";
 import type { Observation, ParticipantAction } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, between, Book, callAction, usd, cellsOf, DAY, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
+import { because, between, Book, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -349,9 +349,134 @@ export const landlord: BehaviourModule = {
   },
 };
 
+/**
+ * A firm's staff (shared by firm.employer and firm.producer): hiring through job postings and offers, wages by
+ * standing order through the firm's bank, notice, and a worker's death. What headcount and wage to aim for is the
+ * module's own rule; this is how any employer carries it out.
+ */
+export class Staffing {
+  private readonly orders = new Map<string, string>(); // agreement -> wage standing order
+  private readonly pendingOrder = new Map<string, string>(); // step marker -> agreement
+  private readonly handled = new Set<string>();
+  readonly noticed = new Map<string, number>(); // agreement -> when we gave notice
+  private n = 0; // unique names for standing orders we create
+
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string }) {}
+
+  absorb(obs: Observation) {
+    for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) { this.orders.set(this.pendingOrder.get(ref)!, id); this.pendingOrder.delete(ref); }
+  }
+
+  private contracts(book: Book): any[] {
+    return [...book.records.values()].filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me);
+  }
+  private endOf(book: Book, a: any): number {
+    return Math.min(...(book.notices.get(a.id) ?? []).map((n) => n.at + (a.terms.termination?.find((x: any) => x.party === n.as)?.notice ?? 14 * DAY)), Infinity);
+  }
+  /** Employment agreements in force and not yet ended, oldest first. */
+  staff(book: Book, t: number): any[] {
+    return this.contracts(book).filter((a) => book.inForce(a.id) && t < this.endOf(book, a)).sort((x, y) => book.signedAt(x.id)! - book.signedAt(y.id)!);
+  }
+  /** Offers we've made in the last month that the worker hasn't signed yet. */
+  offered(book: Book, t: number): any[] {
+    return this.contracts(book).filter((a) => !book.inForce(a.id) && !book.signedBy(a.id, a.terms.parties[1]) && t - a.at < MONTH);
+  }
+  /** Our standing job postings. */
+  postings(book: Book) {
+    return book.open("job_posting").filter((j) => j.speaks_for === this.me);
+  }
+  /** The workers we're paying, by person. */
+  workers(book: Book, t: number): string[] {
+    return this.staff(book, t).map((a) => a.terms.parties[1] as string);
+  }
+
+  /**
+   * The routine: start wages for new hires and stop them for the dead and the departed; offer each posting's job to
+   * one applicant at random (at the posting's wage); post a job at `wage` while short of `target` and `canPost`.
+   */
+  routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string }): Step[] {
+    const t = obs.t;
+    const me = this.me;
+    // Genesis standing orders for existing staff.
+    for (const r of book.records.values()) if (r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.basis && !this.orders.has(r.basis) && !book.withdrawn.has(r.id)) this.orders.set(r.basis, r.id);
+    const contracts = this.contracts(book);
+    const staff = this.staff(book, t);
+    const offered = this.offered(book, t);
+    const steps: Step[] = [];
+    let offersNow = 0;
+
+    // Newly signed: start paying wages by standing order, at the wage agreed.
+    for (const a of staff) {
+      if (this.orders.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
+      const worker = a.terms.parties[1];
+      const pays = jobTerms(a, worker);
+      const to = commitmentOf(a, me).outcome?.money?.to ?? (([...book.records.values()].find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
+      if (!to) continue;
+      const ref = `wo${this.n++}`;
+      this.pendingOrder.set(ref, a.id);
+      steps.push(because("A new hire has signed: starting their wages by standing order.", [ref, pay(to, pays.wage, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
+    }
+    // A worker who has died (registered): stop the wages, and end the employment on record.
+    for (const r of book.all("death_registration")) {
+      const a = staff.find((x) => x.terms.parties[1] === r.data?.deceased);
+      if (!a || this.noticed.has(a.id)) continue;
+      this.noticed.set(a.id, t);
+      const s: Step = because(`${r.data?.deceased}, who worked for us, has died: stopping their wages.`, notice(a.id, "The employee has died."));
+      if (this.orders.has(a.id)) {
+        s.push(withdraw(this.orders.get(a.id)!, "The employee has died; stop wages."));
+        this.orders.delete(a.id);
+      }
+      steps.push(s);
+    }
+    // Ended (notice served): stop the wages.
+    for (const a of contracts) if (book.inForce(a.id) && t >= this.endOf(book, a) && this.orders.has(a.id)) {
+      steps.push(because("Employment has ended: stopping the wages.", withdraw(this.orders.get(a.id)!, "Employment ended; stop wages.")));
+      this.orders.delete(a.id);
+    }
+
+    // Hiring: one applicant at random per posting, at the posting's wage.
+    const posts = this.postings(book);
+    const apps = book.open("job_application").filter((a) => (a.addressed_to ?? []).includes(me) && !this.handled.has(a.id));
+    for (const post of posts) {
+      const mine = apps.filter((a) => a.data?.posting === post.id).sort((x, y) => (x.id < y.id ? -1 : 1));
+      for (const a of mine) this.handled.add(a.id);
+      if (!mine.length) continue;
+      const chosen = this.ctx.rng(`hire-${post.id}`).pick(mine);
+      const worker = chosen.speaks_for!;
+      const wage = Number.isInteger(post.data?.wage) ? (post.data!.wage as number) : want.wage;
+      steps.push(because(`Hiring for our posting: an applicant picked at random among ${mine.length}.`,
+        ["job", offer(worker, {
+          template: "employment", ourNotice: this.o.notice_days * DAY, theirNotice: this.o.notice_days * DAY,
+          we: pay(chosen.data?.account ?? worker, wage, { every: this.o.period, for: "wages" }),
+          they: this.o.workplace ? C.call("occupancy", { who: worker, in: this.o.workplace }) : undefined,
+          text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${wage} cents every ${this.o.period / DAY} days.`,
+          basis: chosen.id,
+        })],
+        withdraw(post.id, "Filled."),
+      ));
+      offersNow++;
+    }
+
+    // Post a job if short-staffed (and the module says we can).
+    const have = staff.length + offered.length + offersNow;
+    if (have < want.target && posts.length === 0 && want.canPost) {
+      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
+    }
+    return steps;
+  }
+
+  /** Let one worker go (the most recent hire not already under notice), with the notice their contract gives. */
+  letGo(book: Book, t: number, why: string, reason: string): Step[] {
+    const last = this.staff(book, t).filter((a) => !this.noticed.has(a.id)).sort((x, y) => book.signedAt(y.id)! - book.signedAt(x.id)!)[0];
+    if (!last) return [];
+    this.noticed.set(last.id, t);
+    return [because(why, notice(last.id, reason))];
+  }
+}
+
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -369,97 +494,29 @@ export const employer: BehaviourModule = {
   );
     const me = ctx.entity;
     const book = new Book();
-    const orders = new Map<string, string>(); // agreement -> wage standing order
-    const pendingOrder = new Map<string, string>(); // step marker -> agreement
-    const handled = new Set<string>();
-    const noticed = new Map<string, number>();
-    let n = 0; // unique names for standing orders we create
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role ?? "staff" });
     let revenue = 0;
     let nextSuppliers = MONTH;
 
     const absorb = (obs: Observation) => {
       book.absorb(obs);
+      staffing.absorb(obs);
       const acc = ownAccount(obs);
       if (acc) for (const [, amount] of receipts(obs, acc.account)) revenue += amount;
-      // Standing orders we just set up.
-      for (const o of obs.outcomes) for (const [ref, id] of Object.entries(o.created ?? {})) if (pendingOrder.has(ref)) { orders.set(pendingOrder.get(ref)!, id); pendingOrder.delete(ref); }
     };
     return stepper(absorb, (obs) => {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
-      // Genesis standing orders for existing staff.
-      for (const r of book.records.values()) if (r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.basis && !orders.has(r.basis) && !book.withdrawn.has(r.id)) orders.set(r.basis, r.id);
-
-      const contracts = [...book.records.values()].filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === me) as any[];
-      const endOf = (a: any) => Math.min(...(book.notices.get(a.id) ?? []).map((n) => n.at + (a.terms.termination?.find((x: any) => x.party === n.as)?.notice ?? 14 * DAY)), Infinity);
-      const staff = contracts.filter((a) => book.inForce(a.id) && t < endOf(a));
-      const offered = contracts.filter((a) => !book.inForce(a.id) && !book.signedBy(a.id, a.terms.parties[1]) && t - a.at < MONTH);
-      const steps: Step[] = [];
-      let offersNow = 0;
-
-      // Newly signed: start paying wages by standing order.
-      for (const a of staff) {
-        if (orders.has(a.id) || [...pendingOrder.values()].includes(a.id)) continue;
-        const account = ([...book.records.values()].find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === a.terms.parties[1]) as any)?.data?.account;
-        if (!account) continue;
-        const ref = `wo${n++}`;
-        pendingOrder.set(ref, a.id);
-        steps.push(because("A new hire has signed: starting their wages by standing order.", [ref, pay(account, p.wage, { from: acc.account, every: p.period, first: p.period, basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })]));
-      }
-      // A worker who has died (registered): stop the wages, and end the employment on record.
-      for (const r of book.all("death_registration")) {
-        const a = staff.find((x) => x.terms.parties[1] === r.data?.deceased);
-        if (!a || noticed.has(a.id)) continue;
-        noticed.set(a.id, t);
-        const s: Step = because(`${r.data?.deceased}, who worked for us, has died: stopping their wages.`, notice(a.id, "The employee has died."));
-        if (orders.has(a.id)) {
-          s.push(withdraw(orders.get(a.id)!, "The employee has died; stop wages."));
-          orders.delete(a.id);
-        }
-        steps.push(s);
-      }
-      // Ended (notice served): stop the wages.
-      for (const a of contracts) if (book.inForce(a.id) && t >= endOf(a) && orders.has(a.id)) {
-        steps.push(because("Employment has ended: stopping the wages.", withdraw(orders.get(a.id)!, "Employment ended; stop wages.")));
-        orders.delete(a.id);
-      }
-
-      // Hiring: one applicant at random per posting.
-      const posts = book.open("job_posting").filter((j) => j.speaks_for === me);
-      const apps = book.open("job_application").filter((a) => (a.addressed_to ?? []).includes(me) && !handled.has(a.id));
-      for (const post of posts) {
-        const mine = apps.filter((a) => a.data?.posting === post.id).sort((x, y) => (x.id < y.id ? -1 : 1));
-        for (const a of mine) handled.add(a.id);
-        if (!mine.length) continue;
-        const chosen = ctx.rng(`hire-${post.id}`).pick(mine);
-        const worker = chosen.speaks_for!;
-        steps.push(because(`Hiring for our posting: an applicant picked at random among ${mine.length}.`,
-          ["job", offer(worker, {
-            template: "employment", ourNotice: p.notice_days * DAY, theirNotice: p.notice_days * DAY,
-            we: pay(chosen.data?.account ?? worker, p.wage, { every: p.period, for: "wages" }),
-            they: p.workplace ? C.call("occupancy", { who: worker, in: p.workplace }) : undefined,
-            text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${p.wage} cents every ${p.period / DAY} days.`,
-            basis: chosen.id,
-          })],
-          withdraw(post.id, "Filled."),
-        ));
-        offersNow++;
-      }
-
-      // Post a job if short-staffed and the wage bill is affordable.
+      const staff = staffing.staff(book, t);
       const bill = (staff.length + 1) * p.wage;
-      if (staff.length + offered.length + offersNow < p.target_staff && posts.length === 0 && acc.balance >= p.buffer_periods * bill) {
-        steps.push(because(`Short-staffed (${staff.length + offered.length + offersNow} of ${p.target_staff}) with ${p.buffer_periods} pay periods of the wage bill in hand: posting a job.`, say("job_posting", `Hiring: ${p.wage} cents every ${p.period / DAY} days.`, { data: { wage: p.wage, period: p.period, role: p.role ?? "staff", ...(p.workplace ? { workplace: structureOf(p.workplace), space: p.workplace } : {}) } })));
-      }
-
+      const steps = staffing.routine(obs, book, acc.account, {
+        target: p.target_staff, wage: p.wage, canPost: acc.balance >= p.buffer_periods * bill,
+        why: `Short-staffed (${staff.length + staffing.offered(book, t).length} of ${p.target_staff}) with ${p.buffer_periods} pay periods of the wage bill in hand: posting a job.`,
+      });
       // Can't cover the next pay period: lay off the most recent hire.
       if (staff.length && acc.balance < staff.length * p.wage) {
-        const last = staff.filter((a) => !noticed.has(a.id)).sort((x, y) => (book.signedAt(y.id)! - book.signedAt(x.id)!))[0];
-        if (last) {
-          noticed.set(last.id, t);
-          steps.push(because(`Can't cover the next pay period (${usd(acc.balance)} for ${staff.length} staff): laying off the most recent hire.`, notice(last.id, "Redundancy: we can't cover the wage bill.")));
-        }
+        steps.push(...staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${staff.length} staff): laying off the most recent hire.`, "Redundancy: we can't cover the wage bill."));
       }
 
       // Monthly: pay suppliers (the outside world) for goods sold.

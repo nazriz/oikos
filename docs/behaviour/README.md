@@ -18,10 +18,11 @@ Rules every module follows (so re-runs are reproducible):
 |---|---|---|
 | `bank.payment_system` | a bank's automated payment system | [bank-payment-system.md](bank-payment-system.md) |
 | `world.trade` | the world market: sells at world prices against paid orders, buys exports against invoices (a boundary condition, D31) | [boundary.md](boundary.md) |
-| `world.export_demand` | the outside world's purchases as money on a schedule (until the factories export goods) | [boundary.md](boundary.md) |
+| `world.export_demand` | the outside world's purchases as money on a schedule (worlds without goods) | [boundary.md](boundary.md) |
 | `citizen.default` | a townsperson: housing, work, spending, leaving town | [citizen.md](citizen.md) |
 | `firm.landlord` | a landlord's letting office | [firms.md](firms.md) |
-| `firm.employer` | a shop's or factory's manager | [firms.md](firms.md) |
+| `firm.employer` | a shop's manager: a fixed headcount at a fixed wage | [firms.md](firms.md) |
+| `firm.producer` | a factory (Lengnick 2013): makes goods from inputs with its workers' hours, sells wholesale, exports; hires, sets wages and prices, pays dividends | [producer.md](producer.md) |
 | `city.planning_officer` | decides permit applications under the laws that bind the office | [institutions.md](institutions.md) |
 | `city.inspector` | patrols, detects unpermitted building, fines and orders demolition | [institutions.md](institutions.md) |
 | `firm.builder` | builds and demolishes what it's contracted to: materials bought from its supplier, its crew's hours; invoices | [institutions.md](institutions.md) |

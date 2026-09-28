@@ -21,7 +21,7 @@ async function run(name: string, config: any, until: number) {
   const s = await runWorld({ config, runId: name, outDir: out, until, modules });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   // Every call the modules wrote was one they could make.
-  expect(log.filter((e) => e.kind === "annotation" && e.body.data?.call_unresolved).map((e) => e.body.data)).toEqual([]);
+  expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   return { ev, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
 }
@@ -39,7 +39,7 @@ test("the builder buys materials from outside, and its crew's hours finish each 
     expect(g).toMatchObject({ kind: "materials", to_at: "builder-yard" });
     expect(ev.some((e) => e.event === "transfer" && e.from === "acc-builder" && e.to === "acc-outside" && e.amount === String(Number(g.quantity) * price) && e.t <= g.t)).toBe(true);
   }
-  expect(recs.filter((r) => r.kind === "delivery_note" && r.speaks_for === "outside").length).toBe(bought.length);
+  expect(recs.filter((r) => r.kind === "delivery_note" && r.speaks_for === "outside" && r.addressed_to.includes("builder")).length).toBe(bought.length);
   // Every building finished took exactly its hours of the crew's work (and no more), from the yard.
   const started = new Map(ev.filter((e) => e.event === "structure_started").map((e) => [e.structure, e]));
   const done = ev.filter((e) => e.event === "structure_completed" && started.has(e.structure));
@@ -93,6 +93,7 @@ test("the world market buys exports it has received, up to the month's demand, a
   const manager = config.participants.find((p: any) => p.id === "factory-1-manager-system");
   manager.controller = { type: "code", impl: "test.exporter", params: { account: "acc-factory-1", from_at: "factory-1-works", price: 1000,
     script: [{ day: 2, ship: 100, invoice: 100 }, { day: 3, ship: 100, invoice: 100 }, { day: 4, ship: 200, invoice: 200 }, { day: 5, ship: 0, invoice: 50 }] } };
+  config.world.holdings = config.world.holdings.filter((h: any) => !(h.holder === "factory-1" && h.kind === "goods"));
   config.world.holdings.push({ kind: "goods", holder: "factory-1", at: "factory-1-works", quantity: "1000" });
   const { ev, recs } = await run("exports", config, 25 * DAY);
   expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);

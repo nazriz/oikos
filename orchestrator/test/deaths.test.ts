@@ -35,8 +35,24 @@ test("a death is seen, reported, registered, and the world's people act on it", 
     const after = ev.filter((e) => e.event === "transfer" && e.t > r.t + DAY);
     // Nothing leaves the dead person's accounts after registration except to settle the estate.
     for (const x of after.filter((x) => holder.get(x.from) === who)) expect(x.per_instruction).toBe(r.id);
-    // Wages stop (the employer withdraws the standing order) within a pay period.
-    expect(after.filter((x) => holder.get(x.to) === who && x.t > r.t + 15 * DAY && x.per_instruction !== r.id).length).toBe(0);
+    // Wages stop (the employer withdraws the standing order) within a pay period. (What else comes into the estate, a
+    // dividend say, the bank passes on to the heirs.)
+    const wageOrders = new Set(ev.filter((e) => e.event === "recorded" && e.record.kind === "request" && /^Wages for /.test(e.record.data?.outcome?.money?.for ?? "")).map((e) => e.record.id));
+    for (const o of config.world.records) if (o.kind === "request" && o.data?.outcome?.money?.for === "wages") wageOrders.add(o.id);
+    expect(after.filter((x) => holder.get(x.to) === who && x.t > r.t + 15 * DAY && wageOrders.has(x.per_instruction)).length).toBe(0);
+  }
+  // An estate is left with nothing: what was there, and what comes in later (a dividend), goes on to the heirs, but
+  // for anything that came in the last few days.
+  const balance = new Map<string, number>(config.world.accounts.map((a: any) => [a.id, Number(a.balance)]));
+  const lastIn = new Map<string, number>();
+  for (const e of ev.filter((x) => x.event === "transfer")) {
+    balance.set(e.from, (balance.get(e.from) ?? 0) - Number(e.amount));
+    balance.set(e.to, (balance.get(e.to) ?? 0) + Number(e.amount));
+    lastIn.set(e.to, e.t);
+  }
+  for (const [who, r] of regs) {
+    if (r.t > 365 * DAY - 14 * DAY) continue;
+    for (const [acc, h] of holder) if (h === who && (lastIn.get(acc) ?? 0) < 365 * DAY - 3 * DAY) expect(balance.get(acc) ?? 0).toBeLessThanOrEqual(0);
   }
   // Estates are settled: something moved under a registration, to a partner, adult children or the town.
   const estates = ev.filter((e) => e.event === "transfer" && [...regs.values()].some((r) => r.id === e.per_instruction));

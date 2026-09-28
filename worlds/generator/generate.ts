@@ -14,8 +14,13 @@ const MATERIALS_PRICE = 125;
 const HOUR = 3600;
 /** The working day: the most a person works in a day (physics: a limit on hours; docs/behaviour/building.md). */
 const WORKING_DAY = 8 * HOUR;
-/** The builder's crew: its yard's places, and their wage (cents every 14 days). */
-const CREW = { capacity: 12, wage: 150_000 };
+/** Factories (docs/behaviour/producer.md; placeholders): an item of goods takes 1.5 hours of work and 10 kg of inputs. */
+const MAKE = { labour: 5400, inputs: 10 };
+/** World prices, cents each (placeholders): inputs a kg, and goods as the world market buys them. */
+const WORLD = { inputs: 250, goods_export: 6000 };
+/** The builder's crew: its yard's places, the crew it starts with (sized to its usual work, not its room), and their
+ * wage (cents every 14 days). */
+const CREW = { capacity: 12, start: 4, wage: 150_000 };
 
 export const GENERATOR_VERSION = "0.12.0";
 const DAY = 86_400;
@@ -38,7 +43,7 @@ export interface TownSpec {
   /** Superseded by apartment_units and house_types (generator 0.10). */
   rents?: { apartment: number; house: number };
   wages: { shop: number; factory: number }; // cents every 14 days
-  exports_per_month: number; // the outside world's purchases from the factories, cents
+  exports_per_month: number; // the world market's demand for the factories' goods, as money at the world price, cents
   housed_bps: number;
   employed_bps: number;
   savings_months: [number, number];
@@ -177,12 +182,12 @@ export function generate(spec: TownSpec): any {
     own(lot, l);
     homes.push({ structure: id, space: `${id}/dwelling.1`, type: ht.id, landlord: l, rent: ht.rent, bedrooms: ht.bedrooms });
   }
-  const workplaces: { employer: string; structure: string; space: string; wage: number; capacity: number }[] = [];
+  const workplaces: { employer: string; structure: string; space: string; wage: number; capacity: number; start?: number }[] = [];
   // The builder's yard: where it keeps materials and its crew works from (phase B).
   const yardLot = site();
   structures.push({ id: "builder-yard", at: cellOf.get(yardLot), type: "yard", built_by: "builder" });
   own(yardLot, "builder");
-  workplaces.push({ employer: "builder", structure: "builder-yard", space: "builder-yard/workplace.1", wage: CREW.wage, capacity: CREW.capacity });
+  workplaces.push({ employer: "builder", structure: "builder-yard", space: "builder-yard/workplace.1", wage: CREW.wage, capacity: CREW.capacity, start: CREW.start });
   for (const s of shops) {
     const lot = site(), id = `${s}-premises`;
     structures.push({ id, at: cellOf.get(lot), type: "shop", built_by: "builder" });
@@ -238,7 +243,7 @@ export function generate(spec: TownSpec): any {
 
   // Jobs: adults, at the working-age employment rate.
   const pick = rng("people");
-  const jobSlots = workplaces.flatMap((w) => Array.from({ length: w.capacity }, () => w));
+  const jobSlots = workplaces.flatMap((w) => Array.from({ length: w.start ?? w.capacity }, () => w));
   let job = 0;
   const staffCount = new Map<string, number>();
   const monthlyPay = new Map<string, number>();
@@ -322,6 +327,25 @@ export function generate(spec: TownSpec): any {
     for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
   }
 
+  // ---- factories: their opening stock (a month's inputs for the staff they have, and some goods) and their shareholders ----
+  // Lengnick (2013): firms are owned by the households, in proportion to their wealth. Here each household's
+  // leaseholder holds shares in every factory, in proportion to the household's savings (in dollars).
+  const factoryStock: any[] = [];
+  const balanceOf = new Map(accounts.map((a) => [a.holder, a.balance as number]));
+  const holders = households.map((h) => ({ holder: h.leaseholder, account: `acc-${h.leaseholder}`, shares: Math.floor(h.members.reduce((x, m) => x + (balanceOf.get(m.id) ?? 0), 0) / 100) })).filter((h) => h.shares > 0);
+  for (const f of factories) {
+    const month = Math.floor(((staffCount.get(f) ?? 0) * WORKING_DAY * 5 * 30) / 7 / MAKE.labour);
+    factoryStock.push({ kind: "inputs", holder: f, at: `${f}-works`, quantity: String(month * MAKE.inputs) }, { kind: "goods", holder: f, at: `${f}-works`, quantity: String(Math.floor(month / 4)) });
+    records.push({ id: `shareholders-${f}`, record: "statement", author: "genesis", at: 0, visible_to: [f, ...holders.map((h) => h.holder)], speaks_for: f, kind: "shareholders",
+      text: `The shareholders of ${f}, and their shares.`, data: { holders } });
+  }
+
+  const exportUnits = Math.floor(spec.exports_per_month / WORLD.goods_export);
+  // Each factory's export customers, in proportion to the size of its works.
+  const room = new Map(workplaces.map((w) => [w.employer, w.capacity]));
+  const totalRoom = factories.reduce((x, f) => x + (room.get(f) ?? 0), 0);
+  const exportShares = Object.fromEntries(factories.map((f) => [f, Math.floor((exportUnits * (room.get(f) ?? 0)) / Math.max(1, totalRoom))]));
+
   // ---- participants and positions ----
   // Each organisation acts through positions (its roles). At the start each is held by a system participant running
   // the job's module (software, or the code stand-in for a person); a person could hold any of them instead, running
@@ -379,14 +403,16 @@ export function generate(spec: TownSpec): any {
   office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city" }));
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
   office("outside-trade", "outside", "The world market", undefined, [{ id: "ledger", kind: "accounts" }, mine("orders"), { id: "stock", kind: "holdings" }],
-    code("world.trade", { account: "acc-outside", sells: { materials: MATERIALS_PRICE } }));
-  office("export-demand", "outside", "The outside world's demand", undefined, [{ id: "ledger", kind: "accounts" }],
-    code("world.export_demand", { purchases: factories.map((f) => ({ to: `acc-${f}`, amount: Math.floor(spec.exports_per_month / factories.length), every: MONTH, memo: "Export sales." })) }));
+    code("world.trade", { account: "acc-outside", sells: { materials: MATERIALS_PRICE, inputs: WORLD.inputs },
+      // The world market's demand for the town's goods, split among the factories by the size of their works (each
+      // factory's export customers).
+      buys: { goods: { unit_price: WORLD.goods_export, per_month: exportUnits, from: exportShares } } }));
   // The foreman knows the registry's lots and goes to see the ground, to know where on a lot a building goes.
   // It sees its crew at the yard, its supplier's prices and what it holds.
-  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), priceLists, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } },
+  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, priceLists, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } },
     { id: "ground", kind: "sites", area: "all", every: 7 * DAY }, { id: "yard", kind: "sites", area: [cellOf.get(yardLot)], occupants: "names" }],
-    code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", wage: CREW.wage, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS }));
+    code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", wage: CREW.wage, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS,
+      workplace: "builder-yard/workplace.1", max_crew: CREW.capacity }));
   const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
   office("planning", "city", "Planning officer", "planning_officer",
     [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
@@ -432,11 +458,19 @@ export function generate(spec: TownSpec): any {
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
         city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, tax_rate_bps: 1000 }));
   }
+  // What the town's firms sell and buy: their price lists, and the world market's buying offers.
+  const market = { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"] } };
   for (const w of workplaces) {
+    if (w.employer === "builder") continue; // the foreman hires its own crew, to the work in hand
+    if (w.employer.startsWith("factory")) {
+      const cell = structures.find((x) => x.id === w.structure)!.at;
+      office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, { id: "stock", kind: "holdings" }, { id: "works", kind: "sites", area: [cell], occupants: "names" }],
+        code("firm.producer", { works: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY,
+          per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside" }));
+      continue;
+    }
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths],
-      code("firm.employer", { wage: w.wage, target_staff: Math.max(staffCount.get(w.employer) ?? 0, Math.floor(w.capacity * 0.8)), workplace: w.space, outside_account: "acc-outside",
-        // The builder buys its materials itself (firm.builder); the others' purchases are still a share of revenue, until they trade in goods.
-        ...(w.employer === "builder" ? { supplier_share_bps: 0 } : {}), role: w.employer === "builder" ? "construction worker" : w.employer.startsWith("shop") ? "shop assistant" : "factory worker" }));
+      code("firm.employer", { wage: w.wage, target_staff: Math.max(staffCount.get(w.employer) ?? 0, Math.floor(w.capacity * 0.8)), workplace: w.space, outside_account: "acc-outside", role: "shop assistant" }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = { id: "petitions", kind: "records", match: { statement_kinds: ["petition"] }, on_request: true };
@@ -466,13 +500,15 @@ export function generate(spec: TownSpec): any {
     catalogue: {
       structure_types: structureTypes.map((t) => ({ ...t, materials: Object.fromEntries(Object.entries(t.materials).map(([k, q]) => [k, String(q)])) })),
       resources: [{ id: "goods", unit: "item" }, { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }],
+      // Making goods: a worker's hours at a workplace turn inputs into goods.
+      tasks: [{ id: "make", labour: MAKE.labour, in: "workplace", consumes: { inputs: String(MAKE.inputs) }, produces: { goods: "1" } }],
       working_day: WORKING_DAY,
     },
     world: { boundaries: ["outside"], currencies: [{ code: "AUD", minor_units: 2 }], ground: { w: spec.grid.w, h: spec.grid.h },
       // One place (D58): the town, detailed, covering its ground.
       places: [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }], entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
       // The builder's stock at its yard: a house's worth of materials.
-      holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }] },
+      holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }, ...factoryStock] },
     participants,
     positions,
     templates,

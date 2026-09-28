@@ -501,6 +501,45 @@ See the design note, §16.
     - no call a module writes goes unresolved.
 
     Changed tests: the park's price; the view's channel kinds (holdings); deaths "at home" now means in a dwelling when they died, where it used to mean housed at the start.
+- **B4, step 2 landed: factories (`firm.producer`, after Lengnick 2013).** See [producer.md](behaviour/producer.md).
+  - **What a factory does:**
+    - its workers' hours turn inputs into goods (the task `make`);
+    - it buys inputs by an (s, S) rule;
+    - it sells wholesale;
+    - it exports what it needn't keep under its share of the world market's buying offer, and invoices it;
+    - monthly, it applies Lengnick's hiring, wage and price rules, and pays what it holds beyond a buffer to its shareholders (a `shareholders` register: in the town, each household's leaseholder, in proportion to savings).
+  - `world.export_demand` is gone from the town.
+  - **Changed from Lengnick (each in the doc, with why):** inputs; output follows hours, and nothing is made when stock is above the band; contracts keep their wage; exports; a buffer covering wages and inputs paid ahead of sales; last in, first out.
+  - **Employers share one staffing routine** (`Staffing`: postings, offers, wage orders, notice, deaths). It was extracted from `firm.employer` with the town's two-year run unchanged to the state hash.
+  - **The builder hires its own crew, to the work in hand:** enough hands to do it within 90 days, a core of 2, the yard's 12 at most. It used to keep a fixed crew. In one seed the builder paid 12 idle hands for 250 days and went broke.
+  - **Found:**
+    - **Shared export demand swung.** A first-come-first-served monthly quantity, shared by two factories, went mostly to whoever shipped first, and the other's demand swung between zero and everything. The world market now buys from named sellers, each with its own share (a factory's export customers). The generator splits the spec's demand by the size of each works.
+    - **An empty factory never started.** It counted only what it sold as demand, so with no staff it saw none. Its demand now includes demand it couldn't meet (its export share), as Lengnick's does.
+    - **An empty factory paid out all its capital.** Its buffer was a month's wages for no one, so its $400,000 went to its shareholders. Dividends now come out of the month's earnings only.
+    - **Daily hiring checks hired endlessly.** Stock that's shipped out weekly always looks low. Hiring is now decided monthly, as in Lengnick.
+    - **Unsold stock kept piling up.** A factory with stock it couldn't sell kept making more. Now it makes nothing above the band.
+    - **Dividends were never paid.** The act had 78 payments, beyond a program's 32 lines, and was dropped as `call_unreadable`. They're now paid in batches, and the tests fail on unreadable calls as well as unresolved ones.
+    - **Offices answered bank notices with price lists.** Letters about one of our records (a bank saying a payment wasn't made) were answered with the price list. They're now not answered.
+    - **Resumed runs diverged.** The log keeps the config in canonical form (keys sorted). A module that iterated a parameter's keys (the world market's price list) wrote its text in a different order after a resume, and the recorded model calls no longer matched. The orchestrator now gives every module its parameters with keys sorted, so a fresh run and a resumed one see the same.
+    - **Dividends went on arriving in dead people's accounts.** The bank now passes on to the heirs whatever comes into an estate after it's settled, as an administrator does (bank 0.7.0). The deaths test checks estates end empty, and that wages (the thing it meant) stop.
+  - **What changed in the town (3 seeds, 2 years, against the commit before B4):**
+    - **Leases, move-ins and households** are within noise.
+    - **More people leave:** 34 a run on average, was 23. There are fewer people at the end (176, was 184), and rent stress is somewhat higher (27% of households over 30%, was 22%). The added departures are households with nobody earning.
+    - **Why:** about 100 people work, against 108 before.
+      - At the placeholder productivity, $400,000 a month of exports keeps about 58 factory workers, where the money-only factories kept 72.
+      - The builder's crew follows its work: from 4 at the start, up to 12 when busy, down to 2 when quiet.
+      - The yard's opening crew is 4, sized to its usual work. A full yard of 12 at the start, laid off in the first quiet spell, doubled departures in a trial run.
+      - Households don't yet buy goods locally. That's step 3, about 1,500 items a month through the shops, which is roughly 13 factory jobs.
+
+      **To judge after step 3**, and calibrate in B5 (unemployment against ABS Labour Force).
+    - **Dividends:** about $56,000 a month goes to households, and the factories' cash stays near their buffers.
+  - **Tests:** `orchestrator/test/production.test.ts`.
+    - Goods are made only by the factory's own employees, and within a working day.
+    - Inputs are bought at the world price.
+    - Exports are paid at the world price, within each factory's share.
+    - Dividends are in proportion to shares.
+    - Too little demand: workers are let go monthly, and making falls to what sells.
+    - Plenty of demand: the factories hire monthly.
 **D59. Reliability: timing failures stop cleanly and resume; deterministic ones recover in place.** *(Naz, 2026-09-28: "we need to be able to automatically gracefully recover from things like infinite loops, things getting stuck"; "determinism split sounds right".)*
 - **Why:** a two-year run hung at day 691 for eight minutes with no sign anything was wrong. The cause was the orchestrator's own bug (D58's same-moment rule). The real problem was that nothing noticed. A dead kernel would also have been misread as an off-contract request, and the run would have gone on against nothing.
 - **The split:** results must never depend on wall-clock timing. Deterministic failures (a module throws; a model call fails after its time limits and retries, which is then in the log) are recovered in place: recorded, and the participant waits. Timing failures (a stall, a dead kernel) stop the run cleanly, with a diagnosis, to be resumed once fixed.

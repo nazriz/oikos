@@ -1,4 +1,4 @@
-# Firms: `firm.landlord` (v0.6.0) and `firm.employer` (v0.5.0)
+# Firms: `firm.landlord` (v0.6.0) and `firm.employer` (v0.6.0)
 
 **Source:** `participants/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
 
@@ -21,7 +21,9 @@
 
 **Differs from the BoE model on purpose:** that model injects cash so tenants never miss rent. Here arrears happen, and what follows is up to the landlord.
 
-## `firm.employer`: a shop or factory's manager
+## `firm.employer`: a shop's manager
+
+How any employer hires and pays (postings, offers, standing orders, notice, a worker's death) is shared code, `Staffing` in `participants/src/behaviour/firms.ts`. Factories ([producer.md](producer.md)) and the builder use it too, each with its own rule for how many staff to have and at what wage. `firm.employer`'s rule is the simple one below: a fixed target headcount at a fixed wage.
 
 | Rule | Detail |
 |---|---|
@@ -30,7 +32,7 @@
 | **Postings** | A posting says where the work is (`data.workplace`), so someone told about a workplace can find it. |
 | **Paying** | Once the worker signs, set up a standing order through the firm's bank for wages every 14 days |
 | **Layoffs** | If the balance can't cover the next pay period, give 14 days' notice to the most recent hire, and stop their wages when it runs out |
-| **Suppliers** | Monthly: 40% of the month's revenue paid to the outside world, for goods bought in |
+| **Suppliers** | Monthly: 40% of the month's revenue paid to the outside world, for goods bought in. This is a money-only stand-in until shops buy goods (phase B, stage B4 step 3). |
 
 The labour-market literature (the Dosi et al. "Schumpeter meeting Keynes" labour extension) is the planned refinement for wage-setting and hiring.
 

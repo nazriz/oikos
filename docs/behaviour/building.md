@@ -21,7 +21,7 @@ Materials are one kind, `materials` (kg), bought from the world market at **$1.2
 | civic | 330 t | 10,000 h | 800 h | 120 days |
 | park | 20 t | 1,500 h | 100 h | 30 days |
 
-A building is finished when its hours are done **and** its least time has passed (drying, curing and inspections take time whatever the crew). A crew of 12 working 5 days a week puts in 480 hours a week. A house therefore takes about 8 weeks of the whole crew, and its least time (13 weeks) decides when it's finished, unless the crew is shared between several jobs. Apartments take about 75 weeks of the whole crew: labour decides.
+A building is finished when its hours are done **and** its least time has passed (drying, curing and inspections take time whatever the crew). A full crew of 12 (the yard's room; the builder starts with 4 and hires to its work) working 5 days a week puts in 480 hours a week. A house therefore takes about 8 weeks of the whole crew, and its least time (13 weeks) decides when it's finished, unless the crew is shared between several jobs. Apartments take about 75 weeks of the whole crew: labour decides.
 
 ## What it costs
 

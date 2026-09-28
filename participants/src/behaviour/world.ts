@@ -43,9 +43,9 @@ export const exportDemand: BehaviourModule = {
  * demand, both researcher-set:
  * - it publishes a price list (`sells`: a unit price for each kind) and fills paid orders from outside (the edge's
  *   own goods, which may go negative: they come from elsewhere);
- * - each month it publishes a buying offer for each kind it `buys` (a unit price and that month's quantity), and pays
- *   invoices for goods shipped to it under the offer, once the goods have arrived; goods beyond the month's quantity
- *   are sent back, unpaid.
+ * - each month it publishes a buying offer for each kind it `buys` (a unit price and that month's quantity: in all, or
+ *   for each seller it buys from, `from`), and pays invoices for goods shipped to it under the offer, once the goods
+ *   have arrived; goods beyond the month's quantity (the seller's, or all sellers') are sent back, unpaid.
  */
 export const trade: BehaviourModule = {
   name: "world.trade",
@@ -58,7 +58,7 @@ export const trade: BehaviourModule = {
       {
         account: "acc-outside",
         sells: {} as { [kind: string]: number }, // unit prices, cents
-        buys: {} as { [kind: string]: { unit_price: number; per_month: number } },
+        buys: {} as { [kind: string]: { unit_price: number; per_month: number; from?: { [seller: string]: number } } },
         wait_days: 14, // how long an invoice waits for its goods before it's declined
       },
       ctx.params,
@@ -69,7 +69,7 @@ export const trade: BehaviourModule = {
     let published = false;
     const offers = new Map<string, string>(); // kind -> this month's buying offer
     let month = -1;
-    const bought = new Map<string, number>(); // kind -> quantity accepted this month
+    const bought = new Map<string, number>(); // kind (and kind|seller) -> quantity accepted this month
     const sent = new Map<string, number>(); // kind -> quantity we've delivered from outside, all told
     const paidFor = new Map<string, number>(); // kind -> quantity received that we've paid for or sent back
     const baseline = new Map<string, number>(); // kind -> our holding when we first looked
@@ -113,8 +113,8 @@ export const trade: BehaviourModule = {
             const old = offers.get(kind);
             steps.push(because(`A new month: the world market's demand for the town's ${kind}.`,
               ...(old ? [withdraw(old, "Superseded by this month's offer.")] : []),
-              ["offer", say("buying_offer", `Buying ${kind} from the town this month: up to ${b.per_month} at ${usd(b.unit_price)} each. Ship to us (the outside) and invoice us; we pay once the goods arrive.`, {
-                visible: "public", data: { kind, unit_price: b.unit_price, quantity: b.per_month, until: (m + 1) * MONTH, account: p.account },
+              ["offer", say("buying_offer", `Buying ${kind} from the town this month: up to ${b.from ? Object.entries(b.from).map(([s, q]) => `${q} from ${s}`).join(", ") : b.per_month} at ${usd(b.unit_price)} each. Ship to us (the outside) and invoice us; we pay once the goods arrive.`, {
+                visible: "public", data: { kind, unit_price: b.unit_price, quantity: b.per_month, ...(b.from ? { quantities: b.from } : {}), until: (m + 1) * MONTH, account: p.account },
               })],
             ));
             (steps.at(-1) as Step).then = (out) => { if (out.created?.offer) offers.set(kind, out.created.offer); };
@@ -144,9 +144,12 @@ export const trade: BehaviourModule = {
           }
           answered.add(inv.id);
           paidFor.set(kind, (paidFor.get(kind) ?? 0) + q);
-          const room = offer.per_month - (bought.get(kind) ?? 0);
+          // Room this month: the seller's own quantity, if we buy from each seller, and in all.
+          const own = offer.from ? (offer.from[from] ?? 0) - (bought.get(`${kind}|${from}`) ?? 0) : Infinity;
+          const room = Math.min(own, offer.per_month - (bought.get(kind) ?? 0));
           const take = Math.max(0, Math.min(q, room));
           bought.set(kind, (bought.get(kind) ?? 0) + take);
+          bought.set(`${kind}|${from}`, (bought.get(`${kind}|${from}`) ?? 0) + take);
           const amount = Math.min(cents(owed.amount), take * offer.unit_price);
           const back = q - take;
           const returnTo = String(inv.data?.from_at ?? "");

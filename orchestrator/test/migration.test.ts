@@ -21,8 +21,14 @@ async function run(name: string, config: any) {
 }
 
 test("with jobs going, households move in, bank their savings, and find work and a home", async () => {
-  // Four factories for 120 people: more jobs than takers; and elsewhere pays less.
-  const ev = await run("jobs", generate({ ...spec, citizens: 120, factories: 4, migration: { outside_monthly_income: 200_000, response_bps: 3000 } }));
+  // Four factories for 120 people, each keeping 32 staff (the simple employer module in the factories' seats: the
+  // Lengnick factories grow a worker a month): more jobs than takers; and elsewhere pays less.
+  const config = generate({ ...spec, citizens: 120, factories: 4, migration: { outside_monthly_income: 200_000, response_bps: 3000 } });
+  for (const p of config.participants.filter((x: any) => /^factory-\d+-manager-system$/.test(x.id))) {
+    const f = p.id.replace("-manager-system", "");
+    p.controller = { type: "code", impl: "firm.employer", params: { wage: 150_000, target_staff: 32, workplace: `${f}-works/workplace.1`, role: "factory worker" } };
+  }
+  const ev = await run("jobs", config);
   const arrived = ev.filter((e) => e.event === "person_arrived").map((e) => e.person);
   expect(arrived.length).toBeGreaterThan(0);
   // Only the outside world brings them, and each household's paperwork lists them.
@@ -40,7 +46,8 @@ test("with jobs going, households move in, bank their savings, and find work and
 }, 300_000);
 
 test("with no jobs going, nobody comes", async () => {
-  const ev = await run("none", generate({ ...spec, citizens: 120, shops: 1, factories: 1, migration: { outside_monthly_income: 200_000, response_bps: 3000 } }));
+  // One shop and one factory, whose export customers want less than it makes (so it isn't hiring).
+  const ev = await run("none", generate({ ...spec, citizens: 120, shops: 1, factories: 1, exports_per_month: 4_000_000, migration: { outside_monthly_income: 200_000, response_bps: 3000 } }));
   // Postings may appear and be filled at once; with none standing when the outside world looks, or a gap below zero, no one comes.
   expect(ev.filter((e) => e.event === "person_arrived").length).toBeLessThanOrEqual(2);
 }, 300_000);

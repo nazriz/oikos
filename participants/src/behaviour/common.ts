@@ -145,7 +145,8 @@ export const callAction = (step: Step): ParticipantAction => ({ type: "call", ca
 export class Letters {
   private pending: { id: string; from: string }[] = [];
   take(obs: Observation) {
-    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ")) this.pending.push({ id: m.id, from: m.from });
+    // A note about one of our records (a bank saying a payment of ours wasn't made) isn't a question: it isn't answered.
+    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ") && !(m.re && !m.re.startsWith("msg."))) this.pending.push({ id: m.id, from: m.from });
   }
   answer(report: () => string, why = "A letter to our office: answering with our standard report."): Step[] {
     const out = this.pending.map((m) => because(why, message([m.from], report(), m.id)));

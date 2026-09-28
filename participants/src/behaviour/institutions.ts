@@ -13,7 +13,7 @@ import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
-import { stepper } from "./firms";
+import { Staffing, stepper } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
 function prohibitions(book: Book): StatementRecord[] {
@@ -42,7 +42,7 @@ export function ownerOf(book: Book, lot: string): string | undefined {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.6.0",
+  version: "0.7.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -116,7 +116,7 @@ export const planningOfficer: BehaviourModule = {
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -181,12 +181,13 @@ export const inspector: BehaviourModule = {
  *   agreed price.
  * - Each working day (`work_days` of every 7) its crew at the yard works on the sites it has begun, oldest first,
  *   each worker up to a working day's hours, until a building's hours are done, or a demolition's.
- * The crew is hired and paid by the firm's employer (firm.employer at the yard). Documented in
- * docs/behaviour/institutions.md.
+ * - Its crew is sized to its work: it hires while the hours in hand need more hands over the next `horizon_days`
+ *   (up to the yard's room), and lets one go at a time when it has more than that (keeping `min_crew`).
+ * Documented in docs/behaviour/institutions.md.
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.6.0",
+  version: "0.7.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -200,10 +201,18 @@ export const builder: BehaviourModule = {
         working_day: 8 * 3600, // seconds a worker works in a day
         work_days: 5, // of every 7
         build_markup_bps: 2000,
+        workplace: "", // the space in the yard its crew works in
+        max_crew: 12,
+        min_crew: 2, // a core crew, kept through quiet times
+        horizon_days: 90, // the crew it wants: enough to do the work in hand within this
+        notice_days: 14,
+        let_go_every_days: 7, // at most one let go in this time
       },
       ctx.params,
     );
     const book = new Book();
+    const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker" });
+    let lastLetGo = -Infinity;
     const letters = new Letters();
     const deliveries = new Deliveries();
     const handled = new Set<string>(); // contracts taken on
@@ -220,6 +229,7 @@ export const builder: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
+        staffing.absorb(obs);
         letters.take(obs);
         for (const d of deliveries.take(book, obs.entity)) {
           const o = orderQty.get(d.order);
@@ -328,7 +338,9 @@ export const builder: BehaviourModule = {
           usedDay = day;
           used.clear();
         }
-        const crew = [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.yard).flatMap((c) => c.structure!.spaces.flatMap((sp) => sp.occupants ?? [])))].sort();
+        // Our own crew, there now.
+        const ours = new Set(staffing.workers(book, t));
+        const crew = [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.yard).flatMap((c) => c.structure!.spaces.flatMap((sp) => sp.occupants ?? [])))].filter((w) => ours.has(w)).sort();
         if (day % 7 < p.work_days && crew.length) {
           const standing = new Set(channels.cells(obs).flatMap((c) => (c.structure ? [c.structure.structure] : [])));
           for (const pr of [...projects]) {
@@ -356,6 +368,23 @@ export const builder: BehaviourModule = {
             steps.push(s);
           }
         }
+        // The crew: enough hands for the work in hand (waiting and begun) within the horizon, within the yard's room.
+        const crewNow = staffing.workers(book, t);
+        const inHand = projects.reduce((x, pr) => x + Math.max(0, pr.left), 0) + waiting.reduce((x, w) => x + ((w.remove ? p.types[typeOf.get(w.remove) ?? ""]?.demolition_labour : w.type ? p.types[w.type]?.build_labour : 0) ?? 0), 0);
+        const perHand = (p.horizon_days * p.working_day * p.work_days) / 7;
+        const want = Math.min(p.max_crew, Math.max(p.min_crew, Math.ceil(inHand / perHand)));
+        const bill = Math.floor((crewNow.length * p.wage * 30 * DAY) / p.period);
+        steps.push(...staffing.routine(obs, book, acc.account, {
+          target: want, wage: p.wage, canPost: acc.balance >= bill + p.wage,
+          why: `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands to do within ${p.horizon_days} days; we have ${crewNow.length}: posting a job.`,
+        }));
+        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || (crewNow.length && acc.balance < crewNow.length * p.wage)) {
+          const broke = acc.balance < crewNow.length * p.wage;
+          const s = staffing.letGo(book, t, broke ? `Can't cover the next pay period (${usd(acc.balance)} for ${crewNow.length}): letting the most recent hire go.` : `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands; we have ${crewNow.length}: letting the most recent hire go.`,
+            broke ? "Redundancy: we can't cover the wage bill." : "Redundancy: there isn't the work.");
+          if (s.length) lastLetGo = t;
+          steps.push(...s);
+        }
         steps.push(...letters.answer(() => `Our prices for building on your lot, finished, and for demolition: ${priceText() || "none yet (we're waiting on our supplier's prices)"}. To have us build or demolish, offer us a construction agreement: what to build and on which lot (or what to demolish), and the price, paid from your account on our invoice. We start once you've signed and we have the materials; permits are the owner's to get.`,
           "A letter asking about work: answering with our prices and how we take on a job."));
         return steps;
@@ -373,7 +402,7 @@ export const builder: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(_ctx: ParticipantContext) {
@@ -414,7 +443,7 @@ export const registry: BehaviourModule = {
  */
 export const childProtection: BehaviourModule = {
   name: "city.child_protection",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(_ctx: ParticipantContext) {

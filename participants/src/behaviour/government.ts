@@ -122,7 +122,7 @@ function ownerIsCity(book: Book, lot: string): boolean {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -190,7 +190,7 @@ export const councilClerk: BehaviourModule = {
  */
 export const councillor: BehaviourModule = {
   name: "city.councillor",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -239,7 +239,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.6.0",
+  version: "0.7.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -326,7 +326,7 @@ export const financeOfficer: BehaviourModule = {
  */
 export const taxClerk: BehaviourModule = {
   name: "city.tax_clerk",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {

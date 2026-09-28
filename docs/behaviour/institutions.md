@@ -44,7 +44,7 @@ A builder with a yard, a crew and a supplier (phase B). It wakes daily.
 
   It **invoices** the agreed price as it starts: an `invoice` statement whose data is the payment asked for (`data: { outcome: { money: { to, amount } }, agreement }`). Payment is the client's act, through their bank.
 - **Working.** On working days (5 of every 7) the crew at the yard (whoever occupies its workplace: the firm's employees) works on its sites, oldest first. Each worker works up to a working day (the world's physical limit; the builder knows it as `working_day`), shared evenly across the crew. It works on a building until its hours are done (the kernel finishes it once its least time has passed too), and on a demolition until it's down. A site that's gone, or is no longer being built (demolished meanwhile), is dropped.
-- **Hiring.** The crew is hired and paid by the firm's own `firm.employer` office at the yard, like any employer's staff ([firms.md](firms.md)).
+- **Its crew** is sized to its work. It works out the hours of work in hand (jobs begun, and jobs waiting) and the hands needed to do them within `horizon_days` (90). While it has fewer, it hires, up to the yard's room. When it has more, it lets the most recent hire go, at most one a week, keeping a core crew of `min_crew` (2). It also lets someone go if it can't cover the next pay period. Hiring and paying are the shared `Staffing` routine ([firms.md](firms.md)).
 
 It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
 
@@ -57,6 +57,7 @@ A demolition is priced on its hours alone. It **publishes** a public `price_list
 
 **Parameters:**
 - `types`, `yard` and `supplier` (default `outside`);
+- `workplace` (the yard's space for its crew), `max_crew`, `min_crew`, `horizon_days`, `notice_days` and `let_go_every_days`;
 - the crew's `wage` and `period`;
 - `working_day` (8 h) and `work_days` (5);
 - `build_markup_bps` (2000).
