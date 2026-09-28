@@ -31,8 +31,9 @@ export function answerSchema(toolNames: string[]): object {
     additionalProperties: false,
     required: ["tool", "input_json", "text"],
     properties: {
-      tool: { type: "string", enum: [...toolNames, "none"] },
-      input_json: { type: "string", description: "The tool's input as a JSON object (\"{}\" when tool is none)." },
+      // "none" only when there are no tools (a plain answer): offered alongside tools, a model mistakes it for declining.
+      tool: { type: "string", enum: toolNames.length ? toolNames : ["none"] },
+      input_json: { type: "string", description: toolNames.length ? "The tool's input, as a JSON object." : "\"{}\"." },
       text: { type: "string", description: "Any words to say besides the tool use (may be empty)." },
     },
   };
@@ -57,7 +58,7 @@ export function codexPrompt(req: LlmRequest): string {
     "=== Conversation so far ===",
     transcript(req.messages),
     "",
-    `=== Your answer ===\nChoose one tool${tools ? "" : ' ("none", with text, if there are no tools)'} and give its input as a JSON object in input_json.`,
+    tools ? "=== Your answer ===\nChoose one tool and give its input as a JSON object in input_json." : '=== Your answer ===\nAnswer in text, with tool "none".',
   ].join("\n");
 }
 

@@ -26,7 +26,7 @@ export function fixture(): Knowledge {
   return k;
 }
 
-export interface CaseResult { id: string; held_out: boolean; pass: boolean; got?: string; expect: string[]; error?: string }
+export interface CaseResult { id: string; held_out: boolean; pass: boolean; got?: string; expect: string[]; error?: string; raw?: string }
 export interface EvalReport { model: string; results: CaseResult[]; seen: { passed: number; of: number }; held_out: { passed: number; of: number }; cost_microusd: number }
 
 const canonical = (program: string) => {
@@ -67,7 +67,9 @@ export async function evaluate(adapter: LlmAdapter, o: { prices?: Record<string,
       const got = r.ok ? r.draft.call : r.call;
       const acts = got !== undefined ? actsOf(got) : undefined;
       const pass = got !== undefined && (expect.includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e) === acts)));
-      results.push({ id: c.id, held_out: !!c.held_out, pass, ...(got !== undefined ? { got } : {}), expect });
+      // No program at all: keep what came back instead, to see why.
+      const raw = !r.ok && got === undefined ? JSON.stringify(r.raw ?? r.notices).slice(0, 500) : undefined;
+      results.push({ id: c.id, held_out: !!c.held_out, pass, ...(got !== undefined ? { got } : {}), expect, ...(raw ? { raw } : {}) });
     } catch (e) {
       results.push({ id: c.id, held_out: !!c.held_out, pass: false, expect, error: String((e as Error).message).slice(0, 300) });
       if ((e as Error).constructor?.name === "SpendingLimitReached") break; // out of budget: report what ran
@@ -79,6 +81,6 @@ export async function evaluate(adapter: LlmAdapter, o: { prices?: Record<string,
 
 export function reportText(r: EvalReport): string {
   const lines = [`Translator test set on ${r.model}: seen ${r.seen.passed}/${r.seen.of}, held out ${r.held_out.passed}/${r.held_out.of}. Cost $${(r.cost_microusd / 1e6).toFixed(4)}.`];
-  for (const x of r.results.filter((x) => !x.pass)) lines.push(`- ${x.id}${x.held_out ? " (held out)" : ""}: got ${x.got ?? `(error: ${x.error})`}; expected ${x.expect.join(" | ")}`);
+  for (const x of r.results.filter((x) => !x.pass)) lines.push(`- ${x.id}${x.held_out ? " (held out)" : ""}: got ${x.got ?? (x.error ? `(error: ${x.error})` : `(no program: ${x.raw})`)}; expected ${x.expect.join(" | ")}`);
   return lines.join("\n");
 }

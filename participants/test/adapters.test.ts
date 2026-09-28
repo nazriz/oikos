@@ -108,7 +108,7 @@ test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-
   expect(a.args.at(-1)).toBe("-"); // the prompt on stdin
   expect(a.stdin).toContain("You are the mayor.");
   expect(a.stdin).toContain("[used do:"); // the conversation so far
-  expect(a.schema.properties.tool.enum).toEqual(["do", "none"]);
+  expect(a.schema.properties.tool.enum).toEqual(["do"]);
   expect(r.content).toEqual([{ type: "tool_use", id: "codex-1", name: "do", input: { what: "Publish a notice." } }]);
   expect(r.usage).toEqual({ input_tokens: 1400, output_tokens: 100, cache_read_tokens: 1000 });
   // A failed run is an error, with what codex said.
