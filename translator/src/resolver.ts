@@ -479,7 +479,7 @@ class Resolver {
     const f = this.k.form(to, name);
     if (!f) {
       // Known by name but not from that office: say where it goes, rather than that it's unknown.
-      const elsewhere = this.k.forms.filter((x) => x.data?.form === name);
+      const elsewhere = this.k.forms.filter((x) => x.data?.form === name || x.id === name);
       if (!elsewhere.length) throw new Ask(LABEL_TEXT.unknown_form);
       const where = [...new Set(elsewhere.map((x) => x.in_position ?? x.speaks_for ?? x.author))];
       throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);

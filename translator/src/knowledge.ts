@@ -135,11 +135,11 @@ export class Knowledge {
     return [...this.formsById.values()].filter((f) => !this.withdrawn.has(f.id));
   }
 
-  /** The standing forms published by an institution a participant, position or entity id names. */
+  /** The standing form, by its name or its record's id, published by an institution a participant, position or entity id names. */
   form(to: string, name: string): StatementRecord | undefined {
     const ent = this.entityOf(to);
     return [...this.formsById.values()]
-      .filter((f) => !this.withdrawn.has(f.id) && f.data?.form === name && (f.author === to || f.in_position === to || f.speaks_for === ent || (f.data?.submit_to ?? []).includes(ent)))
+      .filter((f) => !this.withdrawn.has(f.id) && (f.data?.form === name || f.id === name) && (f.author === to || f.in_position === to || f.speaks_for === ent || (f.data?.submit_to ?? []).includes(ent)))
       .sort((a, b) => b.at - a.at)[0];
   }
 }

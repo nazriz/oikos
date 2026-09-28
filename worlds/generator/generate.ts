@@ -355,7 +355,11 @@ export function generate(spec: TownSpec): any {
   // The foreman knows the registry's lots and goes to see the ground, to know where on a lot a building goes.
   office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "ground", kind: "sites", area: "all", every: 7 * DAY }], code("firm.builder", { build_markup_bps: BUILD_MARKUP_BPS }));
   const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
-  office("planning", "city", "Planning officer", "planning_officer", [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } }], code("city.planning_officer"));
+  office("planning", "city", "Planning officer", "planning_officer",
+    [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
+      // The land register: lots, who owns them, and a monthly survey of what's built.
+      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
+    code("city.planning_officer"));
   office("inspector", "city", "Building inspector", "inspector",
     [laws, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "patrol", kind: "sites", area: "all", every: 14 * DAY }],
     code("city.inspector"));

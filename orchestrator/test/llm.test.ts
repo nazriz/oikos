@@ -142,7 +142,7 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   const adapter = new MockAdapter("mock", {
     participant: (req: LlmRequest) => {
       seen.push(JSON.stringify(req.messages.at(-1)!.content));
-      if (calls === 0) return tool("write", { to: ["finance", "council-clerk"], text: "Please send me the town's figures.", as: "mayor" });
+      if (calls === 0) return tool("write", { to: ["finance", "council-clerk", "planning"], text: "Please send me the town's figures.", as: "mayor" });
       return tool("done_for_now", { days: 7 });
     },
     translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
@@ -158,6 +158,8 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   // The budget brief: what the budget can pay for, and what a park costs.
   expect(read).toContain("The budget's lines: parks, for building a park");
   expect(read).toContain("about $60,000 a park");
+  // The land register: the town's lots, and the vacant ones by id.
+  expect(read).toMatch(/The town owns \d+ lots; \d+ have nothing built on them: lot-/);
 }, 300_000);
 
 test("the notebook, used alongside an action, carries to the next wake; every tool use gets a result, as the APIs require", async () => {

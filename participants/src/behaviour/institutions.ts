@@ -10,7 +10,7 @@ import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step } from "./common";
+import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step } from "./common";
 import { stepper } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
@@ -34,22 +34,27 @@ export function ownerOf(book: Book, lot: string): string | undefined {
  * (e.g. "no permit may be granted on the river lots"), by evaluating the
  * law's formal condition on the act of granting. It grants (records a
  * liberty to build) or refuses (publishes the decision), citing the law.
- * params: compliance_bps (how often it follows the law; default 10000).
+ * It keeps the town's land register (lots, their owners from the registry, and
+ * what its survey shows built), and its report lists the town's vacant lots.
+ * params: compliance_bps (how often it follows the law; default 10000), town.
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ compliance_bps: 10_000 }, ctx.params);
+    const p = params({ compliance_bps: 10_000, town: "city" }, ctx.params);
     const book = new Book();
     const decided = new Set<string>();
     const letters = new Letters();
+    // What the survey last showed on each cell: built or not.
+    const built = new Map<string, boolean>();
     return stepper(
       (obs) => {
         book.absorb(obs);
         letters.take(obs);
+        for (const c of channels.cells(obs)) built.set(c.cell, !!c.structure);
       },
       (obs) => {
         const me = obs.entity;
@@ -85,7 +90,13 @@ export const planningOfficer: BehaviourModule = {
           const decisions = book.open("permit_decision").filter((d) => d.speaks_for === me || d.in_position !== undefined);
           const granted = decisions.filter((d) => d.data?.decision === "granted").length;
           const refused = decisions.filter((d) => d.data?.decision === "refused").map((d) => `${d.data?.application} (${d.data?.law ?? "?"})`);
-          return `Report from the planning office: ${decided.size} applications decided: ${granted} granted, ${refused.length} refused${refused.length ? ` (${refused.join(", ")})` : ""}. Apply on the permit application form (form-permit).`;
+          // The land register: the town's lots, and which of them the last survey showed with nothing built.
+          const townLots = book.open("lot").map((l) => l.id).filter((l) => ownerOf(book, l) === p.town).sort();
+          const vacant = townLots.filter((l) => { const cs = cellsOf(book, l); return cs.length > 0 && cs.every((c) => built.get(c) === false); });
+          const land = townLots.length
+            ? ` The town owns ${townLots.length} lots; ${vacant.length} have nothing built on them${vacant.length ? `: ${vacant.slice(0, 40).join(", ")}${vacant.length > 40 ? `, and ${vacant.length - 40} more` : ""}` : ""}.`
+            : "";
+          return `Report from the planning office: ${decided.size} applications decided: ${granted} granted, ${refused.length} refused${refused.length ? ` (${refused.join(", ")})` : ""}.${land} Apply on the permit application form (form-permit).`;
         }));
         return steps;
       },

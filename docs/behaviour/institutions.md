@@ -12,7 +12,9 @@ Wakes weekly. For each permit application addressed to the town:
 2. If not, it **grants**: it records a *liberty* claim (Hohfeld) for the applicant to build that structure on that parcel, and publishes the decision.
 3. If so, it **refuses**, publishing the decision with the law it cites.
 
-**Parameters:** `compliance_bps` (default 10000) is how often it follows the law. Below 10000, some unlawful permits get granted: a lax or captured office.
+It also **keeps the town's land register**: the lot records, their owners from the claims registry, and a monthly survey of what's built (`sites`, every 30 days). Its report, sent in answer to any letter, lists how many lots the town owns and the ones with nothing built on them, the first 40 by id. A real council keeps such a register, and "which vacant land do we own?" is a question it answers. Without the register, a language-model mayor with a parks budget had no way to find a lot: its filings listed 12 of the town's 187 lots, and nothing said which were free (pilot 6, docs/real-models.md). The register lists; it doesn't advise. The river law is on file for whoever reads the list.
+
+**Parameters:** `compliance_bps` (default 10000) is how often it follows the law. Below 10000, some unlawful permits get granted: a lax or captured office. `town` (default `city`) is whose land the register lists.
 
 **Source:** administrative decision-making as procedure-following (MOISE+-style roles and procedures, borrowing survey §1). Discretion is a parameter rather than a mechanism.
 
