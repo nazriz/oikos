@@ -29,7 +29,7 @@ import { createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapte
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
 
-export const ORCHESTRATOR_VERSION = "0.6.0";
+export const ORCHESTRATOR_VERSION = "0.7.0";
 
 export interface RunOptions {
   config: any;
