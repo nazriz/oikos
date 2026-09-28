@@ -40,7 +40,7 @@ export const ageAt = (m: Member, t: number, year: number) => Math.floor((t - m.b
 
 /**
  * Bedrooms a household needs by the Canadian National Occupancy Standard, as
- * the ABS applies it (Census 2021, "Housing suitability (HOSD)"):
+ * statistics offices apply it (docs/behaviour/households.md):
  *  - no more than two people per bedroom;
  *  - a couple shares a bedroom;
  *  - a lone parent, and every other member 18 or over, has their own;
@@ -122,26 +122,6 @@ export interface HouseholdSpec {
   group_size: [number, number];
 }
 
-export const DEFAULT_HOUSEHOLDS: HouseholdSpec = {
-  // ABS Census 2021 (QuickStats, Australia): lone person 25.6%, group 3.9%, family 70.5% of households; of families,
-  // couple without children 38.8%, couple with children 43.7%, one parent 15.9%, other 1.6% (counted here with groups).
-  lone_bps: 2560,
-  group_bps: 503,
-  couple_bps: 2735,
-  couple_children_bps: 3081,
-  one_parent_bps: 1121,
-  // AIFS, from the 2021 Census: couples with dependent children had 1 (35-36%), 2 (43-44%), 3+ (20-22%);
-  // one-parent families 1 (51-52%), 2 (32-34%), 3+ (15-16%). "3+" is taken as 3.
-  children_couple: [3550, 4350, 2100],
-  children_one_parent: [5150, 3300, 1550],
-  same_sex_couple_bps: 140, // ABS Census 2021: 1.4% of couples living together
-  lone_parent_female_bps: 8000, // ABS Census 2021: one in five lone parents was male
-  adult_female_bps: 5000, // about half (placeholder)
-  child_male_bps: 5141, // ABS Births 2024: 105.8 boys per 100 girls
-  adult_ages: [18, 64], // a working-age town: no retirees yet (there's no pension income to live on)
-  mother_age_at_first_birth: [22, 36], // placeholder around ABS Births 2024's median age of mothers (32.1)
-  group_size: [2, 3], // placeholder
-};
 
 /** A drawn household: members by age (whole years), days since their last birthday and sex; couples by index; the leaseholder's index; and, in a family, each child's parents (the biological ones the world records: in a same-sex couple, the first partner). */
 export interface DrawnHousehold {

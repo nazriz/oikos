@@ -481,7 +481,7 @@
                 "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Currency"
               },
               "minor_units": {
-                "description": "Decimal places of its smallest unit (2 for AUD: amounts are cents). Presentation only; the kernel counts in the smallest unit.",
+                "description": "Decimal places of its smallest unit (2 for a currency with cents). Presentation only; the kernel counts in the smallest unit.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 8
@@ -552,7 +552,7 @@
           }
         },
         "places": {
-          "description": "The places (D58): named areas of the ground, nested as a tree (the world, a country, a region, a locality, a neighbourhood: the world's vocabulary, after the ABS's statistical geography). Exactly one root (no 'within'); every other place lies within its parent's area. A detailed place's cells exist: lots, buildings and bodies in spaces, as in a town. A summarised place is an area simulated in aggregate (built stock and cohorts, later in v0.5). Distance works across places, on the one plane. The detailed places together may cover at most 16,777,216 cells.",
+          "description": "The places (D58): named areas of the ground, nested as a tree (the world, a country, a region, a locality, a neighbourhood: the world's vocabulary, after how statistics offices draw their geographies). Exactly one root (no 'within'); every other place lies within its parent's area. A detailed place's cells exist: lots, buildings and bodies in spaces, as in a town. A summarised place is an area simulated in aggregate (built stock and cohorts, later in v0.5). Distance works across places, on the one plane. The detailed places together may cover at most 16,777,216 cells.",
           "type": "array",
           "minItems": 1,
           "items": {

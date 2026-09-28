@@ -1,0 +1,530 @@
+{
+  "id": "au-vic-2026",
+  "place": "A town in regional Victoria, Australia",
+  "as_of": "2026-09",
+  "about": "Every place-specific figure the town generator uses, with its source. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+  "values": {
+    "currency": {
+      "code": "AUD",
+      "minor_units": 2
+    },
+    "households": {
+      "lone_bps": 2560,
+      "group_bps": 503,
+      "couple_bps": 2735,
+      "couple_children_bps": 3081,
+      "one_parent_bps": 1121,
+      "children_couple": [
+        3550,
+        4350,
+        2100
+      ],
+      "children_one_parent": [
+        5150,
+        3300,
+        1550
+      ],
+      "same_sex_couple_bps": 140,
+      "lone_parent_female_bps": 8000,
+      "adult_female_bps": 5000,
+      "child_male_bps": 5141,
+      "adult_ages": [
+        18,
+        80
+      ],
+      "mother_age_at_first_birth": [
+        22,
+        36
+      ],
+      "group_size": [
+        2,
+        3
+      ]
+    },
+    "life": {
+      "qx_per_100000": {
+        "male": [
+          343,
+          22,
+          15,
+          13,
+          11,
+          10,
+          9,
+          8,
+          8,
+          8,
+          8,
+          9,
+          10,
+          13,
+          17,
+          24,
+          32,
+          40,
+          46,
+          51,
+          54,
+          56,
+          58,
+          59,
+          61,
+          63,
+          64,
+          66,
+          69,
+          71,
+          73,
+          76,
+          79,
+          83,
+          87,
+          90,
+          94,
+          99,
+          106,
+          115,
+          125,
+          136,
+          149,
+          163,
+          178,
+          191,
+          205,
+          221,
+          240,
+          261,
+          284,
+          309,
+          334,
+          361,
+          391,
+          423,
+          458,
+          497,
+          540,
+          586,
+          636,
+          692,
+          754,
+          822,
+          895,
+          974,
+          1060,
+          1155,
+          1260,
+          1372,
+          1496,
+          1637,
+          1804,
+          1998,
+          2221,
+          2476,
+          2767,
+          3104,
+          3492,
+          3934,
+          4434,
+          4987,
+          5609,
+          6322,
+          7147,
+          8095,
+          9179,
+          10402,
+          11767,
+          13296,
+          14971,
+          16789,
+          18921,
+          21233,
+          23269,
+          25522,
+          28320,
+          31443,
+          34410,
+          37938,
+          41442
+        ],
+        "female": [
+          301,
+          20,
+          12,
+          10,
+          9,
+          8,
+          7,
+          7,
+          6,
+          6,
+          6,
+          7,
+          8,
+          9,
+          11,
+          13,
+          16,
+          17,
+          19,
+          21,
+          23,
+          24,
+          25,
+          25,
+          25,
+          25,
+          26,
+          27,
+          28,
+          30,
+          32,
+          34,
+          37,
+          39,
+          43,
+          46,
+          51,
+          55,
+          61,
+          66,
+          72,
+          79,
+          86,
+          95,
+          104,
+          113,
+          123,
+          133,
+          145,
+          158,
+          172,
+          186,
+          201,
+          219,
+          237,
+          256,
+          277,
+          299,
+          324,
+          351,
+          379,
+          410,
+          444,
+          484,
+          529,
+          577,
+          629,
+          687,
+          752,
+          827,
+          909,
+          1001,
+          1108,
+          1238,
+          1392,
+          1571,
+          1778,
+          2021,
+          2305,
+          2631,
+          3004,
+          3435,
+          3933,
+          4509,
+          5166,
+          5925,
+          6807,
+          7827,
+          9010,
+          10357,
+          11870,
+          13565,
+          15456,
+          17431,
+          19730,
+          21847,
+          24026,
+          26707,
+          29375,
+          31900,
+          34407
+        ]
+      },
+      "illness": {
+        "by_age": [
+          {
+            "from": 0,
+            "bps": 600
+          },
+          {
+            "from": 5,
+            "bps": 350
+          },
+          {
+            "from": 15,
+            "bps": 600
+          },
+          {
+            "from": 45,
+            "bps": 900
+          },
+          {
+            "from": 65,
+            "bps": 1800
+          },
+          {
+            "from": 85,
+            "bps": 4500
+          }
+        ],
+        "severity": [
+          {
+            "label": "serious",
+            "share_bps": 8000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "severe",
+            "share_bps": 2000,
+            "days": [
+              14,
+              60
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "injury": {
+        "bps": 210,
+        "severity": [
+          {
+            "label": "minor",
+            "share_bps": 6000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "serious",
+            "share_bps": 4000,
+            "days": [
+              14,
+              90
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "birth": {
+        "ages": [
+          15,
+          49
+        ],
+        "gestation_days": 266,
+        "female_bps": 4859
+      },
+      "work_injury_bps": {
+        "factory": 160,
+        "shop": 116
+      }
+    },
+    "wages_per_fortnight": {
+      "shop": 211356,
+      "factory": 300000,
+      "construction": 300000
+    },
+    "rents_per_month": {
+      "apartment_units": [
+        {
+          "bedrooms": 1,
+          "count": 3,
+          "rent": 147333
+        },
+        {
+          "bedrooms": 2,
+          "count": 7,
+          "rent": 177667
+        },
+        {
+          "bedrooms": 3,
+          "count": 2,
+          "rent": 203667
+        }
+      ],
+      "house_types": [
+        {
+          "id": "house",
+          "bedrooms": 3,
+          "share_bps": 5500,
+          "rent": 212333
+        },
+        {
+          "id": "large-house",
+          "bedrooms": 4,
+          "share_bps": 4500,
+          "rent": 247000
+        }
+      ]
+    },
+    "spending": {
+      "saving_bps": 650,
+      "wealth_effect_bps_per_year": 300,
+      "essentials_per_month": 40000
+    },
+    "retirement_age": 67,
+    "retiree_savings": [
+      15000000,
+      35000000
+    ],
+    "support": {
+      "pension": {
+        "amount": 120090,
+        "every_days": 14,
+        "from_age": 67
+      },
+      "unemployment": {
+        "amount": 80870,
+        "every_days": 14,
+        "from_age": 22
+      }
+    },
+    "wealth_quintile_shares_bps": [
+      70,
+      480,
+      1130,
+      2050,
+      6280
+    ],
+    "outside_ownership_bps": {
+      "factory": 8000,
+      "shop": 2000,
+      "landlord": 3000
+    },
+    "industry": {
+      "factory_labour_share_bps": 2000,
+      "factory_input_share_bps": 6700,
+      "retail_purchases_share_bps": 7000,
+      "retail_labour_share_bps": 1400
+    },
+    "prices": {
+      "goods_world": 10000,
+      "goods_import_markup_bps": 1000,
+      "inputs_per_kg": 250,
+      "materials_per_kg": 125
+    },
+    "ordinary_hours_per_week": 38,
+    "fertility_per_10000": [
+      {
+        "from": 15,
+        "rate": 60
+      },
+      {
+        "from": 20,
+        "rate": 306
+      },
+      {
+        "from": 25,
+        "rate": 713
+      },
+      {
+        "from": 30,
+        "rate": 1060
+      },
+      {
+        "from": 35,
+        "rate": 666
+      },
+      {
+        "from": 40,
+        "rate": 155
+      },
+      {
+        "from": 45,
+        "rate": 14
+      },
+      {
+        "from": 50,
+        "rate": 0
+      }
+    ],
+    "labour_force_participation_bps": 8000
+  },
+  "sources": {
+    "currency": "Australian dollars, in cents.",
+    "households": "ABS, Census of Population and Housing 2021 (QuickStats, Australia): lone person 25.6%, group 3.9%, family 70.5% of households; of families, couple without children 38.8%, with children 43.7%, one parent 15.9%, other 1.6% (counted with groups). Children per family: AIFS, from the 2021 Census (3+ taken as 3). Same-sex couples 1.4% (Census 2021); one in five lone parents male (Census 2021); 105.8 boys per 100 girls (ABS, Births, Australia 2024). Placeholders: adult_female_bps (about half), group_size, mother_age_at_first_birth (around the median age of mothers, 32.1, ABS Births 2024), adult_ages (18-80 puts about a fifth of adults at 67 or over, near the census share; to replace with the census age distribution).",
+    "life.qx_per_100000": "ABS, Life Tables 2021-2023 (Table 9, Australia): the probability of dying within a year, ages 0-100, per 100,000, males and females.",
+    "life.illness": "Placeholder shaped by AIHW's age gradient of hospitalisations (99 per 1,000 at 5-14, 1,511 at 85+; 153 overnight per 1,000 overall, 2022-23); to replace with age-specific overnight rates.",
+    "life.injury": "AIHW: 2,100 injury hospitalisations per 100,000 people (2022-23). Severity split: placeholder.",
+    "life.birth": "Bearing a child from 15 to 49 (ABS age-specific fertility rates cover 15-49); 38 weeks from conception; 105.8 boys per 100 girls (ABS Births 2024).",
+    "life.work_injury_bps": "Safe Work Australia, Key WHS Statistics 2024 (2023-24): serious claims (a week or more off), at about 1,700 hours a year: manufacturing 9.4 per million hours; all industries 6.8 (a placeholder for retail).",
+    "wages_per_fortnight": "Shop: the award minimum, General Retail Industry Award Level 1 from 1 July 2026 ($26.55 in 2025-26, +4.75% in the Fair Work Commission's Annual Wage Review 2026: $27.81 an hour, 76 hours a fortnight); full-time retail staff are paid close to it (the industry's all-employee median, $900 a week, is mostly part-time). Factory and construction: the industries' median weekly earnings in main job, $1,500 each (ABS, Employee Earnings, August 2025; all employees, mostly full-time in these industries), two weeks.",
+    "rents_per_month": "Weekly rents x 52/12. Regional Victoria medians: $470 a week overall (Homes Victoria, Rental Report, September quarter 2025); houses $495-530, units $400 (REIV, early 2026). The split by bedrooms ($340, $410, $470 for units of 1-3 bedrooms; $490 and $570 for houses of 3 and 4) is a placeholder around those medians, to replace with the Rental Report's tables by bedrooms. The apartment mix and house shares are placeholders.",
+    "spending.saving_bps": "The household saving ratio, 6.5% (ABS, Australian National Accounts: National Income, Expenditure and Product, June quarter 2026).",
+    "spending.wealth_effect_bps_per_year": "About 3 cents of consumption a year per dollar of wealth (Dvornak & Kohler 2003, 'Housing wealth, stock market wealth and consumption: a panel analysis for Australia', RBA RDP 2003-07; to confirm the figure used).",
+    "spending.essentials_per_month": "Placeholder: what a person spends however little comes in.",
+    "retirement_age": "The Age Pension age, 67 (Services Australia).",
+    "retiree_savings": "Placeholder: savings at retirement, $150,000-350,000, around typical superannuation balances at 65-69 (to confirm against ATO or ASFA figures).",
+    "support.pension": "Age Pension, single, maximum rate with supplements: $1,200.90 a fortnight from 20 March 2026 (Department of Social Services, rates from 20 March 2026). Couples' rates and means tests left out.",
+    "support.unemployment": "JobSeeker Payment, single, no children: $808.70 a fortnight from 20 March 2026 (Department of Social Services). From age 22 (younger people are on Youth Allowance, left out). Means test left out.",
+    "wealth_quintile_shares_bps": "Shares of household net worth by wealth quintile, lowest to highest: 0.7%, 4.8%, 11.3%, 20.5%, 62.8% (ABS, Household Income and Wealth, Australia, 2019-20).",
+    "outside_ownership_bps": "Placeholder: the share of a firm owned from outside the town (a factory mostly by companies elsewhere; a shop mostly locally; landlords partly by outside investors). To source.",
+    "industry": "Placeholders to confirm: manufacturing's compensation of employees and intermediate inputs as shares of output (about 20% and 67%, ABS, Australian National Accounts: Input-Output Tables); retail trade's purchases of goods and wages as shares of sales (about 70% and 14%, ABS, Australian Industry).",
+    "prices": "Placeholders: an item of goods worth $100 at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs $2.50 a kg; building materials $1.25 a kg (docs/behaviour/building.md).",
+    "ordinary_hours_per_week": "Maximum ordinary hours for a full-time employee, 38 a week (Fair Work Act 2009, s 62, the National Employment Standards).",
+    "fertility_per_10000": "ABS, Births, Australia 2024: births per 10,000 women (the published rates per 1,000, times 10: configs are integers) a year, by age.",
+    "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80%; to confirm against ABS, Labour Force, Australia, Table 16 (15-64 year olds). Those outside it (studying, caring, other reasons) don't look for work."
+  },
+  "targets": [
+    {
+      "what": "employment_to_population_pct",
+      "value": 63.9,
+      "source": "ABS, Labour Force, Australia, August 2026 (seasonally adjusted)"
+    },
+    {
+      "what": "unemployment_rate_pct",
+      "value": 4.6,
+      "source": "ABS, Labour Force, Australia, August 2026"
+    },
+    {
+      "what": "participation_rate_pct",
+      "value": 67.1,
+      "source": "ABS, Labour Force, Australia, August 2026"
+    },
+    {
+      "what": "household_saving_ratio_pct",
+      "value": 6.5,
+      "source": "ABS, Australian National Accounts, June quarter 2026"
+    },
+    {
+      "what": "renters_housing_costs_share_of_income_pct",
+      "value": 20.2,
+      "source": "ABS, Housing Occupancy and Costs, 2019-20 (private renters, mean)"
+    },
+    {
+      "what": "union_membership_pct",
+      "value": 13.1,
+      "source": "ABS, Trade Union Membership, August 2024"
+    },
+    {
+      "what": "business_entry_rate_pct",
+      "value": 16.4,
+      "source": "ABS, Counts of Australian Businesses, 2024-25: 437,150 entries on about 2.66 million at the start"
+    },
+    {
+      "what": "business_exit_rate_pct",
+      "value": 13.9,
+      "source": "ABS, Counts of Australian Businesses, 2024-25: 370,500 exits"
+    },
+    {
+      "what": "working_days_lost_per_1000_per_quarter",
+      "value": 4.2,
+      "source": "ABS, Industrial Disputes, Australia, September quarter 2025"
+    }
+  ]
+}

@@ -31,8 +31,8 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const share = trader.buys.goods.from as { [f: string]: number };
   const task = config.catalogue.tasks.find((t: any) => t.id === "make");
   const { ev, recs } = await run("town", config, 200 * DAY);
-  // Nothing refused but same-moment races (D58).
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work"].includes(e.code))).toEqual([]);
+  // Nothing refused but same-moment races (D58), and households moving into homes still being left.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code))).toEqual([]);
   // Making: at the works, by the factory's own employees, never more than a working day each.
   const employees = new Map<string, Set<string>>();
   for (const a of [...config.world.records, ...recs].filter((r: any) => r.record === "agreement" && r.terms.template === "employment")) {
@@ -58,7 +58,8 @@ test("goods are made from inputs by workers' hours, exported within each factory
   for (const g of inputs) expect(ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${g.to}` && e.amount === String(Number(g.quantity) * trader.sells.inputs) && e.t <= g.t)).toBe(true);
   // Exports: paid for at the world price, never beyond a factory's share of a month's demand.
   const paid = new Map<string, number>();
-  for (const e of ev.filter((x) => x.event === "transfer" && x.from === "acc-outside" && x.to.startsWith("acc-factory"))) {
+  // (Payments for exports settle the factory's invoice; other payments from outside are refunds.)
+  for (const e of ev.filter((x) => x.event === "transfer" && x.from === "acc-outside" && x.to.startsWith("acc-factory") && x.settles)) {
     const k = `${e.to}|${Math.floor(e.t / MONTH)}`;
     paid.set(k, (paid.get(k) ?? 0) + Number(e.amount));
   }
@@ -85,27 +86,26 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   const letGo = c1.filter((c) => c.participant?.startsWith("factory-") && /letting one worker go/.test(c.reasoning ?? ""));
   expect(letGo.length).toBeGreaterThanOrEqual(4);
   expect(e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && e.record.text?.startsWith("Redundancy: we're making more")).length).toBe(letGo.length);
-  // With stock beyond the top of Lengnick's band (a month's demand) there's no making, though their staff could make far
-  // more: each factory's stock at a month's end stays within about a month of what it sells (exports taken, and goods
-  // delivered to the shops).
+  // Beyond the top of Lengnick's band (last month's demand: the shops' orders, and its share of the world market's
+  // offer) a factory makes nothing, though its staff could make far more: a day's making never takes its stock past
+  // the band's top. (Stock made earlier may stay above it, unsold; making stops.)
+  const recs1 = e1.filter((e) => e.event === "recorded").map((e) => e.record);
   for (const f of ["factory-1", "factory-2"]) {
+    // What the shops ordered, as the factory counts it: orders paid that month, in full, met or not (its delivery notes).
+    const ordered = (m: number) => recs1.filter((r) => r.kind === "delivery_note" && r.speaks_for === f && !r.data.declined && Math.floor(r.at / MONTH) === m).reduce((x, r) => x + r.data.ordered, 0);
+    const quota = (m: number) => recs1.filter((r) => r.kind === "buying_offer" && Math.floor(r.at / MONTH) === m).reduce((x, r) => x + (r.data.quantities?.[f] ?? 0), 0);
     let stock = Number(slack.world.holdings.find((h: any) => h.holder === f && h.kind === "goods")?.quantity ?? 0);
-    const sold = new Map<number, number>();
-    const atEnd = new Map<number, number>();
     for (const e of e1) {
-      const m = Math.floor(e.t / MONTH);
-      if (e.event === "worked" && e.task === "make" && e.at === `${f}-works`) stock += e.units;
-      if (e.event === "goods_moved" && e.kind === "goods" && e.from === f) {
-        stock -= Number(e.quantity);
-        sold.set(m, (sold.get(m) ?? 0) + Number(e.quantity));
+      if (e.event === "goods_moved" && e.kind === "goods" && e.from === f) stock -= Number(e.quantity);
+      if (e.event === "goods_moved" && e.kind === "goods" && e.to === f) stock += Number(e.quantity);
+      if (e.event === "worked" && e.task === "make" && e.at === `${f}-works`) {
+        stock += e.units;
+        const m = Math.floor(e.t / MONTH);
+        if (m >= 1) {
+          expect(stock).toBeLessThanOrEqual(ordered(m - 1) + quota(m - 1) + 1);
+        }
       }
-      if (e.event === "goods_moved" && e.kind === "goods" && e.to === f) {
-        stock += Number(e.quantity);
-        sold.set(m, (sold.get(m) ?? 0) - Number(e.quantity)); // sent back: not sold after all
-      }
-      atEnd.set(m, stock);
     }
-    for (const m of [1, 2, 3]) expect(atEnd.get(m)!).toBeLessThanOrEqual(Math.max(sold.get(m) ?? 0, sold.get(m + 1) ?? 0) * 1.25 + 300);
   }
   // Twice what they can make: they post jobs for a bigger headcount each month, up to the works' room.
   const busy = generate({ ...base, citizens: 120, exports_per_month: 120_000_000 });

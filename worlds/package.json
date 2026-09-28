@@ -12,6 +12,7 @@
     "ajv": "^8.17.1"
   },
   "exports": {
-    "./generator/generate": "./generator/generate.ts"
+    "./generator/generate": "./generator/generate.ts",
+    "./generator/profile": "./generator/profile.ts"
   }
 }

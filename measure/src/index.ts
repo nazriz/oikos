@@ -13,7 +13,7 @@ import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { basename, join } from "node:path";
 
-export const MEASURE_VERSION = "0.3.0";
+export const MEASURE_VERSION = "0.4.0";
 
 const QUERY_DIR = join(import.meta.dir, "../queries");
 
@@ -47,6 +47,7 @@ const TABLES: { [name: string]: string } = {
       where r.kind = 'event' and json_extract_string(r.body, '$.event') = 'participant_created')
     select $run as run_id, g.seq as created_seq, g.t as created_t, g.participant, g.kind, g.person, g.owner, g.title, g.template,
       json_extract_string(g.controller, '$.type') as controller, json_extract_string(g.controller, '$.impl') as impl, json_extract_string(g.controller, '$.model') as model,
+      json_extract(g.controller, '$.params') as params,
       json_extract_string(o.body, '$.data.llm.participants."' || g.participant || '".adapter') as adapter,
       json_extract_string(o.body, '$.data.llm.participants."' || g.participant || '".configured') as configured
     from (select * from genesis union all select * from created) g left join o on true`,
@@ -90,6 +91,16 @@ const TABLES: { [name: string]: string } = {
     select $run as run_id, seq, t, json_extract_string(body, '$.from') as "from", json_extract_string(body, '$.to') as "to", (json_extract_string(body, '$.amount'))::HUGEINT as amount, json_extract_string(body, '$.currency') as currency,
       json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by", json_extract_string(body, '$.settles') as settles, json_extract_string(body, '$.per_instruction') as per_instruction, json_extract_string(body, '$.memo') as memo
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'transfer'`,
+  // Goods moved (phase B): a quantity of a kind, from a holder at a place to a holder at a place.
+  goods: `
+    select $run as run_id, seq, t, json_extract_string(body, '$.kind') as kind, (json_extract_string(body, '$.quantity'))::HUGEINT as quantity,
+      json_extract_string(body, '$.from') as "from", json_extract_string(body, '$.from_at') as from_at, json_extract_string(body, '$.to') as "to", json_extract_string(body, '$.to_at') as to_at, json_extract_string(body, '$.by') as "by"
+    from raw where kind = 'event' and json_extract_string(body, '$.event') = 'goods_moved'`,
+  // Work done (phase B): units of a task at a place, by how many people, taking how many seconds of their time in all.
+  work: `
+    select $run as run_id, seq, t, json_extract_string(body, '$.task') as task, (json_extract_string(body, '$.units'))::BIGINT as units, (json_extract_string(body, '$.labour'))::BIGINT as labour,
+      json_extract_string(body, '$.at') as "at", json_extract_string(body, '$.on') as "on", json_array_length(json_extract(body, '$.performers')) as performers, json_extract_string(body, '$.by') as "by"
+    from raw where kind = 'event' and json_extract_string(body, '$.event') = 'worked'`,
   // Bodies going into and out of spaces (a space is <structure>/<kind>.<n>; its structure and kind are split out). Genesis occupancy at 0.
   occupancy: `
     select $run as run_id, seq, t, event, occupant, space, split_part(space, '/', 1) as structure, regexp_extract(space, '/(.*)\\.[0-9]+$', 1) as space_kind, reason, "by"

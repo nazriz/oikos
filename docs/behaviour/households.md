@@ -9,7 +9,7 @@ The kernel knows nothing of it: bodies occupy spaces, and a home's capacity is h
 
 ## The starting town (the generator)
 
-Households are drawn one at a time until the town has its people (`citizens` in the spec).
+Households are drawn one at a time until the town has its people (`citizens` in the spec), from the shares in the town's **profile** (docs/profiles.md). The figures below are the first profile's (`au-vic-2026`); another place's profile has its own.
 
 | What | Figure | Source |
 |---|---|---|
@@ -23,8 +23,8 @@ Households are drawn one at a time until the town has its people (`citizens` in 
 
 The result, at 1,000 people: about 405 households of 1–5 people (25%, 35%, 16%, 17%, 7%; mean 2.5, matching the census's 2.5). About 315 of the people are children.
 
-**Simplifications, all world parameters (`households` in the spec):**
-- **A working-age town.** Adults are 18–64 (uniform): there's no pension income to live on yet.
+**Simplifications, all profile or spec parameters (`households`):**
+- **Adults are 18–80** (uniform, a placeholder): about a fifth are at the retirement age or over, near the census share. Retirees live on savings and support paid from outside (docs/behaviour/citizen.md). To replace with the census age distribution.
 - **Children at home are all under 18.** The census's "couple with children" includes adult children; the town doesn't have them at the start, though children grow up during a run.
 - **Parents' ages** are the eldest child's age plus the mother's age at a first birth, drawn from 22–36 (a placeholder around ABS Births' median maternal age of about 31). A partner is within 5 years.
 - **Adults living alone or in groups** are half female, half male (placeholder).

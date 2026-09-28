@@ -1,5 +1,5 @@
-// Money on the wire (contracts v0.5, D58): an exact integer in the smallest unit of its account's currency (cents for
-// AUD), written as a decimal string, so a world's amounts aren't limited by JSON's 2^53. Code does its arithmetic in
+// Money on the wire (contracts v0.5, D58): an exact integer in the smallest unit of its account's currency (cents,
+// for a currency with two decimal places), written as a decimal string, so a world's amounts aren't limited by JSON's 2^53. Code does its arithmetic in
 // ordinary numbers, which are exact up to 2^53 (about $90 trillion in cents): `cents` converts at the edge and throws
 // beyond that rather than rounding. A module that ever needs more would work in bigint.
 

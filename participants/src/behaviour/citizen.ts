@@ -43,7 +43,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.10.0",
+  version: "0.11.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -55,9 +55,18 @@ export const citizen: BehaviourModule = {
       gestation: 266 * DAY, // how long a pregnancy lasts (the world's birth physics: the standard 38 weeks from conception)
       rent_share_bps: 3300, // BoE: renters bid 33% of income
       savings_rent_months: 6, // without income, rent only if savings cover this many months
-      essentials: 50_000, // cents per month
-      spend_above_buffer_bps: 3000, // BoE eq. (2): spend a fraction of savings above the desired buffer
+      // Place-specific figures are placeholders here: a world sets them from its profile (docs/profiles.md).
+      essentials: 40_000, // cents per month: what's spent however little comes in
+      // Spending out of income (docs/behaviour/citizen.md): what isn't saved, less housing, plus a little out of wealth.
+      saving_bps: 500, // the household saving ratio
+      wealth_effect_bps_per_year: 300, // consumption a year per dollar of wealth
+      income_window_days: 90, // income is what came in over this, a month's worth
       buffer_months: 3,
+      // Retiring, and claiming support (docs/behaviour/citizen.md). None unless the world says: no retirement age, no payer.
+      retirement_age: null as number | null,
+      support_from: null as string | null, // who pays support (an entity: in a town, usually the outside world)
+      support_kinds: { retired: "pension", unemployed: "unemployment" } as { retired?: string; unemployed?: string }, // what to claim, when
+      in_labour_force: true, // false: not looking for work (studying, caring...), and not claiming support for being out of it
       // Shopping (Lengnick 2013, Table 1): how often, and the rules for changing shops.
       shop_every_days: 14,
       psi_price_bps: 2500, // chance a trip starts by comparing the favourite with another shop's price
@@ -84,8 +93,8 @@ export const citizen: BehaviourModule = {
       pass_on_bps: 10_000, // chance a contact who can see a lead passes it on (placeholder)
       // Households (docs/behaviour/households.md).
       accept_fewer_bedrooms_after_days: 60, // still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)
-      // Fertility (docs/behaviour/households.md): births per 1,000 women a year by age, ABS Births 2024; a month's chance is a twelfth.
-      fertility_per_1000: [{ from: 15, rate: 6.0 }, { from: 20, rate: 30.6 }, { from: 25, rate: 71.3 }, { from: 30, rate: 106.0 }, { from: 35, rate: 66.6 }, { from: 40, rate: 15.5 }, { from: 45, rate: 1.4 }, { from: 50, rate: 0 }],
+      // Fertility (docs/behaviour/households.md): births per 10,000 women a year by age (the world's profile); a month's chance is a twelfth.
+      fertility_per_10000: [] as { from: number; rate: number }[],
     },
     ctx.params,
   );
@@ -105,6 +114,7 @@ export const citizen: BehaviourModule = {
     let nextShop = ctx.rng("shop-day").below(p.shop_every_days) * DAY;
     let trip: { at: number; tried: Set<string> } | null = null;
     let nextUse = 0; // when we next use things up (weekly)
+    let carried = 0; // budget not spent last trip (less than an item's price), carried to the next
     const deliveries = new Deliveries();
     let departed = false;
     let todo: Step[] = [];
@@ -122,7 +132,18 @@ export const citizen: BehaviourModule = {
     let looking: "leads" | "market" | null = null; // which search the next observation answers
     const leadFound: { homes: StatementRecord[]; jobs: StatementRecord[] } = { homes: [], jobs: [] };
 
-    const monthlyIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
+    // Support paid to us, once our claim is granted (the decision says how much, how often), and whether it's the kind
+    // we claim on retiring.
+    let benefit: { claim: string; payment: string; amount: number; every: number; retired: boolean } | null = null;
+    let claiming: string | null = null; // a claim we've made and not yet heard back on
+    const refusedAt = new Map<string, number>(); // a kind of claim refused, at the age we were: not made again until we're older
+    let retired = false;
+    const inflows: { t: number; amount: number }[] = []; // money that came in (refunds counted negative), for what our income is
+    const wageIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
+    const benefitIncome = () => (benefit ? Math.floor((benefit.amount * MONTH) / benefit.every) : 0);
+    const monthlyIncome = () => wageIncome() + benefitIncome();
+    /** Income that keeps a household in town: work, or support in retirement (support while out of work is a stopgap). */
+    const earnedIncome = () => wageIncome() + (benefit?.retired ? benefitIncome() : 0);
 
     // The household (a record the members keep; none: living alone, as the leaseholder of one).
     const year: number = p.year;
@@ -176,6 +197,10 @@ export const citizen: BehaviourModule = {
     let fresh: ReturnType<Book["absorb"]> = [];
     const absorb = (obs: Observation) => {
       fresh.push(...book.absorb(obs));
+      // Money that came in from others, for what our income is (refunds, which delivery notes tell us of, come off it).
+      const mine = new Set(channels.accounts(obs).filter((a) => a.holder === me).map((a) => a.account));
+      for (const tx of channels.transactions(obs)) if (mine.has(tx.to) && !mine.has(tx.from)) inflows.push({ t: tx.t, amount: cents(tx.amount) });
+      while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
       for (const k of ["homes", "jobs", "petitions"] as const) {
         const ch = obs.channels[k];
         if (ch?.kind !== "records" || !ch.search) continue;
@@ -341,14 +366,14 @@ export const citizen: BehaviourModule = {
         const age = Math.floor((t - body.born_at) / year);
         if (body.sex === "female" && p.births && body.present && t >= nextFertility && t >= expectingUntil) {
           nextFertility = t + MONTH;
-          const rate = [...(p.fertility_per_1000 as { from: number; rate: number }[])].reverse().find((r) => age >= r.from)?.rate ?? 0;
-          if (rate > 0 && ctx.rng(`conceive-${t}`).below(120_000) < Math.round(rate * 10)) {
+          const rate = [...(p.fertility_per_10000 as { from: number; rate: number }[])].reverse().find((r) => age >= r.from)?.rate ?? 0;
+          if (rate > 0 && ctx.rng(`conceive-${t}`).below(120_000) < rate) {
             const partner = household?.couples.find((c) => c.includes(me))?.find((x) => x !== me);
             const man = partner && household!.members.find((m) => m.person === partner && m.sex === "male");
             // With a partner, only when they're here with us (we see who's in our own home).
             const together = !man || (street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.occupants?.includes(me) && sp.occupants?.includes(man.person))));
             if (together) expectingUntil = t + p.gestation + MONTH;
-            if (together) steps.push(because(`Having a child: at ${age}, the chance this month is ${rate} in 12,000 (ABS: ${rate} births per 1,000 women a year at this age).`,
+            if (together) steps.push(because(`Having a child: at ${age}, the chance this month is ${rate} in 120,000 (${rate} births per 10,000 women a year at this age).`,
               C.call("birth", { name: C.text(`baby of ${me}`), template: p.child_template ?? "child", ...(man ? { with: man.person } : {}) })));
           }
         }
@@ -446,7 +471,7 @@ export const citizen: BehaviourModule = {
       const broke = acc.balance < Math.max(home?.rent ?? 0, p.essentials);
       const leave = isLeaseholder() && (
         (homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY) ||
-        (joblessSince !== null && t - joblessSince >= p.leave_after_jobless_days * DAY && householdIncome() === 0 && broke));
+        (joblessSince !== null && t - joblessSince >= p.leave_after_jobless_days * DAY && earnedIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0) === 0 && broke));
       if (leave) {
         const why = homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY
           ? `Leaving town: ${Math.floor((t - homelessSince) / DAY)} days without a home (we leave after ${p.leave_after_homeless_days}).`
@@ -473,8 +498,36 @@ export const citizen: BehaviourModule = {
             data: { listing: best.id, account: acc.account, members, household: { people: members.length, bedrooms_needed: household ? bedroomsNeeded(household, t, year) : 0 } }, basis: best.id })));
         }
       }
+      // Retiring at the world's retirement age: we stop working (giving our employer notice) and claim support.
+      const age = obs.body ? Math.floor((t - obs.body.born_at) / year) : 0;
+      if (!retired && p.retirement_age !== null && age >= p.retirement_age) {
+        retired = true;
+        if (job) {
+          steps.push(because(`We've reached the retirement age (${p.retirement_age}): retiring, with the notice our job asks.`, notice(job.agreement, "Retiring.")));
+          job.endsAt = Math.min(job.endsAt, t + 14 * DAY);
+        }
+      }
+      // Claims for support: once retired, and while out of work. A claim that no longer fits (work found, or retired)
+      // is stopped by saying so.
+      const want = !p.support_from ? null : retired ? p.support_kinds.retired ?? null : !job && p.in_labour_force ? p.support_kinds.unemployed ?? null : null;
+      if (benefit && benefit.payment !== want) {
+        steps.push(because(`Our circumstances have changed (${job ? "working again" : retired ? "retired" : "no longer eligible"}): asking for our ${benefit.payment} payments to stop.`,
+          say("benefit_change", `Please stop payment ${benefit.claim}.`, { to: [p.support_from!], visible: [me, p.support_from!], basis: benefit.claim, data: { claim: benefit.claim, stop: true } })));
+        benefit = null;
+      }
+      if (want && !benefit && claiming !== want && !(refusedAt.get(want) === age)) {
+        claiming = want;
+        steps.push(because(retired ? `Retired, at ${age}: claiming ${want} support.` : `Out of work: claiming ${want} support while we look.`,
+          say("benefit_claim", `Claim: ${want}.`, { to: [p.support_from!], visible: [me, p.support_from!], data: { payment: want, account: acc.account, born_at: obs.body?.born_at } })));
+      }
+      for (const r of fresh) {
+        if (r.record !== "statement" || r.kind !== "benefit_decision" || !(r.addressed_to ?? []).includes(me)) continue;
+        if (r.data?.granted && claiming && r.data?.payment === claiming) benefit = { claim: r.data.claim, payment: claiming, amount: r.data.amount, every: r.data.every, retired };
+        else if (claiming) refusedAt.set(claiming, age);
+        claiming = null;
+      }
       // Looking for work: where someone told us about first, then the best-paid posting.
-      if (!job) {
+      if (!job && !retired && p.in_labour_force) {
         const told = leadFound.jobs.filter((j) => !applied.has(j.id));
         const posts = (told.length ? told : found.jobs).filter((j) => !applied.has(j.id));
         posts.sort((a, b) => (b.data?.wage ?? 0) - (a.data?.wage ?? 0) || (a.id < b.id ? -1 : 1));
@@ -488,11 +541,17 @@ export const citizen: BehaviourModule = {
 
       // Spending: essentials, plus a share of savings above the buffer, a month's worth at a time. Where there are
       // shops (their price lists), it buys goods, every fortnight; a world without them takes the money-only stand-in.
+      // A month's spending: out of income, what isn't saved (the saving ratio), less housing; never below essentials;
+      // plus a little out of savings above a buffer (the wealth effect). Income is a month's worth of what came in lately
+      // (before we've a window of it, what our job and payments say).
       const monthly = () => {
-        const reserve = home?.rent ?? share?.cents ?? 0;
-        const buffer = p.buffer_months * monthlyIncome();
-        const above = Math.max(0, acc.balance - reserve - buffer);
-        return Math.min(acc.balance - reserve, p.essentials + Math.floor((above * p.spend_above_buffer_bps) / 10_000));
+        const housing = home?.rent ?? share?.cents ?? 0;
+        const seen = t >= p.income_window_days * DAY;
+        const income = seen ? Math.floor((inflows.reduce((x, f) => x + f.amount, 0) * MONTH) / (p.income_window_days * DAY)) : monthlyIncome();
+        const fromIncome = Math.max(p.essentials, Math.floor((income * (10_000 - p.saving_bps)) / 10_000) - housing);
+        const above = Math.max(0, acc.balance - housing - p.buffer_months * Math.max(income, p.essentials));
+        const fromWealth = Math.floor((above * p.wealth_effect_bps_per_year) / 12 / 10_000);
+        return Math.max(0, Math.min(acc.balance - housing, fromIncome + fromWealth));
       };
       const shops = [...new Set(book.open("price_list").map((r) => r.speaks_for!))].sort()
         .map((s) => ({ shop: s, ...goodsPrices(book, s) }))
@@ -503,21 +562,22 @@ export const citizen: BehaviourModule = {
       // somewhere we keep things), or else kept at the shop for us.
       const homeAt = home && inside(home.space) ? home.structure : livingAt && inside(livingAt) ? structureOf(livingAt) : undefined;
       const placeFor = (s: { at?: string }) => homeAt ?? s.at;
-      const buy = (s: (typeof shops)[number], q: number, why: string) => {
+      const buy = (s: (typeof shops)[number], q: number, why: string, retryOf?: string) => {
         const place = placeFor(s);
         if (!place || q < 1) return;
         trip!.tried.add(s.shop);
-        steps.push(order({ me, seller: s.shop, sellerAccount: s.account, kind: p.goods, quantity: q, unitPrice: s.price, at: place, from: acc.account, why }));
+        steps.push(order({ me, seller: s.shop, sellerAccount: s.account, kind: p.goods, quantity: q, unitPrice: s.price, at: place, from: acc.account, why, retryOf }));
       };
       if (shops.length) {
         // A shop that couldn't serve all we asked: now and then we give up on it; and we try another for what's missing.
         for (const d of deliveries.take(book, me)) {
+          if (d.refund > 0) inflows.push({ t, amount: -d.refund }); // a refund isn't income
           const short = d.ordered - d.delivered;
           if (short <= 0 || d.kind !== p.goods) continue;
           if (d.seller === favourite && ctx.rng(`quit-${d.order}`).below(10_000) < p.psi_quant_bps) favourite = undefined;
           if (!trip || trip.tried.size >= p.beta) continue;
           const next = shops.filter((x) => !trip!.tried.has(x.shop)).sort((a, b) => a.price - b.price || (a.shop < b.shop ? -1 : 1))[0];
-          if (next) buy(next, Math.min(short, Math.floor((short * (priceAt(d.seller)?.price ?? next.price)) / next.price)), `${d.seller} could serve ${d.delivered} of the ${d.ordered} we wanted: trying ${next.shop} for the rest.`);
+          if (next) buy(next, Math.min(short, Math.floor((short * (priceAt(d.seller)?.price ?? next.price)) / next.price)), `${d.seller} could serve ${d.delivered} of the ${d.ordered} we wanted: trying ${next.shop} for the rest.`, d.order);
         }
         if (t >= nextShop) {
           nextShop = t + p.shop_every_days * DAY;
@@ -536,9 +596,10 @@ export const citizen: BehaviourModule = {
             }
           }
           const s = priceAt(favourite)!;
-          const budget = Math.floor((monthly() * p.shop_every_days * DAY) / MONTH);
+          const budget = Math.min(acc.balance, Math.floor((monthly() * p.shop_every_days * DAY) / MONTH) + carried);
           const q = Math.floor(budget / s.price);
-          buy(s, q, `Shopping for the fortnight: ${usd(p.essentials)} a month of essentials plus ${p.spend_above_buffer_bps / 100}% of savings above a ${p.buffer_months}-month buffer, keeping the rent aside, buys ${q} at ${s.shop} (${usd(s.price)} each)${why ? `; ${why}` : ""}.`);
+          carried = Math.max(0, Math.min(budget - q * s.price, s.price));
+          buy(s, q, `Shopping for the fortnight: what we don't save of our income (${100 - p.saving_bps / 100}%) less the rent, and a little out of savings, is ${usd(budget)}: ${q} at ${s.shop} (${usd(s.price)} each)${why ? `; ${why}` : ""}.`);
         }
       } else if (t >= nextSpend) {
         nextSpend = t + MONTH;
@@ -546,7 +607,7 @@ export const citizen: BehaviourModule = {
         const amount = monthly();
         if (amount > 0 && shopAccounts.length) {
           const shop = ctx.rng(`shop-${t}`).pick(shopAccounts);
-          steps.push(because(`Monthly shopping: ${usd(p.essentials)} of essentials plus ${p.spend_above_buffer_bps / 100}% of savings above a ${p.buffer_months}-month buffer, keeping the rent aside.`, pay(shop, amount, { from: acc.account, for: "Shopping." })));
+          steps.push(because(`Monthly shopping: what we don't save of our income (${100 - p.saving_bps / 100}%) less the rent, and a little out of savings.`, pay(shop, amount, { from: acc.account, for: "Shopping." })));
         }
       }
       // Using things up: what we hold, spread over the weeks until the next trip. With a home, we use things there, and
@@ -742,7 +803,7 @@ export const citizen: BehaviourModule = {
             const lead = leads.pop()!;
             const looks: LookRequest[] = [];
             if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }, ...roomy], limit: p.search_limit } });
-            if (!job) looks.push({ channel: "jobs", query: { standing: true, where: [{ field: "data.workplace", op: "=", value: lead }], limit: p.search_limit } });
+            if (!job && !retired && p.in_labour_force) looks.push({ channel: "jobs", query: { standing: true, where: [{ field: "data.workplace", op: "=", value: lead }], limit: p.search_limit } });
             leadFound.homes = [];
             leadFound.jobs = [];
             looking = "leads";
@@ -752,7 +813,7 @@ export const citizen: BehaviourModule = {
           const looks: LookRequest[] = [];
           if (lookedAt !== obs.t && acc) {
             if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], order: { field: "data.rent", desc: true }, limit: p.search_limit } });
-            if (!job) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
+            if (!job && !retired && p.in_labour_force) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
             // A glance at the petitions board: what's standing now.
             looks.push({ channel: "petitions", query: { standing: true, limit: 10 } });
           }

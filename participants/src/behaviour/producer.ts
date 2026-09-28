@@ -188,7 +188,7 @@ export const producer: BehaviourModule = {
           const up = Math.floor((plan * per * 3) / 2);
           const unit = supply.prices[kind];
           if (have >= s || unit === undefined || !supply.account) continue;
-          const q = up - have;
+          const q = Math.max(up - have, supply.min_order ?? 1); // at least what the supplier sells in one order
           if (acc.balance < q * unit) continue;
           onOrder.set(kind, (onOrder.get(kind) ?? 0) + q);
           const st = order({ me, seller: p.supplier, sellerAccount: supply.account, kind, quantity: q, unitPrice: unit, at: p.works, from: acc.account,
@@ -215,7 +215,9 @@ export const producer: BehaviourModule = {
           const avail = Math.min(...present.map((w) => p.working_day - (used.get(w) ?? 0)));
           const byHours = Math.floor((avail * present.length) / p.labour_per_unit);
           const byInputs = Math.min(...Object.entries(p.per_unit).map(([k, q]) => Math.floor(held(obs, p.works, k) / q)));
-          const units = Math.min(byHours, byInputs);
+          // No further than the top of the band: a day's making can be a lot next to a month's demand.
+          const room = Math.max(0, Math.ceil((p.phi_high_bps * lastDemand) / 10_000) - stock);
+          const units = Math.min(byHours, byInputs, room);
           if (units > 0) {
             const share = Math.ceil((units * p.labour_per_unit) / present.length);
             for (const w of present) used.set(w, (used.get(w) ?? 0) + share);

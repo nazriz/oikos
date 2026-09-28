@@ -9,7 +9,7 @@ import { cents } from "../money";
 import { because, Book, callAction, MONTH, pay, say, usd, withdraw, type Step } from "./common";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
-import { DEFAULT_HOUSEHOLDS, drawHousehold, type HouseholdSpec } from "./household";
+import { drawHousehold, type HouseholdSpec } from "./household";
 
 export const exportDemand: BehaviourModule = {
   name: "world.export_demand",
@@ -173,6 +173,73 @@ export const trade: BehaviourModule = {
   },
 };
 
+/**
+ * world.transfers: support paid to people from outside the world (a boundary condition, D31): for a town, a national
+ * government's payments. It decides claims for the payment kinds the world names, each with its amount, how often, and
+ * the ages it's for; pays those it grants on that schedule until the claimant says to stop, dies (a death
+ * registration) or leaves (a departure). It takes the claim's date of birth as stated. Means tests are left out.
+ * Documented in docs/behaviour/boundary.md.
+ */
+export const transfers: BehaviourModule = {
+  name: "world.transfers",
+  version: "0.1.0",
+  doc: "docs/behaviour/boundary.md",
+  cadence: () => DAY,
+  firstWake: () => 0,
+  create(ctx) {
+    const p = params(
+      {
+        account: "acc-outside",
+        year: 365 * DAY,
+        payments: {} as { [kind: string]: { amount: number; every_days: number; from_age: number; to_age?: number } },
+      },
+      ctx.params,
+    );
+    const me = ctx.entity;
+    const book = new Book();
+    const decided = new Set<string>();
+    const paying = new Map<string, { person: string; account: string; payment: string; next: number }>(); // claim -> payment
+    return stepper(
+      (obs) => book.absorb(obs),
+      (obs) => {
+        const t = obs.t;
+        const steps: Step[] = [];
+        // Claims: granted if the claimant's age fits the payment; the first payment one period on.
+        for (const c of book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
+          decided.add(c.id);
+          const who = c.speaks_for!;
+          const payment = String(c.data?.payment);
+          const rule = p.payments[payment];
+          const age = Number.isInteger(c.data?.born_at) ? Math.floor((t - (c.data!.born_at as number)) / p.year) : -1;
+          const ok = !!rule && typeof c.data?.account === "string" && age >= rule.from_age && (rule.to_age === undefined || age <= rule.to_age);
+          // One payment a person: a new claim replaces the old.
+          for (const [id, x] of paying) if (x.person === who) paying.delete(id);
+          if (ok) paying.set(c.id, { person: who, account: c.data!.account as string, payment, next: t + rule!.every_days * DAY });
+          steps.push(because(ok ? `A claim for ${payment} support from someone it's for (aged ${age}): granted, at ${usd(rule!.amount)} every ${rule!.every_days} days.` : `A claim for ${payment} support that doesn't qualify: refused.`,
+            say("benefit_decision", ok ? `Claim ${c.id} granted: ${usd(rule!.amount)} every ${rule!.every_days} days.` : `Claim ${c.id} refused.`, {
+              to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: ok, ...(ok ? { amount: rule!.amount, every: rule!.every_days * DAY } : {}) },
+            })));
+        }
+        // Stopping: the claimant asked, died or left.
+        const gone = new Set([...book.all("death_registration").map((r) => r.data?.deceased as string), ...book.all("departure").map((r) => r.speaks_for!)]);
+        for (const r of book.all("benefit_change")) if (r.data?.stop) paying.delete(r.data.claim);
+        for (const [id, x] of paying) if (gone.has(x.person)) paying.delete(id);
+        // Paying what's due, in batches (a program has at most 32 lines).
+        const due: C.Call[] = [];
+        for (const [, x] of [...paying].sort(([a], [b]) => (a < b ? -1 : 1))) {
+          const rule = p.payments[x.payment]!;
+          while (x.next <= t) {
+            due.push(pay(x.account, rule.amount, { from: p.account, for: `${x.payment} support.` }));
+            x.next += rule.every_days * DAY;
+          }
+        }
+        for (let i = 0; i < due.length; i += 30) steps.push(because(`Paying the support due (${due.length} payments).`, ...due.slice(i, i + 30)));
+        return steps;
+      },
+    );
+  },
+};
+
 /** idle: a participant that does nothing (placeholder, and a control condition). */
 export const idle: BehaviourModule = {
   name: "idle",
@@ -209,12 +276,13 @@ export const migration: BehaviourModule = {
         memory_days: 90,
         savings_months: [1, 3] as [number, number],
         template: "newcomer",
-        households: {} as Partial<HouseholdSpec>,
+        households: null as HouseholdSpec | null, // who comes, as the world's profile describes households (required)
         search_limit: 200,
       },
       ctx.params,
     );
-    const H: HouseholdSpec = { ...DEFAULT_HOUSEHOLDS, ...p.households };
+    if (!p.households) throw new Error("world.migration: params.households is required (the world's household mix)");
+    const H: HouseholdSpec = p.households;
     const book = new Book();
     const brought: { t: number; adults: number }[] = [];
     let arrivals = 0;

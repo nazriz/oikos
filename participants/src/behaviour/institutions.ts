@@ -395,8 +395,8 @@ export const builder: BehaviourModule = {
 
 
 /**
- * city.registry: the registry of deaths (after Victoria's Registry of Births, Deaths and Marriages, where a death
- * is registered from a notification). It reads death notifications addressed to the town and, once per death,
+ * city.registry: the registry of deaths (after a real registry of births, deaths and marriages, where a death is
+ * registered from a notification: docs/behaviour/institutions.md). It reads death notifications addressed to the town and, once per death,
  * publishes a public registration with what it was told: who died, who reported it, the partner, the children and
  * any children left with no adult at home. It doesn't check what it's told (a later module could).
  */
@@ -438,7 +438,7 @@ export const registry: BehaviourModule = {
 /**
  * city.child_protection: children left with no adult at home. On a death registration naming children without an
  * adult, or a child's own request for help, it takes them into care, which (the town having no foster homes yet)
- * is care elsewhere: they leave the town with the office's worker. After Victoria's child protection service, much
+ * is care elsewhere: they leave the town with the office's worker. After a real child protection service, much
  * simplified (docs/behaviour/institutions.md).
  */
 export const childProtection: BehaviourModule = {

@@ -16,7 +16,7 @@ const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const tight = { ...base, citizens: 120, apartment_blocks: 2, houses: 16, landlord_capital: 300_000_000, landlord_compliance_bps: 10_000 };
 
 /** Refusals from same-moment races (D58): someone who'd just left, named for work by a firm acting on what it saw. */
-const RACES = ["not_present", "not_at_work"];
+const RACES = ["not_present", "not_at_work", "capacity_exceeded"]; // and moving into a home still being left
 
 async function run(name: string, config: any, until: number) {
   const out = join(root, "runs", `test-building-${name}`);

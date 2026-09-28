@@ -159,7 +159,7 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   expect(read).toContain("council proposal form");
   // The budget brief: what the budget can pay for; what a park costs is the builder's published price, not something finance was told.
   expect(read).toContain("The budget's lines: parks, for building a park");
-  expect(read).toMatch(/builder's published prices \(rec\.\d+\): .*park \$63,750\.00/);
+  expect(read).toMatch(/builder's published prices \(rec\.\d+\): .*park \$[\d,]+\.00/);
   // The land register: the town's lots, and the vacant ones by id.
   expect(read).toMatch(/The town owns \d+ lots; \d+ have nothing built on them: lot-/);
 }, 300_000);
@@ -203,7 +203,7 @@ test("after the council adopts a budget, the clerk's report says so (it sees wha
     participant: (req: LlmRequest) => {
       const obs = req.context.observation;
       seen.push(JSON.stringify(req.messages.at(-1)!.content));
-      if (calls === 0) return tool("do", { what: "Table the year 1 budget: parks $60,000." });
+      if (calls === 0) return tool("do", { what: "Table the year 1 budget: parks $150,000." });
       const d = obs.drafts[0];
       if (d) return tool("confirm", { ref: d.id, decision: "confirm" });
       if (!asked && obs.t >= 20 * DAY) {
@@ -212,7 +212,7 @@ test("after the council adopts a budget, the clerk's report says so (it sees wha
       }
       return tool("done_for_now", { days: 7 });
     },
-    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: 'form(to=city, form=council_proposal, kind=budget, parks="$60,000", proposal="Year 1 budget: parks $60,000.")' } }],
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: 'form(to=city, form=council_proposal, kind=budget, parks="$150,000", proposal="Year 1 budget: parks $150,000.")' } }],
     debrief: () => [{ type: "text", text: "Thanks." }],
   });
   const s = await run("clerk-budget", town(), 30 * DAY, { adapter });

@@ -615,6 +615,49 @@ See the design note, §16.
 - **Found by the tests:** annotations are stored in canonical JSON, so recordings must be compared canonically; a failed debrief used to crash the end of a run.
 - Operator's guide: docs/reliability.md.
 
+**D60. The platform is general: every place-specific figure lives in a profile.** *(Naz, 2026-09-28: "I feel like it's too scoped to like australia? ... we are trying to create a generalised platform here"; "please ensure that we have guardrails/docs/tests whatever to keep this untangled".)*
+- **Why:** calibrating the town to Australian data had started to leak into the platform. Module defaults held Australian figures (census shares, fertility, the pension age, the saving ratio); a module was named for the Commonwealth, and a citizen's logic knew Australian payment names. A world for another place would have inherited Australia's rules without anyone noticing.
+- **The rule:**
+  - **Kernel, contracts, behaviour modules and generators are the same for every place.** Modules have neutral names ("support", "pension", "unemployment" as names a world gives), and their defaults are placeholders or "none" (no retirement age unless a world sets one).
+  - **Every place-specific figure lives in a profile** (`worlds/profiles/<id>.json`): its values, a source for each (or "placeholder" and why), and that place's calibration targets.
+  - **The generator reads a profile**, and derives by general formulas what it doesn't hold (hours per item from an industry's labour share and a wage).
+
+  The first profile is `au-vic-2026` (a regional Victorian town, September 2026), holding everything that used to be scattered through the code: census household shares, life tables, fertility, injury rates, wages, rents, support payments, wealth shares, industry shares, currency.
+- **Guardrails:**
+  - `orchestrator/test/generality.test.ts` fails if platform code names a place, its statistics offices, agencies, payments or currency; if any profile figure lacks a source; or if a town doesn't generate from a profile, taking its figures from it.
+  - CLAUDE.md states the rule, and docs/profiles.md explains the layers.
+- **The guardrail found 11 leaks**, now fixed: comments citing a statistics office or a state's institutions (the rules' sources stay in docs/behaviour/); a household's stated reason for having a child, which cited the ABS; and contract descriptions that used "AUD" as the example currency.
+  - ⚑ **Wording only:** contracts' descriptions now give a generic example ("cents, for a currency with two decimal places"). No schema change.
+- ⚑ **Known exception, held for Naz:** money is displayed with "$", and the call language writes amounts in dollars ("$12.50"). A world in another currency would still see dollar signs. Fixing it changes the call language (a contract).
+- **Revisit if** a second profile shows that a rule, general in form, was really one country's (the support payments' age windows, the example legal code).
+
+- **Phase C, stage C0 (a sourced baseline):** see docs/design/phase-c-stakes.md for the phase: credit, firm failure and entry, concentrated ownership, shocks, prices that bite, government, and workers' voice (Naz: "everything you mentioned 1 to 7 I want implemented").
+  - **What changed:**
+    - wages: the award for shops, the ABS industry medians for factories and building;
+    - rents: regional medians;
+    - spending tied to income: the saving ratio and a small wealth effect, replacing 30% of savings a month;
+    - retirement at the world's retirement age, with support in retirement and for the unemployed paid from outside (`world.transfers`);
+    - participation in the labour force;
+    - wealth-concentrated ownership (fifths of households by savings hold the profile's shares, with part of each firm owned from outside);
+    - industry shares define an item (manufacturing's labour and input shares; retail's purchases and labour shares);
+    - the world market's demand derived from the factories' opening staff when a spec doesn't set it.
+
+    Measured against the profile's targets: docs/calibration.md.
+  - **Changed my mind:**
+    - **What "goods" stands for.** With retail's sourced shares, shops are retail. Consumer services are a missing sector for now; last stage I'd framed goods as goods and services.
+    - **Award minimums for all wages** made every worker earn the floor. Industry medians are the better source.
+  - **Found:**
+    - **Money-only spending kept households spending more than they earned.**
+    - **Claims were made again every week.** A refused claim for unemployment support (people under the minimum age) was repeated weekly.
+    - **Income was undercounted.** Refunds were detected as "money from someone we paid", which counted a shop worker's wage from their own shop, or a tenant's dividend from their landlord, as a refund. Refunds now come off from delivery notes.
+    - **A day's making overshot.** At sourced productivity, a day's making could be more than a month's demand, so factories now make only up to the band's top.
+    - **Input orders fell below the minimum.** Factories' input orders could be below the supplier's minimum and be refunded.
+    - **An empty factory never started** (a stage B4 issue, now covered by the demand rule).
+  - **Tests:**
+    - allow refusals when a household moves into a home its last tenants are still leaving (designed: refused, and retried);
+    - read prices from what the builder publishes rather than fixed amounts;
+    - the stock-band test checks the property itself (no day's making beyond the band's top).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

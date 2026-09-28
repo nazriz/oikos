@@ -46,8 +46,9 @@ test("with jobs going, households move in, bank their savings, and find work and
 }, 300_000);
 
 test("with no jobs going, nobody comes", async () => {
-  // One shop and one factory, whose export customers want less than it makes (so it isn't hiring).
-  const ev = await run("none", generate({ ...spec, citizens: 120, shops: 1, factories: 1, exports_per_month: 4_000_000, migration: { outside_monthly_income: 200_000, response_bps: 3000 } }));
+  // One shop and one factory, whose export customers want less than it makes (so it isn't hiring); and elsewhere pays
+  // more than the town does, so any posting there is isn't worth coming for.
+  const ev = await run("none", generate({ ...spec, citizens: 120, shops: 1, factories: 1, exports_per_month: 4_000_000, migration: { outside_monthly_income: 1_000_000, response_bps: 3000 } }));
   // Postings may appear and be filled at once; with none standing when the outside world looks, or a gap below zero, no one comes.
   expect(ev.filter((e) => e.event === "person_arrived").length).toBeLessThanOrEqual(2);
 }, 300_000);

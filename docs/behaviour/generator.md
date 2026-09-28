@@ -1,6 +1,10 @@
-# The town generator (`worlds/generator/generate.ts`, v0.12.0)
+# The town generator (`worlds/generator/generate.ts`, v0.13.0)
 
-Turns a short spec (`worlds/town.yaml`) into a full, explicit contracts v0.5 world config. It's deterministic from the spec's seed, using the kernel's keyed randomness. The kernel never generates anything; it receives this output. Everything generated is example **content** (D23).
+Turns a short spec (`worlds/town.yaml`) and a **profile** (`worlds/profiles/`, docs/profiles.md: every place-specific figure, with its source) into a full, explicit contracts v0.5 world config. The generator's code holds no place's figures; what it needs beyond the profile it derives by general formulas:
+- **a factory's item:** its labour share of the world price, as hours at the factory wage; its input share, as kg of inputs;
+- **a shop's item:** its retail price from the purchases share; its serving time from the labour share, at the shop wage;
+- **shops' opening staff:** from the sales the town's expected incomes would make;
+- **the world market's demand**, if the spec doesn't set it: what the factories' opening staff make, less the town's own purchases (a boundary condition, set by rule). It's deterministic from the spec's seed, using the kernel's keyed randomness. The kernel never generates anything; it receives this output. Everything generated is example **content** (D23).
 
 **What it makes:**
 - **Land:** a grid of cells, each a lot on the town's registry (a `lot` record naming its cell). The southern row is the river.

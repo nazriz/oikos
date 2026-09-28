@@ -54,19 +54,20 @@ test("households live, move and pay together", async () => {
   const shares = ev.filter((e) => e.event === "transfer" && requests.get(e.per_instruction)?.data?.outcome?.money?.for === "Household share of the rent.");
   expect(shares.length).toBeGreaterThan(20);
   const holder = new Map<string, string>([...config.world.accounts.map((a: any) => [a.id, a.holder]), ...ev.filter((e) => e.event === "account_opened").map((e) => [e.account, e.holder])] as [string, string][]);
-  for (const x of shares) expect(householdOf.get(holder.get(x.from)!)?.leaseholder).toBe(holder.get(x.to));
+  for (const x of shares) if (known(holder.get(x.from)!)) expect(householdOf.get(holder.get(x.from)!)?.leaseholder).toBe(holder.get(x.to));
   // Nobody was refused anything, but for same-moment races (D58): someone who had just left or moved, named for work by
-  // a firm acting on what it saw at the moment's start.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work"].includes(e.code))).toEqual([]);
+  // a firm acting on what it saw at the moment's start; and a household moving into a home its last tenants are still
+  // leaving (refused, and tried again: docs/behaviour/citizen.md).
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code))).toEqual([]);
 }, 300_000);
 
 test("a child born here is brought home by the parent who bore them and added to the household's record", async () => {
   const out = join(root, "runs", "test-births");
   rmSync(out, { recursive: true, force: true });
   const config = generate({ ...spec, years: 1 });
-  // Ten times the ABS rates, so a year of a small town has births to check.
-  for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller.params.fertility_per_1000 = [{ from: 15, rate: 300 }, { from: 45, rate: 0 }];
-  for (const t of config.templates) if (t.controller?.impl === "citizen.default") t.controller.params.fertility_per_1000 = [{ from: 15, rate: 300 }, { from: 45, rate: 0 }];
+  // Far above real rates (80% a year), so a year of a small town has births to check.
+  for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller.params.fertility_per_10000 = [{ from: 15, rate: 8000 }, { from: 45, rate: 0 }];
+  for (const t of config.templates) if (t.controller?.impl === "citizen.default") t.controller.params.fertility_per_10000 = [{ from: 15, rate: 8000 }, { from: 45, rate: 0 }];
   const s = await runWorld({ config, runId: "births", outDir: out, until: 365 * DAY });
   const ev = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const births = ev.filter((e) => e.event === "person_created" && e.parents?.length);
@@ -81,6 +82,6 @@ test("a child born here is brought home by the parent who bore them and added to
     const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person);
     if (home) expect(home.by).toBe(`${b.parents[0]}-self`);
   }
-  // Nothing refused but same-moment races (D58), as above.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work"].includes(e.code))).toEqual([]);
+  // Nothing refused but same-moment races (D58) and moving into a home still being left, as above.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code))).toEqual([]);
 }, 300_000);

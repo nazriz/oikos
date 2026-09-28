@@ -65,5 +65,6 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   expect(heldLease.length).toBeGreaterThan(0);
   const records = ev.filter((e) => e.event === "recorded" && e.record.kind === "household").map((e) => e.record);
   expect(heldLease.some((who) => records.some((r) => r.data.leaseholder !== who && !r.data.members.some((m: any) => m.person === who)))).toBe(true);
-  expect(ev.filter((e) => e.event === "action_refused").map((e) => e.code)).toEqual([]);
+  // Nothing refused but same-moment races (D58) and moving into a home still being left.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code)).map((e) => e.code)).toEqual([]);
 }, 300_000);

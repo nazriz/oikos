@@ -21,7 +21,7 @@ async function run(name: string, config: any, until: number) {
   expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   // Nothing refused but same-moment races (D58): someone who'd just left, named for work.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work"].includes(e.code))).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code))).toEqual([]);
   return { ev, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
 }
 

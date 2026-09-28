@@ -1,4 +1,4 @@
--- Households at the end of each run (as their standing records list them, those still in town): living together or apart, unhoused, and overcrowded by the occupancy standard (CNOS, as the ABS applies it: bedrooms needed > bedrooms), with the people in overcrowded homes.
+-- Households at the end of each run (as their standing records list them, those still in town): living together or apart, unhoused, and overcrowded by the occupancy standard (CNOS, as statistics offices apply it: bedrooms needed > bedrooms), with the people in overcrowded homes.
 with hh as (
   select r.run_id, r.id, json_extract_string(r.body, '$.data.leaseholder') as leaseholder,
     from_json(json_extract(r.body, '$.data.members'), '["JSON"]') as members, from_json(json_extract(r.body, '$.data.couples'), '[["VARCHAR"]]') as couples

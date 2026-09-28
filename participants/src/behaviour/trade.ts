@@ -43,13 +43,13 @@ export function priceList(prices: { [kind: string]: number }, account: string, t
  * An order for goods, paid with the order in the same act. `from` is the buyer's paying account; `sellerAccount`
  * the one the seller's price list names.
  */
-export function order(o: { me: string; seller: string; sellerAccount: string; kind: string; quantity: number; unitPrice: number; to?: string; at: string; from: string; why: string; ref?: string }): Step {
+export function order(o: { me: string; seller: string; sellerAccount: string; kind: string; quantity: number; unitPrice: number; to?: string; at: string; from: string; why: string; ref?: string; retryOf?: string }): Step {
   const to = o.to ?? o.me;
   const total = o.quantity * o.unitPrice;
   return because(o.why,
     [o.ref ?? "order", say("order", `Order: ${o.quantity} ${o.kind} at ${usd(o.unitPrice)} each (${usd(total)}), delivered to ${to} at ${o.at}. Paid with this order.`, {
       to: [o.seller], visible: [o.me, o.seller],
-      data: { kind: o.kind, quantity: o.quantity, unit_price: o.unitPrice, deliver_to: to, at: o.at, account: o.from },
+      data: { kind: o.kind, quantity: o.quantity, unit_price: o.unitPrice, deliver_to: to, at: o.at, account: o.from, ...(o.retryOf ? { retry_of: o.retryOf } : {}) },
     })],
     pay(o.sellerAccount, total, { from: o.from, for: `Order: ${o.quantity} ${o.kind}.` }),
   );

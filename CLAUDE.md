@@ -20,6 +20,7 @@ A wind tunnel for AI stewardship: a configurable, living, visual simulated world
 - Citizen behaviour rules are documented with sources in `docs/behaviour/` and exposed as parameters.
 - Every run records token usage and cost.
 - Respect VISION §15 (welfare of AI participants) when designing participants, framings and scenarios.
+- **The platform is general: no place in the code.** Every place-specific figure (census shares, wages, rents, rates, currency...) lives in a profile (`worlds/profiles/`), with its source; modules and generators have neutral names and no place's figures as defaults (docs/profiles.md). `orchestrator/test/generality.test.ts` enforces it.
 
 ## Stack
 Rust (kernel) · TypeScript on **Bun, not Node** (participants, translator, orchestrator) · Three.js on WebGPU (renderer) · Apache-2.0.

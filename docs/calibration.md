@@ -1,6 +1,22 @@
 # Calibration targets for the generated town
 
-What the generated town's outcomes should look like, where each target comes from, and what the town measures now. **Targets are outcomes to compare against, never settings.** The rules that produce them are in docs/behaviour/, and measurement lives outside the world (the queries named below). All figures are Australian unless said otherwise, to keep one source country.
+What the generated town's outcomes should look like, where each target comes from, and what the town measures now. **Targets are outcomes to compare against, never settings.** The rules that produce them are in docs/behaviour/, and measurement lives outside the world (the queries named below). The targets belong to a place: each profile (docs/profiles.md) carries its own `targets` with sources; the figures here are the first profile's (`au-vic-2026`).
+
+## The economy (phase C, stage C0: a sourced baseline)
+
+Every economic figure the town used to have as a placeholder now comes from its profile, with its source: award and median wages, regional rents, the household saving ratio and a wealth effect, the retirement age and support payments, wealth by quintile, industry shares. Measured on `worlds/town.yaml` (200 people), three seeds, two years (`economy/summary`, `town/rent-stress`):
+
+| Outcome | Target | Measured | Notes |
+|---|---|---|---|
+| Unemployment rate | 4.6% (ABS Labour Force, Aug 2026) | 2–7% | The labour force: working-age adults drawn as in it (a placeholder 80%) |
+| Employment to population (adults) | 63.9% (ABS, of people 15+) | 77–81% | Too high: too few retirees (the placeholder age range makes about 10% of adults 67+, not ~20%); nobody under 18 counts |
+| Renters' housing costs, share of income | 20.2% mean (ABS, 2019–20) | 20–24% median | Close |
+| Rental stress (over 30% of income) | 58% of lower-income renters | 23–33% of renter households | Not comparable yet (the target is for lower incomes) |
+| Household saving ratio | 6.5% (ABS, June quarter 2026) | about 15% (people's money in less out, over what came in) | High: households build savings as the town's exports bring money in; partly a transition over the first two years. To look into (the measure isn't the national accounts' either) |
+
+**Chosen, not sourced** (a boundary condition, set openly): the world market's demand for the town's goods, absent from the spec, is what the factories' opening staff make less the town's own purchases, so the town starts in balance with its markets.
+
+## Earlier outcomes
 
 Measured on `worlds/town-1000.yaml` (1,000 people, two years, several seeds), as of 2026-09-28.
 

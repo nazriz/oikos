@@ -53,6 +53,14 @@ A first-come-first-served quantity, shared by two factories, made the demand eac
 - exchange rates (one currency);
 - trade policy (tariffs, quotas): these would be laws, as records, applied by an office.
 
+## `world.transfers` (v0.1.0): support paid from outside
+
+Support paid to people in the world by someone outside it: for a town, a national government's payments. The world names the payments (`payments`: a kind, its amount, how often, and the ages it's for). A person claims (a `benefit_claim` to the payer, with the kind, the account to pay and their date of birth); the payer grants the claim if their age fits (taking the stated date of birth as true), says so (`benefit_decision`), and pays on schedule until the person asks to stop (`benefit_change`), dies (a death registration) or leaves (a departure). One payment a person: a new claim replaces the old.
+
+**Leaves out:** means tests; couples' rates; checking what's claimed; payments for anything but age and being out of work. A world that needs a national government's decisions inside it replaces this module with a participant of its own, reading the same claims (phase F).
+
+In the generated town, the profile's payments are "pension" (from the retirement age) and "unemployment" (below it, from the age the profile gives).
+
 ## `world.migration` (v0.1.0): people moving in from elsewhere
 
 **Participant:** the outside world's `migration` position ("People moving from elsewhere"), held by a system. **Source:** `participants/src/behaviour/world.ts`. People cross into the world only through the boundary (the `arrive` block; contracts v0.4), so arrivals are the outside world's act. Who comes is the outside world's business.
