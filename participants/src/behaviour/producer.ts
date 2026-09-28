@@ -2,13 +2,14 @@
 // docs/behaviour/producer.md, with sources.
 
 import * as C from "../calls";
+import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
-import { Staffing, stepper } from "./firms";
+import { Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
-import { LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
+import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from "./trade";
 
 /**
@@ -21,7 +22,7 @@ import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from
  */
 export const producer: BehaviourModule = {
   name: "firm.producer",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -46,6 +47,10 @@ export const producer: BehaviourModule = {
         price: 6000, // its wholesale price, cents each
         min_order: 50, // the least it sells in one order (it sells wholesale)
         lender: "bank", // whom it borrows from
+        // Insolvency (docs/behaviour/insolvency.md; placeholders): short of wages this long with no credit, or in default on
+        // a loan, and it winds up over this long.
+        short_days: 60,
+        wind_up_days: 60,
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
@@ -54,6 +59,7 @@ export const producer: BehaviourModule = {
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role });
     const borrowing = new Borrowing(me, p.lender);
+    const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days });
     const orders = new OrderBook(me);
     const deliveries = new Deliveries();
     const onOrder = new Map<string, number>(); // inputs ordered, not yet delivered
@@ -100,7 +106,9 @@ export const producer: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
-        if (!acc) return steps;
+        if (!acc || winding.state === "closed") return steps;
+        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc.account, x, "Wound up: what's left, to our shareholders by their shares").steps);
+        const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
         // Before a month's history: what our export customers want (our share of the market's offer), or failing that
         // what our staff can make.
@@ -119,7 +127,7 @@ export const producer: BehaviourModule = {
         // ---- the month's end: Lengnick's rules ----
         const m = Math.floor(t / MONTH);
         if (month < 0) month = m;
-        if (m !== month) {
+        if (m !== month && trading) {
           month = m;
           // Demand (Lengnick): what customers wanted, met or not: their orders, and what our export customers would take.
           lastDemand = domestic + quota;
@@ -164,12 +172,22 @@ export const producer: BehaviourModule = {
         // ---- staff: this month's headcount (hiring for it, or replacing someone who's left) ----
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
-          target: Math.min(p.max_staff, headcount), wage, canPost: acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs) > 0,
+          target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs) > 0,
           why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} a fortnight.`,
         }));
         // Can't cover the next pay period: let the most recent hire go.
         steps.push(...borrowing.steps(book, t, acc.account));
-        if (workers.length && acc.balance < workers.length * wage) {
+        // Insolvent (it can't pay its debts as they fall due): wind up.
+        const insolvent = winding.insolvent(t, book, { balance: acc.balance, noCredit: !borrowing.canApply(t) && !borrowing.waiting(t), defaulted: borrowing.impaired });
+        if (insolvent) steps.push(...winding.begin(t, book, staffing, insolvent));
+        // Debts recorded against us (unpaid wages, a fine...), paid while we can, keeping the next pay period's wages; more
+        // than we can pay, we ask our bank for the difference.
+        else {
+          steps.push(...winding.payDebts(book, acc.account, acc.balance, workers.length * wage));
+          const owed = winding.debts(book).reduce((x, d) => x + cents(d.about.amount), 0);
+          if (owed > acc.balance && winding.state === "trading" && borrowing.canApply(t)) steps.push(borrowing.apply(t, acc.account, Math.ceil((owed - acc.balance) / 100_000) * 100_000, 12, "paying our debts", `We owe ${usd(owed)} in debts recorded against us and have ${usd(acc.balance)}: asking our bank for the difference.`));
+        }
+        if (winding.state === "trading" && workers.length && acc.balance < workers.length * wage) {
           // Short of the next pay period: first, working capital from our bank (two months' wages); while we wait to hear,
           // nobody is let go. Refused (or in default): the most recent hire goes, and this month's headcount with them.
           const bill = Math.floor((workers.length * wage * MONTH) / p.period);
@@ -184,7 +202,7 @@ export const producer: BehaviourModule = {
         }
 
         // ---- our price list ----
-        if (price !== publishedPrice) {
+        if (price !== publishedPrice && winding.state === "trading") {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our wholesale price is now ${usd(price)}.` : "Publishing our wholesale price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
@@ -194,6 +212,7 @@ export const producer: BehaviourModule = {
         // ---- inputs: (s, S): below a month's use (with what's on order), order up to a month and a half's ----
         const plan = monthlyUnits(workers.length);
         for (const [kind, per] of Object.entries(p.per_unit).sort(([a], [b]) => (a < b ? -1 : 1))) {
+          if (winding.state !== "trading") break; // winding up: no more buying
           const have = held(obs, p.works, kind) + (onOrder.get(kind) ?? 0);
           const s = plan * per;
           const up = Math.floor((plan * per * 3) / 2);
@@ -222,7 +241,7 @@ export const producer: BehaviourModule = {
         const present = [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.works).flatMap((c) => c.structure!.spaces.flatMap((sp) => (sp.kind === "workplace" ? sp.occupants ?? [] : []))))].filter((w) => mine.has(w)).sort();
         // Beyond the top of Lengnick's band, more stock is no use: the workers are paid, but nothing is made today.
         const enough = stock * 10_000 > p.phi_high_bps * lastDemand;
-        if (workDay(t) && present.length && !enough) {
+        if (workDay(t) && present.length && !enough && winding.state === "trading") {
           const avail = Math.min(...present.map((w) => p.working_day - (used.get(w) ?? 0)));
           const byHours = Math.floor((avail * present.length) / p.labour_per_unit);
           const byInputs = Math.min(...Object.entries(p.per_unit).map(([k, q]) => Math.floor(held(obs, p.works, k) / q)));

@@ -509,6 +509,141 @@ export class Staffing {
     this.noticed.set(last.id, t);
     return [because(why, notice(last.id, reason))];
   }
+
+  /** Let everyone go, with the notice their contracts give (in batches: a program has at most 32 lines). */
+  letGoAll(book: Book, t: number, why: string, reason: string): Step[] {
+    const all = this.staff(book, t).filter((a) => !this.noticed.has(a.id));
+    for (const a of all) this.noticed.set(a.id, t);
+    const out: Step[] = [];
+    for (let i = 0; i < all.length; i += 30) out.push(because(why, ...all.slice(i, i + 30).map((a) => notice(a.id, reason))));
+    return out;
+  }
+}
+
+/**
+ * Winding up an insolvent firm (docs/behaviour/insolvency.md). A firm is insolvent when it can't pay its debts as they
+ * fall due: here, when it's in default on a loan, or has been short of a pay period's wages for `short_days` with no
+ * credit to be had. Then it says so publicly, lets everyone go, stops buying and making, and sells what it has; after
+ * `wind_up_days` it pays what it owes (debts recorded against it, then what's left on its loans), passes anything left
+ * to its shareholders, and closes. The steps are the module's; what trading means while winding up is the firm's.
+ */
+export class WindingUp {
+  state: "trading" | "winding_up" | "closed" = "trading";
+  since = 0;
+  constructor(private readonly me: string, private readonly p: { short_days: number; wind_up_days: number }) {}
+
+  private readonly paid = new Set<string>(); // debts against us we've paid
+
+  /** Debts recorded against us (a lender's on a loan in default, unpaid wages, a fine) that we haven't paid, oldest first. */
+  debts(book: Book): any[] {
+    return ([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.counterparty === this.me && ["debt", "fine"].includes(r.about?.kind) && !this.paid.has(r.id)) as any[]).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+  }
+
+  /** Paying debts recorded against us, oldest first, while we can do it and keep `keep` in hand. */
+  payDebts(book: Book, account: string, balance: number, keep: number): Step[] {
+    const out: Step[] = [];
+    let left = balance - keep;
+    for (const d of this.debts(book)) {
+      const amount = cents(d.about.amount);
+      const to = creditorAccount(book, d.holder);
+      if (!to || amount > left) break;
+      left -= amount;
+      this.paid.add(d.id);
+      out.push(because(`Paying a debt recorded against us (${d.about.for ?? d.about.kind}).`, pay(to, amount, { from: account, for: `Paying ${d.about.kind} ${d.id}.`, settles: d.id })));
+    }
+    return out;
+  }
+
+  /**
+   * Each plan: are we insolvent now (only while trading)? In default on a loan; or with debts recorded against us
+   * unpaid for `short_days` that we can't pay (more than we have), and no credit to be had.
+   */
+  insolvent(t: number, book: Book, o: { balance: number; noCredit: boolean; defaulted: boolean }): string | null {
+    if (this.state !== "trading") return null;
+    if (o.defaulted) return "we're in default on a loan";
+    const owed = this.debts(book);
+    const total = owed.reduce((x, d) => x + cents(d.about.amount), 0);
+    if (owed.length && o.noCredit && total > o.balance && t - owed[0].at >= this.p.short_days * DAY) return `${usd(total)} of debts recorded against us have gone unpaid for ${Math.floor((t - owed[0].at) / DAY)} days, more than we have, with no credit to be had`;
+    return null;
+  }
+
+  /** Beginning to wind up: said publicly; everyone let go; our price lists withdrawn. */
+  begin(t: number, book: Book, staffing: Staffing, why: string): Step[] {
+    this.state = "winding_up";
+    this.since = t;
+    const lists = book.open("price_list").filter((r) => r.speaks_for === this.me);
+    return [
+      because(`We can't pay our debts as they fall due (${why}): we're insolvent, and winding up.`,
+        say("insolvency", `${this.me} can't pay its debts as they fall due (${why}), and is being wound up.`, { visible: "public", data: { firm: this.me, reason: why, since: t } }),
+        ...lists.map((l) => withdraw(l.id, "Winding up: no longer trading."))),
+      ...staffing.letGoAll(book, t, "Winding up: letting everyone go, with the notice their contracts give.", "Redundancy: the business is being wound up."),
+    ];
+  }
+
+  /** Whether it's time to finish (after the wind-up period). */
+  due(t: number): boolean {
+    return this.state === "winding_up" && t - this.since >= this.p.wind_up_days * DAY;
+  }
+
+  /**
+   * Finishing: what we owe paid from what we have, in order (debts recorded against us, oldest first; then what's left
+   * on our loans, which fall due at once); our loan repayments stopped; anything left to our shareholders; and closed.
+   */
+  finish(t: number, book: Book, account: string, balance: number, distributeTo: (amount: number) => Step[]): Step[] {
+    this.state = "closed";
+    let left = balance;
+    const pays: C.Call[] = [];
+    const paid: string[] = [];
+    // Debts recorded against us and still unpaid (a lender's claim on a loan in default, unpaid wages, a fine), oldest first.
+    const debts = this.debts(book);
+    const inDefault = new Set(debts.map((d) => d.basis));
+    for (const d of debts) {
+      const amount = Math.min(left, cents(d.about.amount));
+      const holderAccount = creditorAccount(book, d.holder!);
+      if (amount <= 0 || !holderAccount) continue;
+      pays.push(pay(holderAccount, amount, { from: account, for: `Winding up: paying ${d.about.kind} ${d.id}.`, settles: d.id }));
+      left -= amount;
+      paid.push(d.id);
+    }
+    // Loans not in default: what's left of the repayments falls due now.
+    for (const a of [...book.records.values()].filter((r) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(this.me) && book.inForce(r.id) && !inDefault.has(r.id)) as any[]) {
+      const owe = commitmentOf(a, this.me);
+      const m = owe.outcome?.money;
+      if (!m) continue;
+      const months = Math.floor((a.terms.term ?? 0) / MONTH);
+      const done = Math.floor((t - (book.signedAt(a.id) ?? t)) / MONTH);
+      const amount = Math.min(left, Math.max(0, months - done) * cents(m.amount));
+      if (amount > 0) {
+        pays.push(pay(m.to, amount, { from: account, for: `Winding up: repaying loan ${a.id}.` }));
+        left -= amount;
+      }
+    }
+    const stop = [...book.records.values()].filter((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === this.me && !book.withdrawn.has(r.id) && r.data?.outcome?.money?.for === "Loan repayment.");
+    const steps: Step[] = [];
+    for (let i = 0; i < pays.length; i += 30) steps.push(because(`Winding up: paying what we owe from the ${usd(balance)} we have.`, ...pays.slice(i, i + 30)));
+    if (stop.length) steps.push(because("Winding up: our loan repayments are settled (or can't be); stopping them.", ...stop.map((r) => withdraw(r.id, "Winding up."))));
+    if (left > 0) steps.push(...distributeTo(left));
+    steps.push(because(`Wound up: ${usd(balance - Math.max(0, left))} paid to creditors${left > 0 ? `, ${usd(left)} to our shareholders` : ""}. Closed.`,
+      say("closure", `${this.me} has been wound up and has closed.`, { visible: "public", data: { firm: this.me, to_creditors: balance - Math.max(0, left), to_shareholders: Math.max(0, left), debts_paid: paid } })));
+    return steps;
+  }
+}
+
+/** The account a creditor is paid into: a lender's (its loan agreement names it), or a worker's (their employment
+ * agreement names it). */
+function creditorAccount(book: Book, holder: string): string | undefined {
+  for (const r of book.records.values()) {
+    if (r.record !== "agreement" || !r.terms.parties.includes(holder)) continue;
+    if (r.terms.template === "loan" && r.terms.parties[0] === holder) {
+      const to = r.terms.commitments.find((c: any) => c.who !== holder)?.does?.outcome?.money?.to;
+      if (to) return to;
+    }
+    if (r.terms.template === "employment" && r.terms.parties[1] === holder) {
+      const to = r.terms.commitments.find((c: any) => c.who !== holder)?.does?.outcome?.money?.to;
+      if (to) return to;
+    }
+  }
+  return undefined;
 }
 
 export const employer: BehaviourModule = {

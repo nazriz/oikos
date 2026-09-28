@@ -29,7 +29,7 @@ import type { LookRequest, Observation, ParticipantAction, SiteStructure, Statem
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import * as C from "../calls";
-import { because, Book, callAction, DAY, usd, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step, ownBanked } from "./common";
+import { because, Book, callAction, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
 import { Borrowing } from "./credit";
@@ -40,11 +40,11 @@ type Want = keyof typeof ASKING;
 
 /** A home is a unit (a space) in a building. */
 interface Home { agreement: string; space: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean }
-interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; endsAt: number }
+interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; endsAt: number; since: number; paidAt?: number; claimed?: boolean }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.11.0",
+  version: "0.12.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -186,7 +186,7 @@ export const citizen: BehaviourModule = {
         }
         if (r.terms.template === "employment" && !job) {
           const employer = r.terms.parties.find((x) => x !== me)!;
-          job = { agreement: r.id, employer, ...jobTerms(r, me), endsAt: end };
+          job = { agreement: r.id, employer, ...jobTerms(r, me), endsAt: end, since };
         }
       }
       // Another adult's share of the rent, if one is already standing.
@@ -201,7 +201,10 @@ export const citizen: BehaviourModule = {
       fresh.push(...book.absorb(obs));
       // Money that came in from others, for what our income is (refunds, which delivery notes tell us of, come off it).
       const mine = new Set(channels.accounts(obs).filter((a) => a.holder === me).map((a) => a.account));
-      for (const tx of channels.transactions(obs)) if (mine.has(tx.to) && !mine.has(tx.from)) inflows.push({ t: tx.t, amount: cents(tx.amount) });
+      for (const tx of channels.transactions(obs)) if (mine.has(tx.to) && !mine.has(tx.from)) {
+        inflows.push({ t: tx.t, amount: cents(tx.amount) });
+        if (job && cents(tx.amount) === job.wage) job.paidAt = tx.t; // our wages, as agreed
+      }
       while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
       for (const k of ["homes", "jobs", "petitions"] as const) {
         const ch = obs.channels[k];
@@ -403,6 +406,19 @@ export const citizen: BehaviourModule = {
         home = null;
         homelessSince = t;
       }
+      // Wages not paid: a pay period (and a few days' grace) without them, we resign, and claim what we're owed, as an
+      // employee can (docs/behaviour/citizen.md). The claim is a debt recorded against the employer.
+      if (job && !job.claimed && t < job.endsAt) {
+        const last = job.paidAt ?? job.since;
+        if (t - last > job.period + 5 * DAY) {
+          job.claimed = true;
+          const missed = Math.max(1, Math.floor((t - last) / job.period));
+          steps.push(because(`Our wages haven't been paid for ${Math.floor((t - last) / DAY)} days: resigning, and claiming the ${usd(missed * job.wage)} we're owed.`,
+            notice(job.agreement, "Resigning: our wages haven't been paid."),
+            record("right", me, { kind: "debt", amount: missed * job.wage, for: `Unpaid wages (${missed} pay period${missed > 1 ? "s" : ""}).` }, { against: job.employer, basis: job.agreement })));
+          job.endsAt = t;
+        }
+      }
       // A job that has ended.
       if (job && t >= job.endsAt) {
         if (job.workplace && inside(job.workplace)) steps.push(because("Our job has ended: leaving the workplace.", moveOut(job.workplace, me)));
@@ -433,7 +449,7 @@ export const citizen: BehaviourModule = {
           const s: Step = because(`Taking the job offered: ${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days.`, sign(r.id));
           if (terms.workplace) s.push(moveIn(terms.workplace));
           steps.push(s);
-          job = { agreement: r.id, employer: other, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER };
+          job = { agreement: r.id, employer: other, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER, since: t };
           joblessSince = null;
         }
       }

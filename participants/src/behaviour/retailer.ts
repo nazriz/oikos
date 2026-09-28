@@ -2,13 +2,14 @@
 // docs/behaviour/retailer.md, with sources.
 
 import * as C from "../calls";
+import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
-import { Staffing, stepper } from "./firms";
+import { Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
-import { LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
+import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERABLE, type Order } from "./trade";
 
 /**
@@ -21,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -47,6 +48,10 @@ export const retailer: BehaviourModule = {
         unpaid_days: 7,
         serve_within_days: 3, // what isn't served within this is refunded (the customer goes elsewhere)
         lender: "bank", // whom it borrows from
+        // Insolvency (docs/behaviour/insolvency.md; placeholders): short of wages this long with no credit, or in default on
+        // a loan, and it winds up over this long.
+        short_days: 60,
+        wind_up_days: 60,
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
@@ -55,6 +60,7 @@ export const retailer: BehaviourModule = {
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role });
     const borrowing = new Borrowing(me, p.lender);
+    const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days });
     const orders = new OrderBook(me, p.unpaid_days);
     const deliveries = new Deliveries();
     let onOrder = 0; // goods ordered from suppliers, not yet delivered
@@ -102,7 +108,9 @@ export const retailer: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
-        if (!acc) return steps;
+        if (!acc || winding.state === "closed") return steps;
+        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc.account, x, "Wound up: what's left, to our shareholders by their shares").steps);
+        const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
         if (headcount < 0) headcount = workers.length;
         if (monthStart < 0) monthStart = acc.balance;
@@ -117,7 +125,7 @@ export const retailer: BehaviourModule = {
         // ---- the month's end: Lengnick's rules ----
         const m = Math.floor(t / MONTH);
         if (month < 0) month = m;
-        if (m !== month) {
+        if (m !== month && trading) {
           month = m;
           lastDemand = sold;
           sold = 0;
@@ -154,11 +162,21 @@ export const retailer: BehaviourModule = {
         // ---- staff ----
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
-          target: Math.min(p.max_staff, headcount), wage, canPost: acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs) > 0,
+          target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs) > 0,
           why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} a fortnight.`,
         }));
         steps.push(...borrowing.steps(book, t, acc.account));
-        if (workers.length && acc.balance < workers.length * wage) {
+        // Insolvent (it can't pay its debts as they fall due): wind up.
+        const insolvent = winding.insolvent(t, book, { balance: acc.balance, noCredit: !borrowing.canApply(t) && !borrowing.waiting(t), defaulted: borrowing.impaired });
+        if (insolvent) steps.push(...winding.begin(t, book, staffing, insolvent));
+        // Debts recorded against us (unpaid wages, a fine...), paid while we can, keeping the next pay period's wages; more
+        // than we can pay, we ask our bank for the difference.
+        else {
+          steps.push(...winding.payDebts(book, acc.account, acc.balance, workers.length * wage));
+          const owed = winding.debts(book).reduce((x, d) => x + cents(d.about.amount), 0);
+          if (owed > acc.balance && winding.state === "trading" && borrowing.canApply(t)) steps.push(borrowing.apply(t, acc.account, Math.ceil((owed - acc.balance) / 100_000) * 100_000, 12, "paying our debts", `We owe ${usd(owed)} in debts recorded against us and have ${usd(acc.balance)}: asking our bank for the difference.`));
+        }
+        if (winding.state === "trading" && workers.length && acc.balance < workers.length * wage) {
           // Short of the next pay period: first, working capital from our bank (two months' wages); while we wait to hear,
           // nobody is let go. Refused (or in default): the most recent hire goes, and this month's headcount with them.
           const bill = Math.floor((workers.length * wage * MONTH) / p.period);
@@ -173,7 +191,7 @@ export const retailer: BehaviourModule = {
         }
 
         // ---- our price list: where we are, and what we charge ----
-        if (price !== publishedPrice) {
+        if (price !== publishedPrice && winding.state === "trading") {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our price is now ${usd(price)}.` : "Publishing our price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
@@ -181,7 +199,7 @@ export const retailer: BehaviourModule = {
         }
 
         // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----
-        if (t >= nextRestock && offers.length) {
+        if (t >= nextRestock && offers.length && winding.state === "trading") {
           nextRestock = t + 7 * DAY;
           const top = Math.ceil((p.phi_high_bps * lastDemand) / 10_000);
           const mid = Math.ceil((((p.phi_low_bps + p.phi_high_bps) / 2) * lastDemand) / 10_000);

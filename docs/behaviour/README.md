@@ -20,6 +20,7 @@ Rules every module follows (so re-runs are reproducible):
 | `world.trade` | the world market: sells at world prices against paid orders, buys exports against invoices (a boundary condition, D31) | [boundary.md](boundary.md) |
 | `world.transfers` | support paid from outside (a national government's payments): decides claims by age, pays on schedule | [boundary.md](boundary.md) |
 | `world.funding` | lends into the world from outside (a town bank's funding) | [boundary.md](boundary.md) |
+| (winding up) | an insolvent firm's winding up, in factories' and shops' modules | [insolvency.md](insolvency.md) |
 | `bank.lending` | a bank's lending office: decides loans on serviceability from the account it keeps, pays out, follows arrears and default, draws funding | [credit.md](credit.md) |
 | `world.export_demand` | the outside world's purchases as money on a schedule (worlds without goods) | [boundary.md](boundary.md) |
 | `citizen.default` | a townsperson: housing, work, shopping and using goods up, leaving town | [citizen.md](citizen.md) |

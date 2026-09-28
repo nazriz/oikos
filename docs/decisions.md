@@ -691,6 +691,23 @@ See the design note, §16.
     - default only after arrears, with a debt recorded, and refusal after;
     - funding draws paid by the outside.
 
+- **Phase C, stage C3a: firms that fail** (docs/behaviour/insolvency.md).
+  - **Debts are claims recorded against a firm:** a lender's on a loan in default, and unpaid wages. A worker unpaid for a pay period plus five days resigns and claims them.
+  - **A trading firm pays its debts while it can,** and asks its bank for what it can't cover.
+  - **Insolvent** means in default on a loan, or with debts unpaid for 60 days that it can't pay and can't borrow for (after the "debts as they fall due" test). An insolvent firm says so, lets everyone go, sells what it has, pays its creditors oldest first after 60 days, passes any remainder to shareholders, and closes.
+  - **Found:**
+    - **A factory kept working people it wasn't paying.** Its wage payments failed and nobody noticed. Unpaid wages are now a debt, and the workers leave.
+    - **A factory that had shed all its staff never counted as insolvent.** Being short of wages stopped counting once there were no workers. Insolvency now turns on unpaid debts.
+    - **A firm with stock it could sell** paid its debts from it and wasn't insolvent, which is correct.
+  - **Test** (`orchestrator/test/insolvency.test.ts`): a factory with no money, customers or stock:
+    - is refused credit, and its unpaid workers claim;
+    - is insolvent after trying to borrow;
+    - lets everyone go, and stops buying and making;
+    - pays creditors before shareholders;
+    - closes after the wind-up period, and does nothing after.
+
+    In that run its workers got $2,000 of the $102,000 owed them.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
