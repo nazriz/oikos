@@ -281,7 +281,7 @@
     "World": {
       "type": "object",
       "required": [
-        "boundary",
+        "boundaries",
         "currencies",
         "ground",
         "entities",
@@ -292,9 +292,14 @@
       ],
       "additionalProperties": false,
       "properties": {
-        "boundary": {
-          "description": "The single entity of kind 'boundary': the world's outside. Its account (custodian: itself) may go negative; total money including it is constant for the whole run. Money enters the world only when the outside world's own participant pays from that account (D31): exports bought, visitors' spending, grants, and what newcomers bring. How much is researcher-set world content.",
-          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+        "boundaries": {
+          "description": "The world's edges (D58): the entities of kind 'boundary', each named once; at least one. An edge is what lies outside the simulated world in some direction: the rest of the country for a region, a neighbouring world, the unsimulated world. Each holds an account in its own custody in every currency, which may go negative; total money including every edge is constant for the whole run. Money enters the world only when an edge's own participant pays (D31): exports bought, visitors' spending, grants, and what newcomers bring. How much is researcher-set world content. The first edge is the default: construction materials are paid into it, and someone leaving without naming an edge leaves by it.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+          }
         },
         "currencies": {
           "description": "The currencies the world's money comes in (D58). The first is the default: accounts that name none, construction materials and newcomers' money are in it. The outside world holds an account in its own custody in each. The kernel never converts between currencies: an exchange is a trade, two transfers in one action.",

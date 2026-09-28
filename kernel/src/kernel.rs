@@ -111,8 +111,8 @@ impl Kernel {
         let currency = w.currencies[0].code.clone();
         let cur_of = |a: &crate::config::AccountCfg| a.currency.clone().unwrap_or_else(|| currency.clone());
         let mut boundary_accounts = BTreeMap::new();
-        for a in w.accounts.iter().filter(|a| a.holder == w.boundary && a.custodian == w.boundary) {
-            boundary_accounts.entry(cur_of(a)).or_insert_with(|| a.id.clone());
+        for a in w.accounts.iter().filter(|a| w.boundaries.contains(&a.holder) && a.custodian == a.holder) {
+            boundary_accounts.entry((a.holder.clone(), cur_of(a))).or_insert_with(|| a.id.clone());
         }
         let s = Statics {
             types: c.catalogue.structure_types.iter().map(|t| (t.id.clone(), t.clone())).collect(),
@@ -123,7 +123,7 @@ impl Kernel {
                 .map(|t| (t.id.clone(), crate::config::spaces_of(t).into_iter().map(|(l, sp)| (l, sp.clone())).collect()))
                 .collect(),
             templates: c.templates.iter().map(|t| (t.id.clone(), t.clone())).collect(),
-            boundary: w.boundary.clone(),
+            boundaries: w.boundaries.clone(),
             boundary_accounts,
             currency: currency.clone(),
             tick: c.clock.tick_seconds,

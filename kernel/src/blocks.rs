@@ -89,6 +89,9 @@ pub enum Block {
     Leave {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         person: Option<IdOrRef>,
+        /// Which of the world's edges they leave by; absent: the default (the first).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<Id>,
     },
     /// The acting person conceives a child (with another parent, if named); the child is born after gestation.
     Birth {

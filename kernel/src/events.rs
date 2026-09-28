@@ -53,6 +53,8 @@ pub enum RefusalCode {
     /// A payment between accounts in different currencies (an exchange is a trade: two transfers).
     CurrencyMismatch,
     UnknownCurrency,
+    /// Leaving by something that isn't one of the world's edges.
+    NotABoundary,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -181,10 +183,14 @@ pub enum EventBody {
     },
     PersonArrived {
         person: Id,
+        /// The edge they came in by (the boundary whose position acted).
+        via: Id,
         by: Id,
     },
     PersonLeft {
         person: Id,
+        /// The edge they left by.
+        to: Id,
         by: Id,
     },
     PersonDied {

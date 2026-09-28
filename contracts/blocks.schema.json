@@ -897,6 +897,10 @@
         },
         "person": {
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
+        },
+        "to": {
+          "description": "Which of the world's edges they leave by (a boundary entity); absent: the default edge (the first). Refused otherwise: not_a_boundary.",
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
         }
       }
     },

@@ -36,7 +36,7 @@ fn street() -> Run<Vec<u8>> {
             {"id": "flats", "category": "residential", "materials_cost": "1", "build_time": 86_400, "demolition_cost": "1", "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 4}]}
         ]},
         "world": {
-            "boundary": "outside",
+            "boundaries": ["outside"],
             "currencies": [{"code": "AUD", "minor_units": 2}],
             "ground": {"w": 10, "h": 1},
             "entities": [

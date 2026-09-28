@@ -11,10 +11,10 @@ pub struct Statics {
     /// Each structure type's spaces, in order: local id (`dwelling.3`) -> spec.
     pub spaces: BTreeMap<String, BTreeMap<String, SpaceSpec>>,
     pub templates: BTreeMap<String, Template>,
-    /// The boundary entity, and its accounts (in its own custody) by currency: what construction materials are paid
-    /// into and newcomers' money comes from.
-    pub boundary: String,
-    pub boundary_accounts: BTreeMap<String, String>,
+    /// The world's edges (the first is the default), and each edge's accounts in its own custody, by currency:
+    /// what newcomers' money comes from, and (at the default edge) what construction materials are paid into.
+    pub boundaries: Vec<String>,
+    pub boundary_accounts: BTreeMap<(String, String), String>,
     /// The world's default currency (its first): materials and newcomers' money are in it.
     pub currency: String,
     pub tick: i64,
@@ -32,12 +32,22 @@ impl Statics {
         self.span(self.config.clock.run_seconds)
     }
 
-    /// The outside world's account in the default currency.
-    pub fn boundary_account(&self) -> &str {
-        &self.boundary_accounts[&self.currency]
+    /// The default edge.
+    pub fn boundary(&self) -> &str {
+        &self.boundaries[0]
     }
 
-    /// Whether an account id is one of the outside world's own (which can never be closed).
+    /// Whether an entity is one of the world's edges.
+    pub fn is_boundary(&self, entity: &str) -> bool {
+        self.boundaries.iter().any(|b| b == entity)
+    }
+
+    /// An edge's own account in the default currency.
+    pub fn boundary_account(&self, edge: &str) -> &str {
+        &self.boundary_accounts[&(edge.to_string(), self.currency.clone())]
+    }
+
+    /// Whether an account id is one of the edges' own (which can never be closed: the world's edges always exist).
     pub fn is_boundary_account(&self, account: &str) -> bool {
         self.boundary_accounts.values().any(|a| a == account)
     }

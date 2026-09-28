@@ -100,7 +100,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
                 Err(RefusalCode::Overflow)
             } else if f.currency != t.currency {
                 Err(RefusalCode::CurrencyMismatch)
-            } else if f.holder == s.boundary {
+            } else if s.is_boundary(&f.holder) {
                 let below = f.balance.checked_sub(*amount).is_none_or(|x| x < -max);
                 if below || above() {
                     Err(RefusalCode::Overflow)
@@ -134,7 +134,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             let Some(acc) = st.accounts.get(materials_from) else { return Some(Err(RefusalCode::UnknownAccount)) };
             if acc.holder != me {
                 Err(RefusalCode::NotHolder)
-            } else if acc.holder != s.boundary && acc.balance < ty.materials_cost {
+            } else if !s.is_boundary(&acc.holder) && acc.balance < ty.materials_cost {
                 // (The outside world pays materials to itself: a quirk of the temporary liberty.)
                 Err(RefusalCode::InsufficientFunds)
             } else {
@@ -184,12 +184,16 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             Some(a) if a.balance != 0 => Err(RefusalCode::AccountNotEmpty),
             Some(_) => Ok(()),
         },
-        Block::Leave { person } => {
+        Block::Leave { person, to } => {
             let who = match person {
                 Some(w) => w.clone(),
                 None if me_person => me.clone(),
                 None => return Some(Err(RefusalCode::NotAPerson)),
             };
+            // Leaving by something that isn't one of the world's edges is refused.
+            if to.as_ref().is_some_and(|e| !s.is_boundary(e)) {
+                return Some(Err(RefusalCode::NotABoundary));
+            }
             living(st, &who)
         }
         Block::Appoint { position: target, participant: to } => {
@@ -349,9 +353,17 @@ proptest! {
 /// are injured and die, and positions change hands, all checked by the mirror.
 #[test]
 fn the_cast_changes_and_physics_holds() {
-    let mut runner = proptest::test_runner::TestRunner::deterministic();
-    let ops = proptest::collection::vec(op_strategy(), 600..601).new_tree(&mut runner).unwrap().current();
-    let seen = check(&ops).unwrap();
+    // Several fixed sequences, not one: which events one random sequence happens to reach shifts whenever the test
+    // world changes (an actor added, v0.5's second edge), so the check is that each happens in at least one of them.
+    let mut seen: std::collections::BTreeMap<String, usize> = Default::default();
+    for seed in 0u8..4 {
+        let rng = proptest::test_runner::TestRng::from_seed(proptest::test_runner::RngAlgorithm::ChaCha, &[seed; 32]);
+        let mut runner = proptest::test_runner::TestRunner::new_with_rng(ProptestConfig::default(), rng);
+        let ops = proptest::collection::vec(op_strategy(), 600..601).new_tree(&mut runner).unwrap().current();
+        for (k, n) in check(&ops).unwrap() {
+            *seen.entry(k).or_default() += n;
+        }
+    }
     for e in ["person_created", "person_arrived", "person_left", "person_died", "birth_started", "condition_began", "condition_ended", "appointed", "occupied", "vacated", "structure_started"] {
         assert!(seen.get(e).copied().unwrap_or(0) > 0, "{e} never happened: {seen:?}");
     }

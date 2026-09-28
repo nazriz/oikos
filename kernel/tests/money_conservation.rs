@@ -2,7 +2,7 @@
 //!
 //! Over random worlds and random command sequences (many of them refused,
 //! which is the point), after every command:
-//!   1. total money, including the boundary's account, equals the opening total;
+//!   1. total money, including the edges' accounts, equals the opening total in each currency;
 //!   2. no ordinary account is negative;
 //!   3. every account's balance equals its opening balance plus the `transfer`
 //!      events logged so far: no money moves without a transfer event;
@@ -20,7 +20,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
     let mut run = Run::start(world(params), "money", Vec::new(), None).unwrap();
     let opening = run.kernel().state().total_money();
     let mut ledger: BTreeMap<String, i128> = run.kernel().state().accounts.iter().map(|(k, a)| (k.clone(), a.balance)).collect();
-    let boundary = run.kernel().statics().boundary.clone();
+    let edges = run.kernel().statics().boundaries.clone();
 
     for op in ops {
         let Some(cmd) = concretize(&run, op) else { continue };
@@ -48,7 +48,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
         let st = run.kernel().state();
         prop_assert_eq!(&st.total_money(), &opening, "money created or destroyed by {:?}", cmd);
         for (id, a) in &st.accounts {
-            if a.holder != boundary {
+            if !edges.contains(&a.holder) {
                 prop_assert!(a.balance >= 0, "{} went negative ({}) after {:?}", id, a.balance, cmd);
             }
             prop_assert_eq!(

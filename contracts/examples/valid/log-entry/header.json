@@ -101,7 +101,9 @@
         ]
       },
       "world": {
-        "boundary": "outside",
+        "boundaries": [
+          "outside"
+        ],
         "currencies": [
           {
             "code": "AUD",

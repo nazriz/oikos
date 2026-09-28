@@ -119,7 +119,9 @@ pub struct SpaceSpec {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct World {
-    pub boundary: Id,
+    /// The world's edges (entities of kind boundary): at least one. The first is the default edge: construction
+    /// materials are paid into it, and someone leaving without naming an edge leaves by it.
+    pub boundaries: Vec<Id>,
     /// The currencies the world's money comes in; the first is the default.
     pub currencies: Vec<CurrencyCfg>,
     pub ground: Ground,
@@ -662,13 +664,11 @@ pub fn validate(c: &Config) -> Result<(), String> {
     let entity = |id: &str| entities.get(id).copied().ok_or_else(|| format!("unknown entity {id:?}"));
     let cell_exists = |id: &str| cell_xy(id).is_some_and(|(x, y)| x < w.ground.w && y < w.ground.h);
 
-    // The boundary.
-    let boundaries: Vec<&EntityCfg> = w.entities.iter().filter(|e| e.kind == BOUNDARY).collect();
-    if boundaries.len() != 1 || boundaries[0].id != w.boundary {
-        return Err("exactly one entity of kind boundary is required, and world.boundary must name it".into());
-    }
-    if !w.accounts.iter().any(|a| a.holder == w.boundary && a.custodian == w.boundary) {
-        return Err("the boundary needs an account it holds in its own custody".into());
+    // The edges: world.boundaries names exactly the entities of kind boundary, at least one, each once.
+    let declared: BTreeSet<&str> = w.entities.iter().filter(|e| e.kind == BOUNDARY).map(|e| e.id.as_str()).collect();
+    let named: BTreeSet<&str> = w.boundaries.iter().map(|b| b.as_str()).collect();
+    if named.is_empty() || named.len() != w.boundaries.len() || named != declared {
+        return Err("world.boundaries must name each entity of kind boundary exactly once (at least one)".into());
     }
 
     // Bodies: only persons have them.
@@ -696,15 +696,17 @@ pub fn validate(c: &Config) -> Result<(), String> {
         if !currencies.contains(cur) {
             return Err(format!("account {} is in {cur}, which the world doesn't declare", a.id));
         }
-        if a.holder != w.boundary && a.balance < 0 {
+        if !named.contains(a.holder.as_str()) && a.balance < 0 {
             return Err(format!("account {} has a negative opening balance", a.id));
         }
         let t = totals.entry(cur).or_insert(0);
         *t = t.checked_add(a.balance).filter(|x| x.abs() <= crate::money::MAX_MONEY).ok_or_else(|| format!("total money in {cur} out of range"))?;
     }
-    for cur in &currencies {
-        if !w.accounts.iter().any(|a| a.holder == w.boundary && a.custodian == w.boundary && a.currency.as_deref().unwrap_or(&w.currencies[0].code) == *cur) {
-            return Err(format!("the outside world needs an account in its own custody in {cur}"));
+    for b in &w.boundaries {
+        for cur in &currencies {
+            if !w.accounts.iter().any(|a| &a.holder == b && &a.custodian == b && a.currency.as_deref().unwrap_or(&w.currencies[0].code) == *cur) {
+                return Err(format!("the edge {b} needs an account in its own custody in {cur}"));
+            }
         }
     }
 

@@ -467,6 +467,7 @@ See the design note, §16.
   12. the order of work, with the municipal draft as phase C's instance.
 - **Contracts bumped to v0.5** (the versioning rule, D40). **Phase A** (cheap now, painful later) lands first: amounts and units, several boundaries, the places tree with the town as one detailed place, and the same-moment rule. Each lands with the town unchanged in outcome, or the difference explained.
 - **Money landed** (phase A, step 1): amounts are decimal strings with currencies; the kernel counts in 128 bits. A two-year town run on seed 1 has identical outcomes (economy, households, rent stress, cast, activity), identical event counts and identical money moved ($36,038,760.15) before and after. **Liberty:** TypeScript behaviour code does its arithmetic in ordinary numbers, exact to 2^53 (about $90 trillion), and throws beyond it rather than rounding. The wire, the kernel, the log and measurement (HUGEINT) are exact to 38 digits. A module that needs more works in bigint.
+- **Several edges landed** (phase A, step 2): `world.boundaries`; arrivals and departures record their edge. The kernel's test world now has two edges (`outside`, `upriver`), so the property tests (conservation, physical feasibility, replay) exercise trade, arrivals and departures by either one. The deterministic "the cast changes" check now takes the union of four fixed sequences, since one sequence's reach shifts whenever the test world changes. The town: identical outcomes, events and money moved.
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 

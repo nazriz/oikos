@@ -44,7 +44,7 @@ pub const MONTH: i64 = 2_592_000;
 pub const YEAR: i64 = 30 * 86_400;
 
 /// Actors at the start: (participant, position it acts in, the entity it acts for).
-pub const ACTORS: [(&str, Option<&str>, &str); 9] = [
+pub const ACTORS: [(&str, Option<&str>, &str); 10] = [
     ("mayor-system", Some("mayor"), "city"),
     ("finance-system", Some("finance"), "city"),
     ("bank-pay-system", Some("bank-pay"), "bank"),
@@ -54,6 +54,8 @@ pub const ACTORS: [(&str, Option<&str>, &str); 9] = [
     ("bob-self", None, "bob"),
     ("carol-self", None, "carol"),
     ("outside-system", Some("outside-trade"), "outside"),
+    // A second edge (v0.5, D58): the world has more than one outside.
+    ("upriver-system", Some("upriver-trade"), "upriver"),
 ];
 
 /// Opening balances for: bank, city, devco, buildco, alice, bob, carol.
@@ -97,6 +99,7 @@ fn severity(fatal: u32) -> Value {
 pub fn world(p: &WorldParams) -> Value {
     let ents = [
         ("outside", "boundary"),
+        ("upriver", "boundary"),
         ("city", "government"),
         ("bank", "bank"),
         ("devco", "firm"),
@@ -114,7 +117,10 @@ pub fn world(p: &WorldParams) -> Value {
         })
         .collect();
     let holders = ["bank", "city", "devco", "buildco", "alice", "bob", "carol"];
-    let mut accounts = vec![json!({"id": "acc-outside", "holder": "outside", "custodian": "outside", "balance": "0"})];
+    let mut accounts = vec![
+        json!({"id": "acc-outside", "holder": "outside", "custodian": "outside", "balance": "0"}),
+        json!({"id": "acc-upriver", "holder": "upriver", "custodian": "upriver", "balance": "0"}),
+    ];
     for (i, h) in holders.iter().enumerate() {
         // Carol keeps her own money (cash-like); everyone else banks with the bank.
         let custodian = if *h == "carol" { "carol" } else { "bank" };
@@ -184,7 +190,7 @@ pub fn world(p: &WorldParams) -> Value {
              "terrains": ["water"], "spaces": [{"kind": "mooring", "count": 2, "capacity": 1}]}
         ]},
         "world": {
-            "boundary": "outside",
+            "boundaries": ["outside", "upriver"],
             "currencies": [{"code": "AUD", "minor_units": 2}],
             "ground": {"w": 4, "h": 3, "terrain": [{"label": "water", "x": 3, "y": 0, "w": 1, "h": 3}]},
             "entities": entities,
@@ -363,7 +369,9 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
         Op::Observe { actor: a } => Some(Command::Observe { participant: actor(*a).0, only: None }),
         Op::OptOut { actor: a } => {
             let p = actor(*a).0;
-            (st.participants[&p].status == ParticipantStatus::Active).then(|| Command::OptOut { participant: p, statement: "leaving the study".into() })
+            // The world's edges keep running, so that arrivals stay exercised whichever actor the sequence lands on.
+            let edge = ["outside-system", "upriver-system"].contains(&p.as_str());
+            (!edge && st.participants[&p].status == ParticipantStatus::Active).then(|| Command::OptOut { participant: p, statement: "leaving the study".into() })
         }
         Op::Smart { kind, a, b, flag } => match kind % 10 {
             0 => {
@@ -408,10 +416,11 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 direct(&p, pos.as_deref(), vec![Block::Vacate { occupant, from: structure }])
             }
             4 if a % 3 == 0 => {
-                // The outside world buys something from the town: money enters (D31).
+                // One of the world's edges buys something from the town: money enters (D31).
                 let firms = ["acc-devco", "acc-buildco", "acc-city"];
-                direct("outside-system", Some("outside-trade"), vec![Block::Transfer {
-                    from: "acc-outside".into(),
+                let (who, pos, acc) = if b % 2 == 0 { ("outside-system", "outside-trade", "acc-outside") } else { ("upriver-system", "upriver-trade", "acc-upriver") };
+                direct(who, Some(pos), vec![Block::Transfer {
+                    from: acc.into(),
                     to: firms[*b as usize % 3].into(),
                     amount: 1 + *b as i128 * 1000,
                     settles: None,
@@ -451,13 +460,22 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         bind: None,
                     },
                 };
-                direct("outside-system", Some("outside-trade"), vec![block])
+                // By either edge.
+                let (who, pos) = if b % 2 == 0 { ("outside-system", "outside-trade") } else { ("upriver-system", "upriver-trade") };
+                direct(who, Some(pos), vec![block])
             }
             6 => {
                 // Someone alive in the world leaves it (or removes someone).
                 let (p, _, _) = all.iter().filter(|(_, pos, e)| pos.is_none() && living(e)).nth(*a as usize % 6).cloned()?;
                 let who = if *flag { None } else { persons.iter().filter(|x| living(x)).nth(*b as usize % 4).cloned() };
-                direct(&p, None, vec![Block::Leave { person: who }])
+                // By the default edge, a named one, or (refused: not_a_boundary) something that isn't an edge.
+                let to = match b % 4 {
+                    0 => None,
+                    1 => Some("upriver".to_string()),
+                    2 => Some("outside".to_string()),
+                    _ => Some("city".to_string()),
+                };
+                direct(&p, None, vec![Block::Leave { person: who, to }])
             }
             7 => {
                 // An adult has a child, with another parent near them or alone.
@@ -607,7 +625,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         sex: None,
                         bind: None,
                     },
-                    B::Leave { person } => Block::Leave { person: person.map(|i| pick(&persons, i).unwrap()) },
+                    B::Leave { person } => Block::Leave { person: person.map(|i| pick(&persons, i).unwrap()), to: None },
                     B::Birth { with } => Block::Birth { name: "baby".into(), template: "child".into(), other_parent: with.map(|i| pick(&persons, i).unwrap()) },
                     B::Harm { person } => Block::Harm { person: pick(&persons, *person).unwrap() },
                     B::CreatePosition => serde_json::from_value(json!({"block": "create_position", "title": "Deputy", "channels": [{"id": "laws", "kind": "records", "match": {"records": ["statement"]}}]})).unwrap(),

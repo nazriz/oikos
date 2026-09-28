@@ -442,7 +442,7 @@ export function generate(spec: TownSpec): any {
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
     // Amounts on the wire are decimal strings (D58); the generator counts in numbers.
     catalogue: { structure_types: structureTypes.map((t) => ({ ...t, materials_cost: String(t.materials_cost), demolition_cost: String(t.demolition_cost) })) },
-    world: { boundary: "outside", currencies: [{ code: "AUD", minor_units: 2 }], ground: { w: spec.grid.w, h: spec.grid.h }, entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records },
+    world: { boundaries: ["outside"], currencies: [{ code: "AUD", minor_units: 2 }], ground: { w: spec.grid.w, h: spec.grid.h }, entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records },
     participants,
     positions,
     templates,

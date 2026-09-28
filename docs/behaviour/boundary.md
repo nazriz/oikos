@@ -4,7 +4,7 @@
 
 ## What it does
 
-Money enters a world only when the outside world's own seat pays (D31). This module is the simplest such seat. On a researcher-set schedule, it buys from named town accounts, e.g. a factory's exports or tourist spending at shops. Each purchase is an ordinary transfer from the outside world's account (which may go negative) to the seller's account.
+Money enters a world only when the outside world's own seat pays (D31). A world can have several edges (v0.5, D58: the rest of the country, a neighbouring world, the unsimulated world), each an entity of kind `boundary` with its own seat and accounts. The generated town has one, `outside`. This module is the simplest such seat. On a researcher-set schedule, it buys from named town accounts, e.g. a factory's exports or tourist spending at shops. Each purchase is an ordinary transfer from the outside world's account (which may go negative) to the seller's account.
 
 ## Where the rule comes from
 

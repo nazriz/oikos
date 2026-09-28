@@ -571,7 +571,7 @@ impl<'a> Exec<'a> {
         if src.currency != dst.currency {
             return Err(refuse(RefusalCode::CurrencyMismatch, format!("{from} is in {}, {to} in {}", src.currency, dst.currency)));
         }
-        if src.holder == self.s.boundary {
+        if self.s.is_boundary(&src.holder) {
             // The outside world's account may go negative (money flowing in), within range.
             if src.balance.checked_sub(amount).is_none_or(|x| x < -MAX_MONEY) {
                 return Err(refuse(RefusalCode::Overflow, "the outside world's account would go beyond the range of an amount"));
@@ -811,7 +811,7 @@ impl<'a> Exec<'a> {
                 let completes = self.later(ty.build_time)?;
                 // Documented liberty (D25, accepted temporarily): materials are paid
                 // straight to the outside world, not through the builder's bank.
-                let boundary = self.s.boundary_account().to_string();
+                let boundary = self.s.boundary_account(self.s.boundary()).to_string();
                 self.move_money(&from, &boundary, ty.materials_cost, TransferReason::Materials, None, None, None)?;
                 let id = self.st.mint("str");
                 self.st.structures.insert(
@@ -850,7 +850,7 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::NotHolder, format!("{from} isn't held by {}", self.entity)));
                 }
                 let cost = self.s.types[&x.structure_type].demolition_cost;
-                let boundary = self.s.boundary_account().to_string();
+                let boundary = self.s.boundary_account(self.s.boundary()).to_string();
                 self.move_money(&from, &boundary, cost, TransferReason::Demolition, None, None, None)?;
                 for (space, bodies) in self.st.occupancy.remove(&sid).unwrap_or_default() {
                     for occupant in bodies {
@@ -929,7 +929,7 @@ impl<'a> Exec<'a> {
 
             // ---------------- bodies ----------------
             Block::Arrive { person, name, born_at, template, carrying, sex, bind } => {
-                if self.entity != self.s.boundary || self.position.is_none() {
+                if !self.s.is_boundary(&self.entity) || self.position.is_none() {
                     return Err(refuse(RefusalCode::NotTheirs, "people cross into the world only through the outside world"));
                 }
                 let id = match person {
@@ -960,30 +960,36 @@ impl<'a> Exec<'a> {
                         id
                     }
                 };
-                self.emit(EventBody::PersonArrived { person: id.clone(), by: self.participant.into() });
+                self.emit(EventBody::PersonArrived { person: id.clone(), via: self.entity.clone(), by: self.participant.into() });
                 if let Some(amount) = carrying {
                     let acc = self.st.mint("acc");
                     let c = self.st.stamp();
                     let currency = self.s.currency.clone();
                     self.st.accounts.insert(acc.clone(), Account { holder: id.clone(), custodian: id.clone(), currency: currency.clone(), balance: 0, changed: c });
                     self.emit(EventBody::AccountOpened { account: acc.clone(), holder: id.clone(), custodian: id.clone(), currency, by: self.participant.into() });
-                    let boundary = self.s.boundary_account().to_string();
+                    let boundary = self.s.boundary_account(&self.entity).to_string();
                     self.move_money(&boundary, &acc, *amount, TransferReason::Carried, None, None, None)?;
                 }
                 self.bind(bind, &id)
             }
 
-            Block::Leave { person } => {
+            Block::Leave { person, to } => {
                 let who = match person {
                     Some(p) => self.r(p)?,
                     None => self.acting_person()?,
+                };
+                // Which edge they leave by: named, or the default.
+                let to = match to {
+                    Some(e) if self.s.is_boundary(e) => e.clone(),
+                    Some(e) => return Err(refuse(RefusalCode::NotABoundary, format!("{e} isn't one of the world's edges"))),
+                    None => self.s.boundary().to_string(),
                 };
                 self.living_present(&who)?;
                 let events = vacate_all(self.st, &who, VacateReason::Departed, Some(self.participant));
                 self.emit_all(events);
                 self.st.entities.get_mut(&who).unwrap().body.as_mut().unwrap().present = false;
                 self.st.moved(&who);
-                self.emit(EventBody::PersonLeft { person: who, by: self.participant.into() });
+                self.emit(EventBody::PersonLeft { person: who, to, by: self.participant.into() });
                 Ok(())
             }
 
