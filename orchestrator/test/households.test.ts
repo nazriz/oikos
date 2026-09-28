@@ -58,3 +58,27 @@ test("households live, move and pay together", async () => {
   // Nobody was refused anything.
   expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
 }, 300_000);
+
+test("a child born here is brought home by the parent who bore them and added to the household's record", async () => {
+  const out = join(root, "runs", "test-births");
+  rmSync(out, { recursive: true, force: true });
+  const config = generate({ ...spec, years: 1 });
+  // Ten times the ABS rates, so a year of a small town has births to check.
+  for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller.params.fertility_per_1000 = [{ from: 15, rate: 300 }, { from: 45, rate: 0 }];
+  for (const t of config.templates) if (t.controller?.impl === "citizen.default") t.controller.params.fertility_per_1000 = [{ from: 15, rate: 300 }, { from: 45, rate: 0 }];
+  const s = await runWorld({ config, runId: "births", outDir: out, until: 365 * DAY });
+  const ev = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
+  const births = ev.filter((e) => e.event === "person_created" && e.parents?.length);
+  expect(births.length).toBeGreaterThan(0);
+  const female = new Set(config.world.entities.filter((e: any) => e.sex === "female").map((e: any) => e.id));
+  const records = ev.filter((e) => e.event === "recorded" && e.record.kind === "household").map((e) => e.record);
+  for (const b of births) {
+    expect(female.has(b.parents[0])).toBe(true); // borne by a woman
+    expect(["female", "male"]).toContain(b.sex); // drawn by the kernel
+    if (365 * DAY - b.t < 14 * DAY) continue; // born in the run's last fortnight
+    expect(records.some((r) => r.data.members.some((m: any) => m.person === b.person && m.sex === b.sex))).toBe(true);
+    const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person);
+    if (home) expect(home.by).toBe(`${b.parents[0]}-self`);
+  }
+  expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
+}, 300_000);

@@ -1,7 +1,7 @@
 # Households (content: `participants/src/behaviour/household.ts`, `citizen.default` 0.8.0, `firm.landlord` 0.5.0, generator 0.10.0)
 
 People live in households, as the census counts them. **A household is a record, never physics.** It's a statement of kind `household` that lists:
-- its members, with the birth date and sex the household knows each by, and how to reach them (their participant);
+- its members, with their birth dates and sexes, and how to reach them (their participant);
 - its couples;
 - who holds the lease.
 
@@ -19,7 +19,7 @@ Households are drawn one at a time until the town has its people (`citizens` in 
 | Children, one-parent families | 1: 51–52%; 2: 32–34%; 3 or more: 15–16% (taken as 3) | AIFS, from the 2021 Census |
 | Same-sex couples | 1.4% of couples living together | ABS, Census 2021 |
 | Lone parents | One in five is a father | ABS, Census 2021 |
-| Sex at birth | 105.4 boys per 100 girls | ABS, Births 2022 |
+| Sex at birth | 105.8 boys per 100 girls | ABS, *Births, Australia 2024* |
 
 The result, at 1,000 people: about 405 households of 1–5 people (25%, 35%, 16%, 17%, 7%; mean 2.5, matching the census's 2.5). About 315 of the people are children.
 
@@ -71,6 +71,23 @@ Households use it to decide how many bedrooms to look for. Measurement uses it t
 - Among the households it will take, it picks one at random.
 - The lease names the leaseholder, and its terms name the household.
 - Rents are set per building and per number of bedrooms: what similar units in the building let for, or the world's base rent for that size.
+
+## Children being born (D51)
+
+A person's sex is physical (a body's, contracts v0.4): only a woman can bear a child, and her partner, if named, is the father. The kernel draws the baby's sex at 105.8 boys per 100 girls.
+
+| Rule | Detail | Source |
+|---|---|---|
+| **Having a child** | Once a month, a woman aged 15–49, present and not already expecting, conceives with a twelfth of the yearly rate for her age: births per 1,000 women of 6.0 (15–19), 30.6 (20–24), 71.3 (25–29), 106.0 (30–34), 66.6 (35–39), 15.5 (40–44) and 1.4 (45–49). With her partner, only in a month he's at home with her. | ABS, *Births, Australia 2024* (age-specific fertility rates; total fertility rate 1.481) |
+| **Afterwards** | The mother brings the baby home, and publishes the household's record with the baby in it. The household now needs the bedrooms the standard asks for, which it looks for when its tenancy ends. | |
+
+**Simplifications:**
+- The rates apply to every woman of those ages, partnered or not, although most births are to couples.
+- Newcomers' children arrive without their parentage recorded in the world.
+- A same-sex couple's children record one parent (the other's is by a donor from elsewhere).
+- Twins aren't modelled.
+
+**Observed** (1,000 people, two years): about 10 births a run, the first after nine months. Each baby is at home within days, if the mother has one.
 
 ## What's not here yet (recorded, not built)
 

@@ -17,7 +17,7 @@ use crate::config::{check_channels, footprint_cells, split_space, Channel, Parti
 use crate::events::{EndReason, EventBody, RefusalCode, Timed, TransferReason, VacateReason};
 use crate::state::{
     Account, Body, Condition, ConditionKind, DeathCause, Entity, Message, Participant, ParticipantDef, ParticipantStatus, Position, Sched,
-    Scheduled, State, Structure, Transaction,
+    Scheduled, Sex, State, Structure, Transaction,
 };
 use crate::statics::Statics;
 use serde_json::Value;
@@ -273,7 +273,8 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
 }
 
 /// A new body, with its participant from a template.
-fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, parents: Vec<Id>, present: bool, template: &str) -> (Id, Vec<Timed>) {
+#[allow(clippy::too_many_arguments)]
+fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, sex: Option<Sex>, parents: Vec<Id>, present: bool, template: &str) -> (Id, Vec<Timed>) {
     let t = st.t;
     let id = st.mint("ent");
     let c = st.stamp();
@@ -284,13 +285,22 @@ fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, parents:
             name: name.into(),
             changed: c,
             moved: 0,
-            body: Some(Body { born_at, present, alive: true, parents: parents.clone(), conditions: vec![], participant: None }),
+            body: Some(Body { born_at, sex, present, alive: true, parents: parents.clone(), conditions: vec![], participant: None, children: vec![] }),
         },
     );
+    // The parents' bodies record the child.
+    for p in &parents {
+        if let Some(b) = st.entities.get_mut(p).and_then(|e| e.body.as_mut()) {
+            b.children.push(id.clone());
+        }
+        if let Some(e) = st.entities.get_mut(p) {
+            e.changed = c;
+        }
+    }
     let (pid, mut pev) = create_participant(s, st, template, Some(id.clone()), None, None);
     st.entities.get_mut(&id).unwrap().body.as_mut().unwrap().participant = Some(pid.clone());
     schedule_birthday(s, st, &id, born_at);
-    let mut events = vec![Timed::new(t, EventBody::PersonCreated { person: id.clone(), name: name.into(), born_at, parents, participant: Some(pid) })];
+    let mut events = vec![Timed::new(t, EventBody::PersonCreated { person: id.clone(), name: name.into(), born_at, sex, parents, participant: Some(pid) })];
     events.append(&mut pev);
     (id, events)
 }
@@ -396,7 +406,12 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
                 return vec![];
             }
             let present = b.present;
-            create_person(s, st, &name, t, parents, present, &template).1
+            // Its sex, where the world models it: drawn by the kernel, keyed by the id the child is about to get.
+            let next_id = format!("ent.{}", st.counters.ent + 1);
+            let sex = s.life().and_then(|l| l.birth.as_ref()).and_then(|bp| bp.female_bps).map(|f| {
+                if uniform(s, &["birth", &next_id, "sex"], 10_000) < f as i64 { Sex::Female } else { Sex::Male }
+            });
+            create_person(s, st, &name, t, sex, parents, present, &template).1
         }
     }
 }
@@ -900,7 +915,7 @@ impl<'a> Exec<'a> {
             }
 
             // ---------------- bodies ----------------
-            Block::Arrive { person, name, born_at, template, carrying, bind } => {
+            Block::Arrive { person, name, born_at, template, carrying, sex, bind } => {
                 if self.entity != self.s.boundary || self.position.is_none() {
                     return Err(refuse(RefusalCode::NotTheirs, "people cross into the world only through the outside world"));
                 }
@@ -927,7 +942,7 @@ impl<'a> Exec<'a> {
                         if *born_at > self.now() {
                             return Err(refuse(RefusalCode::Overflow, "born in the future"));
                         }
-                        let (id, events) = create_person(self.s, self.st, name, *born_at, vec![], true, template);
+                        let (id, events) = create_person(self.s, self.st, name, *born_at, *sex, vec![], true, template);
                         self.emit_all(events);
                         id
                     }
@@ -970,6 +985,11 @@ impl<'a> Exec<'a> {
                 if self.s.templates.get(template).is_none_or(|t| t.kind != ParticipantKind::Person) {
                     return Err(refuse(RefusalCode::UnknownTemplate, format!("no template {template} for a person")));
                 }
+                // Biology, where the world models sex: only a female body bears a child, and the other parent is male.
+                let my_sex = self.st.body(&me).unwrap().sex;
+                if my_sex == Some(Sex::Male) {
+                    return Err(refuse(RefusalCode::NotFertile, format!("{me} can't bear a child")));
+                }
                 let mut parents = vec![me.clone()];
                 if let Some(o) = other_parent {
                     let o = self.r(o)?;
@@ -977,6 +997,9 @@ impl<'a> Exec<'a> {
                         return Err(refuse(RefusalCode::NotAPerson, "another parent can't be oneself"));
                     }
                     self.living_present(&o)?;
+                    if my_sex.is_some() && self.st.body(&o).and_then(|b| b.sex) == Some(Sex::Female) {
+                        return Err(refuse(RefusalCode::NotFertile, format!("{o} can't father a child")));
+                    }
                     if !crate::geo::bodies_near(self.s, self.st, &me, &o, bp.reach) {
                         return Err(refuse(RefusalCode::TooFar, format!("{o} isn't near {me}")));
                     }

@@ -340,3 +340,63 @@ fn a_pick_needs_positive_integer_weights() {
     }
     assert!(terrarium_kernel::config::check_traits("t", &Some(json!({"x": {"pick": {"a": 0, "b": 3}}}))).is_ok());
 }
+
+/// The test town, with bodies that have a sex (Alice and Carol female, Bob male) and newborns' sex drawn.
+fn town_with_sexes() -> Run<Vec<u8>> {
+    let mut w = world(&default_params());
+    for e in w["world"]["entities"].as_array_mut().unwrap() {
+        let sex = match e["id"].as_str().unwrap() {
+            "alice" | "carol" => "female",
+            "bob" => "male",
+            _ => continue,
+        };
+        e["sex"] = json!(sex);
+    }
+    w["life"]["birth"]["female_bps"] = json!(4869);
+    Run::start(w, "sexes", Vec::new(), None).unwrap()
+}
+
+#[test]
+fn where_bodies_have_a_sex_only_a_female_body_bears_a_child_and_the_other_parent_is_male() {
+    let mut run = town_with_sexes();
+    let birth = |with: Option<&str>| match with {
+        Some(w) => json!([{"block": "birth", "name": "Kim", "template": "child", "with": w}]),
+        None => json!([{"block": "birth", "name": "Kim", "template": "child"}]),
+    };
+    assert_eq!(refusal(&act(&mut run, "bob-self", None, birth(None))), Some(RefusalCode::NotFertile));
+    assert_eq!(refusal(&act(&mut run, "bob-self", None, birth(Some("alice")))), Some(RefusalCode::NotFertile));
+    // Alice and Carol are both female: Carol can't be the other parent (she isn't near either, but biology is checked first).
+    let r = act(&mut run, "alice-self", None, birth(Some("carol")));
+    assert!(matches!(refusal(&r), Some(RefusalCode::NotFertile) | Some(RefusalCode::TooFar)));
+    // Alice alone (a donor from elsewhere), or with Bob.
+    assert_eq!(refusal(&act(&mut run, "alice-self", None, birth(Some("bob")))), None);
+    run.command(&Command::Advance { to: 21 * DAY }).unwrap();
+    let st = run.kernel().state();
+    let kim = st.body("alice").unwrap().children[0].clone();
+    assert_eq!(st.body("bob").unwrap().children, vec![kim.clone()]);
+    let sex = st.body(&kim).unwrap().sex;
+    assert!(sex.is_some(), "a newborn's sex is drawn where the world models it");
+    // Both parents see the child in their own body's view; nobody else does.
+    for parent in ["alice-self", "bob-self"] {
+        let b = observe(&mut run, parent).body.unwrap();
+        assert_eq!(b.children.len(), 1);
+        assert_eq!((b.children[0].person.as_str(), b.children[0].sex, b.children[0].alive), (kim.as_str(), sex, true));
+    }
+    assert!(observe(&mut run, "carol-self").body.unwrap().children.is_empty());
+}
+
+#[test]
+fn newborns_sex_follows_the_worlds_ratio() {
+    // 1,500 births to Alice over time (the kernel doesn't stop overlapping pregnancies; behaviour would): the female
+    // share is the world's 48.69% within about four standard errors (±5.2 points).
+    let mut run = town_with_sexes();
+    for i in 0..1_500 {
+        assert_eq!(refusal(&act(&mut run, "alice-self", None, json!([{"block": "birth", "name": format!("B{i}"), "template": "child"}]))), None);
+    }
+    run.command(&Command::Advance { to: 21 * DAY }).unwrap();
+    let st = run.kernel().state();
+    let kids = &st.body("alice").unwrap().children;
+    assert_eq!(kids.len(), 1_500);
+    let female = kids.iter().filter(|k| st.body(k).unwrap().sex == Some(terrarium_kernel::state::Sex::Female)).count();
+    assert!((652..=809).contains(&female), "{female} of 1500 born female");
+}

@@ -69,6 +69,8 @@ export const citizen: BehaviourModule = {
       pass_on_bps: 10_000, // chance a contact who can see a lead passes it on (placeholder)
       // Households (docs/behaviour/households.md).
       accept_fewer_bedrooms_after_days: 60, // still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)
+      // Fertility (docs/behaviour/households.md): births per 1,000 women a year by age, ABS Births 2024; a month's chance is a twelfth.
+      fertility_per_1000: [{ from: 15, rate: 6.0 }, { from: 20, rate: 30.6 }, { from: 25, rate: 71.3 }, { from: 30, rate: 106.0 }, { from: 35, rate: 66.6 }, { from: 40, rate: 15.5 }, { from: 45, rate: 1.4 }, { from: 50, rate: 0 }],
     },
     ctx.params,
   );
@@ -116,6 +118,10 @@ export const citizen: BehaviourModule = {
     let livingAt: string | null = null;
     let share: { cents: number; order?: string } | null = null;
     let payTold = -1;
+    // Children: those we already knew of (from the start), a pregnancy's due date, and when we next think about it.
+    let knownChildren: Set<string> | null = null;
+    let expectingUntil = 0;
+    let nextFertility = ctx.rng("fertility-day").below(30) * DAY;
     const householdIncome = () => monthlyIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0);
 
     const learnFromInitialRecords = (obs: Observation) => {
@@ -237,6 +243,44 @@ export const citizen: BehaviourModule = {
         for (const { from, what } of heard) if (what.kind === "pay") memberPay.set(from.person, what.cents);
         heard = [];
         if (!acc) return withoutAccount(steps);
+      }
+
+      // A child born to us: bring them home, and (as the one who bore them) add them to the household's record.
+      const body = obs.body;
+      if (body) {
+        const kids = body.children ?? [];
+        if (!knownChildren) knownChildren = new Set(kids.map((k) => k.person));
+        for (const k of kids) {
+          if (knownChildren.has(k.person) || !k.alive) continue;
+          knownChildren.add(k.person);
+          // The parent who bore the child does it (the other parent sees the child too).
+          if (body.sex !== "female") continue;
+          const where = home?.movedIn ? home.space : livingAt;
+          if (where) steps.push(because("Our baby is born: bringing them home.", C.call("occupancy", { in: where, who: k.person })));
+          if (household && k.sex) {
+            const members = [...household.members, { person: k.person, born_at: k.born_at, sex: k.sex }];
+            steps.push(because("Our baby is born: adding them to the household's record.", say("household", `Household: ${members.map((m) => m.person).join(", ")}.`, {
+              to: members.map((m) => m.person), visible: members.map((m) => m.person), for: household.leaseholder,
+              data: { ...household, members },
+            })));
+          }
+        }
+        // Having a child: a woman of an age to, not already expecting, once a month, at the rate for her age.
+        const age = Math.floor((t - body.born_at) / year);
+        const birth = ctx.world.config?.life?.birth;
+        if (body.sex === "female" && birth && body.present && t >= nextFertility && t >= expectingUntil) {
+          nextFertility = t + MONTH;
+          const rate = [...(p.fertility_per_1000 as { from: number; rate: number }[])].reverse().find((r) => age >= r.from)?.rate ?? 0;
+          if (rate > 0 && ctx.rng(`conceive-${t}`).below(120_000) < Math.round(rate * 10)) {
+            const partner = household?.couples.find((c) => c.includes(me))?.find((x) => x !== me);
+            const man = partner && household!.members.find((m) => m.person === partner && m.sex === "male");
+            // With a partner, only when they're here with us (we see who's in our own home).
+            const together = !man || (street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.occupants?.includes(me) && sp.occupants?.includes(man.person))));
+            if (together) expectingUntil = t + birth.gestation + MONTH;
+            if (together) steps.push(because(`Having a child: at ${age}, the chance this month is ${rate} in 12,000 (ABS: ${rate} births per 1,000 women a year at this age).`,
+              C.call("birth", { name: C.text(`baby of ${me}`), template: p.child_template ?? "child", ...(man ? { with: man.person } : {}) })));
+          }
+        }
       }
 
       // Notices on our agreements move their end dates.

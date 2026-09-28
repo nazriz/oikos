@@ -491,6 +491,13 @@
           },
           "maxItems": 2,
           "uniqueItems": true
+        },
+        "sex": {
+          "description": "Persons only: biological sex, where the world models it (who can bear a child). Physics only: gender and identity are content.",
+          "enum": [
+            "female",
+            "male"
+          ]
         }
       }
     },
@@ -1209,7 +1216,7 @@
           }
         },
         "birth": {
-          "description": "Biology: the ages (years, inclusive) at which a body can bear a child, the gestation (seconds), and how near the other parent must be.",
+          "description": "Biology: the ages (years, inclusive) at which a body can bear a child, the gestation (seconds), and how near the other parent must be. Where bodies have a sex, only a female body bears a child and a named other parent is male; female_bps sets the sex of newborns.",
           "type": "object",
           "required": [
             "ages",
@@ -1235,6 +1242,12 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 1000
+            },
+            "female_bps": {
+              "description": "If set, a newborn's sex is drawn by the kernel: this share (basis points) female. Unset: newborns have no sex modelled.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
             }
           }
         }

@@ -177,6 +177,9 @@ pub struct EntityCfg {
     /// Persons only: biological parents.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parents: Option<Vec<Id>>,
+    /// Persons only: biological sex, where the world models it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sex: Option<crate::state::Sex>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -379,6 +382,9 @@ pub struct BirthPhysics {
     pub gestation: i64,
     /// How near (in cells) the other parent must be.
     pub reach: i64,
+    /// If set, a newborn's sex is drawn: this share (basis points) female. Unset: bodies born here have no sex modelled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub female_bps: Option<u32>,
 }
 
 impl ParticipantCfg {
@@ -650,7 +656,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
 
     // Bodies: only persons have them.
     for e in &w.entities {
-        if e.kind != PERSON && (e.born_at.is_some() || e.present.is_some() || e.parents.is_some()) {
+        if e.kind != PERSON && (e.born_at.is_some() || e.present.is_some() || e.parents.is_some() || e.sex.is_some()) {
             return Err(format!("entity {} isn't a person, so it has no body", e.id));
         }
         for p in e.parents.iter().flatten() {
@@ -801,8 +807,8 @@ pub fn validate(c: &Config) -> Result<(), String> {
             }
         }
         if let Some(b) = &l.birth {
-            if b.ages[0] > b.ages[1] || b.gestation < 1 || b.reach < 0 {
-                return Err("life.birth: ages lo <= hi, gestation positive, reach 0 or more".into());
+            if b.ages[0] > b.ages[1] || b.gestation < 1 || b.reach < 0 || b.female_bps.is_some_and(|f| f > 10_000) {
+                return Err("life.birth: ages lo <= hi, gestation positive, reach 0 or more, female_bps at most 10000".into());
             }
         }
         for steps in [l.other_causes.as_ref().map(|x| &x.by_age), l.illness.as_ref().map(|x| &x.by_age)].into_iter().flatten() {

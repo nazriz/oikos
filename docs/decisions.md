@@ -366,6 +366,22 @@ See the design note, §16.
 - **Measured** (town.yaml, 2 years): 100% of acts have a reason (up from 0%); 27% of records made during the run cite a basis. The rest have nothing to cite: one-off payment requests, listings and postings, reports. Signatures, withdrawals, votes and notices link through what they refer to.
 - **Revisit if:** the log grows too much (each act gains a sentence), or the renderer's trace needs reasons as structured data (a rule id and its inputs) rather than words. That would be a contract addition.
 
+**D51. Sex is physical; children are born.** *(Naz, 2026-09-28: "yes" to sex as physics, D49's proposal.)*
+- **Contracts (v0.4 draft):**
+  - A person's body has an optional `sex`, female or male: given in the config or on arrival, drawn at birth from `life.birth.female_bps`, and reported on `person_created`.
+  - Where bodies have a sex, only a female body bears a child, and a named other parent is male (`not_fertile` otherwise).
+  - A body records its children, and a person sees them in their body's view (`children`: person, born_at, sex, alive).
+  - It's physics only (who can bear a child); gender and identity are content.
+  - The categorical trait draw (`pick`, D48) stays, as a general feature; the town no longer uses a `sex` trait.
+- **Kernel:** a newborn's sex is keyed by the id they're about to get, so two births at the same moment draw independently. Tests: the biology rules, parents seeing children, and the sex ratio over 1,500 births.
+- **The town:**
+  - `life.birth`: 15–49, 266 days, same place, 48.59% female (ABS Births 2024).
+  - Women conceive monthly at a twelfth of the ABS age-specific fertility rate, with their partner only when he's at home.
+  - The mother brings the baby home and adds them to the household's record.
+  - Generated children record their parents; newcomers' don't.
+  - **Observed:** about 10 births per run of 1,000 people over two years, all housed within days where the mother has a home, with no refusals.
+- **Revisit if:** partnership status should change the rates (most births are to couples), or twins, miscarriage or contraception choice become research questions.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

@@ -79,6 +79,9 @@ export function townLife() {
     },
     // Injuries anywhere: AIHW, 2,100 injury hospitalisations per 100,000 people (2022-23). Places add their own (structure types' injury_bps).
     injury: { bps: 210, severity: [{ label: "minor", share_bps: 6000, days: [3, 14], fatal_bps: 0 }, { label: "serious", share_bps: 4000, days: [14, 90], fatal_bps: 0 }] },
+    // Biology: bearing a child from 15 to 49 (ABS age-specific fertility rates cover 15-49), 38 weeks from conception,
+    // the other parent in the same place, and 105.8 boys per 100 girls (ABS Births 2024).
+    birth: { ages: [15, 49], gestation: 266 * DAY, reach: 0, female_bps: 4859 },
   };
 }
 
@@ -204,18 +207,19 @@ export function generate(spec: TownSpec): any {
   // Households first (docs/behaviour/households.md): who lives together, their ages and sexes, as the census counts them.
   const H: HouseholdSpec = { ...DEFAULT_HOUSEHOLDS, ...spec.households };
   const hr = rng("households");
-  interface Person { id: string; born_at: number; sex: "female" | "male"; adult: boolean }
+  interface Person { id: string; born_at: number; sex: "female" | "male"; adult: boolean; parents?: string[] }
   interface Household { members: Person[]; couples: [string, string][]; leaseholder: string }
   const households: Household[] = [];
   let count = 0;
   while (count < spec.citizens) {
     const d = drawHousehold(H, (n) => hr.below(n));
     // Born `age` whole years ago, on a day of the year before that.
-    const members = d.members.map((m) => ({ id: `c${pad(++count, 4)}`, born_at: -(m.age * YEAR + m.day * DAY), sex: m.sex, adult: m.age >= 18 }));
+    const members: Person[] = d.members.map((m) => ({ id: `c${pad(++count, 4)}`, born_at: -(m.age * YEAR + m.day * DAY), sex: m.sex, adult: m.age >= 18 }));
+    d.members.forEach((m, i) => m.parents && (members[i]!.parents = m.parents.map((j) => members[j]!.id)));
     households.push({ members, couples: d.couples.map(([a, b]) => [members[a]!.id, members[b]!.id]), leaseholder: members[d.leaseholder]!.id });
   }
   const everyone = households.flatMap((h) => h.members);
-  for (const m of everyone) entities.push({ id: m.id, kind: "person", name: m.id, born_at: m.born_at });
+  for (const m of everyone) entities.push({ id: m.id, kind: "person", name: m.id, born_at: m.born_at, sex: m.sex, ...(m.parents ? { parents: m.parents } : {}) });
 
   // Jobs: adults, at the working-age employment rate.
   const pick = rng("people");
@@ -384,9 +388,9 @@ export function generate(spec: TownSpec): any {
   const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street];
   // "population" is who could sign a petition: the adults.
   const citizenController = code("citizen.default", { shop_accounts: shopAccounts, outside_account: "acc-outside", bank: "bank", population: adultCount });
-  for (const m of everyone) participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, traits: { sex: m.sex }, channels: citizenChannels, controller: citizenController, framing: unstated });
-  // People who may come later: newcomers from elsewhere (their sex is the migration office's draw, so a template each).
-  const templates = (["female", "male"] as const).map((sex) => ({ id: `newcomer-${sex}`, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated, traits: { sex } }));
+  for (const m of everyone) participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: citizenController, framing: unstated });
+  // People who may come later: newcomers from elsewhere, and children born here.
+  const templates = ["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated }));
   if (spec.migration !== false) {
     office("migration", "outside", "People moving from elsewhere", undefined, [{ id: "jobs", kind: "records", match: { statement_kinds: ["job_posting"] }, on_request: true }, { id: "who", kind: "directory" }],
       code("world.migration", { households: spec.households ?? {}, ...(spec.migration ?? {}) }));

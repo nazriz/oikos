@@ -166,6 +166,8 @@ pub enum EventBody {
         person: Id,
         name: String,
         born_at: i64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sex: Option<crate::state::Sex>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         parents: Vec<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]

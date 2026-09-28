@@ -42,12 +42,27 @@ pub struct Observation {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BodyView {
     pub born_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sex: Option<crate::state::Sex>,
     pub present: bool,
     pub alive: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parents: Vec<Id>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub conditions: Vec<Condition>,
+    /// Its children, as a parent knows them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<ChildView>,
+}
+
+/// A child, as their parent knows them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChildView {
+    pub person: Id,
+    pub born_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sex: Option<crate::state::Sex>,
+    pub alive: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -712,6 +727,12 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
     }
     let body = p.person.as_ref().and_then(|person| st.body(person)).map(|b| BodyView {
         born_at: b.born_at,
+        sex: b.sex,
+        children: b
+            .children
+            .iter()
+            .filter_map(|c| st.body(c).map(|cb| ChildView { person: c.clone(), born_at: cb.born_at, sex: cb.sex, alive: cb.alive }))
+            .collect(),
         present: b.present,
         alive: b.alive,
         parents: b.parents.clone(),

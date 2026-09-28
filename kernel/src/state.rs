@@ -85,6 +85,9 @@ fn is_zero(x: &u64) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Body {
     pub born_at: i64,
+    /// Biological sex, where the world models it (who can bear a child). Physics only: gender is content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sex: Option<Sex>,
     /// In the world, or outside it.
     pub present: bool,
     pub alive: bool,
@@ -95,6 +98,17 @@ pub struct Body {
     /// Its participant (the one that decides for it), if it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant: Option<Id>,
+    /// Its biological children, in order of birth (the other side of `parents`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<Id>,
+}
+
+/// A body's biological sex, where the world models it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Sex {
+    Female,
+    Male,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

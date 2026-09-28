@@ -145,6 +145,8 @@ impl Kernel {
                 .map(|e| {
                     let body = (e.kind == crate::config::PERSON).then(|| Body {
                         born_at: e.born_at.unwrap_or(0),
+                        sex: e.sex,
+                        children: w.entities.iter().filter(|c| c.parents.as_ref().is_some_and(|ps| ps.contains(&e.id))).map(|c| c.id.clone()).collect(),
                         present: e.present.unwrap_or(true),
                         alive: true,
                         parents: e.parents.clone().unwrap_or_default(),

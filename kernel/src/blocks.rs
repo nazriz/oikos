@@ -75,6 +75,9 @@ pub enum Block {
         template: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         carrying: Option<i64>,
+        /// A newcomer's biological sex, where the world models it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sex: Option<crate::state::Sex>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },

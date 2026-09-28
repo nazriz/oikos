@@ -44,7 +44,7 @@ Each function names a physical outcome. The resolver decides nothing on the part
 | `vote` | `ballot*`, `choice*`, `visible` | `vote` |
 | `message` | `to*`, `text*`, `re` | `message` |
 | `form` | `to*`, `form*`, plus the form's own fields | `publish` of the form's statement kind, with its fields checked against the form |
-| `presence` | `who`, `name`, `age`, `template`, `carrying`, `leave` | `arrive` (at the boundary: a newcomer with `name`, `age` and `template`, carrying money; or `who` returning) / `leave` (its own body, or `who` removed) |
+| `presence` | `who`, `name`, `age`, `sex`, `template`, `carrying`, `leave` | `arrive` (at the boundary: a newcomer with `name`, `age`, `template` and, where the world models it, `sex`, carrying money; or `who` returning) / `leave` (its own body, or `who` removed) |
 | `birth` | `name*`, `template*`, `with` | `birth`: its own person conceives a child, with another parent `with` if named |
 | `harm` | `who*` | `harm`: its own body harms someone near it |
 | `position` | `title`, `role`, `channels`, `role_module`, `appoint`, `to`, `vacate` | `create_position` (a new position of the organisation it acts for); `appoint=<position>, to=<participant>` → `appoint`; `vacate=<position>` → `appoint` of nobody |

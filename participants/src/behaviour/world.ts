@@ -69,7 +69,7 @@ export const migration: BehaviourModule = {
         max_households_per_month: 8,
         memory_days: 90,
         savings_months: [1, 3] as [number, number],
-        templates: { female: "newcomer-female", male: "newcomer-male" },
+        template: "newcomer",
         households: {} as Partial<HouseholdSpec>,
         search_limit: 200,
       },
@@ -132,7 +132,7 @@ export const migration: BehaviourModule = {
             const refs = d.members.map((_, j) => `m${j}`);
             const born_at = d.members.map((m) => obs.t - (m.age * 365 + m.day) * DAY);
             const blocks = d.members.map((m, j) => C.call("presence", {
-              name: C.text(`m${++arrivals}`), age: C.text(`${m.age * 365 + m.day} days`), template: p.templates[m.sex],
+              name: C.text(`m${++arrivals}`), age: C.text(`${m.age * 365 + m.day} days`), sex: m.sex, template: p.template,
               ...(m.age >= 18 ? { carrying: C.dollars(Math.floor(((p.savings_months[0] + r.below(p.savings_months[1] - p.savings_months[0] + 1)) * p.outside_monthly_income))) } : {}),
             }));
             todo.push(because(`A household moves here: the town's expected wage (${usd(Math.floor(mean))} a month x a ${Math.round(chance * 100)}% chance of a job) beats ${usd(p.outside_monthly_income)} elsewhere.`, ...blocks.map((b, j) => [refs[j]!, b] as [string, C.Call])));

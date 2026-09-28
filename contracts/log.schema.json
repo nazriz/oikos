@@ -894,6 +894,13 @@
             },
             "participant": {
               "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+            },
+            "sex": {
+              "description": "Biological sex, where the world models it.",
+              "enum": [
+                "female",
+                "male"
+              ]
             }
           }
         },

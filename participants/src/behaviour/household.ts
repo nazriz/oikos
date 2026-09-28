@@ -136,15 +136,15 @@ export const DEFAULT_HOUSEHOLDS: HouseholdSpec = {
   same_sex_couple_bps: 140, // ABS Census 2021: 1.4% of couples living together
   lone_parent_female_bps: 8000, // ABS Census 2021: one in five lone parents was male
   adult_female_bps: 5000, // about half (placeholder)
-  child_male_bps: 5131, // ABS Births 2022: 105.4 boys per 100 girls
+  child_male_bps: 5141, // ABS Births 2024: 105.8 boys per 100 girls
   adult_ages: [18, 64], // a working-age town: no retirees yet (there's no pension income to live on)
-  mother_age_at_first_birth: [22, 36], // placeholder around ABS Births' median age of mothers (about 31)
+  mother_age_at_first_birth: [22, 36], // placeholder around ABS Births 2024's median age of mothers (32.1)
   group_size: [2, 3], // placeholder
 };
 
-/** A drawn household: members by age (whole years), days since their last birthday and sex; couples by index; the leaseholder's index. */
+/** A drawn household: members by age (whole years), days since their last birthday and sex; couples by index; the leaseholder's index; and, in a family, each child's parents (the biological ones the world records: in a same-sex couple, the first partner). */
 export interface DrawnHousehold {
-  members: { age: number; day: number; sex: "female" | "male" }[];
+  members: { age: number; day: number; sex: "female" | "male"; parents?: number[] }[];
   couples: [number, number][];
   leaseholder: number;
 }
@@ -190,9 +190,14 @@ export function drawHousehold(H: HouseholdSpec, below: (n: number) => number): D
     age = Math.max(0, age - 1 - below(4));
   }
   const parentAge = clampAge(eldest + within(H.mother_age_at_first_birth));
+  const kids = members.map((_, i) => i);
   if (kind === 3) {
     const c = couple(parentAge);
+    const parents = members[c[0]]!.sex === members[c[1]]!.sex ? [c[0]] : [c[0], c[1]];
+    for (const k of kids) members[k]!.parents = parents;
     return { members, couples: [c], leaseholder: c[0] };
   }
-  return { members, couples: [], leaseholder: person(parentAge, chance(H.lone_parent_female_bps) ? "female" : "male") };
+  const lone = person(parentAge, chance(H.lone_parent_female_bps) ? "female" : "male");
+  for (const k of kids) members[k]!.parents = [lone];
+  return { members, couples: [], leaseholder: lone };
 }

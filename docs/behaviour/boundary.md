@@ -33,7 +33,7 @@ VISION §5: "boundary conditions: the world has an outside, with external market
 | **What they bring** | Each adult carries 1–3 months of `outside_monthly_income` in savings, in their own keeping. It moves from the outside world's account, which may go negative. | Placeholder |
 | **Their paperwork** | It writes the `household` record the newcomers bring (members, couples, who will hold a lease), once it can see their participants in its directory | |
 
-**Once here,** newcomers are ordinary citizens (templates `newcomer-female`, `newcomer-male`, running `citizen.default`). They ask the bank for an account, deposit what they brought, and hunt for work and a home. If they can't find a home in 90 days, they leave again.
+**Once here,** newcomers are ordinary citizens (template `newcomer`, running `citizen.default`; their sex is physical, stated on arrival). They ask the bank for an account, deposit what they brought, and hunt for work and a home. If they can't find a home in 90 days, they leave again.
 
 **What it can't see:** the town's unemployment. It knows only the postings it can see and whom it has brought. A town that fills its vacancies quickly draws few people, whatever its unemployment; one with vacancies standing draws people even if many locals are out of work (Harris–Todaro's point).
 

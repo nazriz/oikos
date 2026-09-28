@@ -41,7 +41,7 @@
         { "if": { "properties": { "fn": { "const": "vote" } } }, "then": { "properties": { "args": { "type": "object", "required": ["ballot", "choice"], "propertyNames": { "enum": ["ballot", "choice", "visible", "for"] } } } } },
         { "if": { "properties": { "fn": { "const": "message" } } }, "then": { "properties": { "args": { "type": "object", "required": ["to", "text"], "propertyNames": { "enum": ["to", "text", "re"] } } } } },
         { "if": { "properties": { "fn": { "const": "form" } } }, "then": { "properties": { "args": { "type": "object", "required": ["to", "form"] } } } },
-        { "if": { "properties": { "fn": { "const": "presence" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["who", "name", "age", "template", "carrying", "leave"] } } } } },
+        { "if": { "properties": { "fn": { "const": "presence" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["who", "name", "age", "sex", "template", "carrying", "leave"] } } } } },
         { "if": { "properties": { "fn": { "const": "birth" } } }, "then": { "properties": { "args": { "type": "object", "required": ["name", "template"], "propertyNames": { "enum": ["name", "template", "with"] } } } } },
         { "if": { "properties": { "fn": { "const": "harm" } } }, "then": { "properties": { "args": { "type": "object", "required": ["who"], "propertyNames": { "enum": ["who"] } } } } },
         { "if": { "properties": { "fn": { "const": "position" } } }, "then": { "properties": { "args": { "type": "object", "propertyNames": { "enum": ["title", "role", "channels", "role_module", "appoint", "to", "vacate"] } } } } },

@@ -9,7 +9,7 @@ The kernel's life physics (contracts v0.4, `life`; design note §4) are paramete
 | **Injury, anywhere** | 2.1% a year: 3–14 days (60%) or 14–90 days (40%). Never fatal here. | AIHW, *Injury in Australia*: 549,000 injury hospitalisations in 2022–23, 2,100 per 100,000 people. Flat by age (placeholder: falls make it much higher in old age). |
 | **Injury at work** | Added for the people in a place: factories 1.6% a year, shops 1.2%. | Safe Work Australia, *Key WHS Statistics 2024* (2023–24): serious claims (a week or more off) per million hours worked, manufacturing 9.4 and all industries 6.8 (used for retail, a placeholder), at about 1,700 hours a year |
 | **Harm (violence)** | Not set: `harm` is refused as not modelled. | No code citizen commits violence (that needs its own sourced behaviour). Adding the physics needs a sourced severity table (AIHW assault hospitalisations, for example). |
-| **Birth** | Not set yet. | Waiting on a contract question: see D48 and D49 (sex as physics). |
+| **Birth** | A body can bear a child at 15–49, 266 days (38 weeks) from conception to birth, the other parent in the same place; newborns 48.59% female. Where bodies have a sex (the town's do), only a female body bears a child and the other parent is male. Whether and when is behaviour: [households.md](households.md). | ABS, *Births, Australia 2024*: fertility rates cover ages 15–49; 105.8 boys per 100 girls |
 
 **No death is counted twice.** The life table covers every cause of death, so illness and injury are set never to kill. A world that wants deaths by cause would set `fatal_bps` on its conditions and subtract those causes from `other_causes` (ABS *Causes of Death* has the split).
 

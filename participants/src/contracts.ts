@@ -88,7 +88,10 @@ export interface SiteStructure { structure: Id; type: Id; at: Id; w: number; h: 
 export interface SiteCell { cell: Id; x: number; y: number; terrain?: string; structure?: SiteStructure }
 export interface PositionItem { position: Id; entity: Id; title?: string; role?: string; holder?: Id; held_by?: string }
 export interface Condition { id: Id; kind: "illness" | "injury"; severity: string; since: number; until: number }
-export interface Body { born_at: number; present: boolean; alive: boolean; parents?: Id[]; conditions?: Condition[] }
+export type Sex = "female" | "male";
+/** A child, as their parent knows them. */
+export interface ChildView { person: Id; born_at: number; sex?: Sex; alive: boolean }
+export interface Body { born_at: number; sex?: Sex; present: boolean; alive: boolean; parents?: Id[]; conditions?: Condition[]; children?: ChildView[] }
 
 export type ChannelData =
   | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; balance: number; closed?: true }[]; transactions: Transaction[] }
