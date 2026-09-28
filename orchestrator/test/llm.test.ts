@@ -134,3 +134,25 @@ test("with confirmation set to never, drafts take effect without waiting, and sa
   expect(signoffs.length).toBeGreaterThan(0);
   expect(signoffs.every((a) => a.decision === "accept" && a.note === "confirmation: never")).toBe(true);
 }, 300_000);
+
+test("offices answer the mayor's letters with their reports, in figures", async () => {
+  let calls = 0;
+  const seen: string[] = [];
+  const tool = (name: string, input: object) => [{ type: "tool_use" as const, id: `t${++calls}`, name, input }];
+  const adapter = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      seen.push(JSON.stringify(req.messages.at(-1)!.content));
+      if (calls === 0) return tool("write", { to: ["finance", "council-clerk"], text: "Please send me the town's figures.", as: "mayor" });
+      return tool("done_for_now", { days: 7 });
+    },
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
+    debrief: () => [{ type: "text", text: "Thanks." }],
+  });
+  const s = await run("letters", town(), 20 * DAY, { adapter });
+  const ev = lines(s.logPath).filter((e) => e.kind === "event").map((e) => e.body);
+  expect(ev.some((e) => e.event === "message_delivered" && e.participant === "finance-system" && e.to.includes("mayor-system"))).toBe(true);
+  expect(ev.some((e) => e.event === "message_delivered" && e.participant === "council-clerk-system" && e.to.includes("mayor-system"))).toBe(true);
+  const read = seen.join("\n");
+  expect(read).toContain("Report from the finance office: the town's account acc-city holds");
+  expect(read).toContain("council proposal form");
+}, 300_000);

@@ -239,10 +239,17 @@ export const financeOfficer: BehaviourModule = {
     let spent = 0;
     let budgetYear = -1;
     const letters = new Letters();
+    // The town account's money in and out, as the office sees it (for its reports).
+    const flows: { t: number; amount: number; party: string }[] = [];
     return stepper(
       (obs) => {
         book.absorb(obs);
         letters.take(obs);
+        const mine = ownAccount(obs)?.account;
+        if (mine) for (const x of channels.transactions(obs)) {
+          if (x.to === mine && x.from !== mine) flows.push({ t: x.t, amount: x.amount, party: x.from });
+          if (x.from === mine && x.to !== mine) flows.push({ t: x.t, amount: -x.amount, party: x.to });
+        }
       },
       (obs) => {
         const me = obs.entity;
@@ -272,7 +279,20 @@ export const financeOfficer: BehaviourModule = {
         steps.push(...letters.answer(() => {
           const unpaid = book.open("invoice").filter((i) => (i.addressed_to ?? []).includes(me) && !paid.has(i.id));
           const lines = budget ? Object.entries(budget.data?.lines ?? {}).map(([k, v]) => `${k} ${usd(v as number)}`).join(", ") : "";
-          return `Report from the finance office: the town's account ${acc.account} holds ${usd(acc.balance)}. ` +
+          // Money in and out over the last 30 days, and since records began (for a forecast, at the same rate).
+          const since = (days: number) => flows.filter((f) => f.t > obs.t - days * DAY);
+          const sum = (xs: typeof flows, sign: 1 | -1) => xs.filter((f) => Math.sign(f.amount) === sign).reduce((a, f) => a + Math.abs(f.amount), 0);
+          const month = since(30);
+          const byPayer = new Map<string, number>();
+          for (const f of month) if (f.amount > 0) byPayer.set(f.party, (byPayer.get(f.party) ?? 0) + f.amount);
+          const top = [...byPayer].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([a, v]) => `${a} ${usd(v)}`).join(", ");
+          const days = Math.max(1, Math.round(Math.min(obs.t, 365 * DAY) / DAY));
+          const year = since(365);
+          const history = flows.length
+            ? `In the last 30 days the account received ${usd(sum(month, 1))}${top ? ` (largest: ${top})` : ""} and paid out ${usd(sum(month, -1))}. ` +
+              `Over the last ${days} days it received ${usd(sum(year, 1))} and paid out ${usd(sum(year, -1))}: at that rate, about ${usd(Math.round((sum(year, 1) * 30) / days))} a month in and ${usd(Math.round((sum(year, -1) * 30) / days))} out. `
+            : "No money has moved in or out of the account yet. ";
+          return `Report from the finance office: the town's account ${acc.account} holds ${usd(acc.balance)}. ` + history +
             (budget ? `The adopted budget (${budget.id}, year ${budget.data?.year}): ${lines}; spent under it so far ${usd(spent)}. ` : "No budget has been adopted for this year. ") +
             (unpaid.length ? `Invoices awaiting payment: ${unpaid.map((i) => `${i.id} (${usd(i.data?.outcome?.money?.amount ?? 0)})`).join(", ")}.` : "No invoices are awaiting payment.");
         }));
