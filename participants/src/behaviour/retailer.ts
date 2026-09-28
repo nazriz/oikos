@@ -7,6 +7,7 @@ import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
 import { Staffing, stepper } from "./firms";
+import { Borrowing } from "./credit";
 import { LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERABLE, type Order } from "./trade";
 
@@ -45,6 +46,7 @@ export const retailer: BehaviourModule = {
         demand: 250, // what it expects to sell in a month, before it knows
         unpaid_days: 7,
         serve_within_days: 3, // what isn't served within this is refunded (the customer goes elsewhere)
+        lender: "bank", // whom it borrows from
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
@@ -52,6 +54,7 @@ export const retailer: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role });
+    const borrowing = new Borrowing(me, p.lender);
     const orders = new OrderBook(me, p.unpaid_days);
     const deliveries = new Deliveries();
     let onOrder = 0; // goods ordered from suppliers, not yet delivered
@@ -154,11 +157,19 @@ export const retailer: BehaviourModule = {
           target: Math.min(p.max_staff, headcount), wage, canPost: acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs) > 0,
           why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} a fortnight.`,
         }));
+        steps.push(...borrowing.steps(book, t, acc.account));
         if (workers.length && acc.balance < workers.length * wage) {
-          // And this month's headcount comes down with it: we don't hire again as soon as money comes in.
-          const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${workers.length} staff): letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
-          if (s.length) headcount = Math.min(headcount, workers.length - 1);
-          steps.push(...s);
+          // Short of the next pay period: first, working capital from our bank (two months' wages); while we wait to hear,
+          // nobody is let go. Refused (or in default): the most recent hire goes, and this month's headcount with them.
+          const bill = Math.floor((workers.length * wage * MONTH) / p.period);
+          if (borrowing.canApply(t)) {
+            const amount = Math.ceil((2 * bill) / 100_000) * 100_000;
+            steps.push(borrowing.apply(t, acc.account, amount, 12, "working capital", `We have ${usd(acc.balance)}, not enough for the next pay period (${workers.length} staff): asking our bank for ${usd(amount)} of working capital before letting anyone go.`));
+          } else if (!borrowing.waiting(t)) {
+            const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${workers.length} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
+            if (s.length) headcount = Math.min(headcount, workers.length - 1);
+            steps.push(...s);
+          }
         }
 
         // ---- our price list: where we are, and what we charge ----

@@ -277,6 +277,38 @@ export const transfers: BehaviourModule = {
   },
 };
 
+/**
+ * world.funding: money lent into the world from outside (a boundary condition, D31): for a town's bank, the wider
+ * market it funds itself from. It lends what's asked for, at once (the market is large next to a town), paying it with
+ * the draw settled. What the borrower pays in interest and repays is the borrower's to do; this module doesn't chase it.
+ * Documented in docs/behaviour/boundary.md.
+ */
+export const funding: BehaviourModule = {
+  name: "world.funding",
+  version: "0.1.0",
+  doc: "docs/behaviour/boundary.md",
+  cadence: () => DAY,
+  firstWake: () => 0,
+  create(ctx) {
+    const p = params({ account: "acc-outside" }, ctx.params);
+    const me = ctx.entity;
+    const book = new Book();
+    const lent = new Set<string>();
+    return stepper(
+      (obs) => book.absorb(obs),
+      () => {
+        const steps: Step[] = [];
+        for (const d of book.open("funding_draw").filter((r) => (r.addressed_to ?? []).includes(me) && !lent.has(r.id)).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+          lent.add(d.id);
+          const amount = Math.floor(Number(d.data?.amount) || 0);
+          if (amount > 0 && typeof d.data?.account === "string") steps.push(because(`A draw on funding from ${d.speaks_for}: lending ${usd(amount)}.`, pay(d.data.account, amount, { from: p.account, for: "Funding.", settles: d.id })));
+        }
+        return steps;
+      },
+    );
+  },
+};
+
 /** idle: a participant that does nothing (placeholder, and a control condition). */
 export const idle: BehaviourModule = {
   name: "idle",

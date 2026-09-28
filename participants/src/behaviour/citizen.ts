@@ -32,6 +32,7 @@ import * as C from "../calls";
 import { because, Book, callAction, DAY, usd, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
+import { Borrowing } from "./credit";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
@@ -115,6 +116,7 @@ export const citizen: BehaviourModule = {
     let trip: { at: number; tried: Set<string> } | null = null;
     let nextUse = 0; // when we next use things up (weekly)
     let carried = 0; // budget not spent last trip (less than an item's price), carried to the next
+    const borrowing = new Borrowing(me, ctx.params.bank ?? "bank");
     const deliveries = new Deliveries();
     let departed = false;
     let todo: Step[] = [];
@@ -558,6 +560,17 @@ export const citizen: BehaviourModule = {
           applied.add(best.id);
           steps.push(because(`Applying for the best-paid job we've seen (${usd(best.data?.wage ?? 0)} a fortnight)${told.length ? ", where someone told us to look" : ""}.`,
             say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account }, basis: best.id })));
+        }
+      }
+
+      // Borrowing (docs/behaviour/credit.md): short of next month's housing and essentials, with income coming in, we
+      // ask our bank for a loan to tide us over (three months' worth, less what we have); we take what's offered.
+      steps.push(...borrowing.steps(book, t, acc.account));
+      {
+        const housing = home?.rent ?? share?.cents ?? 0;
+        if (housing > 0 && monthlyIncome() > 0 && acc.balance < housing + p.essentials && borrowing.canApply(t)) {
+          const amount = Math.ceil((3 * (housing + p.essentials) - acc.balance) / 10_000) * 10_000;
+          steps.push(borrowing.apply(t, acc.account, amount, 12, "living costs", `We have ${usd(acc.balance)}, less than next month's housing and essentials (${usd(housing + p.essentials)}): asking our bank for a loan of ${usd(amount)} to tide us over.`));
         }
       }
 

@@ -65,6 +65,10 @@ Support paid to people in the world by someone outside it: for a town, a nationa
 
 In the generated town, the profile's payments are "pension" (from the retirement age) and "unemployment" (below it, from the age the profile gives).
 
+## `world.funding` (v0.1.0): money lent into the world from outside
+
+For a town's bank, the wider market it funds itself from. It lends what's asked for at once (`funding_draw`: an amount and an account), paying it with the draw settled: the market is large next to a town. The interest and repayments are the borrower's to make (`bank.lending` pays them monthly); this module doesn't chase them.
+
 ## `world.migration` (v0.1.0): people moving in from elsewhere
 
 **Participant:** the outside world's `migration` position ("People moving from elsewhere"), held by a system. **Source:** `participants/src/behaviour/world.ts`. People cross into the world only through the boundary (the `arrive` block; contracts v0.4), so arrivals are the outside world's act. Who comes is the outside world's business.

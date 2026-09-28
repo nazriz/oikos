@@ -32,6 +32,10 @@ export interface Profile {
     labour_force_participation_bps: number;
     tenancy: { rent_review_months: number; rent_increase_notice_days: number };
     world_price_process: { [kind: string]: { sd_bps: number; persistence_bps: number } };
+    credit: {
+      cash_rate_bps: number; funding_spread_bps: number; lending_rate_bps: { person: number; organisation: number }; serviceability_buffer_bps: number;
+      max_repayment_share_bps: { person: number; organisation: number }; arrears_days: number; default_days: number; max_months: number;
+    };
     retiree_savings: [number, number];
     support: { pension: { amount: number; every_days: number; from_age: number }; unemployment: { amount: number; every_days: number; from_age: number } };
     wealth_quintile_shares_bps: [number, number, number, number, number];

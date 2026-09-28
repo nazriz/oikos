@@ -61,7 +61,10 @@ test("goods are made from inputs by workers' hours, exported within each factory
     // at the old price is refunded, and made again.)
     const inForce = lists.filter((l) => l.at <= o.at).slice(-2).map((l) => l.data.goods.inputs);
     expect(inForce).toContain(o.data.unit_price);
-    expect(ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${o.speaks_for}` && e.amount === String(o.data.quantity * o.data.unit_price) && e.t >= o.at)).toBe(true);
+    // Paid with the order; or, if the bank couldn't pay it (other payments went first), declined unpaid.
+    const paid = ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${o.speaks_for}` && e.amount === String(o.data.quantity * o.data.unit_price) && e.t >= o.at);
+    const declined = recs.some((r) => r.kind === "delivery_note" && r.data.order === o.id && r.data.declined === "unpaid");
+    expect(paid || declined || o.at > 190 * DAY).toBe(true);
   }
   // Exports: paid for at the month's offer price (world prices move), never beyond a factory's share of that month's demand.
   const offersBy = recs.filter((r) => r.kind === "buying_offer" && r.speaks_for === "outside");

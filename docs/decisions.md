@@ -670,6 +670,27 @@ See the design note, §16.
 
     Earlier tests that assumed fixed world prices now check the order's price against the list in force, or the one just before, since a list republished in the same moment isn't seen yet (D58).
 
+- **Phase C, stage C2: credit** (docs/behaviour/credit.md).
+  - **The bank lends.** It decides on serviceability, assessed at the rate plus the regulator's buffer against regular income read from the account it keeps. Loans are agreements, paid out once signed and repaid by standing order. A month behind is arrears; 90 days is default, recorded as a debt claim, after which the borrower is refused.
+  - **Funding:** it draws from outside when short (`world.funding`).
+  - **Who borrows:** households short of rent with income coming in; firms before letting staff go.
+  - **Figures** from the profile: cash rate 4.35%, small-business rate 7.39%, a 3-point buffer, the 90-day default rule.
+  - **Found:**
+    - **Serial lending.** The bank ignored existing loans, and one newcomer was lent five times while already behind. Assessments now count existing repayments and refuse anyone behind.
+    - **A lump sum counted as income.** A newcomer's deposited savings looked like a month's income. Income is now the least of the last three months'.
+    - **Two loans at once.** A borrower could apply again between approval and signing. Now it's one loan at a time.
+
+    Defaults are still frequent: about a third of loans in the 200-person town, mostly firms that were already failing and people who later lost work. That's C3's business, and a calibration target (APRA's non-performing rates) for C6.
+  - ⚑ **Held for Naz:**
+    - **Money creation.** The bank lends what it has or borrows, since the kernel conserves money. Letting banks create deposits is a physics change.
+    - **Mortgages** need a housing sales market.
+  - **Tests** (`orchestrator/test/credit.test.ts`):
+    - the repayment formula;
+    - loans follow applications, are paid out once signed, and are repaid by standing order;
+    - one loan at a time;
+    - default only after arrears, with a debt recorded, and refusal after;
+    - funding draws paid by the outside.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

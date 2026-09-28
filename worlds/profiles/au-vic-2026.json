@@ -471,6 +471,22 @@
         "sd_bps": 300,
         "persistence_bps": 9000
       }
+    },
+    "credit": {
+      "cash_rate_bps": 435,
+      "funding_spread_bps": 100,
+      "lending_rate_bps": {
+        "person": 1300,
+        "organisation": 739
+      },
+      "serviceability_buffer_bps": 300,
+      "max_repayment_share_bps": {
+        "person": 3000,
+        "organisation": 2000
+      },
+      "arrears_days": 30,
+      "default_days": 90,
+      "max_months": 60
     }
   },
   "sources": {
@@ -498,7 +514,15 @@
     "fertility_per_10000": "ABS, Births, Australia 2024: births per 10,000 women (the published rates per 1,000, times 10: configs are integers) a year, by age.",
     "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80%; to confirm against ABS, Labour Force, Australia, Table 16 (15-64 year olds). Those outside it (studying, caring, other reasons) don't look for work.",
     "tenancy": "Residential Tenancies Act 1997 (Vic), s 44: a residential rent may be increased no more than once every 12 months, with at least 60 days' written notice.",
-    "world_price_process": "Placeholder: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from ABS, International Trade Price Indexes (import and export price indexes by commodity)."
+    "world_price_process": "Placeholder: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from ABS, International Trade Price Indexes (import and export price indexes by commodity).",
+    "credit.cash_rate_bps": "The RBA's cash rate target, 4.35% (held on 11 August 2026).",
+    "credit.funding_spread_bps": "Placeholder: what a small bank pays over the cash rate for its funding.",
+    "credit.lending_rate_bps": "Organisations: small-business loans' average outstanding rate, 7.39% (RBA, May 2026). People: placeholder, to confirm against RBA indicator lending rates for personal loans (Table F5).",
+    "credit.serviceability_buffer_bps": "APRA's serviceability buffer: lenders assess borrowers at least 3 percentage points above the loan's rate (maintained, May 2026).",
+    "credit.max_repayment_share_bps": "Placeholders: the most of a borrower's monthly income a lender lets repayments take (people 30%, a common lending guide; organisations 20% of what comes in).",
+    "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
+    "credit.default_days": "Non-performing at 90 days past due (APRA, Prudential Standard APS 220 Credit Risk Management).",
+    "credit.max_months": "Placeholder: the longest term for these loans (five years)."
   },
   "targets": [
     {

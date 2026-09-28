@@ -436,6 +436,12 @@ export function generate(spec: TownSpec): any {
       role_module: { code: "city.mayor_code", params: mayorParams } });
   // Deaths, as registered: what banks, employers, landlords and child protection act on (law-succession).
   const deaths = { id: "deaths", kind: "records", match: { statement_kinds: ["death_registration"] } };
+  // The bank's lending office (docs/behaviour/credit.md): the profile's lending rules; funding from outside.
+  const Cr = V.credit;
+  office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), { id: "who", kind: "directory" }],
+    code("bank.lending", { rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
+      default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: 10_000_000, funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
+  office("outside-funding", "outside", "Wholesale funding", undefined, [{ id: "ledger", kind: "accounts" }, mine("draws")], code("world.funding", { account: "acc-outside" }));
   office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city" }));
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
   office("outside-trade", "outside", "The world market", undefined, [{ id: "ledger", kind: "accounts" }, mine("orders"), { id: "stock", kind: "holdings" }],
