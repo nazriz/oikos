@@ -2,9 +2,9 @@
 // (the same prompt, tool and parser), and the call it produces is compared, in canonical form, with the accepted
 // answers. Reported separately for seen and held-out cases, with what it cost.
 
-import { calls } from "@terrarium/participants";
+import { calls, canonical as canonicalJson } from "@terrarium/participants";
 import { PRICES, type Budget, type LlmAdapter, type LlmIO, type Price } from "@terrarium/participants/llm";
-import { createTranslator, Knowledge } from "../src/index";
+import { createTranslator, Knowledge, resolve } from "../src/index";
 import { CASES, type Case } from "./cases";
 
 /** What the mayor of the test town knows (the forms and names the translator is shown). */
@@ -37,7 +37,21 @@ const canonical = (program: string) => {
   }
 };
 
-/** Run every case (or those given) through the translator on `adapter`. */
+/** What a program comes to: the acts it resolves to for the test mayor (or undefined if it doesn't resolve). */
+const actsOf = (program: string): string | undefined => {
+  try {
+    const r = resolve(calls.parseProgram(program), fixture(), () => undefined, "mayor");
+    return r.ok ? canonicalJson(r.blocks) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Run every case (or those given) through the translator on `adapter`. An answer passes if it's one of the accepted
+ * programs, or comes to the same acts as one (`choice="yes"` and `choice=yes`; a form sent to the office or to the
+ * town it belongs to): the test is whether the translation does what was asked, not how it's spelled.
+ */
 export async function evaluate(adapter: LlmAdapter, o: { prices?: Record<string, Price>; budget?: Budget; cases?: Case[] } = {}): Promise<EvalReport> {
   let cost = 0;
   const io: LlmIO = {
@@ -51,7 +65,9 @@ export async function evaluate(adapter: LlmAdapter, o: { prices?: Record<string,
     try {
       const r = await t.translate({ draftId: `eval.${c.id}`, participant: "mayor-system", as: "mayor", proposal: c.request, knowledge: fixture() });
       const got = r.ok ? r.draft.call : r.call;
-      results.push({ id: c.id, held_out: !!c.held_out, pass: got !== undefined && expect.includes(canonical(got)), ...(got !== undefined ? { got } : {}), expect });
+      const acts = got !== undefined ? actsOf(got) : undefined;
+      const pass = got !== undefined && (expect.includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e) === acts)));
+      results.push({ id: c.id, held_out: !!c.held_out, pass, ...(got !== undefined ? { got } : {}), expect });
     } catch (e) {
       results.push({ id: c.id, held_out: !!c.held_out, pass: false, expect, error: String((e as Error).message).slice(0, 300) });
       if ((e as Error).constructor?.name === "SpendingLimitReached") break; // out of budget: report what ran

@@ -42,6 +42,8 @@ export interface RunOptions {
   log?: (msg: string) => void;
   /** The model behind every language-model participant and the translator. Default: the mock. */
   adapter?: LlmAdapter;
+  /** The translator's own model (default: the same as the participants'). */
+  translatorAdapter?: LlmAdapter;
   /** Prices for real models (micro-USD per million tokens, keyed "provider/model"), added to the mock's. */
   prices?: Record<string, Price>;
   /** A spending limit for real models: the run stops (and says why) rather than exceed it. 5% is kept back for debriefs. */
@@ -293,7 +295,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   };
   for (const pid of [...parts.keys()].sort()) await syncUnits(pid);
 
-  const translator = createTranslator(io, async (participant, position, blocks) => {
+  const translator = createTranslator(o.translatorAdapter ? { ...io, adapter: o.translatorAdapter } : io, async (participant, position, blocks) => {
     const r = await k.tryRequest({ op: "check", participant, ...(position ? { as: position } : {}), blocks });
     return r === null ? { ok: false, error: "the blocks could not be read" } : r.check;
   }, typeOf);
@@ -306,7 +308,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {
     version: ORCHESTRATOR_VERSION, modules: used, thinking_time: cfg.orchestration.thinking_time, max_actions_per_wake: cfg.orchestration.max_actions_per_wake, confirm,
-    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(io.prices!).filter(([key]) => key === `${io.adapter.provider}/${io.adapter.model}` || key === "mock/mock").map(([key, price]) => ({ model: key, ...price })), participants: bindings, ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd } : {}) } } : {}),
+    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(io.prices!).filter(([key]) => key === `${io.adapter.provider}/${io.adapter.model}` || key === translator.id.model || key === "mock/mock").map(([key, price]) => ({ model: key, ...price })), participants: bindings, ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd } : {}) } } : {}),
   } } });
 
   const unitsOf = (pid: string) => units.of(pid);

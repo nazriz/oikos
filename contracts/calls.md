@@ -19,7 +19,7 @@ value    := ID                    e.g.  lot-00-00   cell.3.4   apts-3/dwelling.2
 
 - **One program is one atomic act.** Its lines are independent calls, or bindings the later lines refer to (things the participant creates itself in the same act).
 - **One program is done in one capacity:** as the participant itself, or in one position it holds. The capacity is on the action (`as`), not in the calls: an act is one person doing one thing, in one role.
-- **Ids are bare, and copied text is quoted.** Inside a quoted string, `\"` is a quote and `\\` a backslash.
+- **Ids are bare, and copied text is quoted.** Inside a quoted string, `\"` is a quote and `\\` a backslash. No id has a capital letter, so a bare word with one (`GreenCo`) is read as a name, as if quoted.
 - **Keyword arguments only.**
 - **Zero arithmetic.** Amounts and durations are always quoted text, converted by the parser's tables:
   - amounts: `"$500"`, `"$1,234.56"`, `"60k"`, `"$1.5k"`, `"$2m"`, `"500 dollars"` → integer cents;
@@ -71,5 +71,6 @@ f = entity(kind=firm, name="Riverside Bakery", position="Owner")
 position(title="Baker", role=staff)
 position(appoint=bakery-baker, to=par.12)
 presence(name="Ana Silva", age="31 years", template=newcomer, carrying="$2,400")
+claim(position=liberty, holder=builder, about={"action":"build","object":"lot-12-03"})
 none(not_yours)
 ```

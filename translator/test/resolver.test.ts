@@ -196,3 +196,11 @@ test("every block kind is reachable from some call", () => {
   const all = (BLOCKS.$defs.BlockName.enum as string[]).slice().sort();
   expect([...kinds].sort()).toEqual(all);
 });
+
+test("a bare word with a capital letter is a name (ids are lowercase), and '12-month' is a duration", () => {
+  const r = run('message(to=GreenCo, text="Hi.")');
+  expect(r.ok && r.blocks[0]!.to).toEqual(["greenco"]);
+  expect(run("message(to=Nobody, text=\"Hi.\")")).toEqual({ ok: false, questions: ['You don\'t know of anyone or anything called "Nobody" (for to).'] });
+  expect(calls.parseDuration("12-month")).toBe(calls.parseDuration("12 months"));
+  expect(calls.parseDuration("two-week")).toBe(calls.parseDuration("2 weeks"));
+});

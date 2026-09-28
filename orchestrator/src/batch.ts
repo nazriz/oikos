@@ -58,14 +58,17 @@ export interface RunRecord extends RunSummary {
 export const runIdFor = (world: string, seed: number) => `${basename(world).replace(/\.(json|ya?ml)$/, "")}.seed${seed}`;
 
 /** Run one seed in this process and write its summary next to its log. */
-export async function runOne(o: { world: string; seed: number; out: string; until?: number; sets?: string[]; model?: string; budgetUsd?: number; baseUrl?: string }): Promise<RunRecord> {
+export async function runOne(o: { world: string; seed: number; out: string; until?: number; sets?: string[]; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string }): Promise<RunRecord> {
   const { config } = await loadWorld(o.world, o.sets);
   // A real model (or the mock, by default): its adapter, price and the run's spending limit.
   const real = o.model ? chooseModel(o.model, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl }) : undefined;
+  // The translator on its own model, if one is named (sharing the run's spending limit).
+  const tr = real && o.translatorModel ? chooseModel(o.translatorModel, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl }) : undefined;
   const runId = runIdFor(o.world, o.seed);
   for (const f of [`${runId}.jsonl`, `${runId}.anchors.jsonl`, `${runId}.summary.json`]) rmSync(join(o.out, f), { force: true });
   const t0 = performance.now();
-  const s = await runWorld({ config: { ...config, seed: o.seed }, runId, outDir: o.out, until: o.until, ...(real ? { adapter: real.adapter, prices: real.prices, ...(real.budget ? { budget: real.budget } : {}) } : {}) });
+  const s = await runWorld({ config: { ...config, seed: o.seed }, runId, outDir: o.out, until: o.until, ...(real ? { adapter: real.adapter, prices: { ...real.prices, ...(tr?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : {}),
+    ...(tr ? { translatorAdapter: tr.adapter } : {}) });
   const rec: RunRecord = { ...s, seed: o.seed, wallMs: Math.round(performance.now() - t0) };
   writeFileSync(join(o.out, `${runId}.summary.json`), JSON.stringify(rec, null, 2));
   return rec;
@@ -102,6 +105,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const sets = o.sets ?? [];
   const { config, spec, generator } = await loadWorld(o.world, sets);
   if (o.model) chooseModel(o.model, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl }); // fail early: a price, a limit and a key
+  if (o.model && o.translatorModel) chooseModel(o.translatorModel, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl });
   const out = resolve(o.out ?? join("runs", basename(o.world).replace(/\.(json|ya?ml)$/, "")));
   mkdirSync(out, { recursive: true });
   const seeds = Array.from({ length: o.seeds }, (_, i) => Number(config.seed) + i);
@@ -115,7 +119,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const worker = async () => {
     for (let seed = queue.shift(); seed !== undefined; seed = queue.shift()) {
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.model ? ["--model", o.model] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : [])];
+        ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
       const [code, err] = await Promise.all([p.exited, new Response(p.stderr).text()]);
       if (code !== 0) throw new Error(`seed ${seed} failed (exit ${code}):\n${err.trim()}`);

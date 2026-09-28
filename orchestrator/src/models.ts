@@ -28,6 +28,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
   const [provider, ...rest] = name.split("/");
   const model = rest.join("/");
   if (!provider || !model) throw new Error(`--model: expected provider/model, got "${name}"`);
+  if (model === "default") throw new Error(`name the model (${provider}/<model>), so the log records which one ran`);
   const prices = priceTable();
   const local = LOCAL_PROVIDERS.includes(provider);
   if (local) prices[name] = { input: 0, output: 0, cache_read: 0, cache_write: 0 };

@@ -267,7 +267,8 @@ const WORDS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, f
 
 /** "30 days", "2 weeks", "monthly", "every 3 months", "a year" → seconds. The world has no calendar: a month is 30 days, a year 365. */
 export function parseDuration(s: string): number {
-  const t = s.trim().toLowerCase().replace(/\s+/g, " ").replace(/^every /, "").replace(/^per /, "");
+  // "12-month" (as in "a 12-month lease") reads as "12 month".
+  const t = s.trim().toLowerCase().replace(/\s+/g, " ").replace(/^every /, "").replace(/^per /, "").replace(/^([0-9]+|[a-z]+)-(?=[a-z])/, "$1 ");
   if (t in ADVERB) return ADVERB[t]!;
   const m = /^([0-9]+|[a-z]+)? ?(second|minute|hour|day|week|fortnight|month|quarter|year)s?$/.exec(t);
   if (!m) throw new UnitError(`not a duration: ${s}`);

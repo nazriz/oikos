@@ -106,7 +106,8 @@ export function translatorSystem(): string {
 }
 
 function context(req: TranslateRequest): string {
-  const forms = req.knowledge.forms.map((f) => `- ${f.data?.form} (published by ${f.speaks_for ?? f.author}): fields ${Object.entries(f.data?.fields ?? {}).map(([k, v]: [string, any]) => `${k} (${v.type}${v.required ? ", required" : ""})`).join(", ")}`);
+  // Who published it: the office (the position it was made in), or its author's organisation.
+  const forms = req.knowledge.forms.map((f) => `- ${f.data?.form} (published by ${f.in_position ?? f.speaks_for ?? f.author}): fields ${Object.entries(f.data?.fields ?? {}).map(([k, v]: [string, any]) => `${k} (${v.type}${v.required ? ", required" : ""})`).join(", ")}`);
   return [`Request: ${req.proposal}`, ...(forms.length ? ["", "Forms this person knows of:", ...forms] : [])].join("\n");
 }
 

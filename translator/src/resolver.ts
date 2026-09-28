@@ -91,13 +91,15 @@ class Resolver {
   private id(c: Call, key: string, what = key): string | undefined {
     const v = this.raw(c, key);
     if (v === undefined) return undefined;
-    if ("id" in v) return v.id;
+    // No id has a capital letter (ids are lowercase): a bare word with one is a name, as if it were quoted.
+    const named = "text" in v ? v.text : "id" in v && /[A-Z]/.test(v.id) ? v.id : undefined;
+    if ("id" in v && named === undefined) return v.id;
     if ("var" in v) return `$${v.var}`;
-    if ("text" in v) {
-      const found = this.k.byName(v.text);
+    if (named !== undefined) {
+      const found = this.k.byName(named);
       if (found.length === 1) return found[0];
-      if (found.length > 1) throw new Ask(`More than one ${what} is called "${v.text}": ${found.join(", ")}. Which one?`);
-      throw new Ask(`You don't know of anyone or anything called "${v.text}" (for ${what}).`);
+      if (found.length > 1) throw new Ask(`More than one ${what} is called "${named}": ${found.join(", ")}. Which one?`);
+      throw new Ask(`You don't know of anyone or anything called "${named}" (for ${what}).`);
     }
     throw new Ask(`${what} should name something, not ${"json" in v ? "data" : "a call"}.`);
   }

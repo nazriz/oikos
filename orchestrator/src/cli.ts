@@ -7,6 +7,8 @@
 //     --model runs every language-model participant and the translator on a real model: anthropic/…, openai/…
 //     (keys from ANTHROPIC_API_KEY / OPENAI_API_KEY), or a local open-weight model: ollama/… or local/… --base-url.
 //     A model that costs money needs --budget: the run stops, and says why, rather than spend more.
+//     With --model, --translator-model runs the translator on its own model (e.g. a smaller one); without, it only
+//     prices the cost projection.
 //   terrarium measure <DIR> [QUERY...] [--sql "select ..."] [--list]
 //   terrarium cost <DIR> [--translator-model provider/model]
 //   terrarium translator-eval --model provider/model [--budget DOLLARS] [--base-url URL] [--out FILE]
@@ -61,7 +63,7 @@ try {
     }
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"),
-      model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
+      model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
   } else if (cmd === "measure" && positional()[0]) {
     const dir = await measureDir(positional()[0]!);
     if (has("list")) for (const q of queries()) console.log(`${q.name.padEnd(22)} ${q.description}`);
