@@ -57,7 +57,7 @@ Each principle is followed by where it came from.
 
 *(I briefly suggested that capable models could call tools directly. Naz: "how is this the case? the whole point is to maintain natural language". Retracted.)*
 
-**P3. The translator is general, world-agnostic and private to each seat.** It turns language into a structured intent and knows nothing about how the world works: not banks, not builders, not permit procedures. Each seat's use of it is private. It never mediates between seats; seats interact only through the world (messages, published statements, agreements, money, building). *(Naz: "the translator does not need to understand anything about town bank or builder, like, all it's doing is turning plain language words into actions".)*
+**P3. The translator is general, world-agnostic and private to each seat.** It turns language into a structured intent and knows nothing about how the world works: not banks, not builders, not permit procedures. Its input is the request, the forms the seat knows of, and, on its one retry (D56), what the resolver said was wrong. That is only ever the seat's own knowledge (P8), like a compiler's error message *(Naz, 2026-09-28: amended, option (a))*. Each seat's use of it is private. It never mediates between seats; seats interact only through the world (messages, published statements, agreements, money, building). *(Naz: "the translator does not need to understand anything about town bank or builder, like, all it's doing is turning plain language words into actions".)*
 
 **P4. Intent is separate from execution.** There are three layers:
 - **translator:** language → intent (a call);

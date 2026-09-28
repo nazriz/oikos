@@ -16,7 +16,7 @@ import * as C from "../calls";
 import type { Observation, ParticipantAction } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, between, Book, callAction, usd, cellsOf, DAY, leaseTerms, MONTH, notice, offer, ownAccount, pay, say, structureOf, withdraw, type Step } from "./common";
+import { because, between, Book, callAction, usd, cellsOf, DAY, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -70,7 +70,6 @@ export const landlord: BehaviourModule = {
       develop_type: "house",
       develop_window_days: 90, // look at average occupancy over this window
       develop_max_vacancy_bps: 1000, // build when average vacancy is at most 10% of homes
-      build_markup_bps: 2000, // the builder's price over materials
       compliance_bps: 10_000, // how often it obeys a refusal, a fine, an order, or reports rent honestly
       tax_rate_bps: 0, // the rate it believes the tax law sets (the world supplies it)
       // Occupancy policy: turn down a household with more than this many people per bedroom (0: no limit). Two is the
@@ -81,8 +80,6 @@ export const landlord: BehaviourModule = {
   );
     const me = ctx.entity;
     const book = new Book();
-    const cfg = ctx.world.config;
-    const types = new Map<string, any>(cfg.catalogue.structure_types.map((t: any) => [t.id, t]));
     // The homes we own: each a unit (a dwelling space) in a finished building on one of our lots.
     const owned: { structure: string; type: string; space: string; bedrooms?: number }[] = [];
     const received = new Map<string, number>(); // tenant account -> total received
@@ -232,7 +229,12 @@ export const landlord: BehaviourModule = {
       // account on their first application, or the one the world started them with.
       const payingAccount = new Map<string, string>();
       for (const r of book.all("rental_application")) if (r.speaks_for && !payingAccount.has(r.speaks_for)) payingAccount.set(r.speaks_for, r.data?.account);
-      for (const x of cfg.world.accounts) if (!payingAccount.get(x.holder)) payingAccount.set(x.holder, x.id);
+      // Otherwise the account the lease itself says they pay from.
+      for (const a of active) {
+        const tenant = tenantOf(a);
+        const from = a.terms.commitments?.find((c: any) => c.who === tenant)?.does?.outcome?.money?.from;
+        if (tenant && from && !payingAccount.get(tenant)) payingAccount.set(tenant, from);
+      }
       for (const a of active) {
         if (noticeGiven.has(a.id)) continue;
         const tenant = tenantOf(a);
@@ -281,8 +283,8 @@ export const landlord: BehaviourModule = {
       const occupiedEnough = t >= p.develop_window_days * DAY && unitSum > 0 && vacantSum * 10_000 <= unitSum * p.develop_max_vacancy_bps;
       // A lot of ours with nothing on it yet.
       const emptyLots = ownLots.filter((l) => cellsOf(book, l).length > 0 && cellsOf(book, l).every((c) => sites.some((s) => s.cell === c && !s.structure)));
-      const devType = types.get(p.develop_type);
-      const price = devType ? Math.floor((devType.materials_cost * (10_000 + p.build_markup_bps)) / 10_000) : Infinity;
+      // What the builder charges for it, from its published prices.
+      const price = (p.builder && publishedPrice(book, p.builder, p.develop_type)) || Infinity;
       if (p.develop && !dev && t >= devCooldownUntil && occupiedEnough && emptyLots.length && acc.balance >= price + price / 2 && p.city && p.builder) {
         dev = { lot: emptyLots[0]!, stage: "applying" };
         // The planning office's published form (it's in the world's genesis records).

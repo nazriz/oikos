@@ -221,6 +221,13 @@ export function jobTerms(a: Record | undefined, worker: string): { wage: number;
 
 export const between = (lo: number, hi: number, u: number) => lo + Math.floor(u * (hi - lo + 1));
 
+/** A builder's published price for a kind of building (its latest price list), if it has published one. */
+export function publishedPrice(book: Book, builder: string, type: string): number | undefined {
+  const list = book.open("price_list").filter((r) => r.speaks_for === builder || r.author === builder).sort((a, b) => b.at - a.at)[0];
+  const price = list?.data?.prices?.[type];
+  return Number.isInteger(price) ? price : undefined;
+}
+
 // ------------------------------------------------------------------ land: lots are registry records over cells
 
 /** The cells a lot covers, from its registry record (a statement of kind "lot"). */

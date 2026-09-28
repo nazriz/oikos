@@ -157,9 +157,9 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   const read = seen.join("\n");
   expect(read).toContain("Report from the finance office: the town's account acc-city holds");
   expect(read).toContain("council proposal form");
-  // The budget brief: what the budget can pay for, and what a park costs.
+  // The budget brief: what the budget can pay for; what a park costs is the builder's published price, not something finance was told.
   expect(read).toContain("The budget's lines: parks, for building a park");
-  expect(read).toContain("about $60,000 a park");
+  expect(read).toMatch(/builder's published prices \(rec\.\d+\): .*park \$60,000\.00/);
   // The land register: the town's lots, and the vacant ones by id.
   expect(read).toMatch(/The town owns \d+ lots; \d+ have nothing built on them: lot-/);
 }, 300_000);

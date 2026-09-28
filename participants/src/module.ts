@@ -16,11 +16,13 @@
 import type { Block, Observation, ParticipantAction } from "./contracts";
 import type { Rng } from "./rng";
 
+/**
+ * What a module may know about the run itself: the clock's grain and when the run ends. Nothing about the world:
+ * a module knows the world only through what it perceives and its own parameters, like any participant (P14).
+ */
 export interface WorldInfo {
   tickSeconds: number;
   runEnd: number;
-  /** The world config as loaded (catalogue, parcels, ...): public facts of the world. */
-  config: any;
 }
 
 /**

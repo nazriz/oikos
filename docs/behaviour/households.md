@@ -78,7 +78,7 @@ A person's sex is physical (a body's, contracts v0.4): only a woman can bear a c
 
 | Rule | Detail | Source |
 |---|---|---|
-| **Having a child** | Once a month, a woman aged 15–49, present and not already expecting, conceives with a twelfth of the yearly rate for her age: births per 1,000 women of 6.0 (15–19), 30.6 (20–24), 71.3 (25–29), 106.0 (30–34), 66.6 (35–39), 15.5 (40–44) and 1.4 (45–49). With her partner, only in a month he's at home with her. | ABS, *Births, Australia 2024* (age-specific fertility rates; total fertility rate 1.481) |
+| **Having a child** | Once a month, a woman aged 15–49, present and not already expecting, conceives with a twelfth of the yearly rate for her age: births per 1,000 women of 6.0 (15–19), 30.6 (20–24), 71.3 (25–29), 106.0 (30–34), 66.6 (35–39), 15.5 (40–44) and 1.4 (45–49). With her partner, only in a month he's at home with her. Only in a world with births (`births`); after conceiving, not again until the pregnancy (`gestation`) and a month have passed. The calendar (`year`), `births` and `gestation` are the citizen's parameters, set from the world's life physics by the generator (D57). | ABS, *Births, Australia 2024* (age-specific fertility rates; total fertility rate 1.481) |
 | **Afterwards** | The mother brings the baby home, and publishes the household's record with the baby in it. The household now needs the bedrooms the standard asks for, which it looks for when its tenancy ends. | |
 
 **Simplifications:**

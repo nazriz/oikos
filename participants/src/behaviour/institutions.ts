@@ -10,7 +10,7 @@ import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step } from "./common";
+import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd } from "./common";
 import { stepper } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
@@ -170,31 +170,47 @@ export const inspector: BehaviourModule = {
 /**
  * firm.builder: takes construction contracts. When a client it has a
  * contract with has signed, and it can pay for materials, it signs, builds,
- * and invoices the contract price.
+ * and invoices the contract price. It publishes its prices (materials plus its
+ * margin), and answers letters with them. params: materials (cents, by kind of
+ * building: what its suppliers charge, its own business knowledge),
+ * build_markup_bps (its margin over materials).
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
+    const p = params({ materials: {} as Record<string, number>, build_markup_bps: 2000 }, ctx.params);
     const book = new Book();
     const started = new Set<string>();
-    const types = new Map<string, any>(ctx.world.config.catalogue.structure_types.map((t: any) => [t.id, t]));
+    const letters = new Letters();
+    const prices = Object.fromEntries(Object.entries(p.materials).map(([type, cost]) => [type, Math.floor((cost * (10_000 + p.build_markup_bps)) / 10_000)]));
+    const priceText = () => Object.entries(prices).sort(([a], [b]) => (a < b ? -1 : 1)).map(([type, price]) => `${type} ${usd(price)}`).join("; ");
+    let published = false;
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+      },
       (obs) => {
         const me = obs.entity;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
         if (!acc) return steps;
+        // Our prices, published once for anyone who wants building work.
+        if (!published && Object.keys(prices).length) {
+          published = true;
+          steps.push(because("Publishing our prices, so clients know what building costs.",
+            say("price_list", `Our prices for building, on your lot, finished: ${priceText()}.`, { visible: "public", data: { prices } })));
+        }
         let balance = acc.balance;
         for (const r of book.records.values()) {
           if (r.record !== "agreement" || r.terms.template !== "construction" || !r.terms.parties.includes(me) || started.has(r.id)) continue;
           const client = r.terms.parties.find((x) => x !== me)!;
           if (!book.signedBy(r.id, client)) continue;
           const job = commitmentOf(r, me).outcome?.structure ?? {};
-          const cost = job.type ? types.get(job.type)?.materials_cost ?? Infinity : Infinity;
+          const cost = job.type ? p.materials[job.type] ?? Infinity : Infinity;
           if (!job.on || balance < cost) continue;
           started.add(r.id);
           balance -= cost;
@@ -205,6 +221,8 @@ export const builder: BehaviourModule = {
             ...(price ? [say("invoice", `Invoice: ${price} cents for building a ${job.type} on ${job.on}.`, { to: [client], basis: r.id, data: { outcome: { money: { to: acc.account, amount: price, for: `building a ${job.type} on ${job.on}` } }, agreement: r.id } })] : []),
           ));
         }
+        steps.push(...letters.answer(() => `Our prices for building, on your lot, finished: ${priceText()}. To have us build, offer us a construction agreement: what to build, on which lot, and the price, paid from your account on our invoice. We start once you've signed and we can buy the materials; permits are the owner's to get.`,
+          "A letter asking about work: answering with our prices and how we take on a job."));
         return steps;
       },
     );

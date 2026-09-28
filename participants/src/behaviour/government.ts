@@ -9,7 +9,7 @@ import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, cellsOf, DAY, Letters, lotOf, message, ownAccount, pay, publishedCount, record, say, type Step, usd, vote } from "./common";
+import { because, Book, cellsOf, DAY, Letters, lotOf, message, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, vote } from "./common";
 import { stepper } from "./firms";
 
 const YEAR = 365 * DAY;
@@ -58,8 +58,8 @@ export const mayorCode: BehaviourModule = {
         // apply for planning permission like anyone else, then commission the builder once granted.
         const budget = book.open("budget").sort((a, b) => b.at - a.at)[0];
         const year = Math.floor(t / YEAR);
-        const types = new Map<string, any>(ctx.world.config.catalogue.structure_types.map((x: any) => [x.id, x]));
-        const price = Math.floor(((types.get(p.park_type)?.materials_cost ?? 0) * 12) / 10);
+        // The builder's published price for a park (none published: nothing to plan with).
+        const price = publishedPrice(book, p.builder, p.park_type) ?? 0;
         if (budget && budget.data?.year === year + 1 && parkYear !== year && price > 0 && price <= (budget.data?.lines?.parks ?? 0)) {
           const cells = channels.cells(obs);
           const free = new Set(cells.filter((c) => !c.structure).map((c) => c.cell));
@@ -305,6 +305,8 @@ export const financeOfficer: BehaviourModule = {
             (budget ? `The adopted budget (${budget.id}, year ${budget.data?.year}): ${lines}; spent under it so far ${usd(spent)}. ` : "No budget has been adopted for this year. ") +
             // The budget brief: what each line pays for (world config). The amounts are the mayor's and the council's to set.
             (Object.keys(p.budget_lines).length ? `The budget's lines: ${Object.entries(p.budget_lines).map(([k, v]) => `${k}, for ${v}`).join("; ")} Setting the amounts is for the mayor and the council; a budget goes to the council on the council proposal form. ` : "") +
+            // What building costs, as builders have published it.
+            book.open("price_list").map((l) => `${l.speaks_for ?? l.author}'s published prices (${l.id}): ${Object.entries(l.data?.prices ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k} ${usd(v as number)}`).join(", ")}. `).join("") +
             (unpaid.length ? `Invoices awaiting payment: ${unpaid.map((i) => `${i.id} (${usd(i.data?.outcome?.money?.amount ?? 0)})`).join(", ")}.` : "No invoices are awaiting payment.");
         }));
         return steps;

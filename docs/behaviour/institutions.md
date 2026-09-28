@@ -37,9 +37,11 @@ What happens next is up to the owner, and to whoever else might enforce.
 
 Wakes weekly. For each construction agreement a client has signed, if it can pay for the materials, it signs too and builds (`construct`), the materials being bought from outside (the temporary liberty in docs/decisions.md). It then **invoices** the client for the contract price (an `invoice` statement whose data is the payment it asks for, in the shared outcome language: `data: { outcome: { money: { to, amount } }, agreement }`). Payment is the client's act, through their bank. It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
 
+**Its prices** are what its materials cost (`materials`, by kind of building: what its suppliers charge, its own business knowledge from the world's config) plus its margin (`build_markup_bps`, 20%). It **publishes them** once, as a public `price_list` statement, and answers letters with them and with how it takes on a job. Everyone else learns what building costs from that list: the mayor, finance's budget brief, landlords planning to develop. Before D57, the code mayor and landlords read materials costs from the world config, which a model-run mayor couldn't do.
+
 ## Landlords as developers (`firm.landlord`, see [firms.md](firms.md))
 
-When a landlord's **average vacancy over the last 90 days is at most 10%** of its homes, and it has 1.5× the price of a house in hand, it applies to build on an empty site it owns.
+When a landlord's **average vacancy over the last 90 days is at most 10%** of its homes, and it has 1.5× the price of a house in hand (the builder's published price), it applies to build on an empty site it owns.
 - **Granted:** it contracts the builder and pays the invoice when it arrives.
 - **Refused:** it complies with probability `compliance_bps`. Otherwise it **builds anyway**.
 

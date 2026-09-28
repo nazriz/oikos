@@ -46,6 +46,9 @@ export const citizen: BehaviourModule = {
   create(ctx: ParticipantContext) {
     const p = params(
     {
+      year: 365 * DAY, // the calendar: how long a year is, for ages
+      births: false, // whether this world has births (its life physics), so whether having a child is possible
+      gestation: 266 * DAY, // how long a pregnancy lasts (the world's birth physics: the standard 38 weeks from conception)
       rent_share_bps: 3300, // BoE: renters bid 33% of income
       savings_rent_months: 6, // without income, rent only if savings cover this many months
       essentials: 50_000, // cents per month
@@ -105,7 +108,7 @@ export const citizen: BehaviourModule = {
     const monthlyIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
 
     // The household (a record the members keep; none: living alone, as the leaseholder of one).
-    const year: number = ctx.world.config?.life?.year ?? 365 * DAY;
+    const year: number = p.year;
     let household: HouseholdData | undefined;
     const isLeaseholder = () => !household || household.leaseholder === me;
     const others = () => (household?.members ?? []).filter((m) => m.person !== me);
@@ -317,8 +320,7 @@ export const citizen: BehaviourModule = {
         }
         // Having a child: a woman of an age to, not already expecting, once a month, at the rate for her age.
         const age = Math.floor((t - body.born_at) / year);
-        const birth = ctx.world.config?.life?.birth;
-        if (body.sex === "female" && birth && body.present && t >= nextFertility && t >= expectingUntil) {
+        if (body.sex === "female" && p.births && body.present && t >= nextFertility && t >= expectingUntil) {
           nextFertility = t + MONTH;
           const rate = [...(p.fertility_per_1000 as { from: number; rate: number }[])].reverse().find((r) => age >= r.from)?.rate ?? 0;
           if (rate > 0 && ctx.rng(`conceive-${t}`).below(120_000) < Math.round(rate * 10)) {
@@ -326,7 +328,7 @@ export const citizen: BehaviourModule = {
             const man = partner && household!.members.find((m) => m.person === partner && m.sex === "male");
             // With a partner, only when they're here with us (we see who's in our own home).
             const together = !man || (street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.occupants?.includes(me) && sp.occupants?.includes(man.person))));
-            if (together) expectingUntil = t + birth.gestation + MONTH;
+            if (together) expectingUntil = t + p.gestation + MONTH;
             if (together) steps.push(because(`Having a child: at ${age}, the chance this month is ${rate} in 12,000 (ABS: ${rate} births per 1,000 women a year at this age).`,
               C.call("birth", { name: C.text(`baby of ${me}`), template: p.child_template ?? "child", ...(man ? { with: man.person } : {}) })));
           }

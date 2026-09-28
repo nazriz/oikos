@@ -194,7 +194,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     entity,
     ...(cap === "self" ? {} : { position: cap }),
     rng: (purpose) => randomness.stream(["participant", pid, cap, String(t), purpose]),
-    world: { tickSeconds: tick, runEnd, config: cfg },
+    world: { tickSeconds: tick, runEnd },
     params: (params ?? {}) as any,
   });
   const isLlm = (p: Part) => p.controller?.type === "llm";

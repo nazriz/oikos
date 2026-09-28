@@ -12,7 +12,8 @@ Turns a short spec (`worlds/town.yaml`) into a full, explicit contracts v0.4 wor
   - the example legal code (`worlds/law/basic.json`): charter, property, tenancy, planning and tax law;
   - ownership claims;
   - each household (a `household` record);
-  - leases and jobs already in force (tenancies part-way through, 12–24-month terms; a lease is the leaseholder's, naming the household);
+  - leases and jobs already in force (tenancies part-way through, 12–24-month terms; a lease is the leaseholder's, naming the household and the account the rent is paid from);
+  - the builder's materials costs, from the catalogue, as its own parameters: it publishes its prices, and the mayor, finance and landlords read them there (D57);
   - the standing orders that pay rent, the other adults' shares of the rent, and wages;
   - the town's `signatories` list for its account (the finance officer's position) and its payments procedure.
 - **Positions and participants:** every organisation acts through positions, each held at the start by a system participant running the job's module:
