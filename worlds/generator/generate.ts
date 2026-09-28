@@ -366,6 +366,14 @@ export function generate(spec: TownSpec): any {
   records.push({ id: "proc-payments", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
     text: "The finance officer pays an invoice only within the adopted budget, and any payment over $50,000 only with the mayor's written approval.",
     adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay an invoice", condition: "outside the adopted budget, or over $50,000 without the mayor's written approval" } });
+  // The council clerk publishes how to put something to the council: anyone may, on this form.
+  records.push({ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
+    text: "Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for 14 days.",
+    data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: {
+      proposal: { type: "text", required: true, description: "What's proposed, in full: the law's words, or what the budget is for." },
+      kind: { type: "choice", required: true, options: ["law", "budget", "other"], description: "A law, a budget, or something else." },
+      affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." },
+      parks: { type: "amount", description: "For a budget: the parks line." } } } });
   // The planning office publishes the form it expects applications on (docs/design/translator-and-resolver.md §9.3).
   records.push({ id: "form-permit", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
     text: "Planning permit application: the lot and the kind of building.",

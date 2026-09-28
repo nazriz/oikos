@@ -9,7 +9,7 @@ import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, cellsOf, DAY, lotOf, message, ownAccount, pay, publishedCount, record, say, type Step, usd, vote } from "./common";
+import { because, Book, cellsOf, DAY, Letters, lotOf, message, ownAccount, pay, publishedCount, record, say, type Step, usd, vote } from "./common";
 import { stepper } from "./firms";
 
 const YEAR = 365 * DAY;
@@ -121,7 +121,7 @@ function ownerIsCity(book: Book, lot: string): boolean {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -129,8 +129,12 @@ export const councilClerk: BehaviourModule = {
     const book = new Book();
     const balloted = new Set<string>();
     const closed = new Set<string>();
+    const letters = new Letters();
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+      },
       (obs) => {
         const me = obs.entity;
         const t = obs.t;
@@ -140,7 +144,7 @@ export const councilClerk: BehaviourModule = {
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);
-          steps.push(because("A proposal addressed to the council: opening a ballot.", say("ballot", `Council ballot: ${prop.text}`, { basis: prop.id, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? [] } })));
+          steps.push(because("A proposal addressed to the council: opening a ballot.", say("ballot", `Council ballot: ${prop.text}`, { basis: prop.id, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? formTags(prop) } })));
         }
         for (const ballot of book.open("ballot")) {
           if (closed.has(ballot.id) || ballot.speaks_for !== me || t < (ballot.data?.closes_at ?? Infinity)) continue;
@@ -152,10 +156,23 @@ export const councilClerk: BehaviourModule = {
           const passed = yes > no && yes * 2 > councillors.size;
           const step: Step = because(`The ballot closed: counting the councillors' latest votes (${passed ? "a majority for" : "no majority for"}).`, say("ballot_result", `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.`, { basis: ballot.id, data: { ballot: ballot.id, yes, no, passed } }));
           const prop = book.records.get(ballot.data?.proposal) as StatementRecord | undefined;
-          const enact = prop?.data?.enact;
+          const enact = prop?.data?.enact ?? fromForm(prop, t);
           if (passed && enact) step.push(say(enact.kind, enact.text, { basis: ballot.id, adico: enact.adico, formal: enact.formal?.condition, data: enact.data }));
           steps.push(step);
         }
+        steps.push(...letters.answer(() => {
+          const waiting = book.open("proposal").filter((x) => (x.addressed_to ?? []).includes(me) && !balloted.has(x.id));
+          const open = book.open("ballot").filter((b) => b.speaks_for === me && !closed.has(b.id));
+          const results = book.open("ballot_result").slice(-3);
+          const year = Math.floor(t / YEAR) + 1;
+          const budget = book.open("budget").find((b) => b.data?.year === year);
+          return "Report from the council clerk: " +
+            (open.length ? `ballots open: ${open.map((b) => `${b.id} on ${b.data?.proposal}, closing day ${Math.floor(b.data?.closes_at / DAY)}`).join("; ")}. ` : "no ballots are open. ") +
+            (waiting.length ? `Proposals waiting for a ballot: ${waiting.map((x) => x.id).join(", ")}. ` : "") +
+            (results.length ? `Recent results: ${results.map((r) => `${r.data?.ballot}: ${r.data?.passed ? "passed" : "rejected"} ${r.data?.yes}-${r.data?.no}`).join("; ")}. ` : "") +
+            (budget ? `The council adopted a budget for year ${year} (${budget.id}). ` : `No budget is adopted for year ${year}. `) +
+            "Anyone may put a proposal to the council on the council proposal form (form-council-proposal); I put it to a ballot of the councillors, open for 14 days.";
+        }));
         return steps;
       },
     );
@@ -212,7 +229,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -221,8 +238,12 @@ export const financeOfficer: BehaviourModule = {
     const paid = new Set<string>();
     let spent = 0;
     let budgetYear = -1;
+    const letters = new Letters();
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+      },
       (obs) => {
         const me = obs.entity;
         const acc = ownAccount(obs);
@@ -248,6 +269,13 @@ export const financeOfficer: BehaviourModule = {
           spent += amount;
           steps.push(because(withinProcedure ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : "Paying an invoice outside the procedure.", pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })));
         }
+        steps.push(...letters.answer(() => {
+          const unpaid = book.open("invoice").filter((i) => (i.addressed_to ?? []).includes(me) && !paid.has(i.id));
+          const lines = budget ? Object.entries(budget.data?.lines ?? {}).map(([k, v]) => `${k} ${usd(v as number)}`).join(", ") : "";
+          return `Report from the finance office: the town's account ${acc.account} holds ${usd(acc.balance)}. ` +
+            (budget ? `The adopted budget (${budget.id}, year ${budget.data?.year}): ${lines}; spent under it so far ${usd(spent)}. ` : "No budget has been adopted for this year. ") +
+            (unpaid.length ? `Invoices awaiting payment: ${unpaid.map((i) => `${i.id} (${usd(i.data?.outcome?.money?.amount ?? 0)})`).join(", ")}.` : "No invoices are awaiting payment.");
+        }));
         return steps;
       },
     );
@@ -264,7 +292,7 @@ export const financeOfficer: BehaviourModule = {
  */
 export const taxClerk: BehaviourModule = {
   name: "city.tax_clerk",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -272,9 +300,11 @@ export const taxClerk: BehaviourModule = {
     const book = new Book();
     const assessed = new Map<string, { payer: string; account: string; amount: number; at: number; chased: boolean }>();
     const received = new Map<string, number>(); // paying account -> total received
+    const letters = new Letters();
     return stepper(
       (obs) => {
         book.absorb(obs);
+        letters.take(obs);
         const acc = ownAccount(obs);
         if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account) received.set(tx.from, (received.get(tx.from) ?? 0) + tx.amount);
       },
@@ -306,9 +336,30 @@ export const taxClerk: BehaviourModule = {
             message([a.payer], `Tax of ${a.amount} cents on report ${id} is overdue; a penalty of ${fine} cents has been recorded.`, id),
           ));
         }
+        steps.push(...letters.answer(() => {
+          const total = [...assessed.values()].reduce((a, x) => a + x.amount, 0);
+          const paidIn = [...new Set([...assessed.values()].map((x) => x.account))].reduce((a, acc) => a + (received.get(acc) ?? 0), 0);
+          const chased = [...assessed.values()].filter((x) => x.chased).map((x) => x.payer);
+          return `Report from the tax clerk: ${assessed.size} tax reports assessed, ${usd(total)} owed under the tax law (${rate / 100}% of rent), ${usd(paidIn)} received from those who owe it.` +
+            (chased.length ? ` Overdue, with penalties recorded: ${[...new Set(chased)].join(", ")}.` : " Nothing is overdue.");
+        }));
         return steps;
       },
     );
   },
 };
 
+/** What a proposal made on the council proposal form enacts if it passes: a law, or a budget (with its parks line). */
+function fromForm(prop: StatementRecord | undefined, t: number): any {
+  const d = prop?.data;
+  if (!d?.proposal) return undefined;
+  if (d.kind === "law") return { kind: "law", text: d.proposal };
+  if (d.kind === "budget") return { kind: "budget", text: d.proposal, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: Number.isInteger(d.parks) ? d.parks : 0 } } };
+  return undefined;
+}
+
+/** How a form-made proposal is placed for the councillors (their votes weigh who it mainly bears on). */
+function formTags(prop: StatementRecord): string[] {
+  const d = prop.data ?? {};
+  return d.kind === "budget" ? ["budget"] : d.affects === "tenants" ? ["tenant_protection"] : d.affects === "development" ? ["development"] : [];
+}

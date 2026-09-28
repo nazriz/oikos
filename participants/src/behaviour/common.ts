@@ -129,6 +129,23 @@ export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): S
 
 export const callAction = (step: Step): ParticipantAction => ({ type: "call", call: C.program(...step), ...(step.why ? { reasoning: step.why } : {}) });
 
+/**
+ * Letters to an office. Each is answered once, with the office's standard report: what a real office sends when
+ * asked. The report is the office's own figures, composed by code (a code office can't read a letter, so it
+ * answers every one the same way). Office reports aren't answered, so offices never write to each other forever.
+ */
+export class Letters {
+  private pending: { id: string; from: string }[] = [];
+  take(obs: Observation) {
+    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ")) this.pending.push({ id: m.id, from: m.from });
+  }
+  answer(report: () => string, why = "A letter to our office: answering with our standard report."): Step[] {
+    const out = this.pending.map((m) => because(why, message([m.from], report(), m.id)));
+    this.pending = [];
+    return out;
+  }
+}
+
 /** Dollars, for reasons: 123456 -> "$1,234.56". */
 export const usd = (cents: number) =>
   `${cents < 0 ? "-" : ""}$${Math.floor(Math.abs(cents) / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${String(Math.abs(cents) % 100).padStart(2, "0")}`;

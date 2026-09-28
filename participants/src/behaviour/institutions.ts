@@ -10,7 +10,7 @@ import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, commitmentOf, DAY, lotOf, ownAccount, record, say, sign, type Step } from "./common";
+import { because, Book, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step } from "./common";
 import { stepper } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
@@ -38,15 +38,19 @@ export function ownerOf(book: Book, lot: string): string | undefined {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
     const p = params({ compliance_bps: 10_000 }, ctx.params);
     const book = new Book();
     const decided = new Set<string>();
+    const letters = new Letters();
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+      },
       (obs) => {
         const me = obs.entity;
         const steps: Step[] = [];
@@ -77,6 +81,12 @@ export const planningOfficer: BehaviourModule = {
           if (!refuse) step.unshift(record("liberty", applicant, { action: "build", object: app.data?.lot, structure_type: app.data?.structure_type }, { basis: app.id }));
           steps.push(step);
         }
+        steps.push(...letters.answer(() => {
+          const decisions = book.open("permit_decision").filter((d) => d.speaks_for === me || d.in_position !== undefined);
+          const granted = decisions.filter((d) => d.data?.decision === "granted").length;
+          const refused = decisions.filter((d) => d.data?.decision === "refused").map((d) => `${d.data?.application} (${d.data?.law ?? "?"})`);
+          return `Report from the planning office: ${decided.size} applications decided: ${granted} granted, ${refused.length} refused${refused.length ? ` (${refused.join(", ")})` : ""}. Apply on the permit application form (form-permit).`;
+        }));
         return steps;
       },
     );
