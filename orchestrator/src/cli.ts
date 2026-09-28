@@ -14,6 +14,7 @@
 //   terrarium translator-eval --model provider/model [--budget DOLLARS] [--base-url URL] [--out FILE]
 //     The translator's test set (translator/eval/cases.ts) on a real model: seen and held-out pass rates, and cost.
 //   terrarium replay <log.jsonl> [--anchors <anchors.jsonl>]      (the kernel's own replay)
+//   terrarium story <log.jsonl> [participant]                     (what a language-model participant did, day by day)
 //
 // A DIR is a batch folder (its measure/ is used) or a folder of logs (exported to DIR/measure first).
 
@@ -47,7 +48,7 @@ async function measureDir(dir: string): Promise<string> {
   return m;
 }
 
-const usage = "usage: terrarium run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--translator-model m] [--no-measure] [--model provider/model --budget USD [--base-url URL]] | measure <DIR> [QUERY...] [--sql SQL] [--list] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl>";
+const usage = "usage: terrarium run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--translator-model m] [--no-measure] [--model provider/model --budget USD [--base-url URL]] | measure <DIR> [QUERY...] [--sql SQL] [--list] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -80,6 +81,9 @@ try {
     if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(r, null, 2));
   } else if (cmd === "cost" && positional()[0]) {
     console.log((await costReport(await measureDir(positional()[0]!), { translatorModel: flag("translator-model") })).text);
+  } else if (cmd === "story" && positional()[0]) {
+    const { story } = await import("./story");
+    console.log(story(positional()[0]!, positional()[1]));
   } else if (cmd === "replay" && rest[0]) {
     const p = Bun.spawnSync([kernelBinary(), "replay", rest[0], ...rest.slice(1)], { stdout: "inherit", stderr: "inherit" });
     process.exit(p.exitCode ?? 1);
