@@ -117,7 +117,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         }
         Block::Construct { at, structure_type, materials_from, .. } => {
             let Some(ty) = types.get(structure_type) else { return Some(Err(RefusalCode::UnknownStructureType)) };
-            let Some(cells) = footprint_cells(&s.config.world.ground, at, ty.footprint) else { return Some(Err(RefusalCode::UnknownCell)) };
+            let Some(cells) = footprint_cells(&s.detailed, at, ty.footprint) else { return Some(Err(RefusalCode::UnknownCell)) };
             for c in &cells {
                 let cell = &st.cells[c];
                 if cell.structure.is_some() {
@@ -237,7 +237,7 @@ fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
             match &e.body {
                 EventBody::StructureStarted { structure, on, structure_type, .. } => {
                     let ty = &s.types[structure_type];
-                    let cells = footprint_cells(&s.config.world.ground, on, ty.footprint).expect("a building stands on the ground");
+                    let cells = footprint_cells(&s.detailed, on, ty.footprint).expect("a building stands on the ground");
                     for c in &cells {
                         prop_assert!(!m.structures.values().any(|(cs, _, _)| cs.contains(c)), "built on occupied ground {}", c);
                         let (x, y) = cell_xy(c).unwrap();

@@ -124,6 +124,7 @@ impl Kernel {
                 .collect(),
             templates: c.templates.iter().map(|t| (t.id.clone(), t.clone())).collect(),
             boundaries: w.boundaries.clone(),
+            detailed: crate::config::detailed_rects(&w.places),
             boundary_accounts,
             currency: currency.clone(),
             tick: c.clock.tick_seconds,
@@ -132,9 +133,12 @@ impl Kernel {
         };
         let person_of: BTreeMap<&str, &str> = c.participants.iter().filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
         let mut cells = crate::state::Map::new();
-        for y in 0..w.ground.h {
-            for x in 0..w.ground.w {
-                cells.insert(cell_id(x, y), Cell { x, y, terrain: terrain_at(&w.ground, x, y).map(String::from), structure: None, changed: 0 });
+        // Cells exist only where a place is detailed (D58); nested detailed places share theirs.
+        for r in crate::config::detailed_rects(&w.places) {
+            for y in r.y..r.y + r.h {
+                for x in r.x..r.x + r.w {
+                    cells.insert(cell_id(x, y), Cell { x, y, terrain: terrain_at(&w.ground, x, y).map(String::from), structure: None, changed: 0 });
+                }
             }
         }
         let mut st = State {
@@ -215,7 +219,7 @@ impl Kernel {
         };
         for x in &w.structures {
             let f = s.types[&x.structure_type].footprint;
-            let cells = crate::config::footprint_cells(&w.ground, &x.at, f).expect("validated");
+            let cells = crate::config::footprint_cells(&crate::config::detailed_rects(&w.places), &x.at, f).expect("validated");
             for cell in &cells {
                 st.cells.get_mut(cell).unwrap().structure = Some(x.id.clone());
             }

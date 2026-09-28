@@ -74,16 +74,13 @@ Each foundation gives the problem, the scale-free form, what changes in the cont
   - **detailed:** it has ground (a grid of cells at the place's own scale), lots and individual structures, as the town does now; or
   - **summarised:** it holds **stocks of built space by type** (1,200 three-bedroom dwellings, 40 shops, 3 factories) with occupancy as counts, and no individual structures.
 - **The same physics applies to both.** Capacity is capacity, and occupancy can't exceed it. A place can be **detailed on demand** (§4.2's promotion): its summary is drawn into individual structures, deterministically and keyed.
-- **Nearness generalises:**
-  - within a detailed place, distance in its units (D44 as now);
-  - between places, adjacency and a distance between their centres (a table in the config);
-  - a channel's area names places (`region-3`), cells, or "near me".
-- **Contract changes:**
-  - `world.ground` becomes `world.places` (a tree), with `ground` optional per place;
-  - structure and space ids are scoped by place;
-  - channel areas take place ids;
-  - summarised built stock and counted occupancy are new state.
-- **The town:** one detailed place, the world's only child. Every id it uses today stays valid under its place prefix.
+- **One plane, places as areas on it** *(as built, phase A; revised from "ids scoped by place")*:
+  - The ground is one plane of cells, up to 2^31 each way. Places are named rectangles on it, nested, the way the ABS's areas are drawn on one geography.
+  - **Cells exist only inside detailed places**, so a country-sized plane costs nothing where it's summarised. The detailed places may together cover up to 16.7M cells.
+  - Cell ids stay global (`cell.x.y`), so nothing is renamed, and **distance works across places for free** (D44's gap between rectangles, on the one plane), with no distance table.
+  - A channel's area can name a place (`{"place": id}`): the place's detailed cells, found by intersecting rectangles, never by walking a summarised area.
+- **Contract changes (phase A):** `world.places` (a tree: `id`, `kind`, `name`, `within`, `area`, `detailed`); the ground's bounds raised to 2^31; the place area for channels. Summarised built stock and counted occupancy come in phase D.
+- **The town:** one detailed place covering its grid. Every id stays as it is.
 - **Tests:**
   - capacity physics on summarised places;
   - deterministic detailing (drawing the same summary twice gives the same structures);

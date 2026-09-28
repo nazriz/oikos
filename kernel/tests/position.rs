@@ -39,6 +39,7 @@ fn street() -> Run<Vec<u8>> {
             "boundaries": ["outside"],
             "currencies": [{"code": "AUD", "minor_units": 2}],
             "ground": {"w": 10, "h": 1},
+            "places": [{"id": "here", "kind": "street", "area": {"x": 0, "y": 0, "w": 10, "h": 1}, "detailed": true}],
             "entities": [
                 {"id": "outside", "kind": "boundary", "name": "Outside"},
                 {"id": "alice", "kind": "person", "name": "Alice"},

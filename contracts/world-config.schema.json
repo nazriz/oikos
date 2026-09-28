@@ -284,6 +284,7 @@
         "boundaries",
         "currencies",
         "ground",
+        "places",
         "entities",
         "accounts",
         "structures",
@@ -326,7 +327,7 @@
           }
         },
         "ground": {
-          "description": "The land: a grid of w by h cells ('cell.<x>.<y>'), each 'cell' world units across (presentation only), with terrain labels over rectangles (the world's vocabulary: water, rock...). Finite: this is all of it. Lots are records over cells, never part of the ground.",
+          "description": "The ground: one plane of w by h cells ('cell.<x>.<y>'), each 'cell' world units across (presentation only), with terrain labels over rectangles (the world's vocabulary: water, rock...). Finite: this is all of it. Only cells inside a detailed place exist (D58), so a plane the size of a country costs nothing where it's summarised. Lots are records over cells, never part of the ground.",
           "type": "object",
           "required": [
             "w",
@@ -337,12 +338,12 @@
             "w": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100000
+              "maximum": 2147483647
             },
             "h": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100000
+              "maximum": 2147483647
             },
             "cell": {
               "type": "integer",
@@ -383,6 +384,76 @@
                     "minimum": 1
                   }
                 }
+              }
+            }
+          }
+        },
+        "places": {
+          "description": "The places (D58): named areas of the ground, nested as a tree (the world, a country, a region, a locality, a neighbourhood: the world's vocabulary, after the ABS's statistical geography). Exactly one root (no 'within'); every other place lies within its parent's area. A detailed place's cells exist: lots, buildings and bodies in spaces, as in a town. A summarised place is an area simulated in aggregate (built stock and cohorts, later in v0.5). Distance works across places, on the one plane. The detailed places together may cover at most 16,777,216 cells.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "kind",
+              "area",
+              "detailed"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+              },
+              "kind": {
+                "description": "A label in the world's vocabulary.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "name": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
+              },
+              "within": {
+                "description": "Its parent place; absent: the root.",
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+              },
+              "area": {
+                "description": "Its area on the ground: a rectangle of cells.",
+                "type": "object",
+                "required": [
+                  "x",
+                  "y",
+                  "w",
+                  "h"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "x": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483646
+                  },
+                  "y": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483646
+                  },
+                  "w": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "h": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  }
+                }
+              },
+              "detailed": {
+                "description": "Whether its cells exist (detailed) or it's simulated in aggregate (summarised).",
+                "type": "boolean"
               }
             }
           }
@@ -644,7 +715,7 @@
               }
             },
             "area": {
-              "description": "Where this channel looks. With an area, it shows records placed on those cells (a notice put up somewhere is seen by being near it). Without one, it shows records not placed anywhere, and those the participant's own entity put up. Which cells: 'all', a list, or those near where the capacity's entity is (within a distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them). An organisation occupies nothing, so nothing is near it. 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
+              "description": "Where this channel looks. With an area, it shows records placed on those cells (a notice put up somewhere is seen by being near it). Without one, it shows records not placed anywhere, and those the participant's own entity put up. Which cells: 'all', a list, a place's (`{\"place\": id}`), or those near where the capacity's entity is (within a distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them). An organisation occupies nothing, so nothing is near it. 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
               "anyOf": [
                 {
                   "const": "all"
@@ -667,6 +738,19 @@
                     "near": {
                       "type": "integer",
                       "minimum": 0
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "place"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "place": {
+                      "description": "The cells of a place (where it's detailed; D58).",
+                      "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
                     }
                   }
                 }
@@ -704,7 +788,7 @@
               "const": "sites"
             },
             "area": {
-              "description": "Which cells: 'all', a list, or those near where the capacity's entity is (within a distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them). An organisation occupies nothing, so nothing is near it. 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
+              "description": "Which cells: 'all', a list, a place's (`{\"place\": id}`), or those near where the capacity's entity is (within a distance, in cells, of the cells under a building where it occupies a space; 0: those cells and the ones touching them). An organisation occupies nothing, so nothing is near it. 'near' moves with the entity: after a move, the next look delivers the whole of the new surroundings in place of the old.",
               "anyOf": [
                 {
                   "const": "all"
@@ -727,6 +811,19 @@
                     "near": {
                       "type": "integer",
                       "minimum": 0
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "place"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "place": {
+                      "description": "The cells of a place (where it's detailed; D58).",
+                      "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
                     }
                   }
                 }

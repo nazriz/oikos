@@ -193,6 +193,7 @@ pub fn world(p: &WorldParams) -> Value {
             "boundaries": ["outside", "upriver"],
             "currencies": [{"code": "AUD", "minor_units": 2}],
             "ground": {"w": 4, "h": 3, "terrain": [{"label": "water", "x": 3, "y": 0, "w": 1, "h": 3}]},
+            "places": [{"id": "here", "kind": "town", "area": {"x": 0, "y": 0, "w": 4, "h": 3}, "detailed": true}],
             "entities": entities,
             "accounts": accounts,
             "structures": [

@@ -18,6 +18,8 @@ pub struct Statics {
     /// The world's default currency (its first): materials and newcomers' money are in it.
     pub currency: String,
     pub tick: i64,
+    /// The detailed places' areas: where cells exist (D58).
+    pub detailed: Vec<crate::config::PlaceRect>,
     pub randomness: Randomness,
 }
 

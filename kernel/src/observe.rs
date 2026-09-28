@@ -401,7 +401,23 @@ impl RecordIndex {
                 for r in &self.places[me].1 {
                     for y in (r.y - n.near - 1).max(0)..(r.y + r.h + n.near + 1).min(g.h) {
                         for x in (r.x - n.near - 1).max(0)..(r.x + r.w + n.near + 1).min(g.w) {
-                            if within(*r, Rect::cell(x, y), n.near) {
+                            if within(*r, Rect::cell(x, y), n.near) && crate::config::cell_in(&s.detailed, x, y) {
+                                cells.insert(cell_id(x, y));
+                            }
+                        }
+                    }
+                }
+                Scope::Cells(cells)
+            }
+            // A place's cells: where its area meets a detailed place (never walking a summarised area cell by cell).
+            Area::Place(p) => {
+                let mut cells = BTreeSet::new();
+                if let Some(a) = s.config.world.places.iter().find(|x| x.id == p.place).map(|x| x.area) {
+                    for d in &s.detailed {
+                        let (x0, y0) = (a.x.max(d.x), a.y.max(d.y));
+                        let (x1, y1) = ((a.x + a.w).min(d.x + d.w), (a.y + a.h).min(d.y + d.h));
+                        for y in y0..y1 {
+                            for x in x0..x1 {
                                 cells.insert(cell_id(x, y));
                             }
                         }

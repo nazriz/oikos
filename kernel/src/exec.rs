@@ -527,9 +527,8 @@ impl<'a> Exec<'a> {
     }
 
     fn check_new_channels(&self, owner: &str, channels: &[Channel]) -> R<()> {
-        let g = &self.s.config.world.ground;
-        check_channels(owner, channels, &|e| self.st.entities.contains_key(e), &|c| {
-            crate::config::cell_xy(c).is_some_and(|(x, y)| x < g.w && y < g.h)
+        check_channels(owner, channels, &|e| self.st.entities.contains_key(e), &|c| self.st.cells.contains_key(c), &|p| {
+            self.s.config.world.places.iter().any(|x| x.id == p)
         })
         .map_err(|e| refuse(RefusalCode::UnknownEntity, e))
     }
@@ -789,7 +788,7 @@ impl<'a> Exec<'a> {
                     .get(structure_type)
                     .ok_or_else(|| refuse(RefusalCode::UnknownStructureType, format!("no structure type {structure_type}")))?
                     .clone();
-                let cells = footprint_cells(&self.s.config.world.ground, at, ty.footprint)
+                let cells = footprint_cells(&self.s.detailed, at, ty.footprint)
                     .ok_or_else(|| refuse(RefusalCode::UnknownCell, format!("a {structure_type} doesn't fit on the ground at {at}")))?;
                 for cell in &cells {
                     let c = &self.st.cells[cell];

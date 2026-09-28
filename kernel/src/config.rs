@@ -125,6 +125,9 @@ pub struct World {
     /// The currencies the world's money comes in; the first is the default.
     pub currencies: Vec<CurrencyCfg>,
     pub ground: Ground,
+    /// The places (D58): named areas on the ground, nested, each detailed (its cells exist: lots, buildings,
+    /// bodies) or summarised (an area, simulated in aggregate). One root; each other place lies within its parent.
+    pub places: Vec<PlaceCfg>,
     pub entities: Vec<EntityCfg>,
     pub accounts: Vec<AccountCfg>,
     pub structures: Vec<StructureCfg>,
@@ -132,8 +135,9 @@ pub struct World {
     pub records: Vec<Record>,
 }
 
-/// The land: a grid of `w` by `h` cells (`cell.<x>.<y>`), each `cell` world units across
-/// (presentation only), with optional terrain labels over rectangles.
+/// The ground: one plane of `w` by `h` cells (`cell.<x>.<y>`), each `cell` world units across (presentation only),
+/// with optional terrain labels over rectangles. Only cells inside a detailed place exist (D58): a country-sized plane
+/// costs nothing where it's summarised.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Ground {
@@ -144,6 +148,35 @@ pub struct Ground {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub terrain: Vec<TerrainArea>,
 }
+
+/// A place: a named area of the ground, within its parent (none: the root, the whole world).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceCfg {
+    pub id: Id,
+    /// A label in the world's vocabulary (a country, region, locality, neighbourhood...).
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub within: Option<Id>,
+    /// Its area on the ground: a rectangle of cells.
+    pub area: PlaceRect,
+    /// Detailed: its cells exist (lots, buildings, bodies in spaces). Summarised: simulated in aggregate (D58 §4.1).
+    pub detailed: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceRect {
+    pub x: i64,
+    pub y: i64,
+    pub w: i64,
+    pub h: i64,
+}
+
+/// The most cells the detailed places may cover together: what the kernel keeps one by one.
+pub const MAX_DETAILED_CELLS: i64 = 16_777_216;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -471,6 +504,14 @@ pub enum Area {
     /// Every cell within this distance of a cell under a building where the capacity's entity occupies a
     /// space (in cells; 0 is those cells and the ones touching them). Moves with it.
     Near(Near),
+    /// The cells of a place (where it's detailed).
+    Place(PlaceArea),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceArea {
+    pub place: Id,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -516,13 +557,67 @@ pub fn load(v: Value) -> Result<LoadedConfig, String> {
     Ok(LoadedConfig { config, canonical: v, hash })
 }
 
-/// The cells a footprint covers from its corner, in order, or None if any falls off the ground.
-pub fn footprint_cells(ground: &Ground, at: &str, f: Footprint) -> Option<Vec<Id>> {
+/// Places form one tree over the ground: ids unique, one root, each other place within an existing parent (no cycles)
+/// and inside its area, every area on the ground, and the detailed ones not too many cells together.
+fn check_places(w: &World) -> Result<(), String> {
+    let by_id: BTreeMap<&str, &PlaceCfg> = w.places.iter().map(|p| (p.id.as_str(), p)).collect();
+    if by_id.len() != w.places.len() {
+        return Err("a place id is used twice".into());
+    }
+    let roots = w.places.iter().filter(|p| p.within.is_none()).count();
+    if roots != 1 {
+        return Err(format!("places need exactly one root (a place within no other), found {roots}"));
+    }
+    let inside = |a: PlaceRect, b: PlaceRect| a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
+    let ground = PlaceRect { x: 0, y: 0, w: w.ground.w, h: w.ground.h };
+    let mut detailed_cells: i64 = 0;
+    for p in &w.places {
+        if p.area.w < 1 || p.area.h < 1 || !inside(p.area, ground) {
+            return Err(format!("place {}'s area must be at least one cell and on the ground", p.id));
+        }
+        if let Some(parent) = &p.within {
+            let q = by_id.get(parent.as_str()).ok_or_else(|| format!("place {} is within unknown place {parent}", p.id))?;
+            if !inside(p.area, q.area) {
+                return Err(format!("place {} must lie within {parent}'s area", p.id));
+            }
+        }
+        // No cycles: walking up from any place reaches the root within as many steps as there are places.
+        let (mut at, mut steps) = (p, 0);
+        while let Some(parent) = &at.within {
+            at = by_id[parent.as_str()];
+            steps += 1;
+            if steps > w.places.len() {
+                return Err(format!("place {} is within itself", p.id));
+            }
+        }
+        if p.detailed {
+            detailed_cells = detailed_cells.saturating_add(p.area.w.saturating_mul(p.area.h));
+        }
+    }
+    if detailed_cells > MAX_DETAILED_CELLS {
+        return Err(format!("the detailed places cover {detailed_cells} cells; at most {MAX_DETAILED_CELLS} are kept one by one"));
+    }
+    Ok(())
+}
+
+/// The detailed places' areas: where cells exist.
+pub fn detailed_rects(places: &[PlaceCfg]) -> Vec<PlaceRect> {
+    places.iter().filter(|p| p.detailed).map(|p| p.area).collect()
+}
+
+/// Does a cell exist: is it inside a detailed place?
+pub fn cell_in(detailed: &[PlaceRect], x: i64, y: i64) -> bool {
+    detailed.iter().any(|r| x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
+}
+
+/// The cells a footprint covers from its corner, in order, or None if any doesn't exist (off the ground, or outside
+/// every detailed place).
+pub fn footprint_cells(detailed: &[PlaceRect], at: &str, f: Footprint) -> Option<Vec<Id>> {
     let (x0, y0) = cell_xy(at)?;
     let mut v = vec![];
     for y in y0..y0 + f.h {
         for x in x0..x0 + f.w {
-            if x >= ground.w || y >= ground.h {
+            if !cell_in(detailed, x, y) {
                 return None;
             }
             v.push(cell_id(x, y));
@@ -537,7 +632,7 @@ pub fn terrain_at(ground: &Ground, x: i64, y: i64) -> Option<&str> {
 }
 
 /// Check a set of channels: ids unique, entities and cells they name exist, distances sensible.
-pub fn check_channels(owner: &str, channels: &[Channel], entity_exists: &dyn Fn(&str) -> bool, cell_exists: &dyn Fn(&str) -> bool) -> Result<(), String> {
+pub fn check_channels(owner: &str, channels: &[Channel], entity_exists: &dyn Fn(&str) -> bool, cell_exists: &dyn Fn(&str) -> bool, place_exists: &dyn Fn(&str) -> bool) -> Result<(), String> {
     let mut ids = BTreeSet::new();
     for ch in channels {
         if !ids.insert(ch.id.as_str()) {
@@ -567,6 +662,7 @@ pub fn check_channels(owner: &str, channels: &[Channel], entity_exists: &dyn Fn(
                 }
             }
             Some(Area::Near(n)) if n.near < 0 => return Err(format!("{owner} channel {}: near must be 0 or more", ch.id)),
+            Some(Area::Place(p)) if !place_exists(&p.place) => return Err(format!("{owner} channel {} names unknown place {}", ch.id, p.place)),
             _ => {}
         }
     }
@@ -609,9 +705,10 @@ pub fn validate(c: &Config) -> Result<(), String> {
         return Err("seed must be <= 2^53-1".into());
     }
     let w = &c.world;
-    if w.ground.w < 1 || w.ground.h < 1 || w.ground.w > 100_000 || w.ground.h > 100_000 {
-        return Err("the ground must be 1..=100000 cells each way".into());
+    if w.ground.w < 1 || w.ground.h < 1 || w.ground.w > i32::MAX as i64 || w.ground.h > i32::MAX as i64 {
+        return Err("the ground must be 1..=2^31-1 cells each way".into());
     }
+    check_places(w)?;
 
     // Ids are unique across every kind.
     let mut ids: BTreeSet<String> = BTreeSet::new();
@@ -662,7 +759,9 @@ pub fn validate(c: &Config) -> Result<(), String> {
     let participants: BTreeMap<&str, &ParticipantCfg> = c.participants.iter().map(|p| (p.id.as_str(), p)).collect();
     let records: BTreeMap<&str, &Record> = w.records.iter().map(|r| (r.id.as_str(), r)).collect();
     let entity = |id: &str| entities.get(id).copied().ok_or_else(|| format!("unknown entity {id:?}"));
-    let cell_exists = |id: &str| cell_xy(id).is_some_and(|(x, y)| x < w.ground.w && y < w.ground.h);
+    let detailed = detailed_rects(&w.places);
+    let cell_exists = |id: &str| cell_xy(id).is_some_and(|(x, y)| cell_in(&detailed, x, y));
+    let place_exists = |id: &str| w.places.iter().any(|p| p.id == id);
 
     // The edges: world.boundaries names exactly the entities of kind boundary, at least one, each once.
     let declared: BTreeSet<&str> = w.entities.iter().filter(|e| e.kind == BOUNDARY).map(|e| e.id.as_str()).collect();
@@ -718,7 +817,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
         if let Some(b) = &s.built_by {
             entity(b)?;
         }
-        let cells = footprint_cells(&w.ground, &s.at, ty.footprint).ok_or_else(|| format!("structure {} doesn't fit on the ground at {}", s.id, s.at))?;
+        let cells = footprint_cells(&detailed, &s.at, ty.footprint).ok_or_else(|| format!("structure {} doesn't fit on the detailed ground at {}", s.id, s.at))?;
         for cell in cells {
             let (x, y) = cell_xy(&cell).unwrap();
             let t = terrain_at(&w.ground, x, y);
@@ -783,14 +882,14 @@ pub fn validate(c: &Config) -> Result<(), String> {
                 }
             }
         }
-        check_channels(&format!("participant {}", p.id), &p.channels, &|e| entities.contains_key(e), &cell_exists)?;
+        check_channels(&format!("participant {}", p.id), &p.channels, &|e| entities.contains_key(e), &cell_exists, &place_exists)?;
         check_traits(&format!("participant {}", p.id), &p.traits)?;
     }
     for t in &c.templates {
         if t.kind == ParticipantKind::System && !t.channels.is_empty() {
             return Err(format!("template {}: a system has no personal channels", t.id));
         }
-        check_channels(&format!("template {}", t.id), &t.channels, &|e| entities.contains_key(e), &cell_exists)?;
+        check_channels(&format!("template {}", t.id), &t.channels, &|e| entities.contains_key(e), &cell_exists, &place_exists)?;
         check_traits(&format!("template {}", t.id), &t.traits)?;
     }
 
@@ -804,7 +903,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
                 return Err(format!("position {} is held by unknown participant {h}", p.id));
             }
         }
-        check_channels(&format!("position {}", p.id), &p.channels, &|e| entities.contains_key(e), &cell_exists)?;
+        check_channels(&format!("position {}", p.id), &p.channels, &|e| entities.contains_key(e), &cell_exists, &place_exists)?;
     }
 
     // Life: bands must make sense.
