@@ -12,15 +12,30 @@ export interface HttpOptions {
   fetch?: typeof fetch;
   /** Sampling temperature, in thousandths (a world's controller params: temperature_milli). */
   temperatureMilli?: number;
-  /** Retries on rate limits and server errors (default 4), with exponential backoff from `backoffMs`. */
+  /** Retries on rate limits, server errors, timeouts and dropped connections (default 4), with exponential backoff from `backoffMs`. */
   retries?: number;
   backoffMs?: number;
+  /** How long one attempt may take before it's abandoned and retried (default 180 s; D59). */
+  timeoutMs?: number;
 }
 
-/** Retry a request on 429 and 5xx, with exponential backoff. Other errors are thrown with the provider's message. */
-export async function post(f: typeof fetch, url: string, headers: Record<string, string>, body: object, retries: number, backoffMs: number): Promise<any> {
+/** Retry a request on 429, 5xx, a timeout or a dropped connection, with exponential backoff. Other errors are thrown
+ * with the provider's message. Each attempt may take at most `timeoutMs` (D59: a call that never answers mustn't hang
+ * the run). */
+export async function post(f: typeof fetch, url: string, headers: Record<string, string>, body: object, retries: number, backoffMs: number, timeoutMs = 180_000): Promise<any> {
   for (let attempt = 0; ; attempt++) {
-    const res = await f(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
+    let res: Response;
+    try {
+      res = await f(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
+    } catch (e) {
+      // A timeout or a dropped connection: worth another try.
+      if (attempt < retries) {
+        await Bun.sleep(backoffMs * 2 ** attempt);
+        continue;
+      }
+      const why = (e as Error).name === "TimeoutError" ? `no answer within ${Math.round(timeoutMs / 1000)} s` : (e as Error).message;
+      throw new Error(`${url}: ${why} (after ${attempt + 1} attempts)`);
+    }
     if (res.ok) return res.json();
     const text = await res.text().catch(() => "");
     if ((res.status === 429 || res.status >= 500) && attempt < retries) {
@@ -48,7 +63,7 @@ export class AnthropicAdapter implements LlmAdapter {
       ...(this.o.temperatureMilli !== undefined ? { temperature: this.o.temperatureMilli / 1000 } : {}),
     };
     const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl ?? "https://api.anthropic.com"}/v1/messages`,
-      { "x-api-key": this.o.apiKey, "anthropic-version": "2023-06-01" }, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000);
+      { "x-api-key": this.o.apiKey, "anthropic-version": "2023-06-01" }, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
     const content: ContentBlock[] = (r.content ?? []).flatMap((b: any): ContentBlock[] =>
       b.type === "text" ? [{ type: "text", text: b.text }] : b.type === "tool_use" ? [{ type: "tool_use", id: b.id, name: b.name, input: b.input }] : []);
     return {

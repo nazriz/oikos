@@ -25,9 +25,10 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { calls, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
-import { createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
+import { createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
+import type { Watchdog } from "./watchdog";
 
 export const ORCHESTRATOR_VERSION = "0.7.0";
 
@@ -51,7 +52,18 @@ export interface RunOptions {
   /** For tests: called after each look, with the participant, the observation its controller reads (for a code unit, its capacity's slice), the kernel, and the capacity. */
   /** Tests: each look, as the controller reads it (`obs`) and as the kernel sent it (`raw`, what changed). */
   inspect?: (participant: string, obs: Observation, kernel: Kernel, capacity?: string, raw?: Observation) => Promise<void>;
+  /** Breadcrumbs for a watchdog that stops the run if it stalls (D59; set by runOne, not by tests running in-process). */
+  watchdog?: Watchdog;
+  /** A resumed run (resume.ts): the log it resumes, and how serving its recorded model calls went (noted at the end). */
+  resumedFrom?: { log: string; serving: { served: number; diverged?: object } };
 }
+
+/** More than this many cohorts at one simulated moment means participants are waking each other without end: the run
+ * stops, deterministically, rather than spin (D59). */
+export const MAX_COHORTS_PER_MOMENT = 1000;
+
+/** A run that can't go on (participants waking each other without end at one moment): deterministic, so replayable. */
+export class RunStuck extends Error {}
 
 export interface RunSummary {
   runId: string;
@@ -67,6 +79,8 @@ export interface RunSummary {
   moduleMs: number;
   /** The orchestrator's own work: keeping participants' knowledge, parsing and resolving calls (profiling only). */
   platformMs: number;
+  /** Failures to decide that were recovered in place (a module that threw, a model call that failed; D59). */
+  participantErrors: number;
 }
 
 /** A participant, as the orchestrator runs it. */
@@ -135,6 +149,17 @@ export function debriefText(p: any): string {
 }
 
 export async function runWorld(o: RunOptions): Promise<RunSummary> {
+  const k = o.kernel ?? new Kernel();
+  try {
+    return await runWith(o, k);
+  } catch (e) {
+    // A run that fails takes its kernel with it (one it was given is the caller's to close).
+    if (!o.kernel) k.kill();
+    throw e;
+  }
+}
+
+async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const log = o.log ?? (() => {});
   const mods = { ...builtin, ...(o.modules ?? {}) };
   const cfg = o.config;
@@ -145,11 +170,15 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   mkdirSync(o.outDir, { recursive: true });
   const logPath = join(o.outDir, `${o.runId}.jsonl`);
   const anchorsPath = join(o.outDir, `${o.runId}.anchors.jsonl`);
-  const k = o.kernel ?? new Kernel();
+  let t = 0;
   let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
+  let participantErrors = 0; // failures to decide, recovered in place (D59)
+  // Breadcrumbs (D59): what the run is doing, for the watchdog, at every point where it could hang.
+  const mark = (doing: object) => o.watchdog?.mark({ t, ...doing });
+  if (o.watchdog) k.onRequest = (req: any) => mark({ doing: "kernel request", request: req.op === "command" ? req.command?.command : req.op, participant: req.command?.participant ?? req.participant });
+  const watched = (a: LlmAdapter): LlmAdapter => (o.watchdog ? { provider: a.provider, model: a.model, complete: (req) => (mark({ doing: "model call", subject: req.subject, purpose: req.purpose }), a.complete(req)) } : a);
 
   await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath });
-  let t = 0;
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
   const brains = new Map<string, MockBrain>(); // filled below, as mock participants are created
@@ -157,7 +186,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   // cohort's order, so the log doesn't depend on which call came back first (D58 §4.8).
   let holding: Map<string, object[]> | null = null;
   const io: LlmIO = {
-    adapter: o.adapter ?? new MockAdapter("mock", mockPolicies(brains)),
+    adapter: watched(o.adapter ?? new MockAdapter("mock", mockPolicies(brains))),
     annotate: async (annotation) => {
       if (holding) {
         const who = String((annotation as { subject?: unknown }).subject ?? "");
@@ -303,7 +332,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   };
   for (const pid of [...parts.keys()].sort()) await syncUnits(pid);
 
-  const translator = createTranslator(o.translatorAdapter ? { ...io, adapter: o.translatorAdapter } : io, async (participant, position, blocks) => {
+  const translator = createTranslator(o.translatorAdapter ? { ...io, adapter: watched(o.translatorAdapter) } : io, async (participant, position, blocks) => {
     const r = await k.tryRequest({ op: "check", participant, ...(position ? { as: position } : {}), blocks });
     return r === null ? { ok: false, error: "the blocks could not be read" } : r.check;
   }, typeOf);
@@ -500,7 +529,14 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     }
     if (action.type === "propose") {
       const draftId = `draft.${u.participant}.${++L.drafted}`;
-      const tr = await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
+      let tr: Awaited<ReturnType<typeof translator.translate>>;
+      try {
+        tr = await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
+      } catch (e) {
+        if (!(e instanceof ModelCallFailed)) throw e;
+        // The translator's model failed after its retries (D59): the participant is told it couldn't be drafted now.
+        tr = { ok: false, notices: ["That couldn't be drafted just now. You could try again."], raw: { model_call_failed: e.message } };
+      }
       // Earlier attempts the translator retried (its own, not the participant's): kept on record.
       for (const [i, x] of (tr.retries ?? []).entries())
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason.slice(0, 8000), ...(x.call ? { call: x.call } : {}) } } } });
@@ -530,6 +566,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   };
 
   const maxActions: number = cfg.orchestration.max_actions_per_wake;
+  let momentAt = -1, cohortsNow = 0; // how many cohorts have woken at this moment (MAX_COHORTS_PER_MOMENT)
   let stopped: string | undefined; // why the run stopped early, if it did (a spending limit)
   try {
     for (;;) {
@@ -540,6 +577,10 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
         t = first.nextWake;
         continue; // who's due now (some may have ended while time passed)
       }
+      if (t === momentAt) {
+        if (++cohortsNow > MAX_COHORTS_PER_MOMENT)
+          throw new RunStuck(`participants kept waking each other at t=${t} (${MAX_COHORTS_PER_MOMENT} rounds of wakes in one moment): ${units.next()?.key ?? "?"} was next`);
+      } else [momentAt, cohortsNow] = [t, 1];
       // Everyone waking at this moment, in key order (D58 §4.8); a wake set in the past (a participant created during
       // the run starts at 0) is due now.
       const cohort: Unit[] = [];
@@ -568,19 +609,29 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
         }
         const m0 = performance.now();
         holding = new Map();
-        const decided = await Promise.allSettled(looking.map((x) => Promise.resolve().then(() => x.u.controller.step(x.obs, x.u.ctx))));
+        const decided = await Promise.allSettled(looking.map((x) => Promise.resolve().then(() => (mark({ doing: "deciding", participant: x.u.key }), x.u.controller.step(x.obs, x.u.ctx)))));
         moduleMs += performance.now() - m0;
         // Annotations made while deciding (usage, transcripts) go into the log in the cohort's order.
         const notes = holding;
         holding = null;
         const order = [...new Set([...looking.map((x) => x.u.participant), ...[...notes.keys()].sort()])];
         for (const who of order) for (const annotation of notes.get(who) ?? []) await k.request({ op: "annotate", annotation });
-        const failed = decided.find((r): r is PromiseRejectedResult => r.status === "rejected");
-        if (failed) throw failed.reason;
+        // A spending limit stops the run. Any other failure to decide (a module that throws, a model call that failed
+        // after its retries) is deterministic, so it's recovered in place (D59): recorded, and the participant waits.
+        const limit = decided.find((r): r is PromiseRejectedResult => r.status === "rejected" && r.reason instanceof SpendingLimitReached);
+        if (limit) throw limit.reason;
         const next: { u: Unit; n: number }[] = [];
         for (const [i, x] of looking.entries()) {
           if (units.get(x.u.key) !== x.u) continue; // it ended this round (opted out, or its capacity went)
-          const goesOn = await apply(x.u, (decided[i] as PromiseFulfilledResult<ParticipantAction>).value);
+          const r = decided[i]!;
+          if (r.status === "rejected") {
+            participantErrors++;
+            const err = r.reason as Error;
+            await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err?.name ?? "Error"}: ${String(err?.message ?? err)}`.slice(0, 2000) } } } });
+            log(`${o.runId}: ${x.u.key} failed to decide at t=${t} (it waits this wake): ${String(err?.message ?? err).slice(0, 200)}`);
+            continue;
+          }
+          const goesOn = await apply(x.u, r.value);
           if (goesOn && x.n + 1 < maxActions && units.get(x.u.key) === x.u) next.push({ u: x.u, n: x.n + 1 });
         }
         awake = next;
@@ -601,15 +652,18 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     try {
       await d.controller.debrief(debriefText(d.part));
     } catch (e) {
-      if (!(e instanceof SpendingLimitReached)) throw e;
+      // Out of budget, or the model failed after its retries (D59): the debrief is skipped, and that's recorded.
+      if (!(e instanceof SpendingLimitReached) && !(e instanceof ModelCallFailed)) throw e;
       await k.request({ op: "annotate", annotation: { annotation: "note", subject: d.part.id, data: { debrief_skipped: e.message } } });
     }
   }
+  // A resumed run says so at the end (not the start, so that up to where the old run stopped, the two logs are the same).
+  if (o.resumedFrom) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { resumed_from: { log: o.resumedFrom.log, model_calls_served: o.resumedFrom.serving.served, ...(o.resumedFrom.serving.diverged ? { serving_stopped_at: o.resumedFrom.serving.diverged } : {}) } } } });
   const completed = !stopped && until === runEnd;
   const end = await k.request({ op: "finish", reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) });
   if (!o.kernel) await k.close();
-  log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}`);
-  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs) };
+  log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
+  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs) };
 }
 
 /**

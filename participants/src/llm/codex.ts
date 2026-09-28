@@ -15,13 +15,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ContentBlock, LlmAdapter, LlmMessage, LlmRequest, LlmResponse } from "./adapter";
 
-/** Runs the codex binary: args, stdin and a working directory in; stdout out. Injectable for tests. */
-export type CodexRunner = (args: string[], stdin: string, cwd: string) => Promise<{ code: number; stdout: string; stderr: string }>;
+/** Runs the codex binary: args, stdin and a working directory in; stdout out; ended if it takes longer than
+ * `timeoutMs`. Injectable for tests. */
+export type CodexRunner = (args: string[], stdin: string, cwd: string, timeoutMs: number) => Promise<{ code: number; stdout: string; stderr: string; timedOut?: boolean }>;
 
-export const spawnCodex: CodexRunner = async (args, stdin, cwd) => {
+export const spawnCodex: CodexRunner = async (args, stdin, cwd, timeoutMs) => {
   const p = Bun.spawn(["codex", ...args], { cwd, stdin: new Blob([stdin]), stdout: "pipe", stderr: "pipe" });
-  const [code, stdout, stderr] = await Promise.all([p.exited, new Response(p.stdout).text(), new Response(p.stderr).text()]);
-  return { code, stdout, stderr };
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    p.kill();
+  }, timeoutMs);
+  try {
+    const [code, stdout, stderr] = await Promise.all([p.exited, new Response(p.stdout).text(), new Response(p.stderr).text()]);
+    return { code, stdout, stderr, timedOut };
+  } finally {
+    clearTimeout(timer);
+  }
 };
 
 /**
@@ -80,6 +90,8 @@ export class CodexCliAdapter implements LlmAdapter {
   constructor(
     readonly model: string,
     private readonly run: CodexRunner = spawnCodex,
+    /** One attempt's time limit, and how many attempts (D59: a call that never answers mustn't hang the run). */
+    private readonly o: { timeoutMs?: number; attempts?: number } = {},
   ) {}
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
@@ -90,8 +102,16 @@ export class CodexCliAdapter implements LlmAdapter {
       writeFileSync(schema, JSON.stringify(answerSchema((req.tools ?? []).map((t) => t.name))));
       const args = ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
         ...(this.model !== "default" ? ["-m", this.model] : []), "--output-schema", schema, "--output-last-message", last, "-"];
-      const r = await this.run(args, codexPrompt(req), dir);
-      if (r.code !== 0) throw new Error(`codex exec failed (exit ${r.code}): ${r.stderr.slice(0, 500)}`);
+      const timeoutMs = this.o.timeoutMs ?? 180_000;
+      const attempts = this.o.attempts ?? 3;
+      let r!: Awaited<ReturnType<CodexRunner>>;
+      for (let n = 1; ; n++) {
+        r = await this.run(args, codexPrompt(req), dir, timeoutMs);
+        if (r.code === 0 && !r.timedOut) break;
+        const why = r.timedOut ? `no answer within ${Math.round(timeoutMs / 1000)} s` : `exit ${r.code}: ${r.stderr.slice(0, 500)}`;
+        if (n >= attempts) throw new Error(`codex exec failed after ${n} attempts (${why})`);
+        await Bun.sleep(1000 * 2 ** (n - 1));
+      }
       let usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0 };
       for (const line of r.stdout.split("\n")) {
         if (!line.trim()) continue;

@@ -52,7 +52,7 @@ export class OpenAICompatibleAdapter implements LlmAdapter {
       ...(this.o.temperatureMilli !== undefined ? { temperature: this.o.temperatureMilli / 1000 } : {}),
     };
     const r = await post(this.o.fetch ?? fetch, `${this.o.baseUrl ?? "https://api.openai.com/v1"}/chat/completions`,
-      this.o.apiKey ? { authorization: `Bearer ${this.o.apiKey}` } : {}, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000);
+      this.o.apiKey ? { authorization: `Bearer ${this.o.apiKey}` } : {}, body, this.o.retries ?? 4, this.o.backoffMs ?? 2000, this.o.timeoutMs);
     const msg = r.choices?.[0]?.message ?? {};
     const content: ContentBlock[] = [];
     if (typeof msg.content === "string" && msg.content) content.push({ type: "text", text: msg.content });

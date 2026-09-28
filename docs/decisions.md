@@ -473,6 +473,27 @@ See the design note, §16.
 - **Found while building it:** a wake set in the past (a participant created mid-run starts at 0) must count as due now. Missing that hung a two-year run at day 691 with no sign anything was wrong, which led to the reliability work (D59).
 - **What changed in the town (5 seeds, 2 years):** the economy, rent stress and cast are unchanged within noise (leases 92.6 → 92.4, move-ins 245.6 → 245.2, paid to the town $148,541 → $164,297 with a spread of ±$26,139). Households at the end differ: more partly housed (0.6 → 2.8) and overcrowded (0.4 → 2.0), fewer unhoused (2.2 → 0.8). Members used to follow a leaseholder within the same moment by reading its fresh act; now they see it a round later. **To look into** (docs/gaps.md) before calling it right.
 
+**D59. Reliability: timing failures stop cleanly and resume; deterministic ones recover in place.** *(Naz, 2026-09-28: "we need to be able to automatically gracefully recover from things like infinite loops, things getting stuck"; "determinism split sounds right".)*
+- **Why:** a two-year run hung at day 691 for eight minutes with no sign anything was wrong. The cause was the orchestrator's own bug (D58's same-moment rule). The real problem was that nothing noticed. A dead kernel would also have been misread as an off-contract request, and the run would have gone on against nothing.
+- **The split:** results must never depend on wall-clock timing. Deterministic failures (a module throws; a model call fails after its time limits and retries, which is then in the log) are recovered in place: recorded, and the participant waits. Timing failures (a stall, a dead kernel) stop the run cleanly, with a diagnosis, to be resumed once fixed.
+- **Built:**
+  - **Breadcrumbs and a watchdog thread** (`orchestrator/src/watchdog.ts`). It still works when the main thread is stuck in a synchronous loop. After `TERRARIUM_STALL_SECONDS` (default 300) without progress, it writes `<run>.failure.json` and ends the process.
+  - **`KernelDied`**, distinct from a refused request.
+  - **`RunStuck`** after 1,000 rounds of wakes at one moment.
+  - **`ModelCallFailed`**: time limits (180 s) and retries on every adapter, including Codex's.
+  - **Failed decisions and debriefs** are recorded and skipped.
+  - **Batches** survive a failed seed.
+  - **`terrarium resume <log>`** re-runs from the log's own config, serving recorded model calls (checked against the recording) until the stop, then going on live. It costs no model quota for what was already done.
+  - **`--modules FILE`** for researchers' own behaviour modules.
+- **Tests** (`orchestrator/test/reliability.test.ts`), fault injection:
+  - a module stuck in a loop is stopped within seconds, with a diagnosis naming the participant and the time;
+  - a throwing module is recovered, and two runs are byte-identical;
+  - a killed kernel ends the run at once as `KernelDied`;
+  - a model that never answers times out, retries, and its participant waits;
+  - a run stopped at day 20 and resumed to day 40 serves every recorded call, makes exactly the remaining calls anew, ends in the same state as an uninterrupted run, and has the same log up to its closing `resumed_from` note.
+- **Found by the tests:** annotations are stored in canonical JSON, so recordings must be compared canonically; a failed debrief used to crash the end of a run.
+- Operator's guide: docs/reliability.md.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

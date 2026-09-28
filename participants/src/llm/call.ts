@@ -15,7 +15,15 @@ export interface Budget {
 }
 
 /** Thrown instead of making a call that could exceed the run's spending limit. The run stops, and says why. */
-export class SpendingLimitReached extends Error {}
+export class SpendingLimitReached extends Error {
+  override name = "SpendingLimitReached";
+}
+
+/** A model call that failed after its adapter's own timeouts and retries (D59). The participant waits this wake, and
+ * it's recorded: the run goes on, and replays exactly, because what the model said (nothing) is in the log. */
+export class ModelCallFailed extends Error {
+  override name = "ModelCallFailed";
+}
 
 export interface LlmIO {
   adapter: LlmAdapter;
@@ -49,6 +57,9 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
   let res: LlmResponse;
   try {
     res = await adapter.complete(req);
+  } catch (e) {
+    if (e instanceof SpendingLimitReached || e instanceof ModelCallFailed) throw e;
+    throw new ModelCallFailed(`${key} (${req.purpose}, for ${req.subject}): ${(e as Error).message}`.slice(0, 2000));
   } finally {
     if (io.budget) io.budget.reservedMicroUsd = (io.budget.reservedMicroUsd ?? 0) - worst;
   }

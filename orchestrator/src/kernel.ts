@@ -14,13 +14,20 @@ export function kernelBinary(): string {
   throw new Error("kernel binary not found: run `bun run kernel` (cargo build --release) or set TERRARIUM_KERNEL");
 }
 
+/** The kernel refused a request (a protocol error: off-contract input, never logged). */
 export class KernelError extends Error {}
+
+/** The kernel process is gone (it crashed, or was killed): nothing more can happen in this run. Never mistaken for a
+ * refused request (D59: a dead kernel used to read as "off-contract", and the run would go on against nothing). */
+export class KernelDied extends Error {}
 
 export class Kernel {
   private proc: Bun.Subprocess<"pipe", "pipe", "inherit">;
   private reader: ReadableStreamDefaultReader<Uint8Array>;
   private buf = "";
   private decoder = new TextDecoder();
+  /** Called before each request is sent (the run's breadcrumbs, D59). */
+  onRequest?: (req: any) => void;
 
   constructor(binary = kernelBinary()) {
     this.proc = Bun.spawn([binary, "serve"], { stdin: "pipe", stdout: "pipe", stderr: "inherit" });
@@ -36,15 +43,23 @@ export class Kernel {
         return l;
       }
       const { value, done } = await this.reader.read();
-      if (done) throw new KernelError("kernel exited");
+      if (done) {
+        const code = await Promise.race([this.proc.exited, Bun.sleep(1000).then(() => undefined)]);
+        throw new KernelDied(`the kernel process ended${code === undefined ? "" : ` (exit ${code}${this.proc.signalCode ? `, ${this.proc.signalCode}` : ""})`} while a request was waiting for its reply`);
+      }
       this.buf += this.decoder.decode(value, { stream: true });
     }
   }
 
   /** Send one request; resolves to the reply, or throws KernelError on {ok:false}. */
   async request(req: object): Promise<any> {
-    this.proc.stdin.write(JSON.stringify(req) + "\n");
-    this.proc.stdin.flush();
+    this.onRequest?.(req);
+    try {
+      this.proc.stdin.write(JSON.stringify(req) + "\n");
+      this.proc.stdin.flush();
+    } catch (e) {
+      throw new KernelDied(`the kernel process can't be written to: ${(e as Error).message}`);
+    }
     const reply = JSON.parse(await this.line());
     if (!reply.ok) throw new KernelError(reply.error);
     return reply;
@@ -58,6 +73,11 @@ export class Kernel {
       if (e instanceof KernelError) return null;
       throw e;
     }
+  }
+
+  /** End the kernel process at once (a run that failed). */
+  kill(): void {
+    this.proc.kill();
   }
 
   async close(): Promise<void> {
