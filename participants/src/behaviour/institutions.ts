@@ -11,7 +11,8 @@ import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd } from "./common";
+import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
+import { Deliveries, goodsPrices, held, order } from "./trade";
 import { stepper } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
@@ -169,61 +170,193 @@ export const inspector: BehaviourModule = {
 };
 
 /**
- * firm.builder: takes construction contracts. When a client it has a
- * contract with has signed, and it can pay for materials, it signs, builds,
- * and invoices the contract price. It publishes its prices (materials plus its
- * margin), and answers letters with them. params: materials (cents, by kind of
- * building: what its suppliers charge, its own business knowledge),
- * build_markup_bps (its margin over materials).
+ * firm.builder: takes construction and demolition contracts, and does the work (phase B). Its business knowledge
+ * (params): for each kind of building, the materials it takes and the hours of building and demolition work
+ * (`types`); where it keeps materials and its crew works (`yard`); whom it buys materials from (`supplier`, whose
+ * price list it reads); what it pays its crew (`wage` per `period`); and its margin.
+ * - Prices: materials at the supplier's prices, plus the crew's hours at their hourly wage, plus its margin. Published,
+ *   and republished when its costs change.
+ * - When a client has signed a construction contract: it signs, buys any materials it lacks (an order to its
+ *   supplier, paid with the order), and once the materials are in the yard it starts the building and invoices the
+ *   agreed price.
+ * - Each working day (`work_days` of every 7) its crew at the yard works on the sites it has begun, oldest first,
+ *   each worker up to a working day's hours, until a building's hours are done, or a demolition's.
+ * The crew is hired and paid by the firm's employer (firm.employer at the yard). Documented in
+ * docs/behaviour/institutions.md.
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/institutions.md",
-  cadence: () => 7 * DAY,
+  cadence: () => DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ materials: {} as Record<string, number>, build_markup_bps: 2000 }, ctx.params);
+    const p = params(
+      {
+        types: {} as { [type: string]: { materials: { [kind: string]: number }; build_labour: number; demolition_labour: number } },
+        yard: "",
+        supplier: "outside",
+        wage: 150_000, // the crew's pay, cents per period
+        period: 14 * DAY,
+        working_day: 8 * 3600, // seconds a worker works in a day
+        work_days: 5, // of every 7
+        build_markup_bps: 2000,
+      },
+      ctx.params,
+    );
     const book = new Book();
-    const started = new Set<string>();
     const letters = new Letters();
-    const prices = Object.fromEntries(Object.entries(p.materials).map(([type, cost]) => [type, Math.floor((cost * (10_000 + p.build_markup_bps)) / 10_000)]));
-    const priceText = () => Object.entries(prices).sort(([a], [b]) => (a < b ? -1 : 1)).map(([type, price]) => `${type} ${usd(price)}`).join("; ");
-    let published = false;
+    const deliveries = new Deliveries();
+    const handled = new Set<string>(); // contracts taken on
+    const waiting: { agreement: string; client: string; type?: string; on?: string; remove?: string; price?: string }[] = []; // signed, not yet begun
+    const projects: { structure: string; task: "build" | "demolish"; left: number }[] = [];
+    const typeOf = new Map<string, string>(); // structure -> its kind of building: what we've built, and what we've seen
+    const onOrder = new Map<string, number>(); // kind -> ordered, not yet delivered
+    const orderQty = new Map<string, { kind: string; quantity: number }>(); // our order -> what it was for
+    const used = new Map<string, number>(); // worker -> seconds worked today
+    let usedDay = -1;
+    let publishedAt = "";
+    // Hourly pay: the wage over the hours it pays for (working days in the period x the working day).
+    const hourly = () => Math.ceil((p.wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
     return stepper(
       (obs) => {
         book.absorb(obs);
         letters.take(obs);
+        for (const d of deliveries.take(book, obs.entity)) {
+          const o = orderQty.get(d.order);
+          if (!o) continue;
+          orderQty.delete(d.order);
+          onOrder.set(o.kind, Math.max(0, (onOrder.get(o.kind) ?? 0) - o.quantity));
+        }
       },
       (obs) => {
         const me = obs.entity;
+        const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
         if (!acc) return steps;
-        // Our prices, published once for anyone who wants building work.
-        if (!published && Object.keys(prices).length) {
-          published = true;
-          steps.push(because("Publishing our prices, so clients know what building costs.",
-            say("price_list", `Our prices for building, on your lot, finished: ${priceText()}.`, { visible: "public", data: { prices } })));
+        for (const c of channels.cells(obs)) if (c.structure) typeOf.set(c.structure.structure, c.structure.type);
+        const supply = goodsPrices(book, p.supplier);
+        const materialsCost = (m: { [kind: string]: number }) => Object.entries(m).reduce((x, [k, q]) => x + (supply.prices[k] === undefined ? Infinity : q * supply.prices[k]!), 0);
+        const withMargin = (x: number) => Math.floor((x * (10_000 + p.build_markup_bps)) / 10_000);
+        const prices: { [type: string]: number } = {};
+        const demolition: { [type: string]: number } = {};
+        for (const [type, x] of Object.entries(p.types)) {
+          const m = materialsCost(x.materials);
+          if (Number.isFinite(m)) prices[type] = withMargin(m + Math.ceil((x.build_labour * hourly()) / 3600));
+          demolition[type] = withMargin(Math.ceil((x.demolition_labour * hourly()) / 3600));
         }
-        let balance = acc.balance;
+        const priceText = () => Object.keys(prices).sort().map((type) => `${type} ${usd(prices[type]!)} (demolition ${usd(demolition[type]!)})`).join("; ");
+        // Our prices, published for anyone who wants building work, and again whenever our costs change.
+        const key = JSON.stringify([prices, demolition]);
+        if (Object.keys(prices).length && key !== publishedAt) {
+          const old = book.open("price_list").filter((r) => r.speaks_for === me);
+          publishedAt = key;
+          steps.push(because(old.length ? "Our costs have changed: republishing our prices." : "Publishing our prices, so clients know what building costs.",
+            ...old.map((r) => withdraw(r.id, "Superseded.")),
+            say("price_list", `Our prices for building on your lot, finished, and for demolition: ${priceText()}.`, { visible: "public", data: { prices, demolition } })));
+        }
+
+        // Contracts a client has signed: take them on (sign), and queue them.
         for (const r of book.records.values()) {
-          if (r.record !== "agreement" || r.terms.template !== "construction" || !r.terms.parties.includes(me) || started.has(r.id)) continue;
+          if (r.record !== "agreement" || r.terms.template !== "construction" || !r.terms.parties.includes(me) || handled.has(r.id)) continue;
           const client = r.terms.parties.find((x) => x !== me)!;
           if (!book.signedBy(r.id, client)) continue;
+          handled.add(r.id);
           const job = commitmentOf(r, me).outcome?.structure ?? {};
-          const cost = job.type ? p.materials[job.type] ?? Infinity : Infinity;
-          if (!job.on || balance < cost) continue;
-          started.add(r.id);
-          balance -= cost;
           const agreed = commitmentOf(r, client).outcome?.money?.amount;
-          const price = agreed === undefined ? undefined : amount(cents(agreed));
-          steps.push(because("A client has signed a construction contract and we can pay for materials: building, and invoicing the price.",
-            ...(book.signedBy(r.id, me) ? [] : [sign(r.id)]),
-            C.call("structure", { type: job.type, on: job.on, by: me, from: acc.account }),
-            ...(price ? [say("invoice", `Invoice: ${price} cents for building a ${job.type} on ${job.on}.`, { to: [client], basis: r.id, data: { outcome: { money: { to: acc.account, amount: price, for: `building a ${job.type} on ${job.on}` } }, agreement: r.id } })] : []),
-          ));
+          waiting.push({ agreement: r.id, client, type: job.type, on: job.on, remove: job.remove, price: agreed === undefined ? undefined : amount(cents(agreed)) });
+          if (!book.signedBy(r.id, me)) steps.push(because("A client has signed a construction contract: taking it on.", sign(r.id)));
         }
-        steps.push(...letters.answer(() => `Our prices for building, on your lot, finished: ${priceText()}. To have us build, offer us a construction agreement: what to build, on which lot, and the price, paid from your account on our invoice. We start once you've signed and we can buy the materials; permits are the owner's to get.`,
+
+        // Materials: what the waiting jobs need, against what's in the yard and on order; order the shortfall.
+        const need = new Map<string, number>();
+        for (const w of waiting) for (const [k, q] of Object.entries((w.type && p.types[w.type]?.materials) || {})) need.set(k, (need.get(k) ?? 0) + q);
+        for (const [kind, q] of [...need].sort(([a], [b]) => (a < b ? -1 : 1))) {
+          const short = q - held(obs, p.yard, kind) - (onOrder.get(kind) ?? 0);
+          const price = supply.prices[kind];
+          if (short <= 0 || price === undefined || !supply.account || acc.balance < short * price) continue;
+          onOrder.set(kind, (onOrder.get(kind) ?? 0) + short);
+          const s = order({ me, seller: p.supplier, sellerAccount: supply.account, kind, quantity: short, unitPrice: price, at: p.yard, from: acc.account, why: `Our waiting jobs need ${q} ${kind} and the yard has ${held(obs, p.yard, kind)}: ordering ${short} from our supplier.` });
+          s.then = (out) => {
+            const id = out.created?.order;
+            if (id) orderQty.set(id, { kind, quantity: short });
+            else onOrder.set(kind, Math.max(0, (onOrder.get(kind) ?? 0) - short));
+          };
+          steps.push(s);
+        }
+
+        // Start what we can, oldest first: buildings once their materials are in the yard; demolitions at once.
+        const inYard = new Map<string, number>();
+        const stock = (k: string) => inYard.get(k) ?? held(obs, p.yard, k);
+        for (const w of [...waiting]) {
+          const invoice = w.price ? [say("invoice", `Invoice: ${w.price} cents for ${w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}`}.`, { to: [w.client], basis: w.agreement, data: { outcome: { money: { to: acc.account, amount: w.price, for: w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}` } }, agreement: w.agreement } })] : [];
+          if (w.remove) {
+            // We need to know what it is (how long it takes to bring down): once we've seen it, we start.
+            const type = typeOf.get(w.remove);
+            if (!type) continue;
+            waiting.splice(waiting.indexOf(w), 1);
+            const labour = p.types[type]?.demolition_labour ?? 0;
+            const sid = w.remove;
+            // Anything of ours being built there stops.
+            for (const pr of projects) if (pr.structure === sid && pr.task === "build") pr.left = 0;
+            const s = because(`A demolition contract: starting to bring down ${sid}, and invoicing the price.`, C.call("structure", { remove: sid, by: me }), ...invoice);
+            s.then = (out) => { if (out.status === "applied" && labour > 0) projects.push({ structure: sid, task: "demolish", left: labour }); };
+            steps.push(s);
+            continue;
+          }
+          const x = w.type ? p.types[w.type] : undefined;
+          if (!x || !w.on) {
+            waiting.splice(waiting.indexOf(w), 1);
+            continue;
+          }
+          if (!Object.entries(x.materials).every(([k, q]) => stock(k) >= q)) continue;
+          for (const [k, q] of Object.entries(x.materials)) inYard.set(k, stock(k) - q);
+          waiting.splice(waiting.indexOf(w), 1);
+          const s = because(`The materials for a ${w.type} on ${w.on} are in the yard: starting it, and invoicing the agreed price.`,
+            ["site", C.call("structure", { type: w.type, on: w.on, by: me, materials_at: p.yard })], ...invoice);
+          s.then = (out) => {
+            const sid = out.created?.site;
+            if (sid) typeOf.set(sid, w.type!);
+            if (sid && x.build_labour > 0) projects.push({ structure: sid, task: "build", left: x.build_labour });
+          };
+          steps.push(s);
+        }
+
+        // The day's work: the crew at the yard, on our sites, oldest first, each up to a working day.
+        const day = Math.floor(t / DAY);
+        if (day !== usedDay) {
+          usedDay = day;
+          used.clear();
+        }
+        const crew = [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.yard).flatMap((c) => c.structure!.spaces.flatMap((sp) => sp.occupants ?? [])))].sort();
+        if (day % 7 < p.work_days && crew.length) {
+          const standing = new Set(channels.cells(obs).flatMap((c) => (c.structure ? [c.structure.structure] : [])));
+          for (const pr of [...projects]) {
+            // A building finished (its hours done and its time passed), or one that's gone: nothing more to do there.
+            const st = channels.cells(obs).find((c) => c.structure?.structure === pr.structure)?.structure;
+            if (pr.left <= 0 || (pr.task === "build" && st?.complete) || (pr.task === "demolish" && !standing.has(pr.structure))) {
+              projects.splice(projects.indexOf(pr), 1);
+              continue;
+            }
+            const avail = Math.min(...crew.map((w) => p.working_day - (used.get(w) ?? 0)));
+            if (avail <= 0) break;
+            const units = Math.min(pr.left, avail * crew.length);
+            const share = Math.ceil(units / crew.length);
+            for (const w of crew) used.set(w, (used.get(w) ?? 0) + share);
+            const s = because(`The day's work: ${crew.length} of our crew ${pr.task === "build" ? "building" : "demolishing"} ${pr.structure} (${Math.round(units / 3600)} hours of the ${Math.round(pr.left / 3600)} left).`,
+              C.call("work", { task: pr.task, units: C.text(String(units)), at: p.yard, by: C.json(crew), on: pr.structure }));
+            s.then = (out) => {
+              if (out.status === "applied") pr.left -= units;
+              else {
+                for (const w of crew) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
+                // Not (or no longer) there to work on: the job is over.
+                if (["not_being_built", "not_coming_down", "unknown_structure"].includes(out.refusal?.code ?? "")) pr.left = 0;
+              }
+            };
+            steps.push(s);
+          }
+        }
+        steps.push(...letters.answer(() => `Our prices for building on your lot, finished, and for demolition: ${priceText() || "none yet (we're waiting on our supplier's prices)"}. To have us build or demolish, offer us a construction agreement: what to build and on which lot (or what to demolish), and the price, paid from your account on our invoice. We start once you've signed and we have the materials; permits are the owner's to get.`,
           "A letter asking about work: answering with our prices and how we take on a job."));
         return steps;
       },

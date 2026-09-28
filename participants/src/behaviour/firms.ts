@@ -22,26 +22,37 @@ import { because, between, Book, callAction, usd, cellsOf, DAY, leaseTerms, MONT
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
  * in every observation (new records, payments received, ids just created),
- * and `plan` decides what to do once per wake.
+ * and `plan` decides what to do once per wake. A step may say what follows from its own outcome (`then`: an order's
+ * id, whether a day's work was done): what it returns is done next.
  */
 export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observation) => Step[]) {
   let todo: Step[] = [];
   let plannedAt = -1;
+  let sent: Step | undefined;
   return {
     step(obs: Observation): ParticipantAction {
+      const follow: Step[] = [];
+      if (sent?.then) {
+        const o = obs.outcomes.at(-1);
+        if (o) follow.push(...(sent.then(o) ?? []));
+      }
+      sent = undefined;
       absorb(obs);
       if (plannedAt !== obs.t) {
         todo = plan(obs).filter((s) => s.length);
         plannedAt = obs.t;
       }
+      todo.unshift(...follow.filter((s) => s.length));
       const next = todo.shift();
-      return next ? callAction(next) : wait();
+      if (!next) return wait();
+      sent = next;
+      return callAction(next);
     },
   };
 }
 
 /** Money received into `account` this observation, by paying account. */
-function receipts(obs: Observation, account: string): Map<string, number> {
+export function receipts(obs: Observation, account: string): Map<string, number> {
   const m = new Map<string, number>();
   for (const tx of channels.transactions(obs)) if (tx.to === account && tx.from !== account) m.set(tx.from, (m.get(tx.from) ?? 0) + cents(tx.amount));
   return m;
@@ -325,8 +336,12 @@ export const landlord: BehaviourModule = {
           if (obeys(`fine-${r.id}`) && p.city_account && acc.balance >= cents(r.about.amount)) steps.push(because("Paying a fine recorded against us.", pay(p.city_account, cents(r.about.amount), { from: acc.account, for: "Paying a fine.", settles: r.id })));
         }
         if (r.record === "statement" && r.kind === "demolition_order" && (r.addressed_to ?? []).includes(me)) {
+          // Obeying: the builder does demolitions (it has the crew), at its published price for that kind of building.
+          const type = sites.find((c) => c.structure?.structure === r.data?.structure)?.structure?.type;
+          const price = type && p.builder ? publishedPrice(book, p.builder, type, "demolition") : undefined;
+          if (price === undefined || acc.balance < price) continue; // not yet: we don't know the price, or can't pay it
           answered.add(r.id);
-          if (obeys(`order-${r.id}`)) steps.push(because("Obeying a demolition order.", C.call("structure", { remove: r.data?.structure, by: me, from: acc.account })));
+          if (obeys(`order-${r.id}`)) steps.push(because("Obeying a demolition order: commissioning the builder to demolish it.", C.call("structure", { remove: r.data?.structure, by: p.builder, price: C.dollars(price), from: acc.account, basis: r.id })));
         }
       }
       return steps;

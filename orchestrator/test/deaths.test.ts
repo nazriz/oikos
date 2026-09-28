@@ -24,8 +24,9 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   expect(died.length).toBeGreaterThan(3);
   const regs = new Map<string, any>(ev.filter((e) => e.event === "recorded" && e.record.kind === "death_registration").map((e) => [e.record.data.deceased, { ...e.record, t: e.t }]));
   // Nearly every death at home is registered within a fortnight (someone sees it; a lone person's landlord does).
-  const housed = new Set(config.world.occupancy.filter((o: any) => o.space.includes("/dwelling.")).map((o: any) => o.occupant));
-  const early = died.filter((d) => d.t < 365 * DAY - 14 * DAY && housed.has(d.person));
+  // Deaths at home: the body leaves a dwelling as they die.
+  const atHome = new Set(ev.filter((e) => e.event === "vacated" && e.reason === "died" && e.space.includes("/dwelling.")).map((e) => e.occupant));
+  const early = died.filter((d) => d.t < 365 * DAY - 14 * DAY && atHome.has(d.person));
   const registeredSoon = early.filter((d) => regs.has(d.person) && regs.get(d.person).t - d.t <= 14 * DAY);
   expect(registeredSoon.length).toBeGreaterThanOrEqual(Math.ceil(early.length * 0.8));
 

@@ -307,7 +307,7 @@ export const financeOfficer: BehaviourModule = {
             // The budget brief: what each line pays for (world config). The amounts are the mayor's and the council's to set.
             (Object.keys(p.budget_lines).length ? `The budget's lines: ${Object.entries(p.budget_lines).map(([k, v]) => `${k}, for ${v}`).join("; ")} Setting the amounts is for the mayor and the council; a budget goes to the council on the council proposal form. ` : "") +
             // What building costs, as builders have published it.
-            book.open("price_list").map((l) => `${l.speaks_for ?? l.author}'s published prices (${l.id}): ${Object.entries(l.data?.prices ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k} ${usd(v as number)}`).join(", ")}. `).join("") +
+            book.open("price_list").filter((l) => l.data?.prices).map((l) => `${l.speaks_for ?? l.author}'s published prices (${l.id}): ${Object.entries(l.data?.prices ?? {}).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, v]) => `${k} ${usd(v as number)}`).join(", ")}. `).join("") +
             (unpaid.length ? `Invoices awaiting payment: ${unpaid.map((i) => `${i.id} (${usd(i.data?.outcome?.money?.amount ?? 0)})`).join(", ")}.` : "No invoices are awaiting payment.");
         }));
         return steps;

@@ -7,11 +7,17 @@ import { DEFAULT_HOUSEHOLDS, drawHousehold, Randomness, type HouseholdSpec } fro
 export { DEFAULT_HOUSEHOLDS };
 import law from "../law/basic.json";
 
-/** A park's materials, and the builder's margin over materials (its published prices). */
-const PARK_MATERIALS = 5_000_000;
+/** The builder's margin over its costs (its published prices). */
 const BUILD_MARKUP_BPS = 2000;
+/** The world price of building materials, cents a kg (placeholder, docs/behaviour/building.md). */
+const MATERIALS_PRICE = 125;
+const HOUR = 3600;
+/** The working day: the most a person works in a day (physics: a limit on hours; docs/behaviour/building.md). */
+const WORKING_DAY = 8 * HOUR;
+/** The builder's crew: its yard's places, and their wage (cents every 14 days). */
+const CREW = { capacity: 12, wage: 150_000 };
 
-export const GENERATOR_VERSION = "0.11.0";
+export const GENERATOR_VERSION = "0.12.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -172,6 +178,11 @@ export function generate(spec: TownSpec): any {
     homes.push({ structure: id, space: `${id}/dwelling.1`, type: ht.id, landlord: l, rent: ht.rent, bedrooms: ht.bedrooms });
   }
   const workplaces: { employer: string; structure: string; space: string; wage: number; capacity: number }[] = [];
+  // The builder's yard: where it keeps materials and its crew works from (phase B).
+  const yardLot = site();
+  structures.push({ id: "builder-yard", at: cellOf.get(yardLot), type: "yard", built_by: "builder" });
+  own(yardLot, "builder");
+  workplaces.push({ employer: "builder", structure: "builder-yard", space: "builder-yard/workplace.1", wage: CREW.wage, capacity: CREW.capacity });
   for (const s of shops) {
     const lot = site(), id = `${s}-premises`;
     structures.push({ id, at: cellOf.get(lot), type: "shop", built_by: "builder" });
@@ -318,19 +329,22 @@ export function generate(spec: TownSpec): any {
   const shopAccounts = shops.map((s) => `acc-${s}`);
   const unstated = { disclosure: "unstated", reason: "Code controller; framing does not apply." };
   const code = (impl: string, params: object = {}) => ({ type: "code", impl, params });
-  // The catalogue: what can be built, and what its materials cost (physics). The builder's materials costs are its own business knowledge, from the same figures.
+  // The catalogue: what can be built, what it's made of, and the hours of work it takes to build and to demolish
+  // (physics; placeholders, docs/behaviour/building.md). The builder knows the same figures (its own business knowledge).
+  const kg = (t: number) => t * 1000;
   const structureTypes = [
     // A home is a unit with bedrooms; its capacity is how many bodies could physically live in it (what's suitable is content).
-    ...houseTypes.map((h) => ({ id: h.id, category: "residential", materials_value: 30_000_000 + (h.bedrooms - 3) * 5_000_000, build_time: 90 * DAY, footprint: { w: 1, h: 1 },
+    ...houseTypes.map((h) => ({ id: h.id, category: "residential", materials: { materials: kg(120 + (h.bedrooms - 3) * 20) }, build_labour: (4_000 + (h.bedrooms - 3) * 600) * HOUR, demolition_labour: 300 * HOUR, build_time: 90 * DAY, footprint: { w: 1, h: 1 },
       spaces: [{ kind: "dwelling", count: 1, capacity: capacityFor(h.bedrooms), attrs: { bedrooms: h.bedrooms } }] })),
-    { id: "apartments", category: "residential", materials_value: 250_000_000, build_time: 180 * DAY, footprint: { w: 1, h: 1 },
+    { id: "apartments", category: "residential", materials: { materials: kg(1_000) }, build_labour: 36_000 * HOUR, demolition_labour: 2_000 * HOUR, build_time: 180 * DAY, footprint: { w: 1, h: 1 },
       spaces: units.map((u) => ({ kind: "dwelling", count: u.count, capacity: capacityFor(u.bedrooms), attrs: { bedrooms: u.bedrooms } })) },
-    { id: "shop", category: "commercial", materials_value: 60_000_000, build_time: 90 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 6 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.shop }) },
-    { id: "factory", category: "industrial", materials_value: 400_000_000, build_time: 240 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.factory }) },
-    { id: "civic", category: "civic", materials_value: 80_000_000, build_time: 120 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }] },
-    { id: "park", category: "green", materials_value: PARK_MATERIALS, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [] },
+    { id: "shop", category: "commercial", materials: { materials: kg(250) }, build_labour: 8_000 * HOUR, demolition_labour: 500 * HOUR, build_time: 90 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 6 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.shop }) },
+    { id: "factory", category: "industrial", materials: { materials: kg(1_600) }, build_labour: 50_000 * HOUR, demolition_labour: 3_000 * HOUR, build_time: 240 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.factory }) },
+    { id: "yard", category: "industrial", materials: { materials: kg(30) }, build_labour: 1_000 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: CREW.capacity }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.factory }) },
+    { id: "civic", category: "civic", materials: { materials: kg(330) }, build_labour: 10_000 * HOUR, demolition_labour: 800 * HOUR, build_time: 120 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }] },
+    { id: "park", category: "green", materials: { materials: kg(20) }, build_labour: 1_500 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [] },
   ];
-  const MATERIALS = Object.fromEntries(structureTypes.map((t) => [t.id, t.materials_value]));
+  const builderTypes = Object.fromEntries(structureTypes.map((t) => [t.id, { materials: t.materials, build_labour: t.build_labour, demolition_labour: t.demolition_labour }]));
   const forms = { id: "forms", kind: "records", match: { statement_kinds: ["form"] } };
   // Builders' published prices (firm.builder publishes its own).
   const priceLists = { id: "prices", kind: "records", match: { statement_kinds: ["price_list"] } };
@@ -363,10 +377,16 @@ export function generate(spec: TownSpec): any {
   // Deaths, as registered: what banks, employers, landlords and child protection act on (law-succession).
   const deaths = { id: "deaths", kind: "records", match: { statement_kinds: ["death_registration"] } };
   office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city" }));
+  // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
+  office("outside-trade", "outside", "The world market", undefined, [{ id: "ledger", kind: "accounts" }, mine("orders"), { id: "stock", kind: "holdings" }],
+    code("world.trade", { account: "acc-outside", sells: { materials: MATERIALS_PRICE } }));
   office("export-demand", "outside", "The outside world's demand", undefined, [{ id: "ledger", kind: "accounts" }],
     code("world.export_demand", { purchases: factories.map((f) => ({ to: `acc-${f}`, amount: Math.floor(spec.exports_per_month / factories.length), every: MONTH, memo: "Export sales." })) }));
   // The foreman knows the registry's lots and goes to see the ground, to know where on a lot a building goes.
-  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "ground", kind: "sites", area: "all", every: 7 * DAY }], code("firm.builder", { materials: MATERIALS, build_markup_bps: BUILD_MARKUP_BPS }));
+  // It sees its crew at the yard, its supplier's prices and what it holds.
+  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), priceLists, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } },
+    { id: "ground", kind: "sites", area: "all", every: 7 * DAY }, { id: "yard", kind: "sites", area: [cellOf.get(yardLot)], occupants: "names" }],
+    code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", wage: CREW.wage, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS }));
   const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
   office("planning", "city", "Planning officer", "planning_officer",
     [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
@@ -414,7 +434,9 @@ export function generate(spec: TownSpec): any {
   }
   for (const w of workplaces) {
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths],
-      code("firm.employer", { wage: w.wage, target_staff: Math.max(staffCount.get(w.employer) ?? 0, Math.floor(w.capacity * 0.8)), workplace: w.space, outside_account: "acc-outside", role: w.employer.startsWith("shop") ? "shop assistant" : "factory worker" }));
+      code("firm.employer", { wage: w.wage, target_staff: Math.max(staffCount.get(w.employer) ?? 0, Math.floor(w.capacity * 0.8)), workplace: w.space, outside_account: "acc-outside",
+        // The builder buys its materials itself (firm.builder); the others' purchases are still a share of revenue, until they trade in goods.
+        ...(w.employer === "builder" ? { supplier_share_bps: 0 } : {}), role: w.employer === "builder" ? "construction worker" : w.employer.startsWith("shop") ? "shop assistant" : "factory worker" }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = { id: "petitions", kind: "records", match: { statement_kinds: ["petition"] }, on_request: true };
@@ -440,13 +462,17 @@ export function generate(spec: TownSpec): any {
     seed: spec.seed,
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
-    // Amounts on the wire are decimal strings (D58); the generator counts in numbers.
-    // Interim (phase B stage B2): the types carry no materials yet, so building takes only time, until the builder has a
-    // yard and a supplier (stage B4). `materials_value` is the builder's own reckoning of materials, for its prices.
-    catalogue: { structure_types: structureTypes.map(({ materials_value: _, ...t }) => t) },
+    // Amounts and quantities on the wire are decimal strings (D58); the generator counts in numbers.
+    catalogue: {
+      structure_types: structureTypes.map((t) => ({ ...t, materials: Object.fromEntries(Object.entries(t.materials).map(([k, q]) => [k, String(q)])) })),
+      resources: [{ id: "goods", unit: "item" }, { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }],
+      working_day: WORKING_DAY,
+    },
     world: { boundaries: ["outside"], currencies: [{ code: "AUD", minor_units: 2 }], ground: { w: spec.grid.w, h: spec.grid.h },
       // One place (D58): the town, detailed, covering its ground.
-      places: [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }], entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records },
+      places: [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }], entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
+      // The builder's stock at its yard: a house's worth of materials.
+      holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }] },
     participants,
     positions,
     templates,

@@ -17,19 +17,22 @@ Rules every module follows (so re-runs are reproducible):
 | Module | Seat | Doc |
 |---|---|---|
 | `bank.payment_system` | a bank's automated payment system | [bank-payment-system.md](bank-payment-system.md) |
-| `world.export_demand` | the outside world (a boundary condition, D31) | [boundary.md](boundary.md) |
+| `world.trade` | the world market: sells at world prices against paid orders, buys exports against invoices (a boundary condition, D31) | [boundary.md](boundary.md) |
+| `world.export_demand` | the outside world's purchases as money on a schedule (until the factories export goods) | [boundary.md](boundary.md) |
 | `citizen.default` | a townsperson: housing, work, spending, leaving town | [citizen.md](citizen.md) |
 | `firm.landlord` | a landlord's letting office | [firms.md](firms.md) |
 | `firm.employer` | a shop's or factory's manager | [firms.md](firms.md) |
 | `city.planning_officer` | decides permit applications under the laws that bind the office | [institutions.md](institutions.md) |
 | `city.inspector` | patrols, detects unpermitted building, fines and orders demolition | [institutions.md](institutions.md) |
-| `firm.builder` | builds what it's contracted to build, and invoices | [institutions.md](institutions.md) |
+| `firm.builder` | builds and demolishes what it's contracted to: materials bought from its supplier, its crew's hours; invoices | [institutions.md](institutions.md) |
 | `city.mayor_code` | a rule-following mayor (the all-code control; an LLM takes this seat in AI runs) | [government.md](government.md) |
 | `city.council_clerk` | runs council ballots, publishes results and what passed | [government.md](government.md) |
 | `city.councillor` | votes on council ballots (spatial voting) | [government.md](government.md) |
 | `city.finance_officer` | pays the town's invoices under the payments procedure | [government.md](government.md) |
 | `city.tax_clerk` | assesses reported tax, chases arrears | [government.md](government.md) |
 | `idle` | does nothing (placeholder, and a control condition) | this page |
+
+Trade in goods (price lists, orders paid with the order, delivery notes) is shared by every module that buys or sells: [trade.md](trade.md). What buildings take (materials, hours of work) is in [building.md](building.md).
 
 The town these modules run in is made by the [generator](generator.md).
 

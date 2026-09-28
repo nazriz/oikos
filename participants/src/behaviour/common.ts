@@ -3,7 +3,7 @@
 // its own book of the records relevant to it, as a person would.
 
 import * as C from "../calls";
-import type { Observation, Record, ParticipantAction, StatementRecord } from "../contracts";
+import type { Observation, Outcome as ActOutcome, Record, ParticipantAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { cents, formatMoney } from "../money";
 
@@ -130,7 +130,7 @@ export function ownAccount(obs: Observation): { account: string; balance: number
  * One atomic act: lines of calls, optionally binding a name (whose id comes back in the outcome's `created`), and
  * optionally why: the rule that fired, in plain words, which goes into the log with the act (its `reasoning`).
  */
-export type Step = (C.Call | [string, C.Call])[] & { why?: string };
+export type Step = (C.Call | [string, C.Call])[] & { why?: string; then?: (o: ActOutcome) => Step[] | void };
 
 /** A step with its reason: `because("Rent is due", pay(...))`. */
 export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): Step => Object.assign(lines, { why });
@@ -197,7 +197,7 @@ export function offer(withWhom: string, o: { template: string; we?: C.Call; they
 
 // ------------------------------------------------------------------ reading agreements (the standard encoding, §9.2)
 
-export type Outcome = { money?: { from?: string; to: string; amount: number; for?: string }; occupancy?: { who: string; in: string; leave?: boolean }; structure?: { type?: string; on?: string; remove?: string } };
+export type Outcome = { money?: { from?: string; to: string; amount: number; for?: string }; goods?: { kind: string; quantity: string; to: string; at: string; from?: string }; occupancy?: { who: string; in: string; leave?: boolean }; structure?: { type?: string; on?: string; remove?: string } };
 
 /** The structure a space is in (`apts-3/dwelling.2` -> `apts-3`). */
 export const structureOf = (space: string) => space.split("/")[0]!;
@@ -228,10 +228,10 @@ export function jobTerms(a: Record | undefined, worker: string): { wage: number;
 
 export const between = (lo: number, hi: number, u: number) => lo + Math.floor(u * (hi - lo + 1));
 
-/** A builder's published price for a kind of building (its latest price list), if it has published one. */
-export function publishedPrice(book: Book, builder: string, type: string): number | undefined {
-  const list = book.open("price_list").filter((r) => r.speaks_for === builder || r.author === builder).sort((a, b) => b.at - a.at)[0];
-  const price = list?.data?.prices?.[type];
+/** A builder's published price for a kind of building, or for demolishing one (its latest price list), if it has published one. */
+export function publishedPrice(book: Book, builder: string, type: string, what: "prices" | "demolition" = "prices"): number | undefined {
+  const list = book.open("price_list").filter((r) => (r.speaks_for === builder || r.author === builder) && r.data?.prices).sort((a, b) => b.at - a.at)[0];
+  const price = list?.data?.[what]?.[type];
   return Number.isInteger(price) ? price : undefined;
 }
 

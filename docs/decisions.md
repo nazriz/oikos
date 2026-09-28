@@ -475,6 +475,32 @@ See the design note, §16.
 
 - **Phase B, B1–B2 landed** (Naz: "no half measures"; docs/design/phase-b-production.md). Holdings and `move_goods`: possession is physics (D20), and an edge's holdings may go negative. Tasks and `work`: a person's working day is a physical limit. State variables, perceived with their trend. Construction and demolition as materials plus labour; money for materials and demolition is retired. The kernel tests cover conservation (money; goods, accounted for by work and construction), feasibility, perception, reach, and the new `work.rs`.
   - **Interim until B4:** the generated town's building types carry no materials yet, so construction there takes only time. The builder has no yard, supplier or crew yet, and it still prices by its own reckoning of materials. B4 gives it all three.
+- **B3 landed:** `goods(...)` and `work(...)` in the call language, and `materials_at` for building yourself. The resolver, the preview and the translator know them (contracts/calls.md).
+- **B4, step 1 landed: the world market, and a builder with a yard, a crew and a supplier.** The B2 interim is over. The town's buildings are made of materials and hours of work ([building.md](behaviour/building.md); placeholder figures, to calibrate in B5).
+  - **Trade** ([trade.md](behaviour/trade.md)) is shared by everyone who buys or sells goods. Sellers publish price lists. Buyers order and pay in the same act (cash with order). Sellers match payments by the paying account, deliver, refund what they couldn't, and send delivery notes.
+    - **Why not a payment reference:** a bank can't vouch for a record it can't see, and the kernel refuses a `settles` naming a record that isn't there.
+    - **Why no credit:** it keeps stock and cash physically honest.
+    - **Revisit if** firm-to-firm trade needs payment terms (trade credit is the norm there).
+  - **`world.trade`** is the outside as a price-taking world market: it sells against paid orders, and buys exports against invoices once the goods have arrived, up to a monthly demand, sending the rest back. For now the town buys only materials from it. Factories and shops come in steps 2–3, and `world.export_demand` goes then.
+  - **`firm.builder` 0.6.0:**
+    - buys materials for its waiting jobs;
+    - starts each job when they're in the yard, and invoices;
+    - on 5 days of 7, works its crew (the yard's employees, hired by its own `firm.employer`) up to a working day each;
+    - prices from its costs (materials at its supplier's price, hours at the crew's hourly pay, a 20% margin), republishing when they change.
+
+    A house now costs $270,000 (was $360,000) and a park $63,750 (was $60,000). **Landlords obey a demolition order by commissioning the builder**, since demolition is now work.
+  - **The stepper** (`firms.ts`): a step can say what follows from its own outcome (`then`). That's how the builder learns its order's id and whether a day's work was done, and the world market what it has delivered.
+  - **Found:** the builder was ordered to demolish a house it was still building. It then kept working on the house (refused as `not_being_built`), and never started the demolition, because its weekly survey didn't show the new house yet, so it didn't know how long bringing it down takes. Now it remembers what it builds, waits to see a building before demolishing it, and drops jobs the world says are over. Also: the world market was refunding every payment it couldn't match, including the factories' money-only "supplier" payments. Refunds now go only to its own customers.
+  - **Tests** (`orchestrator/test/building.test.ts`):
+    - materials bought at the world price, and a delivery note for each delivery;
+    - every finished building took exactly its hours, and at least its least time;
+    - nobody works beyond a working day;
+    - invoices are paid;
+    - a demolition order carried out: owner → builder → crew;
+    - exports paid only once arrived, and only up to the month's demand, with the excess sent back and an invoice with no goods declined;
+    - no call a module writes goes unresolved.
+
+    Changed tests: the park's price; the view's channel kinds (holdings); deaths "at home" now means in a dwelling when they died, where it used to mean housed at the start.
 **D59. Reliability: timing failures stop cleanly and resume; deterministic ones recover in place.** *(Naz, 2026-09-28: "we need to be able to automatically gracefully recover from things like infinite loops, things getting stuck"; "determinism split sounds right".)*
 - **Why:** a two-year run hung at day 691 for eight minutes with no sign anything was wrong. The cause was the orchestrator's own bug (D58's same-moment rule). The real problem was that nothing noticed. A dead kernel would also have been misread as an off-contract request, and the run would have gone on against nothing.
 - **The split:** results must never depend on wall-clock timing. Deterministic failures (a module throws; a model call fails after its time limits and retries, which is then in the log) are recovered in place: recorded, and the participant waits. Timing failures (a stall, a dead kernel) stop the run cleanly, with a diagnosis, to be resumed once fixed.

@@ -1,4 +1,4 @@
-# The people inside institutions (planning officer v0.3.0, inspector v0.2.0; builder v0.3.0)
+# The people inside institutions (planning officer, inspector, builder, registry, child protection)
 
 **Source:** `participants/src/behaviour/institutions.ts`. These are code seats of the town (`entity: city`) and of the builder. None of this is kernel law. Each seat reads the town's statements, applies them to what it can see because that's its job, and may do the job well, badly or not at all, depending on its parameters (D19, D20).
 
@@ -33,11 +33,39 @@ What happens next is up to the owner, and to whoever else might enforce.
 
 **Source:** deterrence depends on the probability of detection and the size of the sanction (Becker 1968). Inspection capacity and coverage limit detection (the inspection-game and risk-based-regulation literature, borrowing survey §5). The inspector's work has no time cost until work is modelled (D24).
 
-## `firm.builder`
+## `firm.builder` (v0.6.0)
 
-Wakes weekly. For each construction agreement a client has signed, if it can pay for the materials, it signs too and builds (`construct`), the materials being bought from outside (the temporary liberty in docs/decisions.md). It then **invoices** the client for the contract price (an `invoice` statement whose data is the payment it asks for, in the shared outcome language: `data: { outcome: { money: { to, amount } }, agreement }`). Payment is the client's act, through their bank. It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
+A builder with a yard, a crew and a supplier (phase B). It wakes daily.
+- **Taking on work.** For each construction agreement a client has signed, it signs too and queues the job. A job is a building (what, on which lot) or a demolition (what to bring down).
+- **Materials.** It adds up what its waiting jobs need, sets that against what's in its yard and what's already on order, and orders the shortfall from its supplier (the world market) at the supplier's published price, paid with the order ([trade.md](trade.md)). The supplier's delivery notes tell it what has come.
+- **Starting.** Oldest first:
+  - a building once its materials are in the yard (`structure(type, on, by = itself, materials_at = yard)`);
+  - a demolition once it knows what the building is. That comes from its own record of what it built, or its survey of the ground; it needs the type to know how many hours bringing it down takes.
 
-**Its prices** are what its materials cost (`materials`, by kind of building: what its suppliers charge, its own business knowledge from the world's config) plus its margin (`build_markup_bps`, 20%). It **publishes them** once, as a public `price_list` statement, and answers letters with them and with how it takes on a job. Everyone else learns what building costs from that list: the mayor, finance's budget brief, landlords planning to develop. Before D57, the code mayor and landlords read materials costs from the world config, which a model-run mayor couldn't do.
+  It **invoices** the agreed price as it starts: an `invoice` statement whose data is the payment asked for (`data: { outcome: { money: { to, amount } }, agreement }`). Payment is the client's act, through their bank.
+- **Working.** On working days (5 of every 7) the crew at the yard (whoever occupies its workplace: the firm's employees) works on its sites, oldest first. Each worker works up to a working day (the world's physical limit; the builder knows it as `working_day`), shared evenly across the crew. It works on a building until its hours are done (the kernel finishes it once its least time has passed too), and on a demolition until it's down. A site that's gone, or is no longer being built (demolished meanwhile), is dropped.
+- **Hiring.** The crew is hired and paid by the firm's own `firm.employer` office at the yard, like any employer's staff ([firms.md](firms.md)).
+
+It builds whatever it's contracted to build, wherever. Whether that's lawful is the client's problem and the inspector's. A builder that refuses unlawful jobs would be a different module.
+
+**Its prices** follow from its costs:
+- a building's materials at its supplier's current prices;
+- plus its hours of work at the crew's hourly pay (the wage over the hours it pays for: working days in the pay period times the working day);
+- plus its margin (`build_markup_bps`, 20%).
+
+A demolition is priced on its hours alone. It **publishes** a public `price_list` statement (`data: { prices, demolition }`, by kind of building), republishes it whenever its costs change, and answers letters with it. Everyone else learns what building costs from that list: the mayor, finance's budget brief, and landlords planning to develop or ordered to demolish. What each kind of building takes is its business knowledge (`types`: materials, building hours, demolition hours). In the generated town these are the catalogue's own figures ([building.md](building.md)).
+
+**Parameters:**
+- `types`, `yard` and `supplier` (default `outside`);
+- the crew's `wage` and `period`;
+- `working_day` (8 h) and `work_days` (5);
+- `build_markup_bps` (2000).
+
+**Leaves out:**
+- scheduling across jobs beyond "oldest first";
+- trades, and subcontractors;
+- trade credit with its supplier;
+- turning down work when its crew is overbooked. It quotes the same price however long the queue.
 
 ## Landlords as developers (`firm.landlord`, see [firms.md](firms.md))
 
@@ -45,7 +73,7 @@ When a landlord's **average vacancy over the last 90 days is at most 10%** of it
 - **Granted:** it contracts the builder and pays the invoice when it arrives.
 - **Refused:** it complies with probability `compliance_bps`. Otherwise it **builds anyway**.
 
-It also pays fines and obeys demolition orders with that same probability.
+It also pays fines and obeys demolition orders with that same probability. To obey an order, it commissions the builder to demolish, at the builder's published demolition price for that kind of building, once it can pay it. Since phase B, demolition is work, and the builder has the crew.
 
 In the example town, `landlord_compliance_bps: 5000`. The river scenario test (`orchestrator/test/river.test.ts`) runs a tight-housing town at compliance 0 and 10000, and checks the whole chain:
 - the application;

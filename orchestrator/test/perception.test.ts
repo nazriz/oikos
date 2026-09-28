@@ -50,5 +50,5 @@ test("every capacity's view equals the kernel's full picture, after every look",
   });
   expect(checked).toBeGreaterThan(500);
   expect(moves).toBeGreaterThan(0); // someone moved, and their view followed
-  expect(kinds).toEqual(new Set(["accounts", "sites", "directory"]));
+  expect(kinds).toEqual(new Set(["accounts", "sites", "directory", "holdings"]));
 }, 300_000);

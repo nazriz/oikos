@@ -10,7 +10,7 @@ export { ASKING } from "./behaviour/citizen";
 export { DEFAULT_HOUSEHOLDS, drawHousehold, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
-import { exportDemand, idle, migration } from "./behaviour/world";
+import { exportDemand, idle, migration, trade } from "./behaviour/world";
 import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
 import { builder, childProtection, inspector, planningOfficer, registry } from "./behaviour/institutions";
@@ -24,6 +24,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [exportDemand, "behaviour/world.ts"],
       [idle, "behaviour/world.ts"],
       [migration, "behaviour/world.ts"],
+      [trade, "behaviour/world.ts"],
       [citizen, "behaviour/citizen.ts"],
       [landlord, "behaviour/firms.ts"],
       [employer, "behaviour/firms.ts"],
