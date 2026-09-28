@@ -91,19 +91,25 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
     Some(match b {
         Block::Transfer { from, to, amount, settles: None, per_instruction: None, .. } => {
             let (Some(f), Some(t)) = (st.accounts.get(from), st.accounts.get(to)) else { return Some(Err(RefusalCode::UnknownAccount)) };
+            // v0.5 (D58): amounts are exact to 38 digits, and money moves only within one currency.
+            let max = terrarium_kernel::money::MAX_MONEY;
+            let above = || from != to && t.balance.checked_add(*amount).is_none_or(|x| x > max);
             if f.custodian != me {
                 Err(RefusalCode::NotCustodian)
+            } else if !(1..=max).contains(amount) {
+                Err(RefusalCode::Overflow)
+            } else if f.currency != t.currency {
+                Err(RefusalCode::CurrencyMismatch)
             } else if f.holder == s.boundary {
-                let below = (f.balance as i128) - (*amount as i128) < -9_007_199_254_740_991;
-                let above = from != to && t.balance as i128 + *amount as i128 > 9_007_199_254_740_991;
-                if below || above {
+                let below = f.balance.checked_sub(*amount).is_none_or(|x| x < -max);
+                if below || above() {
                     Err(RefusalCode::Overflow)
                 } else {
                     Ok(())
                 }
             } else if f.balance < *amount {
                 Err(RefusalCode::InsufficientFunds)
-            } else if from != to && t.balance as i128 + *amount as i128 > 9_007_199_254_740_991 {
+            } else if above() {
                 Err(RefusalCode::Overflow)
             } else {
                 Ok(())
@@ -174,7 +180,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         Block::CloseAccount { account } => match st.accounts.get(account) {
             None => Err(RefusalCode::UnknownAccount),
             Some(a) if a.custodian != me => Err(RefusalCode::NotCustodian),
-            Some(_) if *account == s.boundary_account => Err(RefusalCode::BoundaryProtected),
+            Some(_) if s.is_boundary_account(account) => Err(RefusalCode::BoundaryProtected),
             Some(a) if a.balance != 0 => Err(RefusalCode::AccountNotEmpty),
             Some(_) => Ok(()),
         },
@@ -364,9 +370,9 @@ fn the_oracle_is_exercised() {
     };
     let bld = |b: serde_json::Value| act("builder-system", Some("builder"), b);
     let cases = [
-        (act("finance-system", Some("finance"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 5})), Err(RefusalCode::NotCustodian)),
-        (act("bank-pay-system", Some("bank-pay"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 5})), Ok(())),
-        (act("alice-self", Some("mayor"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 5})), Err(RefusalCode::NotInPosition)),
+        (act("finance-system", Some("finance"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "5"})), Err(RefusalCode::NotCustodian)),
+        (act("bank-pay-system", Some("bank-pay"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "5"})), Ok(())),
+        (act("alice-self", Some("mayor"), json!({"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "5"})), Err(RefusalCode::NotInPosition)),
         (bld(json!({"block": "construct", "at": "cell.1.0", "structure_type": "park", "materials_from": "acc-buildco"})), Err(RefusalCode::GroundOccupied)),
         (bld(json!({"block": "construct", "at": "cell.2.0", "structure_type": "jetty", "materials_from": "acc-buildco"})), Err(RefusalCode::UnsuitableTerrain)),
         (bld(json!({"block": "construct", "at": "cell.2.2", "structure_type": "flats", "materials_from": "acc-buildco"})), Err(RefusalCode::UnsuitableTerrain)),

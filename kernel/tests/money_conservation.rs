@@ -18,8 +18,8 @@ use terrarium_kernel::run::Run;
 
 fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
     let mut run = Run::start(world(params), "money", Vec::new(), None).unwrap();
-    let opening: i128 = run.kernel().state().total_money();
-    let mut ledger: BTreeMap<String, i128> = run.kernel().state().accounts.iter().map(|(k, a)| (k.clone(), a.balance as i128)).collect();
+    let opening = run.kernel().state().total_money();
+    let mut ledger: BTreeMap<String, i128> = run.kernel().state().accounts.iter().map(|(k, a)| (k.clone(), a.balance)).collect();
     let boundary = run.kernel().statics().boundary.clone();
 
     for op in ops {
@@ -41,19 +41,19 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
                     TransferReason::Payment | TransferReason::Carried => prop_assert_eq!(by_entity.as_str(), src.custodian.as_str(), "payment not executed by the custodian"),
                     _ => prop_assert_eq!(by_entity.as_str(), src.holder.as_str(), "construction cost not paid by the builder"),
                 }
-                *ledger.entry(from.clone()).or_insert(0) -= *amount as i128;
-                *ledger.entry(to.clone()).or_insert(0) += *amount as i128;
+                *ledger.entry(from.clone()).or_insert(0) -= *amount;
+                *ledger.entry(to.clone()).or_insert(0) += *amount;
             }
         }
         let st = run.kernel().state();
-        prop_assert_eq!(st.total_money(), opening, "money created or destroyed by {:?}", cmd);
+        prop_assert_eq!(&st.total_money(), &opening, "money created or destroyed by {:?}", cmd);
         for (id, a) in &st.accounts {
             if a.holder != boundary {
                 prop_assert!(a.balance >= 0, "{} went negative ({}) after {:?}", id, a.balance, cmd);
             }
             prop_assert_eq!(
                 ledger.get(id).copied().unwrap_or(0),
-                a.balance as i128,
+                a.balance,
                 "{}'s balance moved without a transfer event after {:?}",
                 id,
                 cmd

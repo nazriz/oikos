@@ -29,7 +29,7 @@ function town(): Knowledge {
         { cell: "cell.0.1", x: 0, y: 1, structure: building("str.4", "shop", "cell.0.1", [{ space: "str.4/floor.0", kind: "floor", capacity: 20, count: 3 }]) },
       ] },
       mine: { kind: "records", records: [
-        rec({ id: "inv.1", record: "statement", author: "builder-foreman", speaks_for: "builder", kind: "invoice", text: "Invoice", data: { outcome: { money: { to: "acc-builder", amount: 50000 } } }, addressed_to: ["city"] }),
+        rec({ id: "inv.1", record: "statement", author: "builder-foreman", speaks_for: "builder", kind: "invoice", text: "Invoice", data: { outcome: { money: { to: "acc-builder", amount: "50000" } } }, addressed_to: ["city"] }),
         rec({ id: "form-permit", record: "statement", author: "planning-system", in_position: "planning", speaks_for: "city", kind: "form", text: "Permit application.",
           data: { form: "permit_application", submit_as: "permit_application", submit_to: ["city"], fields: { lot: { type: "lot", required: true }, structure_type: { type: "structure_type", required: true }, notes: { type: "text" } } } }),
         rec({ id: "lot-00", record: "statement", author: "registry", speaks_for: "city", kind: "lot", text: "Lot 00.", data: { cells: ["cell.1.0"] } }),
@@ -59,7 +59,10 @@ test("the call language parses, and prints back canonically", () => {
 });
 
 test("amounts and durations convert by table, with no arithmetic beyond the digits written", () => {
-  expect(["$500", "$1,234.56", "60k", "$1.5k", "$2m", "500 dollars", "250 cents", "$0.05"].map(calls.parseAmount)).toEqual([50000, 123456, 6000000, 150000, 200000000, 50000, 250, 5]);
+  expect(["$500", "$1,234.56", "60k", "$1.5k", "$2m", "500 dollars", "250 cents", "$0.05"].map(calls.parseAmount)).toEqual(["50000", "123456", "6000000", "150000", "200000000", "50000", "250", "5"]);
+  // Exact beyond JSON's 2^53 (D58): a world's sums can be that large.
+  expect(calls.parseAmount("$120 trillion")).toBe("12000000000000000");
+  expect(calls.parseAmount("$90,071,992,547,409.93")).toBe("9007199254740993");
   for (const bad of ["10%", "half", "$1,23", "$1.234", "1.5 cents", "about $500"]) expect(() => calls.parseAmount(bad)).toThrow();
   expect(["monthly", "every 3 months", "2 weeks", "a year", "fortnightly", "30 days"].map(calls.parseDuration)).toEqual([2592000, 7776000, 1209600, 31536000, 1209600, 2592000]);
   for (const bad of ["next Friday", "soon", "1.5 days"]) expect(() => calls.parseDuration(bad)).toThrow();
@@ -69,14 +72,14 @@ test("4.1: paying someone asks the bank that keeps the account", () => {
   const r = run('money(to=builder, amount="$500", for="the fence")');
   if (!r.ok) throw new Error(r.questions.join(" "));
   expect(r.blocks).toEqual([{ block: "publish", kind: "request", speaks_for: "city", addressed_to: ["bank"], visible_to: ["city", "bank"],
-    text: "Please pay $500.00 from acc-city to acc-builder, for the fence.", data: { outcome: { money: { from: "acc-city", to: "acc-builder", amount: 50000, for: "the fence" } } } }]);
+    text: "Please pay $500.00 from acc-city to acc-builder, for the fence.", data: { outcome: { money: { from: "acc-city", to: "acc-builder", amount: "50000", for: "the fence" } } } }]);
   expect(new Preview(town()).of(r.blocks)).toBe("You will ask Millbrook Bank (bank) to pay $500.00 from your account (acc-city) to acc-builder, for the fence.");
 });
 
 test("4.2: a repeating payment is a standing request", () => {
   const r = run('money(to=acc-landlord-1, amount="$850", every="month", for="rent")');
   if (!r.ok) throw new Error(r.questions.join(" "));
-  expect(r.blocks[0]!.data).toEqual({ outcome: { money: { from: "acc-city", to: "acc-landlord-1", amount: 85000, for: "rent" } }, every: 2592000 });
+  expect(r.blocks[0]!.data).toEqual({ outcome: { money: { from: "acc-city", to: "acc-landlord-1", amount: "85000", for: "rent" } }, every: 2592000 });
 });
 
 test("4.3: with the inputs supplied, an offered agreement to whoever builds, citing the permit", () => {
@@ -84,7 +87,7 @@ test("4.3: with the inputs supplied, an offered agreement to whoever builds, cit
   if (!r.ok) throw new Error(r.questions.join(" "));
   expect(r.blocks).toEqual([
     { block: "propose_agreement", speaks_for: "city", ref: "offer1", basis: "rec.412", terms: { template: "construction", parties: ["city", "greenco"],
-      commitments: [{ who: "greenco", does: { outcome: { structure: { type: "park", on: "lot-00" } } } }, { who: "city", does: { outcome: { money: { from: "acc-city", to: "greenco", amount: 6000000 } } } }],
+      commitments: [{ who: "greenco", does: { outcome: { structure: { type: "park", on: "lot-00" } } } }, { who: "city", does: { outcome: { money: { from: "acc-city", to: "greenco", amount: "6000000" } } } }],
       text: "GreenCo (greenco) will build a park on lot-00; Millbrook (city) pays $60,000.00 from acc-city." } },
     { block: "sign_agreement", agreement: "$offer1", as: "city" },
   ]);
@@ -129,7 +132,7 @@ test("a lease: nested commitments become outcomes, notice periods and term are d
   const r = run('agreement(with=c0042, template=lease, term="12 months", our_notice="60 days", their_notice="30 days", we_do=occupancy(who=c0042, in=str.3/dwelling.2), they_do=money(to=acc-city, amount="$850", every="monthly", for="rent"))');
   if (!r.ok) throw new Error(r.questions.join(" "));
   expect(r.blocks[0]!.terms).toEqual({ template: "lease", parties: ["city", "c0042"], term: 31104000,
-    commitments: [{ who: "city", does: { outcome: { occupancy: { who: "c0042", in: "str.3/dwelling.2" } } } }, { who: "c0042", does: { outcome: { money: { to: "acc-city", amount: 85000, for: "rent" } } }, every: 2592000 }],
+    commitments: [{ who: "city", does: { outcome: { occupancy: { who: "c0042", in: "str.3/dwelling.2" } } } }, { who: "c0042", does: { outcome: { money: { to: "acc-city", amount: "85000", for: "rent" } } }, every: 2592000 }],
     termination: [{ party: "city", notice: 5184000 }, { party: "c0042", notice: 2592000 }] });
 });
 

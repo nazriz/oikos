@@ -2,6 +2,6 @@
   "block": "transfer",
   "from": "acc-city",
   "to": "acc-devco",
-  "amount": 100,
+  "amount": "100",
   "participant": "finance"
 }

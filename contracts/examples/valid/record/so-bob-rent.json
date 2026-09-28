@@ -19,7 +19,7 @@
       "money": {
         "from": "acc-bob",
         "to": "acc-devco",
-        "amount": 180000
+        "amount": "180000"
       }
     },
     "every": 2592000,

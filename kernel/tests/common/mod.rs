@@ -114,11 +114,11 @@ pub fn world(p: &WorldParams) -> Value {
         })
         .collect();
     let holders = ["bank", "city", "devco", "buildco", "alice", "bob", "carol"];
-    let mut accounts = vec![json!({"id": "acc-outside", "holder": "outside", "custodian": "outside", "balance": 0})];
+    let mut accounts = vec![json!({"id": "acc-outside", "holder": "outside", "custodian": "outside", "balance": "0"})];
     for (i, h) in holders.iter().enumerate() {
         // Carol keeps her own money (cash-like); everyone else banks with the bank.
         let custodian = if *h == "carol" { "carol" } else { "bank" };
-        accounts.push(json!({"id": format!("acc-{h}"), "holder": h, "custodian": custodian, "balance": p.balances.get(i).copied().unwrap_or(0)}));
+        accounts.push(json!({"id": format!("acc-{h}"), "holder": h, "custodian": custodian, "balance": p.balances.get(i).copied().unwrap_or(0).to_string()}));
     }
     // A 4 x 3 ground; the east column is water. Lots are records over cells.
     let lots = [
@@ -173,18 +173,19 @@ pub fn world(p: &WorldParams) -> Value {
         "clock": {"tick_seconds": TICK, "run_seconds": 40 * MONTH},
         "log": {"checkpoint_every": MONTH, "anchor_every_entries": 7},
         "catalogue": {"structure_types": [
-            {"id": "house", "category": "residential", "materials_cost": 300_000, "build_time": 20 * 86_400, "demolition_cost": 20_000,
+            {"id": "house", "category": "residential", "materials_cost": "300000", "build_time": 20 * 86_400, "demolition_cost": "20000",
              "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 5, "attrs": {"bedrooms": 3}}]},
-            {"id": "flats", "category": "residential", "materials_cost": 900_000, "build_time": 40 * 86_400, "demolition_cost": 50_000,
+            {"id": "flats", "category": "residential", "materials_cost": "900000", "build_time": 40 * 86_400, "demolition_cost": "50000",
              "footprint": {"w": 2, "h": 1}, "spaces": [{"kind": "dwelling", "count": 3, "capacity": 4, "attrs": {"bedrooms": 2}}, {"kind": "dwelling", "count": 1, "capacity": 1, "attrs": {"bedrooms": 1}}]},
-            {"id": "shop", "category": "commercial", "materials_cost": 500_000, "build_time": 30 * 86_400, "demolition_cost": 30_000, "injury_bps": 800,
+            {"id": "shop", "category": "commercial", "materials_cost": "500000", "build_time": 30 * 86_400, "demolition_cost": "30000", "injury_bps": 800,
              "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "workplace", "count": 1, "capacity": 2}, {"kind": "dwelling", "count": 1, "capacity": 1, "attrs": {"bedrooms": 1}}]},
-            {"id": "park", "category": "green", "materials_cost": 50_000, "build_time": 10 * 86_400, "demolition_cost": 5_000, "footprint": {"w": 1, "h": 1}, "spaces": []},
-            {"id": "jetty", "category": "marine", "materials_cost": 80_000, "build_time": 10 * 86_400, "demolition_cost": 5_000, "footprint": {"w": 1, "h": 1},
+            {"id": "park", "category": "green", "materials_cost": "50000", "build_time": 10 * 86_400, "demolition_cost": "5000", "footprint": {"w": 1, "h": 1}, "spaces": []},
+            {"id": "jetty", "category": "marine", "materials_cost": "80000", "build_time": 10 * 86_400, "demolition_cost": "5000", "footprint": {"w": 1, "h": 1},
              "terrains": ["water"], "spaces": [{"kind": "mooring", "count": 2, "capacity": 1}]}
         ]},
         "world": {
             "boundary": "outside",
+            "currencies": [{"code": "AUD", "minor_units": 2}],
             "ground": {"w": 4, "h": 3, "terrain": [{"label": "water", "x": 3, "y": 0, "w": 1, "h": 3}]},
             "entities": entities,
             "accounts": accounts,
@@ -232,7 +233,7 @@ pub enum Op {
 
 #[derive(Debug, Clone)]
 pub enum B {
-    Transfer { from: u8, to: u8, amount: i64 },
+    Transfer { from: u8, to: u8, amount: i128 },
     OpenAccount { holder: u8, to_new: bool },
     CloseAccount { account: u8 },
     Construct { cell: u8, ty: u8, from: u8 },
@@ -260,8 +261,9 @@ pub enum B {
     Retire { participant: u8 },
 }
 
-fn amount() -> impl Strategy<Value = i64> {
-    prop_oneof![12 => 1i64..50_000, 1 => Just(0i64), 3 => 50_000i64..5_000_000, 1 => Just(9_007_199_254_740_991i64)]
+fn amount() -> impl Strategy<Value = i128> {
+    // Includes amounts beyond JSON's 2^53 (exact on the wire since v0.5) and the largest amount there is.
+    prop_oneof![12 => 1i128..50_000, 1 => Just(0i128), 3 => 50_000i128..5_000_000, 1 => Just(9_007_199_254_740_993i128), 1 => Just(terrarium_kernel::money::MAX_MONEY)]
 }
 
 pub fn block_strategy() -> impl Strategy<Value = B> {
@@ -372,7 +374,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 direct("bank-pay-system", Some("bank-pay"), vec![Block::Transfer {
                     from,
                     to: pick(&accounts, *b)?,
-                    amount: 1 + (*b as i64 * 97) % max,
+                    amount: 1 + (*b as i128 * 97) % max,
                     settles: None,
                     per_instruction: flag.then(|| "so-bob".into()),
                     memo: None,
@@ -411,7 +413,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 direct("outside-system", Some("outside-trade"), vec![Block::Transfer {
                     from: "acc-outside".into(),
                     to: firms[*b as usize % 3].into(),
-                    amount: 1 + *b as i64 * 1000,
+                    amount: 1 + *b as i128 * 1000,
                     settles: None,
                     per_instruction: None,
                     memo: None,
@@ -425,7 +427,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                     direct("carol-self", None, vec![Block::Transfer {
                         from: "acc-carol".into(),
                         to: pick(&accounts, *b)?,
-                        amount: 1 + (*a as i64) % max,
+                        amount: 1 + (*a as i128) % max,
                         settles: None,
                         per_instruction: None,
                         memo: None,
@@ -444,7 +446,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         name: Some(format!("newcomer {a}")),
                         born_at: Some(k.t() - 20 * YEAR - *b as i64 * 86_400),
                         template: Some("newcomer".into()),
-                        carrying: Some(1 + *b as i64 * 5000),
+                        carrying: Some(1 + *b as i128 * 5000),
                         sex: None,
                         bind: None,
                     },
@@ -495,7 +497,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             for b in blocks {
                 out.push(match b {
                     B::Transfer { from, to, amount } => Block::Transfer { from: my(*from), to: pick(&accounts, *to).unwrap(), amount: *amount, settles: None, per_instruction: None, memo: None },
-                    B::OpenAccount { holder, to_new } => Block::OpenAccount { holder: if *to_new && bound { "$new".into() } else { e(*holder) }, bind: None },
+                    B::OpenAccount { holder, to_new } => Block::OpenAccount { holder: if *to_new && bound { "$new".into() } else { e(*holder) }, currency: None, bind: None },
                     B::CloseAccount { account } => Block::CloseAccount { account: my(*account) },
                     B::Construct { cell, ty, from } => Block::Construct {
                         at: if cell % 7 == 0 { "cell.9.9".into() } else { pick(&cells, *cell).unwrap() },

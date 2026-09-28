@@ -183,6 +183,10 @@
         "holder": {
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
         },
+        "currency": {
+          "description": "The account's currency; absent: the world's first. It must be one the world declares (refused otherwise: unknown_currency).",
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Currency"
+        },
         "ref": {
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/RefName"
         }

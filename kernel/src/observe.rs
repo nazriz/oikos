@@ -103,7 +103,9 @@ pub struct AccountItem {
     pub account: Id,
     pub holder: Id,
     pub custodian: Id,
-    pub balance: i64,
+    pub currency: Id,
+    #[serde(with = "crate::money::amount")]
+    pub balance: crate::money::Money,
     /// Set when the account has been closed since the last look.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub closed: Option<bool>,
@@ -647,13 +649,13 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                         .iter()
                         .filter_map(|id| {
                             let a = &st.accounts[id];
-                            changed(a.changed).then(|| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance, closed: None })
+                            changed(a.changed).then(|| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), currency: a.currency.clone(), balance: a.balance, closed: None })
                         })
                         .collect();
                     if after.is_some() {
                         for (id, x) in st.closed_accounts.iter() {
                             if (x.holder == me || x.custodian == me) && changed(x.changed) {
-                                accounts.push(AccountItem { account: id.clone(), holder: x.holder.clone(), custodian: x.custodian.clone(), balance: 0, closed: Some(true) });
+                                accounts.push(AccountItem { account: id.clone(), holder: x.holder.clone(), custodian: x.custodian.clone(), currency: x.currency.clone(), balance: 0, closed: Some(true) });
                             }
                         }
                     }

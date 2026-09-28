@@ -12,6 +12,7 @@
 // through its bank, pays suppliers (the outside world) a share of its
 // revenue, and lays off when it can't cover a pay period.
 
+import { cents } from "../money";
 import * as C from "../calls";
 import type { Observation, ParticipantAction } from "../contracts";
 import { channels } from "../contracts";
@@ -42,7 +43,7 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
 /** Money received into `account` this observation, by paying account. */
 function receipts(obs: Observation, account: string): Map<string, number> {
   const m = new Map<string, number>();
-  for (const tx of channels.transactions(obs)) if (tx.to === account && tx.from !== account) m.set(tx.from, (m.get(tx.from) ?? 0) + tx.amount);
+  for (const tx of channels.transactions(obs)) if (tx.to === account && tx.from !== account) m.set(tx.from, (m.get(tx.from) ?? 0) + cents(tx.amount));
   return m;
 }
 
@@ -313,7 +314,7 @@ export const landlord: BehaviourModule = {
         if (answered.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
         answered.add(inv.id);
         const owed = inv.data?.outcome?.money;
-        if (owed && acc.balance >= owed.amount) steps.push(because("Paying an invoice addressed to us.", pay(owed.to, owed.amount, { from: acc.account, for: "Paying an invoice.", settles: inv.id })));
+        if (owed && acc.balance >= cents(owed.amount)) steps.push(because("Paying an invoice addressed to us.", pay(owed.to, cents(owed.amount), { from: acc.account, for: "Paying an invoice.", settles: inv.id })));
       }
 
       // Fines recorded against us, and demolition orders addressed to us.
@@ -321,7 +322,7 @@ export const landlord: BehaviourModule = {
         if (answered.has(r.id)) continue;
         if (r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty"].includes(r.about?.kind)) {
           answered.add(r.id);
-          if (obeys(`fine-${r.id}`) && p.city_account && acc.balance >= r.about.amount) steps.push(because("Paying a fine recorded against us.", pay(p.city_account, r.about.amount, { from: acc.account, for: "Paying a fine.", settles: r.id })));
+          if (obeys(`fine-${r.id}`) && p.city_account && acc.balance >= cents(r.about.amount)) steps.push(because("Paying a fine recorded against us.", pay(p.city_account, cents(r.about.amount), { from: acc.account, for: "Paying a fine.", settles: r.id })));
         }
         if (r.record === "statement" && r.kind === "demolition_order" && (r.addressed_to ?? []).includes(me)) {
           answered.add(r.id);

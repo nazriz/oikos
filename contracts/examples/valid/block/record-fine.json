@@ -5,7 +5,7 @@
   "counterparty": "devco",
   "about": {
     "kind": "fine",
-    "amount": 5000000,
+    "amount": "5000000",
     "for": "building on p12 without a permit"
   },
   "basis": "law-river",

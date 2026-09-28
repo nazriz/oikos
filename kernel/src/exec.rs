@@ -13,6 +13,7 @@
 
 use crate::blocks::{AgreementTerms, Block, Id, Record, RecordBody, Visibility};
 use crate::canon::MAX_SAFE;
+use crate::money::{Money, MAX_MONEY};
 use crate::config::{check_channels, footprint_cells, split_space, Channel, ParticipantKind, Severity, BOUNDARY, PERSON, SELF};
 use crate::events::{EndReason, EventBody, RefusalCode, Timed, TransferReason, VacateReason};
 use crate::state::{
@@ -555,7 +556,7 @@ impl<'a> Exec<'a> {
         &mut self,
         from: &str,
         to: &str,
-        amount: i64,
+        amount: Money,
         reason: TransferReason,
         settles: Option<Id>,
         per_instruction: Option<Id>,
@@ -563,20 +564,24 @@ impl<'a> Exec<'a> {
     ) -> R<()> {
         let src = self.account(from)?.clone();
         let dst = self.account(to)?.clone();
-        if !(1..=MAX_SAFE).contains(&amount) {
+        if !(1..=MAX_MONEY).contains(&amount) {
             return Err(refuse(RefusalCode::Overflow, "amount out of range"));
+        }
+        // Money moves only between accounts in the same currency: the kernel never converts.
+        if src.currency != dst.currency {
+            return Err(refuse(RefusalCode::CurrencyMismatch, format!("{from} is in {}, {to} in {}", src.currency, dst.currency)));
         }
         if src.holder == self.s.boundary {
             // The outside world's account may go negative (money flowing in), within range.
-            if src.balance.checked_sub(amount).is_none_or(|x| x < -MAX_SAFE) {
-                return Err(refuse(RefusalCode::Overflow, "the outside world's account would go beyond -(2^53-1)"));
+            if src.balance.checked_sub(amount).is_none_or(|x| x < -MAX_MONEY) {
+                return Err(refuse(RefusalCode::Overflow, "the outside world's account would go beyond the range of an amount"));
             }
         } else if src.balance < amount {
             return Err(refuse(RefusalCode::InsufficientFunds, format!("{from} holds {}, needs {amount}", src.balance)));
         }
         if from != to {
-            if dst.balance.checked_add(amount).is_none_or(|x| x > MAX_SAFE) {
-                return Err(refuse(RefusalCode::Overflow, format!("{to}'s balance would exceed 2^53-1")));
+            if dst.balance.checked_add(amount).is_none_or(|x| x > MAX_MONEY) {
+                return Err(refuse(RefusalCode::Overflow, format!("{to}'s balance would exceed the range of an amount")));
             }
             let c = self.st.stamp();
             let a = self.st.accounts.get_mut(from).unwrap();
@@ -591,6 +596,7 @@ impl<'a> Exec<'a> {
             from: from.into(),
             to: to.into(),
             amount,
+            currency: src.currency.clone(),
             by: self.participant.into(),
             settles: settles.clone(),
             per_instruction: per_instruction.clone(),
@@ -613,6 +619,7 @@ impl<'a> Exec<'a> {
             from: from.into(),
             to: to.into(),
             amount,
+            currency: src.currency.clone(),
             by: self.participant.into(),
             reason,
             settles,
@@ -741,13 +748,17 @@ impl<'a> Exec<'a> {
                 self.move_money(&from, &to, *amount, TransferReason::Payment, settles, per_instruction, memo.clone())
             }
 
-            Block::OpenAccount { holder, bind } => {
+            Block::OpenAccount { holder, currency, bind } => {
                 let holder = self.r(holder)?;
                 self.entity_exists(&holder)?;
+                let currency = currency.clone().unwrap_or_else(|| self.s.currency.clone());
+                if !self.s.config.world.currencies.iter().any(|c| c.code == currency) {
+                    return Err(refuse(RefusalCode::UnknownCurrency, format!("the world has no currency {currency}")));
+                }
                 let id = self.st.mint("acc");
                 let c = self.st.stamp();
-                self.st.accounts.insert(id.clone(), Account { holder: holder.clone(), custodian: self.entity.clone(), balance: 0, changed: c });
-                self.emit(EventBody::AccountOpened { account: id.clone(), holder, custodian: self.entity.clone(), by: self.participant.into() });
+                self.st.accounts.insert(id.clone(), Account { holder: holder.clone(), custodian: self.entity.clone(), currency: currency.clone(), balance: 0, changed: c });
+                self.emit(EventBody::AccountOpened { account: id.clone(), holder, custodian: self.entity.clone(), currency, by: self.participant.into() });
                 self.bind(bind, &id)
             }
 
@@ -757,7 +768,7 @@ impl<'a> Exec<'a> {
                 if a.custodian != self.entity {
                     return Err(refuse(RefusalCode::NotCustodian, format!("{account} is held in custody by {}", a.custodian)));
                 }
-                if account == self.s.boundary_account {
+                if self.s.is_boundary_account(&account) {
                     return Err(refuse(RefusalCode::BoundaryProtected, "the outside world's account can't be closed"));
                 }
                 if a.balance != 0 {
@@ -765,7 +776,7 @@ impl<'a> Exec<'a> {
                 }
                 let c = self.st.stamp();
                 if let Some(gone) = self.st.accounts.remove(&account) {
-                    self.st.closed_accounts.insert(account.clone(), crate::state::ClosedAccount { holder: gone.holder, custodian: gone.custodian, changed: c });
+                    self.st.closed_accounts.insert(account.clone(), crate::state::ClosedAccount { holder: gone.holder, custodian: gone.custodian, currency: gone.currency, changed: c });
                 }
                 self.emit(EventBody::AccountClosed { account, by: self.participant.into() });
                 Ok(())
@@ -800,7 +811,7 @@ impl<'a> Exec<'a> {
                 let completes = self.later(ty.build_time)?;
                 // Documented liberty (D25, accepted temporarily): materials are paid
                 // straight to the outside world, not through the builder's bank.
-                let boundary = self.s.boundary_account.clone();
+                let boundary = self.s.boundary_account().to_string();
                 self.move_money(&from, &boundary, ty.materials_cost, TransferReason::Materials, None, None, None)?;
                 let id = self.st.mint("str");
                 self.st.structures.insert(
@@ -839,7 +850,7 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::NotHolder, format!("{from} isn't held by {}", self.entity)));
                 }
                 let cost = self.s.types[&x.structure_type].demolition_cost;
-                let boundary = self.s.boundary_account.clone();
+                let boundary = self.s.boundary_account().to_string();
                 self.move_money(&from, &boundary, cost, TransferReason::Demolition, None, None, None)?;
                 for (space, bodies) in self.st.occupancy.remove(&sid).unwrap_or_default() {
                     for occupant in bodies {
@@ -953,9 +964,10 @@ impl<'a> Exec<'a> {
                 if let Some(amount) = carrying {
                     let acc = self.st.mint("acc");
                     let c = self.st.stamp();
-                    self.st.accounts.insert(acc.clone(), Account { holder: id.clone(), custodian: id.clone(), balance: 0, changed: c });
-                    self.emit(EventBody::AccountOpened { account: acc.clone(), holder: id.clone(), custodian: id.clone(), by: self.participant.into() });
-                    let boundary = self.s.boundary_account.clone();
+                    let currency = self.s.currency.clone();
+                    self.st.accounts.insert(acc.clone(), Account { holder: id.clone(), custodian: id.clone(), currency: currency.clone(), balance: 0, changed: c });
+                    self.emit(EventBody::AccountOpened { account: acc.clone(), holder: id.clone(), custodian: id.clone(), currency, by: self.participant.into() });
+                    let boundary = self.s.boundary_account().to_string();
                     self.move_money(&boundary, &acc, *amount, TransferReason::Carried, None, None, None)?;
                 }
                 self.bind(bind, &id)

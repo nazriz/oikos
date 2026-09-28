@@ -1,0 +1,6 @@
+{
+  "block": "transfer",
+  "from": "acc-bob",
+  "to": "acc-devco",
+  "amount": 180000
+}

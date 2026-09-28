@@ -144,7 +144,7 @@ pub fn river_script() -> Vec<Command> {
         Command::Observe { participant: "inspector-system".into(), only: None },
         act(
             "bank-payments",
-            json!([{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": 180000, "per_instruction": "so-bob-rent"}]),
+            json!([{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": "180000", "per_instruction": "so-bob-rent"}]),
         ),
         act(
             "developer",
@@ -167,7 +167,7 @@ pub fn river_script() -> Vec<Command> {
         Command::Observe { participant: "inspector-system".into(), only: None },
         act(
             "inspector",
-            json!([{"block": "record_claim", "position": "right", "holder": "city", "counterparty": "devco", "basis": "law-river", "speaks_for": "city", "about": {"kind": "fine", "amount": 5000000}}]),
+            json!([{"block": "record_claim", "position": "right", "holder": "city", "counterparty": "devco", "basis": "law-river", "speaks_for": "city", "about": {"kind": "fine", "amount": "5000000"}}]),
         ),
         act(
             "mayor",
@@ -175,7 +175,7 @@ pub fn river_script() -> Vec<Command> {
         ),
         act("alice-self", json!([{"block": "vote", "ballot": "rec.6", "choice": "no", "speaks_for": "alice"}])),
         act("developer", json!([{"block": "vacate", "occupant": "bob", "from": "s-apts"}])),
-        act("finance", json!([{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 1}])),
+        act("finance", json!([{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "1"}])),
         Command::Advance { to: 100 * 86_400 },
         Command::Observe { participant: "inspector-system".into(), only: None },
         Command::Observe { participant: "bob-self".into(), only: None },

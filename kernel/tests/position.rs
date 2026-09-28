@@ -32,11 +32,12 @@ fn street() -> Run<Vec<u8>> {
         "clock": {"tick_seconds": 3600, "run_seconds": 86_400 * 30},
         "log": {"checkpoint_every": 86_400 * 30, "anchor_every_entries": 100},
         "catalogue": {"structure_types": [
-            {"id": "house", "category": "residential", "materials_cost": 1, "build_time": 86_400, "demolition_cost": 1, "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 2}]},
-            {"id": "flats", "category": "residential", "materials_cost": 1, "build_time": 86_400, "demolition_cost": 1, "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 4}]}
+            {"id": "house", "category": "residential", "materials_cost": "1", "build_time": 86_400, "demolition_cost": "1", "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 2}]},
+            {"id": "flats", "category": "residential", "materials_cost": "1", "build_time": 86_400, "demolition_cost": "1", "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 4}]}
         ]},
         "world": {
             "boundary": "outside",
+            "currencies": [{"code": "AUD", "minor_units": 2}],
             "ground": {"w": 10, "h": 1},
             "entities": [
                 {"id": "outside", "kind": "boundary", "name": "Outside"},
@@ -45,7 +46,7 @@ fn street() -> Run<Vec<u8>> {
                 {"id": "carol", "kind": "person", "name": "Carol"},
                 {"id": "registry", "kind": "office", "name": "Registry"}
             ],
-            "accounts": [{"id": "acc-outside", "holder": "outside", "custodian": "outside", "balance": 0}],
+            "accounts": [{"id": "acc-outside", "holder": "outside", "custodian": "outside", "balance": "0"}],
             "structures": [
                 {"id": "h0", "at": "cell.0.0", "type": "house"},
                 {"id": "h2", "at": "cell.2.0", "type": "house"},

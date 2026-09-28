@@ -20,6 +20,7 @@ pub mod exec;
 pub mod geo;
 pub mod kernel;
 pub mod log;
+pub mod money;
 pub mod observe;
 pub mod protocol;
 pub mod rng;

@@ -3,7 +3,7 @@
     "money": {
       "from": "acc-c0042",
       "to": "acc-landlord-1",
-      "amount": 85000,
+      "amount": "85000",
       "for": "rent"
     }
   },

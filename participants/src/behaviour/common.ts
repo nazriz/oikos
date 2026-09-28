@@ -5,6 +5,7 @@
 import * as C from "../calls";
 import type { Observation, Record, ParticipantAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
+import { cents, formatMoney } from "../money";
 
 export const DAY = 86_400;
 export const MONTH = 30 * DAY;
@@ -107,9 +108,16 @@ export function publishedCount(book: Book, petition: StatementRecord): number {
   return counts.length ? (counts.at(-1)!.data.signatures as number) : 0;
 }
 
-/** Its own account (held by the entity it acts for). */
-export function ownAccount(obs: Observation): { account: string; balance: number; custodian: string } | undefined {
-  return channels.accounts(obs).find((a) => a.holder === obs.entity);
+/** An entity's own account at a bank (not money it keeps itself), with its balance as a number (money.ts). */
+export function ownBanked(obs: Observation, holder: string): { account: string; balance: number; custodian: string; currency: string } | undefined {
+  const a = channels.accounts(obs).find((x) => x.holder === holder && x.custodian !== holder);
+  return a && { account: a.account, balance: cents(a.balance), custodian: a.custodian, currency: a.currency };
+}
+
+/** Its own account (held by the entity it acts for), with its balance as a number for arithmetic (money.ts). */
+export function ownAccount(obs: Observation): { account: string; balance: number; custodian: string; currency: string } | undefined {
+  const a = channels.accounts(obs).find((x) => x.holder === obs.entity);
+  return a && { account: a.account, balance: cents(a.balance), custodian: a.custodian, currency: a.currency };
 }
 
 // ------------------------------------------------------------------ acting through calls
@@ -147,8 +155,7 @@ export class Letters {
 }
 
 /** Dollars, for reasons: 123456 -> "$1,234.56". */
-export const usd = (cents: number) =>
-  `${cents < 0 ? "-" : ""}$${Math.floor(Math.abs(cents) / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${String(Math.abs(cents) % 100).padStart(2, "0")}`;
+export const usd = formatMoney;
 
 /** Money to an account: a one-off or repeating payment. */
 export function pay(to: string, amount: number, o: { from?: string; for?: string; settles?: string; every?: number; first?: number; basis?: string; per_request?: string } = {}): C.Call {
@@ -208,7 +215,7 @@ export function leaseTerms(a: Record | undefined, tenant: string): { rent: numbe
   const other = a.terms.parties.find((x) => x !== tenant)!;
   const pays = commitmentOf(a, tenant).outcome?.money;
   const space = commitmentOf(a, other).outcome?.occupancy?.in;
-  return { rent: pays?.amount ?? 0, rentTo: pays?.to, space, structure: space ? structureOf(space) : undefined };
+  return { rent: cents(pays?.amount), rentTo: pays?.to, space, structure: space ? structureOf(space) : undefined };
 }
 
 /** A job's wage and pay period (from the employer) and workplace (the space the worker commits to be in). */
@@ -216,7 +223,7 @@ export function jobTerms(a: Record | undefined, worker: string): { wage: number;
   if (a?.record !== "agreement") return { wage: 0, period: 14 * DAY };
   const employer = a.terms.parties.find((x) => x !== worker)!;
   const pays = commitmentOf(a, employer);
-  return { wage: pays.outcome?.money?.amount ?? 0, period: pays.every ?? 14 * DAY, workplace: commitmentOf(a, worker).outcome?.occupancy?.in };
+  return { wage: cents(pays.outcome?.money?.amount), period: pays.every ?? 14 * DAY, workplace: commitmentOf(a, worker).outcome?.occupancy?.in };
 }
 
 export const between = (lo: number, hi: number, u: number) => lo + Math.floor(u * (hi - lo + 1));

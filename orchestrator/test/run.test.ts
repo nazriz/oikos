@@ -28,7 +28,7 @@ test("the bank carries out standing orders on schedule; the run replays byte-ide
   const transfers = events(s.logPath).filter((e) => e.event === "transfer");
   const rent = transfers.filter((e) => e.from === "acc-bob");
   expect(rent.map((e) => e.t / DAY)).toEqual([30, 60, 90]);
-  expect(rent.every((e) => e.to === "acc-devco" && e.amount === 180000 && e.by === "bank-payments-system" && e.per_instruction === "so-bob-rent")).toBe(true);
+  expect(rent.every((e) => e.to === "acc-devco" && e.amount === "180000" && e.by === "bank-payments-system" && e.per_instruction === "so-bob-rent")).toBe(true);
   const wages = transfers.filter((e) => e.to === "acc-carol");
   expect(wages.map((e) => e.t / DAY)).toEqual([14, 28, 42, 56, 70, 84, 98]);
 

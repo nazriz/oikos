@@ -5,6 +5,7 @@
 // and applies them to what it can see, because that is its job, and
 // (depending on its parameters) it may do the job well, badly, or not at all.
 
+import { amount, cents } from "../money";
 import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
@@ -214,7 +215,8 @@ export const builder: BehaviourModule = {
           if (!job.on || balance < cost) continue;
           started.add(r.id);
           balance -= cost;
-          const price = commitmentOf(r, client).outcome?.money?.amount;
+          const agreed = commitmentOf(r, client).outcome?.money?.amount;
+          const price = agreed === undefined ? undefined : amount(cents(agreed));
           steps.push(because("A client has signed a construction contract and we can pay for materials: building, and invoicing the price.",
             ...(book.signedBy(r.id, me) ? [] : [sign(r.id)]),
             C.call("structure", { type: job.type, on: job.on, by: me, from: acc.account }),

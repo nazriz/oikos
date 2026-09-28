@@ -1,4 +1,6 @@
-# Terrarium contracts, v0.4 (draft)
+# Terrarium contracts, v0.5 (draft, in progress)
+
+*Status: **v0.5 is being built, phase A of docs/design/foundation-for-scale.md** (D58, approved 2026-09-28). It's v0.4 made ready for scale: money exact beyond 2^53 and in currencies (done), several boundaries, a tree of places, and one state per simulated moment for everyone who wakes in it (to come). See "Changes from v0.4". What follows describes v0.4 where v0.5 hasn't changed it yet.*
 
 *Status: **v0.4 is a draft, built and tested, awaiting Naz's review of the details** (opened 2026-09-27, D47). It is v0.3 plus a world whose cast and land can change: participants and positions, bodies that arrive, leave, are born, fall ill, are hurt and die, and ground made of cells with buildings made of spaces. The concepts were agreed ("design and build it all now"; "participant is fine, and yes overcrowding possible, go ahead and build"); the design and its reasoning are in [docs/design/v0.4-cast-and-land.md](../docs/design/v0.4-cast-and-land.md). v0.3 (D40) was v0.2 (approved 2026-09-25, D28, with one reservation: the construction payment liberty) plus the translator and resolver, perception as changes, attention and opting out. v0.2 replaced v0.1, which put law, authority and ownership inside the kernel; see [the audit](../docs/audit-kernel-law.md), [the design](../docs/design/v0.2-physics-and-constructs.md), [the borrowing survey](../docs/research/borrowing-survey.md) and D18–D27 in [docs/decisions.md](../docs/decisions.md).*
 
@@ -25,7 +27,7 @@ These schemas are the constitution. Humans review them and the invariant tests; 
 
 ## Conventions
 
-- **No floating point anywhere**, including opaque data. Money is integer cents; rates are basis points (`rate_bps: 1000` means 10%).
+- **No floating point anywhere**, including opaque data. Money is an integer in the smallest unit of its currency (cents), written as a **decimal string** (`"180000"`, up to 38 digits; v0.5, D58), so it's exact beyond JSON's 2^53. Rates are basis points (`rate_bps: 1000` means 10%).
 - **Canonical JSON** (RFC 8785 subset) and domain-separated SHA-256 for log entries, state, config, observations and drafts.
 - **Time** is simulated seconds.
 - **Ids.** Researcher ids are lowercase without dots. Kernel ids are `prefix.n`: `ent`, `acc`, `str`, `rec`, `act`, `msg`, `par` (participants), `pos` (positions), `cnd` (conditions). Cells are `cell.X.Y`; spaces are `<structure>/<kind>.<n>` (`apts-3/dwelling.2`). A position's channels are addressed `<position>/<channel>`. `self` is reserved. Within an action, `ref` binds a name that later blocks use as `$name`.
@@ -95,6 +97,8 @@ Each record has an **author** (the participant, or `genesis` for records the wor
 Money is a conserved integer quantity in **accounts**. Every account has a **holder** and a **custodian**: a bank, or the holder itself if the world lets entities keep their own money. Only someone acting for the custodian can move money out of an account. The outside world holds its own account, so **money enters the world only when someone acting for the outside world pays** (buying exports, visitors spending, grants): boundary conditions are world content, a code participant with researcher-set parameters (D31).
 
 To pay, an account holder publishes an `instruction` addressed to their bank. The bank's payment system (or clerk) reads it and executes the transfer, or doesn't. Standing orders and direct debits are standing instructions.
+
+**Currencies (v0.5):** the world declares its currencies (`world.currencies`, each with a code and its decimal places); the first is the default. Every account is in one currency, and an amount's unit is its account's. Money moves only between accounts in the same currency (`currency_mismatch` otherwise): the kernel never converts, and an exchange is a trade, two transfers in one action. The outside world holds an account in each currency. Construction materials and newcomers' money are in the default currency.
 
 **Debt and credit are supported** through agreements plus paired claims: loans, mortgages (with security over property), overdrafts, interest and arrears. The lender's people apply interest and schedules. **The liberty:** lenders lend only money they actually hold, so there is no money creation by lending out deposits. Derivatives, securitisation and securities markets are out of scope.
 
@@ -176,6 +180,11 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 7. **A seat acts as exactly one entity.** *(Superseded in v0.4: a participant acts as itself, or for an organisation in a position it holds.)*
 8. **`sites` channels have a refresh interval** (since v0.3, any channel's `every`), so detection can be delayed and partial. Coverage and frequency are experimental variables.
 
+## Changes from v0.4 (in progress)
+
+- **Money** (done): amounts and balances are decimal-string integers, 38 digits at most (`common#/$defs/Amount`, `Cents`); `world.currencies`; accounts, observed accounts, transactions and the `transfer` and `account_opened` events carry a `currency`; `open_account` takes an optional `currency`; refusal codes `currency_mismatch` and `unknown_currency`. Outcomes' money amounts (the platform standard, outcomes.schema.json) are decimal strings too. Code does its arithmetic in ordinary numbers and converts at the edge, throwing beyond 2^53 rather than rounding (`participants/src/money.ts`); display is exact at any size.
+- The version: every `$id` is `urn:terrarium:contracts:0.5:…`, and configs and log headers say `contracts: "0.5"`.
+
 ## Changes from v0.3
 
 - **Seat → participant**, everywhere (seat-api.schema.json is now participant-api.schema.json). Participants are people or systems; templates create them during a run.
@@ -184,7 +193,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 - **Land:** `world.ground` (cells, terrain) replaces parcels; structure types gain `footprint`, `terrains`, `spaces` (instead of slot capacities) and `injury_bps`; `construct` names a corner cell (`at`); `occupy` names a space (`space`, optionally `who`); `vacate` names `from`. Lots are records.
 - **Calls:** `occupancy` takes `in` (a space or building), `who`, `leave`; new functions `presence`, `birth`, `harm`, `position`, `system`; `entity(position=…)`; ids may contain `/` (spaces).
 - **Outcomes:** occupancy is `{ who, in, leave? }`; form field types `lot`, `cell` and `space` replace `parcel`.
-- The version: every `$id` is `urn:terrarium:contracts:0.5:…`, and configs and log headers say `contracts: "0.4"`.
+- The version: every `$id` is `urn:terrarium:contracts:0.4:…`, and configs and log headers say `contracts: "0.4"`.
 
 ## Changes from v0.2
 

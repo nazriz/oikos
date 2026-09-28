@@ -237,13 +237,14 @@ export function program(...lines: (Call | [string, Call])[]): string {
 export class UnitError extends Error {}
 
 /** "$500", "$1,234.56", "60k", "$1.5k", "$2m", "500 dollars", "250 cents" → integer cents. No arithmetic on anything but the digits written. */
-export function parseAmount(s: string): number {
+/** An amount as written ("$1.5k", "250 cents", "$3 trillion") in cents, exact, as the contracts write it: a decimal string (D58). */
+export function parseAmount(s: string): string {
   const t = s.trim().toLowerCase().replace(/\s+/g, " ");
-  const m = /^\$?\s?([0-9][0-9,]*)(?:\.([0-9]{1,3}))?\s?(k|m|b|thousand|million|billion)?\s?(dollars?|bucks|cents?)?$/.exec(t);
+  const m = /^\$?\s?([0-9][0-9,]*)(?:\.([0-9]{1,3}))?\s?(k|m|b|t|thousand|million|billion|trillion)?\s?(dollars?|bucks|cents?)?$/.exec(t);
   if (!m) throw new UnitError(`not an amount: ${s}`);
   const whole = m[1]!;
   if (whole.includes(",") && !/^[0-9]{1,3}(,[0-9]{3})*$/.test(whole)) throw new UnitError(`badly grouped digits: ${s}`);
-  const mult = ({ k: 1_000n, thousand: 1_000n, m: 1_000_000n, million: 1_000_000n, b: 1_000_000_000n, billion: 1_000_000_000n } as Record<string, bigint>)[m[3] ?? ""] ?? 1n;
+  const mult = ({ k: 1_000n, thousand: 1_000n, m: 1_000_000n, million: 1_000_000n, b: 1_000_000_000n, billion: 1_000_000_000n, t: 1_000_000_000_000n, trillion: 1_000_000_000_000n } as Record<string, bigint>)[m[3] ?? ""] ?? 1n;
   const cents = m[4]?.startsWith("cent");
   if (cents && (m[2] || m[3])) throw new UnitError(`not an amount: ${s}`);
   const frac = m[2] ?? "";
@@ -252,8 +253,8 @@ export function parseAmount(s: string): number {
   const scaled = (BigInt(whole.replace(/,/g, "")) * 1000n + BigInt((frac + "000").slice(0, 3))) * mult * unitsPerDollar;
   if (scaled % 1000n !== 0n) throw new UnitError(`fraction of a cent: ${s}`);
   const n = scaled / 1000n;
-  if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw new UnitError(`too large: ${s}`);
-  return Number(n);
+  if (n.toString().length > 38) throw new UnitError(`too large: ${s}`);
+  return n.toString();
 }
 
 const DAY = 86_400;

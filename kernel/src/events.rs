@@ -50,6 +50,9 @@ pub enum RefusalCode {
     UnknownRecord,
     WrongRecordKind,
     CapExceeded,
+    /// A payment between accounts in different currencies (an exchange is a trade: two transfers).
+    CurrencyMismatch,
+    UnknownCurrency,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,7 +117,9 @@ pub enum EventBody {
     Transfer {
         from: Id,
         to: Id,
-        amount: i64,
+        #[serde(with = "crate::money::amount")]
+        amount: crate::money::Money,
+        currency: Id,
         by: Id,
         reason: TransferReason,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -128,6 +133,7 @@ pub enum EventBody {
         account: Id,
         holder: Id,
         custodian: Id,
+        currency: Id,
         by: Id,
     },
     AccountClosed {

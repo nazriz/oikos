@@ -4,6 +4,7 @@
 // agreements, a survey of the town. No blocks, records, channels or refusal
 // codes. Deterministic: the same observation always reads the same.
 
+import { cents, formatMoney } from "../money";
 import type { Body, Observation, Record, SiteStructure, Transaction } from "../contracts";
 import { channels } from "../contracts";
 import { refusalText } from "./words";
@@ -11,12 +12,8 @@ import { refusalText } from "./words";
 const DAY = 86_400;
 const YEAR = 365 * DAY;
 
-export function money(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  const c = Math.abs(cents);
-  const dollars = Math.floor(c / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return `${sign}$${dollars}.${String(c % 100).padStart(2, "0")}`;
-}
+/** Money as people write it (money.ts). */
+export const money = formatMoney;
 
 export function when(t: number): string {
   return `year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((t % YEAR) / DAY) + 1}`;
@@ -186,8 +183,8 @@ function describeTransactions(txs: Transaction[], mine: Set<string>): string[] {
   const inflow = new Map<string, number>();
   const outflow = new Map<string, number>();
   for (const x of txs) {
-    if (mine.has(x.to) && !mine.has(x.from)) inflow.set(x.from, (inflow.get(x.from) ?? 0) + x.amount);
-    if (mine.has(x.from) && !mine.has(x.to)) outflow.set(x.to, (outflow.get(x.to) ?? 0) + x.amount);
+    if (mine.has(x.to) && !mine.has(x.from)) inflow.set(x.from, (inflow.get(x.from) ?? 0) + cents(x.amount));
+    if (mine.has(x.from) && !mine.has(x.to)) outflow.set(x.to, (outflow.get(x.to) ?? 0) + cents(x.amount));
   }
   const line = (label: string, m: Map<string, number>) => {
     if (m.size === 0) return [];

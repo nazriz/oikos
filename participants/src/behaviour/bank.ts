@@ -8,6 +8,7 @@
 // It is content: a bank run by a different module (or an AI) can freeze
 // accounts, ignore instructions, or pay the wrong people. Physics doesn't stop it.
 
+import { cents } from "../money";
 import type { Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
@@ -47,7 +48,7 @@ export const bankPaymentSystem: BehaviourModule = {
     const plan = (obs: Observation) => {
       const me = obs.entity;
       const withdrawn = book.withdrawn;
-      const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, a]));
+      const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, { ...a, balance: cents(a.balance) }]));
       const instructions = book.all("request").filter((r) => (r.addressed_to ?? []).includes(me)).sort((a, b) => (a.id < b.id ? -1 : 1));
       const out: Payment[] = [];
       // Deaths registered: the dead person's instructions are no longer carried out (law-succession).
@@ -75,7 +76,7 @@ export const bankPaymentSystem: BehaviourModule = {
           cannot("this bank only makes payments and opens accounts.");
           continue;
         }
-        const d = { from: m.from, to: m.to, pay: m.amount, settles: m.settles, every: ins.data.every, first: ins.data.first };
+        const d = { from: m.from, to: m.to, pay: cents(m.amount), settles: m.settles, every: ins.data.every, first: ins.data.first };
         const acc = custody.get(d.from);
         if (acc && dead.has(acc.holder)) continue; // the account holder has died: it pays out only to settle the estate
         if (!acc) {
@@ -152,7 +153,7 @@ export const bankPaymentSystem: BehaviourModule = {
         if (opens.length) return callAction(because("Opening accounts people asked for.", ...opens.splice(0, 32)));
         if (queue.length === 0) return wait();
 
-        const balance = new Map(channels.accounts(obs).map((a) => [a.account, a.balance]));
+        const balance = new Map(channels.accounts(obs).map((a) => [a.account, cents(a.balance)]));
         const holderOf = new Map(channels.accounts(obs).map((a) => [a.account, a.holder]));
         const blocks: Step = [];
         while (queue.length && blocks.length < maxBatch) {

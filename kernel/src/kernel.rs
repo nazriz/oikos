@@ -108,12 +108,12 @@ impl Kernel {
     pub fn new(loaded: &LoadedConfig) -> Result<Kernel, String> {
         let c = loaded.config.clone();
         let w = &c.world;
-        let boundary_account = w
-            .accounts
-            .iter()
-            .find(|a| a.holder == w.boundary && a.custodian == w.boundary)
-            .map(|a| a.id.clone())
-            .ok_or("the boundary needs an account in its own custody")?;
+        let currency = w.currencies[0].code.clone();
+        let cur_of = |a: &crate::config::AccountCfg| a.currency.clone().unwrap_or_else(|| currency.clone());
+        let mut boundary_accounts = BTreeMap::new();
+        for a in w.accounts.iter().filter(|a| a.holder == w.boundary && a.custodian == w.boundary) {
+            boundary_accounts.entry(cur_of(a)).or_insert_with(|| a.id.clone());
+        }
         let s = Statics {
             types: c.catalogue.structure_types.iter().map(|t| (t.id.clone(), t.clone())).collect(),
             spaces: c
@@ -124,7 +124,8 @@ impl Kernel {
                 .collect(),
             templates: c.templates.iter().map(|t| (t.id.clone(), t.clone())).collect(),
             boundary: w.boundary.clone(),
-            boundary_account,
+            boundary_accounts,
+            currency: currency.clone(),
             tick: c.clock.tick_seconds,
             randomness: Randomness::new(c.seed),
             config: c.clone(),
@@ -156,7 +157,7 @@ impl Kernel {
                     (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0, body })
                 })
                 .collect(),
-            accounts: w.accounts.iter().map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), balance: a.balance, changed: 0 })).collect(),
+            accounts: w.accounts.iter().map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), currency: cur_of(a), balance: a.balance, changed: 0 })).collect(),
             closed_accounts: crate::state::Map::new(),
             cells,
             structures: crate::state::Map::new(),

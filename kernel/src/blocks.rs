@@ -22,7 +22,8 @@ pub enum Block {
     Transfer {
         from: IdOrRef,
         to: IdOrRef,
-        amount: i64,
+        #[serde(with = "crate::money::amount")]
+        amount: crate::money::Money,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         settles: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -32,6 +33,9 @@ pub enum Block {
     },
     OpenAccount {
         holder: IdOrRef,
+        /// The account's currency; absent: the world's first (its default).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        currency: Option<Id>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },
@@ -73,8 +77,8 @@ pub enum Block {
         born_at: Option<i64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         template: Option<Id>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        carrying: Option<i64>,
+        #[serde(default, with = "crate::money::opt_amount", skip_serializing_if = "Option::is_none")]
+        carrying: Option<crate::money::Money>,
         /// A newcomer's biological sex, where the world models it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sex: Option<crate::state::Sex>,

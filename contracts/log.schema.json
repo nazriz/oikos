@@ -460,6 +460,7 @@
             "from",
             "to",
             "amount",
+            "currency",
             "by",
             "reason"
           ],
@@ -480,6 +481,10 @@
             },
             "amount": {
               "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Amount"
+            },
+            "currency": {
+              "description": "The currency of both accounts.",
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Currency"
             },
             "by": {
               "description": "The participant that physically executed it.",
@@ -514,6 +519,7 @@
             "account",
             "holder",
             "custodian",
+            "currency",
             "by"
           ],
           "additionalProperties": false,
@@ -533,6 +539,9 @@
             },
             "custodian": {
               "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+            },
+            "currency": {
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Currency"
             },
             "by": {
               "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
@@ -1322,7 +1331,9 @@
         "reserved_kind",
         "unknown_record",
         "wrong_record_kind",
-        "cap_exceeded"
+        "cap_exceeded",
+        "currency_mismatch",
+        "unknown_currency"
       ]
     },
     "AnnotationEntry": {

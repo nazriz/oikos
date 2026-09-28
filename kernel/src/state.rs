@@ -160,7 +160,10 @@ pub struct Condition {
 pub struct Account {
     pub holder: Id,
     pub custodian: Id,
-    pub balance: i64,
+    /// Its currency: every amount in or out of it is in this unit.
+    pub currency: Id,
+    #[serde(with = "crate::money::amount")]
+    pub balance: crate::money::Money,
     /// The change stamp of its last change (opened, balance moved).
     pub changed: u64,
 }
@@ -299,6 +302,7 @@ pub struct Look {
 pub struct ClosedAccount {
     pub holder: Id,
     pub custodian: Id,
+    pub currency: Id,
     pub changed: u64,
 }
 
@@ -348,7 +352,9 @@ pub struct Transaction {
     pub t: i64,
     pub from: Id,
     pub to: Id,
-    pub amount: i64,
+    #[serde(with = "crate::money::amount")]
+    pub amount: crate::money::Money,
+    pub currency: Id,
     pub by: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settles: Option<Id>,
@@ -446,9 +452,13 @@ impl State {
         self.records.insert(record.id.clone(), Stored { seq, record: Arc::new(record) });
     }
 
-    /// Total money in the world, including the boundary. Constant for a run.
-    pub fn total_money(&self) -> i128 {
-        self.accounts.values().map(|a| a.balance as i128).sum()
+    /// Total money in the world in each currency, including the boundary. Constant for a run.
+    pub fn total_money(&self) -> std::collections::BTreeMap<Id, crate::money::Money> {
+        let mut t = std::collections::BTreeMap::new();
+        for a in self.accounts.values() {
+            *t.entry(a.currency.clone()).or_insert(0) += a.balance;
+        }
+        t
     }
 
     /// Bodies in a space.

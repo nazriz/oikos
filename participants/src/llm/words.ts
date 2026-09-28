@@ -37,6 +37,8 @@ const REFUSAL: Record<string, string> = {
   unknown_record: "there's no such record",
   wrong_record_kind: "that record isn't the right kind of thing",
   cap_exceeded: "the world's limit on that has been reached",
+  currency_mismatch: "the two accounts are in different currencies, so money can't simply move between them (it would have to be exchanged)",
+  unknown_currency: "there's no such currency here",
 };
 
 /**

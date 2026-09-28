@@ -3,6 +3,7 @@ export * from "./module";
 export * from "./rng";
 export * from "./law";
 export * from "./canon";
+export * from "./money";
 export * as calls from "./calls";
 export { View } from "./view";
 export { ASKING } from "./behaviour/citizen";

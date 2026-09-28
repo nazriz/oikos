@@ -7,7 +7,8 @@
     "cause": 41,
     "from": "acc-bob",
     "to": "acc-devco",
-    "amount": 180000,
+    "amount": "180000",
+    "currency": "AUD",
     "reason": "payment"
   },
   "prev": "abababababababababababababababababababababababababababababababab",

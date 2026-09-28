@@ -2,5 +2,5 @@
   "block": "transfer",
   "from": "acc-bob",
   "to": "acc-devco",
-  "amount": 1800.5
+  "amount": "1800.5"
 }

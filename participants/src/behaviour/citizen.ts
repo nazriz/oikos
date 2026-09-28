@@ -22,11 +22,12 @@
 // Everything is done the way a person does it: applying, signing, moving in,
 // asking the bank to pay. Nothing happens to them automatically.
 
+import { cents } from "../money";
 import type { LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import * as C from "../calls";
-import { because, Book, callAction, DAY, usd, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step } from "./common";
+import { because, Book, callAction, DAY, usd, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
@@ -151,7 +152,7 @@ export const citizen: BehaviourModule = {
       }
       // Another adult's share of the rent, if one is already standing.
       const mine = [...book.records.values()].find((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.data?.outcome?.money?.for === "Household share of the rent.");
-      if (mine && !share) share = { cents: (mine as any).data.outcome.money.amount, order: mine.id };
+      if (mine && !share) share = { cents: cents((mine as any).data.outcome.money.amount), order: mine.id };
       void obs;
     };
 
@@ -203,7 +204,7 @@ export const citizen: BehaviourModule = {
       if (plannedAt === -1) learnFromInitialRecords(obs);
       const t = obs.t;
       // Our account at a bank (standing orders need one). Money brought from elsewhere is in our own keeping until we deposit it.
-      const ours = channels.accounts(obs).filter((a) => a.holder === me);
+      const ours = channels.accounts(obs).filter((a) => a.holder === me).map((a) => ({ ...a, balance: cents(a.balance) }));
       const acc = ours.find((a) => a.custodian !== me);
       const steps: Step[] = [];
       if (acc) for (const k of ours) if (k.custodian === me && k.balance > 0) steps.push(because("Depositing the money we brought into our bank account.", pay(acc.account, k.balance, { from: k.account, for: "Deposit." })));
@@ -583,7 +584,8 @@ export const citizen: BehaviourModule = {
     /** At the start, the share of the rent another adult already pays us (a standing order in the world's genesis records). */
     const genesisShare = (a: Member) => {
       const o = [...book.records.values()].find((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === a.person && r.data?.outcome?.money?.for === "Household share of the rent.");
-      return (o as any)?.data?.outcome?.money?.amount ?? -1;
+      const paid = (o as any)?.data?.outcome?.money?.amount;
+      return paid === undefined ? -1 : cents(paid);
     };
 
     /** Grown up with no account of our own (children have none): ask the bank for one, once. */
@@ -636,7 +638,7 @@ export const citizen: BehaviourModule = {
           return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY));
         }
         if (plannedAt !== obs.t) {
-          const acc = channels.accounts(obs).find((a) => a.holder === me && a.custodian !== me);
+          const acc = ownBanked(obs, me);
           const budget = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
           const needHome = isLeaseholder() && !home;
           const rooms = minBedrooms(obs.t);

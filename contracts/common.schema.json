@@ -16,14 +16,19 @@
       "maximum": 9007199254740991
     },
     "Cents": {
-      "description": "Money in integer cents. Only the boundary's account may be negative.",
-      "$ref": "#/$defs/SafeInt"
+      "description": "A balance: an integer in the smallest unit of its account's currency (cents for AUD), as a decimal string (D58: exact, and beyond JSON's 2^53). Only the outside world's accounts may be negative.",
+      "type": "string",
+      "pattern": "^(0|-?[1-9][0-9]{0,37})$"
     },
     "Amount": {
-      "description": "A strictly positive amount of money in integer cents.",
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 9007199254740991
+      "description": "A strictly positive amount of money: an integer in the smallest unit of its account's currency (cents for AUD), as a decimal string of at most 38 digits (D58: exact, and beyond JSON's 2^53). Its unit is the currency of the account it moves from or to.",
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,37}$"
+    },
+    "Currency": {
+      "description": "A currency's code: ISO 4217 for real ones (AUD), or a world's own.",
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]{1,7}$"
     },
     "SimTime": {
       "description": "Simulated seconds since the start of the run; a multiple of clock.tick_seconds once stamped by the kernel. Never wall-clock time.",

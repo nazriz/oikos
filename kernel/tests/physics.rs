@@ -31,7 +31,7 @@ fn refusal(r: &Response) -> Option<RefusalCode> {
     }
 }
 
-fn balance(run: &Run<Vec<u8>>, acc: &str) -> i64 {
+fn balance(run: &Run<Vec<u8>>, acc: &str) -> i128 {
     run.kernel().state().accounts[acc].balance
 }
 
@@ -45,7 +45,7 @@ fn created(r: &Response, name: &str) -> String {
 #[test]
 fn only_the_custodian_can_move_money() {
     let mut run = town();
-    let pay = json!([{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": 100}]);
+    let pay = json!([{"block": "transfer", "from": "acc-city", "to": "acc-devco", "amount": "100"}]);
     // The mayor and the city's own finance officer can't move the city's money: the bank holds it.
     assert_eq!(refusal(&act(&mut run, "mayor", pay.clone())), Some(RefusalCode::NotCustodian));
     assert_eq!(refusal(&act(&mut run, "finance", pay.clone())), Some(RefusalCode::NotCustodian));
@@ -57,9 +57,9 @@ fn only_the_custodian_can_move_money() {
 #[test]
 fn money_cant_be_conjured_or_overdrawn() {
     let mut run = town();
-    let r = act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": 800_001}]));
+    let r = act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-bob", "to": "acc-devco", "amount": "800001"}]));
     assert_eq!(refusal(&r), Some(RefusalCode::InsufficientFunds));
-    let r = act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-bob", "amount": 1}]));
+    let r = act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-bob", "amount": "1"}]));
     assert_eq!(refusal(&r), Some(RefusalCode::NotCustodian), "only the outside world holds its own account");
 }
 
@@ -68,7 +68,7 @@ fn money_enters_only_through_the_outside_worlds_own_participant() {
     // Riverbend has nobody acting for the outside world, so no money can come in at all...
     let mut run = town();
     assert_eq!(
-        refusal(&act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-devco", "amount": 1}]))),
+        refusal(&act(&mut run, "bank-payments", json!([{"block": "transfer", "from": "acc-outside", "to": "acc-devco", "amount": "1"}]))),
         Some(RefusalCode::NotCustodian)
     );
     // ...until a world gives the outside world a position someone acts in: its behaviour is the boundary condition (D31).
@@ -81,7 +81,7 @@ fn money_enters_only_through_the_outside_worlds_own_participant() {
         refusal(&act(
             &mut run,
             "export-demand",
-            json!([{"block": "transfer", "from": "acc-outside", "to": "acc-devco", "amount": 5_000_000}])
+            json!([{"block": "transfer", "from": "acc-outside", "to": "acc-devco", "amount": "5000000"}])
         )),
         None
     );
@@ -100,7 +100,7 @@ fn an_account_can_only_close_when_empty() {
         &mut run,
         "bank-payments",
         json!([
-            {"block": "transfer", "from": "acc-carol", "to": "acc-alice", "amount": 1200000},
+            {"block": "transfer", "from": "acc-carol", "to": "acc-alice", "amount": "1200000"},
             {"block": "close_account", "account": "acc-carol"}
         ]),
     );
@@ -301,8 +301,8 @@ fn actions_are_atomic() {
         "bank-payments",
         json!([
             {"block": "open_account", "holder": "carol", "ref": "a"},
-            {"block": "transfer", "from": "acc-bob", "to": "$a", "amount": 1000},
-            {"block": "transfer", "from": "acc-bob", "to": "$a", "amount": 999999999}
+            {"block": "transfer", "from": "acc-bob", "to": "$a", "amount": "1000"},
+            {"block": "transfer", "from": "acc-bob", "to": "$a", "amount": "999999999"}
         ]),
     );
     assert!(matches!(&r.events[0].body, EventBody::ActionRefused { code: RefusalCode::InsufficientFunds, block: Some(2), .. }));

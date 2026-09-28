@@ -1,0 +1,6 @@
+{
+  "block": "transfer",
+  "from": "acc-central",
+  "to": "acc-treasury",
+  "amount": "12000000000000000000"
+}

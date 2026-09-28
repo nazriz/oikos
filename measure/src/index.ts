@@ -87,7 +87,7 @@ const TABLES: { [name: string]: string } = {
     select $run as run_id, seq, t, json_extract_string(body, '$.event') as event, (json_extract_string(body, '$.cause'))::UBIGINT as cause, body
     from raw where kind = 'event'`,
   transfers: `
-    select $run as run_id, seq, t, json_extract_string(body, '$.from') as "from", json_extract_string(body, '$.to') as "to", (json_extract_string(body, '$.amount'))::BIGINT as amount,
+    select $run as run_id, seq, t, json_extract_string(body, '$.from') as "from", json_extract_string(body, '$.to') as "to", (json_extract_string(body, '$.amount'))::HUGEINT as amount, json_extract_string(body, '$.currency') as currency,
       json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by", json_extract_string(body, '$.settles') as settles, json_extract_string(body, '$.per_instruction') as per_instruction, json_extract_string(body, '$.memo') as memo
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'transfer'`,
   // Bodies going into and out of spaces (a space is <structure>/<kind>.<n>; its structure and kind are split out). Genesis occupancy at 0.

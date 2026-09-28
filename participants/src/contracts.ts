@@ -78,7 +78,8 @@ export interface Outcome {
 
 export interface Message { id: Id; t: number; from: Id; as?: Id; to: Id[]; text: string; re?: Id }
 
-export interface Transaction { t: number; from: Id; to: Id; amount: number; by: Id; settles?: Id; per_instruction?: Id; memo?: string }
+/** Amounts and balances are decimal-string integers in the currency's smallest unit (D58); `cents` (money.ts) reads them. */
+export interface Transaction { t: number; from: Id; to: Id; amount: string; currency: string; by: Id; settles?: Id; per_instruction?: Id; memo?: string }
 
 /** A space in a building: its kind and attributes (the world's vocabulary), how many bodies it holds at most, how many
  * are in it, and who (in the capacity's own buildings, or where its channel shows names). */
@@ -95,7 +96,7 @@ export interface ChildView { person: Id; born_at: number; sex?: Sex; alive: bool
 export interface Body { born_at: number; sex?: Sex; present: boolean; alive: boolean; parents?: Id[]; conditions?: Condition[]; children?: ChildView[] }
 
 export type ChannelData =
-  | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; balance: number; closed?: true }[]; transactions: Transaction[] }
+  | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; currency: string; balance: string; closed?: true }[]; transactions: Transaction[] }
   | { kind: "records"; records: Record[]; search?: true; whole?: true }
   | { kind: "sites"; as_of: number; cells: SiteCell[]; whole?: true }
   | { kind: "directory"; entities: { entity: Id; kind: string; name: string; participant?: Id }[]; positions: PositionItem[] };

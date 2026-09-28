@@ -5,6 +5,7 @@
 // after counting a ballot; money moves because the finance officer instructed
 // the bank, and the bank checked its signatory list.
 
+import { cents } from "../money";
 import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
@@ -256,8 +257,8 @@ export const financeOfficer: BehaviourModule = {
         letters.take(obs);
         const mine = ownAccount(obs)?.account;
         if (mine) for (const x of channels.transactions(obs)) {
-          if (x.to === mine && x.from !== mine) flows.push({ t: x.t, amount: x.amount, party: x.from });
-          if (x.from === mine && x.to !== mine) flows.push({ t: x.t, amount: -x.amount, party: x.to });
+          if (x.to === mine && x.from !== mine) flows.push({ t: x.t, amount: cents(x.amount), party: x.from });
+          if (x.from === mine && x.to !== mine) flows.push({ t: x.t, amount: -cents(x.amount), party: x.to });
         }
       },
       (obs) => {
@@ -274,7 +275,7 @@ export const financeOfficer: BehaviourModule = {
         for (const inv of book.open("invoice").sort((a, b) => (a.id < b.id ? -1 : 1))) {
           if (paid.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           const owed = inv.data?.outcome?.money;
-          const amount: number = owed?.amount ?? 0;
+          const amount = cents(owed?.amount);
           // Approved in writing by the mayor: made in the mayor's position, whoever holds it.
           const approved = book.open("approval").some((a) => a.data?.invoice === inv.id && a.in_position === p.mayor_position);
           const withinProcedure = spent + amount <= limit && (amount <= p.approval_over || approved);
@@ -339,7 +340,7 @@ export const taxClerk: BehaviourModule = {
         book.absorb(obs);
         letters.take(obs);
         const acc = ownAccount(obs);
-        if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account) received.set(tx.from, (received.get(tx.from) ?? 0) + tx.amount);
+        if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account) received.set(tx.from, (received.get(tx.from) ?? 0) + cents(tx.amount));
       },
       (obs) => {
         const me = obs.entity;
@@ -387,7 +388,7 @@ function fromForm(prop: StatementRecord | undefined, t: number): any {
   const d = prop?.data;
   if (!d?.proposal) return undefined;
   if (d.kind === "law") return { kind: "law", text: d.proposal };
-  if (d.kind === "budget") return { kind: "budget", text: d.proposal, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: Number.isInteger(d.parks) ? d.parks : 0 } } };
+  if (d.kind === "budget") return { kind: "budget", text: d.proposal, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: d.parks === undefined ? 0 : cents(d.parks) } } };
   return undefined;
 }
 

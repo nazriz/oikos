@@ -15,7 +15,7 @@
       "money": {
         "from": "acc-devco",
         "to": "acc-buildco",
-        "amount": 250000000,
+        "amount": "250000000",
         "for": "the p12 foundations"
       }
     }

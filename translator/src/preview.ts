@@ -2,14 +2,11 @@
 // world words, generated mechanically from the blocks, never written by the
 // translator. The participant reads this before confirming.
 
-import type { Block } from "@terrarium/participants";
+import { formatMoney, type Block } from "@terrarium/participants";
 import type { Knowledge } from "./knowledge";
 
 const DAY = 86_400;
-const $ = (cents: number) => {
-  const d = Math.floor(Math.abs(cents) / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return `${cents < 0 ? "-" : ""}$${d}.${String(Math.abs(cents) % 100).padStart(2, "0")}`;
-};
+const $ = formatMoney;
 const span = (s: number) => (s % (365 * DAY) === 0 ? `${s / (365 * DAY)} year${s === 365 * DAY ? "" : "s"}` : s % DAY === 0 ? `${s / DAY} day${s === DAY ? "" : "s"}` : `${s} seconds`);
 
 export class Preview {

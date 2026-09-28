@@ -80,9 +80,11 @@ pub struct Catalogue {
 pub struct StructureType {
     pub id: Id,
     pub category: String,
-    pub materials_cost: i64,
+    #[serde(with = "crate::money::amount")]
+    pub materials_cost: crate::money::Money,
     pub build_time: i64,
-    pub demolition_cost: i64,
+    #[serde(with = "crate::money::amount")]
+    pub demolition_cost: crate::money::Money,
     /// The cells it stands on: `w` by `h`, from the corner cell it's built at.
     pub footprint: Footprint,
     /// Terrain labels it can stand on; absent: any cell with no terrain label.
@@ -118,6 +120,8 @@ pub struct SpaceSpec {
 #[serde(deny_unknown_fields)]
 pub struct World {
     pub boundary: Id,
+    /// The currencies the world's money comes in; the first is the default.
+    pub currencies: Vec<CurrencyCfg>,
     pub ground: Ground,
     pub entities: Vec<EntityCfg>,
     pub accounts: Vec<AccountCfg>,
@@ -188,7 +192,20 @@ pub struct AccountCfg {
     pub id: Id,
     pub holder: Id,
     pub custodian: Id,
-    pub balance: i64,
+    /// Absent: the world's first currency.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency: Option<Id>,
+    #[serde(with = "crate::money::amount")]
+    pub balance: crate::money::Money,
+}
+
+/// A currency the world's money comes in: its code, and how many decimal places its smallest unit is
+/// (presentation only: the kernel counts in the smallest unit).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrencyCfg {
+    pub code: Id,
+    pub minor_units: u8,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -666,21 +683,29 @@ pub fn validate(c: &Config) -> Result<(), String> {
         }
     }
 
-    // Money.
-    let mut total: i128 = 0;
+    // Money: in declared currencies, within range, and the outside world holds an account in each currency.
+    let currencies: BTreeSet<&str> = w.currencies.iter().map(|c| c.code.as_str()).collect();
+    if currencies.len() != w.currencies.len() {
+        return Err("a currency is declared twice".into());
+    }
+    let mut totals: BTreeMap<&str, crate::money::Money> = BTreeMap::new();
     for a in &w.accounts {
         entity(&a.holder)?;
         entity(&a.custodian)?;
+        let cur = a.currency.as_deref().unwrap_or(&w.currencies[0].code);
+        if !currencies.contains(cur) {
+            return Err(format!("account {} is in {cur}, which the world doesn't declare", a.id));
+        }
         if a.holder != w.boundary && a.balance < 0 {
             return Err(format!("account {} has a negative opening balance", a.id));
         }
-        if a.balance.abs() > canon::MAX_SAFE {
-            return Err(format!("account {} balance out of range", a.id));
-        }
-        total += a.balance as i128;
+        let t = totals.entry(cur).or_insert(0);
+        *t = t.checked_add(a.balance).filter(|x| x.abs() <= crate::money::MAX_MONEY).ok_or_else(|| format!("total money in {cur} out of range"))?;
     }
-    if total.abs() > canon::MAX_SAFE as i128 {
-        return Err("total money out of range".into());
+    for cur in &currencies {
+        if !w.accounts.iter().any(|a| a.holder == w.boundary && a.custodian == w.boundary && a.currency.as_deref().unwrap_or(&w.currencies[0].code) == *cur) {
+            return Err(format!("the outside world needs an account in its own custody in {cur}"));
+        }
     }
 
     // Structures: footprints on the ground, on terrain they can stand on, not overlapping.

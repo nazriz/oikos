@@ -245,13 +245,13 @@ export function generate(spec: TownSpec): any {
       template: "employment", parties: [w.employer, c.id],
       // Commitments in the standard encoding (outcomes, docs/design/translator-and-resolver.md §9.2).
       commitments: [
-        { who: w.employer, does: { outcome: { money: { to: `acc-${c.id}`, amount: w.wage, for: "wages" } } }, every: 14 * DAY },
+        { who: w.employer, does: { outcome: { money: { to: `acc-${c.id}`, amount: String(w.wage), for: "wages" } } }, every: 14 * DAY },
         { who: c.id, does: { outcome: { occupancy: { who: c.id, in: w.space } } } },
       ],
       termination: [{ party: w.employer, notice: 14 * DAY }, { party: c.id, notice: 14 * DAY }] } });
     for (const party of [w.employer, c.id]) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [w.employer, c.id], speaks_for: party, agreement: ag, as: party });
     records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, kind: "request", addressed_to: ["bank"], basis: ag,
-      text: `Please pay ${c.id}'s wages every 14 days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: w.wage, for: "wages" } }, every: 14 * DAY, first: (1 + pick.below(14)) * DAY } });
+      text: `Please pay ${c.id}'s wages every 14 days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage), for: "wages" } }, every: 14 * DAY, first: (1 + pick.below(14)) * DAY } });
     occupancy.push({ occupant: c.id, space: w.space });
   }
 
@@ -292,21 +292,21 @@ export function generate(spec: TownSpec): any {
       template: "lease", parties: [home.landlord, lh],
       commitments: [
         { who: home.landlord, does: { outcome: { occupancy: { who: lh, in: home.space } } } },
-        { who: lh, does: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: home.rent, for: "rent" } } }, every: MONTH },
+        { who: lh, does: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } } }, every: MONTH },
       ],
       term: Math.max(MONTH, term - elapsed),
       termination: [{ party: home.landlord, notice: 60 * DAY }, { party: lh, notice: 30 * DAY }],
       text: `${lh} rents home ${home.space} from ${home.landlord}${others.length ? `, to live there with their household: ${others.map((m) => m.id).join(", ")}` : ""}.` } });
     for (const party of visible) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: visible, speaks_for: party, agreement: ag, as: party });
     records.push({ id: `${ag}-rent`, record: "statement", author: "genesis", at: 0, visible_to: [lh, "bank"], speaks_for: lh, kind: "request", addressed_to: ["bank"], basis: ag,
-      text: "Please pay my rent monthly.", data: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: home.rent, for: "rent" } }, every: MONTH, first: (1 + pick.below(30)) * DAY } });
+      text: "Please pay my rent monthly.", data: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } }, every: MONTH, first: (1 + pick.below(30)) * DAY } });
     // The other adults who earn pay the leaseholder an even share of the rent.
     const earners = h.members.filter((m) => (monthlyPay.get(m.id) ?? 0) > 0);
     for (const m of others) {
       if (!earners.includes(m)) continue;
       const due = Math.floor(home.rent / earners.length);
       records.push({ id: `share-${m.id}`, record: "statement", author: "genesis", at: 0, visible_to: [m.id, "bank"], speaks_for: m.id, kind: "request", addressed_to: ["bank"],
-        text: "Please pay my share of the rent monthly.", data: { outcome: { money: { from: `acc-${m.id}`, to: `acc-${lh}`, amount: due, for: "Household share of the rent." } }, every: MONTH, first: (1 + pick.below(30)) * DAY } });
+        text: "Please pay my share of the rent monthly.", data: { outcome: { money: { from: `acc-${m.id}`, to: `acc-${lh}`, amount: String(due), for: "Household share of the rent." } }, every: MONTH, first: (1 + pick.below(30)) * DAY } });
     }
     for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
   }
@@ -440,8 +440,9 @@ export function generate(spec: TownSpec): any {
     seed: spec.seed,
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
-    catalogue: { structure_types: structureTypes },
-    world: { boundary: "outside", ground: { w: spec.grid.w, h: spec.grid.h }, entities, accounts, structures, occupancy, records },
+    // Amounts on the wire are decimal strings (D58); the generator counts in numbers.
+    catalogue: { structure_types: structureTypes.map((t) => ({ ...t, materials_cost: String(t.materials_cost), demolition_cost: String(t.demolition_cost) })) },
+    world: { boundary: "outside", currencies: [{ code: "AUD", minor_units: 2 }], ground: { w: spec.grid.w, h: spec.grid.h }, entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records },
     participants,
     positions,
     templates,

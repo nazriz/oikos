@@ -57,7 +57,7 @@ fn someone_arrives_from_outside_carrying_their_money_and_can_leave_and_come_back
     let mut run = town();
     let total = run.kernel().state().total_money();
     // Only the outside world brings people in.
-    let newcomer = json!([{"block": "arrive", "name": "Dana", "born_at": -28 * YEAR, "template": "newcomer", "carrying": 250_000, "ref": "d"}]);
+    let newcomer = json!([{"block": "arrive", "name": "Dana", "born_at": -28 * YEAR, "template": "newcomer", "carrying": "250000", "ref": "d"}]);
     assert_eq!(refusal(&act(&mut run, "mayor-system", Some("mayor"), newcomer.clone())), Some(RefusalCode::NotTheirs));
     let r = act(&mut run, "outside-system", Some("outside-trade"), newcomer);
     assert_eq!(refusal(&r), None);
@@ -173,7 +173,7 @@ fn many(n: usize, life: Value, occupied: bool) -> Run<Vec<u8>> {
     }
     if occupied {
         // A dangerous workplace everyone is in.
-        c["catalogue"]["structure_types"].as_array_mut().unwrap().push(json!({"id": "mine", "category": "industrial", "materials_cost": 1, "build_time": DAY, "demolition_cost": 1, "footprint": {"w": 1, "h": 1}, "injury_bps": 3000, "spaces": [{"kind": "workplace", "count": 1, "capacity": 100000}]}));
+        c["catalogue"]["structure_types"].as_array_mut().unwrap().push(json!({"id": "mine", "category": "industrial", "materials_cost": "1", "build_time": DAY, "demolition_cost": "1", "footprint": {"w": 1, "h": 1}, "injury_bps": 3000, "spaces": [{"kind": "workplace", "count": 1, "capacity": 100000}]}));
         c["world"]["structures"].as_array_mut().unwrap().push(json!({"id": "s-mine", "at": "cell.2.0", "type": "mine"}));
         let occ = c["world"]["occupancy"].as_array_mut().unwrap();
         for i in 0..n {

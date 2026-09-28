@@ -7,11 +7,11 @@ agreements as (
   from records r where r.record = 'agreement' and r.template in ('lease', 'employment')
     and (select count(*) from signed s where s.run_id = r.run_id and s.agreement = r.id) > 0),
 leases as (
-  select run_id, second as tenant, arg_max((json_extract_string(list_filter(commitments, c -> json_extract_string(c, '$.who') = second)[1], '$.does.outcome.money.amount'))::BIGINT, t) as rent
+  select run_id, second as tenant, arg_max((json_extract_string(list_filter(commitments, c -> json_extract_string(c, '$.who') = second)[1], '$.does.outcome.money.amount'))::HUGEINT, t) as rent
   from agreements where template = 'lease' group by all),
 jobs as (
   select a.run_id, a.second as worker,
-    sum((json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.does.outcome.money.amount'))::BIGINT * 30 / 14) as monthly
+    sum((json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.does.outcome.money.amount'))::HUGEINT * 30 / 14) as monthly
   from agreements a where a.template = 'employment' and not exists (select 1 from noticed n where n.run_id = a.run_id and n.agreement = a.id) group by all),
 hh as (
   select r.run_id, json_extract_string(r.body, '$.data.leaseholder') as leaseholder, from_json(json_extract(r.body, '$.data.members'), '["JSON"]') as members

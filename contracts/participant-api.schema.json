@@ -595,6 +595,7 @@
                   "account",
                   "holder",
                   "custodian",
+                  "currency",
                   "balance"
                 ],
                 "additionalProperties": false,
@@ -607,6 +608,9 @@
                   },
                   "custodian": {
                     "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+                  },
+                  "currency": {
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Currency"
                   },
                   "balance": {
                     "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Cents"
@@ -628,6 +632,7 @@
                   "from",
                   "to",
                   "amount",
+                  "currency",
                   "by"
                 ],
                 "additionalProperties": false,
@@ -643,6 +648,10 @@
                   },
                   "amount": {
                     "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Amount"
+                  },
+                  "currency": {
+                    "description": "The currency of both accounts.",
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Currency"
                   },
                   "by": {
                     "description": "The participant that executed it.",

@@ -20,7 +20,7 @@
           "outcome": {
             "money": {
               "to": "acc-devco",
-              "amount": 180000
+              "amount": "180000"
             }
           }
         },

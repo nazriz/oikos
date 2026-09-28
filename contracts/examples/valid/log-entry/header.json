@@ -30,9 +30,9 @@
           {
             "id": "house",
             "category": "residential",
-            "materials_cost": 30000000,
+            "materials_cost": "30000000",
             "build_time": 7776000,
-            "demolition_cost": 2000000,
+            "demolition_cost": "2000000",
             "footprint": {
               "w": 1,
               "h": 1
@@ -48,9 +48,9 @@
           {
             "id": "apartments",
             "category": "residential",
-            "materials_cost": 250000000,
+            "materials_cost": "250000000",
             "build_time": 15552000,
-            "demolition_cost": 10000000,
+            "demolition_cost": "10000000",
             "footprint": {
               "w": 1,
               "h": 1
@@ -66,9 +66,9 @@
           {
             "id": "shop",
             "category": "commercial",
-            "materials_cost": 60000000,
+            "materials_cost": "60000000",
             "build_time": 7776000,
-            "demolition_cost": 3000000,
+            "demolition_cost": "3000000",
             "footprint": {
               "w": 1,
               "h": 1
@@ -89,9 +89,9 @@
           {
             "id": "park",
             "category": "green",
-            "materials_cost": 5000000,
+            "materials_cost": "5000000",
             "build_time": 2592000,
-            "demolition_cost": 500000,
+            "demolition_cost": "500000",
             "footprint": {
               "w": 1,
               "h": 1
@@ -102,6 +102,12 @@
       },
       "world": {
         "boundary": "outside",
+        "currencies": [
+          {
+            "code": "AUD",
+            "minor_units": 2
+          }
+        ],
         "ground": {
           "w": 4,
           "h": 2
@@ -156,49 +162,49 @@
             "id": "acc-outside",
             "holder": "outside",
             "custodian": "outside",
-            "balance": 0
+            "balance": "0"
           },
           {
             "id": "acc-bank",
             "holder": "bank",
             "custodian": "bank",
-            "balance": 100000000
+            "balance": "100000000"
           },
           {
             "id": "acc-city",
             "holder": "city",
             "custodian": "bank",
-            "balance": 500000000
+            "balance": "500000000"
           },
           {
             "id": "acc-devco",
             "holder": "devco",
             "custodian": "bank",
-            "balance": 200000000
+            "balance": "200000000"
           },
           {
             "id": "acc-buildco",
             "holder": "buildco",
             "custodian": "bank",
-            "balance": 80000000
+            "balance": "80000000"
           },
           {
             "id": "acc-alice",
             "holder": "alice",
             "custodian": "bank",
-            "balance": 2500000
+            "balance": "2500000"
           },
           {
             "id": "acc-bob",
             "holder": "bob",
             "custodian": "bank",
-            "balance": 800000
+            "balance": "800000"
           },
           {
             "id": "acc-carol",
             "holder": "carol",
             "custodian": "bank",
-            "balance": 1200000
+            "balance": "1200000"
           }
         ],
         "structures": [
@@ -565,7 +571,7 @@
                     "outcome": {
                       "money": {
                         "to": "acc-devco",
-                        "amount": 180000
+                        "amount": "180000"
                       }
                     }
                   },
@@ -651,7 +657,7 @@
                     "outcome": {
                       "money": {
                         "to": "acc-carol",
-                        "amount": 400000
+                        "amount": "400000"
                       }
                     }
                   },
@@ -715,7 +721,7 @@
                 "money": {
                   "from": "acc-bob",
                   "to": "acc-devco",
-                  "amount": 180000
+                  "amount": "180000"
                 }
               },
               "every": 2592000,
@@ -743,7 +749,7 @@
                 "money": {
                   "from": "acc-devco",
                   "to": "acc-carol",
-                  "amount": 400000
+                  "amount": "400000"
                 }
               },
               "every": 1209600,

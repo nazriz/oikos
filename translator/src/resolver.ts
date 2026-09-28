@@ -9,7 +9,7 @@
 //   - it uses only what the participant knows (P8). Ids the participant states outright
 //     are passed through: if one doesn't exist, physics says so.
 
-import { calls, type Block } from "@terrarium/participants";
+import { calls, formatMoney, type Block } from "@terrarium/participants";
 import { Knowledge } from "./knowledge";
 
 type Call = calls.Call;
@@ -38,7 +38,7 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
 
 class Ask extends Error {}
 
-const $ = (cents: number) => `$${Math.floor(cents / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${String(cents % 100).padStart(2, "0")}`;
+const $ = formatMoney;
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
 export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string): Resolution {
@@ -115,7 +115,7 @@ class Resolver {
     if ("id" in v) return v.id;
     throw new Ask(`${key} should be written out.`);
   }
-  private amount(c: Call, key: string): number | undefined {
+  private amount(c: Call, key: string): string | undefined {
     const s = this.str(c, key);
     return s === undefined ? undefined : calls.parseAmount(s);
   }
@@ -219,7 +219,7 @@ class Resolver {
 
   private money(c: Call, bind?: string): Block[] {
     const from = this.payer(c, "the payment");
-    const out = this.moneyOutcome(c, from).money as { to: string; amount: number; for?: string; settles?: string };
+    const out = this.moneyOutcome(c, from).money as { to: string; amount: string; for?: string; settles?: string };
     const every = this.seconds(c, "every");
     const first = this.seconds(c, "first");
     const keeper = this.keeper(from);
