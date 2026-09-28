@@ -7,7 +7,13 @@ import { DEFAULT_HOUSEHOLDS, drawHousehold, Randomness, type HouseholdSpec } fro
 export { DEFAULT_HOUSEHOLDS };
 import law from "../law/basic.json";
 
-export const GENERATOR_VERSION = "0.10.0";
+/** A park's materials, and the builder's price over materials (both the builder and the finance office's budget brief use them). */
+const PARK_MATERIALS = 5_000_000;
+const BUILD_MARKUP_BPS = 2000;
+/** Whole dollars with thousands separators, the same on every machine. */
+const usdWhole = (cents: number) => `$${String(Math.floor(cents / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+export const GENERATOR_VERSION = "0.11.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -347,14 +353,16 @@ export function generate(spec: TownSpec): any {
   office("export-demand", "outside", "The outside world's demand", undefined, [{ id: "ledger", kind: "accounts" }],
     code("world.export_demand", { purchases: factories.map((f) => ({ to: `acc-${f}`, amount: Math.floor(spec.exports_per_month / factories.length), every: MONTH, memo: "Export sales." })) }));
   // The foreman knows the registry's lots and goes to see the ground, to know where on a lot a building goes.
-  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "ground", kind: "sites", area: "all", every: 7 * DAY }], code("firm.builder"));
+  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "ground", kind: "sites", area: "all", every: 7 * DAY }], code("firm.builder", { build_markup_bps: BUILD_MARKUP_BPS }));
   const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
   office("planning", "city", "Planning officer", "planning_officer", [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } }], code("city.planning_officer"));
   office("inspector", "city", "Building inspector", "inspector",
     [laws, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "patrol", kind: "sites", area: "all", every: 14 * DAY }],
     code("city.inspector"));
   const civic = (id: string, kinds: string[]) => ({ id, kind: "records", match: { statement_kinds: kinds } });
-  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"])], code("city.finance_officer"));
+  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"])], code("city.finance_officer", {
+    // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
+    budget_lines: { parks: `building a park on one of the town's free lots, commissioned from the builder: about ${usdWhole(Math.floor((PARK_MATERIALS * (10_000 + BUILD_MARKUP_BPS)) / 10_000))} a park (the builder's price). The town has no other spending from its account: no paid staff or running services.` } }));
   office("tax-clerk", "city", "Tax clerk", "tax_clerk", [{ id: "treasury", kind: "accounts" }, laws, civic("reports", ["tax_report"])], code("city.tax_clerk"));
   office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [civic("notifications", ["death_notification"]), deaths], code("city.registry"));
   office("child-protection", "city", "Child protection officer", "child_protection", [deaths, civic("requests", ["care_request"])], code("city.child_protection"));
@@ -423,7 +431,7 @@ export function generate(spec: TownSpec): any {
       { id: "shop", category: "commercial", materials_cost: 60_000_000, build_time: 90 * DAY, demolition_cost: 3_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 6 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.shop }) },
       { id: "factory", category: "industrial", materials_cost: 400_000_000, build_time: 240 * DAY, demolition_cost: 20_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY_BPS.factory }) },
       { id: "civic", category: "civic", materials_cost: 80_000_000, build_time: 120 * DAY, demolition_cost: 4_000_000, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }] },
-      { id: "park", category: "green", materials_cost: 5_000_000, build_time: 30 * DAY, demolition_cost: 500_000, footprint: { w: 1, h: 1 }, spaces: [] },
+      { id: "park", category: "green", materials_cost: PARK_MATERIALS, build_time: 30 * DAY, demolition_cost: 500_000, footprint: { w: 1, h: 1 }, spaces: [] },
     ] },
     world: { boundary: "outside", ground: { w: spec.grid.w, h: spec.grid.h }, entities, accounts, structures, occupancy, records },
     participants,

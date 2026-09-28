@@ -58,6 +58,8 @@ It wakes every 3 days and, for each invoice addressed to the town, pays through 
 
 Otherwise it waits: an approval or next year's budget may come. With probability `1 − compliance_bps` it pays anyway.
 
+It answers letters with its report: the balance, money in and out, the adopted budget and what's been spent under it, unpaid invoices, and the **budget brief**. The brief lists the budget's lines and what each one pays for (`budget_lines`, from world config), and says that the amounts are for the mayor and the council. The generated town has one line, parks, priced at the builder's rate. Without the brief, a language-model mayor asked for cost estimates day after day and never tabled a budget (pilot 3, docs/real-models.md). It had no way to learn what a budget in this town could fund, and a real finance office would tell it.
+
 **Source:** delegated spending limits and budget control, as in real local-government finance.
 
 ## `city.tax_clerk`

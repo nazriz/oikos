@@ -1,4 +1,4 @@
-# The town generator (`worlds/generator/generate.ts`, v0.10.0)
+# The town generator (`worlds/generator/generate.ts`, v0.11.0)
 
 Turns a short spec (`worlds/town.yaml`) into a full, explicit contracts v0.4 world config. It's deterministic from the spec's seed, using the kernel's keyed randomness. The kernel never generates anything; it receives this output. Everything generated is example **content** (D23).
 
@@ -17,6 +17,7 @@ Turns a short spec (`worlds/town.yaml`) into a full, explicit contracts v0.4 wor
   - the town's `signatories` list for its account (the finance officer's position) and its payments procedure.
 - **Positions and participants:** every organisation acts through positions, each held at the start by a system participant running the job's module:
   - the mayor: with `mayor: llm`, a language-model participant (weekly cadence; the laws as standing documents; until a real model is used, the mock, with `city.mayor_code` as its brain, see docs/design/m2-llm-participants.md), or with `mayor: code` the rule-following code mayor (the all-code control);
+  - the finance officer's budget brief (`budget_lines`): one line, parks, at the builder's price for a park (materials plus the builder's 20%, the same constants the builder uses);
   - the city's finance officer, planning officer, inspector, tax clerk, council clerk, and five councillors at positions −80, −40, 0, 40 and 80 ([government.md](government.md));
   - the bank's payment system and the outside world's export demand;
   - the builder's site foreman, landlords' letting offices, shop and factory managers;

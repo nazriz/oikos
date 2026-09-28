@@ -155,4 +155,7 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   const read = seen.join("\n");
   expect(read).toContain("Report from the finance office: the town's account acc-city holds");
   expect(read).toContain("council proposal form");
+  // The budget brief: what the budget can pay for, and what a park costs.
+  expect(read).toContain("The budget's lines: parks, for building a park");
+  expect(read).toContain("about $60,000 a park");
 }, 300_000);

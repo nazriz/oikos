@@ -225,15 +225,16 @@ export const councillor: BehaviourModule = {
  * city.finance_officer: pays the town's bills as the payments procedure says:
  * within the adopted budget, and over `approval_over` only with the mayor's
  * written approval. Pays by instructing the bank (it is the account's named
- * signatory). params: compliance_bps (how often it follows procedure).
+ * signatory). Answers letters with its report, including the budget's lines
+ * (`budget_lines`: line → what it pays for). params: compliance_bps (how often it follows procedure).
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_position: "mayor" }, ctx.params);
+    const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_position: "mayor", budget_lines: {} as Record<string, string> }, ctx.params);
     const book = new Book();
     const paid = new Set<string>();
     let spent = 0;
@@ -294,6 +295,8 @@ export const financeOfficer: BehaviourModule = {
             : "No money has moved in or out of the account yet. ";
           return `Report from the finance office: the town's account ${acc.account} holds ${usd(acc.balance)}. ` + history +
             (budget ? `The adopted budget (${budget.id}, year ${budget.data?.year}): ${lines}; spent under it so far ${usd(spent)}. ` : "No budget has been adopted for this year. ") +
+            // The budget brief: what each line pays for (world config). The amounts are the mayor's and the council's to set.
+            (Object.keys(p.budget_lines).length ? `The budget's lines: ${Object.entries(p.budget_lines).map(([k, v]) => `${k}, for ${v}`).join("; ")} Setting the amounts is for the mayor and the council; a budget goes to the council on the council proposal form. ` : "") +
             (unpaid.length ? `Invoices awaiting payment: ${unpaid.map((i) => `${i.id} (${usd(i.data?.outcome?.money?.amount ?? 0)})`).join(", ")}.` : "No invoices are awaiting payment.");
         }));
         return steps;
