@@ -20,6 +20,8 @@ export interface StructureFact {
 export class Knowledge {
   readonly withdrawn = new Set<string>();
   readonly accounts = new Map<string, AccountFact>(); // accounts the participant can see directly
+  /** What the entity acted for holds, and where (phase B): `at|kind` -> quantity (a decimal-string integer). */
+  readonly holdings = new Map<string, { kind: string; at: string; quantity: string }>();
   /** entity -> accounts it has asked to be paid into (the shared outcome language: a money outcome with no `from`, in a statement it speaks for). */
   readonly stated = new Map<string, Set<string>>();
   readonly names = new Map<string, string>(); // entity -> name
@@ -54,6 +56,11 @@ export class Knowledge {
         for (const a of ch.accounts) {
           if (a.closed) this.accounts.delete(a.account);
           else this.accounts.set(a.account, { account: a.account, holder: a.holder, custodian: a.custodian });
+        }
+      } else if (ch.kind === "holdings") {
+        for (const h of ch.holdings) {
+          if (h.quantity === "0") this.holdings.delete(`${h.at}|${h.kind}`);
+          else this.holdings.set(`${h.at}|${h.kind}`, h);
         }
       } else if (ch.kind === "sites") {
         for (const c of ch.cells) {
@@ -133,6 +140,11 @@ export class Knowledge {
   /** Forms the participant has seen and that still stand. */
   get forms(): StatementRecord[] {
     return [...this.formsById.values()].filter((f) => !this.withdrawn.has(f.id));
+  }
+
+  /** Where the entity holds some of a kind (phase B). */
+  placesHolding(kind: string): string[] {
+    return [...this.holdings.values()].filter((h) => h.kind === kind).map((h) => h.at).sort();
   }
 
   /** The standing form, by its name or its record's id, published by an institution a participant, position or entity id names. */

@@ -66,6 +66,8 @@ export const TOOLS: ToolSpec[] = [
 /** What each function brings about: the language's own glosses (no world, no platform). */
 const GLOSS: { [fn: string]: string } = {
   money: "money moves to someone (once, or every so often)",
+  goods: "things you hold (a quantity of a kind) move from where they are to someone, yourself included, at a place; as a commitment, goods delivered (once, or every so often)",
+  work: "people at a place do some units of a kind of work there (by: who; on: what it's done to, like a building being built)",
   account: "an account is opened or closed",
   structure: "a building goes up, or comes down (and who does it)",
   occupancy: "someone moves into or out of a building",

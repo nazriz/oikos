@@ -26,6 +26,19 @@
             "settles": { "$ref": "#/$defs/Id" }
           }
         },
+        "goods": {
+          "description": "Goods delivered (phase B): a quantity of a kind to someone at a place, from the one committed's holding (at `from`, if said).",
+          "type": "object",
+          "required": ["kind", "quantity", "to", "at"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "$ref": "#/$defs/Id" },
+            "quantity": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Quantity" },
+            "to": { "$ref": "#/$defs/Id" },
+            "at": { "$ref": "#/$defs/Id" },
+            "from": { "$ref": "#/$defs/Id" }
+          }
+        },
         "account": {
           "type": "object",
           "required": ["holder"],

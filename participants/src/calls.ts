@@ -6,7 +6,7 @@
 import { canonical } from "./canon";
 import CALLS_SCHEMA from "../../contracts/calls.schema.json";
 
-export const FUNCTIONS = ["money", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system"] as const;
+export const FUNCTIONS = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
 export const LABELS = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form"] as const;
 export type Label = (typeof LABELS)[number];

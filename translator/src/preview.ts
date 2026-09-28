@@ -35,6 +35,7 @@ export class Preview {
   outcome(o: any, every?: number): string {
     const rep = every ? ` every ${span(every)}` : "";
     if (o?.money) return `pay ${$(o.money.amount)}${o.money.from ? ` from ${this.acct(o.money.from)}` : ""} to ${this.who(o.money.to)}${rep}${o.money.for ? `, for ${o.money.for}` : ""}`;
+    if (o?.goods) return `deliver ${o.goods.quantity} ${o.goods.kind}${o.goods.from ? ` from ${o.goods.from}` : ""} to ${this.who(o.goods.to)} at ${o.goods.at}${rep}`;
     if (o?.structure) return o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`;
     if (o?.occupancy) return o.occupancy.leave ? `have ${this.who(o.occupancy.who)} leave ${o.occupancy.in}` : `let ${this.who(o.occupancy.who)} live or be in ${o.occupancy.in}`;
     if (o?.account) return o.account.close ? `close account ${o.account.close}` : `open an account for ${this.who(o.account.holder)}`;

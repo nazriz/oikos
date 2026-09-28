@@ -23,6 +23,11 @@ export const CASES: Case[] = [
   { id: "commission-park", request: 'Have greenco build a park on lot-00 for $60,000, paid from acc-city, under permit rec.412.', expect: ['structure(type=park, on=lot-00, by=greenco, price="$60,000", from=acc-city, basis=rec.412)'] },
   { id: "demolish", request: "We'll knock down str.9 ourselves (city), paying from acc-city.", expect: ["structure(remove=str.9, by=city, from=acc-city)"] },
   { id: "build-held-out", request: "Get GreenCo to put a park on lot-01. Offer them $45k out of acc-city.", expect: ['structure(type=park, on=lot-01, by="GreenCo", price="$45k", from=acc-city)', 'structure(type=park, on=lot-01, by=greenco, price="$45k", from=acc-city)'], held_out: true },
+  // goods and work (phase B)
+  { id: "move-goods", request: "Move 40 goods from str.7 to the builder at str.8.", expect: ["goods(kind=goods, quantity=40, from_at=str.7, to=builder, at=str.8)"] },
+  { id: "work", request: "Have c0042 do 3 units of make at str.7.", expect: ["work(task=make, units=3, at=str.7, by=c0042)", 'work(task=make, units=3, at=str.7, by=["c0042"])'] },
+  { id: "work-held-out", request: "Put Dana Reyes on the job at str.5: two hours of building (7200 units of build), working out of the yard at str.2.", held_out: true,
+    expect: ['work(task=build, units=7200, at=str.2, by="Dana Reyes", on=str.5)', "work(task=build, units=7200, at=str.2, by=c0042, on=str.5)", 'work(task=build, units=7200, at=str.2, by=["c0042"], on=str.5)'] },
   // forms
   { id: "form-permit", request: "Apply to planning for a permit to build a park on lot-00.", expect: ["form(to=planning, form=permit_application, lot=lot-00, structure_type=park)"] },
   { id: "form-held-out", request: "Lodge the planning application: lot-01, apartments, and note that it's affordable housing.", expect: ['form(to=planning, form=permit_application, lot=lot-01, structure_type=apartments, notes="affordable housing")', 'form(to=planning, form=permit_application, lot=lot-01, structure_type=apartments, notes="it\'s affordable housing")'], held_out: true },

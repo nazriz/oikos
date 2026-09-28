@@ -213,3 +213,21 @@ test("a bare word with a capital letter is a name (ids are lowercase), and '12-m
   expect(calls.parseDuration("12-month")).toBe(calls.parseDuration("12 months"));
   expect(calls.parseDuration("two-week")).toBe(calls.parseDuration("2 weeks"));
 });
+
+test("goods and work (phase B): your own goods move from where you hold them; work by the people named; committed goods are an outcome", () => {
+  const k = town();
+  k.absorb({ participant: "mayor-system", as: "mayor", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: {
+    stores: { kind: "holdings", holdings: [{ kind: "goods", at: "str.1", quantity: "40" }, { kind: "materials", at: "str.1", quantity: "500" }, { kind: "materials", at: "str.2", quantity: "90" }] } } } as any);
+  const r = (text: string) => resolve(calls.parseProgram(text), k, () => undefined, "mayor");
+  // The one place it holds goods is filled in; a choice of places is a question.
+  expect(r("goods(kind=goods, quantity=12, to=c0042, at=str.9)")).toEqual({ ok: true, blocks: [{ block: "move_goods", kind: "goods", quantity: "12", from_at: "str.1", to: "c0042", to_at: "str.9" }] });
+  expect(r("goods(kind=materials, quantity=10, at=str.2)")).toEqual({ ok: false, questions: ["From where: str.1 or str.2?"] });
+  expect(r("goods(kind=bread, quantity=1, at=str.1)")).toEqual({ ok: false, questions: ["You don't hold any bread that you know of."] });
+  expect(r("goods(kind=goods, quantity=5)")).toEqual({ ok: false, questions: ["Where to? Somewhere you keep things."] });
+  // Work: the people named, at the place; with nobody named, work that takes no one's time.
+  expect(r('work(task=make, units=48, at=str.1, by=["c0012", "c0040"])')).toEqual({ ok: true, blocks: [{ block: "work", task: "make", units: 48, at: "str.1", performers: ["c0012", "c0040"] }] });
+  expect(r('work(task=build, units="7200", at=str.1, by=c0012, on=str.5)')).toEqual({ ok: true, blocks: [{ block: "work", task: "build", units: 7200, at: "str.1", performers: ["c0012"], on: "str.5" }] });
+  // Committed goods: an outcome in an agreement (a supplier delivers, every 30 days).
+  const a = r('agreement(with=builder, they_do=goods(kind=materials, quantity=2000, to=city, at=str.1, every="30 days"), we_do=money(amount="$900", to=acc-builder))');
+  expect(a.ok && (a.blocks[0] as any).terms.commitments[1]).toEqual({ who: "builder", does: { outcome: { goods: { kind: "materials", quantity: "2000", to: "city", at: "str.1" } } }, every: 2592000 });
+});

@@ -193,6 +193,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
   - **Construction** takes its materials from the builder's holding (`materials_at`) and completes once its `build_labour` has been worked (the built-in task `build`) and its `build_time` has passed. **Demolition** begins (its occupants leave, and it can't be moved into) and ends once its `demolition_labour` is worked (`demolish`).
   - **Retired:** `materials_cost`, `demolition_cost`, `materials_from`, `costs_from`, and the transfer reasons `materials` and `demolition`: money paid to nowhere.
   - **New events** `worked` and `demolition_started`; **refusal codes** `unknown_task`, `not_at_work`, `no_time_left`, `not_being_built`, `not_coming_down`, `coming_down`.
+- **The call language** (phase B, stage B3): `goods(...)` (move your own goods; a goods outcome in requests and agreements) and `work(...)`; `structure(...)` takes `materials_at` when you build yourself, and no longer pays for materials. Outcomes gain `goods`. The translator's test set has goods and work cases (one held out).
 - The version: every `$id` is `urn:terrarium:contracts:0.5:…`, and configs and log headers say `contracts: "0.5"`.
 
 ## Changes from v0.3

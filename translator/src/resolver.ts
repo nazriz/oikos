@@ -189,6 +189,8 @@ class Resolver {
   line(c: Call, bind?: string): Block[] {
     switch (c.fn) {
       case "money": return this.money(c, bind);
+      case "goods": return this.goods(c);
+      case "work": return this.work(c);
       case "account": return this.account(c, bind);
       case "structure": return this.structure(c, bind);
       case "occupancy": return this.occupancy(c);
@@ -205,6 +207,44 @@ class Resolver {
       case "position": return this.position(c, bind);
       case "system": return this.system(c, bind);
     }
+  }
+
+  /** A quantity of goods, as written ("40", "40 items"): a count, exact. */
+  private quantity(c: Call, key: string): string | undefined {
+    const s = this.str(c, key);
+    return s === undefined ? undefined : String(calls.parseCount(s));
+  }
+
+  /** Moving your own goods (phase B): from where you hold them (said, or the one place you hold that kind), to
+   * someone (yourself by default) at a place. Only the holder can move goods: someone else's are asked for (a request
+   * or an agreement: a goods outcome). */
+  private goods(c: Call): Block[] {
+    const kind = this.need(c, "kind", "Of what?");
+    const quantity = this.quantity(c, "quantity");
+    if (!quantity || quantity === "0") throw new Ask("How much?");
+    const to = this.k.entityOf(this.id(c, "to") ?? this.me);
+    const toAt = this.id(c, "at");
+    if (!toAt) throw new Ask(to === this.me ? `Where to? Somewhere you keep things.` : `Where should ${this.k.name(to)} get them: at which place?`);
+    let fromAt = this.id(c, "from_at");
+    if (!fromAt) {
+      const places = this.k.placesHolding(kind);
+      if (places.length === 0) throw new Ask(`You don't hold any ${kind} that you know of.`);
+      if (places.length > 1) throw new Ask(`From where: ${places.join(" or ")}?`);
+      fromAt = places[0]!;
+    }
+    return [{ block: "move_goods", kind, quantity, from_at: fromAt, to, to_at: toAt }];
+  }
+
+  /** Work (phase B): units of a task at a place, by the people named (`by`: one, or a list). Nobody named: work that
+   * takes no one's time (using things up). */
+  private work(c: Call): Block[] {
+    const task = this.need(c, "task", "What work?");
+    const units = this.quantity(c, "units");
+    if (!units || units === "0") throw new Ask("How much of it?");
+    const at = this.need(c, "at", "Where?");
+    const by = this.has(c, "by") ? (this.ids(c, "by") ?? [this.id(c, "by")!]).map((p) => this.k.entityOf(p)) : [];
+    const on = this.id(c, "on");
+    return [{ block: "work", task, units: Number(units), at, performers: by, ...(on ? { on } : {}) }];
   }
 
   /** The money outcome of a call, for requests and commitments. */
@@ -421,14 +461,15 @@ class Resolver {
     if (v === undefined) return undefined;
     if (!("call" in v)) return { does: { text: "text" in v ? v.text : JSON.stringify("json" in v ? v.json : v) } };
     const c = v.call;
-    const every = c.fn === "money" ? this.seconds(c, "every") : undefined;
+    const every = c.fn === "money" || c.fn === "goods" ? this.seconds(c, "every") : undefined;
     const outcome =
       c.fn === "money" ? this.moneyOutcome(c, this.id(c, "from"), true)
+      : c.fn === "goods" ? { goods: { kind: this.need(c, "kind", "Of what?"), quantity: this.quantity(c, "quantity") ?? "0", to: this.k.entityOf(this.need(c, "to", "Delivered to whom?")), at: this.need(c, "at", "Delivered where?"), ...(this.id(c, "from_at") ? { from: this.id(c, "from_at") } : {}) } }
       : c.fn === "occupancy" ? this.occupancyOutcome(c)
       : c.fn === "structure" ? { structure: this.id(c, "remove") ? { remove: this.id(c, "remove") } : { type: this.id(c, "type"), on: this.id(c, "on") } }
       : c.fn === "account" ? { account: { holder: this.id(c, "holder") ?? who, ...(this.id(c, "close") ? { close: this.id(c, "close") } : {}) } }
       : undefined;
-    if (!outcome) throw new Ask(`A commitment can be money, a building, occupancy or an account, not ${c.fn}.`);
+    if (!outcome) throw new Ask(`A commitment can be money, goods, a building, occupancy or an account, not ${c.fn}.`);
     return { does: { outcome }, ...(every ? { every } : {}) };
   }
 
