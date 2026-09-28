@@ -20,7 +20,7 @@ interface Payment { instruction: string; from: string; to: string; amount: numbe
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.8.0",
+  version: "0.9.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -71,12 +71,18 @@ export const bankPaymentSystem: BehaviourModule = {
           else opens.push(C.call("account", { holder: opening.holder, at: me }));
           continue;
         }
-        const m = ins.data?.outcome?.money;
+        // A bulk payment (a share registry's dividends, say): one instruction, from one account, to many, once.
+        const bulk = Array.isArray(ins.data?.payments) ? (ins.data!.payments as { to?: unknown; amount?: unknown }[]) : null;
+        const m = bulk ? { from: ins.data?.from, to: "(many)", amount: String(bulk.reduce((x, b) => x + (cents(b.amount as any) || 0), 0)) } : ins.data?.outcome?.money;
         if (!m) {
           cannot("this bank only makes payments and opens accounts.");
           continue;
         }
-        const d = { from: m.from, to: m.to, pay: cents(m.amount), settles: m.settles, every: ins.data.every, first: ins.data.first };
+        if (bulk && bulk.some((b) => typeof b.to !== "string" || !Number.isInteger(cents(b.amount as any)) || cents(b.amount as any) <= 0)) {
+          cannot("a payment in it doesn't say a valid amount and account to pay.");
+          continue;
+        }
+        const d = { from: m.from, to: m.to, pay: cents(m.amount), settles: m.settles, every: bulk ? undefined : ins.data.every, first: ins.data.first };
         const acc = custody.get(d.from);
         if (acc && dead.has(acc.holder)) continue; // the account holder has died: it pays out only to settle the estate
         if (!acc) {
@@ -104,6 +110,9 @@ export const bankPaymentSystem: BehaviourModule = {
             due += d.every;
           }
           nextDue.set(ins.id, due);
+        } else if (bulk && !done.has(ins.id)) {
+          done.add(ins.id);
+          for (const b of bulk) out.push({ instruction: ins.id, from: d.from, to: b.to as string, amount: cents(b.amount as any), due: ins.at });
         } else if (!done.has(ins.id)) {
           done.add(ins.id);
           out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at, ...(typeof d.settles === "string" ? { settles: d.settles } : {}) }); // the payer's reference, as given
@@ -138,7 +147,9 @@ export const bankPaymentSystem: BehaviourModule = {
       step(obs) {
         book.absorb(obs);
         if (queuedAt !== obs.t) {
-          queue = plan(obs);
+          // Payments a busy moment didn't get to (a wake allows only so many actions) are made first at the next: they're
+          // already counted as due (a one-off as handled, a standing order's next date moved on), so never dropped.
+          queue = [...queue, ...plan(obs)];
           queuedAt = obs.t;
           inFlight = [];
         }

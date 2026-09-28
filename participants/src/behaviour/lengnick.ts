@@ -6,7 +6,7 @@
 // 102-120.
 
 import type { Rng } from "../rng";
-import { because, type Book, pay, type Step, usd } from "./common";
+import { because, type Book, pay, say, type Step, usd } from "./common";
 
 /** Table 1, as basis points of 1 (and months). */
 export const LENGNICK = {
@@ -82,15 +82,14 @@ export function payOut(book: Book, firm: string, account: string, balance: numbe
 }
 
 /** Paying an amount to a firm's shareholders by their shares, in batches (a program has at most 32 lines). */
-export function distribute(book: Book, firm: string, account: string, amount: number, why: string): { steps: Step[]; paid: number } {
+export function distribute(book: Book, firm: string, account: string, amount: number, why: string, bankOf = "bank"): { steps: Step[]; paid: number } {
   const holders = shareholders(book, firm);
   const total = holders.reduce((x, h) => x + h.shares, 0);
   if (amount <= 0 || total <= 0) return { steps: [], paid: 0 };
   const lines = holders.map((h) => [h, Math.floor((amount * h.shares) / total)] as const).filter(([, x]) => x > 0);
-  const steps: Step[] = [];
-  for (let i = 0; i < lines.length; i += 30) {
-    steps.push(because(`${why}${lines.length > 30 ? ` (payments ${i + 1}-${Math.min(lines.length, i + 30)} of ${lines.length})` : ""}.`,
-      ...lines.slice(i, i + 30).map(([h, x]) => pay(h.account, x, { from: account, for: "Dividend." }))));
-  }
+  if (!lines.length) return { steps: [], paid: 0 };
+  // One instruction to the bank for them all, as a share registry pays a dividend (docs/behaviour/bank-payment-system.md).
+  const steps: Step[] = [because(`${why} (${lines.length} payment${lines.length > 1 ? "s" : ""}, in one instruction to the bank).`,
+    say("request", `Please pay this dividend from ${account}: ${lines.length} payments.`, { to: [bankOf], data: { from: account, payments: lines.map(([h, x]) => ({ to: h.account, amount: String(x), for: "Dividend." })) } }))];
   return { steps, paid: lines.reduce((x, [, y]) => x + y, 0) };
 }

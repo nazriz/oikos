@@ -1050,7 +1050,8 @@ export const citizen: BehaviourModule = {
           }
           lookedAt = obs.t;
           looking = null;
-          todo = plan(obs);
+          // (What the last wake didn't get to comes first: our state already counts on it.)
+          todo = [...todo, ...plan(obs)];
           plannedAt = obs.t;
           leadFound.homes = [];
           leadFound.jobs = [];

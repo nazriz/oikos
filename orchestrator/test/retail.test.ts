@@ -70,7 +70,7 @@ test("households buy from shops and use their goods up; shops serve with their s
   expect(local).toBeGreaterThan(imported);
   // No money-only stand-ins: nobody pays a shop "for shopping", and landlords' owners take their draw as dividends.
   expect(recs.filter((r) => r.kind === "request" && ["Shopping.", "Owners' spending."].includes(r.data?.outcome?.money?.for)).length).toBe(0);
-  expect(recs.filter((r) => r.kind === "request" && r.speaks_for?.startsWith("landlord-") && r.data?.outcome?.money?.for === "Dividend.").length).toBeGreaterThan(0);
+  expect(recs.filter((r) => r.kind === "request" && r.speaks_for?.startsWith("landlord-") && r.data?.payments?.[0]?.for === "Dividend.").length).toBeGreaterThan(0);
 }, 300_000);
 
 test("a shop with no staff serves nobody: what it can't serve within three days is refunded", async () => {

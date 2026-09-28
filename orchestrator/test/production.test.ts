@@ -82,14 +82,16 @@ test("goods are made from inputs by workers' hours, exported within each factory
   }
   expect(units.size).toBeGreaterThan(0);
   void share;
-  // Dividends, out of a month's earnings: in proportion to the shares on the register.
-  const asked = recs.filter((r) => r.kind === "request" && r.speaks_for?.startsWith("factory-") && r.data?.outcome?.money?.for === "Dividend.");
+  // Dividends, out of a month's earnings: one instruction to the bank (a bulk payment), in proportion to the shares on
+  // the register; the bank pays every line of it.
+  const asked = recs.filter((r) => r.kind === "request" && r.speaks_for?.startsWith("factory-") && Array.isArray(r.data?.payments) && r.data.payments[0]?.for === "Dividend.");
   expect(asked.length).toBeGreaterThan(0);
   const register = config.world.records.find((r: any) => r.id === `shareholders-${asked[0].speaks_for}`).data.holders as { account: string; shares: number }[];
-  const first = asked.filter((r) => r.at === asked[0].at && r.speaks_for === asked[0].speaks_for).map((r) => r.data.outcome.money);
+  const first = asked[0].data.payments as { to: string; amount: string }[];
   const [a, b] = [register[0]!, register[1]!];
-  const [pa, pb] = [a, b].map((h) => Number(first.find((m: any) => m.to === h.account)?.amount)) as [number, number];
+  const [pa, pb] = [a, b].map((h) => Number(first.find((m) => m.to === h.account)?.amount)) as [number, number];
   expect(Math.abs(pa / pb - a.shares / b.shares)).toBeLessThan(0.01);
+  for (const r of asked.filter((x) => x.at < 170 * DAY)) expect(ev.filter((e) => e.event === "transfer" && e.per_instruction === r.id).length).toBe(r.data.payments.length);
 }, 300_000);
 
 test("Lengnick: with too little demand a factory lets workers go and stops making; with plenty it hires", async () => {
