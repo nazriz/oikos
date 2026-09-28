@@ -93,6 +93,16 @@ That was **our bug**, not the model's. The mayor's only memory between wakes is 
 - the translator is shown where each form goes (`to=city`) and the options of each choice field (luna had written `affects=parks`);
 - the forms on file are standing documents for the mayor, the same as the laws. It had seen each form in full only on the day it was new.
 
+**Pilot 6** (stopped at day 24, the best run yet):
+- **Budget:** the mayor tabled the $60,000 parks budget on day 3. Luna translated it first time, and the council adopted it 5–0 on day 18. The mayor then asked the builder for a scope and an itemised estimate, noting that "this request does not authorize work or payment".
+- **Petition:** on day 7 it answered the tenants' petition with a law (90 days' notice to end a tenancy). It needed five tries to get past luna's refusals. It then lobbied the councillors, citing the signature count, and asked which provisions concerned them. The law was rejected 4–1.
+- **What it found on our side:**
+  - The **clerk's report said no budget was adopted** after the council had adopted one. The clerk's reports didn't include the records it publishes. The mayor spotted the contradiction and asked for the records to be reconciled. Fixed, with a test that reproduces it.
+  - **Planning couldn't say which lots the town owns.** The mayor asked four times. Fixed: planning keeps a land register.
+  - **Two resolver strictnesses:** a form named by its record id, and a quoted building type. Both are now accepted.
+- **Luna as translator:** it translated this run's easy forms first time. On harder requests it refused ("not yours", "too much", "unclear") where sol's wording was plain. Re-run on the translator test set, it varied between 15 and 18 of 20 seen. Run alone on the same request, it gave 1 "unclear" in 2 tries through the translator path and 0 in 8 in isolation. Each refusal costs the mayor a sol call to reword.
+- **The councillors can't be persuaded.** They're code that votes by a fixed leaning; they don't read letters. A real councillor might. Whether they should is a design question.
+
 A pattern across the pilots: each gap was something **a real office would tell a new mayor on day one**, which the code mayor never needed because it reads config. Pilots with a real model are finding the places where the code stand-ins were quietly reading what nobody in the world would tell them. An audit of every direct config read by a code participant (2026-09-28) found no others that matter. Landlords read their own buildings' types, builders read materials prices, and citizens read their biology and the calendar: all things those parties would know. The mayor's park price was the only knowledge its position couldn't get from the world, and the budget brief now supplies it.
 
 **Cost and speed:** each Codex call takes about 10 seconds and carries about 14,000 tokens of Codex's own instructions. The mayor makes 2–3 calls a simulated day while it's gathering information.

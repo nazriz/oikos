@@ -37,6 +37,7 @@ It wakes daily.
 - At close, it counts the latest vote of each **councillor seat**, checked against the directory's roles, so votes from anyone else don't count.
 - A proposal passes with more yes than no *and* a majority of all councillors (so abstentions count against).
 - It publishes the `ballot_result`. If the proposal passed, it publishes the law or budget itself, with the ballot as its basis.
+- It answers letters with its report: open ballots, recent results, whether a budget is adopted for the year, and the council proposal form. It reads its own results, budgets and laws from its records channel. Before pilot 6 that channel held only proposals and ballots, so its report said "no budget is adopted" after the council had adopted one.
 
 **Source:** ordinary council procedure (motion, vote, minute, enactment). Quorum and amendment are left out.
 

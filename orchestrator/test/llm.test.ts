@@ -192,3 +192,30 @@ test("the notebook, used alongside an action, carries to the next wake; every to
   expect(firsts.slice(1).every((f) => f.includes("Your notebook: Wrote to finance on day 0."))).toBe(true);
   expect(firsts.length).toBeGreaterThan(1);
 }, 300_000);
+
+test("after the council adopts a budget, the clerk's report says so (it sees what it publishes)", async () => {
+  let calls = 0, asked = false;
+  const seen: string[] = [];
+  const tool = (name: string, input: object) => [{ type: "tool_use" as const, id: `t${++calls}`, name, input }];
+  const adapter = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      const obs = req.context.observation;
+      seen.push(JSON.stringify(req.messages.at(-1)!.content));
+      if (calls === 0) return tool("do", { what: "Table the year 1 budget: parks $60,000." });
+      const d = obs.drafts[0];
+      if (d) return tool("confirm", { ref: d.id, decision: "confirm" });
+      if (!asked && obs.t >= 20 * DAY) {
+        asked = true;
+        return tool("write", { to: ["council-clerk"], text: "Is the budget adopted?", as: "mayor" });
+      }
+      return tool("done_for_now", { days: 7 });
+    },
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: 'form(to=city, form=council_proposal, kind=budget, parks="$60,000", proposal="Year 1 budget: parks $60,000.")' } }],
+    debrief: () => [{ type: "text", text: "Thanks." }],
+  });
+  const s = await run("clerk-budget", town(), 30 * DAY, { adapter });
+  const recs = lines(s.logPath).filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
+  const budget = recs.find((r) => r.kind === "budget" && r.author === "council-clerk-system");
+  expect(budget).toBeDefined();
+  expect(seen.join("\n")).toContain(`The council adopted a budget for year 1 (${budget.id}).`);
+}, 300_000);

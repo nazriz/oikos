@@ -499,6 +499,8 @@ class Resolver {
         : t.type === "text" ? this.str(c, field)
         : t.type === "choice" ? this.choice(c, field, t.options ?? [])
         : t.type === "space" ? this.space(this.id(c, field)!)
+        // A kind of building names a catalogue entry, not anyone: quoted or not, it's the same word.
+        : t.type === "structure_type" ? this.str(c, field)
         : this.id(c, field);
     }
     const unknown = Object.keys(c.args).filter((a) => !["to", "form", "for"].includes(a) && !(a in spec.fields));

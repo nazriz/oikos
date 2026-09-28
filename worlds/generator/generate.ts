@@ -370,7 +370,7 @@ export function generate(spec: TownSpec): any {
   office("tax-clerk", "city", "Tax clerk", "tax_clerk", [{ id: "treasury", kind: "accounts" }, laws, civic("reports", ["tax_report"])], code("city.tax_clerk"));
   office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [civic("notifications", ["death_notification"]), deaths], code("city.registry"));
   office("child-protection", "city", "Child protection officer", "child_protection", [deaths, civic("requests", ["care_request"])], code("city.child_protection"));
-  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["proposal", "ballot"]), votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
+  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["proposal", "ballot", "ballot_result", "budget", "law"]), votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
   [-80, -40, 0, 40, 80].forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
   // The town tells its bank who may instruct payments from its account: the finance officer (the position, whoever holds it).
   records.push({ id: "signatories-city", record: "statement", author: "genesis", at: 0, visible_to: ["city", "bank"], speaks_for: "city", kind: "signatories", addressed_to: ["bank"],

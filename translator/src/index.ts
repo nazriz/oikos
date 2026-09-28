@@ -59,7 +59,7 @@ export type KernelCheck = (participant: string, position: string | undefined, bl
 
 const CALLS_MD = readFileSync(join(import.meta.dir, "../../contracts/calls.md"), "utf8");
 
-const TOOLS: ToolSpec[] = [
+export const TOOLS: ToolSpec[] = [
   { name: "call", description: "The request, written in the call language.", input_schema: { type: "object", required: ["program"], properties: { program: { type: "string" } } } },
 ];
 

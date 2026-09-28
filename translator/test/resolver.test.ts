@@ -99,6 +99,8 @@ test("4.4: filling in a published form, checked against its fields", () => {
   const missing = run("form(to=planning, form=permit_application, lot=lot-00)");
   expect(missing).toEqual({ ok: false, questions: ["The permit application needs: structure_type."] });
   expect(run("form(to=planning, form=dog_licence, name=rex)")).toEqual({ ok: false, questions: ["You haven't seen a form by that name."] });
+  // A kind of building, quoted or not, is the same kind.
+  expect(run('form(to=planning, form=permit_application, lot=lot-00, structure_type="park")')).toEqual(run("form(to=planning, form=permit_application, lot=lot-00, structure_type=park)"));
   // A form named by its record's id is the same form.
   expect(run("form(to=planning, form=form-permit, lot=lot-00, structure_type=park)").ok).toBe(true);
   // A known form sent to the wrong office: where it goes, not "unknown".
