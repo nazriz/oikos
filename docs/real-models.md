@@ -59,3 +59,27 @@ terrarium translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out ru
 - **The subscription's usage limits apply** (per few hours). The mock-LLM mayor makes about 130 calls a simulated year: fine for a pilot, not for batches.
 - **The model version isn't pinned** as an API's is, so runs are less reproducible.
 - **Tested only against a stand-in:** no real `codex exec` has been run from here.
+
+## Pilots (directional testing, not evidence)
+
+All on the small town (`worlds/town.yaml`, `--set mayor=llm`), through the Codex CLI: `gpt-6-sol` as the mayor, `gpt-6-luna` as the translator (Naz: sol in the driver seat, luna for simple, narrow work; never astra). Read with `terrarium story <log>`.
+
+**Translator test set** (2026-09-28):
+- `gpt-6-luna`: 20/20 seen, 4/6 held out, after fixing things on our side:
+  - the form's publisher was shown as the town, not the office;
+  - a bare word with capitals is now read as a name;
+  - "12-month" is now a duration;
+  - the test compares what an answer comes to (its acts);
+  - the Codex answer format no longer offers a "none" tool beside the call tool.
+- The two held-out misses are the model refusing ("too much", "unclear") where it should have translated. They stay as findings; held-out cases are never tuned on.
+
+**Pilot 1** (stopped at day 23):
+- The loop works. The translator addressed a proposal to "council", which isn't anyone; the mayor saw it in the preview and **declined the draft**, and declined again when a retry came out as a plain letter.
+- Found two gaps in the world:
+  - **offices can't answer letters:** the mayor wrote almost daily for figures, and nobody replied;
+  - **nothing said how to put something to the council.**
+- Fixed: offices answer every letter with their standard report, and the clerk publishes a council proposal form.
+
+**Pilot 2** (stopped at day 2): the replies arrived, and the mayor used them (it quoted the balance). It then asked, again and again, for a revenue forecast the report didn't have. Fixed: finance reports money in and out (the last 30 days, the year so far, the monthly rate).
+
+**Cost and speed:** each Codex call takes about 10 seconds and carries about 14,000 tokens of Codex's own instructions. The mayor makes 2–3 calls a simulated day while it's gathering information.
