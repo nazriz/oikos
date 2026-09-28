@@ -382,6 +382,17 @@ See the design note, §16.
   - **Observed:** about 10 births per run of 1,000 people over two years, all housed within days where the mother has a home, with no refusals.
 - **Revisit if:** partnership status should change the rates (most births are to couples), or twins, miscarriage or contraception choice become research questions.
 
+**D52. A light calibration of voice, and calibration targets with their sources.** *(Naz, 2026-09-28: "see if we can calibrate now, but no need to go too deep"; "document where we got these numbers from".)*
+- **Voice:**
+  - Only people who sign petitions at all do so: 44%, drawn once per person (Australian Election Study 2016: 44% had signed a written petition in five years).
+  - One tenants' petition now reaches 21–38% of adults over two years, down from ~99%.
+  - When petitions start isn't calibrated: the genesis town has rent-stressed tenants, so one starts on day 0–1.
+- **docs/calibration.md:** every target, its source, what's comparable, the measured value and the gap.
+  - Includes ABS *Housing Occupancy and Costs* (20.2% of income on rent, and 58% of lower-income renters over 30%).
+  - A new `town/rent-stress` query: median 27%; 31–34% of households over 30%.
+  - Targets are outcomes to compare against, never settings to tune by hand.
+- **Revisit if:** petition-signing evidence specific to local or tenant issues is found, or the AES figure is confirmed against its own tables.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

@@ -55,6 +55,7 @@ export const citizen: BehaviourModule = {
       leave_after_jobless_days: 180,
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
+      petition_willing_bps: 4400, // share of people who sign petitions at all (AES 2016: 44% had signed a written petition in the last five years)
       petition_days: 180, // how long an organiser keeps a petition open
       threshold_mean_bps: 2500, // personal thresholds (share of the population already signed) are
       threshold_sd_bps: 1000, //   roughly normal with this mean and spread (Granovetter 1978)
@@ -468,6 +469,8 @@ export const citizen: BehaviourModule = {
     for (let i = 0; i < 12; i++) z += tr.below(10_000);
     const threshold = Math.max(0, p.threshold_mean_bps + Math.trunc((z * p.threshold_sd_bps) / 10_000)); // z / 10000 ~ N(0, 1)
     const signed = new Set<string>();
+    // Whether we're someone who signs petitions at all (drawn once); thresholds apply among those who are.
+    const willing = ctx.rng("petition-willing").below(10_000) < p.petition_willing_bps;
     const countsPublished = new Map<string, { n: number; at: number }>();
     let aggrievedUntil = 0;
     const voice = (t: number, steps: Step[]) => {
@@ -481,7 +484,7 @@ export const citizen: BehaviourModule = {
         signed.add(`closed-${pet.id}`);
         steps.push(because(`Closing our petition after ${p.petition_days} days.`, withdraw(pet.id, "Petition closed.")));
       }
-      if (aggrieved && open.length === 0 && ctx.rng(`petition-${t}`).below(10_000) < p.petition_start_bps) {
+      if (willing && aggrieved && open.length === 0 && ctx.rng(`petition-${t}`).below(10_000) < p.petition_start_bps) {
         steps.push(because(`Aggrieved (${noticed ? "our landlord gave us notice" : `rent is ${Math.round(burden / 100)}% of household income`}) and no tenants' petition is open: starting one.`, say("petition", "Petition: landlords must give 90 days' notice, and may not raise rent by more than 5% a year.", { data: { demand: {
           kind: "law", text: "A landlord must give at least 90 days' notice to end a tenancy, and may not raise the rent by more than 5% in any 12 months.",
           adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"] } } })));
@@ -499,7 +502,7 @@ export const citizen: BehaviourModule = {
           }
           continue;
         }
-        if (signed.has(pet.id)) continue;
+        if (signed.has(pet.id) || !willing) continue;
         const share = (publishedCount(book, pet) * 10_000) / p.population;
         if (aggrieved || ((home || livingAt) && share >= threshold)) {
           signed.add(pet.id);

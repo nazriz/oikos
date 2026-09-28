@@ -61,7 +61,7 @@ terrarium measure runs/llm-mayor --sql "select run_id, count(*) from acts where 
 
 The standing queries live in `measure/queries/`, one SQL file each, with a one-line description on the first line. Add a file and it's listed.
 - **Generic:** `overview`, `activity`, `refusals`, `usage`, `why` (acts with a reason, and records citing a basis), `language-participants`, `cast` (people at the start, births, arrivals, departures, deaths by cause, illness, injury, harm, participants created, appointments).
-- **About the generated town:** `town/economy`, `town/word-of-mouth`, `town/households` (at the end of each run: households living together, apart or unhoused, and overcrowded by the occupancy standard, CNOS). These know the town's vocabulary (leases, `acc-city`, the citizens' own phrasing), which is fine: measurement is outside the world.
+- **About the generated town:** `town/economy`, `town/word-of-mouth`, `town/households` (at the end of each run: households living together, apart or unhoused, and overcrowded by the occupancy standard, CNOS), `town/rent-stress` (rent against household income). Calibration targets and their sources: [calibration.md](calibration.md). These know the town's vocabulary (leases, `acc-city`, the citizens' own phrasing), which is fine: measurement is outside the world.
 
 From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@terrarium/measure`.
 

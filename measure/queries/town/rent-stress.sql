@@ -1,0 +1,28 @@
+-- Rent against household income at the end of each run (households with a lease and someone earning): the median share, and the share of households paying over 30% of gross income ("rental stress"). Income is wages under employment agreements still in force; rent is the leaseholder's latest lease. Calibration targets: docs/calibration.md.
+with signed as (select distinct json_extract_string(body, '$.agreement') as agreement, run_id from records where record = 'signature'),
+noticed as (select distinct json_extract_string(body, '$.agreement') as agreement, run_id from records where record = 'notice'),
+agreements as (
+  select r.run_id, r.id, r.t, r.template, json_extract_string(r.body, '$.terms.parties[0]') as first, json_extract_string(r.body, '$.terms.parties[1]') as second,
+    from_json(json_extract(r.body, '$.terms.commitments'), '["JSON"]') as commitments
+  from records r where r.record = 'agreement' and r.template in ('lease', 'employment')
+    and (select count(*) from signed s where s.run_id = r.run_id and s.agreement = r.id) > 0),
+leases as (
+  select run_id, second as tenant, arg_max((json_extract_string(list_filter(commitments, c -> json_extract_string(c, '$.who') = second)[1], '$.does.outcome.money.amount'))::BIGINT, t) as rent
+  from agreements where template = 'lease' group by all),
+jobs as (
+  select a.run_id, a.second as worker,
+    sum((json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.does.outcome.money.amount'))::BIGINT * 30 / 14) as monthly
+  from agreements a where a.template = 'employment' and not exists (select 1 from noticed n where n.run_id = a.run_id and n.agreement = a.id) group by all),
+hh as (
+  select r.run_id, json_extract_string(r.body, '$.data.leaseholder') as leaseholder, from_json(json_extract(r.body, '$.data.members'), '["JSON"]') as members
+  from records r where r.kind = 'household' and not exists (select 1 from records w where w.run_id = r.run_id and w.withdraws = r.id)),
+people as (select hh.run_id, hh.leaseholder, json_extract_string(m, '$.person') as person from hh, unnest(hh.members) as u(m)),
+income as (
+  select p.run_id, p.leaseholder, sum(coalesce(j.monthly, 0)) as monthly
+  from (select distinct run_id, leaseholder, person from people) p left join jobs j on j.run_id = p.run_id and j.worker = p.person
+  group by all),
+shares as (
+  select i.run_id, i.leaseholder, le.rent, i.monthly, 100.0 * le.rent / i.monthly as pct
+  from income i join leases le on le.run_id = i.run_id and le.tenant = i.leaseholder where i.monthly > 0)
+select r.run_id, r.seed, count(*) as households, round(median(s.pct), 1) as median_rent_pct, round(100.0 * count(*) filter (where s.pct > 30) / count(*), 1) as pct_over_30
+from runs r join shares s on s.run_id = r.run_id group by r.run_id, r.seed, r.world order by r.world, r.seed
