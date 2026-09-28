@@ -1,6 +1,6 @@
 # The municipal economy: design (draft for review)
 
-**Status:** draft, 2026-09-28, for Naz's review before anything is built. Nothing here changes a contract until it's signed off. §9 lists the decisions needed.
+**Status:** draft, 2026-09-28. **Now framed by docs/design/foundation-for-scale.md.** Naz: the platform must carry town to world, and this draft was too town-shaped. Its general pieces (stocks, work, resources, jurisdictions, institution patterns) move there as foundations. What's left here is the **first configuration** of those foundations, phase C of that plan. The sources in §3 and the services chosen in §5.2 still stand.
 
 ## 1. Why
 
