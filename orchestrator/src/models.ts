@@ -6,9 +6,10 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { AnthropicAdapter, OpenAICompatibleAdapter, type Budget, type LlmAdapter, type Price } from "@terrarium/participants/llm";
+import { AnthropicAdapter, CodexCliAdapter, OpenAICompatibleAdapter, type Budget, type LlmAdapter, type Price } from "@terrarium/participants/llm";
 
-export const LOCAL_PROVIDERS = ["ollama", "local"];
+/** Providers whose calls cost nothing per call: local models (your compute), and the Codex CLI on a ChatGPT subscription (flat rate; its usage limits apply). */
+export const LOCAL_PROVIDERS = ["ollama", "local", "codex"];
 
 export function priceTable(): Record<string, Price> {
   const t = JSON.parse(readFileSync(join(import.meta.dir, "../prices.json"), "utf8"));
@@ -41,8 +42,9 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
   const adapter =
     provider === "anthropic" ? new AnthropicAdapter(model, { apiKey: need("ANTHROPIC_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
+    : provider === "codex" ? new CodexCliAdapter(model)
     : provider === "ollama" ? new OpenAICompatibleAdapter("ollama", model, { baseUrl: o.baseUrl ?? "http://localhost:11434/v1" })
     : provider === "local" ? new OpenAICompatibleAdapter("local", model, { baseUrl: o.baseUrl ?? (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })() })
-    : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, ollama or local`); })();
+    : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, codex, ollama or local`); })();
   return { adapter, prices, ...(budget ? { budget } : {}) };
 }

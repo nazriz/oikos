@@ -13,7 +13,8 @@ terrarium run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claud
   - `anthropic/…`, with `ANTHROPIC_API_KEY` in the environment;
   - `openai/…`, with `OPENAI_API_KEY`;
   - `ollama/…`, a local open-weight model behind Ollama (`http://localhost:11434/v1` by default);
-  - `local/… --base-url URL`, any other OpenAI-compatible server (vLLM, LM Studio).
+  - `local/… --base-url URL`, any other OpenAI-compatible server (vLLM, LM Studio);
+  - `codex/…`, OpenAI models through the Codex CLI and a ChatGPT subscription (below).
 - Keys are read from the environment and never logged.
 
 ## What guards it
@@ -39,9 +40,22 @@ terrarium translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out ru
 - The report gives seen and held-out pass rates, and what failed.
 - VISION §14: a translation model is adopted only if it passes a held-out set that includes novel requests. What "passes" means (a threshold) is for Naz to set, before the first real run.
 
-## Why not a ChatGPT or Claude subscription
+## A ChatGPT subscription, through the Codex CLI
 
-A consumer subscription isn't an API.
-- Using one to drive a program would go against the provider's terms.
-- It would make the runs irreproducible: no pinned model version, and no per-call token counts, which every run must record (CLAUDE.md).
-- Use an API key with a spending limit, or a local open-weight model.
+`--model codex/<model>` (or `codex/default`) runs calls through the Codex CLI's non-interactive mode (`codex exec`), signed in with a ChatGPT account. That's the legitimate route for a subscription: the Codex CLI is built to be run by scripts. Pulling its sign-in token out to call OpenAI's backend directly is not.
+
+**Setup, once:**
+- install the Codex CLI (`npm i -g @openai/codex`, or Homebrew);
+- run `codex login` and sign in with ChatGPT in the browser.
+
+**How it runs:**
+- Each call is one `codex exec`, read-only, with no user config or rules, keeping no session files, in an empty temporary directory.
+- Our system prompt, the conversation and the tools go in on stdin.
+- The answer comes back as JSON matching a schema (`--output-schema`), which is read as a tool use.
+- Tokens come from its `turn.completed` event; the cost is recorded as $0 a call (a flat-rate subscription).
+
+**Caveats, which is why it's for smoke tests and pilots:**
+- **Codex is a coding agent.** Its own instructions sit under ours, and there's no way to replace them. The model is being told two things at once, which confounds any study where the framing is the variable.
+- **The subscription's usage limits apply** (per few hours). The mock-LLM mayor makes about 130 calls a simulated year: fine for a pilot, not for batches.
+- **The model version isn't pinned** as an API's is, so runs are less reproducible.
+- **Tested only against a stand-in:** no real `codex exec` has been run from here.
