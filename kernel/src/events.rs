@@ -1,5 +1,5 @@
 //! Events and refusal codes, mirroring the Event and RefusalCode definitions
-//! in contracts/log.schema.json (v0.4). Every refusal code is physics or
+//! in contracts/log.schema.json (v0.5). Every refusal code is physics or
 //! mechanics; there is no code for "illegal" (D19).
 
 use crate::blocks::{Id, Record};

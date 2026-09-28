@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.4:participant-api",
+  "$id": "urn:terrarium:contracts:0.5:participant-api",
   "title": "Participant API (v0.4)",
   "description": "The only window a controller has onto the world. Identical for code, LLM, human and RL controllers (VISION principle 4). Shaped like PettingZoo's AEC API: the environment selects the next participant to act (the one whose wake time or triggering event comes first on the world clock), the participant reads last() and calls step(action). There are no turns. A participant perceives only through its channels; there is no mandate and no approval queue in v0.2, because authority is a matter of records and people (D20).",
   "$defs": {
@@ -35,7 +35,7 @@
           "additionalProperties": false,
           "properties": {
             "actions_left_this_wake": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count"
             }
           }
         }
@@ -57,10 +57,10 @@
       "properties": {
         "participant": {
           "description": "Who is looking.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
         },
         "t": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
         },
         "status": {
           "enum": [
@@ -71,7 +71,7 @@
         },
         "entity": {
           "description": "A person's participant: its person (it acts as this person). Absent for a system.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
         },
         "body": {
           "description": "A person's participant: its own body, in full (it always knows its age, whether it's in the world, and what's wrong with it).",
@@ -97,7 +97,7 @@
             "parents": {
               "type": "array",
               "items": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
               },
               "maxItems": 2
             },
@@ -116,7 +116,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "id": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/KernelId"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/KernelId"
                   },
                   "kind": {
                     "enum": [
@@ -125,13 +125,13 @@
                     ]
                   },
                   "severity": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "since": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
                   },
                   "until": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
                   }
                 }
               }
@@ -157,7 +157,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "person": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "born_at": {
                     "type": "integer",
@@ -192,16 +192,16 @@
             "additionalProperties": false,
             "properties": {
               "position": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
               },
               "entity": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
               },
               "title": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
               },
               "role": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
               }
             }
           }
@@ -236,10 +236,10 @@
             "additionalProperties": false,
             "properties": {
               "t": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
               },
               "text": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
               },
               "re": {
                 "description": "The draft or proposal it's about.",
@@ -252,7 +252,7 @@
         "channels": {
           "type": "object",
           "propertyNames": {
-            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ChannelPath"
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ChannelPath"
           },
           "additionalProperties": {
             "$ref": "#/$defs/ChannelData"
@@ -271,10 +271,10 @@
       "additionalProperties": false,
       "properties": {
         "action": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/KernelId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/KernelId"
         },
         "t": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
         },
         "status": {
           "enum": [
@@ -285,10 +285,10 @@
         "created": {
           "type": "object",
           "propertyNames": {
-            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/RefName"
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/RefName"
           },
           "additionalProperties": {
-            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/KernelId"
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/KernelId"
           }
         },
         "refusal": {
@@ -299,7 +299,7 @@
           "additionalProperties": false,
           "properties": {
             "code": {
-              "$ref": "urn:terrarium:contracts:0.4:log#/$defs/RefusalCode"
+              "$ref": "urn:terrarium:contracts:0.5:log#/$defs/RefusalCode"
             },
             "block": {
               "type": "integer",
@@ -326,30 +326,30 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/KernelId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/KernelId"
         },
         "t": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
         },
         "from": {
           "description": "The participant who wrote it.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
         },
         "as": {
           "description": "The position it wrote in (absent: as itself).",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
         },
         "to": {
           "type": "array",
           "items": {
-            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
           }
         },
         "text": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
         },
         "re": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
         }
       }
     },
@@ -362,7 +362,7 @@
       "additionalProperties": false,
       "properties": {
         "channel": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ChannelPath"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ChannelPath"
         },
         "query": {
           "$ref": "#/$defs/Query"
@@ -406,7 +406,7 @@
               "value": {
                 "anyOf": [
                   {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SafeInt"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SafeInt"
                   },
                   {
                     "type": "string",
@@ -489,7 +489,7 @@
           "maxLength": 200
         },
         "prompt_hash": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash"
         }
       }
     },
@@ -514,17 +514,17 @@
           "pattern": "^[A-Za-z0-9_.:-]{1,128}$"
         },
         "participant": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
         },
         "as": {
           "description": "The capacity the acts are made in: a position it holds (absent: as itself).",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
         },
         "proposal": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
         },
         "blocks": {
-          "$ref": "urn:terrarium:contracts:0.4:blocks#/$defs/Action/properties/blocks"
+          "$ref": "urn:terrarium:contracts:0.5:blocks#/$defs/Action/properties/blocks"
         },
         "call": {
           "description": "The translator's reading of the proposal, in the call language (canonical form).",
@@ -536,7 +536,7 @@
         },
         "summary": {
           "description": "The preview: exactly what the blocks will do, generated mechanically from them in world terms (never written by the translator).",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
         },
         "check": {
           "description": "Kernel dry run of the blocks at drafting time: would physics allow them? Plus the translator's warnings about records (e.g. laws the plan appears to break). The world may change before sign-off; the kernel re-checks on submission.",
@@ -565,7 +565,7 @@
         },
         "caveats": {
           "description": "Parts of the proposal the translator could not express in blocks.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
         },
         "translator": {
           "$ref": "#/$defs/TranslatorId"
@@ -600,16 +600,16 @@
                 "additionalProperties": false,
                 "properties": {
                   "account": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "holder": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "custodian": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "balance": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Cents"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Cents"
                   },
                   "closed": {
                     "description": "The account was closed since the participant's previous look.",
@@ -633,26 +633,26 @@
                 "additionalProperties": false,
                 "properties": {
                   "t": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
                   },
                   "from": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "to": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "amount": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Amount"
                   },
                   "by": {
                     "description": "The participant that executed it.",
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "settles": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "per_instruction": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "memo": {
                     "type": "string",
@@ -677,7 +677,7 @@
             "records": {
               "type": "array",
               "items": {
-                "$ref": "urn:terrarium:contracts:0.4:records#/$defs/Record"
+                "$ref": "urn:terrarium:contracts:0.5:records#/$defs/Record"
               }
             },
             "search": {
@@ -704,7 +704,7 @@
             },
             "as_of": {
               "description": "When this view was last refreshed (see the channel's 'every').",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
             },
             "whole": {
               "description": "The capacity's entity has moved since its last look through this channel (which looks near it): these cells are the whole of its new surroundings, in place of the old.",
@@ -722,7 +722,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "cell": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/CellId"
                   },
                   "x": {
                     "type": "integer",
@@ -733,7 +733,7 @@
                     "minimum": 0
                   },
                   "terrain": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "structure": {
                     "description": "The building standing on this cell (the same on every cell of its footprint).",
@@ -750,13 +750,13 @@
                     "additionalProperties": false,
                     "properties": {
                       "structure": {
-                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                        "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                       },
                       "type": {
-                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                        "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
                       },
                       "at": {
-                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                        "$ref": "urn:terrarium:contracts:0.5:common#/$defs/CellId"
                       },
                       "w": {
                         "type": "integer",
@@ -767,13 +767,13 @@
                         "minimum": 1
                       },
                       "built_by": {
-                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                        "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                       },
                       "complete": {
                         "type": "boolean"
                       },
                       "completes_at": {
-                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+                        "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
                       },
                       "spaces": {
                         "type": "array",
@@ -788,17 +788,17 @@
                           "additionalProperties": false,
                           "properties": {
                             "space": {
-                              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SpaceId"
+                              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SpaceId"
                             },
                             "kind": {
-                              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                             },
                             "capacity": {
                               "type": "integer",
                               "minimum": 1
                             },
                             "attrs": {
-                              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+                              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/OpaqueObject"
                             },
                             "count": {
                               "description": "How many bodies are in it.",
@@ -809,7 +809,7 @@
                               "description": "Who, where that can be told: in the capacity's own buildings, or through a channel that shows names. Absent: only how many.",
                               "type": "array",
                               "items": {
-                                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                               }
                             },
                             "left": {
@@ -826,7 +826,7 @@
                                 "additionalProperties": false,
                                 "properties": {
                                   "occupant": {
-                                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                                   },
                                   "reason": {
                                     "enum": [
@@ -879,17 +879,17 @@
                 "additionalProperties": false,
                 "properties": {
                   "entity": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "kind": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "name": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
                   },
                   "participant": {
                     "description": "A person's participant (who acts as them).",
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   }
                 }
               }
@@ -906,22 +906,22 @@
                 "additionalProperties": false,
                 "properties": {
                   "position": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "entity": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "title": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
                   },
                   "role": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "holder": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
                   },
                   "held_by": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
                   }
                 }
               }
@@ -945,14 +945,14 @@
               "const": "act"
             },
             "blocks": {
-              "$ref": "urn:terrarium:contracts:0.4:blocks#/$defs/Action/properties/blocks"
+              "$ref": "urn:terrarium:contracts:0.5:blocks#/$defs/Action/properties/blocks"
             },
             "reasoning": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
             },
             "as": {
               "description": "The position to act in (absent: as itself, a person's only).",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
             }
           }
         },
@@ -973,11 +973,11 @@
               "maxLength": 65536
             },
             "reasoning": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
             },
             "as": {
               "description": "The position to act in (absent: as itself, a person's only).",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
             }
           }
         },
@@ -993,14 +993,14 @@
               "const": "propose"
             },
             "text": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
             },
             "reasoning": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
             },
             "as": {
               "description": "The position to act in (absent: as itself, a person's only).",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
             }
           }
         },
@@ -1027,7 +1027,7 @@
               ]
             },
             "note": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
             }
           }
         },
@@ -1044,17 +1044,17 @@
               "const": "message"
             },
             "to": {
-              "$ref": "urn:terrarium:contracts:0.4:blocks#/$defs/message/properties/to"
+              "$ref": "urn:terrarium:contracts:0.5:blocks#/$defs/message/properties/to"
             },
             "text": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
             },
             "re": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
             },
             "as": {
               "description": "The position to act in (absent: as itself, a person's only).",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
             }
           }
         },
@@ -1090,7 +1090,7 @@
               "const": "wait"
             },
             "until": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SimTime"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime"
             }
           }
         },
@@ -1106,7 +1106,7 @@
               "const": "opt_out"
             },
             "statement": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
             }
           }
         }

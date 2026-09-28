@@ -1,4 +1,4 @@
-//! World config, mirroring contracts/world-config.schema.json (v0.4), plus
+//! World config, mirroring contracts/world-config.schema.json (v0.5), plus
 //! the semantic checks JSON Schema can't express: unique ids, references
 //! resolve, one boundary, footprints fit the ground and don't overlap,
 //! occupancy within capacity, participants and positions coherent. None of
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACTS_VERSION: &str = "0.4";
+pub const CONTRACTS_VERSION: &str = "0.5";
 
 /// Entity kinds with physical meaning. Every other kind is the world's vocabulary.
 pub const PERSON: &str = "person";

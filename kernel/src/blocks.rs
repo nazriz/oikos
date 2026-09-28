@@ -1,5 +1,5 @@
 //! Building blocks and records, mirroring contracts/blocks.schema.json and
-//! contracts/records.schema.json (v0.4). Field names and shapes must match
+//! contracts/records.schema.json (v0.5). Field names and shapes must match
 //! the schemas exactly; tests/conformance.rs checks that the contract
 //! examples round-trip through these types.
 //!

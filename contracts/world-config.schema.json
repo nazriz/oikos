@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.4:world-config",
+  "$id": "urn:terrarium:contracts:0.5:world-config",
   "title": "Terrarium world config",
   "description": "Everything needed to start a run: the world seed (physical state plus the records it begins with), its participants and positions, framing and parameters. Institutions, laws, procedures and ownership are CONTENT: entities, accounts, records, participants and positions in this config (D23). An empty world is valid. Measurement is deliberately absent. Authored as YAML or JSON; the orchestrator converts it to canonical JSON, and that exact JSON is embedded in the log header.",
   "type": "object",
@@ -20,7 +20,7 @@
   "additionalProperties": false,
   "properties": {
     "contracts": {
-      "const": "0.4"
+      "const": "0.5"
     },
     "meta": {
       "type": "object",
@@ -31,10 +31,10 @@
       "additionalProperties": false,
       "properties": {
         "name": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
         },
         "description": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
         },
         "canary": {
           "description": "Training-data canary (VISION §14).",
@@ -46,7 +46,7 @@
     },
     "seed": {
       "description": "Seed for the kernel's single source of randomness (keyed streams, D7).",
-      "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Count"
+      "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count"
     },
     "clock": {
       "type": "object",
@@ -57,10 +57,10 @@
       "additionalProperties": false,
       "properties": {
         "tick_seconds": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
         },
         "run_seconds": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
         }
       }
     },
@@ -73,7 +73,7 @@
       "additionalProperties": false,
       "properties": {
         "checkpoint_every": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
         },
         "anchor_every_entries": {
           "type": "integer",
@@ -138,7 +138,7 @@
       "properties": {
         "max_created_entities": {
           "description": "Researcher's experimental control on how many entities participants may declare in a run.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Count"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count"
         }
       }
     },
@@ -193,20 +193,20 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "category": {
           "description": "A label for people and laws to refer to (residential, commercial, green...). The kernel attaches no meaning to it.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
         },
         "materials_cost": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Amount"
         },
         "build_time": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
         },
         "demolition_cost": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Amount"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Amount"
         },
         "footprint": {
           "description": "The cells it stands on: w by h, from the corner cell it's built at.",
@@ -233,7 +233,7 @@
           "description": "Terrain labels it can stand on (a jetty on 'water'). Absent: only cells with no terrain label. Physics: a house can't stand on water.",
           "type": "array",
           "items": {
-            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
           },
           "uniqueItems": true,
           "maxItems": 64
@@ -252,7 +252,7 @@
             "additionalProperties": false,
             "properties": {
               "kind": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
               },
               "count": {
                 "type": "integer",
@@ -265,7 +265,7 @@
                 "maximum": 100000
               },
               "attrs": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/OpaqueObject"
               }
             }
           }
@@ -293,7 +293,7 @@
       "properties": {
         "boundary": {
           "description": "The single entity of kind 'boundary': the world's outside. Its account (custodian: itself) may go negative; total money including it is constant for the whole run. Money enters the world only when the outside world's own participant pays from that account (D31): exports bought, visitors' spending, grants, and what newcomers bring. How much is researcher-set world content.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "ground": {
           "description": "The land: a grid of w by h cells ('cell.<x>.<y>'), each 'cell' world units across (presentation only), with terrain labels over rectangles (the world's vocabulary: water, rock...). Finite: this is all of it. Lots are records over cells, never part of the ground.",
@@ -334,7 +334,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "label": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "x": {
                     "type": "integer",
@@ -378,18 +378,18 @@
             "additionalProperties": false,
             "properties": {
               "id": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
               },
               "holder": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
               },
               "custodian": {
                 "description": "The entity that physically holds the money: a bank, or the holder itself (cash-like).",
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
               },
               "balance": {
                 "description": "Opening balance; >= 0 except for the boundary's account.",
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Cents"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Cents"
               }
             }
           },
@@ -408,17 +408,17 @@
             "additionalProperties": false,
             "properties": {
               "id": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
               },
               "at": {
                 "description": "Its corner cell.",
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/CellId"
               },
               "type": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
               },
               "built_by": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
               }
             }
           }
@@ -436,10 +436,10 @@
             "additionalProperties": false,
             "properties": {
               "occupant": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
               },
               "space": {
-                "$ref": "urn:terrarium:contracts:0.4:common#/$defs/SpaceId"
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SpaceId"
               }
             }
           }
@@ -448,7 +448,7 @@
           "description": "The records the world begins with: its laws, procedures and organisation structures; who owns what; agreements in force; debts outstanding. Usually authored 'genesis'.",
           "type": "array",
           "items": {
-            "$ref": "urn:terrarium:contracts:0.4:records#/$defs/Record"
+            "$ref": "urn:terrarium:contracts:0.5:records#/$defs/Record"
           },
           "maxItems": 1000000
         }
@@ -464,14 +464,14 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "kind": {
           "description": "A label. Two are reserved and physical: 'person' (a body: born, alive, in the world or outside it, can't be created by create_entity; only by arriving or being born) and 'boundary' (the world's edge; exactly one). Everything else (government, council, bank, firm, trust, union...) is the world's vocabulary.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
         },
         "name": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
         },
         "born_at": {
           "description": "Persons only: when the body was born, in seconds (before the run: negative).",
@@ -487,7 +487,7 @@
           "description": "Persons only: biological parents.",
           "type": "array",
           "items": {
-            "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+            "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
           },
           "maxItems": 2,
           "uniqueItems": true
@@ -513,7 +513,7 @@
           "additionalProperties": false,
           "properties": {
             "id": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
             },
             "title": {
               "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
@@ -522,7 +522,7 @@
             },
             "every": {
               "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
             },
             "on_request": {
               "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
@@ -544,7 +544,7 @@
           "additionalProperties": false,
           "properties": {
             "id": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
             },
             "title": {
               "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
@@ -553,7 +553,7 @@
             },
             "every": {
               "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
             },
             "on_request": {
               "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
@@ -588,7 +588,7 @@
                 "statement_kinds": {
                   "type": "array",
                   "items": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "uniqueItems": true
                 },
@@ -601,7 +601,7 @@
                         "const": "self"
                       },
                       {
-                        "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+                        "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
                       }
                     ]
                   },
@@ -618,7 +618,7 @@
                 {
                   "type": "array",
                   "items": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/CellId"
                   },
                   "minItems": 1,
                   "uniqueItems": true
@@ -650,7 +650,7 @@
           "additionalProperties": false,
           "properties": {
             "id": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
             },
             "title": {
               "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
@@ -659,7 +659,7 @@
             },
             "every": {
               "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
             },
             "on_request": {
               "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
@@ -678,7 +678,7 @@
                 {
                   "type": "array",
                   "items": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/CellId"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/CellId"
                   },
                   "minItems": 1,
                   "uniqueItems": true
@@ -716,7 +716,7 @@
           "additionalProperties": false,
           "properties": {
             "id": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
             },
             "title": {
               "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
@@ -725,7 +725,7 @@
             },
             "every": {
               "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
             },
             "on_request": {
               "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
@@ -764,7 +764,7 @@
           "maxLength": 200
         },
         "params": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque"
         }
       }
     },
@@ -786,17 +786,17 @@
           ]
         },
         "system": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
         },
         "reason": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
         },
         "debrief": {
           "type": "boolean"
         },
         "debrief_text": {
           "description": "What the participant is told at the end of the run, if debrief is set. Default: the orchestrator's (docs/design/m2-llm-participants.md), which says what the run was, discloses any framing and asks for the participant's reaction.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Text"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Text"
         }
       }
     },
@@ -812,7 +812,7 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "kind": {
           "enum": [
@@ -822,14 +822,14 @@
         },
         "person": {
           "description": "A person's participant: its person.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "owner": {
           "description": "A system participant: the organisation it belongs to.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "title": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
         },
         "channels": {
           "description": "A person's own channels: what it perceives of its own life.",
@@ -863,7 +863,7 @@
                   "maxLength": 200
                 },
                 "params": {
-                  "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+                  "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque"
                 }
               }
             }
@@ -871,7 +871,7 @@
         },
         "traits": {
           "description": "Its own parameters (a person's disposition: a political leaning, how strictly it follows procedure), used by the role modules it runs in positions it holds.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/OpaqueObject"
         }
       }
     },
@@ -885,16 +885,16 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "entity": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "title": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
         },
         "role": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
         },
         "channels": {
           "type": "array",
@@ -905,10 +905,10 @@
         },
         "role_module": {
           "description": "How a code participant does this job, e.g. {\"code\": \"city.councillor\", \"params\": {..}}. Opaque to the kernel; the orchestrator runs it with the holder's traits. A system participant runs its own controller instead.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque"
         },
         "holder": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         }
       }
     },
@@ -924,7 +924,7 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/ConfigId"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
         },
         "kind": {
           "enum": [
@@ -933,7 +933,7 @@
           ]
         },
         "title": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Name"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Name"
         },
         "channels": {
           "type": "array",
@@ -966,14 +966,14 @@
                   "maxLength": 200
                 },
                 "params": {
-                  "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque"
+                  "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque"
                 }
               }
             }
           ]
         },
         "traits": {
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/OpaqueObject"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/OpaqueObject"
         }
       }
     },
@@ -987,7 +987,7 @@
       "properties": {
         "year": {
           "description": "Seconds in a year of age.",
-          "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
         },
         "other_causes": {
           "description": "Yearly chance of death from causes not otherwise modelled, by age (steps: each applies from its age until the next).",
@@ -1074,7 +1074,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "label": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "share_bps": {
                     "type": "integer",
@@ -1131,7 +1131,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "label": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "share_bps": {
                     "type": "integer",
@@ -1188,7 +1188,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "label": {
-                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Label"
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Label"
                   },
                   "share_bps": {
                     "type": "integer",
@@ -1236,7 +1236,7 @@
               }
             },
             "gestation": {
-              "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Duration"
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
             },
             "reach": {
               "type": "integer",

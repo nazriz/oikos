@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.4:calls",
+  "$id": "urn:terrarium:contracts:0.5:calls",
   "title": "Calls (parsed form)",
   "description": "The parsed form of a program in the call language (contracts/calls.md): what the parser produces and the resolver consumes. Values keep what the participant wrote: amounts and durations stay as text until the parser's tables convert them (zero arithmetic in the translator).",
   "type": "object",
@@ -16,7 +16,7 @@
         { "type": "object", "required": ["id"], "additionalProperties": false, "properties": { "id": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]{1,128}$" } } },
         { "type": "object", "required": ["var"], "additionalProperties": false, "properties": { "var": { "$ref": "#/$defs/Name" } } },
         { "type": "object", "required": ["text"], "additionalProperties": false, "properties": { "text": { "type": "string", "maxLength": 16384 } } },
-        { "type": "object", "required": ["json"], "additionalProperties": false, "properties": { "json": { "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Opaque" } } },
+        { "type": "object", "required": ["json"], "additionalProperties": false, "properties": { "json": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" } } },
         { "type": "object", "required": ["call"], "additionalProperties": false, "properties": { "call": { "$ref": "#/$defs/Call" } } }
       ]
     },

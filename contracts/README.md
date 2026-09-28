@@ -184,7 +184,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 - **Land:** `world.ground` (cells, terrain) replaces parcels; structure types gain `footprint`, `terrains`, `spaces` (instead of slot capacities) and `injury_bps`; `construct` names a corner cell (`at`); `occupy` names a space (`space`, optionally `who`); `vacate` names `from`. Lots are records.
 - **Calls:** `occupancy` takes `in` (a space or building), `who`, `leave`; new functions `presence`, `birth`, `harm`, `position`, `system`; `entity(position=…)`; ids may contain `/` (spaces).
 - **Outcomes:** occupancy is `{ who, in, leave? }`; form field types `lot`, `cell` and `space` replace `parcel`.
-- The version: every `$id` is `urn:terrarium:contracts:0.4:…`, and configs and log headers say `contracts: "0.4"`.
+- The version: every `$id` is `urn:terrarium:contracts:0.5:…`, and configs and log headers say `contracts: "0.4"`.
 
 ## Changes from v0.2
 

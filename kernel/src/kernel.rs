@@ -1,4 +1,4 @@
-//! The kernel (v0.4): the only writer of world state, and physics only.
+//! The kernel (v0.5): the only writer of world state, and physics only.
 //!
 //! It takes commands (the only inputs; see the Command definition in
 //! contracts/log.schema.json) and returns the events they caused. An act

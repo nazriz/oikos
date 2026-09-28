@@ -1,6 +1,6 @@
 //! Terrarium kernel: the world's laws of physics and its only writer.
 //!
-//! Physics, plus a place to keep records (contracts v0.4, D18-D22, D47). Inputs are
+//! Physics, plus a place to keep records (contracts v0.5, D18-D22, D47, D58). Inputs are
 //! commands (act / advance / observe / look / opt_out); outputs are events,
 //! observations and a hash-chained log that replays byte-identically. The
 //! kernel refuses only what is physically impossible; laws, ownership and
