@@ -450,6 +450,25 @@ See the design note, §16.
 - **Rule for new modules** (and the municipal economy): what a participant knows comes from what it perceives, or from parameters in the world config that stand for its own knowledge or traits, visible in the config like a model seat's framing.
 - **Revisit if:** a fact is genuinely public and everywhere (a calendar). Publish it as a record everyone perceives, rather than reopening the config.
 
+**D58. A foundation for scale: contracts v0.5.** *(Naz, 2026-09-28: "yes to all twelve, go ahead with phase A".)*
+- **The frame** (docs/design/foundation-for-scale.md): the platform carries a household to a grid of worlds, tens of people to billions, hours to centuries, many AI stewards and humans, and worlds from generators or real data. Each run chooses its resolution. The town is the first instance and the test fixture.
+- **Approved, all twelve decisions of §9:**
+  1. the frame;
+  2. places as a tree, each detailed or summarised;
+  3. cohorts, tested by statistical equivalence;
+  4. conserved resources and state variables, retiring the materials liberty;
+  5. work as a kernel act;
+  6. amounts as decimal-string integers with units;
+  7. several boundaries;
+  8. same-moment wakes observe the same state, with acts applied in participant order;
+  9. humans as participants (designed now, built in phase F);
+  10. real-data seeding (synthetic people only; licences and provenance recorded);
+  11. "one hash chain" becomes "one root";
+  12. the order of work, with the municipal draft as phase C's instance.
+- **Contracts bumped to v0.5** (the versioning rule, D40). **Phase A** (cheap now, painful later) lands first: amounts and units, several boundaries, the places tree with the town as one detailed place, and the same-moment rule. Each lands with the town unchanged in outcome, or the difference explained.
+
+## Open (to decide at the Stage 2 checkpoint or before)
+
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
 
 - **Contract additions proposed by M2** (docs/design/m2-llm-participants.md, "Open"): `notices` on the Observation (translation failures and similar orchestrator-to-seat notes), and `framing.debrief_text`.
