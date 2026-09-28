@@ -8,7 +8,7 @@
 
 ```
 seat wakes ─> report (framing, standing documents, notes, what's new, drafts awaiting sign-off)
-   ─> model ─> one tool call: propose | sign | message | wait | resign  (+ notes)
+   ─> model ─> one tool call: propose | sign | message | wait | resign  (+ notes, as a second tool use; every use gets a result)
 propose ─> translator (model) ─> blocks + summary ─> contract check (ajv) ─> kernel dry run ─> law warnings ─> Draft (hashed)
    ─> next report shows the draft, with the translator's summary AND a mechanical reading of the blocks
 sign accept ─> act, with provenance {via: translator, proposal, draft, draft_hash, translator}

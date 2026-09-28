@@ -15,7 +15,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { renderObservation, renderStanding } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.3.0";
+export const LLM_PARTICIPANT_VERSION = "0.4.0";
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -86,7 +86,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const toolset = tools(c);
   let notes = "";
   let messages: LlmMessage[] = [];
-  let pendingToolId: string | undefined;
+  // The tool uses of the last answer that are still owed a result (the APIs need one for every use): the action's
+  // result is the next report; a notebook update is acknowledged; any further action wasn't taken (one at a time).
+  let pending: { id: string; name: string }[] = [];
+  let actedId: string | undefined;
   let lastAction: string | undefined;
   const seenSystems = new Set<string>();
   let standingText = "";
@@ -97,9 +100,12 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       if (standing) standingText = standing;
       const body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText });
       lastAction = undefined;
-      if (pendingToolId) messages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: pendingToolId, content: body }] });
+      if (actedId)
+        messages.push({ role: "user", content: pending.map((u): ContentBlock => ({ type: "tool_result", tool_use_id: u.id,
+          content: u.id === actedId ? body : u.name === "notebook" ? "Notebook updated." : "Not done: one action at a time." })) });
       else messages = [{ role: "user", content: `Your notebook: ${notes || "(empty)"}\n\n${body}` }];
-      pendingToolId = undefined;
+      actedId = undefined;
+      pending = [];
 
       const res = await callModel(io, {
         purpose: "participant", subject: c.participant, system: systemPrompt(c, standingText), messages, tools: toolset, maxTokens: c.maxTokens ?? 2000,
@@ -112,7 +118,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const use = uses.find((x) => x.name !== "notebook");
       const done = (a: ParticipantAction, label?: string) => {
         if (a.type === "wait" || a.type === "opt_out") messages = [];
-        else pendingToolId = use!.id;
+        else {
+          actedId = use!.id;
+          pending = uses.map((u) => ({ id: u.id, name: u.name }));
+        }
         lastAction = label;
         return a;
       };

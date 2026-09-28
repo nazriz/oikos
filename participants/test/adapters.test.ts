@@ -90,14 +90,14 @@ test("the spending limit: no call that could exceed it is made; debriefs may use
   await expect(callModel({ ...io, prices: {} }, req, new Set())).rejects.toThrow("no price recorded");
 });
 
-test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-shaped answer becomes a tool use; tokens from turn.completed", async () => {
+test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-shaped answer becomes tool uses (the notebook alongside an action); tokens from turn.completed", async () => {
   const { CodexCliAdapter } = await import("../src/llm/codex");
   const seen: { args: string[]; stdin: string; cwd: string; schema: any }[] = [];
   const runner = async (args: string[], stdin: string, cwd: string) => {
     const schemaPath = args[args.indexOf("--output-schema") + 1]!;
     const lastPath = args[args.indexOf("--output-last-message") + 1]!;
     seen.push({ args, stdin, cwd, schema: JSON.parse(await Bun.file(schemaPath).text()) });
-    await Bun.write(lastPath, JSON.stringify({ tool: "do", input_json: '{"what":"Publish a notice."}', text: "" }));
+    await Bun.write(lastPath, JSON.stringify({ uses: [{ tool: "notebook", input_json: '{"text":"Asked for the figures."}' }, { tool: "do", input_json: '{"what":"Publish a notice."}' }], text: "" }));
     return { code: 0, stderr: "", stdout: ['{"type":"thread.started"}', '{"type":"turn.completed","usage":{"input_tokens":2400,"cached_input_tokens":1000,"output_tokens":40,"reasoning_output_tokens":60}}'].join("\n") };
   };
   const r = await new CodexCliAdapter("gpt-5", runner).complete(req);
@@ -108,8 +108,11 @@ test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-
   expect(a.args.at(-1)).toBe("-"); // the prompt on stdin
   expect(a.stdin).toContain("You are the mayor.");
   expect(a.stdin).toContain("[used do:"); // the conversation so far
-  expect(a.schema.properties.tool.enum).toEqual(["do"]);
-  expect(r.content).toEqual([{ type: "tool_use", id: "codex-1", name: "do", input: { what: "Publish a notice." } }]);
+  expect(a.schema.properties.uses.items.properties.tool.enum).toEqual(["do"]);
+  expect(r.content).toEqual([
+    { type: "tool_use", id: "codex-1", name: "notebook", input: { text: "Asked for the figures." } },
+    { type: "tool_use", id: "codex-2", name: "do", input: { what: "Publish a notice." } },
+  ]);
   expect(r.usage).toEqual({ input_tokens: 1400, output_tokens: 100, cache_read_tokens: 1000 });
   // A failed run is an error, with what codex said.
   const failing = async () => ({ code: 1, stdout: "", stderr: "not signed in" });

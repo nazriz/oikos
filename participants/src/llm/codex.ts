@@ -24,17 +24,29 @@ export const spawnCodex: CodexRunner = async (args, stdin, cwd) => {
   return { code, stdout, stderr };
 };
 
-/** The answer's shape: which tool (or "text"), and its input as a JSON string (strict schemas need every field required). */
+/**
+ * The answer's shape: the tools used, in order (usually one action, and the notebook alongside it), each with its
+ * input as a JSON string (strict schemas need every field required), and any words besides. With no tools, a plain answer.
+ */
 export function answerSchema(toolNames: string[]): object {
+  const text = { type: "string", description: "Any words to say besides the tool use (may be empty)." };
+  if (!toolNames.length) return { type: "object", additionalProperties: false, required: ["text"], properties: { text } };
   return {
     type: "object",
     additionalProperties: false,
-    required: ["tool", "input_json", "text"],
+    required: ["uses", "text"],
     properties: {
-      // "none" only when there are no tools (a plain answer): offered alongside tools, a model mistakes it for declining.
-      tool: { type: "string", enum: toolNames.length ? toolNames : ["none"] },
-      input_json: { type: "string", description: toolNames.length ? "The tool's input, as a JSON object." : "\"{}\"." },
-      text: { type: "string", description: "Any words to say besides the tool use (may be empty)." },
+      uses: {
+        type: "array",
+        description: "The tools you use, in order: one action, and your notebook alongside it if you're updating it.",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["tool", "input_json"],
+          properties: { tool: { type: "string", enum: toolNames }, input_json: { type: "string", description: "The tool's input, as a JSON object." } },
+        },
+      },
+      text,
     },
   };
 }
@@ -58,7 +70,7 @@ export function codexPrompt(req: LlmRequest): string {
     "=== Conversation so far ===",
     transcript(req.messages),
     "",
-    tools ? "=== Your answer ===\nChoose one tool and give its input as a JSON object in input_json." : '=== Your answer ===\nAnswer in text, with tool "none".',
+    tools ? "=== Your answer ===\nList the tools you use in `uses`, each with its input as a JSON object in input_json: one action, and your notebook alongside it if you're updating it." : "=== Your answer ===\nAnswer in text.",
   ].join("\n");
 }
 
@@ -93,22 +105,23 @@ export class CodexCliAdapter implements LlmAdapter {
           // not an event line
         }
       }
-      let answer: { tool?: string; input_json?: string; text?: string } = {};
+      let answer: { uses?: { tool?: string; input_json?: string }[]; text?: string } = {};
       try {
         answer = JSON.parse(readFileSync(last, "utf8"));
       } catch {
-        answer = { tool: "none", text: readFileSync(last, "utf8").slice(0, 4000) };
+        answer = { text: readFileSync(last, "utf8").slice(0, 4000) };
       }
       const content: ContentBlock[] = [];
       if (answer.text) content.push({ type: "text", text: answer.text });
-      if (answer.tool && answer.tool !== "none") {
+      for (const u of answer.uses ?? []) {
+        if (!u.tool) continue;
         let input: any;
         try {
-          input = JSON.parse(answer.input_json ?? "{}");
+          input = JSON.parse(u.input_json ?? "{}");
         } catch {
-          input = { _unparsed: answer.input_json };
+          input = { _unparsed: u.input_json };
         }
-        content.push({ type: "tool_use", id: `codex-${++this.calls}`, name: answer.tool, input });
+        content.push({ type: "tool_use", id: `codex-${++this.calls}`, name: u.tool, input });
       }
       return { content, usage };
     } finally {

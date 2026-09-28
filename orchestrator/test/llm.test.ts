@@ -159,3 +159,34 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   expect(read).toContain("The budget's lines: parks, for building a park");
   expect(read).toContain("about $60,000 a park");
 }, 300_000);
+
+test("the notebook, used alongside an action, carries to the next wake; every tool use gets a result, as the APIs require", async () => {
+  let n = 0;
+  const firsts: string[] = [];
+  const unanswered: string[] = [];
+  const adapter = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      // The APIs' rule: each tool use in an answer is followed by a result for it in the next message.
+      for (let i = 0; i + 1 < req.messages.length; i++) {
+        const m = req.messages[i]!;
+        if (m.role !== "assistant" || typeof m.content === "string") continue;
+        const next = req.messages[i + 1]!;
+        const results = new Set(typeof next.content === "string" ? [] : next.content.flatMap((b) => (b.type === "tool_result" ? [b.tool_use_id] : [])));
+        for (const b of m.content) if (b.type === "tool_use" && !results.has(b.id)) unanswered.push(b.id);
+      }
+      const first = req.messages[0]!;
+      if (req.messages.length === 1) firsts.push(typeof first.content === "string" ? first.content : "");
+      const k = ++n;
+      if (k === 1) return [{ type: "tool_use", id: `u${k}a`, name: "notebook", input: { text: "Wrote to finance on day 0." } },
+        { type: "tool_use", id: `u${k}b`, name: "write", input: { to: ["finance"], text: "Please send me the town's figures.", as: "mayor" } }];
+      return [{ type: "tool_use", id: `u${k}`, name: "done_for_now", input: { days: 3 } }];
+    },
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
+    debrief: () => [{ type: "text", text: "Thanks." }],
+  });
+  await run("notebook", town(), 8 * DAY, { adapter });
+  expect(unanswered).toEqual([]);
+  expect(firsts[0]).toContain("Your notebook: (empty)");
+  expect(firsts.slice(1).every((f) => f.includes("Your notebook: Wrote to finance on day 0."))).toBe(true);
+  expect(firsts.length).toBeGreaterThan(1);
+}, 300_000);
