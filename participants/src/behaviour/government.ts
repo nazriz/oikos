@@ -189,16 +189,21 @@ export const councilClerk: BehaviourModule = {
  */
 export const councillor: BehaviourModule = {
   name: "city.councillor",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
     const p = params({ leaning: 0, noise_bps: 1500, budget_yes_bps: 9000 }, ctx.params);
     const book = new Book();
     const voted = new Set<string>();
+    const cast: string[] = []; // "ballot: yes|no", for its answer to letters
+    const letters = new Letters();
     const place = (tags: string[]) => (tags.includes("tenant_protection") ? 60 : 0) - (tags.includes("development") ? 60 : 0);
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+      },
       (obs) => {
         const steps: Step[] = [];
         for (const b of book.open("ballot")) {
@@ -213,8 +218,11 @@ export const councillor: BehaviourModule = {
             yes = Math.abs(p.leaning - x) < Math.abs(p.leaning - 0);
             if (r.below(10_000) < p.noise_bps) yes = !yes;
           }
+          cast.push(`${b.id}: ${yes ? "yes" : "no"}`);
           steps.push(because(tags.includes("budget") ? "A budget: voting on our usual propensity to pass budgets." : `Voting by our leaning (${p.leaning}) against the proposal's place on the tenants-development axis (${place(tags)})${yes !== Math.abs(p.leaning - place(tags)) < Math.abs(p.leaning) ? ", this time the other way (noise)" : ""}.`, vote(b.id, yes ? "yes" : "no")));
         }
+        // A letter gets the councillor's voting record; it doesn't change how they vote (docs/behaviour/government.md).
+        steps.push(...letters.answer(() => `Report from a councillor: my votes on the council's ballots: ${cast.length ? cast.join(", ") : "none yet"}.`, "A letter to a councillor: answering with our voting record."));
         return steps;
       },
     );

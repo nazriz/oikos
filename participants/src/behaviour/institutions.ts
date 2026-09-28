@@ -114,16 +114,23 @@ export const planningOfficer: BehaviourModule = {
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
     const p = params({ fine: 5_000_000, compliance_bps: 10_000 }, ctx.params);
     const book = new Book();
     const known = new Set<string>(); // structures already judged (or standing when we started)
+    const found: string[] = []; // breaches acted on: "structure on lot (law)"
     let first = true;
+    const letters = new Letters();
+    const report = () =>
+      `Report from the building inspector: ${known.size} buildings on record. ${found.length ? `Breaches found and acted on (a fine and a demolition order each): ${found.join(", ")}.` : "No breaches found."}`;
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+      },
       (obs) => {
         const me = obs.entity;
         const buildings = channels.structures(obs);
@@ -131,7 +138,7 @@ export const inspector: BehaviourModule = {
         if (first) {
           for (const st of buildings) known.add(st.structure);
           first = false;
-          return steps;
+          return [...steps, ...letters.answer(report)];
         }
         const claims = standingClaims(book.records.values());
         for (const st of buildings) {
@@ -147,11 +154,13 @@ export const inspector: BehaviourModule = {
             return "value" in v && v.value;
           });
           if (!breached || ctx.rng(`act-${st.structure}`).below(10_000) >= p.compliance_bps) continue;
+          found.push(`${st.structure} on ${lot ?? st.at} (${breached.id})`);
           steps.push(because(`On patrol: ${st.structure} was built in breach of ${breached.id}; fining the owner and ordering it demolished.`,
             record("right", me, { kind: "fine", amount: p.fine, for: `Unpermitted ${st.type} on ${lot ?? st.at} (${st.structure}).` }, { against: owner, basis: breached.id }),
             say("demolition_order", `Order: demolish ${st.structure} on ${lot ?? st.at}, built in breach of ${breached.id}.`, { to: [owner], basis: breached.id, data: { structure: st.structure, lot, law: breached.id } }),
           ));
         }
+        steps.push(...letters.answer(report));
         return steps;
       },
     );
@@ -211,14 +220,18 @@ export const builder: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(_ctx: ParticipantContext) {
     const book = new Book();
     const registered = new Set<string>();
+    const letters = new Letters();
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+      },
       (obs) => {
         const me = obs.entity;
         const steps: Step[] = [];
@@ -233,6 +246,7 @@ export const registry: BehaviourModule = {
             data: { deceased: who, reported_by: n.speaks_for, ...(d.partner ? { partner: d.partner } : {}), children: d.children ?? [], without_adult: d.without_adult ?? [] },
           })));
         }
+        steps.push(...letters.answer(() => `Report from the registrar: ${registered.size} deaths registered${registered.size ? ` (${[...registered].sort().join(", ")})` : ""}.`));
         return steps;
       },
     );
@@ -247,14 +261,18 @@ export const registry: BehaviourModule = {
  */
 export const childProtection: BehaviourModule = {
   name: "city.child_protection",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(_ctx: ParticipantContext) {
     const book = new Book();
     const taken = new Set<string>();
+    const letters = new Letters();
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+      },
       () => {
         const steps: Step[] = [];
         const children = [
@@ -266,6 +284,7 @@ export const childProtection: BehaviourModule = {
           taken.add(c);
           steps.push(because("A child with no adult at home: taking them into care elsewhere.", C.call("presence", { who: c, leave: "yes" })));
         }
+        steps.push(...letters.answer(() => `Report from the child protection office: ${taken.size} children taken into care elsewhere (the town has no foster homes).`));
         return steps;
       },
     );
