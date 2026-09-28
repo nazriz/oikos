@@ -14,6 +14,7 @@ import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
 import { disposal, exportDemand, funding, grants, idle, migration, trade, transfers, valuer } from "./behaviour/world";
 import { lending } from "./behaviour/credit";
+import { organiser } from "./behaviour/union";
 import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
 import { producer } from "./behaviour/producer";
@@ -36,6 +37,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [grants, "behaviour/world.ts"],
       [disposal, "behaviour/world.ts"],
       [lending, "behaviour/credit.ts"],
+      [organiser, "behaviour/union.ts"],
       [citizen, "behaviour/citizen.ts"],
       [landlord, "behaviour/firms.ts"],
       [employer, "behaviour/firms.ts"],

@@ -60,6 +60,7 @@ export interface Profile {
       upkeep_hours_per_week_per_asset: number;
       complain_bps: number;
     };
+    unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; claim_margin_bps: number };
   };
   /** A source for each value (a dotted path into `values`; a value is covered by its own path or a parent's). */
   sources: { [path: string]: string };

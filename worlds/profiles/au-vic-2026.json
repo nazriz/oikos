@@ -530,6 +530,17 @@
       "asset_life_years": 15,
       "upkeep_hours_per_week_per_asset": 4,
       "complain_bps": 3000
+    },
+    "unions": {
+      "membership_bps": {
+        "factory": 900,
+        "shop": 700,
+        "builder": 1170,
+        "city": 2310,
+        "other": 1310
+      },
+      "dues_per_month": 6000,
+      "claim_margin_bps": 200
     }
   },
   "sources": {
@@ -579,7 +590,10 @@
     "services.collect_seconds_per_10kg": "Placeholder: a one-driver side-loader lifts up to 6 bins a minute (Bucher Municipal, Sport side loader); with driving between houses, about 1,000 bins a day is taken as a round, and a household's week of waste as about 24 kg: about 12 seconds of work per 10 kg.",
     "services.asset_life_years": "Placeholder: a park or civic building wears out in 15 years without upkeep (after VAGO, Maintaining Local Roads: spray seals last 10-15 years).",
     "services.upkeep_hours_per_week_per_asset": "Placeholder: a crew member's half a day a week keeps a park or the hall up (mowing, bins, repairs).",
-    "services.complain_bps": "Placeholder: the chance a week that a household whose waste has gone two weeks uncollected writes to the town. Who reports and who doesn't varies (the service-request literature, e.g. Stowers 2022, State and Local Government Review); a rate is to be sourced."
+    "services.complain_bps": "Placeholder: the chance a week that a household whose waste has gone two weeks uncollected writes to the town. Who reports and who doesn't varies (the service-request literature, e.g. Stowers 2022, State and Local Government Review); a rate is to be sourced.",
+    "unions.membership_bps": "ABS, Trade union membership, August 2024: 13.1% of employees; by industry, manufacturing 9.0%, construction 11.7%, retail trade 7.0%, public administration and safety 23.1% (the industry figures to confirm against the release's tables). A factory's staff take manufacturing's, a shop's retail's, the builder's construction's, the town's public administration's; anyone else (`other`) the overall rate.",
+    "unions.dues_per_month": "Placeholder: about $14 a week, around what large Australian unions charge full-time members (to source).",
+    "unions.claim_margin_bps": "Placeholder: a union claims the year's rise in prices and 2% more. Settlements are measured against the Department of Employment and Workplace Relations' Trends in Federal Enterprise Bargaining (average annualised wage increases in new agreements), a calibration target."
   },
   "targets": [
     {
@@ -626,6 +640,16 @@
       "what": "working_days_lost_per_1000_per_quarter",
       "value": 4.2,
       "source": "ABS, Industrial Disputes, Australia, September quarter 2025"
+    },
+    {
+      "what": "working_days_lost_per_1000_employees_per_year",
+      "value": 11.3,
+      "source": "Derived: 139,100 working days lost in industrial disputes in 2024 (ABS, Industrial Disputes, Australia, December 2024) over about 12.3 million employees (ABS, Labour Force; to confirm)"
+    },
+    {
+      "what": "union_membership_pct_of_employees",
+      "value": 13.1,
+      "source": "ABS, Trade union membership, August 2024"
     }
   ]
 }

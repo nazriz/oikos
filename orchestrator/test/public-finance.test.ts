@@ -39,11 +39,15 @@ test("wages are paid net of the tax withheld, which is paid over; rates are levi
   const jobs = new Map([...config.world.records, ...recs].filter((r: any) => r.record === "agreement" && r.terms.template === "employment").map((a: any) => [a.id, a]));
   const wageOrders = [...config.world.records, ...recs].filter((r: any) => r.record === "statement" && r.kind === "request" && jobs.has(r.basis) && r.data?.every);
   expect(wageOrders.length).toBeGreaterThan(10);
+  // (The wage agreed, raised by any enterprise agreement at that employer before the order: docs/behaviour/unions.md.)
+  const eas = recs.filter((r) => r.kind === "enterprise_agreement");
   for (const o of wageOrders) {
     const a: any = jobs.get(o.basis);
     const m = a.terms.commitments.find((c: any) => c.who === a.terms.parties[0]).does.outcome.money;
     const every = a.terms.commitments.find((c: any) => c.who === a.terms.parties[0]).every;
-    expect(Number(o.data.outcome.money.amount)).toBe(Number(m.amount) - withholding(law, Number(m.amount), every));
+    let gross = Number(m.amount);
+    for (const ea of eas.filter((x) => x.data.employer === a.terms.parties[0] && x.at <= o.at && x.at >= a.at)) gross = Math.floor((gross * (10_000 + ea.data.rise_bps)) / 10_000);
+    expect(Number(o.data.outcome.money.amount)).toBe(gross - withholding(law, gross, every));
   }
   // What's withheld is paid over monthly, with a report (a firm short of money pays what it has, and owes the rest).
   const reports = recs.filter((r) => r.kind === "withholding_report");

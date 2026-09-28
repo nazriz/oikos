@@ -36,7 +36,8 @@ test("rents are reviewed within the tenancy law, never down, and tenants pay the
   for (const r of increases) {
     expect(r.data.from - r.at).toBeGreaterThanOrEqual(law.notice * DAY);
     expect(Number(r.data.rent)).toBeGreaterThan(Number(r.data.was));
-    // The tenant answers: a standing order for the new rent, or notice on the lease.
+    // The tenant answers (given a week to): a standing order for the new rent, or notice on the lease.
+    if (r.at > 15 * MONTH - 7 * DAY) continue;
     const tenant = r.addressed_to[0];
     const pays = recs.some((x) => x.kind === "request" && x.speaks_for === tenant && x.basis === r.data.lease && x.data?.outcome?.money?.amount === String(r.data.rent) && x.at >= r.at);
     const leaves = recs.some((x) => x.record === "notice" && x.agreement === r.data.lease && x.as === tenant && x.at >= r.at);

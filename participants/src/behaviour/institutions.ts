@@ -13,7 +13,7 @@ import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
-import { Staffing, stepper, WindingUp } from "./firms";
+import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
 function prohibitions(book: Book): StatementRecord[] {
@@ -227,7 +227,9 @@ export const builder: BehaviourModule = {
     let usedDay = -1;
     let publishedAt = "";
     // Hourly pay: the wage over the hours it pays for (working days in the period x the working day).
-    const hourly = () => Math.ceil((p.wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
+    let wage: number = p.wage; // (an enterprise agreement raises it)
+    const bargaining = new Bargaining(ctx.entity);
+    const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
     return stepper(
       (obs) => {
         book.absorb(obs);
@@ -246,7 +248,7 @@ export const builder: BehaviourModule = {
         const acc = ownAccount(obs);
         const steps: Step[] = [];
         if (!acc) return steps;
-        steps.push(...dues.payDebts(book, acc.account, acc.balance, staffing.workers(book, t).length * p.wage));
+        steps.push(...dues.payDebts(book, acc.account, acc.balance, staffing.workers(book, t).length * wage));
         for (const c of channels.cells(obs)) if (c.structure) typeOf.set(c.structure.structure, c.structure.type);
         const supply = goodsPrices(book, p.supplier);
         const materialsCost = (m: { [kind: string]: number }) => Object.entries(m).reduce((x, [k, q]) => x + (supply.prices[k] === undefined ? Infinity : q * supply.prices[k]!), 0);
@@ -384,13 +386,14 @@ export const builder: BehaviourModule = {
         const inHand = projects.reduce((x, pr) => x + Math.max(0, pr.left), 0) + waiting.reduce((x, w) => x + ((w.remove ? p.types[typeOf.get(w.remove) ?? ""]?.demolition_labour : w.type ? p.types[w.type]?.build_labour : 0) ?? 0), 0);
         const perHand = (p.horizon_days * p.working_day * p.work_days) / 7;
         const want = Math.min(p.max_crew, Math.max(p.min_crew, Math.ceil(inHand / perHand)));
-        const bill = Math.floor((crewNow.length * p.wage * 30 * DAY) / p.period);
+        const bill = Math.floor((crewNow.length * wage * 30 * DAY) / p.period);
+        steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
         steps.push(...staffing.routine(obs, book, acc.account, {
-          target: want, wage: p.wage, canPost: acc.balance >= bill + p.wage,
+          target: want, wage: wage, canPost: acc.balance >= bill + wage,
           why: `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands to do within ${p.horizon_days} days; we have ${crewNow.length}: posting a job.`,
         }));
-        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || (crewNow.length && acc.balance < crewNow.length * p.wage)) {
-          const broke = acc.balance < crewNow.length * p.wage;
+        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || (crewNow.length && acc.balance < crewNow.length * wage)) {
+          const broke = acc.balance < crewNow.length * wage;
           const s = staffing.letGo(book, t, broke ? `Can't cover the next pay period (${usd(acc.balance)} for ${crewNow.length}): letting the most recent hire go.` : `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands; we have ${crewNow.length}: letting the most recent hire go.`,
             broke ? "Redundancy: we can't cover the wage bill." : "Redundancy: there isn't the work.");
           if (s.length) lastLetGo = t;

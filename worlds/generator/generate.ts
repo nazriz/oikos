@@ -121,6 +121,8 @@ export function generate(spec: TownSpec): any {
     { id: "city", kind: "government", name: `Town of ${spec.name}` },
     { id: "bank", kind: "bank", name: `${spec.name} Savings Bank` },
     { id: "builder", kind: "builder", name: `${spec.name} Builders` },
+    // A trade union that the town's workers may join (docs/behaviour/unions.md).
+    { id: "union", kind: "union", name: "The workers' union" },
   ];
   const landlords = Array.from({ length: spec.landlords }, (_, i) => `landlord-${i + 1}`);
   const shops = Array.from({ length: spec.shops }, (_, i) => `shop-${i + 1}`);
@@ -211,6 +213,7 @@ export function generate(spec: TownSpec): any {
   const accounts: any[] = [
     { id: "acc-outside", holder: "outside", custodian: "outside", balance: 0 },
     { id: "acc-bank", holder: "bank", custodian: "bank", balance: 50_000_000 },
+    { id: "acc-union", holder: "union", custodian: "bank", balance: 0 },
     { id: "acc-city", holder: "city", custodian: "bank", balance: 200_000_000 },
     { id: "acc-builder", holder: "builder", custodian: "bank", balance: 30_000_000 },
   ];
@@ -261,6 +264,9 @@ export function generate(spec: TownSpec): any {
   const jobSlots = workplaces.flatMap((w) => Array.from({ length: w.start ?? w.capacity }, () => w));
   let job = 0;
   const staffCount = new Map<string, number>();
+  const U = V.unions;
+  const unionPick = rng("union");
+  const unionMembers: { member: string; employer: string }[] = [];
   const monthlyPay = new Map<string, number>();
   const outOfLabourForce = new Set<string>();
   for (const c of everyone.filter((m) => m.adult)) {
@@ -296,7 +302,22 @@ export function generate(spec: TownSpec): any {
     records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
       text: `Please pay ${c.id}'s wages every 14 days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - withholding(taxLaw, w.wage, 14 * DAY)), for: "wages" } }, every: 14 * DAY, first: (1 + pick.below(14)) * DAY } });
     occupancy.push({ occupant: c.id, space: w.space });
+    // Union members at the start: the profile's membership rate for the employer's kind of work, dues by standing order.
+    const kind = w.employer.split("-")[0]!;
+    if (unionPick.below(10_000) < (U.membership_bps[kind] ?? U.membership_bps.other ?? 0)) {
+      const mem = `member-${c.id}`;
+      unionMembers.push({ member: c.id, employer: w.employer });
+      records.push({ id: mem, record: "agreement", author: "genesis", at: 0, visible_to: ["union", c.id], terms: {
+        template: "membership", parties: ["union", c.id],
+        commitments: [{ who: "union", does: { text: `The union represents ${c.id} at work, and bargains for them.` } },
+          { who: c.id, does: { outcome: { money: { to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } } }, every: MONTH }],
+        termination: [{ party: "union", notice: MONTH }] } });
+      for (const party of ["union", c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: ["union", c.id], speaks_for: party, agreement: mem, as: party });
+      records.push({ id: `${mem}-dues`, record: "statement", author: "genesis", at: 0, visible_to: [c.id, "bank"], speaks_for: c.id, kind: "request", addressed_to: ["bank"], basis: mem,
+        text: "Please pay my union dues monthly.", data: { outcome: { money: { from: `acc-${c.id}`, to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } }, every: MONTH, first: (1 + unionPick.below(30)) * DAY } });
+    }
   }
+  if (unionMembers.length) records.push({ id: "union-register", record: "statement", author: "genesis", at: 0, visible_to: ["union"], speaks_for: "union", kind: "membership_register", text: `The union's ${unionMembers.length} members, and where they work.`, data: { members: unionMembers } });
 
   // Homes: the housed share of households, the neediest (by the occupancy standard) into the most bedrooms, as far as they go.
   const need = (h: Household) => {
@@ -526,6 +547,10 @@ export function generate(spec: TownSpec): any {
     code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
       collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
       maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste" }));
+  // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
+  // and the shops' prices (what its claims follow).
+  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }],
+    code("union.organiser", { employers: [...factories, ...shops, "builder"], claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, dues_account: "acc-union" }));
   office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"] } }],
     code("world.disposal", { kind: "waste", price_per_tonne: SV.landfill_levy_per_tonne, account: "acc-outside" }));
   // Rates (docs/behaviour/public-finance.md): the rates officer levies them on the valuer's valuations, under the rating law.
@@ -595,7 +620,9 @@ export function generate(spec: TownSpec): any {
   // workplace by name, and elsewhere only how full a place is. It moves with them.
   const street = { id: "street", title: "Around you", kind: "sites", area: { near: 0 } };
   // Shops' prices (and others'), and what they hold and where (their shopping).
-  const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street, { id: "prices", kind: "records", match: { statement_kinds: ["price_list", "property_for_sale"] } }, { id: "belongings", kind: "holdings" }, lawBook];
+  const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street, { id: "prices", kind: "records", match: { statement_kinds: ["price_list", "property_for_sale"] } }, { id: "belongings", kind: "holdings" }, lawBook,
+    // Enterprise agreements (a rise at work).
+    { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] } }];
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {
@@ -609,6 +636,7 @@ export function generate(spec: TownSpec): any {
   const life = townLife(P);
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps,
+    union: "union", union_join_bps: V.unions.membership_bps,
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,
     saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, support_from: "outside", support_kinds: { retired: "pension", unemployed: "unemployment" },

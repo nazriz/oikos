@@ -7,7 +7,7 @@ import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
-import { Staffing, stepper, WindingUp } from "./firms";
+import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from "./trade";
@@ -64,6 +64,7 @@ export const producer: BehaviourModule = {
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role });
     const borrowing = new Borrowing(me, p.lender);
+    const bargaining = new Bargaining(me);
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
     // Our premises, as the sites we see show them (for selling them if we close).
     const premisesOf = (obs: Observation) => {
@@ -187,6 +188,8 @@ export const producer: BehaviourModule = {
         }
 
         // ---- staff: this month's headcount (hiring for it, or replacing someone who's left) ----
+        // Bargaining with a union (docs/behaviour/unions.md): a claim answered, an agreement's rise, a strike.
+        steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
           target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs) > 0,

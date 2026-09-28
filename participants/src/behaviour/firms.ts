@@ -14,7 +14,7 @@
 
 import { cents } from "../money";
 import * as C from "../calls";
-import type { Observation, ParticipantAction } from "../contracts";
+import type { Observation, ParticipantAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
@@ -414,6 +414,9 @@ export class Staffing {
 
   /** Wages our orders have paid, gross (what they paid, and what they withheld), since we began. */
   wagesPaid = 0;
+  // Pay that's changed since hiring (an enterprise agreement), and pay stopped (a strike: no pay for time on strike).
+  private readonly gross = new Map<string, number>(); // agreement -> the wage now
+  private readonly stopped = new Map<string, { since: number; lastDue: number }>(); // agreement -> its pay stopped when, and the pay day before
 
   /**
    * `does`: which half of it this office does. Most employers do both; an organisation where one office hires and
@@ -488,9 +491,10 @@ export class Staffing {
     // withhold.
     const law = incomeTaxLaw(book);
     for (const a of doesPay ? staff : []) {
-      if (this.orders.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
+      if (this.orders.has(a.id) || this.stopped.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
       const worker = a.terms.parties[1];
-      const pays = jobTerms(a, worker);
+      const pays = { ...jobTerms(a, worker) };
+      pays.wage = this.gross.get(a.id) ?? pays.wage;
       const to = commitmentOf(a, me).outcome?.money?.to ?? (([...book.records.values()].find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
       if (!to) continue;
       const ref = `wo${this.n++}`;
@@ -573,6 +577,102 @@ export class Staffing {
     return steps;
   }
 
+  /** The pay day after `t` of a wage standing order (its start, then every period). */
+  private nextDue(book: Book, order: string, t: number): number {
+    const r = book.records.get(order);
+    const every = r?.record === "statement" ? Number(r.data?.every) || this.o.period : this.o.period;
+    const start = (r?.at ?? 0) + (r?.record === "statement" && Number.isInteger(r.data?.first) ? r.data!.first : every);
+    return start > t ? start : start + Math.ceil((t - start + 1) / every) * every;
+  }
+
+  /** The account a worker's wages go to. */
+  private payee(book: Book, a: any): string | undefined {
+    const worker = a.terms.parties[1];
+    return commitmentOf(a, this.me).outcome?.money?.to ?? (([...book.records.values()].find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
+  }
+
+  /** The wage an agreement pays now (after any rise). */
+  wageOf(a: any): number {
+    return this.gross.get(a.id) ?? jobTerms(a, a.terms.parties[1]).wage;
+  }
+
+  /**
+   * A rise for everyone we employ (an enterprise agreement, docs/behaviour/unions.md): each wage order is replaced by
+   * one at the new wage (net of the tax withheld), from the next pay day on.
+   */
+  raise(book: Book, t: number, account: string, riseBps: number, why: string): Step[] {
+    const law = incomeTaxLaw(book);
+    const lines: C.Call[] = [];
+    const refs: [string, string, number][] = [];
+    for (const a of this.staff(book, t)) {
+      const wage = Math.floor((this.wageOf(a) * (10_000 + riseBps)) / 10_000);
+      this.gross.set(a.id, wage);
+      const order = this.orders.get(a.id);
+      const to = this.payee(book, a);
+      if (!order || !to || this.stopped.has(a.id)) continue;
+      const period = jobTerms(a, a.terms.parties[1]).period;
+      const tax = withholding(law, wage, period);
+      const ref = `wo${this.n++}`;
+      lines.push(withdraw(order, "Superseded: a new wage."), [ref, pay(to, wage - tax, { from: account, every: period, first: Math.max(DAY, this.nextDue(book, order, t) - t), basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })] as any);
+      refs.push([ref, a.id, tax]);
+      this.orders.delete(a.id);
+    }
+    for (const [ref, id, tax] of refs) {
+      this.pendingOrder.set(ref, id);
+      if (tax > 0) this.pendingWithhold.set(ref, tax);
+    }
+    const out: Step[] = [];
+    for (let i = 0; i < lines.length; i += 30) out.push(because(why, ...lines.slice(i, i + 30)));
+    return out;
+  }
+
+  /** Pay stopped for these workers (on strike: no pay for time on strike). */
+  stop(book: Book, t: number, workers: string[], why: string): Step[] {
+    const lines: C.Call[] = [];
+    for (const a of this.staff(book, t).filter((x) => workers.includes(x.terms.parties[1]) && !this.stopped.has(x.id))) {
+      const order = this.orders.get(a.id);
+      if (!order) continue;
+      const period = jobTerms(a, a.terms.parties[1]).period;
+      this.stopped.set(a.id, { since: t, lastDue: this.nextDue(book, order, t) - period });
+      this.orders.delete(a.id);
+      lines.push(withdraw(order, "Stopped: on strike."));
+    }
+    const out: Step[] = [];
+    for (let i = 0; i < lines.length; i += 30) out.push(because(why, ...lines.slice(i, i + 30)));
+    return out;
+  }
+
+  /**
+   * Pay restarted for workers back from a strike: what they earned between their last pay day and the strike, paid now
+   * (net of tax), and their wages from now on, a period at a time.
+   */
+  resume(book: Book, t: number, account: string, workers: string[], why: string): Step[] {
+    const law = incomeTaxLaw(book);
+    const lines: (C.Call | [string, C.Call])[] = [];
+    for (const a of this.staff(book, t).filter((x) => workers.includes(x.terms.parties[1]) && this.stopped.has(x.id))) {
+      const { since, lastDue } = this.stopped.get(a.id)!;
+      this.stopped.delete(a.id);
+      const to = this.payee(book, a);
+      if (!to) continue;
+      const period = jobTerms(a, a.terms.parties[1]).period;
+      const wage = this.wageOf(a);
+      const earned = Math.max(0, Math.floor((wage * Math.min(period, Math.max(0, since - lastDue))) / period));
+      const tax = Math.floor((withholding(law, wage, period) * earned) / Math.max(1, wage));
+      this.withheld += tax;
+      this.wagesPaid += earned;
+      const ref = `wo${this.n++}`;
+      this.pendingOrder.set(ref, a.id);
+      const perPay = withholding(law, wage, period);
+      if (perPay > 0) this.pendingWithhold.set(ref, perPay);
+      if (earned - tax > 0) lines.push(pay(to, earned - tax, { from: account, for: `Wages for ${a.terms.parties[1]} to the strike.` }));
+      lines.push([ref, pay(to, wage - perPay, { from: account, every: period, first: period, basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })]);
+    }
+    // (Batched: a program has at most 32 lines, and a wake only so many actions.)
+    const steps: Step[] = [];
+    for (let i = 0; i < lines.length; i += 30) steps.push(because(why, ...(lines.slice(i, i + 30) as any[])));
+    return steps;
+  }
+
   /** Let one worker go (the most recent hire not already under notice), with the notice their contract gives. */
   letGo(book: Book, t: number, why: string, reason: string): Step[] {
     const last = this.staff(book, t).filter((a) => !this.noticed.has(a.id)).sort((x, y) => book.signedAt(y.id)! - book.signedAt(x.id)!)[0];
@@ -588,6 +688,70 @@ export class Staffing {
     const out: Step[] = [];
     for (let i = 0; i < all.length; i += 30) out.push(because(why, ...all.slice(i, i + 30).map((a) => notice(a.id, reason))));
     return out;
+  }
+}
+
+/**
+ * An employer's side of bargaining with a union (docs/behaviour/unions.md). A wage claim gets an offer by the firm's
+ * capacity to pay: all of the claim if what it holds beyond a month's wages covers twice the claim's cost for a
+ * year, less in proportion if not. An offer the union accepts becomes an enterprise agreement (published) and a rise
+ * for all staff. Workers on strike aren't paid for the time (as labour law commonly has it): their pay stops, and restarts
+ * when they're back. After each stoppage the offer rises by half the gap to the claim (the employer's concession
+ * rising with the cost of holding out, after Hicks 1932), and to all of it after `concede_after` stoppages.
+ */
+export class Bargaining {
+  private readonly handled = new Set<string>();
+  private open: { claim: string; union: string; claimBps: number; offerBps: number; stoppages: number } | null = null;
+  private strikers: string[] = [];
+  constructor(private readonly me: string, private readonly p: { concede_after: number } = { concede_after: 3 }) {}
+
+  steps(book: Book, t: number, staffing: Staffing, account: string, balance: number, onRaise: (riseBps: number) => void): Step[] {
+    const me = this.me;
+    const steps: Step[] = [];
+    const mine = (r: StatementRecord) => !this.handled.has(r.id) && (r.addressed_to ?? []).includes(me) && r.data?.employer === me;
+    const staff = staffing.staff(book, t);
+    const monthBill = staff.reduce((x, a) => x + Math.floor((staffing.wageOf(a) * MONTH) / jobTerms(a, a.terms.parties[1]).period), 0);
+    const offerFor = (claimBps: number) => {
+      const yearCost = Math.floor((monthBill * 12 * claimBps) / 10_000);
+      const spare = Math.max(0, balance - monthBill);
+      return yearCost <= 0 ? claimBps : Math.floor((claimBps * Math.min(1, spare / (2 * yearCost))) / 10) * 10;
+    };
+    const offer = (why: string) => say("wage_offer", `We offer a rise of ${this.open!.offerBps / 100}% (the claim was ${this.open!.claimBps / 100}%).`,
+      { to: [this.open!.union], visible: [me, this.open!.union], basis: this.open!.claim, data: { employer: me, claim: this.open!.claim, rise_bps: this.open!.offerBps, why } });
+    for (const c of book.open("wage_claim").filter(mine)) {
+      this.handled.add(c.id);
+      const claimBps = Math.max(0, Math.floor(Number(c.data?.rise_bps) || 0));
+      this.open = { claim: c.id, union: c.speaks_for!, claimBps, offerBps: Math.min(claimBps, offerFor(claimBps)), stoppages: 0 };
+      steps.push(because(`A wage claim from ${c.speaks_for} for ${claimBps / 100}%: offering ${this.open.offerBps / 100}%, as far as what we hold beyond a month's wages (${usd(Math.max(0, balance - monthBill))}) covers twice its cost for a year.`,
+        offer("capacity to pay")));
+    }
+    for (const a of book.open("offer_accepted").filter(mine)) {
+      this.handled.add(a.id);
+      if (!this.open || a.data?.claim !== this.open.claim) continue;
+      const rise = this.open.offerBps;
+      const union = this.open.union;
+      this.open = null;
+      onRaise(rise);
+      steps.push(because(`${union} accepted our offer: an enterprise agreement, a rise of ${rise / 100}% for all our staff.`,
+        say("enterprise_agreement", `Enterprise agreement between ${me} and ${union}: wages rise ${rise / 100}% from now.`, { visible: "public", to: [union], basis: a.id, data: { employer: me, union, rise_bps: rise, from: t } })),
+        ...staffing.raise(book, t, account, rise, `The enterprise agreement: everyone's wages up ${rise / 100}%, from their next pay.`));
+    }
+    for (const s of book.open("stop_work").filter(mine)) {
+      this.handled.add(s.id);
+      this.strikers = ((s.data?.members as string[]) ?? []).filter((w) => staff.some((a) => a.terms.parties[1] === w));
+      steps.push(...staffing.stop(book, t, this.strikers, `A strike by ${s.speaks_for}'s members: no pay for the time on strike.`));
+    }
+    for (const r of book.open("return_to_work").filter(mine)) {
+      this.handled.add(r.id);
+      steps.push(...staffing.resume(book, t, account, this.strikers, "Back from the strike: paying what they earned before it, and restarting their wages."));
+      this.strikers = [];
+      if (this.open) {
+        this.open.stoppages++;
+        this.open.offerBps = this.open.stoppages >= this.p.concede_after ? this.open.claimBps : this.open.offerBps + Math.ceil((this.open.claimBps - this.open.offerBps) / 2 / 10) * 10;
+        steps.push(because(`After ${this.open.stoppages} stoppage${this.open.stoppages > 1 ? "s" : ""}: improving our offer to ${this.open.offerBps / 100}%.`, offer("after a stoppage")));
+      }
+    }
+    return steps;
   }
 }
 

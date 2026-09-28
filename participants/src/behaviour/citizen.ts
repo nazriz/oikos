@@ -29,7 +29,7 @@ import type { LookRequest, Observation, ParticipantAction, SiteStructure, Statem
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import * as C from "../calls";
-import { because, Book, callAction, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { because, Book, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
@@ -45,7 +45,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.14.0",
+  version: "0.15.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -110,6 +110,13 @@ export const citizen: BehaviourModule = {
       complain_about: "waste",
       complain_after_days: 14,
       complain_bps: 3000,
+      // A union (docs/behaviour/unions.md): which (none: none to join), the chance of joining on starting a job, by the
+      // kind of employer (the part of its id before "-": the world's profile), and in a protected
+      // action ballot, the chance of voting and of voting yes (placeholders). ("other": for the rest.)
+      union: null as string | null,
+      union_join_bps: {} as { [kind: string]: number },
+      ballot_turnout_bps: 7000,
+      strike_vote_yes_bps: 8500,
     },
     ctx.params,
   );
@@ -118,6 +125,9 @@ export const citizen: BehaviourModule = {
     let home: Home | null = null;
     let job: Job | null = null;
     let homeSite: SiteStructure | undefined; // our home's building, as we last saw it
+    let striking: { employer: string; out: boolean } | null = null; // on strike (protected action), from our job
+    let backToWork = false; // the stoppage is over: back into the workplace
+    let joinAsked = ""; // the job we've asked to join the union for
     let complainedOf: string | null = null; // the home we've complained about, until it's seen to
     // Moving to a better-paid job: the offer we've taken, to sign once our notice at the old one is worked out.
     let switching: { offer: string; wage: number } | null = null;
@@ -210,6 +220,7 @@ export const citizen: BehaviourModule = {
         if (r.terms.template === "employment" && !job) {
           const employer = r.terms.parties.find((x) => x !== me)!;
           job = { agreement: r.id, employer, ...jobTerms(r, me), endsAt: end, since };
+          joinAsked = r.id; // (whether we belong to a union at the start is the world's)
         }
       }
       // Another adult's share of the rent, if one is already standing.
@@ -221,7 +232,24 @@ export const citizen: BehaviourModule = {
     // Everything we observe, after every action (not just on waking).
     let fresh: ReturnType<Book["absorb"]> = [];
     const absorb = (obs: Observation) => {
-      fresh.push(...book.absorb(obs));
+      const news = book.absorb(obs);
+      fresh.push(...news);
+      // At work (docs/behaviour/unions.md), taken in as it's seen, before the money that comes with it: a rise in an
+      // enterprise agreement (paid from the next pay day), a stoppage called, and the return to work (our pay restarts).
+      for (const r of news) {
+        if (r.record !== "statement" || !job) continue;
+        if (r.kind === "enterprise_agreement" && r.data?.employer === job.employer && r.at >= job.since) {
+          job.wage = Math.floor((job.wage * (10_000 + Number(r.data?.rise_bps ?? 0))) / 10_000);
+          job.paidAt = obs.t;
+        }
+        if (!(r.addressed_to ?? []).includes(me)) continue;
+        if (r.kind === "stop_work" && r.data?.employer === job.employer && !striking) striking = { employer: job.employer, out: false };
+        if (r.kind === "return_to_work" && striking && r.data?.employer === striking.employer) {
+          striking = null;
+          backToWork = true;
+          job.paidAt = obs.t; // our pay restarts from now (none for the time on strike)
+        }
+      }
       for (const c of channels.cells(obs)) if (home && c.structure?.structure === home.structure) homeSite = c.structure;
       if (pendingFirm && founded) {
         const id = obs.outcomes.flatMap((o) => (o.created?.firm ? [o.created.firm] : []))[0];
@@ -443,7 +471,7 @@ export const citizen: BehaviourModule = {
       }
       // Wages not paid: a pay period (and a few days' grace) without them, we resign, and claim what we're owed, as an
       // employee can (docs/behaviour/citizen.md). The claim is a debt recorded against the employer.
-      if (job && !job.claimed && t < job.endsAt) {
+      if (job && !job.claimed && t < job.endsAt && !striking) {
         const last = job.paidAt ?? job.since;
         if (t - last > job.period + 5 * DAY) {
           job.claimed = true;
@@ -511,6 +539,39 @@ export const citizen: BehaviourModule = {
           steps.push(because(`Offered a better-paid job (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days, against our ${usd(job.wage)} every ${Math.round(job.period / DAY)}): taking it, and giving our employer the notice our contract asks.`,
             notice(job.agreement, "Resigning: moving to another job.")));
         }
+      }
+
+      // The union (docs/behaviour/unions.md): joining on starting a job, with the chance for its kind of employer; the
+      // membership offered, signed, and its dues paid monthly; a protected action ballot, voted in (or not); a
+      // stoppage, observed (out of the workplace until the return to work); a rise in an enterprise agreement, taken.
+      if (p.union && job && joinAsked !== job.agreement && !retired) {
+        joinAsked = job.agreement;
+        const member = [...book.records.values()].some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && book.inForce(r.id));
+        const kind = job.employer.split("-")[0]!;
+        const chance = p.union_join_bps[kind] ?? p.union_join_bps.other ?? 0;
+        if (!member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance)
+          steps.push(because(`A new job: joining the union (${chance / 100}% of those working for a ${kind} do).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
+      }
+      for (const r of fresh) {
+        if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me)) {
+          const dues = commitmentOf(r, me).outcome?.money;
+          steps.push(because(`Joining the union: signing, and paying the dues monthly.`, sign(r.id),
+            ...(dues ? [pay(dues.to, cents(dues.amount), { from: acc.account, every: MONTH, first: 0, basis: r.id, for: "Union dues." })] : [])));
+          continue;
+        }
+        if (r.record !== "statement" || !(r.addressed_to ?? []).includes(me)) continue;
+        if (r.kind === "action_ballot" && ctx.rng(`turnout-${r.id}`).below(10_000) < p.ballot_turnout_bps) {
+          const yes = ctx.rng(`vote-${r.id}`).below(10_000) < p.strike_vote_yes_bps;
+          steps.push(because(`The union's protected action ballot: voting ${yes ? "yes" : "no"}.`, vote(r.id, yes ? "yes" : "no")));
+        }
+      }
+      if (striking && !striking.out && job) {
+        striking.out = true;
+        steps.push(because(`The union's stoppage at ${job.employer}: stopping work.`, ...(job.workplace && inside(job.workplace) ? [moveOut(job.workplace, me)] : [])));
+      }
+      if (backToWork) {
+        backToWork = false;
+        if (job?.workplace) steps.push(because("The stoppage is over: back to work.", moveIn(job.workplace)));
       }
 
       // A rent increase on our home (the landlord's notice, as the tenancy law allows): if we can still afford it, we pay

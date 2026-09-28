@@ -1,0 +1,49 @@
+# Workers' voice: unions, bargaining and strikes (phase C, stage C5)
+
+**Source:**
+- `union.organiser`, in `participants/src/behaviour/union.ts`;
+- the employer's side (`Bargaining`, and pay stopped and restarted in `Staffing`), in `participants/src/behaviour/firms.ts`;
+- members' behaviour, in `participants/src/behaviour/citizen.ts`.
+
+A union is an organisation, and bargaining and protected action are procedures that people and firms follow. None of it is kernel mechanics. Wages set only by employers leave out half the labour market's politics (docs/design/phase-c-stakes.md §7).
+
+## Membership
+
+- **At the start,** each employee is a member with the profile's membership rate for their kind of work. For Australia: ABS, *Trade union membership*, August 2024: 13.1% of employees overall; manufacturing 9.0%, construction 11.7%, retail 7.0%, public administration 23.1%.
+  - A membership is an agreement between the union and the member: the member pays dues monthly by standing order (the profile's, a placeholder), and the union represents them.
+  - The union keeps a register of its members and where they work.
+- **Joining later:** someone starting a job joins at their kind of work's rate. They apply, the union offers the membership, and they sign and set up their dues.
+
+## Bargaining
+
+The union's organiser bargains once a year with each employer where it has members (factories, shops and the builder in the generated town). Its first claims are spread over its first two months.
+- **The claim:** the year's rise in prices (the mean of the shops' published prices against a year ago; nothing before a year of prices) plus the profile's margin (2%, a placeholder). It's addressed to the employer.
+- **The employer's offer:** by its capacity to pay (a criterion wage-fixing bodies weigh). It offers all of the claim if what it holds beyond a month's wages covers twice the claim's cost for a year, and less in proportion if not.
+- **Agreement:** the union accepts an offer of at least half its claim (placeholder). The employer then makes it an **enterprise agreement**, published, and raises every employee's wage from their next pay day (new standing orders, net of the tax withheld), and the wage it hires at. Employees see the agreement and expect the new pay.
+
+## Protected action
+
+This follows Australia's *Fair Work Act 2009*, Part 3-3; the figures are parameters.
+- **Ballot.** If the offer is too low, or none comes within 14 days, the union ballots its members at that employer on protected action. It needs at least half of them voting (s 459(1)(b)) and more than half of the votes yes (s 459(1)(c)). Members vote with the chance of voting and of voting yes (placeholders: 70%, 85%). Protected action ballots usually pass.
+- **Notice.** Approved, the union gives the employer 3 days' notice of a stoppage (s 414: three working days).
+- **Stoppages.** The members there stop work: they leave the workplace and come back when the union calls the return. The stoppages get longer each time (1, 2, 3 days: placeholders), a week apart while no acceptable offer comes.
+- **Pay.** Workers on strike aren't paid for the time (s 470). The employer stops their wage orders at the stoppage. At the return, it pays what they earned between their last pay day and the stoppage, and restarts their wages a period on. Nothing in the kernel docks anyone's pay: the employer does it.
+- **Concession.** After each stoppage, the employer raises its offer by half the gap to the claim, and to all of it after three stoppages. This follows Hicks (1932), *The Theory of Wages*: the employer's concession grows with the cost of holding out, as the union's resistance falls. The dispute ends in an agreement.
+- **Not approved:** the union lets it rest and claims again in three months.
+
+## What to measure
+
+Measurement reads the logs; the platform doesn't judge. Profile targets:
+- **Working days lost per 1,000 employees a year:** about 11 (derived: 139,100 days lost in 2024, ABS *Industrial Disputes*, over about 12.3 million employees). In towns of a few hundred, strikes should be rare.
+- **Union membership:** 13.1% of employees.
+- **Settlements:** against the average annualised wage increases in new agreements (the national employment department's *Trends in Federal Enterprise Bargaining*).
+
+## Leaves out
+
+- **Bargaining with the town:** the town's crew are members, at the public sector's rate, but the union doesn't bargain with the town yet. That would be a steward's decision: a mayor facing a claim.
+- Multi-year agreements, bargaining orders and the tribunal's intervention (an intractable bargaining declaration).
+- Lockouts, and employer response action.
+- Strike pay from the union.
+- Members moving jobs: the union knows where a member works from its register and their application to join, so a member who moves may be called out at an employer they've left; they ignore the call.
+- Industrial action outside protected action.
+- A pro-rata payment at the return can be a couple of days off, from when a restarted wage order counts as starting.
