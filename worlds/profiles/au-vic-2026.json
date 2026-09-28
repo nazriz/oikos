@@ -487,6 +487,40 @@
       "arrears_days": 30,
       "default_days": 90,
       "max_months": 60
+    },
+    "public_finance": {
+      "income_tax": {
+        "brackets": [
+          {
+            "from": 0,
+            "rate_bps": 0
+          },
+          {
+            "from": 1820000,
+            "rate_bps": 1600
+          },
+          {
+            "from": 4500000,
+            "rate_bps": 3000
+          },
+          {
+            "from": 13500000,
+            "rate_bps": 3700
+          },
+          {
+            "from": 19000000,
+            "rate_bps": 4500
+          }
+        ],
+        "levy_bps": 200,
+        "levy_from": 2722200
+      },
+      "grants_per_resident_per_year": 8768,
+      "rates_per_resident_per_year": 113100,
+      "rates_instalments": 4,
+      "rates_due_days": 30,
+      "rates_penalty_interest_bps": 1000,
+      "median_house_price": 57200000
     }
   },
   "sources": {
@@ -522,7 +556,14 @@
     "credit.max_repayment_share_bps": "Placeholders: the most of a borrower's monthly income a lender lets repayments take (people 30%, a common lending guide; organisations 20% of what comes in).",
     "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
     "credit.default_days": "Non-performing at 90 days past due (APRA, Prudential Standard APS 220 Credit Risk Management).",
-    "credit.max_months": "Placeholder: the longest term for these loans (five years)."
+    "credit.max_months": "Placeholder: the longest term for these loans (five years).",
+    "public_finance.income_tax": "ATO, individual income tax rates for residents, 2025-26: nil to $18,200; 16% to $45,000; 30% to $135,000; 37% to $190,000; 45% above. The Medicare levy, 2% (ATO), from the singles low-income threshold, $27,222 for 2024-25 (to confirm for 2025-26; the phase-in above it is left out). Employers withhold on each pay reckoned as a year's income (the ATO's tax tables round to dollars, so differ slightly).",
+    "public_finance.grants_per_resident_per_year": "Derived: Victoria's 2025-26 general purpose financial assistance grants, $612.0M (Victorian Local Government Grants Commission, 2025-26 annual allocation report, tabled September 2025), over Victoria's population, about 6.98 million (ABS, National, state and territory population, 2025; to confirm). Local roads grants ($218.3M) are left out: the town has no roads yet.",
+    "public_finance.rates_per_resident_per_year": "Derived: Victorian councils' rates and charges, 51% of $15.3B revenue in 2024-25 (VAGO, Results of 2024-25 Audits: Local Government), over about 6.9 million residents: about $1,131 a resident a year (to confirm). Sets the town's opening rate in the dollar.",
+    "public_finance.rates_instalments": "Local Government Act 1989 (Vic), s 167: rates are payable in four instalments (or as a lump sum).",
+    "public_finance.rates_due_days": "Placeholder: an instalment falls due 30 days after its notice.",
+    "public_finance.rates_penalty_interest_bps": "Local Government Act 1989 (Vic), s 172: interest on unpaid rates at the rate fixed under the Penalty Interest Rates Act 1983, 10% a year (to confirm the current rate).",
+    "public_finance.median_house_price": "Valuer-General Victoria, A Guide to Property Values 2024 (released July 2025): country Victoria's median house price, $572,000. The land value of a lot is derived from it: this less what the builder charges to build a house."
   },
   "targets": [
     {

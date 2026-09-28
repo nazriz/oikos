@@ -41,12 +41,13 @@ test("a factory with no customers and no credit is wound up: everyone let go, wh
   // No more making or buying once winding up.
   expect(ev.filter((e) => e.event === "worked" && e.task === "make" && e.at === "factory-2-works" && e.t > insolvency.at)).toEqual([]);
   expect(recs.filter((r) => r.kind === "order" && r.speaks_for === "factory-2" && r.at > insolvency.at)).toEqual([]);
-  // Closed after the wind-up period; nothing after.
+  // Closed after the wind-up period; after that, it only sells its premises (docs/behaviour/entry.md).
   const closure = recs.find((r) => r.kind === "closure" && r.speaks_for === "factory-2");
   expect(closure).toBeDefined();
   expect(closure.at - insolvency.at).toBeGreaterThanOrEqual(60 * DAY);
   const actsAfter = log.filter((e) => e.kind === "command" && e.body.command === "act" && e.body.participant === "factory-2-manager-system" && e.t > closure.at);
-  expect(actsAfter).toEqual([]);
+  expect(actsAfter.length).toBeGreaterThan(0);
+  expect(actsAfter.every((e) => /premises/.test(e.body.reasoning ?? ""))).toBe(true);
   // Creditors before shareholders: nothing to shareholders unless every debt recorded against it was paid.
   const debts = recs.filter((r) => r.record === "claim" && r.about?.kind === "debt" && r.counterparty === "factory-2");
   if (closure.data.to_shareholders > 0) for (const d of debts) expect(closure.data.debts_paid).toContain(d.id);

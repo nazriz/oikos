@@ -32,6 +32,7 @@ import * as C from "../calls";
 import { because, Book, callAction, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
+import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
@@ -44,7 +45,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.12.0",
+  version: "0.13.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -68,6 +69,13 @@ export const citizen: BehaviourModule = {
       support_from: null as string | null, // who pays support (an entity: in a town, usually the outside world)
       support_kinds: { retired: "pension", unemployed: "unemployment" } as { retired?: string; unemployed?: string }, // what to claim, when
       in_labour_force: true, // false: not looking for work (studying, caring...), and not claiming support for being out of it
+      // Looking for a better-paid job while employed (docs/behaviour/citizen.md): a month's chance, Lengnick (2013)'s pi.
+      job_search_bps: 1000,
+      // Starting a business (docs/behaviour/entry.md): the kinds of venture this world has (a template each: its capital
+      // beyond the premises, the founder's position's channels and rules, with "{structure}", "{cell}", "{listing}",
+      // "{founder}" and "{capital}" filled in), and the monthly chance a person able to, seeing premises for sale, does.
+      ventures: [] as { kind: string; name: string; capital: number; channels: unknown[]; role_module: { code: string; params: { [k: string]: unknown } } }[],
+      found_bps: 0,
       // Shopping (Lengnick 2013, Table 1): how often, and the rules for changing shops.
       shop_every_days: 14,
       psi_price_bps: 2500, // chance a trip starts by comparing the favourite with another shop's price
@@ -103,6 +111,10 @@ export const citizen: BehaviourModule = {
     const book = new Book();
     let home: Home | null = null;
     let job: Job | null = null;
+    // Moving to a better-paid job: the offer we've taken, to sign once our notice at the old one is worked out.
+    let switching: { offer: string; wage: number } | null = null;
+    let searchingWork = false; // this month's look for a better-paid job while employed
+    let nextJobSearch = ctx.rng("job-search-day").below(30) * DAY;
     const applied = new Set<string>();
     // Attention: the market is looked at only when hunting, as a search (what's on offer now).
     let lookedAt = -1;
@@ -117,6 +129,9 @@ export const citizen: BehaviourModule = {
     let nextUse = 0; // when we next use things up (weekly)
     let carried = 0; // budget not spent last trip (less than an item's price), carried to the next
     const borrowing = new Borrowing(me, ctx.params.bank ?? "bank");
+    let nextVenture = ctx.rng("venture-day").below(30) * DAY;
+    let founded: { firm?: string; capital: number; paid: boolean } | null = null;
+    let pendingFirm = false; // a business we've just founded: its id comes back in the outcome
     const deliveries = new Deliveries();
     let departed = false;
     let todo: Step[] = [];
@@ -199,11 +214,22 @@ export const citizen: BehaviourModule = {
     let fresh: ReturnType<Book["absorb"]> = [];
     const absorb = (obs: Observation) => {
       fresh.push(...book.absorb(obs));
+      if (pendingFirm && founded) {
+        const id = obs.outcomes.flatMap((o) => (o.created?.firm ? [o.created.firm] : []))[0];
+        if (id) {
+          founded.firm = id;
+          pendingFirm = false;
+        } else if (obs.outcomes.some((o) => o.status === "refused")) {
+          founded = null;
+          pendingFirm = false;
+        }
+      }
       // Money that came in from others, for what our income is (refunds, which delivery notes tell us of, come off it).
       const mine = new Set(channels.accounts(obs).filter((a) => a.holder === me).map((a) => a.account));
       for (const tx of channels.transactions(obs)) if (mine.has(tx.to) && !mine.has(tx.from)) {
         inflows.push({ t: tx.t, amount: cents(tx.amount) });
-        if (job && cents(tx.amount) === job.wage) job.paidAt = tx.t; // our wages, as agreed
+        // Our wages, as agreed: the wage, less the income tax the law says our employer withholds.
+        if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period))) job.paidAt = tx.t;
       }
       while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
       for (const k of ["homes", "jobs", "petitions"] as const) {
@@ -425,6 +451,19 @@ export const citizen: BehaviourModule = {
         job = null;
         joblessSince = t;
       }
+      // Our notice worked out: starting the job we're moving to (signing the offer we took, and going to work there).
+      if (!job && switching) {
+        const r = book.records.get(switching.offer);
+        switching = null;
+        if (r?.record === "agreement" && !book.signedBy(r.id, me) && !retired) {
+          const terms = jobTerms(r, me);
+          const s: Step = because(`Our notice is worked out: starting the job we took (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days).`, sign(r.id));
+          if (terms.workplace) s.push(moveIn(terms.workplace));
+          steps.push(s);
+          job = { agreement: r.id, employer: r.terms.parties.find((x) => x !== me)!, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER, since: t };
+          joblessSince = null;
+        }
+      }
       if (!home && homelessSince === null) homelessSince = t;
       if (!job && joblessSince === null) joblessSince = t;
 
@@ -451,6 +490,17 @@ export const citizen: BehaviourModule = {
           steps.push(s);
           job = { agreement: r.id, employer: other, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER, since: t };
           joblessSince = null;
+        } else if (r.terms.template === "employment" && job && !switching && !retired && other !== job.employer) {
+          // Offered a better-paid job while in one (we applied for it): we take it, give notice at ours, and start the
+          // new one when the notice is worked out.
+          const terms = jobTerms(r, me);
+          if (terms.wage * job.period <= job.wage * terms.period) continue;
+          const old = book.records.get(job.agreement);
+          const noticeDays = old?.record === "agreement" ? old.terms.termination?.find((x) => x.party === me)?.notice ?? 14 * DAY : 14 * DAY;
+          switching = { offer: r.id, wage: terms.wage };
+          job.endsAt = Math.min(job.endsAt, t + noticeDays);
+          steps.push(because(`Offered a better-paid job (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days, against our ${usd(job.wage)} every ${Math.round(job.period / DAY)}): taking it, and giving our employer the notice our contract asks.`,
+            notice(job.agreement, "Resigning: moving to another job.")));
         }
       }
 
@@ -567,15 +617,46 @@ export const citizen: BehaviourModule = {
         claiming = null;
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
-      if (!job && !retired && p.in_labour_force) {
-        const told = leadFound.jobs.filter((j) => !applied.has(j.id));
-        const posts = (told.length ? told : found.jobs).filter((j) => !applied.has(j.id));
+      if ((!job || (searchingWork && !switching)) && !retired && p.in_labour_force) {
+        // In work, only postings that pay better than ours, elsewhere.
+        const better = (j: StatementRecord) => !job || (j.speaks_for !== job.employer && (j.data?.wage ?? 0) * job.period > job.wage * (j.data?.period ?? job.period));
+        const told = job ? [] : leadFound.jobs.filter((j) => !applied.has(j.id));
+        const posts = (told.length ? told : found.jobs).filter((j) => !applied.has(j.id) && better(j));
+        searchingWork = false;
         posts.sort((a, b) => (b.data?.wage ?? 0) - (a.data?.wage ?? 0) || (a.id < b.id ? -1 : 1));
         const best = posts[0];
         if (best?.speaks_for) {
           applied.add(best.id);
-          steps.push(because(`Applying for the best-paid job we've seen (${usd(best.data?.wage ?? 0)} a fortnight)${told.length ? ", where someone told us to look" : ""}.`,
+          steps.push(because(`Applying for the best-paid job we've seen (${usd(best.data?.wage ?? 0)} a fortnight)${job ? `, better than ours (${usd(job.wage)})` : told.length ? ", where someone told us to look" : ""}.`,
             say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account }, basis: best.id })));
+        }
+      }
+
+      // Starting a business (docs/behaviour/entry.md): premises for sale of a kind this world has ventures for; enough
+      // savings for them, the venture's capital and a buffer of three months' housing and essentials; and the month's
+      // chance. We found the business and hold its first position (its rules run there), and put in the capital asked.
+      if (founded?.firm && !founded.paid) for (const r of book.all("capital_call")) {
+        if (r.speaks_for !== founded.firm || !(r.addressed_to ?? []).includes(me)) continue;
+        founded.paid = true;
+        const amount = Math.min(acc.balance, Math.floor(Number(r.data?.amount) || 0));
+        if (amount > 0) steps.push(because(`Putting the ${usd(amount)} of capital into our new business.`, pay(String(r.data.account), amount, { from: acc.account, for: "Capital." })));
+      }
+      if (!founded && p.ventures.length && p.found_bps > 0 && t >= nextVenture && !retired && p.in_labour_force) {
+        nextVenture = t + MONTH;
+        const housing = home?.rent ?? share?.cents ?? 0;
+        const listings = book.open("property_for_sale").filter((l) => p.ventures.some((v) => v.kind === l.data?.type)).sort((a, b) => (a.data.price as number) - (b.data.price as number) || (a.id < b.id ? -1 : 1));
+        const l = listings.find((x) => acc.balance >= (x.data.price as number) + p.ventures.find((v) => v.kind === x.data.type)!.capital + 3 * (housing + p.essentials));
+        if (l && ctx.rng(`found-${t}`).below(10_000) < p.found_bps) {
+          const v = p.ventures.find((x) => x.kind === l.data.type)!;
+          const capital = (l.data.price as number) + v.capital;
+          const fill = (x: unknown): unknown => typeof x === "string"
+            ? ({ "{structure}": l.data.structure, "{cell}": l.data.cell, "{listing}": l.id, "{founder}": me, "{capital}": capital } as { [k: string]: unknown })[x] ?? x.replaceAll("{structure}", l.data.structure)
+            : Array.isArray(x) ? x.map(fill) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, y]) => [k, fill(y)])) : x;
+          founded = { capital, paid: false };
+          const st = because(`${l.data.structure} (a ${l.data.type}) is for sale at ${usd(l.data.price)}, and we have ${usd(acc.balance)}: starting a ${v.kind} there, putting in ${usd(capital)}.`,
+            ["firm", C.call("entity", { kind: v.kind, name: C.text(`${v.name} (${l.data.structure})`), position: C.text("Manager"), channels: C.json(fill(v.channels)), role_module: C.json(fill(v.role_module)) })]);
+          steps.push(st);
+          pendingFirm = true;
         }
       }
 
@@ -862,9 +943,14 @@ export const citizen: BehaviourModule = {
           }
           // Hunting? Look at what's on offer (the next step, at once, has the results).
           const looks: LookRequest[] = [];
+          // In work: a month's chance of looking for something better paid.
+          if (job && !switching && !retired && p.in_labour_force && obs.t >= nextJobSearch) {
+            nextJobSearch = obs.t + MONTH;
+            searchingWork = ctx.rng(`job-search-${obs.t}`).below(10_000) < p.job_search_bps;
+          }
           if (lookedAt !== obs.t && acc) {
             if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], order: { field: "data.rent", desc: true }, limit: p.search_limit } });
-            if (!job && !retired && p.in_labour_force) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
+            if ((!job || searchingWork) && !retired && p.in_labour_force) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
             // A glance at the petitions board: what's standing now.
             looks.push({ channel: "petitions", query: { standing: true, limit: 10 } });
           }

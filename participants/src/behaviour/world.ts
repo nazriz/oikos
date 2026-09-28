@@ -3,10 +3,11 @@
 // params.purchases = [{ to: account, amount: cents, every: seconds, memo? }].
 
 import * as C from "../calls";
-import { channels, type ParticipantAction, type StatementRecord } from "../contracts";
+import { channels, type ParticipantAction, type SiteStructure, type StatementRecord } from "../contracts";
 import { DAY, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
-import { because, Book, callAction, MONTH, pay, say, usd, withdraw, type Step } from "./common";
+import { because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step } from "./common";
+import { ownerOf } from "./institutions";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
 import { drawHousehold, type HouseholdSpec } from "./household";
@@ -304,6 +305,92 @@ export const funding: BehaviourModule = {
           if (amount > 0 && typeof d.data?.account === "string") steps.push(because(`A draw on funding from ${d.speaks_for}: lending ${usd(amount)}.`, pay(d.data.account, amount, { from: p.account, for: "Funding.", settles: d.id })));
         }
         return steps;
+      },
+    );
+  },
+};
+
+/**
+ * world.valuer: the valuer the world's government keeps (for a town, an office of a higher government: the outside
+ * world, D31). Once a year it values every property that someone other than the exempt owns: the lot's land, at the
+ * world's land value, plus each building on it at what the builder would charge to build it now (its published
+ * prices). It publishes each valuation to the owner and to the town that rates it. Documented in
+ * docs/behaviour/public-finance.md.
+ */
+export const valuer: BehaviourModule = {
+  name: "world.valuer",
+  version: "0.1.0",
+  doc: "docs/behaviour/public-finance.md",
+  cadence: () => DAY,
+  firstWake: () => 0,
+  create(ctx) {
+    const p = params({ land_value: 0, builder: "builder", rating: "city", exempt: [] as string[], every_days: 365 }, ctx.params);
+    const me = ctx.entity;
+    const book = new Book();
+    const seen = new Map<string, SiteStructure | undefined>(); // what we last saw on each cell (perception is changes)
+    let next = 0;
+    return stepper(
+      (obs) => {
+        book.absorb(obs);
+        for (const c of channels.cells(obs)) seen.set(c.cell, c.structure);
+      },
+      (obs) => {
+        const t = obs.t;
+        if (t < next) return [];
+        // Not until we can see the builder's prices (a valuation without them would value the buildings at nothing).
+        const priced = book.open("price_list").some((r) => r.speaks_for === p.builder && r.data?.prices);
+        if (!priced) return [];
+        next = t + p.every_days * DAY;
+        const onCell = new Map([...seen].filter(([, st]) => st).map(([c, st]) => [c, st!]));
+        const lines: C.Call[] = [];
+        for (const lot of book.open("lot").sort((a, b) => (a.id < b.id ? -1 : 1))) {
+          const owner = ownerOf(book, lot.id);
+          if (!owner || owner === p.rating || p.exempt.includes(owner)) continue;
+          const buildings = [...new Map(((lot.data?.cells as string[]) ?? []).flatMap((c) => (onCell.has(c) ? [onCell.get(c)!] : [])).map((st) => [st.structure, st])).values()]
+            .map((st) => ({ structure: st.structure, type: st.type, value: publishedPrice(book, p.builder, st.type) ?? 0 }));
+          const value = p.land_value + buildings.reduce((x, b) => x + b.value, 0);
+          lines.push(say("valuation", `Valuation of ${lot.id}${buildings.length ? ` and ${buildings.map((b) => b.structure).join(", ")}` : ""}: ${usd(value)}.`,
+            { to: [owner], visible: [me, owner, p.rating], basis: lot.id, data: { lot: lot.id, owner, land: p.land_value, buildings, value, year: Math.floor(t / (365 * DAY)) + 1 } }));
+        }
+        const steps: Step[] = [];
+        for (let i = 0; i < lines.length; i += 30) steps.push(because(`The year's valuations: each property's land at ${usd(p.land_value)} a lot, and its buildings at what building them now would cost.`, ...lines.slice(i, i + 30)));
+        return steps;
+      },
+    );
+  },
+};
+
+/**
+ * world.grants: grants from a higher government to the town (the outside world, D31), paid every quarter at an amount
+ * a year per resident. Residents are who it sees living in the town's homes. Documented in
+ * docs/behaviour/public-finance.md.
+ */
+export const grants: BehaviourModule = {
+  name: "world.grants",
+  version: "0.1.0",
+  doc: "docs/behaviour/public-finance.md",
+  cadence: () => DAY,
+  firstWake: () => 0,
+  create(ctx) {
+    const p = params({ account: "acc-outside", to: "city", to_account: "", per_resident_per_year: 0, every_days: 91, first_day: 30, dwelling: "dwelling" }, ctx.params);
+    const me = ctx.entity;
+    const seen = new Map<string, SiteStructure | undefined>(); // what we last saw on each cell (perception is changes)
+    let next = p.first_day * DAY;
+    return stepper(
+      (obs) => {
+        for (const c of channels.cells(obs)) seen.set(c.cell, c.structure);
+      },
+      (obs) => {
+        const t = obs.t;
+        if (t < next || !p.to_account || p.per_resident_per_year <= 0) return [];
+        next = t + p.every_days * DAY;
+        const buildings = new Map([...seen.values()].filter((st) => st).map((st) => [st!.structure, st!]));
+        const residents = [...buildings.values()].flatMap((st) => st.spaces).filter((sp) => sp.kind === p.dwelling).reduce((x, sp) => x + sp.count, 0);
+        const amount = Math.floor((p.per_resident_per_year * residents * p.every_days) / 365);
+        if (amount <= 0) return [];
+        return [because(`The quarter's grant: ${usd(p.per_resident_per_year)} a resident a year, for the ${residents} living in the town's homes.`,
+          say("grant_payment", `A grant of ${usd(amount)} for the quarter (${residents} residents).`, { to: [p.to], visible: [me, p.to], data: { amount, residents, per_resident_per_year: p.per_resident_per_year } }),
+          pay(p.to_account, amount, { from: p.account, for: "Grant." }))];
       },
     );
   },

@@ -79,6 +79,8 @@ test("a shop with no staff serves nobody: what it can't serve within three days 
   const staff = new Set(config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "shop-1").map((r: any) => r.terms.parties[1]));
   config.world.records = config.world.records.filter((r: any) => !(r.id.startsWith("job-") && staff.has(r.id.replace(/^job-/, "").replace(/-(sig-.*|wages)$/, ""))));
   config.world.occupancy = config.world.occupancy.filter((o: any) => !(staff.has(o.occupant) && o.space.startsWith("shop-1-")));
+  // ... and doesn't hire before the month's end (people in work look for better jobs, so it could otherwise).
+  config.participants.find((p: any) => p.id === "shop-1-manager-system").controller.params.min_staff = 0;
   const { ev, recs } = await run("unstaffed", config, 20 * DAY);
   expect(ev.some((e) => e.event === "worked" && e.task === "serve" && e.at === "shop-1-premises")).toBe(false);
   const notes = recs.filter((r) => r.kind === "delivery_note" && r.speaks_for === "shop-1");

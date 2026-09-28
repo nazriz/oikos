@@ -83,6 +83,18 @@ Targets (docs/calibration.md): employment-to-population (ABS Labour Force, about
   - JobSeeker for the unemployed and the Age Pension for retirees, paid into it, at Services Australia's rates.
 - **The steward's levers** are the town's: rates, services, staff, spending. The Commonwealth's settings are world parameters (a researcher can change them, or put a second steward there later: phase F).
 
+**As built (C4), in two steps.** Every figure is in the world's profile, with its source. The national government is the outside world's offices (docs/profiles.md: no place in the code).
+- **C4a, revenue:**
+  - **Income tax withheld by employers.** The outside world publishes the tax law (brackets, as a law record from the profile). Every employer's payroll (`Staffing`) pays the wage less what the law says to withhold, and sends what it withheld to the outside monthly, with a report. Support payments aren't taxed (below the tax-free threshold for the payments the profile gives; noted).
+  - **Rates replace the rent tax.** The outside world's valuer values every privately owned property once a year (land per lot, from the profile, plus the builder's published price for the building on it) and publishes each valuation to its owner. The town's rating law (a law record: a rate in the dollar of value, adopted with the budget) is applied by the rates officer (the tax clerk, evolved). It sends each owner a quarterly notice, records the rates as a debt, and adds penalty interest to what's overdue. Owners (landlords, shops, factories) pay as they pay other debts, so unpaid rates count toward a firm's insolvency. The town doesn't rate its own land.
+  - **Grants:** the outside world pays the town quarterly, an amount per resident (from the profile), counting the residents it can see.
+- **C4b, services** (with the physics phase B already built: structure variables and tasks that change them):
+  - **Waste** builds up in homes per occupant per day. A works crew (council staff: ordinary employment with the town, hired by the works manager, paid by the finance officer as payroll) collects it from the depot, a street's worth at a time, within its hours.
+  - **Wear** comes on the town's parks and buildings per day. The crew maintains what's most worn.
+  - **Service levels follow from staffing,** and staffing from the budget, which gets real lines (staff, maintenance, parks).
+  - **Citizens complain** when their bin is overflowing (a letter to the town, with a propensity), and the complaints reach the mayor's reports.
+- **Deferred:** the mayor/CEO framing (a study choice: municipal-economy.md §9 Q2); streets; the rate cap and its regulator (a scenario knob, later); contracting services out.
+
 ## 7. Workers' voice
 
 **Why:** wages set only by employers leave out half of the labour market's politics.

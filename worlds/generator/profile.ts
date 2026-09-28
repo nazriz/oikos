@@ -42,6 +42,15 @@ export interface Profile {
     outside_ownership_bps: { factory: number; shop: number; landlord: number };
     industry: { factory_labour_share_bps: number; factory_input_share_bps: number; retail_purchases_share_bps: number; retail_labour_share_bps: number };
     prices: { goods_world: number; goods_import_markup_bps: number; inputs_per_kg: number; materials_per_kg: number };
+    public_finance: {
+      income_tax: { brackets: { from: number; rate_bps: number }[]; levy_bps: number; levy_from: number };
+      grants_per_resident_per_year: number;
+      rates_per_resident_per_year: number;
+      rates_instalments: number;
+      rates_due_days: number;
+      rates_penalty_interest_bps: number;
+      median_house_price: number;
+    };
   };
   /** A source for each value (a dotted path into `values`; a value is covered by its own path or a parent's). */
   sources: { [path: string]: string };

@@ -18,6 +18,7 @@ import type { Observation, ParticipantAction } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
+import { incomeTaxLaw, withholding } from "./tax";
 import { because, between, Book, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
 
 /**
@@ -368,9 +369,16 @@ export const landlord: BehaviourModule = {
       // Fines recorded against us, and demolition orders addressed to us.
       for (const r of book.records.values()) {
         if (answered.has(r.id)) continue;
-        if (r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty"].includes(r.about?.kind)) {
-          answered.add(r.id);
-          if (obeys(`fine-${r.id}`) && p.city_account && acc.balance >= cents(r.about.amount)) steps.push(because("Paying a fine recorded against us.", pay(p.city_account, cents(r.about.amount), { from: acc.account, for: "Paying a fine.", settles: r.id })));
+        // (Rates are paid when there's the money for them; a fine or rates we don't mean to pay are let be.)
+        if (r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty", "rates", "rates_interest"].includes(r.about?.kind)) {
+          const to = r.about?.account ?? p.city_account;
+          const amount = cents(r.about.amount);
+          if (!obeys(`fine-${r.id}`) || !to) answered.add(r.id);
+          else if (acc.balance >= amount) {
+            answered.add(r.id);
+            const what = String(r.about.kind).startsWith("rates") ? "rates" : "a fine";
+            steps.push(because(`Paying ${what} recorded against us.`, pay(to, amount, { from: acc.account, for: `Paying ${what}.`, settles: r.id })));
+          }
         }
         if (r.record === "statement" && r.kind === "demolition_order" && (r.addressed_to ?? []).includes(me)) {
           // Obeying: the builder does demolitions (it has the crew), at its published price for that kind of building.
@@ -397,11 +405,24 @@ export class Staffing {
   private readonly handled = new Set<string>();
   readonly noticed = new Map<string, number>(); // agreement -> when we gave notice
   private n = 0; // unique names for standing orders we create
+  // Income tax withheld from wages (docs/behaviour/public-finance.md): what each wage order withholds a pay, what we've
+  // withheld and not yet paid over, and when we next pay it over.
+  private readonly withholds = new Map<string, number>(); // wage standing order -> withheld each pay
+  private readonly pendingWithhold = new Map<string, number>(); // step marker -> withheld each pay
+  private withheld = 0;
+  private nextRemit = -1;
 
   constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string }) {}
 
   absorb(obs: Observation) {
-    for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) { this.orders.set(this.pendingOrder.get(ref)!, id); this.pendingOrder.delete(ref); }
+    for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) {
+      this.orders.set(this.pendingOrder.get(ref)!, id);
+      this.pendingOrder.delete(ref);
+      if (this.pendingWithhold.has(ref)) this.withholds.set(id, this.pendingWithhold.get(ref)!);
+      this.pendingWithhold.delete(ref);
+    }
+    // Wages paid by our standing orders: what each withheld is now owed to the collector.
+    for (const tx of channels.transactions(obs)) if (tx.per_instruction && this.withholds.has(tx.per_instruction)) this.withheld += this.withholds.get(tx.per_instruction)!;
   }
 
   private contracts(book: Book): any[] {
@@ -434,15 +455,23 @@ export class Staffing {
   routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string }): Step[] {
     const t = obs.t;
     const me = this.me;
-    // Genesis standing orders for existing staff.
-    for (const r of book.records.values()) if (r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.basis && !this.orders.has(r.basis) && !book.withdrawn.has(r.id)) this.orders.set(r.basis, r.id);
+    // Genesis standing orders for existing staff (what each withholds: the agreed wage less what it pays).
+    for (const r of book.records.values()) if (r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.basis && !this.orders.has(r.basis) && !book.withdrawn.has(r.id)) {
+      this.orders.set(r.basis, r.id);
+      const a = book.records.get(r.basis);
+      const gross = a?.record === "agreement" ? cents(commitmentOf(a, me).outcome?.money?.amount ?? 0) : 0;
+      const net = cents(r.data?.outcome?.money?.amount ?? 0);
+      if (gross > net && net > 0) this.withholds.set(r.id, gross - net);
+    }
     const contracts = this.contracts(book);
     const staff = this.staff(book, t);
     const offered = this.offered(book, t);
     const steps: Step[] = [];
     let offersNow = 0;
 
-    // Newly signed: start paying wages by standing order, at the wage agreed.
+    // Newly signed: start paying wages by standing order, at the wage agreed less the income tax the law says to
+    // withhold.
+    const law = incomeTaxLaw(book);
     for (const a of staff) {
       if (this.orders.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
       const worker = a.terms.parties[1];
@@ -451,7 +480,10 @@ export class Staffing {
       if (!to) continue;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);
-      steps.push(because("A new hire has signed: starting their wages by standing order.", [ref, pay(to, pays.wage, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
+      const tax = withholding(law, pays.wage, pays.period);
+      if (tax > 0) this.pendingWithhold.set(ref, tax);
+      steps.push(because(tax > 0 ? `A new hire has signed: starting their wages by standing order, ${usd(pays.wage - tax)} after the ${usd(tax)} of income tax the law says to withhold.` : "A new hire has signed: starting their wages by standing order.",
+        [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
     }
     // A worker who has died (registered): stop the wages, and end the employment on record.
     for (const r of book.all("death_registration")) {
@@ -494,6 +526,30 @@ export class Staffing {
       offersNow++;
     }
 
+    // Monthly: what we've withheld, paid over to the tax's collector, with a report of it. Short of money, we pay what
+    // we can, keeping the next pay period's wages, and what's left is still owed (carried to next month).
+    if (this.nextRemit < 0) this.nextRemit = t + MONTH;
+    if (t >= this.nextRemit) {
+      this.nextRemit = t + MONTH;
+      const balance = channels.accounts(obs).find((a) => a.account === account)?.balance;
+      if (this.withheld > 0 && law?.account && balance !== undefined) {
+        const owed = this.withheld;
+        // (Keeping the next pay period's wages aside: they go first.)
+        const keep = staff.reduce((x, a) => x + jobTerms(a, a.terms.parties[1]).wage, 0);
+        const paid = Math.min(owed, Math.max(0, cents(balance) - keep));
+        this.withheld = owed - paid;
+        steps.push(because(paid === owed ? `Monthly: paying over the ${usd(owed)} of income tax we withheld from wages.` : `Monthly: we owe ${usd(owed)} of income tax withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
+          say("withholding_report", `Income tax withheld from wages, owed: ${usd(owed)}; paid now: ${usd(paid)}.`, { to: [law.collector], visible: [me, law.collector], basis: law.id, data: { withheld: owed, paid, period_end: t, account } }),
+          ...(paid > 0 ? [pay(law.account, paid, { from: account, for: "Income tax withheld from wages." })] : [])));
+      }
+    }
+
+    // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
+    for (const post of posts) if (!apps.some((a) => a.data?.posting === post.id) && Number.isInteger(post.data?.wage) && post.data!.wage !== want.wage && want.canPost) {
+      steps.push(because(`Our posting is still open, at ${usd(post.data!.wage as number)}; we offer ${usd(want.wage)} now: posting it again at that.`, withdraw(post.id, "Superseded: a new wage."),
+        say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
+    }
+
     // Post a job if short-staffed (and the module says we can).
     const have = staff.length + offered.length + offersNow;
     if (have < want.target && posts.length === 0 && want.canPost) {
@@ -521,7 +577,7 @@ export class Staffing {
 }
 
 /**
- * Winding up an insolvent firm (docs/behaviour/insolvency.md). A firm is insolvent when it can't pay its debts as they
+ * Winding up an insolvent firm, or one its owners close (docs/behaviour/insolvency.md). A firm is insolvent when it can't pay its debts as they
  * fall due: here, when it's in default on a loan, or has been short of a pay period's wages for `short_days` with no
  * credit to be had. Then it says so publicly, lets everyone go, stops buying and making, and sells what it has; after
  * `wind_up_days` it pays what it owes (debts recorded against it, then what's left on its loans), passes anything left
@@ -530,13 +586,13 @@ export class Staffing {
 export class WindingUp {
   state: "trading" | "winding_up" | "closed" = "trading";
   since = 0;
-  constructor(private readonly me: string, private readonly p: { short_days: number; wind_up_days: number }) {}
+  constructor(private readonly me: string, private readonly p: { short_days: number; wind_up_days: number; idle_days: number; reprice_days: number; reprice_bps: number }) {}
 
   private readonly paid = new Set<string>(); // debts against us we've paid
 
-  /** Debts recorded against us (a lender's on a loan in default, unpaid wages, a fine) that we haven't paid, oldest first. */
+  /** Debts recorded against us (a lender's on a loan in default, unpaid wages, a fine, rates) that we haven't paid, oldest first. */
   debts(book: Book): any[] {
-    return ([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.counterparty === this.me && ["debt", "fine"].includes(r.about?.kind) && !this.paid.has(r.id)) as any[]).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+    return ([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.counterparty === this.me && DEBT_KINDS.includes(r.about?.kind) && !this.paid.has(r.id)) as any[]).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
   }
 
   /** Paying debts recorded against us, oldest first, while we can do it and keep `keep` in hand. */
@@ -545,7 +601,7 @@ export class WindingUp {
     let left = balance - keep;
     for (const d of this.debts(book)) {
       const amount = cents(d.about.amount);
-      const to = creditorAccount(book, d.holder);
+      const to = d.about?.account ?? creditorAccount(book, d.holder);
       if (!to || amount > left) break;
       left -= amount;
       this.paid.add(d.id);
@@ -567,15 +623,33 @@ export class WindingUp {
     return null;
   }
 
-  /** Beginning to wind up: said publicly; everyone let go; our price lists withdrawn. */
-  begin(t: number, book: Book, staffing: Staffing, why: string): Step[] {
+  private activeAt = -1;
+  /**
+   * Each plan: have our owners given up on us? Nobody has worked for us for `idle_days` (we can't staff ourselves, so
+   * can't trade): they close us, a voluntary winding up, while we can still pay what we owe.
+   */
+  idle(t: number, staffed: boolean): string | null {
+    if (this.activeAt < 0 || staffed) this.activeAt = t;
+    if (this.state !== "trading" || t - this.activeAt < this.p.idle_days * DAY) return null;
+    return `nobody has worked for us for ${Math.floor((t - this.activeAt) / DAY)} days`;
+  }
+
+  /**
+   * Beginning to wind up: said publicly (insolvent, or closed by our owners); everyone let go; our price lists
+   * withdrawn.
+   */
+  begin(t: number, book: Book, staffing: Staffing, why: string, voluntary = false): Step[] {
     this.state = "winding_up";
     this.since = t;
     const lists = book.open("price_list").filter((r) => r.speaks_for === this.me);
     return [
-      because(`We can't pay our debts as they fall due (${why}): we're insolvent, and winding up.`,
-        say("insolvency", `${this.me} can't pay its debts as they fall due (${why}), and is being wound up.`, { visible: "public", data: { firm: this.me, reason: why, since: t } }),
-        ...lists.map((l) => withdraw(l.id, "Winding up: no longer trading."))),
+      voluntary
+        ? because(`Our owners are closing us (${why}): winding up.`,
+          say("closing", `${this.me} is closing (${why}), and is being wound up by its owners.`, { visible: "public", data: { firm: this.me, reason: why, since: t } }),
+          ...lists.map((l) => withdraw(l.id, "Closing: no longer trading.")))
+        : because(`We can't pay our debts as they fall due (${why}): we're insolvent, and winding up.`,
+          say("insolvency", `${this.me} can't pay its debts as they fall due (${why}), and is being wound up.`, { visible: "public", data: { firm: this.me, reason: why, since: t } }),
+          ...lists.map((l) => withdraw(l.id, "Winding up: no longer trading."))),
       ...staffing.letGoAll(book, t, "Winding up: letting everyone go, with the notice their contracts give.", "Redundancy: the business is being wound up."),
     ];
   }
@@ -599,7 +673,7 @@ export class WindingUp {
     const inDefault = new Set(debts.map((d) => d.basis));
     for (const d of debts) {
       const amount = Math.min(left, cents(d.about.amount));
-      const holderAccount = creditorAccount(book, d.holder!);
+      const holderAccount = d.about?.account ?? creditorAccount(book, d.holder!);
       if (amount <= 0 || !holderAccount) continue;
       pays.push(pay(holderAccount, amount, { from: account, for: `Winding up: paying ${d.about.kind} ${d.id}.`, settles: d.id }));
       left -= amount;
@@ -627,9 +701,71 @@ export class WindingUp {
       say("closure", `${this.me} has been wound up and has closed.`, { visible: "public", data: { firm: this.me, to_creditors: balance - Math.max(0, left), to_shareholders: Math.max(0, left), debts_paid: paid } })));
     return steps;
   }
+
+  private listedAt = -1;
+  private asking = 0;
+  private sold = false;
+  private readonly credit = new Map<string, number>(); // paying account -> money received for our property
+
+  /**
+   * After closing: our premises offered for sale (the lot's title, and the building on it) at `price`, and sold to the
+   * first buyer whose purchase is paid in full; the title is transferred, and the proceeds go to what we still owe, then
+   * to our shareholders. Unsold after `reprice_days`, the asking price comes down by `reprice_bps` (the listing
+   * withdrawn and published again), and again after as long. Payments that come too late are returned.
+   */
+  sell(obs: Observation, book: Book, account: string, balance: number, premises: { structure: string; type: string; cell: string } | undefined, price: number | undefined, distributeTo: (amount: number) => Step[]): Step[] {
+    if (this.state !== "closed" || !premises || !price) return [];
+    for (const tx of channels.transactions(obs)) if (tx.to === account && tx.from !== account) this.credit.set(tx.from, (this.credit.get(tx.from) ?? 0) + cents(tx.amount));
+    const titles = ([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.holder === this.me && r.about?.kind === "ownership") as any[]).filter((c) => !book.withdrawn.has(c.id) && ![...book.records.values()].some((x) => x.record === "claim_transfer" && x.claim === c.id));
+    const steps: Step[] = [];
+    const t = obs.t;
+    const listing = (why: string, at: number, old: string[]) => {
+      this.listedAt = t;
+      this.asking = at;
+      return because(why, ...old.map((id) => withdraw(id, "Superseded: a new asking price.")),
+        say("property_for_sale", `For sale: ${premises.structure} (a ${premises.type}) and its lot, ${usd(at)}. To buy, publish a purchase and pay with it.`, { visible: "public",
+          data: { seller: this.me, structure: premises.structure, type: premises.type, cell: premises.cell, lots: titles.map((c) => c.about.object), price: at, account } }));
+    };
+    if (this.listedAt < 0 && titles.length) return [listing(`Closed: offering our premises (${premises.structure}, a ${premises.type}) for sale at ${usd(price)}.`, price, [])];
+    price = this.asking || price;
+    if (!this.sold && this.listedAt >= 0 && t - this.listedAt >= this.p.reprice_days * DAY && !book.open("property_purchase").some((r) => (r.addressed_to ?? []).includes(this.me))) {
+      const lower = Math.floor((price * (10_000 - this.p.reprice_bps)) / 10_000);
+      const old = book.open("property_for_sale").filter((r) => r.speaks_for === this.me).map((r) => r.id);
+      return [listing(`Our premises unsold after ${Math.floor((t - this.listedAt) / DAY)} days at ${usd(price)}: asking ${usd(lower)}.`, lower, old)];
+    }
+    if (this.sold) {
+      // Paid too late (sold already): returned.
+      for (const [from, x] of this.credit) if (x > 0) {
+        steps.push(because("A payment for our premises, already sold: returning it.", pay(from, x, { from: account, for: "Refund: the property is sold." })));
+        this.credit.set(from, 0);
+      }
+      return steps;
+    }
+    const purchases = book.open("property_purchase").filter((r) => (r.addressed_to ?? []).includes(this.me)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+    for (const pch of purchases) {
+      const from = String(pch.data?.account);
+      if ((this.credit.get(from) ?? 0) < price) continue;
+      this.sold = true;
+      this.credit.set(from, (this.credit.get(from) ?? 0) - price);
+      const buyer = pch.speaks_for!;
+      steps.push(because(`${buyer} has bought our premises, paid in full: transferring the title.`,
+        ...titles.map((c) => C.call("claim", { transfer: c.id, to: buyer })),
+        say("property_sold", `Sold: ${premises.structure} to ${buyer} for ${usd(price)}.`, { visible: "public", basis: pch.id, data: { structure: premises.structure, buyer, price } })));
+      // The proceeds: what we still owe first (as far as it goes), then our shareholders.
+      const owed = this.debts(book).reduce((x, d) => x + cents(d.about.amount), 0);
+      steps.push(...this.payDebts(book, account, balance, 0));
+      const paidNow = owed - this.debts(book).reduce((x, d) => x + cents(d.about.amount), 0);
+      if (balance - paidNow > 0) steps.push(...distributeTo(balance - paidNow));
+      break;
+    }
+    return steps;
+  }
 }
 
-/** The account a creditor is paid into: a lender's (its loan agreement names it), or a worker's (their employment
+/** What's recorded against a firm that it must pay (claims whose kind says so). */
+export const DEBT_KINDS = ["debt", "fine", "rates", "rates_interest"];
+
+/** The account a creditor is paid into (when the claim doesn't name one): a lender's (its loan agreement names it), or a worker's (their employment
  * agreement names it). */
 function creditorAccount(book: Book, holder: string): string | undefined {
   for (const r of book.records.values()) {

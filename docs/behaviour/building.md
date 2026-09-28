@@ -35,6 +35,10 @@ At the crew's wage ($1,500 a fortnight, about $18.75 an hour), a house's materia
 
 The town's wages are lower than Australia's (the generator's pay scale is a placeholder too), so prices are scaled with them.
 
+## Buying materials
+
+The builder buys materials for the jobs it has signed and not yet begun, oldest first, as far as it can pay for them now: a job whose materials it can't yet afford waits, and so do the jobs after it. It pays with the order, so what it can buy is what's in its account. (Before C4a it ordered for every waiting job at once or not at all, so several contracts signed together, more than its balance, stalled every one of them.)
+
 ## Leaves out
 
 - **One kind of material**, instead of concrete, timber, steel and fittings.

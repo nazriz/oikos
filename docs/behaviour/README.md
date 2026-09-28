@@ -20,7 +20,8 @@ Rules every module follows (so re-runs are reproducible):
 | `world.trade` | the world market: sells at world prices against paid orders, buys exports against invoices (a boundary condition, D31) | [boundary.md](boundary.md) |
 | `world.transfers` | support paid from outside (a national government's payments): decides claims by age, pays on schedule | [boundary.md](boundary.md) |
 | `world.funding` | lends into the world from outside (a town bank's funding) | [boundary.md](boundary.md) |
-| (winding up) | an insolvent firm's winding up, in factories' and shops' modules | [insolvency.md](insolvency.md) |
+| (winding up) | an insolvent firm's winding up, or one its owners close; selling its premises; in factories' and shops' modules | [insolvency.md](insolvency.md) |
+| (entry) | founding a business: a citizen buys premises for sale and holds the new firm's first position; the firm sets itself up | [entry.md](entry.md) |
 | `bank.lending` | a bank's lending office: decides loans on serviceability from the account it keeps, pays out, follows arrears and default, draws funding | [credit.md](credit.md) |
 | `world.export_demand` | the outside world's purchases as money on a schedule (worlds without goods) | [boundary.md](boundary.md) |
 | `citizen.default` | a townsperson: housing, work, shopping and using goods up, leaving town | [citizen.md](citizen.md) |
@@ -35,7 +36,11 @@ Rules every module follows (so re-runs are reproducible):
 | `city.council_clerk` | runs council ballots, publishes results and what passed | [government.md](government.md) |
 | `city.councillor` | votes on council ballots (spatial voting) | [government.md](government.md) |
 | `city.finance_officer` | pays the town's invoices under the payments procedure | [government.md](government.md) |
-| `city.tax_clerk` | assesses reported tax, chases arrears | [government.md](government.md) |
+| `city.tax_clerk` | assesses reported tax, chases arrears (not in the generated town since C4a) | [government.md](government.md) |
+| `city.rates_officer` | levies rates on the valuer's valuations under the rating law, records them as claims, charges penalty interest on what's overdue | [public-finance.md](public-finance.md) |
+| `world.valuer` | the outside world's valuer: values every private property yearly (land, plus the builder's price for its buildings) | [public-finance.md](public-finance.md) |
+| `world.grants` | the outside world's grants to the town: quarterly, per resident | [public-finance.md](public-finance.md) |
+| (payroll) | employers withhold income tax under the published law and pay it over monthly, in `Staffing` | [public-finance.md](public-finance.md) |
 | `idle` | does nothing (placeholder, and a control condition) | this page |
 
 Trade in goods (price lists, orders paid with the order, delivery notes) is shared by every module that buys or sells: [trade.md](trade.md). What buildings take (materials, hours of work) is in [building.md](building.md).

@@ -20,7 +20,7 @@ interface Payment { instruction: string; from: string; to: string; amount: numbe
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.7.0",
+  version: "0.8.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -106,7 +106,7 @@ export const bankPaymentSystem: BehaviourModule = {
           nextDue.set(ins.id, due);
         } else if (!done.has(ins.id)) {
           done.add(ins.id);
-          out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at, ...(typeof d.settles === "string" && book.records.has(d.settles) ? { settles: d.settles } : {}) });
+          out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at, ...(typeof d.settles === "string" ? { settles: d.settles } : {}) }); // the payer's reference, as given
         }
       }
       // Settling an estate, as law-succession says: to the partner; else equally to the adult children; else the town.

@@ -6,7 +6,7 @@ import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
+import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
 import { Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
@@ -51,6 +51,11 @@ export const producer: BehaviourModule = {
         // a loan, and it winds up over this long.
         short_days: 60,
         wind_up_days: 60,
+        idle_days: 90, // nobody working for us this long, our owners close us (placeholder)
+        reprice_days: 30, // closed, our premises unsold this long: the asking price comes down (placeholder)
+        reprice_bps: 1000, // by this much (placeholder)
+        builder: "builder", // whose published prices say what our premises are worth
+        premises_sale_bps: 5000, // closed, our premises are offered at this share of what building them new costs (placeholder)
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
@@ -59,7 +64,13 @@ export const producer: BehaviourModule = {
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role });
     const borrowing = new Borrowing(me, p.lender);
-    const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days });
+    const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
+    // Our premises, as the sites we see show them (for selling them if we close).
+    const premisesOf = (obs: Observation) => {
+      const c = channels.cells(obs).find((x) => x.structure?.structure === p.works);
+      return c?.structure ? { structure: c.structure.structure, type: c.structure.type, cell: c.cell } : undefined;
+    };
+
     const orders = new OrderBook(me);
     const deliveries = new Deliveries();
     const onOrder = new Map<string, number>(); // inputs ordered, not yet delivered
@@ -106,7 +117,12 @@ export const producer: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
-        if (!acc || winding.state === "closed") return steps;
+        if (acc && winding.state === "closed") {
+          const where = premisesOf(obs);
+          const worth = where ? buildingPrice(book, p.builder, where.type) : undefined;
+          return winding.sell(obs, book, acc.account, acc.balance, where, worth ? Math.floor((worth * p.premises_sale_bps) / 10_000) : undefined, (x) => distribute(book, me, acc.account, x, "The proceeds of our premises: to our shareholders by their shares").steps);
+        }
+        if (!acc) return steps;
         if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc.account, x, "Wound up: what's left, to our shareholders by their shares").steps);
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
@@ -179,7 +195,9 @@ export const producer: BehaviourModule = {
         steps.push(...borrowing.steps(book, t, acc.account));
         // Insolvent (it can't pay its debts as they fall due): wind up.
         const insolvent = winding.insolvent(t, book, { balance: acc.balance, noCredit: !borrowing.canApply(t) && !borrowing.waiting(t), defaulted: borrowing.impaired });
+        const idle = insolvent ? null : winding.idle(t, workers.length > 0 || staffing.offered(book, t).length > 0);
         if (insolvent) steps.push(...winding.begin(t, book, staffing, insolvent));
+        else if (idle) steps.push(...winding.begin(t, book, staffing, idle, true));
         // Debts recorded against us (unpaid wages, a fine...), paid while we can, keeping the next pay period's wages; more
         // than we can pay, we ask our bank for the difference.
         else {

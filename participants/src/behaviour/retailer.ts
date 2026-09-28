@@ -6,7 +6,7 @@ import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
+import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
 import { Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
@@ -52,6 +52,17 @@ export const retailer: BehaviourModule = {
         // a loan, and it winds up over this long.
         short_days: 60,
         wind_up_days: 60,
+        idle_days: 90, // nobody working for us this long, our owners close us (placeholder)
+        reprice_days: 30, // closed, our premises unsold this long: the asking price comes down (placeholder)
+        reprice_bps: 1000, // by this much (placeholder)
+        builder: "builder", // whose published prices say what our premises are worth
+        premises_sale_bps: 5000,
+        // A shop just founded (docs/behaviour/entry.md): who founded it, the capital they put in, the property listing it
+        // buys its premises from, and its bank. None: a shop that's trading already.
+        founder: null as string | null,
+        capital: 0,
+        listing: null as string | null,
+        bank: "bank", // closed, our premises are offered at this share of what building them new costs (placeholder)
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
@@ -60,7 +71,13 @@ export const retailer: BehaviourModule = {
     const book = new Book();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role });
     const borrowing = new Borrowing(me, p.lender);
-    const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days });
+    const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
+    // Our premises, as the sites we see show them (for selling them if we close).
+    const premisesOf = (obs: Observation) => {
+      const c = channels.cells(obs).find((x) => x.structure?.structure === p.premises);
+      return c?.structure ? { structure: c.structure.structure, type: c.structure.type, cell: c.cell } : undefined;
+    };
+
     const orders = new OrderBook(me, p.unpaid_days);
     const deliveries = new Deliveries();
     let onOrder = 0; // goods ordered from suppliers, not yet delivered
@@ -82,6 +99,8 @@ export const retailer: BehaviourModule = {
     let headcountWhy = "";
     let monthStart = -1;
     let nextRestock = 0;
+    // Setting up (a shop just founded): our account asked for, the capital called, the premises bought.
+    const setup = { accountAsked: false, capitalCalled: false, founderAccount: undefined as string | undefined, registered: false, purchased: false, ready: !p.founder };
     const workDay = (t: number) => Math.floor(t / DAY) % 7 < p.work_days;
     const hoursPerWorkerMonth = (p.working_day * p.work_days * 30) / 7;
     /** Room in our workplace now: its capacity less the bodies in it. */
@@ -90,6 +109,51 @@ export const retailer: BehaviourModule = {
       return sp ? sp.capacity - sp.count : p.max_staff;
     };
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
+
+    /** Setting up a shop just founded: an account at the bank; the founder's capital; our shareholders (the founder);
+     * the premises bought from the property listing. If someone else buys them first, the capital goes back and we close. */
+    function settingUp(obs: Observation, acc: ReturnType<typeof ownAccount>): Step[] {
+      if (!acc) {
+        if (setup.accountAsked) return [];
+        setup.accountAsked = true;
+        return [because("A new shop: opening our account at the bank.", C.call("account", { holder: me, at: p.bank }))];
+      }
+      if (!setup.capitalCalled) {
+        setup.capitalCalled = true;
+        return [because(`A new shop: asking our founder for the ${usd(p.capital)} of capital they're putting in.`, say("capital_call", `Please pay the ${usd(p.capital)} of capital into ${acc.account}.`, { to: [p.founder!], visible: [me, p.founder!], data: { account: acc.account, amount: p.capital } }))];
+      }
+      for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.from !== acc.account && !setup.founderAccount) setup.founderAccount = tx.from;
+      const steps: Step[] = [];
+      if (setup.founderAccount && !setup.registered) {
+        setup.registered = true;
+        steps.push(because("Our shareholders: our founder, who put in the capital.", say("shareholders", `The shareholders of ${me}, and their shares.`, { to: [p.founder!], visible: [me, p.founder!], data: { holders: [{ holder: p.founder, account: setup.founderAccount, shares: 10_000 }] } })));
+      }
+      // The listing we founded ourselves to buy from; if the seller has published it again (at a new price), that one.
+      const first = p.listing ? book.records.get(p.listing) : undefined;
+      const structure = first?.record === "statement" ? first.data?.structure : undefined;
+      const relisted = book.open("property_for_sale").filter((r) => r.data?.structure === structure).sort((a, b) => b.at - a.at)[0];
+      const listing = relisted ?? first;
+      const sold = book.all("property_sold").find((r) => structure && r.data?.structure === structure);
+      if (sold && sold.data?.buyer === me) {
+        setup.ready = true;
+        return [...steps, because(`Our premises (${sold.data.structure}) are ours: opening for trade.`)];
+      }
+      if (sold || (listing && book.withdrawn.has(listing.id))) {
+        // Someone else bought them: the capital goes back, and we close.
+        winding.state = "closed";
+        return [...steps, because("The premises we meant to buy were sold to someone else: returning the capital, and closing.",
+          ...(setup.founderAccount && acc.balance > 0 ? [pay(setup.founderAccount, acc.balance, { from: acc.account, for: "Capital returned: the venture didn't go ahead." })] : []),
+          say("closure", `${me} didn't open: its premises were sold to someone else.`, { visible: "public", data: { firm: me, to_creditors: 0, to_shareholders: acc.balance } }))];
+      }
+      const price = listing?.record === "statement" ? (listing.data?.price as number) : undefined;
+      if (listing?.record === "statement" && price !== undefined && !setup.purchased && acc.balance >= price) {
+        setup.purchased = true;
+        steps.push(because(`Buying our premises (${listing.data.structure}) at the ${usd(price)} asked: publishing our purchase, and paying with it.`,
+          say("property_purchase", `Purchase of ${listing.data.structure}, as listed.`, { to: [listing.speaks_for!], visible: [me, listing.speaks_for!], basis: listing.id, data: { listing: listing.id, account: acc.account } }),
+          pay(listing.data.account, price, { from: acc.account, for: `Premises: ${listing.data.structure}.` })));
+      }
+      return steps;
+    }
 
     return stepper(
       (obs) => {
@@ -108,11 +172,18 @@ export const retailer: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
-        if (!acc || winding.state === "closed") return steps;
+        if (acc && winding.state === "closed") {
+          const where = premisesOf(obs);
+          const worth = where ? buildingPrice(book, p.builder, where.type) : undefined;
+          return winding.sell(obs, book, acc.account, acc.balance, where, worth ? Math.floor((worth * p.premises_sale_bps) / 10_000) : undefined, (x) => distribute(book, me, acc.account, x, "The proceeds of our premises: to our shareholders by their shares").steps);
+        }
+        // A shop just founded sets itself up before it trades.
+        if (!setup.ready) return settingUp(obs, acc);
+        if (!acc) return steps;
         if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc.account, x, "Wound up: what's left, to our shareholders by their shares").steps);
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
-        if (headcount < 0) headcount = workers.length;
+        if (headcount < 0) headcount = Math.max(workers.length, p.min_staff); // (a new shop starts by hiring its minimum)
         if (monthStart < 0) monthStart = acc.balance;
         const stock = held(obs, p.premises, p.kind);
         // Our suppliers' prices, cheapest first (and those that came up short in the last week, last).
@@ -168,7 +239,9 @@ export const retailer: BehaviourModule = {
         steps.push(...borrowing.steps(book, t, acc.account));
         // Insolvent (it can't pay its debts as they fall due): wind up.
         const insolvent = winding.insolvent(t, book, { balance: acc.balance, noCredit: !borrowing.canApply(t) && !borrowing.waiting(t), defaulted: borrowing.impaired });
+        const idle = insolvent ? null : winding.idle(t, workers.length > 0 || staffing.offered(book, t).length > 0);
         if (insolvent) steps.push(...winding.begin(t, book, staffing, insolvent));
+        else if (idle) steps.push(...winding.begin(t, book, staffing, idle, true));
         // Debts recorded against us (unpaid wages, a fine...), paid while we can, keeping the next pay period's wages; more
         // than we can pay, we ask our bank for the difference.
         else {

@@ -59,12 +59,13 @@ Lengnick, M. (2013), *Agent-based macroeconomics: a baseline model*, **Journal o
 - `supplier` and `market`: whom it buys inputs from, and whose buying offer it exports under.
 - `wage` and `period`: the wage offered, per pay period. `price`: its opening wholesale price.
 - `working_day` and `work_days`.
+- Credit and closing: `lender`, `min_order`; `short_days` and `wind_up_days` (60 each), `idle_days` (90), `builder`, `premises_sale_bps` (5000), `reprice_days` (30) and `reprice_bps` (1000), as in [insolvency.md](insolvency.md).
 - Lengnick's parameters, as basis points: `phi_low_bps`, `phi_high_bps`, `delta_bps`, `gamma_months`, `price_up_bound_bps`, `price_down_bound_bps`, `theta_bps`, `vartheta_bps`, `chi_bps`.
 
 ## Leaves out
 
 - **Investment:** the works' room is fixed.
-- **Credit:** a factory that runs short of cash lets workers go.
+- **Credit** beyond working capital: a factory borrows before letting workers go, and pays debts ([credit.md](credit.md)), but doesn't borrow to invest.
 - **Several products.**
 - **Stock that deteriorates.**
 - **Choosing between suppliers.** There is one supplier, the world market, until the town makes inputs.

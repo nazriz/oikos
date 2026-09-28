@@ -43,6 +43,8 @@ Lengnick (2013) is the model: its firms sell to households who visit them, and i
 - `wage` and `period`; `working_day` and `work_days` (6).
 - `price` (its opening price) and `demand` (what it expects to sell in its first month).
 - `unpaid_days` (7) and `serve_within_days` (3).
+- Credit and closing: `lender`; `short_days` and `wind_up_days` (60 each), `idle_days` (90), `builder`, `premises_sale_bps` (5000), `reprice_days` (30) and `reprice_bps` (1000), as in [insolvency.md](insolvency.md).
+- A shop just founded: `founder`, `capital`, `listing` and `bank` ([entry.md](entry.md)).
 - Lengnick's parameters, as in [producer.md](producer.md).
 
 ## Placeholders (to calibrate in phase B, stage B5)

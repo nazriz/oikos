@@ -10,13 +10,13 @@ petition (citizens) ─┐
 annual budget ───────┘
 permit application (mayor) ─> decision (planning officer) ─> construction agreement (mayor, builder)
   ─> construct + invoice (builder) ─> approval (mayor) ─> money(...) (finance officer): a payment request ─> transfer (bank)
-tax report + payment (landlord) ─> tax claim (tax clerk) ─> penalty + demand if unpaid after the grace period
+valuation (valuer, outside) ─> rates notice + claim (rates officer) ─> payment naming the claim (owner) ─> penalty interest monthly if overdue
 ```
 
 The genesis records that set this up are world content, made by the generator:
 - `signatories-city` tells the bank that only the `finance` seat may instruct payments from `acc-city`;
 - `proc-payments` is the payments procedure: within the adopted budget, and over $50,000 only with the mayor's written approval;
-- `law-tax` sets the rate and the penalty.
+- `law-rates` sets the rate in the dollar of value, the instalments and the penalty interest (docs/behaviour/public-finance.md). The generated town no longer has the rent tax (`law-tax`), which had no source.
 
 ## `city.mayor_code`: the all-code control
 
@@ -63,7 +63,7 @@ It answers letters with its report: the balance, money in and out, the adopted b
 
 **Source:** delegated spending limits and budget control, as in real local-government finance.
 
-## `city.tax_clerk`
+## `city.tax_clerk` (not in the generated town since C4a: rates replaced the rent tax; [public-finance.md](public-finance.md))
 
 It wakes weekly.
 - For each `tax_report` addressed to the town, it records the tax owed as a claim at `law-tax`'s `rate_bps`.

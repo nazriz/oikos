@@ -383,6 +383,92 @@ export const taxClerk: BehaviourModule = {
   },
 };
 
+/**
+ * city.rates_officer: administers the rating law (docs/behaviour/public-finance.md). From the latest valuation of each
+ * property, it reckons a year's rates at the law's rate in the dollar, and every instalment period sends each owner a
+ * notice for their share, recording it as the town's claim against them (payable into the town's account, by the due
+ * date). What's still unpaid after the due date draws the law's penalty interest, monthly, recorded as a claim too,
+ * with a letter. A payment settles a claim when it names it.
+ */
+export const ratesOfficer: BehaviourModule = {
+  name: "city.rates_officer",
+  version: "0.1.0",
+  doc: "docs/behaviour/public-finance.md",
+  cadence: () => DAY,
+  create(ctx: ParticipantContext) {
+    const p = params({ law: "law-rates", first_day: 30 }, ctx.params);
+    const book = new Book();
+    const letters = new Letters();
+    const settled = new Set<string>(); // claims a payment into our account has named
+    const lastInterest = new Map<string, number>(); // overdue claim -> when interest was last charged
+    let next = p.first_day * DAY;
+    let levied = 0;
+    let received = 0;
+    return stepper(
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs);
+        const acc = ownAccount(obs);
+        if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.settles) {
+          settled.add(tx.settles);
+          received += cents(tx.amount);
+        }
+      },
+      (obs) => {
+        const me = obs.entity;
+        const t = obs.t;
+        const acc = ownAccount(obs);
+        const steps: Step[] = [];
+        const law = book.records.get(p.law);
+        const terms = law?.record === "statement" ? law.data ?? {} : {};
+        const ratePpm: number = terms.rate_ppm ?? 0;
+        const instalments: number = terms.instalments ?? 4;
+        const dueDays: number = terms.due_days ?? 30;
+        const interestBps: number = terms.penalty_interest_bps ?? 0;
+        if (!acc || !law) return steps;
+        // Notices: each owner's share of a year's rates on what they own, as last valued.
+        if (t >= next && ratePpm > 0) {
+          next = t + Math.floor(365 / instalments) * DAY;
+          const latest = new Map<string, StatementRecord>(); // lot -> its latest valuation
+          for (const v of book.open("valuation").sort((a, b) => a.at - b.at)) latest.set(v.data?.lot, v);
+          const byOwner = new Map<string, { lots: string[]; amount: number }>();
+          for (const v of latest.values()) {
+            const o = byOwner.get(v.data.owner) ?? { lots: [], amount: 0 };
+            o.lots.push(v.data.lot);
+            o.amount += Math.floor((Number(v.data.value) * ratePpm) / 1_000_000 / instalments);
+            byOwner.set(v.data.owner, o);
+          }
+          const lines: C.Call[] = [];
+          for (const [owner, o] of [...byOwner].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+            if (o.amount <= 0) continue;
+            levied += o.amount;
+            const due = t + dueDays * DAY;
+            lines.push(say("rates_notice", `Rates notice: ${usd(o.amount)} on ${o.lots.join(", ")}, due in ${dueDays} days, into ${acc.account}.`, { to: [owner], visible: [me, owner], basis: law.id, data: { amount: o.amount, lots: o.lots, due, account: acc.account } }),
+              record("right", me, { kind: "rates", amount: o.amount, account: acc.account, due, lots: o.lots }, { against: owner, basis: law.id }));
+          }
+          for (let i = 0; i < lines.length; i += 30) steps.push(because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30)));
+        }
+        // Overdue: penalty interest, monthly, on what's still unpaid after its due date.
+        if (interestBps > 0) for (const c of [...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
+          if (settled.has(c.id) || t < c.about.due) continue;
+          if (t - (lastInterest.get(c.id) ?? c.about.due) < 30 * DAY) continue;
+          lastInterest.set(c.id, t);
+          const interest = Math.floor((cents(c.about.amount) * interestBps) / 10_000 / 12);
+          if (interest > 0) steps.push(because(`Rates overdue a month or more: recording a month's penalty interest (${interestBps / 100}% a year) and writing to the owner.`,
+            record("right", me, { kind: "rates_interest", amount: interest, account: acc.account }, { against: c.counterparty, basis: c.id }),
+            message([c.counterparty], `Rates of ${usd(cents(c.about.amount))} are overdue; interest of ${usd(interest)} has been added.`, c.id)));
+        }
+        steps.push(...letters.answer(() => {
+          const overdue = [...new Set(([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates" && !settled.has(r.id) && t >= (r as any).about.due) as any[]).map((c) => c.counterparty))];
+          return `Report from the rates officer: rates at ${ratePpm / 10_000}% of value a year, in ${instalments} instalments; ${usd(levied)} levied so far, ${usd(received)} received.` +
+            (overdue.length ? ` Overdue: ${overdue.join(", ")}.` : " Nothing is overdue.");
+        }));
+        return steps;
+      },
+    );
+  },
+};
+
 /** What a proposal made on the council proposal form enacts if it passes: a law, or a budget (with its parks line). */
 function fromForm(prop: StatementRecord | undefined, t: number): any {
   const d = prop?.data;

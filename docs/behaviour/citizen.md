@@ -1,4 +1,4 @@
-# `citizen.default` (v0.11.0)
+# `citizen.default` (v0.13.0)
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`. Wakes weekly, and whenever something names them (an offer, a notice, a message).
 
@@ -15,6 +15,8 @@ Everything happens the way a person does it: they apply, sign, move in, and ask 
 | **Signing and moving in** | Sign the landlord's offer and set up a monthly standing order for rent, paid in advance. Then move in as a separate physical act, retrying weekly until the home is free. | Rent in advance is standard UK/AU practice. Separating signing from moving in: someone can hold a lease before the last tenant has left. |
 | **Staying** | Never ends a tenancy early; leaves when the term ends or the landlord's notice runs out | BoE model §3.4.2: "a household will never choose to terminate their renting agreement" |
 | **Work** | If unemployed, apply for the best-paid posting seen, one a week | Simple job search; the labour-market literature (Dosi et al.) is the planned refinement |
+| **A better job** (0.13.0) | In work, with a month's chance, look at the postings and apply for the best-paid one elsewhere that pays more than ours. Offered it: take it, give notice at ours (the contract's notice), and sign the new one and start there once the notice is worked out | Lengnick (2013), Table 1: π = 0.1, the monthly chance an employed household searches for a better-paid job. Ours searches the postings rather than visiting one firm. Without it, a firm in a town at full employment can't hire (docs/behaviour/entry.md) |
+| **Starting a business** (0.13.0) | Monthly, working-age and in the labour force: premises for sale of a kind the world has a venture for, savings for their price, the venture's capital and three months' housing and essentials, and the month's chance (`found_bps`, 2%). They found the business (the `entity` call: they hold its first position, where its rules run) and pay in the capital it asks for | docs/behaviour/entry.md. The chance is a placeholder, to calibrate against business entry rates |
 | **Spending** (0.11.0) | A month's spending: out of income, what isn't saved (the saving ratio) less housing, never below essentials; plus a little out of savings above a buffer of 3 months' income (a wealth effect, a share a year). Income is a month's worth of what came in over the last 90 days, less refunds (which delivery notes report); before that, what the job and support pay | Consumption out of income, at the household saving ratio; the wealth effect's share from the literature on consumption and wealth. The world's figures come from its profile (docs/profiles.md). Replaces the BoE rule's 30% of savings a month, which kept households spending far more than they earned |
 | **A rent increase** (0.11.0) | Given notice of a rent increase on its home, the leaseholder pays it from when it starts (a new standing order) if it's still within the household's budget (the rent rule above); if not, it gives notice on the lease and looks for somewhere else | The rent rule above; the notice is the lease's |
 | **Unpaid wages** (0.12.0) | Wages that haven't come for a pay period plus five days: resign (notice on the job, ending it now), and record the wages owed as a debt against the employer (a claim). The employer pays it when it can; a firm that can't is insolvent (docs/behaviour/insolvency.md) | Employees are creditors for unpaid wages, in any employment law |
@@ -31,10 +33,10 @@ Everything happens the way a person does it: they apply, sign, move in, and ask 
 
 A citizen doesn't receive the housing or job market. It looks when it needs to, the way a person reads the listings when they're hunting:
 - **Needing a home:** a search of standing rental listings within its budget (the rent rule above), dearest first, the top 20.
-- **Needing work:** a search of standing job postings, best-paid first, the top 20.
+- **Needing work:** a search of standing job postings, best-paid first, the top 20. In work, the same search in a month it looks for something better (the rule above).
 - **Every wake:** a glance at the petitions board (standing petitions). The running signature counts arrive as an ordinary report.
 
-It then chooses from what it found, as the rules above say. Someone with a home and a job never looks at the markets at all.
+It then chooses from what it found, as the rules above say. Someone with a home and a job looks at the job market only in a month they look for something better.
 
 ## Position: what a citizen can see around it (D44)
 

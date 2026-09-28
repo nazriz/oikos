@@ -1,7 +1,7 @@
 // The town's government on a generated town with the code mayor (the all-code
 // control): a budget goes through the council; a park goes through planning,
-// the builder, an invoice, the mayor's approval and the finance officer; tax
-// is reported, assessed and paid. Every step is people following (or not)
+// the builder, an invoice, the mayor's approval and the finance officer; rates
+// are levied and paid. Every step is people following (or not)
 // procedures written as records; none of it is kernel mechanics.
 
 import { expect, test } from "bun:test";
@@ -14,7 +14,7 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
-test("budget, park and tax run through the town's own procedures", async () => {
+test("budget, park and rates run through the town's own procedures", async () => {
   const config = generate({ ...spec, citizens: 80, mayor: "code" });
   // A payment from the town's account instructed by the mayor, a post the town
   // has not named as a signatory: the bank should decline it.
@@ -57,11 +57,10 @@ test("budget, park and tax run through the town's own procedures", async () => {
   expect(ev.some((e) => e.event === "message_delivered" && e.participant === "bank-payments-system" && e.to.includes("mayor-system"))).toBe(true);
   expect(readFileSync(s.logPath, "utf8").includes("Request mayor-direct not carried out: mayor is not an authorised signatory")).toBe(true);
 
-  // Tax: landlords report, the clerk assesses at the law's rate, and money arrives in the town's account.
-  const reports = recs.filter((r) => r.kind === "tax_report");
-  expect(reports.length).toBeGreaterThan(0);
-  const claims = recs.filter((r) => r.record === "claim" && r.about?.kind === "tax");
-  expect(claims.length).toBe(reports.filter((r) => r.data.rent_received >= 10).length);
-  for (const c of claims) expect(c.about.amount).toBe(Math.floor((byId.get(c.basis).data.rent_received * 1000) / 10_000));
-  expect(ev.some((e) => e.event === "transfer" && e.from.startsWith("acc-landlord") && e.to === "acc-city")).toBe(true);
+  // Rates (the town's tax): landlords are sent notices on the valuer's valuations, and pay them into the town's account.
+  const notices = recs.filter((r) => r.kind === "rates_notice" && r.addressed_to[0].startsWith("landlord"));
+  expect(notices.length).toBeGreaterThan(0);
+  const claims = recs.filter((r) => r.record === "claim" && r.about?.kind === "rates" && r.counterparty.startsWith("landlord"));
+  expect(claims.length).toBe(notices.length);
+  expect(ev.some((e) => e.event === "transfer" && e.from.startsWith("acc-landlord") && e.to === "acc-city" && claims.some((c) => c.id === e.settles))).toBe(true);
 }, 300_000);

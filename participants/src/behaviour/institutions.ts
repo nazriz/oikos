@@ -13,7 +13,7 @@ import { evaluate, standingClaims } from "../law";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
-import { Staffing, stepper } from "./firms";
+import { Staffing, stepper, WindingUp } from "./firms";
 
 /** Laws with a formal condition and a "must not" (prohibitions), in id order. */
 function prohibitions(book: Book): StatementRecord[] {
@@ -212,6 +212,8 @@ export const builder: BehaviourModule = {
     );
     const book = new Book();
     const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker" });
+    // What's recorded against us to pay (rates on our yard, a fine), paid as a firm pays its debts (we don't wind up).
+    const dues = new WindingUp(ctx.entity, { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 });
     let lastLetGo = -Infinity;
     const letters = new Letters();
     const deliveries = new Deliveries();
@@ -244,6 +246,7 @@ export const builder: BehaviourModule = {
         const acc = ownAccount(obs);
         const steps: Step[] = [];
         if (!acc) return steps;
+        steps.push(...dues.payDebts(book, acc.account, acc.balance, staffing.workers(book, t).length * p.wage));
         for (const c of channels.cells(obs)) if (c.structure) typeOf.set(c.structure.structure, c.structure.type);
         const supply = goodsPrices(book, p.supplier);
         const materialsCost = (m: { [kind: string]: number }) => Object.entries(m).reduce((x, [k, q]) => x + (supply.prices[k] === undefined ? Infinity : q * supply.prices[k]!), 0);
@@ -278,11 +281,19 @@ export const builder: BehaviourModule = {
           if (!book.signedBy(r.id, me)) steps.push(because("A client has signed a construction contract: taking it on.", sign(r.id)));
         }
 
-        // Materials: what the waiting jobs need, against what's in the yard and on order; order the shortfall.
+        // Materials: what the waiting jobs need, oldest first, as far as we can pay for them, against what's in the yard
+        // and on order; order the shortfall. (A job we can't yet pay materials for waits, and so do the jobs after it.)
         const need = new Map<string, number>();
-        for (const w of waiting) for (const [k, q] of Object.entries((w.type && p.types[w.type]?.materials) || {})) need.set(k, (need.get(k) ?? 0) + q);
+        const shortOf = (k: string, q: number) => Math.max(0, q - held(obs, p.yard, k) - (onOrder.get(k) ?? 0));
+        const costOf = (m: Map<string, number>) => [...m].reduce((x, [k, q]) => x + shortOf(k, q) * (supply.prices[k] ?? Infinity), 0);
+        for (const w of waiting) {
+          const next = new Map(need);
+          for (const [k, q] of Object.entries((w.type && p.types[w.type]?.materials) || {})) next.set(k, (next.get(k) ?? 0) + q);
+          if (costOf(next) > acc.balance) break;
+          for (const [k, q] of next) need.set(k, q);
+        }
         for (const [kind, q] of [...need].sort(([a], [b]) => (a < b ? -1 : 1))) {
-          const short = q - held(obs, p.yard, kind) - (onOrder.get(kind) ?? 0);
+          const short = shortOf(kind, q);
           const price = supply.prices[kind];
           if (short <= 0 || price === undefined || !supply.account || acc.balance < short * price) continue;
           onOrder.set(kind, (onOrder.get(kind) ?? 0) + short);

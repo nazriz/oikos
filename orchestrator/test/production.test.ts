@@ -95,7 +95,13 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   const slack = generate({ ...base, citizens: 120, exports_per_month: 2_000_000 });
   const { ev: e1, cmds: c1 } = await run("slack", slack, 5 * MONTH + DAY);
   const letGo = c1.filter((c) => c.participant?.startsWith("factory-") && /letting one worker go/.test(c.reasoning ?? ""));
-  expect(letGo.length).toBeGreaterThanOrEqual(4);
+  // Staff leave both ways: let go, or leaving for a better-paid job on their own (citizen 0.13.0).
+  const factoryJobs = new Set([...slack.world.records, ...e1.filter((e) => e.event === "recorded").map((e) => e.record)].filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0].startsWith("factory-")).map((r: any) => r.id));
+  const quit = e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && factoryJobs.has(e.record.agreement) && e.record.text === "Resigning: moving to another job.");
+  // ... or let go because the money for the next pay period isn't there (slack demand runs a factory's cash down).
+  const cashLetGo = c1.filter((c) => c.participant?.startsWith("factory-") && /Can't cover the next pay period/.test(c.reasoning ?? ""));
+  expect(letGo.length).toBeGreaterThanOrEqual(1);
+  expect(letGo.length + cashLetGo.length + quit.length).toBeGreaterThanOrEqual(4);
   expect(e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && e.record.text?.startsWith("Redundancy: we're making more")).length).toBe(letGo.length);
   // Beyond the top of Lengnick's band (last month's demand: the shops' orders, and its share of the world market's
   // offer) a factory makes nothing, though its staff could make far more: a day's making never takes its stock past

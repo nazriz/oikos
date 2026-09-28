@@ -398,7 +398,10 @@ class Resolver {
 
   private entity(c: Call, bind?: string): Block[] {
     const position = this.str(c, "position");
-    return [{ block: "create_entity", kind: this.str(c, "kind")!, name: this.str(c, "name")!, ...(position ? { first_position: { title: position } } : {}), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) }];
+    const channels = this.json(c, "channels");
+    const module = this.json(c, "role_module");
+    const first = position ? { title: position, ...(channels !== undefined ? { channels } : {}), ...(module !== undefined ? { role_module: module } : {}) } : undefined;
+    return [{ block: "create_entity", kind: this.str(c, "kind")!, name: this.str(c, "name")!, ...(first ? { first_position: first } : {}), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   /** Coming into the world (a newcomer, or someone returning: done at the boundary) or leaving it. */
