@@ -221,3 +221,45 @@ test("after the council adopts a budget, the clerk's report says so (it sees wha
   expect(budget).toBeDefined();
   expect(seen.join("\n")).toContain(`The council adopted a budget for year 1 (${budget.id}).`);
 }, 300_000);
+
+test("everyone waking at the same moment sees the same state; what they decide is carried out in key order, not the order decisions come back (D58)", async () => {
+  const seen: Record<string, string[]> = { "mayor-system": [], "planning-system": [] };
+  const wrote = new Set<string>();
+  const inner = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      const who = req.subject;
+      seen[who]!.push(JSON.stringify(req.messages.at(-1)!.content));
+      if (!wrote.has(who)) {
+        wrote.add(who);
+        return who === "mayor-system"
+          ? [{ type: "tool_use", id: "m1", name: "write", input: { to: ["planning"], text: "Hello planning.", as: "mayor" } }]
+          : [{ type: "tool_use", id: "p1", name: "write", input: { to: ["mayor"], text: "Hello mayor.", as: "planning" } }];
+      }
+      return [{ type: "tool_use", id: `${who}-w`, name: "done_for_now", input: { days: 30 } }];
+    },
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
+    debrief: () => [{ type: "text", text: "Thanks." }],
+  });
+  // The mayor's model is slow, planning's quick: their decisions come back in the other order.
+  const adapter = { provider: inner.provider, model: inner.model, complete: async (req: LlmRequest) => {
+    if (req.subject === "mayor-system") await Bun.sleep(40);
+    return inner.complete(req);
+  } };
+  const s = await run("same-moment", town((c) => {
+    const planning = c.participants.find((p: any) => p.id === "planning-system");
+    planning.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 7 } };
+    planning.framing = { disclosure: "simulation", reason: "test" };
+  }), 2 * DAY, { adapter });
+  // Round 1: both looked before either acted, so neither saw the other's letter.
+  expect(seen["mayor-system"]![0]).not.toContain("Hello mayor.");
+  expect(seen["planning-system"]![0]).not.toContain("Hello planning.");
+  // Round 2: each sees the round before.
+  expect(seen["mayor-system"]![1]).toContain("Hello mayor.");
+  expect(seen["planning-system"]![1]).toContain("Hello planning.");
+  // The log: at t=0, the mayor's act before planning's, and the mayor's model calls recorded first too.
+  const log = lines(s.logPath).filter((e) => e.t === 0);
+  const acts = log.filter((e) => e.kind === "command" && e.body.command === "act" && ["mayor-system", "planning-system"].includes(e.body.participant)).map((e) => e.body.participant);
+  expect(acts.slice(0, 2)).toEqual(["mayor-system", "planning-system"]);
+  const usage = log.filter((e) => e.kind === "annotation" && e.body.annotation === "usage").map((e) => e.body.subject);
+  expect(usage.slice(0, 2)).toEqual(["mayor-system", "planning-system"]);
+}, 300_000);

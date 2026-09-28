@@ -9,6 +9,9 @@ import { costMicroUsd, estimateTokens, PRICES, requestText, type LlmAdapter, typ
 export interface Budget {
   limitMicroUsd: number;
   spentMicroUsd: number;
+  /** The worst cases of calls in flight: calls made at once (several participants deciding in the same moment) can't
+   * together take spending past the limit. */
+  reservedMicroUsd?: number;
 }
 
 /** Thrown instead of making a call that could exceed the run's spending limit. The run stops, and says why. */
@@ -32,15 +35,23 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
   const key = `${adapter.provider}/${adapter.model}`;
   const price = (io.prices ?? PRICES)[key];
   if (!price) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
+  let worst = 0;
   if (io.budget) {
     // The worst case for this call: the prompt (estimated generously: characters / 3) and every output token allowed.
-    const worst = costMicroUsd(price, { input_tokens: Math.ceil(estimateTokens(requestText(req)) * 4 / 3), output_tokens: req.maxTokens })!;
+    worst = costMicroUsd(price, { input_tokens: Math.ceil(estimateTokens(requestText(req)) * 4 / 3), output_tokens: req.maxTokens })!;
     // 5% of the limit is kept back for debriefs (VISION §15.3): the run stops before it's touched.
     const limit = req.purpose === "debrief" ? io.budget.limitMicroUsd : Math.floor(io.budget.limitMicroUsd * 0.95);
-    if (io.budget.spentMicroUsd + worst > limit)
-      throw new SpendingLimitReached(`spending limit reached: $${(io.budget.spentMicroUsd / 1e6).toFixed(4)} spent of $${(io.budget.limitMicroUsd / 1e6).toFixed(2)}; the next call could cost up to $${(worst / 1e6).toFixed(4)}`);
+    const reserved = io.budget.reservedMicroUsd ?? 0;
+    if (io.budget.spentMicroUsd + reserved + worst > limit)
+      throw new SpendingLimitReached(`spending limit reached: $${(io.budget.spentMicroUsd / 1e6).toFixed(4)} spent of $${(io.budget.limitMicroUsd / 1e6).toFixed(2)}${reserved ? ` (up to $${(reserved / 1e6).toFixed(4)} more in calls under way)` : ""}; the next call could cost up to $${(worst / 1e6).toFixed(4)}`);
+    io.budget.reservedMicroUsd = reserved + worst;
   }
-  const res = await adapter.complete(req);
+  let res: LlmResponse;
+  try {
+    res = await adapter.complete(req);
+  } finally {
+    if (io.budget) io.budget.reservedMicroUsd = (io.budget.reservedMicroUsd ?? 0) - worst;
+  }
   const cost = costMicroUsd(price, res.usage)!;
   if (io.budget) io.budget.spentMicroUsd += cost;
   await io.annotate({

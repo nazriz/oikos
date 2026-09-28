@@ -17,6 +17,12 @@ A living list. Pilots with a real model (docs/real-models.md) are for **finding*
 | G7 | **Long lists are cut in reports.** For example "187 ownership claims: city … and 175 more". | P6 | Accept (offices answer specifics: the land register); or `look` with a filter | Accept |
 | G8 | **Every result within a wake repeats the whole report** (survey, who's who), and Codex adds about 14k tokens of its own each call. About 10 seconds a call. | all | Send only what changed within a wake; shorter pilots | Small fix (the within-wake report shows what's new) |
 
+## From phase A
+
+| Gap | Status |
+|---|---|
+| Households end more often partly housed or overcrowded under the same-moment rule (5 seeds: partly housed 0.6 → 2.8, overcrowded 0.4 → 2.0; D58) | **To look into:** members now follow a leaseholder a round later. Check that they always do join, and that nothing is left waiting at the end of a wake |
+
 ## Boundaries
 
 | Gap | Status |

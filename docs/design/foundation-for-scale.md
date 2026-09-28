@@ -230,6 +230,8 @@ Each foundation gives the problem, the scale-free form, what changes in the cont
     - their acts are **applied in a fixed order** (by participant id), never in the order the calls came back.
 
     That's a small change of semantics: today a participant waking later in the same moment sees the earlier ones' acts. It's worth making now, while nothing depends on it.
+
+    *As built (phase A):* in rounds. Everyone still awake looks, all decide, and acts are applied in key order; those whose wakes go on look again next round. Annotations from concurrent model calls are held and written in key order. The spending limit reserves each call's worst case while it's in flight.
   - **Replay:** model outputs are already logged (transcripts), and replay doesn't call models.
   - **Budgets and pacing per steward:** each has its own spending limit and cadence, recorded.
   - **Measurement across stewards:** who wrote to whom, agreements between levels, conflicts (a state overriding a town), and who gets blamed for what. These are queries over the logs.

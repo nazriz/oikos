@@ -153,9 +153,17 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
   const brains = new Map<string, MockBrain>(); // filled below, as mock participants are created
+  // While a cohort decides, annotations from its model calls are held by subject and written afterwards in the
+  // cohort's order, so the log doesn't depend on which call came back first (D58 §4.8).
+  let holding: Map<string, object[]> | null = null;
   const io: LlmIO = {
     adapter: o.adapter ?? new MockAdapter("mock", mockPolicies(brains)),
-    annotate: async (annotation) => void (await k.request({ op: "annotate", annotation })),
+    annotate: async (annotation) => {
+      if (holding) {
+        const who = String((annotation as { subject?: unknown }).subject ?? "");
+        holding.set(who, [...(holding.get(who) ?? []), annotation]);
+      } else await k.request({ op: "annotate", annotation });
+    },
     now: () => t,
     prices: { ...PRICES, ...(o.prices ?? {}) },
     ...(o.budget ? { budget: o.budget } : {}),
@@ -398,145 +406,184 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_draft: d.id } } });
   };
 
+  /** A unit looks (its own looks first, if it asked), and gets its picture of the world: null if it no longer can. */
+  const perceive = async (u: Unit): Promise<Observation | null> => {
+    const only = u.capacity ? { only: u.capacity } : {};
+    const looks = u.looks;
+    u.looks = undefined;
+    const prefixed = looks && u.capacity && u.capacity !== "self" ? looks.map((l) => ({ ...l, channel: `${u.capacity}/${l.channel}` })) : looks;
+    let reply = prefixed ? await command({ command: "look", participant: u.participant, ...only, looks: prefixed }) : null;
+    if (looks && reply === null) {
+      // A look the kernel won't take (an unknown channel, a bad query): recorded, and it observes as usual.
+      await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
+      u.notices.push({ t, text: "That couldn't be looked up." });
+    }
+    reply ??= await command({ command: "observe", participant: u.participant, ...only });
+    if (reply === null) return null; // it can no longer look (its capacity went away)
+    const p00 = performance.now();
+    const raw: Observation = u.capacity ? slice(reply.observation, u.capacity, u.entity) : { ...reply.observation, entity: u.entity };
+    // Knowledge takes in the changes themselves; the controller reads the view's full picture.
+    u.knowledge.absorb(raw);
+    const obs: Observation = u.view.apply(raw);
+    platformMs += performance.now() - p00;
+    if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
+    if (u.notices.length) obs.notices = u.notices.splice(0);
+    if (u.llm) obs.drafts = u.llm.drafts.map((d) => d.draft);
+    return obs;
+  };
+
+  /** Carry out what a unit decided: true if its wake goes on (it acted, and may act again), false if it's done. */
+  const apply = async (u: Unit, action: ParticipantAction): Promise<boolean> => {
+    const L = u.llm;
+    if (action.type === "wait") {
+      if (action.until !== undefined) u.nextWake = Math.max(t + tick, ceilTo(action.until, tick));
+      return false;
+    }
+    if (action.type === "look") {
+      u.looks = action.looks; // perceived with the next observation, which follows at once
+      return true;
+    }
+    if (action.type === "opt_out") {
+      // Leaving the study (D38): a platform exit, recorded; what follows is the world's config.
+      await command({ command: "opt_out", participant: u.participant, statement: action.statement });
+      const p = parts.get(u.participant)!;
+      const after = p.on_opt_out;
+      const standIn = after && typeof after === "object" ? mods[after.code] : undefined;
+      if (after && typeof after === "object" && !standIn) throw new Error(`participant ${u.participant}: no behaviour module "${after.code}" to stand in after opting out`);
+      for (const x of unitsOf(u.participant)) units.delete(x.key);
+      if (standIn) {
+        // The stand-in carries the participant on, in the same capacities.
+        p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
+        await syncUnits(u.participant, t);
+        for (const x of unitsOf(u.participant)) x.nextWake = t + ceilTo(x.module.cadence(x.ctx), tick);
+      } else p.ended = true;
+      return false;
+    }
+    // The capacity: a code unit's own; a language-model participant says which position it acts in, if any.
+    const as = u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u);
+    const asField = as ? { as } : {};
+    if (action.type === "act" || action.type === "message") {
+      const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
+      const r = await command({ command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning ? { reasoning: action.reasoning } : {}) });
+      if (r === null) {
+        // Off-contract: never logged by the kernel, so record the attempt ourselves.
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(action).slice(0, 4000) } } });
+      }
+      return true;
+    }
+    if (action.type === "call") {
+      // A structured intent: the resolver turns it into the participant's own acts (D36).
+      const p1 = performance.now();
+      let program: calls.Program;
+      try {
+        program = calls.parseProgram(action.call);
+      } catch (e) {
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unreadable: action.call.slice(0, 4000), error: String((e as Error).message).slice(0, 500) } } });
+        u.notices.push({ t, text: "That request couldn't be read. Could you say it more plainly?" });
+        return true;
+      }
+      const res = resolve(program, u.knowledge, typeOf, as);
+      platformMs += performance.now() - p1;
+      if (!res.ok) {
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
+        for (const q of res.questions) u.notices.push({ t, text: q });
+        return true;
+      }
+      const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program), resolver: RESOLVER }, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
+      if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
+      return true;
+    }
+    if (!L) {
+      // A code participant asked for the translator: only language-model participants use it.
+      await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { unsupported_action: action.type } } });
+      return false;
+    }
+    if (action.type === "propose") {
+      const draftId = `draft.${u.participant}.${++L.drafted}`;
+      const tr = await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
+      // Earlier attempts the translator retried (its own, not the participant's): kept on record.
+      for (const [i, x] of (tr.retries ?? []).entries())
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason.slice(0, 8000), ...(x.call ? { call: x.call } : {}) } } } });
+      if (!tr.ok) {
+        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text.slice(0, 8000), reason: tr.notices.join(" ").slice(0, 8000), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw).slice(0, 8000) } : {}) } } });
+        for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
+        return true;
+      }
+      await k.request({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
+      const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
+      const onlyWords = tr.draft.blocks.every((b) => b.block === "message");
+      if (confirm === "never" || (confirm === "consequential" && onlyWords)) await submit(u, pending, "accept", `confirmation: ${confirm}`);
+      else L.drafts.push(pending);
+      return true;
+    }
+    if (action.type === "sign") {
+      const i = L.drafts.findIndex((d) => d.draft.id === action.draft);
+      if (i < 0) {
+        u.notices.push({ t, text: `There's nothing waiting for you to confirm called ${action.draft}.`, re: action.draft });
+        return true;
+      }
+      const [pending] = L.drafts.splice(i, 1);
+      await submit(u, pending!, action.decision, action.note);
+      return true;
+    }
+    return true;
+  };
+
   const maxActions: number = cfg.orchestration.max_actions_per_wake;
   let stopped: string | undefined; // why the run stopped early, if it did (a spending limit)
   try {
     for (;;) {
-      let next: Unit | undefined;
-      next = units.next();
-      if (!next || next.nextWake > until) break;
-      if (next.nextWake > t) {
-        await command({ command: "advance", to: next.nextWake });
-        t = next.nextWake;
-        if (!units.has(next.key)) continue; // it ended while time passed
+      const first = units.next();
+      if (!first || first.nextWake > until) break;
+      if (first.nextWake > t) {
+        await command({ command: "advance", to: first.nextWake });
+        t = first.nextWake;
+        continue; // who's due now (some may have ended while time passed)
       }
-      // Guard against two code units waking each other forever within one tick.
-      if (next.wakeTick === t && next.wakesThisTick >= 3) {
-        next.nextWake = t + tick;
-        continue;
-      }
-      next.wakesThisTick = next.wakeTick === t ? next.wakesThisTick + 1 : 1;
-      next.wakeTick = t;
-      wakes++;
-      next.nextWake = t + ceilTo(next.module.cadence(next.ctx), tick); // default if it waits without a time
-      const u = next;
-      for (let n = 0; n < maxActions && units.get(u.key) === u; n++) {
-        const only = u.capacity ? { only: u.capacity } : {};
-        const looks = u.looks;
-        u.looks = undefined;
-        const prefixed = looks && u.capacity && u.capacity !== "self" ? looks.map((l) => ({ ...l, channel: `${u.capacity}/${l.channel}` })) : looks;
-        let reply = prefixed ? await command({ command: "look", participant: u.participant, ...only, looks: prefixed }) : null;
-        if (looks && reply === null) {
-          // A look the kernel won't take (an unknown channel, a bad query): recorded, and it observes as usual.
-          await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
-          u.notices.push({ t, text: "That couldn't be looked up." });
+      // Everyone waking at this moment, in key order (D58 §4.8); a wake set in the past (a participant created during
+      // the run starts at 0) is due now.
+      const cohort: Unit[] = [];
+      for (let u = units.next(); u && u.nextWake <= t; u = units.next()) {
+        // Guard against two code units waking each other forever within one tick.
+        if (u.wakeTick === t && u.wakesThisTick >= 3) {
+          u.nextWake = t + tick;
+          continue;
         }
-        reply ??= await command({ command: "observe", participant: u.participant, ...only });
-        if (reply === null) break; // it can no longer look (its capacity went away)
-        const p00 = performance.now();
-        const raw: Observation = u.capacity ? slice(reply.observation, u.capacity, u.entity) : { ...reply.observation, entity: u.entity };
-        // Knowledge takes in the changes themselves; the controller reads the view's full picture.
-        u.knowledge.absorb(raw);
-        const obs: Observation = u.view.apply(raw);
-        platformMs += performance.now() - p00;
-        if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
-        if (u.notices.length) obs.notices = u.notices.splice(0);
-        const L = u.llm;
-        if (L) obs.drafts = L.drafts.map((d) => d.draft);
+        u.wakesThisTick = u.wakeTick === t ? u.wakesThisTick + 1 : 1;
+        u.wakeTick = t;
+        wakes++;
+        u.nextWake = t + ceilTo(u.module.cadence(u.ctx), tick); // default if it waits without a time
+        cohort.push(u);
+      }
+      // Rounds: everyone still awake looks (so all see the same state), all decide (model calls at once), then what
+      // they decided is carried out in key order, never in the order decisions came back. Those whose wakes go on
+      // look again in the next round, and see the round before.
+      let awake = cohort.map((u) => ({ u, n: 0 }));
+      while (awake.length) {
+        const looking: { u: Unit; n: number; obs: Observation }[] = [];
+        for (const a of awake) {
+          if (units.get(a.u.key) !== a.u) continue;
+          const obs = await perceive(a.u);
+          if (obs) looking.push({ ...a, obs });
+        }
         const m0 = performance.now();
-        const action: ParticipantAction = await u.controller.step(obs, u.ctx);
+        holding = new Map();
+        const decided = await Promise.allSettled(looking.map((x) => Promise.resolve().then(() => x.u.controller.step(x.obs, x.u.ctx))));
         moduleMs += performance.now() - m0;
-        if (action.type === "wait") {
-          if (action.until !== undefined) u.nextWake = Math.max(t + tick, ceilTo(action.until, tick));
-          break;
+        // Annotations made while deciding (usage, transcripts) go into the log in the cohort's order.
+        const notes = holding;
+        holding = null;
+        const order = [...new Set([...looking.map((x) => x.u.participant), ...[...notes.keys()].sort()])];
+        for (const who of order) for (const annotation of notes.get(who) ?? []) await k.request({ op: "annotate", annotation });
+        const failed = decided.find((r): r is PromiseRejectedResult => r.status === "rejected");
+        if (failed) throw failed.reason;
+        const next: { u: Unit; n: number }[] = [];
+        for (const [i, x] of looking.entries()) {
+          if (units.get(x.u.key) !== x.u) continue; // it ended this round (opted out, or its capacity went)
+          const goesOn = await apply(x.u, (decided[i] as PromiseFulfilledResult<ParticipantAction>).value);
+          if (goesOn && x.n + 1 < maxActions && units.get(x.u.key) === x.u) next.push({ u: x.u, n: x.n + 1 });
         }
-        if (action.type === "look") {
-          u.looks = action.looks; // perceived with the next observation, which follows at once
-          continue;
-        }
-        if (action.type === "opt_out") {
-          // Leaving the study (D38): a platform exit, recorded; what follows is the world's config.
-          await command({ command: "opt_out", participant: u.participant, statement: action.statement });
-          const p = parts.get(u.participant)!;
-          const after = p.on_opt_out;
-          const standIn = after && typeof after === "object" ? mods[after.code] : undefined;
-          if (after && typeof after === "object" && !standIn) throw new Error(`participant ${u.participant}: no behaviour module "${after.code}" to stand in after opting out`);
-          for (const x of unitsOf(u.participant)) units.delete(x.key);
-          if (standIn) {
-            // The stand-in carries the participant on, in the same capacities.
-            p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
-            await syncUnits(u.participant, t);
-            for (const x of unitsOf(u.participant)) x.nextWake = t + ceilTo(x.module.cadence(x.ctx), tick);
-          } else p.ended = true;
-          break;
-        }
-        // The capacity: a code unit's own; a language-model participant says which position it acts in, if any.
-        const as = u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u);
-        const asField = as ? { as } : {};
-        if (action.type === "act" || action.type === "message") {
-          const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
-          const r = await command({ command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning ? { reasoning: action.reasoning } : {}) });
-          if (r === null) {
-            // Off-contract: never logged by the kernel, so record the attempt ourselves.
-            await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(action).slice(0, 4000) } } });
-          }
-          continue;
-        }
-        if (action.type === "call") {
-          // A structured intent: the resolver turns it into the participant's own acts (D36).
-          const p1 = performance.now();
-          let program: calls.Program;
-          try {
-            program = calls.parseProgram(action.call);
-          } catch (e) {
-            await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unreadable: action.call.slice(0, 4000), error: String((e as Error).message).slice(0, 500) } } });
-            u.notices.push({ t, text: "That request couldn't be read. Could you say it more plainly?" });
-            continue;
-          }
-          const res = resolve(program, u.knowledge, typeOf, as);
-          platformMs += performance.now() - p1;
-          if (!res.ok) {
-            await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
-            for (const q of res.questions) u.notices.push({ t, text: q });
-            continue;
-          }
-          const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program), resolver: RESOLVER }, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
-          if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
-          continue;
-        }
-        if (!L) {
-          // A code participant asked for the translator: only language-model participants use it.
-          await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { unsupported_action: action.type } } });
-          break;
-        }
-        if (action.type === "propose") {
-          const draftId = `draft.${u.participant}.${++L.drafted}`;
-          const tr = await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
-          // Earlier attempts the translator retried (its own, not the participant's): kept on record.
-          for (const [i, x] of (tr.retries ?? []).entries())
-            await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason.slice(0, 8000), ...(x.call ? { call: x.call } : {}) } } } });
-          if (!tr.ok) {
-            await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text.slice(0, 8000), reason: tr.notices.join(" ").slice(0, 8000), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw).slice(0, 8000) } : {}) } } });
-            for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
-            continue;
-          }
-          await k.request({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
-          const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
-          const onlyWords = tr.draft.blocks.every((b) => b.block === "message");
-          if (confirm === "never" || (confirm === "consequential" && onlyWords)) await submit(u, pending, "accept", `confirmation: ${confirm}`);
-          else L.drafts.push(pending);
-          continue;
-        }
-        if (action.type === "sign") {
-          const i = L.drafts.findIndex((d) => d.draft.id === action.draft);
-          if (i < 0) {
-            u.notices.push({ t, text: `There's nothing waiting for you to confirm called ${action.draft}.`, re: action.draft });
-            continue;
-          }
-          const [pending] = L.drafts.splice(i, 1);
-          await submit(u, pending!, action.decision, action.note);
-          continue;
-        }
+        awake = next;
       }
     }
   } catch (e) {
