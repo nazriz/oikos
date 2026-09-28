@@ -76,6 +76,11 @@ const GLOSS: { [fn: string]: string } = {
   vote: "a choice is cast on a ballot",
   message: "someone is told something",
   form: "a published form is filled in and handed in",
+  presence: "someone comes into the world from outside, or leaves it",
+  birth: "a child is conceived",
+  harm: "someone is physically harmed",
+  position: "a post in an organisation is created, filled or left empty",
+  system: "a system (software, an AI system) is put to work for an organisation, or switched off",
 };
 
 /** The translator's instructions: the call language itself, generated from the contract (P12), and nothing about any world. */
@@ -85,7 +90,7 @@ export function translatorSystem(): string {
   const examples = CALLS_MD.slice(CALLS_MD.indexOf("## Examples")).trim();
   return [
     "You translate one plain-language request into the call language below. You don't judge it, improve it or complete it: write exactly what was asked, with exactly the inputs given.",
-    "- Copy ids exactly as written (p00-00, acc-city, rec.412). Copy names, amounts and durations as quoted text, exactly as written; never calculate anything.",
+    "- Copy ids exactly as written (lot-00-00, apts-3/dwelling.2, acc-city, rec.412). Copy names, amounts and durations as quoted text, exactly as written; never calculate anything.",
     "- If something the request needs isn't there, leave that argument out: whoever resolves the call will ask.",
     "- If the request is someone else's decision, needs a calculation, does too much at once, or isn't clear, answer none(<label>) with the matching label.",
     "- To fill in a form, use form(...) with the form's own field names, listed below the request.",

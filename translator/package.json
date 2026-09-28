@@ -6,7 +6,8 @@
   "license": "Apache-2.0",
   "description": "Plain language -> block drafts -> sign-off: the translator that drafts a seat's proposals as kernel blocks (VISION §6).",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./eval": "./eval/run.ts"
   },
   "dependencies": {
     "@terrarium/participants": "workspace:*",

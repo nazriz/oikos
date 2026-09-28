@@ -393,6 +393,21 @@ See the design note, §16.
   - Targets are outcomes to compare against, never settings to tune by hand.
 - **Revisit if:** petition-signing evidence specific to local or tenant issues is found, or the AES figure is confirmed against its own tables.
 
+**D53. Ready for a real model: adapters, a spending limit, and the translator's test set (no calls made).** *(Naz, 2026-09-28: "I want to keep inching as much as possible toward running it with a real LLM".)*
+- **Adapters:**
+  - `AnthropicAdapter` (Messages API);
+  - `OpenAICompatibleAdapter`: OpenAI, or a local open-weight model behind Ollama, vLLM or LM Studio, which also meets V0's "one open-weight model".
+  - Both retry rate limits and server errors, and are tested with a stand-in network.
+- **`--model provider/model`, and a required `--budget` per run** for a model that costs money:
+  - the worst case of every call is checked before it's made;
+  - a run that would exceed the limit stops and says why;
+  - 5% is kept back for debriefs.
+  - No call is ever priced from a guess: a model needs a published price in prices.json.
+- **The translator's test set:** 26 cases, 6 held out; `terrarium translator-eval`. The adoption threshold is Naz's to set.
+- **The translator's glosses** now cover every call function (presence, birth, harm, position, system were missing).
+- **Guide:** docs/real-models.md.
+- **Revisit if:** providers' usage reports differ from what we record (reconcile against their dashboards on the first real run), or a run needs a separate model for the translator (`--translator-model` is only a cost projection today).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

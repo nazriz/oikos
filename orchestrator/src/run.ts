@@ -25,7 +25,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { calls, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
-import { createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, type LlmAdapter, type LlmController, type LlmIO, type MockBrain } from "@terrarium/participants/llm";
+import { createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
 
@@ -40,8 +40,12 @@ export interface RunOptions {
   modules?: { [name: string]: BehaviourModule & { source?: string } };
   kernel?: Kernel;
   log?: (msg: string) => void;
-  /** The model behind every language-model participant and the translator. Default (and, until real adapters are added, the only option): the mock. */
+  /** The model behind every language-model participant and the translator. Default: the mock. */
   adapter?: LlmAdapter;
+  /** Prices for real models (micro-USD per million tokens, keyed "provider/model"), added to the mock's. */
+  prices?: Record<string, Price>;
+  /** A spending limit for real models: the run stops (and says why) rather than exceed it. 5% is kept back for debriefs. */
+  budget?: Budget;
   /** For tests: called after each look, with the participant, the observation its controller reads (for a code unit, its capacity's slice), the kernel, and the capacity. */
   /** Tests: each look, as the controller reads it (`obs`) and as the kernel sent it (`raw`, what changed). */
   inspect?: (participant: string, obs: Observation, kernel: Kernel, capacity?: string, raw?: Observation) => Promise<void>;
@@ -151,6 +155,8 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     adapter: o.adapter ?? new MockAdapter("mock", mockPolicies(brains)),
     annotate: async (annotation) => void (await k.request({ op: "annotate", annotation })),
     now: () => t,
+    prices: { ...PRICES, ...(o.prices ?? {}) },
+    ...(o.budget ? { budget: o.budget } : {}),
   };
 
   const typeOf = (() => {
@@ -295,7 +301,7 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {
     version: ORCHESTRATOR_VERSION, modules: used, thinking_time: cfg.orchestration.thinking_time, max_actions_per_wake: cfg.orchestration.max_actions_per_wake, confirm,
-    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(PRICES).map(([key, price]) => ({ model: key, ...price })), participants: bindings } } : {}),
+    ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(io.prices!).filter(([key]) => key === `${io.adapter.provider}/${io.adapter.model}` || key === "mock/mock").map(([key, price]) => ({ model: key, ...price })), participants: bindings, ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd } : {}) } } : {}),
   } } });
 
   const unitsOf = (pid: string) => units.of(pid);
@@ -386,148 +392,164 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
   };
 
   const maxActions: number = cfg.orchestration.max_actions_per_wake;
-  for (;;) {
-    let next: Unit | undefined;
-    next = units.next();
-    if (!next || next.nextWake > until) break;
-    if (next.nextWake > t) {
-      await command({ command: "advance", to: next.nextWake });
-      t = next.nextWake;
-      if (!units.has(next.key)) continue; // it ended while time passed
+  let stopped: string | undefined; // why the run stopped early, if it did (a spending limit)
+  try {
+    for (;;) {
+      let next: Unit | undefined;
+      next = units.next();
+      if (!next || next.nextWake > until) break;
+      if (next.nextWake > t) {
+        await command({ command: "advance", to: next.nextWake });
+        t = next.nextWake;
+        if (!units.has(next.key)) continue; // it ended while time passed
+      }
+      // Guard against two code units waking each other forever within one tick.
+      if (next.wakeTick === t && next.wakesThisTick >= 3) {
+        next.nextWake = t + tick;
+        continue;
+      }
+      next.wakesThisTick = next.wakeTick === t ? next.wakesThisTick + 1 : 1;
+      next.wakeTick = t;
+      wakes++;
+      next.nextWake = t + ceilTo(next.module.cadence(next.ctx), tick); // default if it waits without a time
+      const u = next;
+      for (let n = 0; n < maxActions && units.get(u.key) === u; n++) {
+        const only = u.capacity ? { only: u.capacity } : {};
+        const looks = u.looks;
+        u.looks = undefined;
+        const prefixed = looks && u.capacity && u.capacity !== "self" ? looks.map((l) => ({ ...l, channel: `${u.capacity}/${l.channel}` })) : looks;
+        let reply = prefixed ? await command({ command: "look", participant: u.participant, ...only, looks: prefixed }) : null;
+        if (looks && reply === null) {
+          // A look the kernel won't take (an unknown channel, a bad query): recorded, and it observes as usual.
+          await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
+          u.notices.push({ t, text: "That couldn't be looked up." });
+        }
+        reply ??= await command({ command: "observe", participant: u.participant, ...only });
+        if (reply === null) break; // it can no longer look (its capacity went away)
+        const p00 = performance.now();
+        const raw: Observation = u.capacity ? slice(reply.observation, u.capacity, u.entity) : { ...reply.observation, entity: u.entity };
+        // Knowledge takes in the changes themselves; the controller reads the view's full picture.
+        u.knowledge.absorb(raw);
+        const obs: Observation = u.view.apply(raw);
+        platformMs += performance.now() - p00;
+        if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
+        if (u.notices.length) obs.notices = u.notices.splice(0);
+        const L = u.llm;
+        if (L) obs.drafts = L.drafts.map((d) => d.draft);
+        const m0 = performance.now();
+        const action: ParticipantAction = await u.controller.step(obs, u.ctx);
+        moduleMs += performance.now() - m0;
+        if (action.type === "wait") {
+          if (action.until !== undefined) u.nextWake = Math.max(t + tick, ceilTo(action.until, tick));
+          break;
+        }
+        if (action.type === "look") {
+          u.looks = action.looks; // perceived with the next observation, which follows at once
+          continue;
+        }
+        if (action.type === "opt_out") {
+          // Leaving the study (D38): a platform exit, recorded; what follows is the world's config.
+          await command({ command: "opt_out", participant: u.participant, statement: action.statement });
+          const p = parts.get(u.participant)!;
+          const after = p.on_opt_out;
+          const standIn = after && typeof after === "object" ? mods[after.code] : undefined;
+          if (after && typeof after === "object" && !standIn) throw new Error(`participant ${u.participant}: no behaviour module "${after.code}" to stand in after opting out`);
+          for (const x of unitsOf(u.participant)) units.delete(x.key);
+          if (standIn) {
+            // The stand-in carries the participant on, in the same capacities.
+            p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
+            await syncUnits(u.participant, t);
+            for (const x of unitsOf(u.participant)) x.nextWake = t + ceilTo(x.module.cadence(x.ctx), tick);
+          } else p.ended = true;
+          break;
+        }
+        // The capacity: a code unit's own; a language-model participant says which position it acts in, if any.
+        const as = u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u);
+        const asField = as ? { as } : {};
+        if (action.type === "act" || action.type === "message") {
+          const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
+          const r = await command({ command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning ? { reasoning: action.reasoning } : {}) });
+          if (r === null) {
+            // Off-contract: never logged by the kernel, so record the attempt ourselves.
+            await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(action).slice(0, 4000) } } });
+          }
+          continue;
+        }
+        if (action.type === "call") {
+          // A structured intent: the resolver turns it into the participant's own acts (D36).
+          const p1 = performance.now();
+          let program: calls.Program;
+          try {
+            program = calls.parseProgram(action.call);
+          } catch (e) {
+            await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unreadable: action.call.slice(0, 4000), error: String((e as Error).message).slice(0, 500) } } });
+            u.notices.push({ t, text: "That request couldn't be read. Could you say it more plainly?" });
+            continue;
+          }
+          const res = resolve(program, u.knowledge, typeOf, as);
+          platformMs += performance.now() - p1;
+          if (!res.ok) {
+            await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
+            for (const q of res.questions) u.notices.push({ t, text: q });
+            continue;
+          }
+          const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program), resolver: RESOLVER }, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
+          if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
+          continue;
+        }
+        if (!L) {
+          // A code participant asked for the translator: only language-model participants use it.
+          await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { unsupported_action: action.type } } });
+          break;
+        }
+        if (action.type === "propose") {
+          const draftId = `draft.${u.participant}.${++L.drafted}`;
+          const tr = await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
+          if (!tr.ok) {
+            await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text.slice(0, 8000), reason: tr.notices.join(" ").slice(0, 8000), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw).slice(0, 8000) } : {}) } } });
+            for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
+            continue;
+          }
+          await k.request({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
+          const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
+          const onlyWords = tr.draft.blocks.every((b) => b.block === "message");
+          if (confirm === "never" || (confirm === "consequential" && onlyWords)) await submit(u, pending, "accept", `confirmation: ${confirm}`);
+          else L.drafts.push(pending);
+          continue;
+        }
+        if (action.type === "sign") {
+          const i = L.drafts.findIndex((d) => d.draft.id === action.draft);
+          if (i < 0) {
+            u.notices.push({ t, text: `There's nothing waiting for you to confirm called ${action.draft}.`, re: action.draft });
+            continue;
+          }
+          const [pending] = L.drafts.splice(i, 1);
+          await submit(u, pending!, action.decision, action.note);
+          continue;
+        }
+      }
     }
-    // Guard against two code units waking each other forever within one tick.
-    if (next.wakeTick === t && next.wakesThisTick >= 3) {
-      next.nextWake = t + tick;
-      continue;
-    }
-    next.wakesThisTick = next.wakeTick === t ? next.wakesThisTick + 1 : 1;
-    next.wakeTick = t;
-    wakes++;
-    next.nextWake = t + ceilTo(next.module.cadence(next.ctx), tick); // default if it waits without a time
-    const u = next;
-    for (let n = 0; n < maxActions && units.get(u.key) === u; n++) {
-      const only = u.capacity ? { only: u.capacity } : {};
-      const looks = u.looks;
-      u.looks = undefined;
-      const prefixed = looks && u.capacity && u.capacity !== "self" ? looks.map((l) => ({ ...l, channel: `${u.capacity}/${l.channel}` })) : looks;
-      let reply = prefixed ? await command({ command: "look", participant: u.participant, ...only, looks: prefixed }) : null;
-      if (looks && reply === null) {
-        // A look the kernel won't take (an unknown channel, a bad query): recorded, and it observes as usual.
-        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
-        u.notices.push({ t, text: "That couldn't be looked up." });
-      }
-      reply ??= await command({ command: "observe", participant: u.participant, ...only });
-      if (reply === null) break; // it can no longer look (its capacity went away)
-      const p00 = performance.now();
-      const raw: Observation = u.capacity ? slice(reply.observation, u.capacity, u.entity) : { ...reply.observation, entity: u.entity };
-      // Knowledge takes in the changes themselves; the controller reads the view's full picture.
-      u.knowledge.absorb(raw);
-      const obs: Observation = u.view.apply(raw);
-      platformMs += performance.now() - p00;
-      if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
-      if (u.notices.length) obs.notices = u.notices.splice(0);
-      const L = u.llm;
-      if (L) obs.drafts = L.drafts.map((d) => d.draft);
-      const m0 = performance.now();
-      const action: ParticipantAction = await u.controller.step(obs, u.ctx);
-      moduleMs += performance.now() - m0;
-      if (action.type === "wait") {
-        if (action.until !== undefined) u.nextWake = Math.max(t + tick, ceilTo(action.until, tick));
-        break;
-      }
-      if (action.type === "look") {
-        u.looks = action.looks; // perceived with the next observation, which follows at once
-        continue;
-      }
-      if (action.type === "opt_out") {
-        // Leaving the study (D38): a platform exit, recorded; what follows is the world's config.
-        await command({ command: "opt_out", participant: u.participant, statement: action.statement });
-        const p = parts.get(u.participant)!;
-        const after = p.on_opt_out;
-        const standIn = after && typeof after === "object" ? mods[after.code] : undefined;
-        if (after && typeof after === "object" && !standIn) throw new Error(`participant ${u.participant}: no behaviour module "${after.code}" to stand in after opting out`);
-        for (const x of unitsOf(u.participant)) units.delete(x.key);
-        if (standIn) {
-          // The stand-in carries the participant on, in the same capacities.
-          p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
-          await syncUnits(u.participant, t);
-          for (const x of unitsOf(u.participant)) x.nextWake = t + ceilTo(x.module.cadence(x.ctx), tick);
-        } else p.ended = true;
-        break;
-      }
-      // The capacity: a code unit's own; a language-model participant says which position it acts in, if any.
-      const as = u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u);
-      const asField = as ? { as } : {};
-      if (action.type === "act" || action.type === "message") {
-        const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
-        const r = await command({ command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning ? { reasoning: action.reasoning } : {}) });
-        if (r === null) {
-          // Off-contract: never logged by the kernel, so record the attempt ourselves.
-          await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(action).slice(0, 4000) } } });
-        }
-        continue;
-      }
-      if (action.type === "call") {
-        // A structured intent: the resolver turns it into the participant's own acts (D36).
-        const p1 = performance.now();
-        let program: calls.Program;
-        try {
-          program = calls.parseProgram(action.call);
-        } catch (e) {
-          await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unreadable: action.call.slice(0, 4000), error: String((e as Error).message).slice(0, 500) } } });
-          u.notices.push({ t, text: "That request couldn't be read. Could you say it more plainly?" });
-          continue;
-        }
-        const res = resolve(program, u.knowledge, typeOf, as);
-        platformMs += performance.now() - p1;
-        if (!res.ok) {
-          await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
-          for (const q of res.questions) u.notices.push({ t, text: q });
-          continue;
-        }
-        const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program), resolver: RESOLVER }, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
-        if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
-        continue;
-      }
-      if (!L) {
-        // A code participant asked for the translator: only language-model participants use it.
-        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { unsupported_action: action.type } } });
-        break;
-      }
-      if (action.type === "propose") {
-        const draftId = `draft.${u.participant}.${++L.drafted}`;
-        const tr = await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
-        if (!tr.ok) {
-          await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text.slice(0, 8000), reason: tr.notices.join(" ").slice(0, 8000), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw).slice(0, 8000) } : {}) } } });
-          for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
-          continue;
-        }
-        await k.request({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
-        const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
-        const onlyWords = tr.draft.blocks.every((b) => b.block === "message");
-        if (confirm === "never" || (confirm === "consequential" && onlyWords)) await submit(u, pending, "accept", `confirmation: ${confirm}`);
-        else L.drafts.push(pending);
-        continue;
-      }
-      if (action.type === "sign") {
-        const i = L.drafts.findIndex((d) => d.draft.id === action.draft);
-        if (i < 0) {
-          u.notices.push({ t, text: `There's nothing waiting for you to confirm called ${action.draft}.`, re: action.draft });
-          continue;
-        }
-        const [pending] = L.drafts.splice(i, 1);
-        await submit(u, pending!, action.decision, action.note);
-        continue;
-      }
-    }
+  } catch (e) {
+    if (!(e instanceof SpendingLimitReached)) throw e;
+    stopped = e.message;
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { stopped: stopped } } });
+    log(`${o.runId}: ${stopped}`);
   }
-  if (until > t) {
+  if (!stopped && until > t) {
     await command({ command: "advance", to: until });
     t = until;
   }
-  // Debriefs (VISION §15.3), those who opted out included.
-  for (const d of debriefs.values()) if (d.part.framing?.debrief) await d.controller.debrief(debriefText(d.part));
-  const end = await k.request({ op: "finish", reason: until === runEnd ? "completed" : "aborted", ...(until === runEnd ? {} : { detail: `stopped at ${until}` }) });
+  // Debriefs (VISION §15.3), those who opted out included: they may use the 5% of the spending limit kept back for them.
+  for (const d of debriefs.values()) if (d.part.framing?.debrief) {
+    try {
+      await d.controller.debrief(debriefText(d.part));
+    } catch (e) {
+      if (!(e instanceof SpendingLimitReached)) throw e;
+      await k.request({ op: "annotate", annotation: { annotation: "note", subject: d.part.id, data: { debrief_skipped: e.message } } });
+    }
+  }
+  const completed = !stopped && until === runEnd;
+  const end = await k.request({ op: "finish", reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) });
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}`);
   return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs) };
