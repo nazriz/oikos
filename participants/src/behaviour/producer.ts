@@ -7,6 +7,7 @@ import { channels } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
 import { Staffing, stepper } from "./firms";
+import { LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
 import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from "./trade";
 
 /**
@@ -42,16 +43,8 @@ export const producer: BehaviourModule = {
         working_day: 8 * 3600,
         work_days: 5, // of every 7
         price: 6000, // its wholesale price, cents each
-        // Lengnick (2013), Table 1 (as basis points of 1):
-        phi_low_bps: 2500, // hire when stock is below this share of last month's demand
-        phi_high_bps: 10_000, // let one go when it's above this
-        delta_bps: 190, // wage steps: up to 1.9%
-        gamma_months: 24, // months fully staffed before the wage offered falls
-        price_up_bound_bps: 11_500, // raise the price only while it's below 1.15 x marginal cost
-        price_down_bound_bps: 10_250, // lower it only while it's above 1.025 x marginal cost
-        theta_bps: 7500, // the chance a price change is made
-        vartheta_bps: 200, // price steps: up to 2%
-        chi_bps: 1000, // the liquidity buffer, as a share of the monthly wage bill
+        min_order: 50, // the least it sells in one order (it sells wholesale)
+        ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
     );
@@ -81,6 +74,11 @@ export const producer: BehaviourModule = {
     let nextShipment = 0;
     const workDay = (t: number) => Math.floor(t / DAY) % 7 < p.work_days;
     const monthlyUnits = (workers: number) => Math.floor((workers * p.working_day * p.work_days * 30) / 7 / p.labour_per_unit);
+    /** Room in our workplace now: its capacity less the bodies in it. */
+    const roomAtWork = (obs: Observation) => {
+      const sp = channels.cells(obs).find((c) => c.structure?.structure === p.works)?.structure?.spaces.find((x) => x.kind === "workplace");
+      return sp ? sp.capacity - sp.count : p.max_staff;
+    };
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
 
     return stepper(
@@ -129,32 +127,16 @@ export const producer: BehaviourModule = {
           const why: string[] = [];
           // Wages: a vacancy nobody took all month raises the wage offered; a long run fully staffed lowers it.
           const posts = staffing.postings(book);
-          const unfilled = posts.some((x) => t - x.at >= MONTH);
-          if (unfilled) {
-            const up = rng.below(p.delta_bps + 1);
-            wage = Math.floor((wage * (10_000 + up)) / 10_000);
-            fullMonths = 0;
-            why.push(`a job we posted has gone unfilled for a month: offering ${up / 100}% more (${usd(wage)} a fortnight)`);
-          } else if (!posts.length && workers.length > 0) {
-            if (++fullMonths >= p.gamma_months) {
-              const down = rng.below(p.delta_bps + 1);
-              wage = Math.floor((wage * (10_000 - down)) / 10_000);
-              fullMonths = 0;
-              why.push(`fully staffed for ${p.gamma_months} months: offering ${down / 100}% less to new hires (${usd(wage)} a fortnight)`);
-            }
-          }
+          const w = moveWage(p, rng, wage, { unfilled: posts.some((x) => t - x.at >= MONTH), posting: posts.length > 0, staffed: workers.length > 0, fullMonths });
+          wage = w.wage;
+          fullMonths = w.fullMonths;
+          if (w.why) why.push(w.why);
           // Prices: move within bounds set by marginal cost, when stock says so.
+          const moved = movePrice(p, rng, price, stock, lastDemand, marginalCost);
+          price = moved.price;
+          if (moved.why) priceWhy = moved.why;
           const low = stock * 10_000 < p.phi_low_bps * lastDemand;
           const high = stock * 10_000 > p.phi_high_bps * lastDemand;
-          if (low && price * 10_000 < p.price_up_bound_bps * marginalCost && rng.below(10_000) < p.theta_bps) {
-            const up = rng.below(p.vartheta_bps + 1);
-            price = Math.ceil((price * (10_000 + up)) / 10_000);
-            priceWhy = `Month's end: stock (${stock}) is low against last month's demand (${lastDemand}), and our price is under ${p.price_up_bound_bps / 100}% of marginal cost (${usd(marginalCost)}): raising it ${up / 100}% to ${usd(price)}.`;
-          } else if (high && price * 10_000 > p.price_down_bound_bps * marginalCost && rng.below(10_000) < p.theta_bps) {
-            const down = rng.below(p.vartheta_bps + 1);
-            price = Math.max(1, Math.floor((price * (10_000 - down)) / 10_000));
-            priceWhy = `Month's end: stock (${stock}) is high against last month's demand (${lastDemand}), and our price is over ${p.price_down_bound_bps / 100}% of marginal cost (${usd(marginalCost)}): cutting it ${down / 100}% to ${usd(price)}.`;
-          }
           headcountWhy = why.length ? `; ${why.join("; ")}` : "";
           // Hiring and letting go (Lengnick): stock against demand decides this month's headcount.
           headcount = workers.length;
@@ -170,29 +152,24 @@ export const producer: BehaviourModule = {
           // wage bill. The capital we started with isn't paid out.
           const staffFor = Math.max(workers.length, headcount);
           const bill = Math.floor((staffFor * wage * MONTH) / p.period);
-          const inputsMonth = monthlyUnits(staffFor) * inputCost;
-          const buffer = bill + inputsMonth + Math.floor((bill * p.chi_bps) / 10_000);
-          const holders = (book.open("shareholders").filter((r) => r.speaks_for === me).sort((a, b) => b.at - a.at)[0]?.data?.holders ?? []) as { holder: string; account: string; shares: number }[];
-          const total = holders.reduce((x, h) => x + h.shares, 0);
-          const earned = monthStart < 0 ? 0 : acc.balance - monthStart;
-          const surplus = Math.min(acc.balance - buffer, earned);
-          monthStart = acc.balance - Math.max(0, total > 0 ? surplus : 0);
-          if (surplus > 0 && total > 0) {
-            const lines = holders.map((h) => [h, Math.floor((surplus * h.shares) / total)] as const).filter(([, x]) => x > 0);
-            // A program has at most 32 lines: paid in batches.
-            for (let i = 0; i < lines.length; i += 30) steps.push(because(`Month's end: we took in ${usd(earned)} more than we paid out this month, and hold ${usd(acc.balance)} against a buffer of ${usd(buffer)} (a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill): paying ${usd(surplus)} to our shareholders by their shares${lines.length > 30 ? ` (payments ${i + 1}-${Math.min(lines.length, i + 30)} of ${lines.length})` : ""}.`,
-              ...lines.slice(i, i + 30).map(([h, x]) => pay(h.account, x, { from: acc.account, for: "Dividend." }))));
-          }
+          const buffer = bill + monthlyUnits(staffFor) * inputCost + Math.floor((bill * p.chi_bps) / 10_000);
+          const out = payOut(book, me, acc.account, acc.balance, buffer, monthStart < 0 ? 0 : acc.balance - monthStart, `a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill`);
+          monthStart = acc.balance - out.paid;
+          steps.push(...out.steps);
         }
 
         // ---- staff: this month's headcount (hiring for it, or replacing someone who's left) ----
         steps.push(...staffing.routine(obs, book, acc.account, {
-          target: Math.min(p.max_staff, headcount), wage, canPost: acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period),
+          // Only with room at the workplace (someone let go may still be there, working out their notice).
+          target: Math.min(p.max_staff, headcount), wage, canPost: acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs) > 0,
           why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} a fortnight.`,
         }));
         // Can't cover the next pay period: let the most recent hire go.
         if (workers.length && acc.balance < workers.length * wage) {
-          steps.push(...staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${workers.length} staff): letting the most recent hire go.`, "Redundancy: we can't cover the wage bill."));
+          // And this month's headcount comes down with it: we don't hire again as soon as money comes in.
+          const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${workers.length} staff): letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
+          if (s.length) headcount = Math.min(headcount, workers.length - 1);
+          steps.push(...s);
         }
 
         // ---- our price list ----
@@ -200,7 +177,7 @@ export const producer: BehaviourModule = {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our wholesale price is now ${usd(price)}.` : "Publishing our wholesale price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
-            priceList({ [p.output]: price }, acc.account, `Wholesale ${p.output} from ${me}: ${usd(price)} each, delivered. Order and pay with the order.`)));
+            priceList({ [p.output]: price }, acc.account, `Wholesale ${p.output} from ${me}: ${usd(price)} each, at least ${p.min_order} to an order, delivered. Order and pay with the order.`, { min_order: p.min_order })));
         }
 
         // ---- inputs: (s, S): below a month's use (with what's on order), order up to a month and a half's ----
@@ -253,13 +230,13 @@ export const producer: BehaviourModule = {
         let left = stock;
         const { paid, unpaid } = orders.due(book, t);
         for (const o of paid) {
-          const ok = o.kind === p.output && o.unitPrice >= price;
+          const ok = o.kind === p.output && o.unitPrice >= price && o.quantity >= p.min_order;
           const q = ok ? Math.min(o.quantity, left) : 0;
           left -= q;
           domestic += o.quantity;
-          steps.push(fill(o, q, p.works, acc.account, !ok ? `An order ${o.kind !== p.output ? `for ${o.kind}, which we don't sell` : "below our price"}: refunding it.` : q === o.quantity ? `An order paid in full: delivering ${q} ${o.kind}.` : `An order paid in full: we have ${q} of the ${o.quantity}; delivering them and refunding the rest.`));
+          steps.push(fill(o, q, p.works, acc.account, !ok ? `An order ${o.kind !== p.output ? `for ${o.kind}, which we don't sell` : o.quantity < p.min_order ? `for fewer than ${p.min_order}` : "below our price"}: refunding it.` : q === o.quantity ? `An order paid in full: delivering ${q} ${o.kind}.` : `An order paid in full: we have ${q} of the ${o.quantity}; delivering them and refunding the rest.`));
         }
-        for (const o of unpaid) steps.push(because("An order unpaid for a week: declining it.", say("delivery_note", `Order ${o.id} declined: not paid.`, { to: [o.buyer], visible: [o.buyer, me], basis: o.id, data: { order: o.id, kind: o.kind, delivered: 0, refund: 0, declined: "unpaid" } })));
+        for (const o of unpaid) steps.push(because("An order unpaid for a week: declining it.", say("delivery_note", `Order ${o.id} declined: not paid.`, { to: [o.buyer], visible: [o.buyer, me], basis: o.id, data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: 0, refund: 0, declined: "unpaid" } })));
         for (const [a, x] of orders.unclaimed(book)) {
           orders.refunded(a);
           steps.push(because("Money paid to us with no order waiting for it: sending it back.", pay(a, x, { from: acc.account, for: "Refund: no order of yours is waiting." })));

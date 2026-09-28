@@ -540,6 +540,60 @@ See the design note, §16.
     - Dividends are in proportion to shares.
     - Too little demand: workers are let go monthly, and making falls to what sells.
     - Plenty of demand: the factories hire monthly.
+- **B4, step 3 landed: shops (`firm.retailer`), and households buying and using goods.** The town's own economy closes the loop: households buy goods through shops, which buy from the factories or import them, and nothing money-only is left in the town's trade.
+  - **Shops** ([retailer.md](behaviour/retailer.md)):
+    - they restock by Lengnick's band from the cheapest supplier, as much as they can pay for;
+    - every paid order joins a queue, served by the staff at the shop (each item is `serve` work, 1.5 hours), over several days if need be;
+    - out of stock, not served within 3 days, or undeliverable: refunded;
+    - monthly: Lengnick price and wage rules, headcount a worker at a time toward what sales need, dividends out of earnings.
+
+    **"Goods" is Lengnick's single consumption good,** standing for households' consumption of goods and services apart from housing. So "serving" is the labour of local consumer businesses. Without that, a town of 200 needs a handful of shop jobs and has no other services until phase C.
+  - **Households** (citizen 0.10.0):
+    - a month's spending by the same rule, now as goods, bought fortnightly from a favourite shop with Lengnick's switching rules (ψ_price, ξ, ψ_quant, β);
+    - goods are delivered home (only if they're living there), or kept at the shop;
+    - they're used up weekly (`consume`) over the weeks to the next trip, with goods held elsewhere brought home first.
+
+    Going without is what was ordered and never delivered. Measurement reads it from delivery notes, so no special record is needed.
+  - **The money-only stand-ins are gone from the generated town:**
+    - citizens paying a shop "for shopping";
+    - landlords' owners spending at a shop. Their draw goes to the landlord's shareholders.
+    - shops paying "suppliers" a share of revenue.
+
+    Wholesalers publish a minimum order, so households buy through shops.
+  - **Shared code:** `lengnick.ts` (parameters, price and wage rules, dividends, distributing to shareholders). The producer moved onto it: identical but for the month's starting balance, which is now exact to the cent.
+  - **Kernel fix (perception):**
+    - **The change:** the full picture of a holdings channel (a first look) now leaves out holdings at 0, as it leaves out closed accounts. An incremental look still reports a holding going to 0, so views drop it.
+    - **Why:** the participant runtime's view and the kernel's full picture disagreed.
+    - **Tests:** the kernel's perception property test applies the same rule.
+    - ⚑ **Contract wording clarified**, not changed: participant-api's holdings channel says "a first look: all it holds, nothing at 0".
+  - **Provisional calibration** (the generated town, to redo in B5):
+    - shops start with 3 staff (room for 6), sized to expected sales; the old 36 shop jobs came from the money-only model;
+    - `exports_per_month` in `town.yaml` is raised to $470,000 (`town-1000.yaml`: $2,350,000), about what the factories' 80 places make less local sales, so the town's employment stays near what it was.
+  - **Found:**
+    - **Jammed queues.** A household's fortnightly order (about 11 items, 16.5 hours to serve) could never be served by one worker. First come, first served blocked every order behind it. Shops now take every paid order into a queue and serve it over days.
+    - **Shops that stopped restocking.** Demand counted every order, including retries at other shops, and a shop that couldn't afford the whole restock ordered nothing. Now it orders what it can pay for.
+    - **Quick re-hires.** A shop let someone go for want of cash, then hired again as soon as money came in. Its month's headcount now comes down with it (factories too).
+    - **Orders that took more serving time than was left.** Accepting an order didn't reserve its serving hours. Now each order's hours are reserved, per worker, as the kernel shares them.
+    - **A demolished home kept as home.** Its tenants had goods delivered there and used them there. Goods are now home only when the household is living there, and a delivery to a place that's gone is refunded, not retried (a retry would have blocked the shop's queue).
+    - **A newborn left behind.** A household leaving town the day after a birth left the baby, who wasn't on the household's record yet. The leaving branch had dropped the birth steps planned in the same wake.
+    - **Same-moment races.** A firm names a worker who left in the same moment (D58's observe-then-act). These refusals are expected and handled, and tests now allow exactly those codes (`not_present`, `not_at_work`).
+
+      I tried re-planning after a refusal and dropped it. A plan's steps change the module's own records when they're planned, so dropping the unexecuted steps would lose orders.
+  - **What changed in the town (3 seeds, 2 years, against the commit before B4):**
+    - **Fewer people leave:** 7 households depart a run on average (was 16), and 11 people leave the world (was 23). There are more people at the end: 204 (was 184).
+    - **About 114 people work** (was 108): 78–80 in the factories, 31–34 in the shops, 2–5 in the builder's crew.
+    - **Leases and building are unchanged.** Rent stress is 26% of households over 30% (was 22%).
+    - **Consumption** reaches about 4,300 items a month by the second year.
+    - **Two-year runs take 40–50 s** (was 14 s): real trade has many more acts.
+  - ⚑ **For calibration (B5): a shortage economy.** The town exports more than it imports, so money builds up in households. They order far more than the shops' 36 places can serve (unmet orders, counting retries, reach about twice what's delivered), and shop prices are held by Lengnick's bound of 1.15 × marginal cost. Nothing adds capacity: no new firms, no investment, as in Lengnick. B5 has to set export demand, serving time and shop room together, measured against unemployment, the retail margin and the trade balance.
+  - **Tests:** `orchestrator/test/retail.test.ts`.
+    - Serving is by each shop's own staff, an item's hours each.
+    - Every household order is answered, with refunds that match.
+    - Goods go home or to the shop.
+    - Households use only what came.
+    - Shops buy mostly from local factories.
+    - No money-only stand-ins are left, and landlords' draws go to shareholders.
+    - A shop with no staff serves nobody and refunds.
 **D59. Reliability: timing failures stop cleanly and resume; deterministic ones recover in place.** *(Naz, 2026-09-28: "we need to be able to automatically gracefully recover from things like infinite loops, things getting stuck"; "determinism split sounds right".)*
 - **Why:** a two-year run hung at day 691 for eight minutes with no sign anything was wrong. The cause was the orchestrator's own bug (D58's same-moment rule). The real problem was that nothing noticed. A dead kernel would also have been misread as an off-contract request, and the run would have gone on against nothing.
 - **The split:** results must never depend on wall-clock timing. Deterministic failures (a module throws; a model call fails after its time limits and retries, which is then in the log) are recovered in place: recorded, and the participant waits. Timing failures (a stall, a dead kernel) stop the run cleanly, with a diagnosis, to be resumed once fixed.

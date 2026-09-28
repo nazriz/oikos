@@ -4,7 +4,7 @@
 
 ## What it does
 
-**Selling.** A seller publishes a **price list**: a public `price_list` statement whose `data.goods` gives a unit price in cents for each kind it sells, and whose `data.account` says where to pay. It republishes when its prices change, withdrawing the old list.
+**Selling.** A seller publishes a **price list**: a public `price_list` statement whose `data.goods` gives a unit price in cents for each kind it sells, and whose `data.account` says where to pay. Optionally, `data.min_order` gives the least it sells in one order (a wholesaler's; households buy only from sellers without one), and `data.at` says where it is (a shop's premises, where goods are kept for collection). It republishes when its prices change, withdrawing the old list.
 
 **Buying.** A buyer places an **order** and pays for it in the same act: cash with order, as at a till or in an online shop.
 - The order is an `order` statement to the seller, seen only by the two of them. Its `data` says what (`kind`), how many (`quantity`), at what unit price (`unit_price`), delivered to whom (`deliver_to`) and where (`at`), and paid from which account (`account`).
@@ -12,7 +12,8 @@
 
 **Filling orders.**
 - **Matching payments.** The seller sets payments against orders by the account they came from, oldest order first, as a small firm's books reconcile receipts. It doesn't use a reference on the payment: a bank can't vouch for a record it can't see.
-- **Paid in full.** Once an order is paid in full, the seller delivers what it can (`goods(...)`), refunds what it couldn't deliver at the price paid, and sends a **delivery note**. The note is a `delivery_note` statement to the buyer, citing the order, with `data: { order, kind, delivered, refund }`.
+- **Paid in full.** Once an order is paid in full, the seller delivers what it can (`goods(...)`), refunds what it couldn't deliver at the price paid, and sends a **delivery note**. The note is a `delivery_note` statement to the buyer, citing the order, with `data: { order, kind, ordered, delivered, refund }`. A shop serves over days, as its staff's hours allow ([retailer.md](retailer.md)).
+- **Can't be delivered.** If the delivery is refused because where it was to go, or whom to, is gone (a demolished home), the whole order is refunded.
 - **Unpaid.** An order still unpaid after a week is declined, with a note saying so.
 - **Money with no order.** Money from a customer (an account that has ordered before) that no order of theirs is waiting for is sent back. That covers a payment made twice, or one that arrived after the order was declined. Money from anyone else is left alone: it is theirs to ask about.
 

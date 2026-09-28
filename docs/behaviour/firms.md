@@ -1,4 +1,4 @@
-# Firms: `firm.landlord` (v0.6.0) and `firm.employer` (v0.6.0)
+# Firms: `firm.landlord` (v0.7.0) and `firm.employer` (v0.6.0)
 
 **Source:** `participants/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
 
@@ -21,9 +21,11 @@
 
 **Differs from the BoE model on purpose:** that model injects cash so tenants never miss rent. Here arrears happen, and what follows is up to the landlord.
 
-## `firm.employer`: a shop's manager
+**The owners' draw (landlord 0.7.0):** monthly, 60% of rent received goes to the landlord's owners. With a `shareholders` register (the generated town's: its households), it's paid to them by their shares, and they spend it as they will. Without one, the old money-only stand-in (spent at a local shop) remains. 20% goes on upkeep bought from outside (maintenance comes in phase C).
 
-How any employer hires and pays (postings, offers, standing orders, notice, a worker's death) is shared code, `Staffing` in `participants/src/behaviour/firms.ts`. Factories ([producer.md](producer.md)) and the builder use it too, each with its own rule for how many staff to have and at what wage. `firm.employer`'s rule is the simple one below: a fixed target headcount at a fixed wage.
+## `firm.employer`: a manager with a fixed headcount
+
+How any employer hires and pays (postings, offers, standing orders, notice, a worker's death) is shared code, `Staffing` in `participants/src/behaviour/firms.ts`. Factories ([producer.md](producer.md)) and the builder use it too, each with its own rule for how many staff to have and at what wage. `firm.employer`'s rule is the simple one below: a fixed target headcount at a fixed wage. The generated town no longer uses it (its shops are `firm.retailer`s), but a researcher can put it in any seat (the migration test does).
 
 | Rule | Detail |
 |---|---|

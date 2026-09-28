@@ -21,10 +21,11 @@ import { receipts } from "./firms";
 /** An order, as the seller reads it. */
 export interface Order { id: string; seller: string; buyer: string; kind: string; quantity: number; unitPrice: number; to: string; at: string; account: string; placed: number }
 
-/** A seller's current prices for goods (its latest standing price list), and the account it's paid into. */
-export function goodsPrices(book: Book, seller: string): { prices: { [kind: string]: number }; account?: string } {
+/** A seller's current prices for goods (its latest standing price list), the account it's paid into, the least it
+ * sells in one order (a wholesaler's minimum), and where it is (a shop's premises, for collection). */
+export function goodsPrices(book: Book, seller: string): { prices: { [kind: string]: number }; account?: string; min_order?: number; at?: string } {
   const list = book.open("price_list").filter((r) => r.speaks_for === seller && r.data?.goods).sort((a, b) => b.at - a.at)[0];
-  return { prices: (list?.data?.goods as { [kind: string]: number }) ?? {}, account: list?.data?.account };
+  return { prices: (list?.data?.goods as { [kind: string]: number }) ?? {}, account: list?.data?.account, min_order: list?.data?.min_order, at: list?.data?.at };
 }
 
 /** What the entity holds of a kind at a place (its holdings channel), as a number. */
@@ -57,12 +58,13 @@ export function order(o: { me: string; seller: string; sellerAccount: string; ki
 /** Delivery notes addressed to us (the answers to our orders), not yet read: which order, how much came, what was refunded. */
 export class Deliveries {
   private read = new Set<string>();
-  take(book: Book, me: string): { order: string; delivered: number; refund: number; seller: string }[] {
+  take(book: Book, me: string): { order: string; kind: string; ordered: number; delivered: number; refund: number; seller: string }[] {
     const out = [];
     for (const n of book.all("delivery_note")) {
       if (this.read.has(n.id) || !(n.addressed_to ?? []).includes(me)) continue;
       this.read.add(n.id);
-      out.push({ order: n.data?.order as string, delivered: (n.data?.delivered as number) ?? 0, refund: (n.data?.refund as number) ?? 0, seller: n.speaks_for! });
+      const delivered = (n.data?.delivered as number) ?? 0;
+      out.push({ order: n.data?.order as string, kind: String(n.data?.kind), ordered: (n.data?.ordered as number) ?? delivered, delivered, refund: (n.data?.refund as number) ?? 0, seller: n.speaks_for! });
     }
     return out;
   }
@@ -93,15 +95,24 @@ export class OrderBook {
       .sort((a, b) => a.placed - b.placed || (a.id < b.id ? -1 : 1));
   }
 
-  /** Orders paid in full (their payment set against them), and orders that have waited unpaid too long (dropped). */
-  due(book: Book, t: number): { paid: Order[]; unpaid: Order[] } {
+  /**
+   * Orders paid in full (their payment set against them), and orders that have waited unpaid too long (dropped).
+   * `accept` says whether we can take an order on now (a shop's hands for the day): the first paid order it turns down
+   * waits, and so do the paid orders after it (first come, first served).
+   */
+  due(book: Book, t: number, accept: (o: Order) => boolean = () => true): { paid: Order[]; unpaid: Order[] } {
     const paid: Order[] = [];
     const unpaid: Order[] = [];
+    let full = false;
     for (const o of this.open(book)) {
       const total = o.quantity * o.unitPrice;
       const have = this.credit.get(o.account) ?? 0;
       this.customers.add(o.account);
       if (total > 0 && have >= total) {
+        if (full || !accept(o)) {
+          full = true;
+          continue;
+        }
         this.credit.set(o.account, have - total);
         this.settled.add(o.id);
         paid.push(o);
@@ -122,17 +133,33 @@ export class OrderBook {
     return [...this.credit].filter(([acc, x]) => x > 0 && this.customers.has(acc) && !waiting.has(acc));
   }
 
+  /** An order taken on whose act didn't go through: it waits again, its payment set aside for it. */
+  reopen(o: Order) {
+    this.settled.delete(o.id);
+    this.credit.set(o.account, (this.credit.get(o.account) ?? 0) + o.quantity * o.unitPrice);
+  }
+
   /** Returning unclaimed money (a refund): forget it once paid back. */
   refunded(account: string) {
     this.credit.delete(account);
   }
 }
 
+/** Refusals that mean an order can't be delivered at all: where it's to go, or whom to, is gone. */
+export const UNDELIVERABLE = ["unknown_place", "unknown_entity", "unknown_structure"];
+
 /**
  * Filling a paid order: deliver `quantity` (all, part or none of it) from where we keep it, refund the rest, and say
- * so in a delivery note. `payFrom` is our account; `fromAt` where the goods are.
+ * so in a delivery note. `payFrom` is our account; `fromAt` where the goods are. If the delivery is refused (the place
+ * it was to go is gone, say), the whole order is refunded instead.
  */
 export function fill(o: Order, quantity: number, fromAt: string, payFrom: string, why: string): Step {
+  const s = fillAs(o, quantity, fromAt, payFrom, why);
+  if (quantity > 0) s.then = (out) => (out.status === "refused" ? [fillAs(o, 0, fromAt, payFrom, `We couldn't deliver order ${o.id} (${out.refusal?.detail ?? out.refusal?.code}): refunding it.`)] : undefined);
+  return s;
+}
+
+function fillAs(o: Order, quantity: number, fromAt: string, payFrom: string, why: string): Step {
   const refund = (o.quantity - quantity) * o.unitPrice;
   const s: Step = because(why);
   if (quantity > 0) s.push(C.call("goods", { kind: o.kind, quantity: C.text(String(quantity)), to: o.to, at: o.at, from_at: fromAt }));
@@ -141,12 +168,12 @@ export function fill(o: Order, quantity: number, fromAt: string, payFrom: string
     ? `Delivered: ${quantity} ${o.kind} to ${o.to} at ${o.at}.`
     : `Delivered ${quantity} of the ${o.quantity} ${o.kind} ordered${refund ? `; ${usd(refund)} refunded` : ""}.`, {
     to: [o.buyer], visible: [o.buyer, o.seller], basis: o.id,
-    data: { order: o.id, kind: o.kind, delivered: quantity, refund },
+    data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: quantity, refund },
   }));
   return s;
 }
 
 /** An order declined unpaid: a note saying so. */
 export function decline(o: Order, why: string): Step {
-  return because(why, say("delivery_note", `Order ${o.id} declined: not paid.`, { to: [o.buyer], visible: [o.buyer, o.seller], basis: o.id, data: { order: o.id, kind: o.kind, delivered: 0, refund: 0, declined: "unpaid" } }));
+  return because(why, say("delivery_note", `Order ${o.id} declined: not paid.`, { to: [o.buyer], visible: [o.buyer, o.seller], basis: o.id, data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: 0, refund: 0, declined: "unpaid" } }));
 }

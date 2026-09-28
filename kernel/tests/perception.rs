@@ -39,8 +39,13 @@ impl View {
                 }
             }
             ChannelData::Holdings { holdings } => {
+                // A holding gone to nothing drops out of the picture (as the participant runtime's view does).
                 for h in holdings {
-                    self.holdings.insert((h.kind.clone(), h.at.clone()), h.quantity);
+                    if h.quantity == 0 {
+                        self.holdings.remove(&(h.kind.clone(), h.at.clone()));
+                    } else {
+                        self.holdings.insert((h.kind.clone(), h.at.clone()), h.quantity);
+                    }
                 }
             }
             ChannelData::Records { records, whole, .. } => {

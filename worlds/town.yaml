@@ -12,7 +12,7 @@ shops: 6                  # 36 jobs
 factories: 2              # 80 jobs
 landlords: 4
 wages: { shop: 120000, factory: 150000 }       # cents every 14 days
-exports_per_month: 40000000                   # $400,000 a month bought from the factories
+exports_per_month: 47000000                   # the world market takes $470,000 a month of the factories' goods at its price (provisional until calibration, phase B stage B5)
 housed_bps: 9500                               # of households
 employed_bps: 7800                             # of adults (placeholder near the working-age employment rate)
 savings_months: [1, 6]

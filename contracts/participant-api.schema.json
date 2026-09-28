@@ -684,7 +684,7 @@
               "const": "holdings"
             },
             "holdings": {
-              "description": "Holdings of the participant's entity that changed since its previous look (a first look: all of them). A quantity of 0: all gone from there.",
+              "description": "Holdings of the participant's entity that changed since its previous look (a first look: all it holds, nothing at 0). A quantity of 0: all gone from there.",
               "type": "array",
               "items": {
                 "type": "object",

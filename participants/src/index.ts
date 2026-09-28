@@ -14,6 +14,7 @@ import { exportDemand, idle, migration, trade } from "./behaviour/world";
 import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
 import { producer } from "./behaviour/producer";
+import { retailer } from "./behaviour/retailer";
 import { builder, childProtection, inspector, planningOfficer, registry } from "./behaviour/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, taxClerk } from "./behaviour/government";
 
@@ -30,6 +31,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [landlord, "behaviour/firms.ts"],
       [employer, "behaviour/firms.ts"],
       [producer, "behaviour/producer.ts"],
+      [retailer, "behaviour/retailer.ts"],
       [planningOfficer, "behaviour/institutions.ts"],
       [inspector, "behaviour/institutions.ts"],
       [builder, "behaviour/institutions.ts"],

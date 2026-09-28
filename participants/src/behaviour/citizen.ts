@@ -6,7 +6,9 @@
 // afford from the listings they see, and don't leave a tenancy early.
 // Work: the unemployed apply for the best-paid posting. Spending (after the
 // same model's consumption rule): essentials, plus a fraction of savings
-// above a desired buffer. Exit (Hirschman 1970): after long enough without a
+// above a desired buffer. Shopping (after Lengnick 2013): goods bought every
+// fortnight from a favourite shop, switching to a cheaper one now and then and
+// away from one that couldn't serve; used up week by week until the next trip. Exit (Hirschman 1970): after long enough without a
 // home, or without work and money, they leave town and take their money.
 // Word of mouth (D44; Granovetter 1974, Ioannides & Loury 2004): people who
 // start hunting ask the people they live and work with, now and before; those
@@ -29,6 +31,7 @@ import { params, wait, type BehaviourModule, type ParticipantContext } from "../
 import * as C from "../calls";
 import { because, Book, callAction, DAY, usd, jobTerms, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
+import { Deliveries, goodsPrices, order } from "./trade";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
@@ -40,7 +43,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.9.0",
+  version: "0.10.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -55,6 +58,13 @@ export const citizen: BehaviourModule = {
       essentials: 50_000, // cents per month
       spend_above_buffer_bps: 3000, // BoE eq. (2): spend a fraction of savings above the desired buffer
       buffer_months: 3,
+      // Shopping (Lengnick 2013, Table 1): how often, and the rules for changing shops.
+      shop_every_days: 14,
+      psi_price_bps: 2500, // chance a trip starts by comparing the favourite with another shop's price
+      xi_bps: 100, // ... and switching if the other is more than this much cheaper
+      psi_quant_bps: 2500, // chance of giving up on a shop that couldn't serve us
+      beta: 5, // shops tried in one trip, at most
+      goods: "goods",
       leave_after_homeless_days: 90,
       leave_after_jobless_days: 180,
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
@@ -90,6 +100,12 @@ export const citizen: BehaviourModule = {
     let homelessSince: number | null = null;
     let joblessSince: number | null = null;
     let nextSpend = ctx.rng("spend-day").below(30) * DAY;
+    // Shopping: the shop we go to, this trip's shortfalls still to find elsewhere, and when we next shop.
+    let favourite: string | undefined;
+    let nextShop = ctx.rng("shop-day").below(p.shop_every_days) * DAY;
+    let trip: { at: number; tried: Set<string> } | null = null;
+    let nextUse = 0; // when we next use things up (weekly)
+    const deliveries = new Deliveries();
     let departed = false;
     let todo: Step[] = [];
     let moveStep: Step | null = null; // the move-in step planned this wake
@@ -307,6 +323,8 @@ export const citizen: BehaviourModule = {
           knownChildren.add(k.person);
           // The parent who bore the child does it (the other parent sees the child too).
           if (body.sex !== "female") continue;
+          // A child of the household now, wherever the household goes (before the record says so).
+          if (!childrenNow.some((c) => c.person === k.person)) childrenNow.push({ person: k.person, born_at: k.born_at, sex: k.sex } as Member);
           const where = home?.movedIn ? home.space : livingAt;
           if (where) steps.push(because("Our baby is born: bringing them home.", C.call("occupancy", { in: where, who: k.person })));
           if (household && k.sex) {
@@ -434,7 +452,8 @@ export const citizen: BehaviourModule = {
           ? `Leaving town: ${Math.floor((t - homelessSince) / DAY)} days without a home (we leave after ${p.leave_after_homeless_days}).`
           : `Leaving town: ${Math.floor((t - joblessSince!) / DAY)} days with nobody in the household earning (we leave after ${p.leave_after_jobless_days}), and less money than a month's rent or essentials.`;
         const tell: Step[] = adults(t).map((a) => because(why, message([reach(a)], SAYING.leaving())));
-        return [...tell, ...departure(acc, why)];
+        // What's already planned this wake (a newborn brought home and put on the household's record) comes first.
+        return [...steps, ...tell, ...departure(acc, why)];
       }
 
       wordOfMouth(obs, t, steps);
@@ -467,18 +486,93 @@ export const citizen: BehaviourModule = {
         }
       }
 
-      // Spending, once a month: essentials, plus a share of savings above the buffer.
-      if (t >= nextSpend) {
-        nextSpend = t + MONTH;
-        const shops: string[] = p.shop_accounts ?? [];
+      // Spending: essentials, plus a share of savings above the buffer, a month's worth at a time. Where there are
+      // shops (their price lists), it buys goods, every fortnight; a world without them takes the money-only stand-in.
+      const monthly = () => {
         const reserve = home?.rent ?? share?.cents ?? 0;
         const buffer = p.buffer_months * monthlyIncome();
         const above = Math.max(0, acc.balance - reserve - buffer);
-        const amount = Math.min(acc.balance - reserve, p.essentials + Math.floor((above * p.spend_above_buffer_bps) / 10_000));
-        if (amount > 0 && shops.length) {
-          const shop = ctx.rng(`shop-${t}`).pick(shops);
+        return Math.min(acc.balance - reserve, p.essentials + Math.floor((above * p.spend_above_buffer_bps) / 10_000));
+      };
+      const shops = [...new Set(book.open("price_list").map((r) => r.speaks_for!))].sort()
+        .map((s) => ({ shop: s, ...goodsPrices(book, s) }))
+        .filter((x) => x.prices[p.goods] !== undefined && x.account && (x.min_order ?? 1) <= 1)
+        .map((x) => ({ shop: x.shop, price: x.prices[p.goods]!, account: x.account!, at: x.at }));
+      const priceAt = (s: string | undefined) => shops.find((x) => x.shop === s);
+      // Where the goods go: home, if we're living there (a home let but not yet moved into, or one being demolished, isn't
+      // somewhere we keep things), or else kept at the shop for us.
+      const homeAt = home && inside(home.space) ? home.structure : livingAt && inside(livingAt) ? structureOf(livingAt) : undefined;
+      const placeFor = (s: { at?: string }) => homeAt ?? s.at;
+      const buy = (s: (typeof shops)[number], q: number, why: string) => {
+        const place = placeFor(s);
+        if (!place || q < 1) return;
+        trip!.tried.add(s.shop);
+        steps.push(order({ me, seller: s.shop, sellerAccount: s.account, kind: p.goods, quantity: q, unitPrice: s.price, at: place, from: acc.account, why }));
+      };
+      if (shops.length) {
+        // A shop that couldn't serve all we asked: now and then we give up on it; and we try another for what's missing.
+        for (const d of deliveries.take(book, me)) {
+          const short = d.ordered - d.delivered;
+          if (short <= 0 || d.kind !== p.goods) continue;
+          if (d.seller === favourite && ctx.rng(`quit-${d.order}`).below(10_000) < p.psi_quant_bps) favourite = undefined;
+          if (!trip || trip.tried.size >= p.beta) continue;
+          const next = shops.filter((x) => !trip!.tried.has(x.shop)).sort((a, b) => a.price - b.price || (a.shop < b.shop ? -1 : 1))[0];
+          if (next) buy(next, Math.min(short, Math.floor((short * (priceAt(d.seller)?.price ?? next.price)) / next.price)), `${d.seller} could serve ${d.delivered} of the ${d.ordered} we wanted: trying ${next.shop} for the rest.`);
+        }
+        if (t >= nextShop) {
+          nextShop = t + p.shop_every_days * DAY;
+          trip = { at: t, tried: new Set() };
+          const r = ctx.rng(`shopping-${t}`);
+          let why = "";
+          if (!priceAt(favourite)) {
+            favourite = r.pick(shops).shop;
+            why = `choosing ${favourite}, one of the shops we know`;
+          } else if (shops.length > 1 && r.below(10_000) < p.psi_price_bps) {
+            const other = r.pick(shops.filter((x) => x.shop !== favourite));
+            const fav = priceAt(favourite)!;
+            if (other.price * 10_000 < fav.price * (10_000 - p.xi_bps)) {
+              why = `${other.shop} is cheaper than ${favourite} (${usd(other.price)} against ${usd(fav.price)}): going there from now on`;
+              favourite = other.shop;
+            }
+          }
+          const s = priceAt(favourite)!;
+          const budget = Math.floor((monthly() * p.shop_every_days * DAY) / MONTH);
+          const q = Math.floor(budget / s.price);
+          buy(s, q, `Shopping for the fortnight: ${usd(p.essentials)} a month of essentials plus ${p.spend_above_buffer_bps / 100}% of savings above a ${p.buffer_months}-month buffer, keeping the rent aside, buys ${q} at ${s.shop} (${usd(s.price)} each)${why ? `; ${why}` : ""}.`);
+        }
+      } else if (t >= nextSpend) {
+        nextSpend = t + MONTH;
+        const shopAccounts: string[] = p.shop_accounts ?? [];
+        const amount = monthly();
+        if (amount > 0 && shopAccounts.length) {
+          const shop = ctx.rng(`shop-${t}`).pick(shopAccounts);
           steps.push(because(`Monthly shopping: ${usd(p.essentials)} of essentials plus ${p.spend_above_buffer_bps / 100}% of savings above a ${p.buffer_months}-month buffer, keeping the rent aside.`, pay(shop, amount, { from: acc.account, for: "Shopping." })));
         }
+      }
+      // Using things up: what we hold, spread over the weeks until the next trip. With a home, we use things there, and
+      // bring home what's elsewhere (kept for us at a shop, or left at a home we've moved from); without one, we use
+      // what a shop keeps for us, there.
+      const pickups = new Set(shops.flatMap((x) => (x.at ? [x.at] : [])));
+      const had = channels.holdings(obs).filter((h) => h.kind === p.goods && Number(h.quantity) > 0 && (homeAt ? true : pickups.has(h.at)))
+        .sort((a, b) => Number(b.quantity) - Number(a.quantity) || (a.at < b.at ? -1 : 1));
+      const total = had.reduce((x, h) => x + Number(h.quantity), 0);
+      if (total > 0 && t >= nextUse) {
+        nextUse = t + 7 * DAY;
+        const weeks = Math.max(1, Math.ceil((nextShop - t) / (7 * DAY)));
+        const lines: C.Call[] = [];
+        if (homeAt) {
+          for (const h of had) if (h.at !== homeAt) lines.push(C.call("goods", { kind: p.goods, quantity: C.text(h.quantity), to: me, at: homeAt, from_at: h.at }));
+          lines.push(C.call("work", { task: "consume", units: C.text(String(Math.ceil(total / weeks))), at: homeAt }));
+        } else {
+          let use = Math.ceil(total / weeks);
+          for (const h of had) {
+            const u = Math.min(use, Number(h.quantity));
+            if (u <= 0) break;
+            lines.push(C.call("work", { task: "consume", units: C.text(String(u)), at: h.at }));
+            use -= u;
+          }
+        }
+        steps.push(because(`Using up ${Math.ceil(total / weeks)} of the ${total} ${p.goods} we have: what we have, spread over the ${weeks} week${weeks > 1 ? "s" : ""} until we shop again${homeAt && had.some((h) => h.at !== homeAt) ? " (bringing home what's elsewhere)" : ""}.`, ...lines));
       }
       voice(t, steps);
       fresh = [];

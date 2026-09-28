@@ -55,8 +55,9 @@ test("households live, move and pay together", async () => {
   expect(shares.length).toBeGreaterThan(20);
   const holder = new Map<string, string>([...config.world.accounts.map((a: any) => [a.id, a.holder]), ...ev.filter((e) => e.event === "account_opened").map((e) => [e.account, e.holder])] as [string, string][]);
   for (const x of shares) expect(householdOf.get(holder.get(x.from)!)?.leaseholder).toBe(holder.get(x.to));
-  // Nobody was refused anything.
-  expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
+  // Nobody was refused anything, but for same-moment races (D58): someone who had just left or moved, named for work by
+  // a firm acting on what it saw at the moment's start.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work"].includes(e.code))).toEqual([]);
 }, 300_000);
 
 test("a child born here is brought home by the parent who bore them and added to the household's record", async () => {
@@ -80,5 +81,6 @@ test("a child born here is brought home by the parent who bore them and added to
     const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person);
     if (home) expect(home.by).toBe(`${b.parents[0]}-self`);
   }
-  expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
+  // Nothing refused but same-moment races (D58), as above.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work"].includes(e.code))).toEqual([]);
 }, 300_000);

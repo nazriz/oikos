@@ -734,7 +734,8 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                     let holdings = st
                         .holdings
                         .range(lo..hi)
-                        .filter(|(_, h)| changed(h.changed))
+                        // What's new includes a holding gone to nothing (so a view drops it); the full picture is only what's held.
+                        .filter(|(_, h)| changed(h.changed) && (after.is_some() || h.quantity != 0))
                         .map(|(_, h)| HoldingItem { kind: h.kind.clone(), at: h.at.clone(), quantity: h.quantity })
                         .collect();
                     ChannelData::Holdings { holdings }

@@ -31,7 +31,8 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const share = trader.buys.goods.from as { [f: string]: number };
   const task = config.catalogue.tasks.find((t: any) => t.id === "make");
   const { ev, recs } = await run("town", config, 200 * DAY);
-  expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
+  // Nothing refused but same-moment races (D58).
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work"].includes(e.code))).toEqual([]);
   // Making: at the works, by the factory's own employees, never more than a working day each.
   const employees = new Map<string, Set<string>>();
   for (const a of [...config.world.records, ...recs].filter((r: any) => r.record === "agreement" && r.terms.template === "employment")) {
@@ -78,18 +79,34 @@ test("goods are made from inputs by workers' hours, exported within each factory
 }, 300_000);
 
 test("Lengnick: with too little demand a factory lets workers go and stops making; with plenty it hires", async () => {
-  // The world market wants a fifth of what the factories can make.
-  const slack = generate({ ...base, citizens: 120, exports_per_month: 8_000_000 });
+  // The world market wants little of what the factories can make, and the town's shops take only part of the rest.
+  const slack = generate({ ...base, citizens: 120, exports_per_month: 2_000_000 });
   const { ev: e1, cmds: c1 } = await run("slack", slack, 5 * MONTH + DAY);
   const letGo = c1.filter((c) => c.participant?.startsWith("factory-") && /letting one worker go/.test(c.reasoning ?? ""));
   expect(letGo.length).toBeGreaterThanOrEqual(4);
   expect(e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && e.record.text?.startsWith("Redundancy: we're making more")).length).toBe(letGo.length);
-  // With stock beyond the top of the band there's no making: they make about what the world market takes, and no
-  // more, though their staff could make far more.
-  const madeIn = (m: number) => e1.filter((e) => e.event === "worked" && e.task === "make" && Math.floor(e.t / MONTH) === m).reduce((x, w) => x + w.units, 0);
-  const demand = Math.floor(8_000_000 / 6000);
-  for (const m of [0, 1, 2, 3, 4]) expect(madeIn(m)).toBeLessThanOrEqual(demand * 1.1);
-  expect(madeIn(4)).toBeGreaterThan(demand * 0.5);
+  // With stock beyond the top of Lengnick's band (a month's demand) there's no making, though their staff could make far
+  // more: each factory's stock at a month's end stays within about a month of what it sells (exports taken, and goods
+  // delivered to the shops).
+  for (const f of ["factory-1", "factory-2"]) {
+    let stock = Number(slack.world.holdings.find((h: any) => h.holder === f && h.kind === "goods")?.quantity ?? 0);
+    const sold = new Map<number, number>();
+    const atEnd = new Map<number, number>();
+    for (const e of e1) {
+      const m = Math.floor(e.t / MONTH);
+      if (e.event === "worked" && e.task === "make" && e.at === `${f}-works`) stock += e.units;
+      if (e.event === "goods_moved" && e.kind === "goods" && e.from === f) {
+        stock -= Number(e.quantity);
+        sold.set(m, (sold.get(m) ?? 0) + Number(e.quantity));
+      }
+      if (e.event === "goods_moved" && e.kind === "goods" && e.to === f) {
+        stock += Number(e.quantity);
+        sold.set(m, (sold.get(m) ?? 0) - Number(e.quantity)); // sent back: not sold after all
+      }
+      atEnd.set(m, stock);
+    }
+    for (const m of [1, 2, 3]) expect(atEnd.get(m)!).toBeLessThanOrEqual(Math.max(sold.get(m) ?? 0, sold.get(m + 1) ?? 0) * 1.25 + 300);
+  }
   // Twice what they can make: they post jobs for a bigger headcount each month, up to the works' room.
   const busy = generate({ ...base, citizens: 120, exports_per_month: 120_000_000 });
   const { cmds: c2 } = await run("busy", busy, 4 * MONTH + DAY);

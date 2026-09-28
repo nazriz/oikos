@@ -60,6 +60,7 @@ export const trade: BehaviourModule = {
         sells: {} as { [kind: string]: number }, // unit prices, cents
         buys: {} as { [kind: string]: { unit_price: number; per_month: number; from?: { [seller: string]: number } } },
         wait_days: 14, // how long an invoice waits for its goods before it's declined
+        min_order: 100, // the least it sells in one order (it sells wholesale)
       },
       ctx.params,
     );
@@ -86,19 +87,23 @@ export const trade: BehaviourModule = {
         const steps: Step[] = [];
         if (!published && Object.keys(p.sells).length) {
           published = true;
-          const list = Object.entries(p.sells).map(([k, x]) => `${k} ${usd(x)}`).join("; ");
-          steps.push(because("The world market's prices, for anyone in the town who buys from outside.", priceList(p.sells, p.account, `Sold from outside, delivered, at world prices (each): ${list}. Order and pay with the order.`)));
+          const list = Object.entries(p.sells).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => `${k} ${usd(x)}`).join("; ");
+          steps.push(because("The world market's prices, for anyone in the town who buys from outside.", priceList(p.sells, p.account, `Sold from outside, delivered, at world prices (each): ${list}; at least ${p.min_order} to an order. Order and pay with the order.`, { min_order: p.min_order })));
         }
         // Orders paid in full: deliver from outside. An order below the world price, or for something not sold, is refunded.
         const { paid, unpaid } = orders.due(book, t);
         for (const o of paid) {
           const price = p.sells[o.kind];
-          const ok = price !== undefined && o.unitPrice >= price;
-          const step = fill(o, ok ? o.quantity : 0, me, p.account, ok ? `An order paid in full: delivering ${o.quantity} ${o.kind} from outside.` : `An order ${price === undefined ? `for ${o.kind}, which isn't sold from outside` : "below the world price"}: refunding it.`);
-          if (ok) step.then = (out) => { if (out.status === "applied") sent.set(o.kind, (sent.get(o.kind) ?? 0) + o.quantity); };
+          const ok = price !== undefined && o.unitPrice >= price && o.quantity >= p.min_order;
+          const step = fill(o, ok ? o.quantity : 0, me, p.account, ok ? `An order paid in full: delivering ${o.quantity} ${o.kind} from outside.` : `An order ${price === undefined ? `for ${o.kind}, which isn't sold from outside` : o.quantity < p.min_order ? `for fewer than ${p.min_order}` : "below the world price"}: refunding it.`);
+          const refundIfRefused = step.then;
+          if (ok) step.then = (out) => {
+            if (out.status === "applied") sent.set(o.kind, (sent.get(o.kind) ?? 0) + o.quantity);
+            return refundIfRefused?.(out);
+          };
           steps.push(step);
         }
-        for (const o of unpaid) steps.push(because("An order unpaid for a week: declining it.", say("delivery_note", `Order ${o.id} declined: not paid.`, { to: [o.buyer], visible: [o.buyer, me], basis: o.id, data: { order: o.id, kind: o.kind, delivered: 0, refund: 0, declined: "unpaid" } })));
+        for (const o of unpaid) steps.push(because("An order unpaid for a week: declining it.", say("delivery_note", `Order ${o.id} declined: not paid.`, { to: [o.buyer], visible: [o.buyer, me], basis: o.id, data: { order: o.id, kind: o.kind, ordered: o.quantity, delivered: 0, refund: 0, declined: "unpaid" } })));
         for (const [acc, x] of orders.unclaimed(book)) {
           orders.refunded(acc);
           steps.push(because("Money paid to us with no order waiting for it: sending it back.", pay(acc, x, { from: p.account, for: "Refund: no order of yours is waiting." })));

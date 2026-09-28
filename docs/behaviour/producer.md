@@ -16,7 +16,7 @@ A factory whose workers' hours turn inputs into goods, which it sells wholesale 
 - **Buying** is from its supplier (the world market) at its published price, paid with the order ([trade.md](trade.md)).
 
 **Selling.**
-- **Wholesale.** It publishes a wholesale price list and fills paid orders from stock, refunding what it can't deliver.
+- **Wholesale.** It publishes a wholesale price list (at least `min_order`, 50, to an order) and fills paid orders from stock, refunding what it can't deliver.
 - **Exports**, weekly:
   - It keeps stock for its customers: the middle of Lengnick's band of what they ordered last month.
   - It ships the rest to the world market, under its share of the monthly buying offer, and invoices it at the world price.

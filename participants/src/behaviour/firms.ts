@@ -17,13 +17,15 @@ import * as C from "../calls";
 import type { Observation, ParticipantAction } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
+import { distribute } from "./lengnick";
 import { because, between, Book, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
  * in every observation (new records, payments received, ids just created),
  * and `plan` decides what to do once per wake. A step may say what follows from its own outcome (`then`: an order's
- * id, whether a day's work was done): what it returns is done next.
+ * id, whether a day's work was done): what it returns is done next. A step refused because the world changed in the
+ * same moment (D58) is undone by its own `then`; the rest of the plan goes on, each step tried as it comes.
  */
 export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observation) => Step[]) {
   let todo: Step[] = [];
@@ -32,10 +34,8 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
   return {
     step(obs: Observation): ParticipantAction {
       const follow: Step[] = [];
-      if (sent?.then) {
-        const o = obs.outcomes.at(-1);
-        if (o) follow.push(...(sent.then(o) ?? []));
-      }
+      const o = sent ? obs.outcomes.at(-1) : undefined;
+      if (sent?.then && o) follow.push(...(sent.then(o) ?? []));
       sent = undefined;
       absorb(obs);
       if (plannedAt !== obs.t) {
@@ -60,7 +60,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.6.0",
+  version: "0.7.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -279,8 +279,12 @@ export const landlord: BehaviourModule = {
         const spend = Math.min(acc.balance - tax, Math.floor((income * p.spend_share_bps) / 10_000));
         const upkeep = Math.min(acc.balance - tax - spend, Math.floor((income * p.upkeep_share_bps) / 10_000));
         income = 0;
-        const s: Step = because(`Monthly: the owners spend ${p.spend_share_bps / 100}% of rent received locally, and ${p.upkeep_share_bps / 100}% goes on upkeep.`);
-        if (spend > 0 && shops.length) s.push(pay(ctx.rng(`spend-${t}`).pick(shops), spend, { from: acc.account, for: "Owners' spending." }));
+        // The owners' draw: to the shareholders on our register, if we keep one (they spend it as they will); a world
+        // without one keeps the money-only stand-in, spent at a local shop.
+        const draw = distribute(book, me, acc.account, spend, `Monthly: the owners draw ${p.spend_share_bps / 100}% of rent received, paid to our shareholders by their shares`);
+        steps.push(...draw.steps);
+        const s: Step = because(`Monthly: ${p.upkeep_share_bps / 100}% of rent received goes on upkeep${draw.steps.length || !shops.length ? "" : `, and the owners spend ${p.spend_share_bps / 100}% locally`}.`);
+        if (!draw.steps.length && spend > 0 && shops.length) s.push(pay(ctx.rng(`spend-${t}`).pick(shops), spend, { from: acc.account, for: "Owners' spending." }));
         if (upkeep > 0 && p.outside_account) s.push(pay(p.outside_account, upkeep, { from: acc.account, for: "Maintenance and repairs." }));
         if (s.length) steps.push(s);
       }

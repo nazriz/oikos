@@ -15,6 +15,9 @@ const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 // Tight housing and rich landlords, so they build.
 const tight = { ...base, citizens: 120, apartment_blocks: 2, houses: 16, landlord_capital: 300_000_000, landlord_compliance_bps: 10_000 };
 
+/** Refusals from same-moment races (D58): someone who'd just left, named for work by a firm acting on what it saw. */
+const RACES = ["not_present", "not_at_work"];
+
 async function run(name: string, config: any, until: number) {
   const out = join(root, "runs", `test-building-${name}`);
   rmSync(out, { recursive: true, force: true });
@@ -31,7 +34,7 @@ test("the builder buys materials from outside, and its crew's hours finish each 
   const types = new Map<string, any>(config.catalogue.structure_types.map((t: any) => [t.id, t]));
   const price = 125; // the world price of materials, cents a kg
   const { ev, recs } = await run("builds", config, 300 * DAY);
-  expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !RACES.includes(e.code))).toEqual([]);
   // Materials come from outside, to the yard, paid for at the world price with the order.
   const bought = ev.filter((e) => e.event === "goods_moved" && e.from === "outside" && e.to === "builder");
   expect(bought.length).toBeGreaterThan(0);
@@ -72,7 +75,7 @@ test("a demolition order is carried out by the builder's crew, commissioned by t
   config.world.records.push({ id: "order-1", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "demolition_order", addressed_to: ["landlord-1"],
     text: `Order: demolish ${house.id}.`, data: { structure: house.id, lot: lotOf(house.at) } });
   const { ev, recs } = await run("demolition", config, 60 * DAY);
-  expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !RACES.includes(e.code))).toEqual([]);
   // The landlord commissions the builder at its published demolition price; the builder starts, and invoices.
   const contract = recs.find((r) => r.record === "agreement" && r.terms.template === "construction" && r.basis === "order-1");
   expect(contract.terms.commitments[0].does.outcome.structure).toEqual({ remove: house.id });
@@ -96,7 +99,7 @@ test("the world market buys exports it has received, up to the month's demand, a
   config.world.holdings = config.world.holdings.filter((h: any) => !(h.holder === "factory-1" && h.kind === "goods"));
   config.world.holdings.push({ kind: "goods", holder: "factory-1", at: "factory-1-works", quantity: "1000" });
   const { ev, recs } = await run("exports", config, 25 * DAY);
-  expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !RACES.includes(e.code))).toEqual([]);
   const offer = recs.find((r) => r.kind === "buying_offer");
   expect(offer.data).toMatchObject({ kind: "goods", unit_price: 1000, quantity: 300 });
   // Paid: 100, 100, then 100 of the 200 (the month's 300); the other 100 sent back; the invoice with no goods declined.

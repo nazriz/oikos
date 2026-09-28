@@ -16,8 +16,12 @@ const HOUR = 3600;
 const WORKING_DAY = 8 * HOUR;
 /** Factories (docs/behaviour/producer.md; placeholders): an item of goods takes 1.5 hours of work and 10 kg of inputs. */
 const MAKE = { labour: 5400, inputs: 10 };
-/** World prices, cents each (placeholders): inputs a kg, and goods as the world market buys them. */
-const WORLD = { inputs: 250, goods_export: 6000 };
+/** World prices, cents each (placeholders): inputs a kg, and goods as the world market buys them and sells them (imports
+ * cost more: freight and margins). */
+const WORLD = { inputs: 250, goods_export: 6000, goods_import: 6600 };
+/** Shops (docs/behaviour/retailer.md; placeholders): serving an item takes 1.5 hours of a shop's staff; a shop starts with
+ * 3 staff (room for 6), sized to what it expects to sell a month, and holds half a month's stock. */
+const SHOP = { serve: 5400, start: 3, demand: 200 };
 /** The builder's crew: its yard's places, the crew it starts with (sized to its usual work, not its room), and their
  * wage (cents every 14 days). */
 const CREW = { capacity: 12, start: 4, wage: 150_000 };
@@ -192,7 +196,7 @@ export function generate(spec: TownSpec): any {
     const lot = site(), id = `${s}-premises`;
     structures.push({ id, at: cellOf.get(lot), type: "shop", built_by: "builder" });
     own(lot, s);
-    workplaces.push({ employer: s, structure: id, space: `${id}/workplace.1`, wage: spec.wages.shop, capacity: 6 });
+    workplaces.push({ employer: s, structure: id, space: `${id}/workplace.1`, wage: spec.wages.shop, capacity: 6, start: SHOP.start });
   }
   for (const f of factories) {
     const lot = site(), id = `${f}-works`;
@@ -327,17 +331,21 @@ export function generate(spec: TownSpec): any {
     for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
   }
 
-  // ---- factories: their opening stock (a month's inputs for the staff they have, and some goods) and their shareholders ----
-  // Lengnick (2013): firms are owned by the households, in proportion to their wealth. Here each household's
-  // leaseholder holds shares in every factory, in proportion to the household's savings (in dollars).
+  // ---- firms: their opening stock (a factory's month of inputs for the staff it has, and some goods; a shop's half month
+  // of goods) and their shareholders. Lengnick (2013): firms are owned by the households, in proportion to their wealth.
+  // Here each household's leaseholder holds shares in every firm, in proportion to the household's savings (in dollars).
   const factoryStock: any[] = [];
   const balanceOf = new Map(accounts.map((a) => [a.holder, a.balance as number]));
   const holders = households.map((h) => ({ holder: h.leaseholder, account: `acc-${h.leaseholder}`, shares: Math.floor(h.members.reduce((x, m) => x + (balanceOf.get(m.id) ?? 0), 0) / 100) })).filter((h) => h.shares > 0);
   for (const f of factories) {
     const month = Math.floor(((staffCount.get(f) ?? 0) * WORKING_DAY * 5 * 30) / 7 / MAKE.labour);
     factoryStock.push({ kind: "inputs", holder: f, at: `${f}-works`, quantity: String(month * MAKE.inputs) }, { kind: "goods", holder: f, at: `${f}-works`, quantity: String(Math.floor(month / 4)) });
-    records.push({ id: `shareholders-${f}`, record: "statement", author: "genesis", at: 0, visible_to: [f, ...holders.map((h) => h.holder)], speaks_for: f, kind: "shareholders",
-      text: `The shareholders of ${f}, and their shares.`, data: { holders } });
+  }
+  for (const s of shops) factoryStock.push({ kind: "goods", holder: s, at: `${s}-premises`, quantity: String(SHOP.demand / 2) });
+  // The same households own the town's firms: its factories, shops and landlords.
+  for (const firm of [...factories, ...shops, ...landlords]) {
+    records.push({ id: `shareholders-${firm}`, record: "statement", author: "genesis", at: 0, visible_to: [firm, ...holders.map((h) => h.holder)], speaks_for: firm, kind: "shareholders",
+      text: `The shareholders of ${firm}, and their shares.`, data: { holders } });
   }
 
   const exportUnits = Math.floor(spec.exports_per_month / WORLD.goods_export);
@@ -403,7 +411,7 @@ export function generate(spec: TownSpec): any {
   office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city" }));
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
   office("outside-trade", "outside", "The world market", undefined, [{ id: "ledger", kind: "accounts" }, mine("orders"), { id: "stock", kind: "holdings" }],
-    code("world.trade", { account: "acc-outside", sells: { materials: MATERIALS_PRICE, inputs: WORLD.inputs },
+    code("world.trade", { account: "acc-outside", sells: { materials: MATERIALS_PRICE, inputs: WORLD.inputs, goods: WORLD.goods_import },
       // The world market's demand for the town's goods, split among the factories by the size of their works (each
       // factory's export customers).
       buys: { goods: { unit_price: WORLD.goods_export, per_month: exportUnits, from: exportShares } } }));
@@ -469,8 +477,13 @@ export function generate(spec: TownSpec): any {
           per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside" }));
       continue;
     }
-    office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths],
-      code("firm.employer", { wage: w.wage, target_staff: Math.max(staffCount.get(w.employer) ?? 0, Math.floor(w.capacity * 0.8)), workplace: w.space, outside_account: "acc-outside", role: "shop assistant" }));
+    // A shop: it buys from the factories or the world market, whichever is cheaper, and serves whoever orders.
+    const cell = structures.find((x) => x.id === w.structure)!.at;
+    const hourly = (w.wage * HOUR) / (14 * (6 / 7) * WORKING_DAY);
+    const price = Math.ceil(((WORLD.goods_export + (SHOP.serve * hourly) / HOUR) * 11) / 10);
+    office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
+      code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve,
+        suppliers: [...factories, "outside"], price, demand: SHOP.demand }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = { id: "petitions", kind: "records", match: { statement_kinds: ["petition"] }, on_request: true };
@@ -478,9 +491,10 @@ export function generate(spec: TownSpec): any {
   // Position: what a citizen can see around where it lives and works (the cells touching them), who shares its home and
   // workplace by name, and elsewhere only how full a place is. It moves with them.
   const street = { id: "street", title: "Around you", kind: "sites", area: { near: 0 } };
-  const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street];
+  // Shops' prices (and others'), and what they hold and where (their shopping).
+  const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street, { id: "prices", kind: "records", match: { statement_kinds: ["price_list"] } }, { id: "belongings", kind: "holdings" }];
   // "population" is who could sign a petition: the adults.
-  const citizenController = code("citizen.default", { shop_accounts: shopAccounts, outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
+  const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     year: townLife().year, births: spec.life !== false, gestation: townLife().birth.gestation });
   for (const m of everyone) participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: citizenController, framing: unstated });
   // People who may come later: newcomers from elsewhere, and children born here.
@@ -501,7 +515,13 @@ export function generate(spec: TownSpec): any {
       structure_types: structureTypes.map((t) => ({ ...t, materials: Object.fromEntries(Object.entries(t.materials).map(([k, q]) => [k, String(q)])) })),
       resources: [{ id: "goods", unit: "item" }, { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }],
       // Making goods: a worker's hours at a workplace turn inputs into goods.
-      tasks: [{ id: "make", labour: MAKE.labour, in: "workplace", consumes: { inputs: String(MAKE.inputs) }, produces: { goods: "1" } }],
+      tasks: [
+        { id: "make", labour: MAKE.labour, in: "workplace", consumes: { inputs: String(MAKE.inputs) }, produces: { goods: "1" } },
+        // Serving a customer: a shop's staff time, per item sold.
+        { id: "serve", labour: SHOP.serve, in: "workplace" },
+        // Using things up: a household's goods, an item at a time; it takes no one's time.
+        { id: "consume", labour: 0, consumes: { goods: "1" } },
+      ],
       working_day: WORKING_DAY,
     },
     world: { boundaries: ["outside"], currencies: [{ code: "AUD", minor_units: 2 }], ground: { w: spec.grid.w, h: spec.grid.h },
