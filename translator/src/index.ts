@@ -13,14 +13,14 @@
 // The model is anything behind an LlmAdapter: the mock during development.
 
 import { calls, canonical, DOMAIN_DRAFT, evaluate, hashWithDomain, standingClaims, type Block } from "@terrarium/participants";
-import { callModel, refusalText, type LlmIO, type ToolSpec } from "@terrarium/participants/llm";
+import { callModel, refusalText, type LlmIO, type LlmMessage, type ToolSpec } from "@terrarium/participants/llm";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.3.2";
+export const TRANSLATOR_VERSION = "0.4.0";
 
 export interface TranslatorId {
   id: string;
@@ -144,39 +144,62 @@ export function draftHash(d: Draft): string {
   return hashWithDomain(DOMAIN_DRAFT, canonical(d));
 }
 
-export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator") {
+/**
+ * The translator. A request it can't turn into a working call (it answers none(...), the call doesn't parse, or the
+ * resolver has a question) is tried again, up to `attempts` in all, with what went wrong as feedback in the same
+ * exchange; it may still answer none(...) if that's right. Each earlier attempt comes back in `retries` (the run logs
+ * them), so what the participant sees is the last attempt's.
+ */
+export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2) {
   const tid: TranslatorId = { id, version: TRANSLATOR_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` };
   const seen = new Set<string>();
+  type Failure = Extract<Translation, { ok: false }>;
+  /** One answer, resolved and checked. `final`: a failure that another attempt can't help (the world, not the call). */
+  async function attempt(req: TranslateRequest, out: { input?: any } | undefined, raw: unknown): Promise<{ ok: true; draft: Draft; hash: string } | (Failure & { final?: boolean })> {
+    const text = typeof out?.input?.program === "string" ? out.input.program : undefined;
+    if (!text) return { ok: false, notices: [LABEL_TEXT.unclear], raw };
+    let program: calls.Program;
+    try {
+      program = calls.parseProgram(text);
+    } catch {
+      return { ok: false, notices: [LABEL_TEXT.unclear], call: text };
+    }
+    const call = calls.programText(program);
+    const r = resolve(program, req.knowledge, typeOf, req.as);
+    if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}) };
+    const k = await check(req.participant, req.as, r.blocks);
+    if (k.error) return { ok: false, notices: [LABEL_TEXT.unclear], call, final: true };
+    const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
+    const draft: Draft = {
+      id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
+      blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as)).of(r.blocks).slice(0, 16384),
+      check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
+      translator: tid,
+    };
+    return { ok: true, draft, hash: draftHash(draft) };
+  }
   return {
     id: tid,
-    async translate(req: TranslateRequest): Promise<Translation> {
-      const res = await callModel(io, {
-        purpose: "translator", subject: id, system: translatorSystem(), maxTokens: 1000, tools: TOOLS,
-        messages: [{ role: "user", content: translatorContext(req) }],
-        context: { proposal: req.proposal, participant: req.participant },
-      }, seen);
-      const out = res.content.find((b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use" && b.name === "call");
-      const text = typeof out?.input?.program === "string" ? out.input.program : undefined;
-      if (!text) return { ok: false, notices: [LABEL_TEXT.unclear], raw: res.content };
-      let program: calls.Program;
-      try {
-        program = calls.parseProgram(text);
-      } catch {
-        return { ok: false, notices: [LABEL_TEXT.unclear], call: text };
+    async translate(req: TranslateRequest): Promise<Translation & { retries?: { call?: string; reason: string }[] }> {
+      const messages: LlmMessage[] = [{ role: "user", content: translatorContext(req) }];
+      const retries: { call?: string; reason: string }[] = [];
+      for (let n = 1; ; n++) {
+        const res = await callModel(io, {
+          purpose: "translator", subject: id, system: translatorSystem(), maxTokens: 1000, tools: TOOLS, messages,
+          context: { proposal: req.proposal, participant: req.participant, attempt: n },
+        }, seen);
+        const out = res.content.find((b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use" && b.name === "call");
+        const r = await attempt(req, out, res.content);
+        if (r.ok || n >= attempts || r.final) {
+          const { final: _, ...t } = r as Failure & { final?: boolean };
+          return { ...(r.ok ? r : t), ...(retries.length ? { retries } : {}) };
+        }
+        retries.push({ ...(r.call ? { call: r.call } : {}), reason: r.notices.join(" ") });
+        // Feedback in the same exchange: the answer, then what went wrong with it.
+        const feedback = `That didn't work: ${r.notices.join(" ")}${r.call ? ` (your call: ${r.call})` : ""}. Read the request again. If it can be written as a call with what's known, write it; if it really can't, answer none(...) again.`;
+        messages.push({ role: "assistant", content: res.content });
+        messages.push(out ? { role: "user", content: [{ type: "tool_result", tool_use_id: out.id, content: feedback }] } : { role: "user", content: feedback });
       }
-      const call = calls.programText(program);
-      const r = resolve(program, req.knowledge, typeOf, req.as);
-      if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}) };
-      const k = await check(req.participant, req.as, r.blocks);
-      if (k.error) return { ok: false, notices: [LABEL_TEXT.unclear], call };
-      const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
-      const draft: Draft = {
-        id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
-        blocks: r.blocks, summary: new Preview(req.knowledge, req.knowledge.actingFor(req.as)).of(r.blocks).slice(0, 16384),
-        check: { ok: k.ok, ...(k.refusal ? { refusal: k.refusal } : {}), ...(warnings.length ? { warnings } : {}) },
-        translator: tid,
-      };
-      return { ok: true, draft, hash: draftHash(draft) };
     },
   };
 }

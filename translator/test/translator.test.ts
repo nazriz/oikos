@@ -57,3 +57,28 @@ test("the translator is shown where each form goes (the `to` to write) and a cho
   expect(translatorContext({ draftId: "d1", participant: "mayor-system", proposal: "Table the budget.", knowledge: k }))
     .toContain("- council_proposal, to=city: fields proposal (text, required), kind (one of law | budget | other, required), parks (amount)");
 });
+
+test("a request the translator can't turn into a working call is tried once more, with what went wrong", async () => {
+  const asked: any[] = [];
+  const answers = ["none(unclear)", "structure(type=park, on=p1)", "notice(text=hi)"];
+  const scripted = (programs: string[]) => {
+    let i = 0;
+    return { adapter: new MockAdapter("mock", { translator: (req: any) => { asked.push(req.messages); return [{ type: "tool_use", id: `c${i}`, name: "call", input: { program: programs[i++] } }]; } }), annotate: async () => {}, now: () => 0 };
+  };
+  // Refused, then a call the resolver has a question about: two attempts, the last one's question comes back, the first is kept.
+  const r = await createTranslator(scripted(answers), ok, () => ({ footprint: { w: 2, h: 1 } })).translate({ draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "Build a park on p1.", knowledge: knows() });
+  expect(r).toMatchObject({ ok: false, notices: ["Who should build a park on p1, and from which account is it paid?"], retries: [{ call: "none(unclear)", reason: "It isn't clear what should happen. Could you say it more plainly?" }] });
+  expect(asked).toHaveLength(2);
+  const feedback = asked[1].at(-1).content[0];
+  expect(feedback).toMatchObject({ type: "tool_result", tool_use_id: "c0" });
+  expect(feedback.content).toContain("That didn't work: It isn't clear what should happen.");
+  // A refusal, then a good call: a draft, with the refusal on record.
+  asked.length = 0;
+  const good = await createTranslator(scripted(["none(too_much)", 'statement(kind=notice, text="The hall opens at nine.")']), ok, () => undefined).translate({ draftId: "d2", participant: "mayor-system", as: "mayor", proposal: "Publish a notice.", knowledge: knows() });
+  expect(good.ok).toBe(true);
+  expect(good.retries).toHaveLength(1);
+  // Only two attempts by default.
+  asked.length = 0;
+  await createTranslator(scripted(["none(unclear)", "none(unclear)", "none(unclear)"]), ok, () => undefined).translate({ draftId: "d3", participant: "mayor-system", proposal: "?", knowledge: knows() });
+  expect(asked).toHaveLength(2);
+});

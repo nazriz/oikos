@@ -326,6 +326,7 @@ Notes:
   - **Ids** appear in the seat's text because the seat's reports show them next to names ("Millbrook Builders (builder)", a renderer requirement). The translator copies them.
   - **Names** the seat writes instead of ids ("GreenCo") are copied as written. Looking them up is the resolver's business (§8.2), not the translator's.
 - **Private:** each seat's translations are its own, and never visible to or mediated between seats (P3).
+- **One retry (D56):** if its answer doesn't give a working call (a failure label, an unparseable call, or a resolver question), it's asked once more in the same exchange, with what went wrong. Both attempts are on record.
 - **Held fixed:** the same translator, at the same version, for every seat in a run and across an experiment's runs. It's an experimental control, recorded in every log.
 - **Behind the adapter until the local model exists:** the mock now; an LLM when Naz allows real calls. Both emit the same call language, so the switch changes nothing downstream (§16.9).
 

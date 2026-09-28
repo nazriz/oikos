@@ -433,7 +433,11 @@ See the design note, §16.
 - **Death:** the participant is debriefed if its framing says so. Whether to warn a model-run person that its body can die is decided per study, in its framing.
 - Detail: docs/design/m2-llm-participants.md, Welfare.
 
-## Open (to decide at the Stage 2 checkpoint or before)
+**D56. The translator retries once, with what went wrong.** *(Naz, 2026-09-28: "yes add a retry".)*
+- A request the translator can't turn into a working call gets one more attempt in the same exchange, with the problem as feedback. That covers a none(...) answer, a call that doesn't parse, and a question from the resolver. It may answer none(...) again when that's right. The participant hears only about the last attempt.
+- **Why:** in the pilots, luna refused plain requests often enough that the mayor spent a sol call rewording each one; one tenancy law took five tries. A retry costs one luna call.
+- **Recorded:** every attempt is an ordinary model call in the log, and each retried attempt is a `note` annotation (`translation_retry`: attempt, call, reason). A run's retry rate is measurable, and the attempts and feedback are training data for the translator model.
+- **Revisit if:** the trained translator makes retries rare, or a study needs a one-shot translator (`attempts` = 1).
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
 

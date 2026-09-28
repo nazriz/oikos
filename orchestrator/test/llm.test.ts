@@ -93,8 +93,9 @@ test("a participant is told when a request can't be done, declines an unfaithful
     },
     translator: () => {
       translated++;
-      if (translated === 1) return [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }];
-      const text = translated === 2 ? "The town hall is closed indefinitely." : "The town hall opens at nine.";
+      // Unclear twice (the translator's own retry too), so the participant is told.
+      if (translated <= 2) return [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }];
+      const text = translated === 3 ? "The town hall is closed indefinitely." : "The town hall opens at nine.";
       return [{ type: "tool_use", id: "x", name: "call", input: { program: `statement(kind=notice, text="${text}")` } }];
     },
     debrief: () => [{ type: "text", text: "Thanks for asking." }],
@@ -103,6 +104,7 @@ test("a participant is told when a request can't be done, declines an unfaithful
   const log = lines(s.logPath);
   const ann = log.filter((e) => e.kind === "annotation").map((e) => e.body);
   expect(ann.find((a) => a.annotation === "translation_failure")?.data.reason).toBe("It isn't clear what should happen. Could you say it more plainly?");
+  expect(ann.find((a) => a.annotation === "note" && a.data.translation_retry)?.data.translation_retry).toMatchObject({ attempt: 1, call: "none(unclear)" });
   expect(seen[1]).toContain("A note on your request: It isn't clear what should happen.");
   expect(ann.filter((a) => a.annotation === "signoff").map((a) => a.decision)).toEqual(["reject", "accept"]);
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
