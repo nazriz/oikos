@@ -48,13 +48,19 @@ test("a run stuck in a module is stopped by its watchdog, with a diagnosis of wh
   expect(diagnosis.doing.t).toBeGreaterThanOrEqual(5 * DAY);
 }, 120_000);
 
-test("a module that throws is recovered in place, recorded, and the run is the same every time", async () => {
+test("a module that throws is recovered in place, recorded, retired after three in a row, and the run is the same every time", async () => {
   const { config, unit } = faulty("test.throw", { throw_at: 10 * DAY });
   const a = await runWorld({ config, runId: "throws", outDir: dir("throw-a"), until: 30 * DAY, modules });
   const b = await runWorld({ config, runId: "throws", outDir: dir("throw-b"), until: 30 * DAY, modules });
-  expect(a.participantErrors).toBeGreaterThan(0);
-  const notes = lines(a.logPath).map((l) => JSON.parse(l)).filter((e) => e.kind === "annotation" && e.body.data?.participant_error);
-  expect(notes[0].body.data.participant_error).toEqual({ unit, error: `Error: a bug at t=${10 * DAY}` });
+  const log = lines(a.logPath).map((l) => JSON.parse(l));
+  const notes = log.filter((e) => e.kind === "annotation" && e.body.data?.participant_error);
+  expect(notes.map((n) => n.body.data.participant_error)).toEqual([1, 2, 3].map((n) => ({ unit, error: `Error: a bug at t=${(9 + n) * DAY}`, in_a_row: n })));
+  expect(a.participantErrors).toBe(3);
+  // The third in a row retires it (no stand-in named): it acts no more.
+  const retired = log.find((e) => e.kind === "annotation" && e.body.data?.participant_retired);
+  expect(retired.body.data.participant_retired).toEqual({ unit, after_failures: 3 });
+  const who = unit.split("|")[0];
+  expect(log.some((e) => e.kind === "command" && e.body.participant === who && e.t > retired.t)).toBe(false);
   // Deterministic: recovering changes nothing about reproducibility.
   expect(readFileSync(b.logPath, "utf8")).toBe(readFileSync(a.logPath, "utf8"));
   expect(a.t).toBe(30 * DAY);
@@ -119,3 +125,42 @@ test("a stopped run resumes: model responses served from its log reproduce it ex
   expect(lr.slice(0, lu.length - 1)).toEqual(lu.slice(0, -1));
   expect(JSON.parse(lr.at(-2)!).body.data.resumed_from).toEqual({ log: "town.seed1.stopped-1.jsonl", model_calls_served: first.calls });
 }, 180_000);
+
+test("a run whose log was cut off mid-line (the process killed as it wrote) still resumes exactly", async () => {
+  const policy = (req: LlmRequest) => req.messages.length === 1
+    ? [{ type: "tool_use" as const, id: "w", name: "write", input: { to: ["finance"], text: "Please send me the figures.", as: "mayor" } }]
+    : [{ type: "tool_use" as const, id: "d", name: "done_for_now", input: { days: 2 } }];
+  const mock = () => new MockAdapter("mock", { participant: policy, translator: () => [], debrief: () => [{ type: "text", text: "Thanks." }] });
+  const config = generate({ ...spec, citizens: 40, mayor: "llm" });
+  const u = await runWorld({ config, runId: "town.seed1", outDir: dir("cut-whole"), until: 30 * DAY, adapter: mock() });
+  const d = dir("cut");
+  await runWorld({ config, runId: "town.seed1", outDir: d, until: 30 * DAY, adapter: mock() });
+  // Cut the log two-thirds of the way through, in the middle of a line.
+  const path = join(d, "town.seed1.jsonl");
+  const text = readFileSync(path, "utf8");
+  let at = Math.floor(text.length * 2 / 3);
+  while (text[at] === "\n") at++;
+  writeFileSync(path, text.slice(0, at + 7));
+  const r0 = prepareResume(path);
+  const serving = new Serving(recordedCalls(r0.stoppedLog));
+  const r = await runWorld({ config: r0.config, runId: r0.runId, outDir: d, until: 30 * DAY, adapter: serving.wrap(mock()), resumedFrom: { log: "town.seed1.stopped-1.jsonl", serving } });
+  expect(serving.served).toBeGreaterThan(0);
+  expect(serving.diverged).toBeUndefined();
+  expect(r.stateHash).toBe(u.stateHash);
+  expect(lines(r.logPath).slice(0, lines(u.logPath).length - 1)).toEqual(lines(u.logPath).slice(0, -1));
+}, 180_000);
+
+test("a slow but healthy model call keeps the run's breadcrumbs moving; the watchdog doesn't take it for a stall", async () => {
+  const { Watchdog } = await import("../src/watchdog");
+  const marks: object[] = [];
+  const dog = new Watchdog({ stallMs: 60_000, diagnosisPath: join(dir("beat"), "x.failure.json"), runId: "beat" });
+  const mark = dog.mark.bind(dog);
+  dog.mark = (d: object) => (marks.push(d), mark(d));
+  // A call that takes 25 s (a model thinking, or retrying): its breadcrumbs keep coming while it runs.
+  const slow = new MockAdapter("mock", { participant: async () => (await Bun.sleep(25_000), [{ type: "tool_use" as const, id: "d", name: "done_for_now", input: { days: 5 } }]), translator: () => [], debrief: () => [] });
+  await runWorld({ config: generate({ ...spec, citizens: 40, mayor: "llm" }), runId: "beat", outDir: dir("beat-run"), until: 1 * DAY, adapter: slow, watchdog: dog });
+  dog.stop();
+  const beats = marks.filter((m: any) => m.doing === "model call");
+  expect(beats.length).toBeGreaterThanOrEqual(3);
+  expect(Math.max(...beats.map((m: any) => m.for_s))).toBeGreaterThanOrEqual(20);
+}, 120_000);

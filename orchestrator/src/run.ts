@@ -63,7 +63,17 @@ export interface RunOptions {
 export const MAX_COHORTS_PER_MOMENT = 1000;
 
 /** A run that can't go on (participants waking each other without end at one moment): deterministic, so replayable. */
-export class RunStuck extends Error {}
+export class RunStuck extends Error {
+  override name = "RunStuck";
+}
+
+/** How long one model call may keep a run's breadcrumbs moving: beyond every adapter's time limit and retries (3
+ * attempts of 180 s, with backoff), so only a call that never ends is taken for a stall (D59). */
+export const MODEL_CALL_MAX_MS = 20 * 60_000;
+
+/** A unit that fails to decide this many times in a row is retired: to its stand-in if the world names one, or it
+ * stops acting. Deterministic, like the failures themselves (D59). */
+export const MAX_FAILURES_IN_A_ROW = 3;
 
 export interface RunSummary {
   runId: string;
@@ -173,10 +183,24 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   let t = 0;
   let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
   let participantErrors = 0; // failures to decide, recovered in place (D59)
+  const failures = new Map<string, number>(); // failures to decide in a row, by unit
   // Breadcrumbs (D59): what the run is doing, for the watchdog, at every point where it could hang.
   const mark = (doing: object) => o.watchdog?.mark({ t, ...doing });
   if (o.watchdog) k.onRequest = (req: any) => mark({ doing: "kernel request", request: req.op === "command" ? req.command?.command : req.op, participant: req.command?.participant ?? req.participant });
-  const watched = (a: LlmAdapter): LlmAdapter => (o.watchdog ? { provider: a.provider, model: a.model, complete: (req) => (mark({ doing: "model call", subject: req.subject, purpose: req.purpose }), a.complete(req)) } : a);
+  // A model call in flight keeps the breadcrumbs moving (every 10 s) for up to MODEL_CALL_MAX_MS: longer than any
+  // adapter's own time limits and retries allow, so a slow but healthy call is never taken for a stall, while one that
+  // outlives even that, or a thread stuck in a synchronous loop (no timers run), still is.
+  const watched = (a: LlmAdapter): LlmAdapter => (o.watchdog ? { provider: a.provider, model: a.model, complete: async (req) => {
+    const began = Date.now();
+    const beat = () => mark({ doing: "model call", subject: req.subject, purpose: req.purpose, for_s: Math.round((Date.now() - began) / 1000) });
+    beat();
+    const timer = setInterval(() => Date.now() - began < MODEL_CALL_MAX_MS && beat(), 10_000);
+    try {
+      return await a.complete(req);
+    } finally {
+      clearInterval(timer);
+    }
+  } } : a);
 
   await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath });
 
@@ -435,6 +459,26 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_draft: d.id } } });
   };
 
+  /** A participant whose decisions keep failing (D59): its stand-in carries it on if the world names one (as after
+   * opting out); otherwise it stops acting. Recorded either way. It isn't the participant leaving the study (that's
+   * its own choice, D38): it's the platform no longer running something that doesn't work. */
+  const retire = async (u: Unit) => {
+    const p = parts.get(u.participant)!;
+    const after = p.on_opt_out;
+    const standIn = after && typeof after === "object" ? mods[after.code] : undefined;
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { participant_retired: { unit: u.key, after_failures: MAX_FAILURES_IN_A_ROW, ...(standIn ? { stand_in: after.code } : {}) } } } });
+    log(`${o.runId}: ${u.participant} retired after ${MAX_FAILURES_IN_A_ROW} failures in a row${standIn ? `; ${after.code} stands in` : ""}`);
+    for (const x of unitsOf(u.participant)) {
+      units.delete(x.key);
+      failures.delete(x.key);
+    }
+    if (standIn) {
+      p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
+      await syncUnits(u.participant, t);
+      for (const x of unitsOf(u.participant)) x.nextWake = t + ceilTo(x.module.cadence(x.ctx), tick);
+    } else p.ended = true;
+  };
+
   /** A unit looks (its own looks first, if it asked), and gets its picture of the world: null if it no longer can. */
   const perceive = async (u: Unit): Promise<Observation | null> => {
     const only = u.capacity ? { only: u.capacity } : {};
@@ -627,10 +671,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           if (r.status === "rejected") {
             participantErrors++;
             const err = r.reason as Error;
-            await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err?.name ?? "Error"}: ${String(err?.message ?? err)}`.slice(0, 2000) } } } });
+            const inARow = (failures.get(x.u.key) ?? 0) + 1;
+            failures.set(x.u.key, inARow);
+            await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err?.name ?? "Error"}: ${String(err?.message ?? err)}`.slice(0, 2000), in_a_row: inARow } } } });
             log(`${o.runId}: ${x.u.key} failed to decide at t=${t} (it waits this wake): ${String(err?.message ?? err).slice(0, 200)}`);
+            if (inARow >= MAX_FAILURES_IN_A_ROW) await retire(x.u);
             continue;
           }
+          failures.delete(x.u.key);
           const goesOn = await apply(x.u, r.value);
           if (goesOn && x.n + 1 < maxActions && units.get(x.u.key) === x.u) next.push({ u: x.u, n: x.n + 1 });
         }

@@ -6,10 +6,10 @@ A run never hangs silently or carries on against something broken. What happens 
 
 | What goes wrong | Kind | What happens |
 |---|---|---|
-| A behaviour module throws | Deterministic | Logged as a `participant_error` note (the error's name and message); the participant waits this wake; the run goes on. The run summary counts them. |
+| A behaviour module throws | Deterministic | Logged as a `participant_error` note (the error's name and message, and how many in a row); the participant waits this wake; the run goes on. After **3 in a row** it's retired (`participant_retired`): its stand-in carries on if the world names one (`on_opt_out`), otherwise it stops acting. The run summary counts them. |
 | A model call fails after its retries (every call has a time limit, 180 s by default, and retries with backoff) | Deterministic once logged | `ModelCallFailed`: the participant waits this wake (a `participant_error` note). A translator call that fails becomes "That couldn't be drafted just now." A debrief that fails is skipped (`debrief_skipped`). |
 | Participants wake each other without end at one moment | Deterministic | `RunStuck` after 1,000 rounds of wakes at one moment: the run stops with a diagnosis. |
-| Nothing makes progress (a module stuck in a loop, a kernel that stalls, a call that never returns despite its limit) | Timing | A watchdog thread sees the run's breadcrumbs stop. After `TERRARIUM_STALL_SECONDS` (default 300), it writes `<run>.failure.json` beside the log, saying what the run was doing, for whom, and when, and ends the process. |
+| Nothing makes progress (a module stuck in a loop, a kernel that stalls, a call that never returns despite its limit) | Timing | A watchdog thread sees the run's breadcrumbs stop. A model call in flight keeps them moving every 10 s for up to 20 minutes, beyond every adapter's own limits, so a slow but healthy call isn't taken for a stall. After `TERRARIUM_STALL_SECONDS` (default 300), it writes `<run>.failure.json` beside the log, saying what the run was doing, for whom, and when, and ends the process. |
 | The kernel process dies | Timing | `KernelDied` at once, with its exit code, never mistaken for an off-contract request. `<run>.failure.json` says so. |
 | One seed of a batch fails | Either | The other seeds finish and are measured. The CLI lists the failed seeds with their diagnoses, and exits 1. |
 | The spending limit is reached | By design | The run stops, says why, and debriefs from the 5% kept back. |
@@ -28,3 +28,12 @@ This runs the world again from the log's own config: not the world file, which m
 ## Your own modules
 
 `--modules FILE` (for `run` and `resume`) loads behaviour modules from a file exporting `modules: { [name]: BehaviourModule }`, which worlds then name in a controller's `impl`. The reliability tests use it for modules that hang or throw on purpose (`orchestrator/test/fixtures/faulty-modules.ts`).
+
+## Limits (as of 2026-09-28)
+
+- **A hang stops the whole run**, not only the module that hung. That's consistent with the split: a hang is a timing failure. Isolating each module in its own thread, so one could be stopped alone, isn't built.
+- **The watchdog runs for runs started by the CLI** (`run`, `run-one`, `resume`). A program calling `runWorld` directly passes its own `watchdog`, or has none.
+- **Resume re-runs from the start.** For a two-year town that takes seconds. For very long runs (centuries), resuming from a kernel checkpoint would be needed, restoring the kernel's state and every module's. Not built yet.
+- **Logs from before contracts v0.5** (the pilots of 2026-09-28) can't be resumed: the v0.5 kernel won't load their config.
+- **Resume is tested with the mock model** (including a log cut off mid-line), not yet against a real one.
+- **Resource growth over very long runs** (log size, memory) isn't addressed yet.
