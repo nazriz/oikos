@@ -30,15 +30,108 @@
       "child_male_bps": 5141,
       "adult_ages": [
         18,
-        80
+        99
       ],
       "mother_age_at_first_birth": [
         22,
         36
       ],
+      "child_max_age": 24,
       "group_size": [
         2,
         3
+      ],
+      "age_bands_bps": [
+        {
+          "from": 0,
+          "to": 4,
+          "bps": 538
+        },
+        {
+          "from": 5,
+          "to": 9,
+          "bps": 598
+        },
+        {
+          "from": 10,
+          "to": 14,
+          "bps": 619
+        },
+        {
+          "from": 15,
+          "to": 19,
+          "bps": 558
+        },
+        {
+          "from": 20,
+          "to": 24,
+          "bps": 515
+        },
+        {
+          "from": 25,
+          "to": 29,
+          "bps": 580
+        },
+        {
+          "from": 30,
+          "to": 34,
+          "bps": 593
+        },
+        {
+          "from": 35,
+          "to": 39,
+          "bps": 591
+        },
+        {
+          "from": 40,
+          "to": 44,
+          "bps": 563
+        },
+        {
+          "from": 45,
+          "to": 49,
+          "bps": 605
+        },
+        {
+          "from": 50,
+          "to": 54,
+          "bps": 640
+        },
+        {
+          "from": 55,
+          "to": 59,
+          "bps": 668
+        },
+        {
+          "from": 60,
+          "to": 64,
+          "bps": 700
+        },
+        {
+          "from": 65,
+          "to": 69,
+          "bps": 666
+        },
+        {
+          "from": 70,
+          "to": 74,
+          "bps": 602
+        },
+        {
+          "from": 75,
+          "to": 79,
+          "bps": 416
+        },
+        {
+          "from": 80,
+          "to": 84,
+          "bps": 279
+        },
+        {
+          "from": 85,
+          "to": 99,
+          "bps": 269
+        }
       ]
     },
     "life": {
@@ -545,7 +638,7 @@
   },
   "sources": {
     "currency": "Australian dollars, in cents.",
-    "households": "ABS, Census of Population and Housing 2021 (QuickStats, Australia): lone person 25.6%, group 3.9%, family 70.5% of households; of families, couple without children 38.8%, with children 43.7%, one parent 15.9%, other 1.6% (counted with groups). Children per family: AIFS, from the 2021 Census (3+ taken as 3). Same-sex couples 1.4% (Census 2021); one in five lone parents male (Census 2021); 105.8 boys per 100 girls (ABS, Births, Australia 2024). Placeholders: adult_female_bps (about half), group_size, mother_age_at_first_birth (around the median age of mothers, 32.1, ABS Births 2024), adult_ages (18-80 puts about a fifth of adults at 67 or over, near the census share; to replace with the census age distribution).",
+    "households": "ABS, Census of Population and Housing 2021 (QuickStats, Australia): lone person 25.6%, group 3.9%, family 70.5% of households; of families, couple without children 38.8%, with children 43.7%, one parent 15.9%, other 1.6% (counted with groups). Children per family: AIFS, from the 2021 Census (3+ taken as 3). Same-sex couples 1.4% (Census 2021); one in five lone parents male (Census 2021); 105.8 boys per 100 girls (ABS, Births, Australia 2024). Placeholders: adult_female_bps (about half), group_size, mother_age_at_first_birth (around the median age of mothers, 32.1, ABS Births 2024), adult_ages (18 to 99: the bounds; adults' ages are drawn from the census bands, households.age_bands_bps).",
     "life.qx_per_100000": "ABS, Life Tables 2021-2023 (Table 9, Australia): the probability of dying within a year, ages 0-100, per 100,000, males and females.",
     "life.illness": "Placeholder shaped by AIHW's age gradient of hospitalisations (99 per 1,000 at 5-14, 1,511 at 85+; 153 overnight per 1,000 overall, 2022-23); to replace with age-specific overnight rates.",
     "life.injury": "AIHW: 2,100 injury hospitalisations per 100,000 people (2022-23). Severity split: placeholder.",
@@ -593,7 +686,9 @@
     "services.complain_bps": "Placeholder: the chance a week that a household whose waste has gone two weeks uncollected writes to the town. Who reports and who doesn't varies (the service-request literature, e.g. Stowers 2022, State and Local Government Review); a rate is to be sourced.",
     "unions.membership_bps": "ABS, Trade union membership, August 2024: 13.1% of employees; by industry, manufacturing 9.0%, construction 11.7%, retail trade 7.0%, public administration and safety 23.1% (the industry figures to confirm against the release's tables). A factory's staff take manufacturing's, a shop's retail's, the builder's construction's, the town's public administration's; anyone else (`other`) the overall rate.",
     "unions.dues_per_month": "Placeholder: about $14 a week, around what large Australian unions charge full-time members (to source).",
-    "unions.claim_margin_bps": "Placeholder: a union claims the year's rise in prices and 2% more. Settlements are measured against the Department of Employment and Workplace Relations' Trends in Federal Enterprise Bargaining (average annualised wage increases in new agreements), a calibration target."
+    "unions.claim_margin_bps": "Placeholder: a union claims the year's rise in prices and 2% more. Settlements are measured against the Department of Employment and Workplace Relations' Trends in Federal Enterprise Bargaining (average annualised wage increases in new agreements), a calibration target.",
+    "households.age_bands_bps": "ABS, Census 2021 QuickStats, Rest of Vic. (GCCSA 2RVIC): people by five-year age group (median age 43); 85 and over taken to 99. The ages of adults living alone, as couples without children at home, or in groups are drawn from this, less the parents the family shares imply (the generator derives it: docs/behaviour/households.md).",
+    "households.child_max_age": "The census counts children of any age living with their parents; the ABS family coding counts full-time students to 24 as dependent children. Children at home are drawn up to 24 (a simplification: older children at home are left out)."
   },
   "targets": [
     {

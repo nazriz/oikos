@@ -70,8 +70,10 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const offersBy = recs.filter((r) => r.kind === "buying_offer" && r.speaks_for === "outside");
   const units = new Map<string, number>();
   // (Payments for exports settle the factory's invoice; other payments from outside are refunds.)
+  // (The offer is the one the factory's invoice was made under: an invoice can go out after the next offer.)
+  const invoices = new Map(recs.filter((r) => r.kind === "invoice").map((r) => [r.id, r]));
   for (const e of ev.filter((x) => x.event === "transfer" && x.from === "acc-outside" && x.to.startsWith("acc-factory") && x.settles)) {
-    const offer = offersBy.filter((o) => o.at <= e.t).at(-1)!;
+    const offer = offersBy.find((o) => o.id === invoices.get(e.settles)?.basis)!;
     expect(Number(e.amount) % offer.data.unit_price).toBe(0);
     const f = e.to.replace("acc-", "");
     const k = `${f}|${offer.id}`;

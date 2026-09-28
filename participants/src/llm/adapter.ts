@@ -31,6 +31,9 @@ export interface LlmRequest {
   purpose: Purpose;
   /** The participant or translator this call is for (usage annotations name it). */
   subject: string;
+  /** What the call is about, where there's a record of it (the translator's: the draft it's writing), so its transcript
+   * can be joined to the rest of the record (docs/measurement.md, the translator corpus). */
+  ref?: string;
   system: string;
   messages: LlmMessage[];
   tools?: ToolSpec[];

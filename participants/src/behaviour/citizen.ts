@@ -125,8 +125,8 @@ export const citizen: BehaviourModule = {
     let home: Home | null = null;
     let job: Job | null = null;
     let homeSite: SiteStructure | undefined; // our home's building, as we last saw it
-    let striking: { employer: string; out: boolean } | null = null; // on strike (protected action), from our job
-    let backToWork = false; // the stoppage is over: back into the workplace
+    let striking: { employer: string; out: boolean; left?: string } | null = null; // on strike (protected action), from our job; the workplace we left
+    let backTo: { employer: string; space: string } | null = null; // the stoppage is over: back into the workplace we left
     let joinAsked = ""; // the job we've asked to join the union for
     let complainedOf: string | null = null; // the home we've complained about, until it's seen to
     // Moving to a better-paid job: the offer we've taken, to sign once our notice at the old one is worked out.
@@ -245,8 +245,8 @@ export const citizen: BehaviourModule = {
         if (!(r.addressed_to ?? []).includes(me)) continue;
         if (r.kind === "stop_work" && r.data?.employer === job.employer && !striking) striking = { employer: job.employer, out: false };
         if (r.kind === "return_to_work" && striking && r.data?.employer === striking.employer) {
+          backTo = striking.left ? { employer: striking.employer, space: striking.left } : null;
           striking = null;
-          backToWork = true;
           job.paidAt = obs.t; // our pay restarts from now (none for the time on strike)
         }
       }
@@ -567,11 +567,13 @@ export const citizen: BehaviourModule = {
       }
       if (striking && !striking.out && job) {
         striking.out = true;
-        steps.push(because(`The union's stoppage at ${job.employer}: stopping work.`, ...(job.workplace && inside(job.workplace) ? [moveOut(job.workplace, me)] : [])));
+        striking.left = job.workplace && inside(job.workplace) ? job.workplace : undefined;
+        steps.push(because(`The union's stoppage at ${job.employer}: stopping work.`, ...(striking.left ? [moveOut(striking.left, me)] : [])));
       }
-      if (backToWork) {
-        backToWork = false;
-        if (job?.workplace) steps.push(because("The stoppage is over: back to work.", moveIn(job.workplace)));
+      if (backTo) {
+        // (Only if we still work there: a job may have ended, or another begun, in the meantime.)
+        if (job?.employer === backTo.employer && job.workplace === backTo.space) steps.push(because("The stoppage is over: back to work.", moveIn(backTo.space)));
+        backTo = null;
       }
 
       // A rent increase on our home (the landlord's notice, as the tenancy law allows): if we can still afford it, we pay

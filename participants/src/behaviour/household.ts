@@ -118,7 +118,14 @@ export interface HouseholdSpec {
   adult_female_bps: number; // adults living alone or in groups
   child_male_bps: number; // the sex ratio at birth
   adult_ages: [number, number];
+  /** The ages of adults living alone, as couples without children at home, or in groups: shares by band (basis points).
+   * None: uniform over `adult_ages`. (A generator derives it from the census, less the parents the family shares imply.) */
+  adult_age_bands?: { from: number; to: number; bps: number }[];
+  /** The whole population by age band (the census): what `adult_age_bands` is derived from. */
+  age_bands_bps?: { from: number; to: number; bps: number }[];
   mother_age_at_first_birth: [number, number];
+  /** The oldest a child living with their parents can be (the census counts children of any age at home); 17 if none. */
+  child_max_age?: number;
   group_size: [number, number];
 }
 
@@ -143,6 +150,13 @@ export function drawHousehold(H: HouseholdSpec, below: (n: number) => number): D
   const person = (age: number, sex: "female" | "male") => members.push({ age, day: below(365), sex }) - 1;
   const clampAge = (a: number) => Math.max(H.adult_ages[0], Math.min(H.adult_ages[1], a));
   const adultSex = () => (chance(H.adult_female_bps) ? "female" : "male");
+  // An adult not a parent at home: from the bands if given (a band by its share, then a year within it), else uniform.
+  const adultAge = () => {
+    const bands = (H.adult_age_bands ?? []).filter((b) => b.bps > 0);
+    if (!bands.length) return within(H.adult_ages);
+    const b = bands[byShare(bands.map((x) => x.bps))]!;
+    return clampAge(within([Math.max(b.from, H.adult_ages[0]), Math.min(b.to, H.adult_ages[1])]));
+  };
   const couple = (age: number): [number, number] => {
     const other = clampAge(age + below(11) - 5);
     if (chance(H.same_sex_couple_bps)) {
@@ -152,19 +166,19 @@ export function drawHousehold(H: HouseholdSpec, below: (n: number) => number): D
     return [person(age, "female"), person(other, "male")];
   };
   const kind = byShare([H.lone_bps, H.group_bps, H.couple_bps, H.couple_children_bps, H.one_parent_bps]);
-  if (kind === 0) return { members, couples: [], leaseholder: person(within(H.adult_ages), adultSex()) };
+  if (kind === 0) return { members, couples: [], leaseholder: person(adultAge(), adultSex()) };
   if (kind === 1) {
     const n = within(H.group_size);
-    for (let i = 0; i < n; i++) person(within(H.adult_ages), adultSex());
+    for (let i = 0; i < n; i++) person(adultAge(), adultSex());
     return { members, couples: [], leaseholder: 0 };
   }
   if (kind === 2) {
-    const c = couple(within(H.adult_ages));
+    const c = couple(adultAge());
     return { members, couples: [c], leaseholder: c[0] };
   }
   // Children first (the eldest sets the parents' ages: older by the mother's age at a first birth).
   const n = 1 + byShare(kind === 3 ? H.children_couple : H.children_one_parent);
-  const eldest = below(18);
+  const eldest = below((H.child_max_age ?? 17) + 1);
   let age = eldest;
   for (let i = 0; i < n; i++) {
     person(age, chance(H.child_male_bps) ? "male" : "female");
@@ -181,4 +195,33 @@ export function drawHousehold(H: HouseholdSpec, below: (n: number) => number): D
   const lone = person(parentAge, chance(H.lone_parent_female_bps) ? "female" : "male");
   for (const k of kids) members[k]!.parents = [lone];
   return { members, couples: [], leaseholder: lone };
+}
+
+/**
+ * The ages of adults who aren't parents at home (living alone, as couples without children, or in groups), so that all
+ * adults together follow the census (`age_bands_bps`): the census's adults in each band, less the parents the family
+ * shares put there (estimated by drawing `n` households), as shares (docs/behaviour/households.md). None without the
+ * census bands.
+ */
+export function adultAgeBands(H: HouseholdSpec, below: (n: number) => number, n = 20_000): HouseholdSpec["adult_age_bands"] {
+  const census = H.age_bands_bps;
+  if (!census?.length) return undefined;
+  const [lo, hi] = H.adult_ages;
+  const bands = census.filter((b) => b.to >= lo).map((b) => ({ from: Math.max(b.from, lo), to: Math.min(b.to, hi), bps: (b.bps * (Math.min(b.to, hi) - Math.max(b.from, lo) + 1)) / (b.to - b.from + 1) }));
+  const band = (age: number) => bands.findIndex((b) => age >= b.from && age <= b.to);
+  const parents = bands.map(() => 0);
+  let adults = 0;
+  for (let i = 0; i < n; i++) {
+    const d = drawHousehold({ ...H, adult_age_bands: undefined }, below);
+    for (const m of d.members) {
+      if (m.age < lo) continue;
+      adults++;
+      const isParent = d.members.some((k) => k.parents?.includes(d.members.indexOf(m)));
+      if (isParent && band(m.age) >= 0) parents[band(m.age)]!++;
+    }
+  }
+  const total = bands.reduce((x, b) => x + b.bps, 0);
+  const need = bands.map((b, i) => Math.max(0, (b.bps / total) * adults - parents[i]!));
+  const sum = need.reduce((a, b) => a + b, 0) || 1;
+  return bands.map((b, i) => ({ from: b.from, to: b.to, bps: Math.round((need[i]! * 10_000) / sum) }));
 }

@@ -80,7 +80,7 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
   await io.annotate({
     annotation: "transcript", subject: req.subject,
     data: {
-      purpose: req.purpose, t: io.now(), provider: adapter.provider, model: adapter.model, system_sha256: systemHash,
+      purpose: req.purpose, ...(req.ref ? { ref: req.ref } : {}), t: io.now(), provider: adapter.provider, model: adapter.model, system_sha256: systemHash,
       ...(newSystem ? { system: req.system } : {}),
       turn: req.messages.length, input: last?.content ?? "", output: res.content,
       ...(res.estimated ? { usage_estimated: true } : {}),

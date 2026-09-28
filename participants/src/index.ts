@@ -9,7 +9,7 @@ export { View } from "./view";
 export { ASKING } from "./behaviour/citizen";
 export { repayment } from "./behaviour/credit";
 export { annualTax, withholding, type IncomeTaxLaw } from "./behaviour/tax";
-export { drawHousehold, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
+export { adultAgeBands, drawHousehold, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
 import { disposal, exportDemand, funding, grants, idle, migration, trade, transfers, valuer } from "./behaviour/world";

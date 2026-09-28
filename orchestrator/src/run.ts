@@ -585,9 +585,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       }
       // Earlier attempts the translator retried (its own, not the participant's): kept on record.
       for (const [i, x] of (tr.retries ?? []).entries())
-        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason.slice(0, 8000), ...(x.call ? { call: x.call } : {}) } } } });
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
       if (!tr.ok) {
-        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text.slice(0, 8000), reason: tr.notices.join(" ").slice(0, 8000), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw).slice(0, 8000) } : {}) } } });
+        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: tr.notices.join(" "), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw) } : {}) } } });
         for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
         return true;
       }

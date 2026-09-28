@@ -187,7 +187,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
       const retries: { call?: string; reason: string }[] = [];
       for (let n = 1; ; n++) {
         const res = await callModel(io, {
-          purpose: "translator", subject: id, system: translatorSystem(), maxTokens: 1000, tools: TOOLS, messages,
+          purpose: "translator", subject: id, ref: req.draftId, system: translatorSystem(), maxTokens: 1000, tools: TOOLS, messages,
           context: { proposal: req.proposal, participant: req.participant, attempt: n },
         }, seen);
         const out = res.content.find((b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use" && b.name === "call");

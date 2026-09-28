@@ -47,6 +47,9 @@ export const retailer: BehaviourModule = {
         demand: 250, // what it expects to sell in a month, before it knows
         unpaid_days: 7,
         serve_within_days: 3, // what isn't served within this is refunded (the customer goes elsewhere)
+        // The share of its staff's hours a shop plans to fill with serving (placeholder): serving can't be stored, and
+        // orders come in lumps, so hands for exactly the average leave queues that never clear (Kingman 1961).
+        utilisation_bps: 8000,
         lender: "bank", // whom it borrows from
         // Insolvency (docs/behaviour/insolvency.md; placeholders): short of wages this long with no credit, or in default on
         // a loan, and it winds up over this long.
@@ -215,7 +218,7 @@ export const retailer: BehaviourModule = {
           price = moved.price;
           if (moved.why) priceWhy = moved.why;
           // Headcount: a worker at a time towards the hands last month's sales needed.
-          const needed = Math.min(p.max_staff, Math.max(p.min_staff, Math.ceil((lastDemand * p.serve_labour) / hoursPerWorkerMonth)));
+          const needed = Math.min(p.max_staff, Math.max(p.min_staff, Math.ceil((lastDemand * p.serve_labour * 10_000) / (hoursPerWorkerMonth * p.utilisation_bps))));
           headcount = workers.length;
           headcountWhy = why.length ? `; ${why.join("; ")}` : "";
           if (needed > workers.length) {
@@ -285,7 +288,8 @@ export const retailer: BehaviourModule = {
           const have = stock + onOrder;
           const best = offers[0]!;
           // As much as we can pay for, keeping the next pay period's wages aside (and at least the supplier's minimum).
-          const affordable = Math.floor((acc.balance - workers.length * wage) / best.unit);
+          // (Keeping the next pay period's wages for the staff we have or are hiring to: this month's headcount.)
+          const affordable = Math.floor((acc.balance - Math.max(workers.length, headcount) * wage) / best.unit);
           if (have < mid) {
             const q = Math.min(Math.max(best.min, top - have), affordable);
             if (q >= best.min) {

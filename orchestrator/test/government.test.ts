@@ -15,7 +15,8 @@ const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
 test("budget, park and rates run through the town's own procedures", async () => {
-  const config = generate({ ...spec, citizens: 80, mayor: "code" });
+  // (Landlords who pay what they owe: whether they do is a propensity, not what's tested here.)
+  const config = generate({ ...spec, citizens: 80, mayor: "code", landlord_compliance_bps: 10_000 });
   // A payment from the town's account instructed by the mayor, a post the town
   // has not named as a signatory: the bank should decline it.
   config.world.records.push({ id: "mayor-direct", record: "statement", author: "mayor-system", in_position: "mayor", speaks_for: "city", at: 0, visible_to: ["city", "bank"], kind: "request", addressed_to: ["bank"],

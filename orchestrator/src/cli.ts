@@ -11,6 +11,9 @@
 //     prices the cost projection.
 //   terrarium measure <DIR> [QUERY...] [--sql "select ..."] [--list]
 //   terrarium cost <DIR> [--translator-model provider/model]
+//   terrarium corpus <DIR|log.jsonl> [--out FILE]
+//     The translator corpus: every translation in the logs (proposal, the translator's exchange, call, resolution, dry
+//     run, the participant's decision, what the kernel did), one JSON line each, for training the translator later.
 //   terrarium translator-eval --model provider/model [--budget DOLLARS] [--base-url URL] [--out FILE]
 //     The translator's test set (translator/eval/cases.ts) on a real model: seen and held-out pass rates, and cost.
 //   terrarium replay <log.jsonl> [--anchors <anchors.jsonl>]      (the kernel's own replay)
@@ -18,7 +21,7 @@
 //
 // A DIR is a batch folder (its measure/ is used) or a folder of logs (exported to DIR/measure first).
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, queries, query, runQuery, table } from "@terrarium/measure";
 import { runBatch, runOne } from "./batch";
@@ -89,6 +92,15 @@ try {
     const r = await evaluate(m.adapter, { prices: m.prices, ...(m.budget ? { budget: m.budget } : {}) });
     console.log(reportText(r));
     if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(r, null, 2));
+  } else if (cmd === "corpus" && positional()[0]) {
+    // The translator corpus: every translation in the logs, as training examples (docs/measurement.md).
+    const { corpusOf, logsIn } = await import("./corpus");
+    const src = positional()[0]!;
+    const out = flag("out") ?? (statSync(src).isDirectory() ? join(src, "translator-corpus.jsonl") : src.replace(/\.jsonl$/, ".translator-corpus.jsonl"));
+    const rows = (await Promise.all(logsIn(src).map(corpusOf))).flat();
+    await Bun.write(out, rows.map((r) => JSON.stringify(r)).join("\n") + (rows.length ? "\n" : ""));
+    const real = rows.filter((r) => !r.synthetic).length;
+    console.log(`${rows.length} translations (${real} from real models, ${rows.length - real} synthetic) into ${out}: ${rows.filter((r) => r.result === "drafted").length} drafted, ${rows.filter((r) => r.result === "failed").length} failed; ${rows.filter((r) => r.executed?.applied).length} carried out and applied.`);
   } else if (cmd === "cost" && positional()[0]) {
     console.log((await costReport(await measureDir(positional()[0]!), { translatorModel: flag("translator-model") })).text);
   } else if (cmd === "story" && positional()[0]) {

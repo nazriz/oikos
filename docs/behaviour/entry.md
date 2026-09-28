@@ -6,7 +6,7 @@
 
 1. **Premises come up for sale.** A closed firm offers its premises (the lot's title, and the building on it) with a public `property_for_sale` statement, at a share of what building them new costs (`premises_sale_bps`, 50%, a placeholder). If they're unsold after `reprice_days` (30), the asking price comes down by `reprice_bps` (10%), and again after as long, until someone buys (placeholders; the way an unsold property's price comes down).
 2. **Someone founds a business to buy them.** Once a month, a working-age citizen in the labour force looks at the premises for sale of a kind the world has a *venture* for. The generated town has one venture: a shop. They found a business if all of these hold:
-   - they have the savings for the price, plus the venture's capital (wages and stock until sales come in: $50,000, a placeholder), plus a buffer of three months' housing and essentials;
+   - they have the savings for the price, plus the venture's capital (derived from the town's own figures: a month's stock at the wholesale price and three months' wages for a shop's opening staff, until customers find it: about $91,000 in the generated town), plus a buffer of three months' housing and essentials;
    - they pass the month's chance, `found_bps` (2%, a placeholder to calibrate against business entry rates).
 3. **The business is founded.** Founding is the `entity` call: a new organisation, whose first position (Manager) the founder holds. That position has the channels and role module the venture's template gives it. The business's rules run in the position, as a manager follows the shop's routines.
 4. **It sets itself up.** The new shop:

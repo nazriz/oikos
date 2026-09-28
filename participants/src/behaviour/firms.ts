@@ -40,7 +40,9 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
       sent = undefined;
       absorb(obs);
       if (plannedAt !== obs.t) {
-        todo = plan(obs).filter((s) => s.length);
+        // What a wake didn't get to (it allows only so many actions) is done first at the next: a module's state already
+        // counts on it (a price it holds as published, a payment as made), so it's never dropped.
+        todo = [...todo, ...plan(obs).filter((s) => s.length)];
         plannedAt = obs.t;
       }
       todo.unshift(...follow.filter((s) => s.length));

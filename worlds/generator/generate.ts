@@ -6,10 +6,12 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { drawHousehold, Randomness, withholding, type HouseholdSpec, type IncomeTaxLaw } from "@terrarium/participants";
+import { adultAgeBands, drawHousehold, Randomness, withholding, type HouseholdSpec, type IncomeTaxLaw } from "@terrarium/participants";
 import law from "../law/basic.json";
 import { loadProfile, type Profile } from "./profile";
 
+/** The share of its staff's hours a shop plans to fill with serving (firm.retailer's default; placeholder). */
+const SHOP_UTILISATION_BPS = 8000;
 /** The builder's margin over its costs (its published prices; placeholder). */
 const BUILD_MARKUP_BPS = 2000;
 const HOUR = 3600;
@@ -224,6 +226,11 @@ export function generate(spec: TownSpec): any {
   const occupancy: any[] = [];
   // Households first (docs/behaviour/households.md): who lives together, their ages and sexes, as the census counts them.
   const H: HouseholdSpec = { ...V.households, ...spec.households };
+  // Adults who aren't parents at home take the census's ages, less the parents the family shares imply.
+  if (!H.adult_age_bands) {
+    const ar = rng("age-bands");
+    H.adult_age_bands = adultAgeBands(H, (n) => ar.below(n));
+  }
   const hr = rng("households");
   interface Person { id: string; born_at: number; sex: "female" | "male"; adult: boolean; parents?: string[] }
   interface Household { members: Person[]; couples: [string, string][]; leaseholder: string }
@@ -259,7 +266,8 @@ export function generate(spec: TownSpec): any {
     const spend = Math.max(0, (income * (10_000 - V.spending.saving_bps)) / 10_000 - Math.floor((households.length * spec.housed_bps) / 10_000) * meanRent);
     SHOP.demand = Math.max(20, Math.floor(spend / RETAIL_PRICE / Math.max(1, shops.length)));
     const hoursPerWorkerMonth = ((WORKING_DAY * 6) / 7) * 30; // a shop opens 6 days of 7
-    for (const w of workplaces) if (w.employer.startsWith("shop-")) w.start = Math.min(w.capacity, Math.max(1, Math.ceil((SHOP.demand * SERVE) / hoursPerWorkerMonth)));
+    // (At the shops' planned utilisation of their staff's hours: docs/behaviour/retailer.md.)
+    for (const w of workplaces) if (w.employer.startsWith("shop-")) w.start = Math.min(w.capacity, Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / (hoursPerWorkerMonth * SHOP_UTILISATION_BPS))));
   }
   const jobSlots = workplaces.flatMap((w) => Array.from({ length: w.start ?? w.capacity }, () => w));
   let job = 0;
@@ -626,7 +634,9 @@ export function generate(spec: TownSpec): any {
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {
-    kind: "shop", name: "Shop", capital: 5_000_000, // beyond the premises: wages and stock until sales come in (placeholder)
+    // Beyond the premises: a month's stock at the wholesale price, and three months' wages for a shop's opening staff
+    // (until customers find it: they change shops only now and then). Derived from the town's own figures.
+    kind: "shop", name: "Shop", capital: SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / (14 * DAY)) * Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / ((((WORKING_DAY * 6) / 7) * 30) * SHOP_UTILISATION_BPS))),
     channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer", "property_for_sale", "property_sold"] } },
       { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: ["{cell}"], occupants: "names" }],
     role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", max_staff: 6, wage: wages.shop, period: 14 * DAY, working_day: WORKING_DAY,

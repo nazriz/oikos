@@ -99,3 +99,11 @@ Two batches: `town-1000.yaml`, five seeds, two years each.
 - About 11 drafts per run, all confirmed.
 - No failed translations.
 - Projected cost at Sonnet 5 prices: about $0.70 per run.
+
+## The translator corpus
+
+Every run with language-model participants is also training data for the translator. The log keeps all of it: the participant's proposal; the translator's exchange, turn by turn (its transcripts carry the draft they were for, `data.ref`, and the system prompt is logged in full once, then by hash); the call it wrote, what that resolved to and the kernel's dry run (the `draft` annotation); retries and failures, with the model's raw answer (never cut short); the participant's decision (`signoff`); and, if it was carried out, whether the kernel applied it (the command's `provenance.draft` and its events).
+
+`terrarium corpus <DIR|log.jsonl> [--out FILE]` joins these into one JSON line per translation (`orchestrator/src/corpus.ts`), by default `DIR/translator-corpus.jsonl`. Examples from the mock are marked `synthetic`: only real models' are fit to train on. `orchestrator/test/corpus.test.ts` checks every translation reads back whole.
+
+**Keep every real-model run.** Its log is the only source of this data, and a real model's answers can't be made again. Never delete a language-model run's folder (or its log) to free space.

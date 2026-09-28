@@ -32,9 +32,13 @@ test("households live, move and pay together", async () => {
     if (e.event === "vacated" && home.get(e.occupant) === e.space) home.delete(e.occupant);
     if (e.event === "person_left" || e.event === "person_died") left.add(e.person);
   }
-  // At the end, each household still in town (the living) lives in one home (or none), bar one caught mid-move.
+  // At the end, each household still in town (the living) lives in one home (or none), bar one caught mid-move: one
+  // whose leaseholder moved in the last fortnight is still bringing the household over (members follow at their next wake).
+  const movedAt = new Map<string, number>();
+  for (const e of ev) if (e.event === "occupied" && e.space.includes("/dwelling.")) movedAt.set(e.occupant, e.t);
   let split = 0;
   for (const h of households) {
+    if ((movedAt.get(h.leaseholder) ?? -Infinity) > 365 * DAY - 14 * DAY) continue;
     const here = h.members.filter((m: any) => !left.has(m.person));
     const homes = new Set(here.map((m: any) => home.get(m.person) ?? "none"));
     if (homes.size > 1) split++;
@@ -72,12 +76,14 @@ test("a child born here is brought home by the parent who bore them and added to
   const ev = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
   const births = ev.filter((e) => e.event === "person_created" && e.parents?.length);
   expect(births.length).toBeGreaterThan(0);
-  const female = new Set(config.world.entities.filter((e: any) => e.sex === "female").map((e: any) => e.id));
+  // (Women living here from the start, and those who came or were born since.)
+  const female = new Set([...config.world.entities.filter((e: any) => e.sex === "female").map((e: any) => e.id), ...ev.filter((e) => e.event === "person_created" && e.sex === "female").map((e) => e.person)]);
   const records = ev.filter((e) => e.event === "recorded" && e.record.kind === "household").map((e) => e.record);
   for (const b of births) {
     expect(female.has(b.parents[0])).toBe(true); // borne by a woman
     expect(["female", "male"]).toContain(b.sex); // drawn by the kernel
     if (365 * DAY - b.t < 14 * DAY) continue; // born in the run's last fortnight
+    if (ev.some((e) => e.event === "person_left" && e.person === b.parents[0] && e.t < b.t)) continue; // born away (the mother had left town)
     expect(records.some((r) => r.data.members.some((m: any) => m.person === b.person && m.sex === b.sex))).toBe(true);
     const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person);
     if (home) expect(home.by).toBe(`${b.parents[0]}-self`);
