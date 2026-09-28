@@ -1,4 +1,4 @@
-# Firms: `firm.landlord` (v0.5.0) and `firm.employer` (v0.4.0)
+# Firms: `firm.landlord` (v0.6.0) and `firm.employer` (v0.5.0)
 
 **Source:** `participants/src/behaviour/firms.ts`. Both wake weekly and whenever something names them.
 
@@ -13,6 +13,7 @@
 | **Counting homes as taken** | Homes under a lease in force, *or* offered and still awaiting the tenant's signature (up to a month) | Found in M1: counting only signed leases let the same flat twice |
 | **Letting only what's free** | A listing being let is never also relisted in the same plan. Before offering a lease, the landlord checks the building still has a free home; if not, it withdraws the listing | Found with D43: a monthly rent cut relisted a home in the same plan that let it, and the stale listing was let again later |
 | **Who it lets to** | Among applicants, it turns down households with more than two people per bedroom (`max_people_per_bedroom`; 0 for no limit) and picks among the rest at random. The lease names the leaseholder and, in its terms, the household ([households.md](households.md)). | The occupancy standard's own ceiling (CNOS); whether a landlord applies it is a placeholder policy |
+| **A tenant's death** | Seen in its own buildings (it sees them by name): it reports it to the registry, if nobody has. Once registered, it gives notice on the lease. | Victoria: a sole tenant's death ends the tenancy after notice; a household member may apply to take it over (not modelled yet) |
 | **Arrears** | After 2 months' unpaid rent, give notice | A typical landlord practice, not a law: what tenancy law requires is a record the landlord may follow or not |
 | **Development** | Builds on its own empty sites when average vacancy over 90 days is ≤10% and it can afford it. Applies for a permit; if refused, complies with probability `compliance_bps`, otherwise builds anyway. Pays fines and obeys demolition orders with the same probability. | [institutions.md](institutions.md) |
 | **Tax** | Monthly, with owners' spending: a `tax_report` to the town of rent received, and payment at the rate it believes the tax law sets (`tax_rate_bps`, supplied by the world). A non-complying landlord (probability `1 − compliance_bps` each month) reports only half. It pays tax penalties like fines. | Tax evasion as a gamble on detection (Allingham & Sandmo 1972). Here the tax clerk can't detect it at all yet. See [government.md](government.md). |
@@ -32,6 +33,9 @@
 | **Suppliers** | Monthly: 40% of the month's revenue paid to the outside world, for goods bought in |
 
 The labour-market literature (the Dosi et al. "Schumpeter meeting Keynes" labour extension) is the planned refinement for wage-setting and hiring.
+
+
+**A worker's death** (v0.5.0): on the registration, it stops the wages and ends the employment on record; the post is advertised again as staffing allows.
 
 ## Calibration notes for the checkpoint
 

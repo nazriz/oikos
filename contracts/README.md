@@ -106,7 +106,7 @@ Perception comes only through channels, plus the participant's inbox and the out
 |---|---|
 | `accounts` | Accounts the entity acted for holds or has custody of, and their transactions |
 | `records` | Records matching a filter (record type, statement kind, entities involved) that the participant is allowed to see |
-| `sites` | The physical state of an area, cell by cell: the building on each (on every cell of its footprint), construction, and each space's occupancy (count; names where the channel shows them). This is how an inspector *notices*. |
+| `sites` | The physical state of an area, cell by cell: the building on each (on every cell of its footprint), construction, and each space's occupancy (count; names where the channel shows them, with the space's last few departures: who left, why and when, so a household sees a member die). This is how an inspector *notices*. |
 | `directory` | Who exists (and which participant each person is), and the positions: whose, and who holds them |
 
 **Perception is changes, not snapshots (D42).** Each look through a channel delivers what changed within its scope since the previous look through it in that capacity. A first look delivers everything the channel covers. The runtime keeps a **view** per capacity (`participants/src/view.ts`) and gives the controller the current picture. A kernel invariant test checks that a view built from looks always equals the full picture (`kernel/tests/perception.rs`), and an orchestrator test checks it on a running town. Any channel can have `every`; between looks, changes accumulate.

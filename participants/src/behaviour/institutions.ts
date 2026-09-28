@@ -181,3 +181,72 @@ export const builder: BehaviourModule = {
   },
 };
 
+
+/**
+ * city.registry: the registry of deaths (after Victoria's Registry of Births, Deaths and Marriages, where a death
+ * is registered from a notification). It reads death notifications addressed to the town and, once per death,
+ * publishes a public registration with what it was told: who died, who reported it, the partner, the children and
+ * any children left with no adult at home. It doesn't check what it's told (a later module could).
+ */
+export const registry: BehaviourModule = {
+  name: "city.registry",
+  version: "0.1.0",
+  doc: "docs/behaviour/institutions.md",
+  cadence: () => DAY,
+  create(_ctx: ParticipantContext) {
+    const book = new Book();
+    const registered = new Set<string>();
+    return stepper(
+      (obs) => void book.absorb(obs),
+      (obs) => {
+        const me = obs.entity;
+        const steps: Step[] = [];
+        for (const r of book.all("death_registration")) registered.add(r.data?.deceased);
+        for (const n of book.open("death_notification")) {
+          const who = n.data?.deceased;
+          if (!who || registered.has(who) || !(n.addressed_to ?? []).includes(me)) continue;
+          registered.add(who);
+          const d = n.data;
+          steps.push(because(`A death is reported to us (${who}, by ${n.speaks_for}): registering it.`, say("death_registration", `Death registered: ${who}.`, {
+            basis: n.id, visible: "public",
+            data: { deceased: who, reported_by: n.speaks_for, ...(d.partner ? { partner: d.partner } : {}), children: d.children ?? [], without_adult: d.without_adult ?? [] },
+          })));
+        }
+        return steps;
+      },
+    );
+  },
+};
+
+/**
+ * city.child_protection: children left with no adult at home. On a death registration naming children without an
+ * adult, or a child's own request for help, it takes them into care, which (the town having no foster homes yet)
+ * is care elsewhere: they leave the town with the office's worker. After Victoria's child protection service, much
+ * simplified (docs/behaviour/institutions.md).
+ */
+export const childProtection: BehaviourModule = {
+  name: "city.child_protection",
+  version: "0.1.0",
+  doc: "docs/behaviour/institutions.md",
+  cadence: () => DAY,
+  create(_ctx: ParticipantContext) {
+    const book = new Book();
+    const taken = new Set<string>();
+    return stepper(
+      (obs) => void book.absorb(obs),
+      () => {
+        const steps: Step[] = [];
+        const children = [
+          ...book.all("death_registration").flatMap((r) => (r.data?.without_adult ?? []) as string[]),
+          ...book.all("care_request").flatMap((r) => (r.data?.children ?? []) as string[]),
+        ];
+        for (const c of children) {
+          if (taken.has(c)) continue;
+          taken.add(c);
+          steps.push(because("A child with no adult at home: taking them into care elsewhere.", C.call("presence", { who: c, leave: "yes" })));
+        }
+        return steps;
+      },
+    );
+  },
+};

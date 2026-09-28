@@ -19,7 +19,7 @@ interface Payment { instruction: string; from: string; to: string; amount: numbe
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -27,6 +27,8 @@ export const bankPaymentSystem: BehaviourModule = {
     const verifyAuthor = ctx.params.verify_author ?? true;
     const maxBatch = Math.min(32, ctx.params.max_batch ?? 32);
     const done = new Set<string>(); // one-off instructions handled
+    const settled = new Set<string>(); // death registrations whose estates we've settled
+    const p = { town: (ctx.params.town as string | undefined) ?? "city" };
     const nextDue = new Map<string, number>(); // standing order -> next due time
     let queue: Payment[] = [];
     let queuedAt = -1;
@@ -48,8 +50,11 @@ export const bankPaymentSystem: BehaviourModule = {
       const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, a]));
       const instructions = book.all("request").filter((r) => (r.addressed_to ?? []).includes(me)).sort((a, b) => (a.id < b.id ? -1 : 1));
       const out: Payment[] = [];
+      // Deaths registered: the dead person's instructions are no longer carried out (law-succession).
+      const deaths = book.all("death_registration");
+      const dead = new Set(deaths.map((r) => r.data?.deceased as string));
       for (const ins of instructions) {
-        if (withdrawn.has(ins.id)) continue;
+        if (withdrawn.has(ins.id) || dead.has(ins.speaks_for ?? "")) continue;
         // Requests the bank can't carry out get a reply, once, as a real bank's would (§9.3).
         const cannot = (why: string) => {
           if (done.has(ins.id)) return;
@@ -72,6 +77,7 @@ export const bankPaymentSystem: BehaviourModule = {
         }
         const d = { from: m.from, to: m.to, pay: m.amount, settles: m.settles, every: ins.data.every, first: ins.data.first };
         const acc = custody.get(d.from);
+        if (acc && dead.has(acc.holder)) continue; // the account holder has died: it pays out only to settle the estate
         if (!acc) {
           cannot(`this bank doesn't keep account ${d.from}.`);
           continue;
@@ -100,6 +106,24 @@ export const bankPaymentSystem: BehaviourModule = {
         } else if (!done.has(ins.id)) {
           done.add(ins.id);
           out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at, ...(typeof d.settles === "string" && book.records.has(d.settles) ? { settles: d.settles } : {}) });
+        }
+      }
+      // Settling an estate, as law-succession says: to the partner; else equally to the adult children; else the town.
+      const accountOf = (holder: string) => [...custody.values()].find((a) => a.holder === holder && !dead.has(holder))?.account;
+      for (const r of deaths) {
+        if (settled.has(r.id)) continue;
+        settled.add(r.id);
+        const heirs = [r.data?.partner].filter((x): x is string => !!x && !!accountOf(x));
+        if (!heirs.length) heirs.push(...((r.data?.adult_children ?? []) as string[]).filter((x) => !!accountOf(x)));
+        const to = heirs.length ? heirs.map((h) => accountOf(h)!) : [accountOf(p.town)].filter((x): x is string => !!x);
+        if (!to.length) continue;
+        for (const acc of custody.values()) {
+          if (acc.holder !== r.data?.deceased || acc.balance <= 0) continue;
+          const each = Math.floor(acc.balance / to.length);
+          to.forEach((account, i) => {
+            const amount = i === 0 ? acc.balance - each * (to.length - 1) : each;
+            if (amount > 0) out.push({ instruction: r.id, from: acc.account, to: account, amount, due: obs.t });
+          });
         }
       }
       out.sort((a, b) => a.due - b.due || (a.instruction < b.instruction ? -1 : 1));

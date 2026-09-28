@@ -298,6 +298,11 @@ export async function runWorld(o: RunOptions): Promise<RunSummary> {
     return r === null ? { ok: false, error: "the blocks could not be read" } : r.check;
   }, typeOf);
 
+  // Welfare (VISION §15; D55): a world that offers violence (life.harm) to language-model people says so in the log.
+  const modelPeople = [...cfg.participants, ...(cfg.templates ?? [])].filter((x: any) => x.kind === "person" && x.controller?.type === "llm").map((x: any) => x.id);
+  if (cfg.life?.harm && modelPeople.length)
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { welfare: "this world lets language-model people physically harm others (life.harm is set)", participants: modelPeople } } });
+
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {
     version: ORCHESTRATOR_VERSION, modules: used, thinking_time: cfg.orchestration.thinking_time, max_actions_per_wake: cfg.orchestration.max_actions_per_wake, confirm,

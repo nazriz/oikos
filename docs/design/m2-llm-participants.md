@@ -65,6 +65,10 @@ Replay needs no model: annotations are copied verbatim, and the acts are re-appl
 - **Framing** comes from the world config (disclosure, system text, and a mandatory reason). The example town uses honest disclosure ("a simulated town used for research").
 - **Debrief:** if `framing.debrief` is set, the seat is told at the end what the run was and asked for its reaction, and is told it may say nothing. If the framing wasn't "simulation", the debrief says how and why it was framed. The reply is logged as data.
 - **Scale awareness** (§15.5) becomes real once real models run: batch sizes for pressure scenarios should be justified per experiment.
+- **Bodies (D55; Naz, 2026-09-28: "yes to ai welfare"):**
+  - **Violence is withheld by default.** Harm exists as physics only in a world that sets `life.harm`. The generated town doesn't, so `harm` is refused as not modelled, for code and model participants alike. A study that offers it to language-model people sets it deliberately, with its reason in the framing. The run's log says so in a note.
+  - **Illness and injury are told plainly,** as facts about one's own body ("You have a serious illness, since …; it should pass by …"). No dramatisation, and nothing beyond what the body view holds. Opting out is always open. A study that doesn't need it can leave illness out of a world with model-run people (`life.illness` unset).
+  - **Death** ends the participant, which is still debriefed if its framing asks. Whether to warn a model-run person that its body can die is part of the framing's disclosure, decided per study.
 
 ## Open, for the checkpoint
 

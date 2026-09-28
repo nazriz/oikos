@@ -400,3 +400,39 @@ fn newborns_sex_follows_the_worlds_ratio() {
     let female = kids.iter().filter(|k| st.body(k).unwrap().sex == Some(terrarium_kernel::state::Sex::Female)).count();
     assert!((652..=809).contains(&female), "{female} of 1500 born female");
 }
+
+#[test]
+fn those_who_share_a_space_see_who_left_it_and_why() {
+    let mut run = town();
+    // Alice moves in with Bob; then Bob leaves the world.
+    assert_eq!(refusal(&act(&mut run, "alice-self", None, json!([{"block": "occupy", "space": "s-flats/dwelling.1"}]))), None);
+    let _ = observe(&mut run, "alice-self"); // she's seen it as it was
+    assert_eq!(refusal(&act(&mut run, "bob-self", None, json!([{"block": "leave"}]))), None);
+    let o = observe(&mut run, "alice-self");
+    let space = o
+        .channels
+        .values()
+        .filter_map(|c| match c {
+            ChannelData::Sites { cells, .. } => Some(cells),
+            _ => None,
+        })
+        .flatten()
+        .filter_map(|c| c.structure.as_ref())
+        .flat_map(|s| s.spaces.iter())
+        .find(|sp| sp.space == "s-flats/dwelling.1")
+        .expect("she sees her home");
+    let left = space.left.as_ref().expect("in her own home she sees who left");
+    let last = left.last().unwrap();
+    assert_eq!((last.occupant.as_str(), last.reason), ("bob", terrarium_kernel::events::VacateReason::Departed));
+    // Carol, who doesn't live there, sees how full it is, not who left.
+    let o = observe(&mut run, "carol-self");
+    for c in o.channels.values() {
+        if let ChannelData::Sites { cells, .. } = c {
+            for sp in cells.iter().filter_map(|c| c.structure.as_ref()).flat_map(|s| s.spaces.iter()) {
+                if sp.space == "s-flats/dwelling.1" {
+                    assert!(sp.left.is_none());
+                }
+            }
+        }
+    }
+}

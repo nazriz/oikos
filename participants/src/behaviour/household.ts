@@ -16,8 +16,9 @@ export interface Member {
   /** How the household reaches them (their participant), if it knows. */
   participant?: string;
   born_at: number;
-  /** As the household knows them (a trait, not physics: the kernel doesn't model sex). */
   sex: "female" | "male";
+  /** Their parents, where the household knows them (members' ids). */
+  parents?: string[];
 }
 export interface HouseholdData {
   /** The member who holds the lease (and searches, applies and signs for the household). */

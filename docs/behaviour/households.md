@@ -89,13 +89,21 @@ A person's sex is physical (a body's, contracts v0.4): only a woman can bear a c
 
 **Observed** (1,000 people, two years): about 10 births a run, the first after nine months. Each baby is at home within days, if the mother has one.
 
+## A death in the household (D54)
+
+A person sees who left their home, and why (contracts v0.4: a space's recent departures). When a household member dies at home:
+- The first surviving adult in the household's list reports it to the registry: who died, the partner, the children, and which of them are adults.
+- They also write the household's new record, without them. If the dead person held the lease, the partner takes it over, or else the eldest adult. The new leaseholder starts looking for a home, because the lease was in the dead person's name and the landlord will give notice.
+- Anyone paying their share of the rent to the dead leaseholder stops.
+- A child whose household has no adult left asks child protection for help, and is taken into care.
+
 ## What's not here yet (recorded, not built)
 
 - **New households forming and ending:**
   - partnering and separating (cited rates);
   - adult children leaving home;
-  - a household changing who holds the lease;
-  - what happens to a household when its leaseholder dies (the estate, the lease).
+  - a household changing who holds the lease, other than after a death;
+  - taking over a dead leaseholder's tenancy (Victoria lets a household member apply to), rather than moving.
 - **Moving to fit.** A household that has grown (a birth) or shrunk looks for a better-sized home only when its tenancy ends; it doesn't give notice early to move.
 - **Other adults leaving on their own**, as flatmates do.
 - **Renter-specific** household and dwelling shares (ABS *Housing Occupancy and Costs*).

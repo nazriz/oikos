@@ -408,6 +408,31 @@ See the design note, §16.
 - **Guide:** docs/real-models.md.
 - **Revisit if:** providers' usage reports differ from what we record (reconcile against their dashboards on the first real run), or a run needs a separate model for the translator (`--translator-model` is only a cost projection today).
 
+**D54. Deaths are seen, reported and acted on.** *(Naz, 2026-09-28: "yes to fixing deaths"; the problem: a dead person's rent and wage orders kept paying, nobody took over the lease, jobs were never refilled, and orphans were stranded.)*
+- **Physics (contracts v0.4 draft):** a space keeps its last five departures (who, why: left, removed, died, …, when). A sites channel that shows who's in a space shows them (`left`). It's perception of a physical fact, like who's at home. Tested in the kernel.
+- **Content:**
+  - the household's first surviving adult reports the death and writes the household's new record (partner or eldest adult as leaseholder);
+  - a lone person's landlord reports theirs (landlords now see their own buildings by name);
+  - the registry (`city.registry`, after Victoria's BDM) registers it;
+  - the bank stops the dead person's payments and settles the estate under a new `law-succession` (partner, else adult children, else the town);
+  - employers stop wages and end the job; landlords give notice;
+  - a child left with no adult asks for help and child protection (`city.child_protection`) takes them into care elsewhere.
+- **Observed:**
+  - With forced mortality, deaths are registered within days. Estates go to partners, or the town. Nothing leaves a dead person's account except the estate, wages stop, and a child alone is taken into care. No refusals.
+  - At normal mortality, 1–3 deaths per 1,000-person run; those with no home go unreported.
+- **Simplifications to revisit:**
+  - estates settle at once (no probate);
+  - minors don't inherit (Victoria holds their shares in trust);
+  - a household member can't take over the tenancy;
+  - care is outside the town;
+  - the registry takes reports on trust.
+
+**D55. Welfare defaults for model-run people.** *(Naz, 2026-09-28: "yes to ai welfare".)*
+- **Violence withheld by default:** `harm` exists only in a world that sets `life.harm` (the generated town doesn't). A world that offers it to language-model people is flagged in the run's log.
+- **Illness and injury are told plainly,** as facts of one's own body; a study that doesn't need them can leave them out.
+- **Death:** the participant is debriefed if its framing says so. Whether to warn a model-run person that its body can die is decided per study, in its framing.
+- Detail: docs/design/m2-llm-participants.md, Welfare.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

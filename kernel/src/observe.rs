@@ -151,6 +151,9 @@ pub struct SiteSpace {
     pub count: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub occupants: Option<Vec<Id>>,
+    /// Its last few departures (who left, why, when), where the channel shows who's there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub left: Option<Vec<crate::state::Departure>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -516,6 +519,7 @@ fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCel
                             attrs: spec.attrs.clone(),
                             count: bodies.map_or(0, |b| b.len()) as u32,
                             occupants: known.then(|| bodies.map(|b| b.iter().cloned().collect()).unwrap_or_default()),
+                            left: known.then(|| st.departures.get(&space).cloned()).flatten(),
                             space,
                         }
                     })

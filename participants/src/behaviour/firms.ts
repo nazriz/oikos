@@ -48,7 +48,7 @@ function receipts(obs: Observation, account: string): Map<string, number> {
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -212,6 +212,22 @@ export const landlord: BehaviourModule = {
         }
       }
 
+      // A tenant has died. Seen in our own buildings (someone leaving a home because they died): report it, if nobody
+      // has. Once registered: give notice on their lease, as it allows (the household may apply for a home again).
+      const registered = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
+      const tenants = new Map(active.map((a) => [tenantOf(a) as string, a]));
+      for (const site of sites) for (const sp of site.structure?.spaces ?? []) for (const l of sp.left ?? []) {
+        if (l.reason !== "died" || !tenants.has(l.occupant) || registered.has(l.occupant) || handled.has(`died-${l.occupant}`)) continue;
+        handled.add(`died-${l.occupant}`);
+        steps.push(because(`Our tenant ${l.occupant} has died in ${sp.space}: reporting it to the registry.`, say("death_notification", `${l.occupant}, our tenant at ${sp.space}, has died.`, { to: [p.city], data: { deceased: l.occupant } })));
+      }
+      for (const who of registered) {
+        const a = tenants.get(who);
+        if (!a || noticeGiven.has(a.id)) continue;
+        noticeGiven.set(a.id, t);
+        steps.push(because(`Our tenant ${who} has died (registered): giving notice on their lease.`, notice(a.id, "The tenant has died.")));
+      }
+
       // Arrears: give notice after enough unpaid months (rent is due monthly in advance). Each tenant pays from the
       // account on their first application, or the one the world started them with.
       const payingAccount = new Map<string, string>();
@@ -317,7 +333,7 @@ export const landlord: BehaviourModule = {
 
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.4.0",
+  version: "0.5.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -372,6 +388,18 @@ export const employer: BehaviourModule = {
         const ref = `wo${n++}`;
         pendingOrder.set(ref, a.id);
         steps.push(because("A new hire has signed: starting their wages by standing order.", [ref, pay(account, p.wage, { from: acc.account, every: p.period, first: p.period, basis: a.id, for: `Wages for ${a.terms.parties[1]}.` })]));
+      }
+      // A worker who has died (registered): stop the wages, and end the employment on record.
+      for (const r of book.all("death_registration")) {
+        const a = staff.find((x) => x.terms.parties[1] === r.data?.deceased);
+        if (!a || noticed.has(a.id)) continue;
+        noticed.set(a.id, t);
+        const s: Step = because(`${r.data?.deceased}, who worked for us, has died: stopping their wages.`, notice(a.id, "The employee has died."));
+        if (orders.has(a.id)) {
+          s.push(withdraw(orders.get(a.id)!, "The employee has died; stop wages."));
+          orders.delete(a.id);
+        }
+        steps.push(s);
       }
       // Ended (notice served): stop the wages.
       for (const a of contracts) if (book.inForce(a.id) && t >= endOf(a) && orders.has(a.id)) {

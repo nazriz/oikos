@@ -82,7 +82,8 @@ export interface Transaction { t: number; from: Id; to: Id; amount: number; by: 
 
 /** A space in a building: its kind and attributes (the world's vocabulary), how many bodies it holds at most, how many
  * are in it, and who (in the capacity's own buildings, or where its channel shows names). */
-export interface SiteSpace { space: Id; kind: string; capacity: number; attrs?: Json; count: number; occupants?: Id[] }
+export interface Departure { occupant: Id; reason: "left" | "removed" | "demolition" | "departed" | "died"; at: number }
+export interface SiteSpace { space: Id; kind: string; capacity: number; attrs?: Json; count: number; occupants?: Id[]; left?: Departure[] }
 export interface SiteStructure { structure: Id; type: Id; at: Id; w: number; h: number; built_by?: Id; complete: boolean; completes_at?: number; spaces: SiteSpace[] }
 /** A cell of ground, and the building standing on it (the same on every cell of its footprint). */
 export interface SiteCell { cell: Id; x: number; y: number; terrain?: string; structure?: SiteStructure }

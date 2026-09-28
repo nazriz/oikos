@@ -90,6 +90,30 @@
         "rate_bps": 1000,
         "penalty_bps": 2000
       }
+    },
+    {
+      "id": "law-succession",
+      "record": "statement",
+      "author": "genesis",
+      "at": 0,
+      "visible_to": "public",
+      "speaks_for": "city",
+      "kind": "law",
+      "basis": "law-charter",
+      "text": "When someone dies, their money passes to their partner; if they have none, in equal shares to their children aged 18 or over; if none, to the town. A death is registered with the town's registry, and a bank that learns of it pays no more from the dead person's accounts except to settle the estate.",
+      "adico": {
+        "attribute": "the estate of someone who has died",
+        "deontic": "must",
+        "aim": "pass to their partner, else their adult children equally, else the town",
+        "condition": "once the death is registered"
+      },
+      "data": {
+        "order": [
+          "partner",
+          "adult_children",
+          "town"
+        ]
+      }
     }
   ]
 }

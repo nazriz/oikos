@@ -12,7 +12,7 @@ import { bankPaymentSystem } from "./behaviour/bank";
 import { exportDemand, idle, migration } from "./behaviour/world";
 import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
-import { builder, inspector, planningOfficer } from "./behaviour/institutions";
+import { builder, childProtection, inspector, planningOfficer, registry } from "./behaviour/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, taxClerk } from "./behaviour/government";
 
 /** Every behaviour module available to worlds, by the name used in controller.impl. */
@@ -29,6 +29,8 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [planningOfficer, "behaviour/institutions.ts"],
       [inspector, "behaviour/institutions.ts"],
       [builder, "behaviour/institutions.ts"],
+      [registry, "behaviour/institutions.ts"],
+      [childProtection, "behaviour/institutions.ts"],
       [mayorCode, "behaviour/government.ts"],
       [councilClerk, "behaviour/government.ts"],
       [councillor, "behaviour/government.ts"],

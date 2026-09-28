@@ -50,3 +50,18 @@ In the example town, `landlord_compliance_bps: 5000`. The river scenario test (`
 - the inspector's patrol detecting it within three weeks;
 - the fine citing law-planning, and the demolition order;
 - the order being ignored (or never needed).
+
+## `city.registry` (v0.1.0): the registry of deaths
+
+After Victoria's Registry of Births, Deaths and Marriages, where a death is registered from a notification. It reads death notifications addressed to the town and, once per death, publishes a public `death_registration` with what it was told: who died, who reported it, the partner, the children (and which are adults), and any children left with no adult at home. It doesn't check what it's told yet. In reality a doctor's certificate is required.
+
+**Who reports:**
+- the household's first surviving adult, who sees the death at home;
+- for someone living alone, their landlord, whose own buildings it sees by name.
+
+Someone with no home dies unseen, and nobody reports it (in reality, the police or a hospital would).
+
+## `city.child_protection` (v0.1.0)
+
+On a registration naming children with no adult at home, or a child's own request for help (a `care_request`, made when every adult of their household has died), it takes them into care. The town has no foster homes yet, so care is elsewhere: they leave the town with the office's worker. Loosely after Victoria's child protection service; foster and kinship care in town are future work.
+

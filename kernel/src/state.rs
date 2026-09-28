@@ -34,6 +34,9 @@ pub struct State {
     pub structures: Map<Id, Structure>,
     /// structure -> space -> the bodies in it
     pub occupancy: Map<Id, BTreeMap<Id, BTreeSet<Id>>>,
+    /// space -> its last few departures (who left, why, when): what those who can see who's there also see.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub departures: Map<Id, Vec<Departure>>,
     pub records: Map<Id, Stored>,
     /// Record ids in the order they were made (record i has seq i+1).
     pub record_order: imbl::Vector<Id>,
@@ -101,6 +104,30 @@ pub struct Body {
     /// Its biological children, in order of birth (the other side of `parents`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<Id>,
+}
+
+/// Someone leaving a space: who, why (they left, were removed, died, ...), and when.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Departure {
+    pub occupant: Id,
+    pub reason: crate::events::VacateReason,
+    pub at: i64,
+}
+
+/// How many departures a space keeps.
+pub const DEPARTURES_KEPT: usize = 5;
+
+impl State {
+    /// Note that someone left a space (keeping the last few).
+    pub fn record_departure(&mut self, space: &str, occupant: &str, reason: crate::events::VacateReason) {
+        let t = self.t;
+        let mut list = self.departures.get(space).cloned().unwrap_or_default();
+        list.push(Departure { occupant: occupant.into(), reason, at: t });
+        if list.len() > DEPARTURES_KEPT {
+            list.remove(0);
+        }
+        self.departures.insert(space.into(), list);
+    }
 }
 
 /// A body's biological sex, where the world models it.

@@ -8,6 +8,7 @@ Once a day it reads the **payment requests** addressed to its bank: statements o
 - **One-off payments:** `data: { outcome: { money: { from, to, amount, for?, settles? } } }`. Paid once.
 - **Standing orders and direct debits:** the same, plus `every` and optionally `first`. Due first at the request's time plus `first` (or `every`), then every `every` seconds. If the bank wakes late, it pays each missed due date once.
 - **Withdrawn requests** (a withdrawal record the bank can see) are no longer carried out.
+- **A registered death (v0.6.0):** the dead person's requests are no longer carried out, and their accounts pay out only to settle the estate. The estate passes as the town's `law-succession` says: to the partner, else equally to the adult children, else the town. It happens at once, on registration. Real probate takes months, and the law's order is simplified: in Victoria, children's shares include minors, held in trust.
 - **Opening an account:** a request whose outcome is `account: { holder }`, from the holder themselves (someone turning 18 in a household, for instance). The bank opens it, with no other checks yet (real banks verify identity; that's content to add).
 
 The bank's own procedure, applied before paying:

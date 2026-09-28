@@ -811,6 +811,39 @@
                               "items": {
                                 "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
                               }
+                            },
+                            "left": {
+                              "description": "Its last few departures (who left, why, when), where the channel shows who's there: those who share it see someone move out, be removed or die.",
+                              "type": "array",
+                              "maxItems": 5,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "occupant",
+                                  "reason",
+                                  "at"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                  "occupant": {
+                                    "$ref": "urn:terrarium:contracts:0.4:common#/$defs/Id"
+                                  },
+                                  "reason": {
+                                    "enum": [
+                                      "left",
+                                      "removed",
+                                      "demolition",
+                                      "departed",
+                                      "died"
+                                    ]
+                                  },
+                                  "at": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  }
+                                }
+                              }
                             }
                           }
                         }

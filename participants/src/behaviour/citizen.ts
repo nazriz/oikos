@@ -39,7 +39,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.8.0",
+  version: "0.9.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -119,6 +119,10 @@ export const citizen: BehaviourModule = {
     let livingAt: string | null = null;
     let share: { cents: number; order?: string } | null = null;
     let payTold = -1;
+    // Deaths in the household: those we've seen (in our own home, someone leaving because they died).
+    const mourned = new Set<string>();
+    let wasLeaseholder: boolean | null = null;
+    let askedForCare = false;
     // Children: those we already knew of (from the start), a pregnancy's due date, and when we next think about it.
     let knownChildren: Set<string> | null = null;
     let expectingUntil = 0;
@@ -207,6 +211,49 @@ export const citizen: BehaviourModule = {
       const inside = (space: string) =>
         street?.kind !== "sites" || street.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === space && sp.occupants?.includes(me)));
 
+      // A death at home: someone of the household left our home because they died (we see who left, and why).
+      const ourHome = home?.space ?? livingAt;
+      if (household && ourHome && street?.kind === "sites") {
+        let hh: HouseholdData = household;
+        const died = street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.space === ourHome).flatMap((sp) => sp.left ?? []).filter((l) => l.reason === "died");
+        for (const d of died) {
+          if (mourned.has(d.occupant) || !hh.members.some((m) => m.person === d.occupant)) continue;
+          mourned.add(d.occupant);
+          const dead = hh.members.find((m) => m.person === d.occupant)!;
+          const heldLease = hh.leaseholder === dead.person;
+          const survivors = hh.members.filter((m) => m.person !== d.occupant && !mourned.has(m.person));
+          const grown = survivors.filter((m) => ageAt(m, t, year) >= ADULT_YEARS);
+          const partner = hh.couples.find((c) => c.includes(dead.person))?.find((x) => x !== dead.person);
+          const kids = survivors.filter((m) => m.parents?.includes(dead.person));
+          const leaseholder = hh.leaseholder !== dead.person ? hh.leaseholder : (grown.find((m) => m.person === partner) ?? [...grown].sort((a, b) => a.born_at - b.born_at)[0])?.person;
+          // The surviving adult first in the household's list reports it, and writes the household's new record.
+          if (grown[0]?.person === me) {
+            steps.push(because(`${dead.person}, of our household, has died: reporting it to the registry.`, say("death_notification", `${dead.person} has died.`, {
+              to: [p.registry ?? "city"],
+              data: { deceased: dead.person, ...(partner && survivors.some((m) => m.person === partner) ? { partner } : {}),
+                children: kids.map((k) => k.person), adult_children: kids.filter((k) => ageAt(k, t, year) >= ADULT_YEARS).map((k) => k.person) },
+            })));
+            if (leaseholder) {
+              const next: HouseholdData = { ...hh, leaseholder, members: survivors, couples: hh.couples.filter((c) => !c.includes(dead.person)) };
+              steps.push(because(`${dead.person} has died: the household's record without them${hh.leaseholder === dead.person ? `, ${leaseholder} holding the lease from now` : ""}.`, say("household", `Household: ${survivors.map((m) => m.person).join(", ")}.`, {
+                to: survivors.map((m) => m.person), visible: survivors.map((m) => m.person), for: leaseholder, data: next,
+              })));
+              hh = next; // as we've just written it
+            }
+          }
+          // Our share of the rent went to the one who died: stop it.
+          if (share?.order && heldLease) {
+            steps.push(because(`${dead.person} held the lease and has died: stopping our share of the rent to them.`, withdraw(share.order, "The leaseholder has died.")));
+            share = null;
+          }
+        }
+        household = hh;
+      }
+
+      // Newly holding the household's lease (the leaseholder died): we start looking for a home from today.
+      if (wasLeaseholder === false && isLeaseholder() && !home) homelessSince = t;
+      wasLeaseholder = isLeaseholder();
+
       if (!isLeaseholder()) {
         // Another adult in the household: we live where the household lives, and move when the leaseholder says.
         if (livingAt === null && street?.kind === "sites")
@@ -259,7 +306,9 @@ export const citizen: BehaviourModule = {
           const where = home?.movedIn ? home.space : livingAt;
           if (where) steps.push(because("Our baby is born: bringing them home.", C.call("occupancy", { in: where, who: k.person })));
           if (household && k.sex) {
-            const members = [...household.members, { person: k.person, born_at: k.born_at, sex: k.sex }];
+            const partner = household.couples.find((c) => c.includes(me))?.find((x) => x !== me);
+            const father = partner && household.members.find((m) => m.person === partner && m.sex === "male")?.person;
+            const members = [...household.members, { person: k.person, born_at: k.born_at, sex: k.sex, parents: father ? [me, father] : [me] }];
             steps.push(because("Our baby is born: adding them to the household's record.", say("household", `Household: ${members.map((m) => m.person).join(", ")}.`, {
               to: members.map((m) => m.person), visible: members.map((m) => m.person), for: household.leaseholder,
               data: { ...household, members },
@@ -342,6 +391,12 @@ export const citizen: BehaviourModule = {
       }
 
       // Moving into a home we hold a lease on, once there's physical room: with the children, in one go.
+      if (home && !home.movedIn && livingAt && livingAt !== home.space) {
+        // We still live where the household used to (the lease there wasn't ours): leave it first.
+        if (inside(livingAt)) steps.push(because("Moving out of our old home, to the one we now hold a lease on.", moveOut(livingAt, me)));
+        for (const k of children(t)) steps.push(because("Taking the children out of our old home.", moveOut(livingAt, k.person)));
+        livingAt = null;
+      }
       if (home && !home.movedIn) {
         moveStep = because(`Moving into ${home.space}, which we hold a lease on${children(t).length ? ", with the children" : ""}.`, moveIn(home.space), ...children(t).map((k) => C.call("occupancy", { in: home!.space, who: k.person })));
         steps.push(moveStep);
@@ -562,8 +617,22 @@ export const citizen: BehaviourModule = {
       step(obs): ParticipantAction {
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
-        // A child does nothing on their own (their parents house them) until they're 18.
-        if (obs.body && obs.t - obs.body.born_at < ADULT_YEARS * year) return wait(Math.min(obs.body.born_at + ADULT_YEARS * year, ctx.world.runEnd + DAY));
+        // A child does nothing on their own (their parents house them) until they're 18, except ask for help if no
+        // adult of the household is left: all of them seen to die (in our home), or gone from it.
+        if (obs.body && obs.t - obs.body.born_at < ADULT_YEARS * year) {
+          const street = obs.channels.street;
+          if (!askedForCare && household && street?.kind === "sites") {
+            const spaces = street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.occupants?.includes(me));
+            const grown = household.members.filter((m) => ageAt(m, obs.t, year) >= ADULT_YEARS);
+            const deadHere = new Set(spaces.flatMap((sp) => sp.left ?? []).filter((l) => l.reason === "died").map((l) => l.occupant));
+            if (spaces.length && grown.length && grown.every((m) => deadHere.has(m.person))) {
+              askedForCare = true;
+              const kids = household.members.filter((m) => ageAt(m, obs.t, year) < ADULT_YEARS).map((m) => m.person);
+              return callAction(because("No adult of our household is left: asking for help.", say("care_request", "We have no adult at home any more.", { to: [p.child_protection ?? "city"], data: { children: kids } })));
+            }
+          }
+          return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY));
+        }
         if (plannedAt !== obs.t) {
           const acc = channels.accounts(obs).find((a) => a.holder === me && a.custodian !== me);
           const budget = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;

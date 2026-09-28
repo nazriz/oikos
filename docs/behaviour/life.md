@@ -15,7 +15,6 @@ The kernel's life physics (contracts v0.4, `life`; design note §4) are paramete
 
 ## What people do about it
 
-For now, nothing. Conditions are recorded (`condition_began`, `condition_ended`), and a death ends the person's participant and takes them out of every space. Behaviour to add, each needing its own sources:
+Deaths are acted on (D54). Those who share the dead person's home see it and report it; the registry registers it; the bank settles the estate; employers stop wages; landlords give notice; children left alone are taken into care ([households.md](households.md), [institutions.md](institutions.md)). Conditions are recorded (`condition_began`, `condition_ended`) but not yet acted on. Behaviour to add, each needing its own sources:
 - being off work while ill or injured, and whether employers pay sick leave (the National Employment Standards: 10 days a year for full-time employees);
-- households after a death: who takes over the lease, and what happens to the estate (law);
 - care: hospitals and clinics as services that change durations and risks (design note §4.7).

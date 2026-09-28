@@ -149,6 +149,7 @@ fn vacate_all(st: &mut State, person: &str, reason: VacateReason, by: Option<&st
         }
         st.touch_structure(&sid);
         for space in spaces {
+            st.record_departure(&space, person, reason);
             events.push(Timed::new(t, EventBody::Vacated { occupant: person.into(), space, by: by.map(String::from), reason }));
         }
     }
@@ -909,6 +910,7 @@ impl<'a> Exec<'a> {
                 self.st.moved(&occupant);
                 let reason = if occupant == self.entity { VacateReason::Left } else { VacateReason::Removed };
                 for space in left {
+                    self.st.record_departure(&space, &occupant, reason);
                     self.emit(EventBody::Vacated { occupant: occupant.clone(), space, by: Some(self.participant.into()), reason });
                 }
                 Ok(())
