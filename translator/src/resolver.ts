@@ -477,7 +477,13 @@ class Resolver {
     const to = this.need(c, "to", "Which office's form?");
     const name = this.need(c, "form", "Which form?");
     const f = this.k.form(to, name);
-    if (!f) throw new Ask(LABEL_TEXT.unknown_form);
+    if (!f) {
+      // Known by name but not from that office: say where it goes, rather than that it's unknown.
+      const elsewhere = this.k.forms.filter((x) => x.data?.form === name);
+      if (!elsewhere.length) throw new Ask(LABEL_TEXT.unknown_form);
+      const where = [...new Set(elsewhere.map((x) => x.in_position ?? x.speaks_for ?? x.author))];
+      throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);
+    }
     const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } } };
     const data: { [k: string]: unknown } = {};
     const missing: string[] = [];

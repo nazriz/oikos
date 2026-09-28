@@ -99,6 +99,8 @@ test("4.4: filling in a published form, checked against its fields", () => {
   const missing = run("form(to=planning, form=permit_application, lot=lot-00)");
   expect(missing).toEqual({ ok: false, questions: ["The permit application needs: structure_type."] });
   expect(run("form(to=planning, form=dog_licence, name=rex)")).toEqual({ ok: false, questions: ["You haven't seen a form by that name."] });
+  // A known form sent to the wrong office: where it goes, not "unknown".
+  expect(run("form(to=council, form=permit_application, lot=lot-00, structure_type=park)")).toEqual({ ok: false, questions: ["The permit application form isn't one council takes: it goes to planning."] });
 });
 
 test("4.5: a missing decision comes back as a question; the resolver never chooses", () => {
