@@ -19,6 +19,7 @@ use terrarium_kernel::Command;
 #[derive(Default, Debug, PartialEq)]
 struct View {
     accounts: BTreeMap<String, AccountItem>,
+    holdings: BTreeMap<(String, String), i128>,
     records: Vec<String>,
     cells: BTreeMap<String, SiteCell>,
     entities: BTreeMap<String, EntityItem>,
@@ -35,6 +36,11 @@ impl View {
                     } else {
                         self.accounts.insert(a.account.clone(), a.clone());
                     }
+                }
+            }
+            ChannelData::Holdings { holdings } => {
+                for h in holdings {
+                    self.holdings.insert((h.kind.clone(), h.at.clone()), h.quantity);
                 }
             }
             ChannelData::Records { records, whole, .. } => {
@@ -86,6 +92,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
             // Compare like with like: the channel's kind decides which parts matter.
             match data {
                 ChannelData::Accounts { .. } => have.accounts = v.accounts.clone(),
+                ChannelData::Holdings { .. } => have.holdings = v.holdings.clone(),
                 ChannelData::Records { .. } => have.records = v.records.clone(),
                 ChannelData::Sites { .. } => have.cells = v.cells.clone(),
                 ChannelData::Directory { .. } => {

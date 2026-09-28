@@ -84,7 +84,8 @@ pub fn channels() -> Value {
         {"id": "town", "kind": "sites", "area": "all", "every": 7 * 86_400},
         {"id": "street", "kind": "sites", "area": {"near": 0}},
         {"id": "board", "kind": "records", "match": {"records": ["statement", "withdrawal"]}, "area": {"near": 0}},
-        {"id": "who", "kind": "directory"}
+        {"id": "who", "kind": "directory"},
+        {"id": "stores", "kind": "holdings"}
     ])
 }
 
@@ -178,7 +179,7 @@ pub fn world(p: &WorldParams) -> Value {
         "seed": 7,
         "clock": {"tick_seconds": TICK, "run_seconds": 40 * MONTH},
         "log": {"checkpoint_every": MONTH, "anchor_every_entries": 7},
-        "catalogue": {"structure_types": [
+        "catalogue": {"resources": [{"id": "goods", "unit": "items"}, {"id": "materials", "unit": "kg"}], "structure_types": [
             {"id": "house", "category": "residential", "materials_cost": "300000", "build_time": 20 * 86_400, "demolition_cost": "20000",
              "footprint": {"w": 1, "h": 1}, "spaces": [{"kind": "dwelling", "count": 1, "capacity": 5, "attrs": {"bedrooms": 3}}]},
             {"id": "flats", "category": "residential", "materials_cost": "900000", "build_time": 40 * 86_400, "demolition_cost": "50000",
@@ -206,7 +207,13 @@ pub fn world(p: &WorldParams) -> Value {
                 {"occupant": "alice", "space": "s-house/dwelling.1"},
                 {"occupant": "carol", "space": "s-shop/workplace.1"}
             ],
-            "records": records
+            "records": records,
+            // Things held (phase B): the developer's goods in the shop, alice's at home, the builder's materials.
+            "holdings": [
+                {"kind": "goods", "holder": "devco", "at": "s-shop", "quantity": "200"},
+                {"kind": "goods", "holder": "alice", "at": "s-house", "quantity": "10"},
+                {"kind": "materials", "holder": "buildco", "at": "s-flats", "quantity": "5000"}
+            ]
         },
         "participants": participants,
         "positions": positions,
@@ -260,6 +267,7 @@ pub enum B {
     Message { to: Vec<u8> },
     Arrive { person: Option<u8>, carrying: bool },
     Leave { person: Option<u8> },
+    MoveGoods { kind: u8, quantity: i128, from_at: u8, to: u8, to_at: u8 },
     Birth { with: Option<u8> },
     Harm { person: u8 },
     CreatePosition,
@@ -297,6 +305,7 @@ pub fn block_strategy() -> impl Strategy<Value = B> {
         1 => proptest::collection::vec(u(), 1..3).prop_map(|to| B::Message { to }),
         1 => (proptest::option::of(u()), any::<bool>()).prop_map(|(person, carrying)| B::Arrive { person, carrying }),
         1 => proptest::option::of(u()).prop_map(|person| B::Leave { person }),
+        3 => (u(), amount(), u(), u(), u()).prop_map(|(kind, quantity, from_at, to, to_at)| B::MoveGoods { kind, quantity, from_at, to, to_at }),
         1 => proptest::option::of(u()).prop_map(|with| B::Birth { with }),
         1 => u().prop_map(|person| B::Harm { person }),
         1 => Just(B::CreatePosition),
@@ -374,7 +383,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             let edge = ["outside-system", "upriver-system"].contains(&p.as_str());
             (!edge && st.participants[&p].status == ParticipantStatus::Active).then(|| Command::OptOut { participant: p, statement: "leaving the study".into() })
         }
-        Op::Smart { kind, a, b, flag } => match kind % 10 {
+        Op::Smart { kind, a, b, flag } => match kind % 12 {
             0 => {
                 // The bank executes a customer's payment.
                 let banked: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == "bank" && x.balance > 0).map(|(id, _)| id.clone()).collect();
@@ -491,6 +500,30 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 let to = if *flag { pick(&participants, *b) } else { None };
                 direct(&p, pos.as_deref(), vec![Block::Appoint { position: pick(&theirs, *b)?, participant: to }])
             }
+            11 => {
+                // The bank closes an empty account it keeps: one it has just opened (closure was otherwise too rare to
+                // count on), or, sometimes, one that may not be empty (refused: account_not_empty).
+                if *flag {
+                    let theirs: Vec<String> = st.accounts.iter().filter(|(_, x)| x.custodian == "bank").map(|(id, _)| id.clone()).collect();
+                    direct("bank-pay-system", Some("bank-pay"), vec![Block::CloseAccount { account: pick(&theirs, *a)? }])
+                } else {
+                    direct("bank-pay-system", Some("bank-pay"), vec![
+                        Block::OpenAccount { holder: e(*a), currency: None, bind: Some("new".into()) },
+                        Block::CloseAccount { account: "$new".into() },
+                    ])
+                }
+            }
+            10 => {
+                // Goods (phase B): an edge delivers goods into the world (an import), or the developer delivers some from
+                // its shop to alice at home (a sale).
+                let q = 1 + (*b as i128 % 50);
+                if *flag {
+                    let (who, pos, edge) = if a % 2 == 0 { ("outside-system", "outside-trade", "outside") } else { ("upriver-system", "upriver-trade", "upriver") };
+                    direct(who, Some(pos), vec![Block::MoveGoods { kind: "goods".into(), quantity: q, from_at: edge.into(), to: "devco".into(), to_at: "s-shop".into() }])
+                } else {
+                    direct("developer-system", Some("developer"), vec![Block::MoveGoods { kind: "goods".into(), quantity: q, from_at: "s-shop".into(), to: "alice".into(), to_at: "s-house".into() }])
+                }
+            }
             _ => {
                 // A party signs an agreement it's named in.
                 let ags: Vec<(String, String)> = st
@@ -515,6 +548,13 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
             let mut bound = false;
             for b in blocks {
                 out.push(match b {
+                    B::MoveGoods { kind, quantity, from_at, to, to_at } => {
+                        // Mostly the actor's own places (the structures, or itself for an edge); sometimes nonsense.
+                        let kinds = ["goods", "materials", "gold"];
+                        let mut places = structures.clone();
+                        places.push(me.clone());
+                        Block::MoveGoods { kind: kinds[*kind as usize % 3].into(), quantity: *quantity, from_at: pick(&places, *from_at).unwrap(), to: e(*to), to_at: pick(&places, *to_at).unwrap() }
+                    }
                     B::Transfer { from, to, amount } => Block::Transfer { from: my(*from), to: pick(&accounts, *to).unwrap(), amount: *amount, settles: None, per_instruction: None, memo: None },
                     B::OpenAccount { holder, to_new } => Block::OpenAccount { holder: if *to_new && bound { "$new".into() } else { e(*holder) }, currency: None, bind: None },
                     B::CloseAccount { account } => Block::CloseAccount { account: my(*account) },

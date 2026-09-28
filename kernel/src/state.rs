@@ -28,6 +28,9 @@ pub struct State {
     pub counters: Counters,
     pub entities: Map<Id, Entity>,
     pub accounts: Map<Id, Account>,
+    /// Holdings of resources (phase B), keyed `holder|at|kind` (holding_key): who holds how much of what, where.
+    #[serde(default)]
+    pub holdings: Map<String, Holding>,
     /// Accounts that have been closed, kept so those who keep or hold them perceive the closure.
     pub closed_accounts: Map<Id, ClosedAccount>,
     pub cells: Map<Id, Cell>,
@@ -298,6 +301,23 @@ pub struct Look {
     pub from: Option<u64>,
 }
 
+/// A holding of a resource: a quantity of a kind, held by an entity, at a place (a structure, or an edge itself).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Holding {
+    pub kind: Id,
+    pub holder: Id,
+    pub at: Id,
+    #[serde(with = "crate::money::amount")]
+    pub quantity: crate::money::Money,
+    /// The change stamp of its last change.
+    pub changed: u64,
+}
+
+/// A holding's key: sorted by holder, then place, then kind.
+pub fn holding_key(holder: &str, at: &str, kind: &str) -> String {
+    format!("{holder}|{at}|{kind}")
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClosedAccount {
     pub holder: Id,
@@ -450,6 +470,20 @@ impl State {
         let seq = self.counters.record_seq;
         self.record_order.push_back(record.id.clone());
         self.records.insert(record.id.clone(), Stored { seq, record: Arc::new(record) });
+    }
+
+    /// The quantity of a kind held by an entity at a place (0 if none).
+    pub fn holding(&self, holder: &str, at: &str, kind: &str) -> crate::money::Money {
+        self.holdings.get(&holding_key(holder, at, kind)).map_or(0, |s| s.quantity)
+    }
+
+    /// Total of each resource kind in the world, edges included. Changes only by work.
+    pub fn total_goods(&self) -> std::collections::BTreeMap<Id, crate::money::Money> {
+        let mut t = std::collections::BTreeMap::new();
+        for s in self.holdings.values() {
+            *t.entry(s.kind.clone()).or_insert(0) += s.quantity;
+        }
+        t
     }
 
     /// Total money in the world in each currency, including the boundary. Constant for a run.

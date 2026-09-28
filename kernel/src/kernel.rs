@@ -162,6 +162,11 @@ impl Kernel {
                 })
                 .collect(),
             accounts: w.accounts.iter().map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), currency: cur_of(a), balance: a.balance, changed: 0 })).collect(),
+            holdings: w
+                .holdings
+                .iter()
+                .map(|x| (crate::state::holding_key(&x.holder, &x.at, &x.kind), crate::state::Holding { kind: x.kind.clone(), holder: x.holder.clone(), at: x.at.clone(), quantity: x.quantity, changed: 0 }))
+                .collect(),
             closed_accounts: crate::state::Map::new(),
             cells,
             structures: crate::state::Map::new(),

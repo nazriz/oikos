@@ -1,0 +1,8 @@
+{
+  "block": "move_goods",
+  "kind": "goods",
+  "quantity": "40",
+  "from_at": "factory-1",
+  "to": "shop-3",
+  "to_at": "shop-3-store"
+}

@@ -1,0 +1,18 @@
+{
+  "seq": 44,
+  "t": 2592000,
+  "kind": "event",
+  "body": {
+    "event": "goods_moved",
+    "cause": 41,
+    "kind": "inputs",
+    "quantity": "12000",
+    "from": "outside",
+    "from_at": "outside",
+    "to": "factory-1",
+    "to_at": "str.4",
+    "by": "outside-trade-system"
+  },
+  "prev": "abababababababababababababababababababababababababababababababab",
+  "hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+}

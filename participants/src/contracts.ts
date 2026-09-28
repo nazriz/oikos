@@ -95,8 +95,12 @@ export type Sex = "female" | "male";
 export interface ChildView { person: Id; born_at: number; sex?: Sex; alive: boolean }
 export interface Body { born_at: number; sex?: Sex; present: boolean; alive: boolean; parents?: Id[]; conditions?: Condition[]; children?: ChildView[] }
 
+/** What an entity holds, and where (phase B): a quantity (a decimal-string integer) of a resource kind at a place. */
+export interface HoldingItem { kind: Id; at: Id; quantity: string }
+
 export type ChannelData =
   | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; currency: string; balance: string; closed?: true }[]; transactions: Transaction[] }
+  | { kind: "holdings"; holdings: HoldingItem[] }
   | { kind: "records"; records: Record[]; search?: true; whole?: true }
   | { kind: "sites"; as_of: number; cells: SiteCell[]; whole?: true }
   | { kind: "directory"; entities: { entity: Id; kind: string; name: string; participant?: Id }[]; positions: PositionItem[] };
@@ -132,6 +136,10 @@ export const channels = {
   },
   accounts(obs: Observation) {
     return Object.values(obs.channels).flatMap((c) => (c.kind === "accounts" ? c.accounts : []));
+  },
+  /** What the entity holds, and where (the holdings channels' current picture). */
+  holdings(obs: Observation): HoldingItem[] {
+    return Object.values(obs.channels).flatMap((c) => (c.kind === "holdings" ? c.holdings : []));
   },
   transactions(obs: Observation): Transaction[] {
     return Object.values(obs.channels).flatMap((c) => (c.kind === "accounts" ? c.transactions : []));

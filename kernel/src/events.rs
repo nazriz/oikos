@@ -55,6 +55,12 @@ pub enum RefusalCode {
     UnknownCurrency,
     /// Leaving by something that isn't one of the world's edges.
     NotABoundary,
+    /// A resource kind the world doesn't declare.
+    UnknownResource,
+    /// Not enough of the holding where it's said to be.
+    InsufficientQuantity,
+    /// A place goods can't be at: not a structure (or, for an edge, not itself).
+    UnknownPlace,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -130,6 +136,16 @@ pub enum EventBody {
         per_instruction: Option<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         memo: Option<String>,
+    },
+    GoodsMoved {
+        kind: Id,
+        #[serde(with = "crate::money::amount")]
+        quantity: crate::money::Money,
+        from: Id,
+        from_at: Id,
+        to: Id,
+        to_at: Id,
+        by: Id,
     },
     AccountOpened {
         account: Id,
@@ -283,6 +299,7 @@ impl EventBody {
             EventBody::ActionApplied { .. } => "action_applied",
             EventBody::ActionRefused { .. } => "action_refused",
             EventBody::Transfer { .. } => "transfer",
+            EventBody::GoodsMoved { .. } => "goods_moved",
             EventBody::AccountOpened { .. } => "account_opened",
             EventBody::AccountClosed { .. } => "account_closed",
             EventBody::StructureStarted { .. } => "structure_started",
@@ -316,6 +333,7 @@ impl EventBody {
         matches!(
             self,
             EventBody::Transfer { .. }
+                | EventBody::GoodsMoved { .. }
                 | EventBody::AccountOpened { .. }
                 | EventBody::AccountClosed { .. }
                 | EventBody::StructureStarted { .. }

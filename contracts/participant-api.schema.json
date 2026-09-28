@@ -676,6 +676,43 @@
           "type": "object",
           "required": [
             "kind",
+            "holdings"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "holdings"
+            },
+            "holdings": {
+              "description": "Holdings of the participant's entity that changed since its previous look (a first look: all of them). A quantity of 0: all gone from there.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "at",
+                  "quantity"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+                  },
+                  "at": {
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Id"
+                  },
+                  "quantity": {
+                    "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Holding"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
             "records"
           ],
           "additionalProperties": false,

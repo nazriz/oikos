@@ -40,6 +40,9 @@ const REFUSAL: Record<string, string> = {
   currency_mismatch: "the two accounts are in different currencies, so money can't simply move between them (it would have to be exchanged)",
   unknown_currency: "there's no such currency here",
   not_a_boundary: "that isn't a way out of here",
+  unknown_resource: "there's no such thing here",
+  insufficient_quantity: "there isn't that much of it there",
+  unknown_place: "that isn't somewhere things can be kept",
 };
 
 /**

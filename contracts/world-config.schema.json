@@ -83,7 +83,7 @@
       }
     },
     "catalogue": {
-      "description": "What can physically be built.",
+      "description": "What can physically be built, and the kinds of thing the world holds, moves and makes.",
       "type": "object",
       "required": [
         "structure_types"
@@ -96,6 +96,30 @@
             "$ref": "#/$defs/StructureType"
           },
           "maxItems": 1000
+        },
+        "resources": {
+          "description": "Kinds of resource (phase B): goods, inputs, materials; the world's vocabulary. Money isn't one: it stays in accounts. A kind's total over the world and its edges changes only by work.",
+          "type": "array",
+          "maxItems": 1000,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "unit"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+              },
+              "unit": {
+                "description": "What its quantities count (items, kg...). Presentation only.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              }
+            }
+          }
         }
       }
     },
@@ -556,6 +580,34 @@
             "$ref": "urn:terrarium:contracts:0.5:records#/$defs/Record"
           },
           "maxItems": 1000000
+        },
+        "holdings": {
+          "description": "Holdings at the start (phase B): a quantity of a resource kind, held by an entity, at a structure (or, for an edge, at itself: goods outside the world). Possession is physics (D20): only the holder can move its holdings.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "holder",
+              "at",
+              "quantity"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+              },
+              "holder": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+              },
+              "at": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+              },
+              "quantity": {
+                "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Holding"
+              }
+            }
+          }
         }
       }
     },
@@ -636,6 +688,36 @@
             "kind": {
               "description": "Balances and new transactions of accounts the participant's entity holds or has custody of.",
               "const": "accounts"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "kind"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+            },
+            "title": {
+              "description": "What the participant's reports call this channel (e.g. 'Treasury', 'Council business'). Presentation only; the kernel ignores it.",
+              "type": "string",
+              "maxLength": 200
+            },
+            "every": {
+              "description": "How often the participant looks through this channel. Between looks, changes accumulate; the next look delivers them. Default: at every observation. Coverage and frequency are experimental variables.",
+              "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Duration"
+            },
+            "on_request": {
+              "description": "Perceived only when the participant asks (a look), never at ordinary observations: attention. A look through a records channel can be a search.",
+              "type": "boolean"
+            },
+            "kind": {
+              "description": "What the participant's entity holds, and where (phase B): its holdings, as they change.",
+              "const": "holdings"
             }
           }
         },

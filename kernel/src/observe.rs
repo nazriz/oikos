@@ -79,6 +79,7 @@ pub struct HeldPosition {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ChannelData {
     Accounts { accounts: Vec<AccountItem>, transactions: Vec<Transaction> },
+    Holdings { holdings: Vec<HoldingItem> },
     Records {
         records: Vec<Record>,
         /// Set when these are a search's results (what matches now), not what's new since the last look.
@@ -96,6 +97,15 @@ pub enum ChannelData {
         whole: Option<bool>,
     },
     Directory { entities: Vec<EntityItem>, positions: Vec<PositionItem> },
+}
+
+/// A holding the capacity's entity has: how much of a kind, where (0: it's all gone from there).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HoldingItem {
+    pub kind: Id,
+    pub at: Id,
+    #[serde(with = "crate::money::amount")]
+    pub quantity: crate::money::Money,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -681,6 +691,18 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                         drained.push(me.clone());
                     }
                     ChannelData::Accounts { accounts, transactions }
+                }
+                ChannelKind::Holdings => {
+                    // Keys start with the holder, so the entity's holdings are one range.
+                    let lo = format!("{me}|");
+                    let hi = format!("{me}}}"); // '}' sorts just after '|'
+                    let holdings = st
+                        .holdings
+                        .range(lo..hi)
+                        .filter(|(_, h)| changed(h.changed))
+                        .map(|(_, h)| HoldingItem { kind: h.kind.clone(), at: h.at.clone(), quantity: h.quantity })
+                        .collect();
+                    ChannelData::Holdings { holdings }
                 }
                 ChannelKind::Records { filter, .. } => {
                     let from = after.unwrap_or(0);

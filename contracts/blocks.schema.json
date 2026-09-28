@@ -27,6 +27,9 @@
           "$ref": "#/$defs/transfer"
         },
         {
+          "$ref": "#/$defs/move_goods"
+        },
+        {
           "$ref": "#/$defs/open_account"
         },
         {
@@ -1034,6 +1037,41 @@
           "const": "retire"
         },
         "participant": {
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
+        }
+      }
+    },
+    "move_goods": {
+      "description": "PHYSICAL (phase B). The holder moves some of its holding of a resource to someone's holding at a place: its own elsewhere, or another's (a delivery, a handover), or out of the world to an edge. Only the holder can move its holdings (possession, D20). An edge's goods come from outside, so its holding may go negative (as for money, D31). Goods move between places instantly (a documented liberty: no transport).",
+      "type": "object",
+      "required": [
+        "block",
+        "kind",
+        "quantity",
+        "from_at",
+        "to",
+        "to_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "move_goods"
+        },
+        "kind": {
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/ConfigId"
+        },
+        "quantity": {
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Quantity"
+        },
+        "from_at": {
+          "description": "Where the goods are now: a structure, or for an edge, itself.",
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
+        },
+        "to": {
+          "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
+        },
+        "to_at": {
+          "description": "Where they go: a structure, or for an edge, itself.",
           "$ref": "urn:terrarium:contracts:0.5:common#/$defs/IdOrRef"
         }
       }

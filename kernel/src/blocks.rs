@@ -31,6 +31,18 @@ pub enum Block {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         memo: Option<String>,
     },
+    /// The holder moves some of its holding of a resource to someone's holding at a place (its own, or another's: a
+    /// delivery, a handover, a shipment out of the world to an edge). Phase B.
+    MoveGoods {
+        kind: Id,
+        #[serde(with = "crate::money::amount")]
+        quantity: crate::money::Money,
+        /// Where the goods are now (a structure, or for an edge, itself).
+        from_at: IdOrRef,
+        to: IdOrRef,
+        /// Where they go (a structure, or for an edge, itself).
+        to_at: IdOrRef,
+    },
     OpenAccount {
         holder: IdOrRef,
         /// The account's currency; absent: the world's first (its default).
@@ -271,6 +283,7 @@ impl Block {
     pub fn name(&self) -> &'static str {
         match self {
             Block::Transfer { .. } => "transfer",
+            Block::MoveGoods { .. } => "move_goods",
             Block::OpenAccount { .. } => "open_account",
             Block::CloseAccount { .. } => "close_account",
             Block::Construct { .. } => "construct",

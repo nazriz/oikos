@@ -506,6 +506,13 @@ impl<'a> Exec<'a> {
         Ok(self.entity.clone())
     }
 
+    /// Add to (or take from) a holding, stamping the change.
+    fn add_holding(&mut self, holder: &str, at: &str, kind: &str, by: Money, stamp: u64) {
+        let key = crate::state::holding_key(holder, at, kind);
+        let q = self.st.holdings.get(&key).map_or(0, |s| s.quantity) + by;
+        self.st.holdings.insert(key, crate::state::Holding { kind: kind.into(), holder: holder.into(), at: at.into(), quantity: q, changed: stamp });
+    }
+
     fn account(&self, id: &str) -> R<&Account> {
         self.st.accounts.get(id).ok_or_else(|| refuse(RefusalCode::UnknownAccount, format!("no account {id}")))
     }
@@ -745,6 +752,47 @@ impl<'a> Exec<'a> {
                     self.record_of_kind(rec, "any")?;
                 }
                 self.move_money(&from, &to, *amount, TransferReason::Payment, settles, per_instruction, memo.clone())
+            }
+
+            Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
+                let (from_at, to, to_at) = (self.r(from_at)?, self.r(to)?, self.r(to_at)?);
+                if !self.s.config.catalogue.resources.iter().any(|r| &r.id == kind) {
+                    return Err(refuse(RefusalCode::UnknownResource, format!("the world has no resource {kind}")));
+                }
+                if !(1..=MAX_MONEY).contains(quantity) {
+                    return Err(refuse(RefusalCode::Overflow, "quantity out of range"));
+                }
+                self.entity_exists(&to)?;
+                // Where goods can be: a structure (standing or begun), or an edge's own outside.
+                let place_ok = |who: &str, at: &str| self.st.structures.contains_key(at) || (self.s.is_boundary(who) && at == who);
+                if !place_ok(&to, &to_at) {
+                    return Err(refuse(RefusalCode::UnknownPlace, format!("{to_at} isn't somewhere {to} can hold goods")));
+                }
+                // Only the holder moves its goods (custody, as for money one keeps oneself). An edge's goods come from
+                // outside, so its holding may go negative (D31, as for money); anyone else's must be there.
+                let me = self.entity.clone();
+                let edge = self.s.is_boundary(&me);
+                let have = self.st.holding(&me, &from_at, kind);
+                if !edge && have < *quantity {
+                    return Err(refuse(RefusalCode::InsufficientQuantity, format!("{me} has {have} {kind} at {from_at}, needs {quantity}")));
+                }
+                if edge && from_at != me && have < *quantity {
+                    return Err(refuse(RefusalCode::InsufficientQuantity, format!("{me} has {have} {kind} at {from_at}, needs {quantity}")));
+                }
+                if have.checked_sub(*quantity).is_none_or(|x| x < -MAX_MONEY) {
+                    return Err(refuse(RefusalCode::Overflow, "the edge's holding would go beyond the range of a quantity"));
+                }
+                let there = self.st.holding(&to, &to_at, kind);
+                if !(me == to && from_at == to_at) && there.checked_add(*quantity).is_none_or(|x| x > MAX_MONEY) {
+                    return Err(refuse(RefusalCode::Overflow, "the holding would exceed the range of a quantity"));
+                }
+                if !(me == to && from_at == to_at) {
+                    let c = self.st.stamp();
+                    self.add_holding(&me, &from_at, kind, -*quantity, c);
+                    self.add_holding(&to, &to_at, kind, *quantity, c);
+                }
+                self.emit(EventBody::GoodsMoved { kind: kind.clone(), quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into() });
+                Ok(())
             }
 
             Block::OpenAccount { holder, currency, bind } => {

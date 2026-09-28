@@ -19,7 +19,7 @@ fn random_operations_reach_the_interesting_states() {
     let mut runner = TestRunner::new_with_rng(Config::default(), TestRng::deterministic_rng(RngAlgorithm::ChaCha));
     let mut seen: BTreeMap<String, usize> = BTreeMap::new();
     let (mut rejected, mut total) = (0usize, 0usize);
-    for _ in 0..200 {
+    for _ in 0..300 {
         let ops = proptest::collection::vec(op_strategy(), 40..60).new_tree(&mut runner).unwrap().current();
         let mut run = Run::start(world(&default_params()), "reach", Vec::new(), None).unwrap();
         for op in &ops {
@@ -53,6 +53,9 @@ fn random_operations_reach_the_interesting_states() {
         "transfer/carried",
         "account_opened",
         "account_closed",
+        "goods_moved",
+        "refused/insufficient_quantity",
+        "refused/unknown_resource",
         "structure_started",
         "structure_completed",
         "structure_demolished",

@@ -25,6 +25,16 @@
       "type": "string",
       "pattern": "^[1-9][0-9]{0,37}$"
     },
+    "Quantity": {
+      "description": "A strictly positive quantity of a resource, in its kind's unit: a decimal-string integer of at most 38 digits, like an amount of money (D58).",
+      "type": "string",
+      "pattern": "^[1-9][0-9]{0,37}$"
+    },
+    "Holding": {
+      "description": "How much of a resource is held: a decimal-string integer (0 when it's all gone; an edge's may be negative: goods entering from outside).",
+      "type": "string",
+      "pattern": "^(0|-?[1-9][0-9]{0,37})$"
+    },
     "Currency": {
       "description": "A currency's code: ISO 4217 for real ones (AUD), or a world's own.",
       "type": "string",

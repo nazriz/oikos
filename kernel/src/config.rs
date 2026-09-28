@@ -73,6 +73,29 @@ pub struct LogParams {
 #[serde(deny_unknown_fields)]
 pub struct Catalogue {
     pub structure_types: Vec<StructureType>,
+    /// The kinds of thing the world holds, moves and makes (D58 §4.3, phase B): goods, inputs, materials. Money
+    /// isn't one: it stays in accounts.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resources: Vec<ResourceCfg>,
+}
+
+/// A kind of resource: its id and the unit its quantities count (items, kg...: the world's vocabulary).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceCfg {
+    pub id: Id,
+    pub unit: String,
+}
+
+/// A holding at the start: a quantity of a kind, held by an entity at a structure (or, for an edge, at itself).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HoldingCfg {
+    pub kind: Id,
+    pub holder: Id,
+    pub at: Id,
+    #[serde(with = "crate::money::amount")]
+    pub quantity: crate::money::Money,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -133,6 +156,9 @@ pub struct World {
     pub structures: Vec<StructureCfg>,
     pub occupancy: Vec<OccupancyCfg>,
     pub records: Vec<Record>,
+    /// Holdings at the start (phase B).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub holdings: Vec<HoldingCfg>,
 }
 
 /// The ground: one plane of `w` by `h` cells (`cell.<x>.<y>`), each `cell` world units across (presentation only),
@@ -450,6 +476,8 @@ impl ParticipantCfg {
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ChannelKind {
     Accounts,
+    /// What the capacity's entity holds, and where (phase B): its holdings that changed since the last look.
+    Holdings,
     Records {
         #[serde(rename = "match")]
         filter: RecordFilter,
@@ -853,6 +881,30 @@ pub fn validate(c: &Config) -> Result<(), String> {
         *u += 1;
         if *u > spec.capacity as u64 {
             return Err(format!("space {} is over its capacity of {}", o.space, spec.capacity));
+        }
+    }
+
+    // Resources and holdings (phase B): kinds unique; holdings of a known kind, held by an entity, at a structure or
+    // (an edge only) at itself; within range; each (holder, place, kind) once.
+    let kinds: BTreeSet<&str> = c.catalogue.resources.iter().map(|r| r.id.as_str()).collect();
+    if kinds.len() != c.catalogue.resources.len() {
+        return Err("a resource kind is declared twice".into());
+    }
+    let mut holding_keys = BTreeSet::new();
+    for st in &w.holdings {
+        if !kinds.contains(st.kind.as_str()) {
+            return Err(format!("a holding of {}, which the catalogue doesn't declare", st.kind));
+        }
+        entity(&st.holder)?;
+        let edge = w.boundaries.contains(&st.holder);
+        if !(structures.contains_key(st.at.as_str()) || (edge && st.at == st.holder)) {
+            return Err(format!("{}'s holding of {} is at {}, which isn't a structure (or, for an edge, itself)", st.holder, st.kind, st.at));
+        }
+        if !(0..=crate::money::MAX_MONEY).contains(&st.quantity) && !edge {
+            return Err(format!("{}'s holding of {} is out of range", st.holder, st.kind));
+        }
+        if !holding_keys.insert((st.holder.as_str(), st.at.as_str(), st.kind.as_str())) {
+            return Err(format!("{}'s holding of {} at {} is given twice", st.holder, st.kind, st.at));
         }
     }
 

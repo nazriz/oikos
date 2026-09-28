@@ -184,6 +184,31 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             Some(a) if a.balance != 0 => Err(RefusalCode::AccountNotEmpty),
             Some(_) => Ok(()),
         },
+        Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
+            // Possession (phase B): the actor moves its own holding; an edge's may go negative.
+            let max = terrarium_kernel::money::MAX_MONEY;
+            if !s.config.catalogue.resources.iter().any(|r| &r.id == kind) {
+                Err(RefusalCode::UnknownResource)
+            } else if !(1..=max).contains(quantity) {
+                Err(RefusalCode::Overflow)
+            } else if !st.entities.contains_key(to) {
+                Err(RefusalCode::UnknownEntity)
+            } else if !(st.structures.contains_key(to_at) || (s.is_boundary(to) && to_at == to)) {
+                Err(RefusalCode::UnknownPlace)
+            } else {
+                let have = st.holding(&me, from_at, kind);
+                let edge_outside = s.is_boundary(&me) && from_at == &me;
+                let same = &me == to && from_at == to_at;
+                let there = st.holding(to, to_at, kind);
+                if !edge_outside && have < *quantity {
+                    Err(RefusalCode::InsufficientQuantity)
+                } else if have.checked_sub(*quantity).is_none_or(|x| x < -max) || (!same && there.checked_add(*quantity).is_none_or(|x| x > max)) {
+                    Err(RefusalCode::Overflow)
+                } else {
+                    Ok(())
+                }
+            }
+        }
         Block::Leave { person, to } => {
             let who = match person {
                 Some(w) => w.clone(),

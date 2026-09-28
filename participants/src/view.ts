@@ -8,7 +8,7 @@
 // invariant test checks that a view built this way always equals the full
 // picture (kernel/tests/perception.rs).
 
-import type { ChannelData, Observation, PositionItem, Record, SiteCell } from "./contracts";
+import type { ChannelData, HoldingItem, Observation, PositionItem, Record, SiteCell } from "./contracts";
 
 type AccountItem = Extract<ChannelData, { kind: "accounts" }>["accounts"][number];
 type DirectoryData = Extract<ChannelData, { kind: "directory" }>;
@@ -18,6 +18,7 @@ const byKey = <T>(m: Map<string, T>) => [...m.keys()].sort().map((k) => m.get(k)
 
 export class View {
   private accounts = new Map<string, Map<string, AccountItem>>();
+  private holdings = new Map<string, Map<string, HoldingItem>>();
   private sites = new Map<string, { as_of: number; cells: Map<string, SiteCell> }>();
   private directories = new Map<string, { entities: Map<string, DirectoryData["entities"][number]>; positions: Map<string, PositionItem> }>();
   private kept = new Map<string, Map<string, Record>>();
@@ -44,6 +45,15 @@ export class View {
           else m.set(a.account, a);
         }
         if (ch.accounts.length) this.cache.delete(id);
+      } else if (ch.kind === "holdings") {
+        // What's held where, as it changes; a holding that has gone to nothing drops out of the picture.
+        const m = this.holdings.get(id) ?? new Map();
+        this.holdings.set(id, m);
+        for (const h of ch.holdings) {
+          if (h.quantity === "0") m.delete(`${h.at}|${h.kind}`);
+          else m.set(`${h.at}|${h.kind}`, h);
+        }
+        if (ch.holdings.length) this.cache.delete(id);
       } else if (ch.kind === "sites") {
         // A move: the whole of the new surroundings replaces the old (what was seen there is the participant's memory, not its view).
         const v = (!ch.whole && this.sites.get(id)) || { as_of: ch.as_of, cells: new Map() };
@@ -74,6 +84,7 @@ export class View {
       return this.cache.get(id) as T;
     };
     for (const [id, m] of this.accounts) channels[id] = { kind: "accounts", accounts: cached(id, () => byKey(m)), transactions: txs(id) };
+    for (const [id, m] of this.holdings) channels[id] = { kind: "holdings", holdings: cached(id, () => byKey(m)) };
     for (const [id, v] of this.sites) channels[id] = { kind: "sites", as_of: v.as_of, cells: cached(id, () => byKey(v.cells)) };
     for (const [id, v] of this.directories) {
       const d = cached(id, () => ({ entities: byKey(v.entities), positions: byKey(v.positions) }));
