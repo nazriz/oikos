@@ -12,14 +12,14 @@ export { annualTax, withholding, type IncomeTaxLaw } from "./behaviour/tax";
 export { drawHousehold, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
-import { exportDemand, funding, grants, idle, migration, trade, transfers, valuer } from "./behaviour/world";
+import { disposal, exportDemand, funding, grants, idle, migration, trade, transfers, valuer } from "./behaviour/world";
 import { lending } from "./behaviour/credit";
 import { citizen } from "./behaviour/citizen";
 import { employer, landlord } from "./behaviour/firms";
 import { producer } from "./behaviour/producer";
 import { retailer } from "./behaviour/retailer";
 import { builder, childProtection, inspector, planningOfficer, registry } from "./behaviour/institutions";
-import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk } from "./behaviour/government";
+import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./behaviour/government";
 
 /** Every behaviour module available to worlds, by the name used in controller.impl. */
 export const modules: { [name: string]: BehaviourModule & { source: string } } = Object.fromEntries(
@@ -34,6 +34,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [funding, "behaviour/world.ts"],
       [valuer, "behaviour/world.ts"],
       [grants, "behaviour/world.ts"],
+      [disposal, "behaviour/world.ts"],
       [lending, "behaviour/credit.ts"],
       [citizen, "behaviour/citizen.ts"],
       [landlord, "behaviour/firms.ts"],
@@ -51,6 +52,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [financeOfficer, "behaviour/government.ts"],
       [taxClerk, "behaviour/government.ts"],
       [ratesOfficer, "behaviour/government.ts"],
+      [works, "behaviour/government.ts"],
     ] as const
   ).map(([m, src]) => [m.name, { ...m, source: new URL(`./${src}`, import.meta.url).pathname }]),
 );

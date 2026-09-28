@@ -105,6 +105,7 @@ export const producer: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
+        winding.absorb(obs, ownAccount(obs)?.account);
         orders.take(obs, ownAccount(obs)?.account);
         for (const d of deliveries.take(book, me)) {
           const o = orderQty.get(d.order);

@@ -21,7 +21,7 @@ The genesis records that set this up are world content, made by the generator:
 ## `city.mayor_code`: the all-code control
 
 A rule-following mayor. In AI experiments an LLM takes this seat instead (M2), and this module is the baseline it's compared against.
-- **Budget:** each year it proposes a budget (`data.enact` = a `budget` statement with `lines`, for now just `parks`). If the council hasn't adopted one within 45 days, it tables it again.
+- **Budget:** each year it proposes a budget (`data.enact` = a `budget` statement with `lines`: `parks`, and since C4b `staff`, the works crew's wages, and `services`, the landfill's charges; [services.md](services.md)). If the council hasn't adopted one within 45 days, it tables it again.
 - **A park a year:** when the current year's adopted budget can pay for one and the town owns a free parcel, it applies for planning permission. Once that is granted, it proposes and signs a construction agreement with the builder at 1.2× materials cost.
 - **Approvals:** it writes an `approval` for each invoice for work it commissioned. The payments procedure needs one over $50,000.
 - **Petitions:** once a petition's organiser's published count (`petition_count`) reaches `petition_threshold_bps` of the population, it turns the petition into a proposal carrying the petition's demand, with probability `responsiveness_bps`.
@@ -51,7 +51,9 @@ Spatial voting on one axis, from pro-development (−100) to pro-tenant (+100) (
 
 The generator seats five councillors at −80, −40, 0, 40 and 80. That makes tenant-protection proposals a coin-flip-ish affair: the two pro-tenant councillors plus noise. The council's composition is an experimental variable.
 
-## `city.finance_officer`
+## `city.finance_officer` (0.8.0)
+
+**Payroll (C4b):** the finance officer also runs the town's payroll: wages for the crew the works office hires, net of the income tax withheld, which it pays over monthly ([services.md](services.md), [public-finance.md](public-finance.md)). Wages count against the adopted budget with the invoices it pays.
 
 It wakes every 3 days and, for each invoice addressed to the town, pays through the bank (it is the named signatory) when the payments procedure allows:
 - within the adopted budget's total for the year;

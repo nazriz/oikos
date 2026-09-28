@@ -29,7 +29,7 @@ import type { LookRequest, Observation, ParticipantAction, SiteStructure, Statem
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import * as C from "../calls";
-import { because, Book, callAction, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, vote, withdraw, type Step, ownBanked } from "./common";
+import { because, Book, callAction, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
@@ -45,7 +45,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.13.0",
+  version: "0.14.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -104,6 +104,12 @@ export const citizen: BehaviourModule = {
       accept_fewer_bedrooms_after_days: 60, // still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)
       // Fertility (docs/behaviour/households.md): births per 10,000 women a year by age (the world's profile); a month's chance is a twelfth.
       fertility_per_10000: [] as { from: number; rate: number }[],
+      // Complaining about a service (docs/behaviour/services.md): whom to (none: nobody), about which of our home's
+      // variables (waste building up), once it's this many days' worth, with this chance each week (placeholder).
+      complain_to: null as string | null,
+      complain_about: "waste",
+      complain_after_days: 14,
+      complain_bps: 3000,
     },
     ctx.params,
   );
@@ -111,6 +117,8 @@ export const citizen: BehaviourModule = {
     const book = new Book();
     let home: Home | null = null;
     let job: Job | null = null;
+    let homeSite: SiteStructure | undefined; // our home's building, as we last saw it
+    let complainedOf: string | null = null; // the home we've complained about, until it's seen to
     // Moving to a better-paid job: the offer we've taken, to sign once our notice at the old one is worked out.
     let switching: { offer: string; wage: number } | null = null;
     let searchingWork = false; // this month's look for a better-paid job while employed
@@ -214,6 +222,7 @@ export const citizen: BehaviourModule = {
     let fresh: ReturnType<Book["absorb"]> = [];
     const absorb = (obs: Observation) => {
       fresh.push(...book.absorb(obs));
+      for (const c of channels.cells(obs)) if (home && c.structure?.structure === home.structure) homeSite = c.structure;
       if (pendingFirm && founded) {
         const id = obs.outcomes.flatMap((o) => (o.created?.firm ? [o.created.firm] : []))[0];
         if (id) {
@@ -572,6 +581,20 @@ export const citizen: BehaviourModule = {
       }
 
       wordOfMouth(obs, t, steps);
+
+      // A service not done: waste piling up at home for `complain_after_days` days' worth. The leaseholder writes to
+      // the town, with the week's chance, once until it's seen to.
+      if (p.complain_to && home && isLeaseholder() && homeSite?.structure === home.structure) {
+        const v = homeSite.variables?.[p.complain_about];
+        const now = variableToday(v, t) ?? 0;
+        const rate = v?.per_day ?? 0;
+        if (complainedOf === home.structure && now < rate * 7) complainedOf = null;
+        if (rate > 0 && now >= rate * p.complain_after_days && complainedOf !== home.structure && ctx.rng(`complain-${t}`).below(10_000) < p.complain_bps) {
+          complainedOf = home.structure;
+          steps.push(because(`Our ${p.complain_about} hasn't been collected for about ${Math.floor(now / rate)} days: writing to the town.`,
+            say("complaint", `Our ${p.complain_about} at ${home.structure} hasn't been collected for about ${Math.floor(now / rate)} days.`, { to: [p.complain_to], visible: [me, p.complain_to], data: { structure: home.structure, about: p.complain_about, days: Math.floor(now / rate) } })));
+        }
+      }
 
       // Looking for a home: what someone told us about first, then the best one we can afford among the listings we've seen.
       if (isLeaseholder() && !home) {

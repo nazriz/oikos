@@ -412,7 +412,14 @@ export class Staffing {
   private withheld = 0;
   private nextRemit = -1;
 
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string }) {}
+  /** Wages our orders have paid, gross (what they paid, and what they withheld), since we began. */
+  wagesPaid = 0;
+
+  /**
+   * `does`: which half of it this office does. Most employers do both; an organisation where one office hires and
+   * another runs the payroll (a town: its works manager, its finance officer) gives each its half.
+   */
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; does?: { hire?: boolean; pay?: boolean } }) {}
 
   absorb(obs: Observation) {
     for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) {
@@ -422,7 +429,13 @@ export class Staffing {
       this.pendingWithhold.delete(ref);
     }
     // Wages paid by our standing orders: what each withheld is now owed to the collector.
-    for (const tx of channels.transactions(obs)) if (tx.per_instruction && this.withholds.has(tx.per_instruction)) this.withheld += this.withholds.get(tx.per_instruction)!;
+    const ours = new Set(this.orders.values());
+    for (const tx of channels.transactions(obs)) {
+      if (!tx.per_instruction || !ours.has(tx.per_instruction)) continue;
+      const w = this.withholds.get(tx.per_instruction) ?? 0;
+      this.withheld += w;
+      this.wagesPaid += cents(tx.amount) + w;
+    }
   }
 
   private contracts(book: Book): any[] {
@@ -468,11 +481,13 @@ export class Staffing {
     const offered = this.offered(book, t);
     const steps: Step[] = [];
     let offersNow = 0;
+    const doesPay = this.o.does?.pay !== false;
+    const doesHire = this.o.does?.hire !== false;
 
     // Newly signed: start paying wages by standing order, at the wage agreed less the income tax the law says to
     // withhold.
     const law = incomeTaxLaw(book);
-    for (const a of staff) {
+    for (const a of doesPay ? staff : []) {
       if (this.orders.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
       const worker = a.terms.parties[1];
       const pays = jobTerms(a, worker);
@@ -486,7 +501,7 @@ export class Staffing {
         [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
     }
     // A worker who has died (registered): stop the wages, and end the employment on record.
-    for (const r of book.all("death_registration")) {
+    for (const r of doesPay ? book.all("death_registration") : []) {
       const a = staff.find((x) => x.terms.parties[1] === r.data?.deceased);
       if (!a || this.noticed.has(a.id)) continue;
       this.noticed.set(a.id, t);
@@ -498,7 +513,7 @@ export class Staffing {
       steps.push(s);
     }
     // Ended (notice served): stop the wages.
-    for (const a of contracts) if (book.inForce(a.id) && t >= this.endOf(book, a) && this.orders.has(a.id)) {
+    for (const a of doesPay ? contracts : []) if (book.inForce(a.id) && t >= this.endOf(book, a) && this.orders.has(a.id)) {
       steps.push(because("Employment has ended: stopping the wages.", withdraw(this.orders.get(a.id)!, "Employment ended; stop wages.")));
       this.orders.delete(a.id);
     }
@@ -506,7 +521,7 @@ export class Staffing {
     // Hiring: one applicant at random per posting, at the posting's wage.
     const posts = this.postings(book);
     const apps = book.open("job_application").filter((a) => (a.addressed_to ?? []).includes(me) && !this.handled.has(a.id));
-    for (const post of posts) {
+    for (const post of doesHire ? posts : []) {
       const mine = apps.filter((a) => a.data?.posting === post.id).sort((x, y) => (x.id < y.id ? -1 : 1));
       for (const a of mine) this.handled.add(a.id);
       if (!mine.length) continue;
@@ -529,7 +544,7 @@ export class Staffing {
     // Monthly: what we've withheld, paid over to the tax's collector, with a report of it. Short of money, we pay what
     // we can, keeping the next pay period's wages, and what's left is still owed (carried to next month).
     if (this.nextRemit < 0) this.nextRemit = t + MONTH;
-    if (t >= this.nextRemit) {
+    if (doesPay && t >= this.nextRemit) {
       this.nextRemit = t + MONTH;
       const balance = channels.accounts(obs).find((a) => a.account === account)?.balance;
       if (this.withheld > 0 && law?.account && balance !== undefined) {
@@ -545,14 +560,14 @@ export class Staffing {
     }
 
     // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
-    for (const post of posts) if (!apps.some((a) => a.data?.posting === post.id) && Number.isInteger(post.data?.wage) && post.data!.wage !== want.wage && want.canPost) {
+    for (const post of doesHire ? posts : []) if (!apps.some((a) => a.data?.posting === post.id) && Number.isInteger(post.data?.wage) && post.data!.wage !== want.wage && want.canPost) {
       steps.push(because(`Our posting is still open, at ${usd(post.data!.wage as number)}; we offer ${usd(want.wage)} now: posting it again at that.`, withdraw(post.id, "Superseded: a new wage."),
         say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
     }
 
     // Post a job if short-staffed (and the module says we can).
     const have = staff.length + offered.length + offersNow;
-    if (have < want.target && posts.length === 0 && want.canPost) {
+    if (doesHire && have < want.target && posts.length === 0 && want.canPost) {
       steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
     }
     return steps;
@@ -702,6 +717,12 @@ export class WindingUp {
     return steps;
   }
 
+  /** Every observation (not only when planning): money paid to us once we've closed, by paying account (a buyer's). */
+  absorb(obs: Observation, account: string | undefined) {
+    if (this.state !== "closed" || !account) return;
+    for (const tx of channels.transactions(obs)) if (tx.to === account && tx.from !== account) this.credit.set(tx.from, (this.credit.get(tx.from) ?? 0) + cents(tx.amount));
+  }
+
   private listedAt = -1;
   private asking = 0;
   private sold = false;
@@ -715,7 +736,6 @@ export class WindingUp {
    */
   sell(obs: Observation, book: Book, account: string, balance: number, premises: { structure: string; type: string; cell: string } | undefined, price: number | undefined, distributeTo: (amount: number) => Step[]): Step[] {
     if (this.state !== "closed" || !premises || !price) return [];
-    for (const tx of channels.transactions(obs)) if (tx.to === account && tx.from !== account) this.credit.set(tx.from, (this.credit.get(tx.from) ?? 0) + cents(tx.amount));
     const titles = ([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.holder === this.me && r.about?.kind === "ownership") as any[]).filter((c) => !book.withdrawn.has(c.id) && ![...book.records.values()].some((x) => x.record === "claim_transfer" && x.claim === c.id));
     const steps: Step[] = [];
     const t = obs.t;

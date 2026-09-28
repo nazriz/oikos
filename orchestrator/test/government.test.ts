@@ -44,7 +44,7 @@ test("budget, park and rates run through the town's own procedures", async () =>
   const app = recs.find((r) => r.kind === "permit_application" && r.in_position === "mayor");
   expect(recs.find((r) => r.kind === "permit_decision" && r.data.application === app.id)?.data.decision).toBe("granted");
   expect(ev.some((e) => e.event === "structure_started" && lotCells(app.data.lot).includes(e.on))).toBe(true);
-  const invoice = recs.find((r) => r.kind === "invoice" && (r.addressed_to ?? []).includes("city"));
+  const invoice = recs.find((r) => r.kind === "invoice" && r.speaks_for === "builder" && (r.addressed_to ?? []).includes("city"));
   expect(recs.some((r) => r.kind === "approval" && r.in_position === "mayor" && r.data.invoice === invoice.id)).toBe(true);
   const order = recs.find((r) => r.kind === "request" && r.data?.outcome?.money?.settles === invoice.id);
   expect(order?.in_position).toBe("finance");

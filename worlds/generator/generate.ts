@@ -234,6 +234,11 @@ export function generate(spec: TownSpec): any {
     households.push({ members, couples: d.couples.map(([a, b]) => [members[a]!.id, members[b]!.id]), leaseholder: members[d.leaseholder]!.id });
   }
   const everyone = households.flatMap((h) => h.members);
+  // The town's works crew, at the hall (its depot): the profile's staff per 1,000 residents, in work from the start like
+  // the firms' staff (docs/behaviour/services.md).
+  const townCrew = Math.max(1, Math.round((V.services.council_staff_per_1000 * everyone.length) / 1000));
+  // (First, so it's filled whatever the size of the town's workforce.)
+  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: 20, start: townCrew });
   for (const m of everyone) entities.push({ id: m.id, kind: "person", name: m.id, born_at: m.born_at, sex: m.sex, ...(m.parents ? { parents: m.parents } : {}) });
 
   // Jobs: adults, at the working-age employment rate.
@@ -287,7 +292,8 @@ export function generate(spec: TownSpec): any {
       ],
       termination: [{ party: w.employer, notice: 14 * DAY }, { party: c.id, notice: 14 * DAY }] } });
     for (const party of [w.employer, c.id]) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [w.employer, c.id], speaks_for: party, agreement: ag, as: party });
-    records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, kind: "request", addressed_to: ["bank"], basis: ag,
+    // (The town's wages are instructed by its finance officer, the signatory the bank knows.)
+    records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
       text: `Please pay ${c.id}'s wages every 14 days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - withholding(taxLaw, w.wage, 14 * DAY)), for: "wages" } }, every: 14 * DAY, first: (1 + pick.below(14)) * DAY } });
     occupancy.push({ occupant: c.id, space: w.space });
   }
@@ -454,12 +460,21 @@ export function generate(spec: TownSpec): any {
   };
   const adultCount = everyone.filter((m) => m.adult).length;
   // The code mayor's yearly budget for parks (placeholder: a park a year at about what the builder charges).
-  const mayorParams = { population: adultCount, park_budget: 15_000_000 };
+  // ---- the town's services (docs/behaviour/services.md) ----
+  const SV = V.services;
+  const crewAnnual = Math.floor((wages.construction * YEAR) / (14 * DAY)); // the works crew, at the construction wage
+  const crew = townCrew;
+  const wearPerDay = Math.max(1, Math.round(100_000 / (SV.asset_life_years * 365))); // wear from 0 to 100,000 over the asset's life
+  const upkeep = { labour: HOUR, per_unit: Math.ceil((7 * wearPerDay) / SV.upkeep_hours_per_week_per_asset) }; // an hour of upkeep undoes this much wear
+  const servicesBudget = Math.ceil((everyone.length * SV.waste_per_person_per_day_g * 365 * SV.landfill_levy_per_tonne * 12) / 10_000_000); // a year's waste (tonnes) at the levy, and a fifth over
+  // The code mayor's yearly budget: parks (placeholder: a park a year at about what the builder charges), the crew the
+  // profile's staff per 1,000 residents gives, and the landfill for a year's waste.
+  const mayorParams = { population: adultCount, park_budget: 15_000_000, staff_budget: crew * crewAnnual, services_budget: servicesBudget };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
     [{ id: "budget", title: "The town's accounts", kind: "accounts" }, { id: "laws", title: "Laws, the charter and procedures", kind: "records", match: { statement_kinds: ["charter", "law", "procedure"] } },
       { ...mine("city-business"), title: "Correspondence and filings concerning the town" }, { ...forms, title: "Forms on file" }, { ...priceLists, title: "Price lists" }, { id: "who", title: "Who's who", kind: "directory" },
-      { id: "civic", title: "Petitions, budgets, invoices and council results", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "invoice", "ballot_result"] } }, { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
+      { id: "civic", title: "Petitions, budgets, invoices, council results and complaints", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "invoice", "ballot_result", "complaint"] } }, { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
     spec.mayor === "code" ? mayorCode : { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       // Until a real model is used, the mock runs the office with the code mayor as its brain (docs/design/m2-llm-participants.md).
       params: { cadence_days: 7, standing: ["laws", "forms", "prices"], mock: { brain: "city.mayor_code", params: mayorParams } } },
@@ -497,9 +512,22 @@ export function generate(spec: TownSpec): any {
     [laws, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "patrol", kind: "sites", area: "all", every: 14 * DAY }],
     code("city.inspector"));
   const civic = (id: string, kinds: string[]) => ({ id, kind: "records", match: { statement_kinds: kinds } });
-  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"]), priceLists], code("city.finance_officer", {
+  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"]), priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
     // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
-    budget_lines: { parks: "building a park on one of the town's free lots, commissioned from a builder. The town has no other spending from its account: no paid staff or running services." } }));
+    budget_lines: {
+      parks: "building a park on one of the town's free lots, commissioned from a builder.",
+      staff: `the wages of the town's works crew, who collect waste from every home each week and keep the town's parks and hall up (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody collects the waste).`,
+      services: "the services' running costs: the landfill's charge for the waste collected (invoiced monthly).",
+    } }));
+  // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
+  const hallCell = structures.find((x) => x.id === "town-hall")!.at;
+  office("works", "city", "Works manager", "works_manager", [mine("works-business"), civic("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
+    { id: "town", kind: "sites", area: "all" }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" }],
+    code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
+      collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
+      maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste" }));
+  office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"] } }],
+    code("world.disposal", { kind: "waste", price_per_tonne: SV.landfill_levy_per_tonne, account: "acc-outside" }));
   // Rates (docs/behaviour/public-finance.md): the rates officer levies them on the valuer's valuations, under the rating law.
   office("rates", "city", "Rates officer", "rates_officer", [{ id: "treasury", kind: "accounts" }, laws, mine("rates-business"), civic("valuations", ["valuation"])], code("city.rates_officer"));
   // From outside the town (a higher government's offices, D31): the valuer, and grants to the town.
@@ -524,7 +552,9 @@ export function generate(spec: TownSpec): any {
       proposal: { type: "text", required: true, description: "What's proposed, in full: the law's words, or what the budget is for." },
       kind: { type: "choice", required: true, options: ["law", "budget", "other"], description: "A law, a budget, or something else." },
       affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." },
-      parks: { type: "amount", description: "For a budget: the parks line." } } } });
+      parks: { type: "amount", description: "For a budget: the parks line." },
+      staff: { type: "amount", description: "For a budget: the staff line (the works crew's wages)." },
+      services: { type: "amount", description: "For a budget: the services line (their running costs)." } } } });
   // The planning office publishes the form it expects applications on (docs/design/translator-and-resolver.md §9.3).
   records.push({ id: "form-permit", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
     text: "Planning permit application: the lot and the kind of building.",
@@ -543,6 +573,7 @@ export function generate(spec: TownSpec): any {
   const market = { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"] } };
   for (const w of workplaces) {
     if (w.employer === "builder") continue; // the foreman hires its own crew, to the work in hand
+    if (w.employer === "city") continue; // the town's works office, below
     if (w.employer.startsWith("factory")) {
       const cell = structures.find((x) => x.id === w.structure)!.at;
       office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, lawBook, { id: "stock", kind: "holdings" }, { id: "works", kind: "sites", area: [cell], occupants: "names" }],
@@ -577,6 +608,7 @@ export function generate(spec: TownSpec): any {
   // "population" is who could sign a petition: the adults.
   const life = townLife(P);
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
+    complain_to: "city", complain_bps: V.services.complain_bps,
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,
     saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, support_from: "outside", support_kinds: { retired: "pension", unemployed: "unemployment" },
@@ -608,7 +640,13 @@ export function generate(spec: TownSpec): any {
     // Amounts and quantities on the wire are decimal strings (D58); the generator counts in numbers.
     catalogue: {
       structure_types: structureTypes.map((t) => ({ ...t, materials: Object.fromEntries(Object.entries(t.materials).map(([k, q]) => [k, String(q)])) })),
-      resources: [{ id: "goods", unit: "item" }, { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }],
+      resources: [{ id: "goods", unit: "item" }, { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }, { id: "waste", unit: "kg" }],
+      // What builds up and wears out (docs/behaviour/services.md): waste in homes (grams), by the people living there;
+      // wear on the town's parks and hall (0 to 100,000 over their life).
+      variables: [
+        { id: "waste", min: 0, max: 100_000_000, initial: 0, per_occupant_per_day: V.services.waste_per_person_per_day_g, types: structureTypes.filter((x) => x.spaces.some((sp: any) => sp.kind === "dwelling")).map((x) => x.id) },
+        { id: "wear", min: 0, max: 100_000, initial: 0, per_day: wearPerDay, types: ["park", "civic"] },
+      ],
       // Making goods: a worker's hours at a workplace turn inputs into goods.
       tasks: [
         { id: "make", labour: MAKE.labour, in: "workplace", consumes: { inputs: String(MAKE.inputs) }, produces: { goods: "1" } },
@@ -616,6 +654,9 @@ export function generate(spec: TownSpec): any {
         { id: "serve", labour: SHOP.serve, in: "workplace" },
         // Using things up: a household's goods, an item at a time; it takes no one's time.
         { id: "consume", labour: 0, consumes: { goods: "1" } },
+        // The works crew's: collecting 10 kg of a home's waste (to the depot), and an hour's upkeep of an asset.
+        { id: "collect", labour: V.services.collect_seconds_per_10kg, in: "workplace", produces: { waste: "10" }, changes: { waste: -10_000 } },
+        { id: "maintain", labour: upkeep.labour, in: "workplace", changes: { wear: -upkeep.per_unit } },
       ],
       working_day: WORKING_DAY,
     },

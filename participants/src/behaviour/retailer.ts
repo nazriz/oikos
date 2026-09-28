@@ -122,7 +122,6 @@ export const retailer: BehaviourModule = {
         setup.capitalCalled = true;
         return [because(`A new shop: asking our founder for the ${usd(p.capital)} of capital they're putting in.`, say("capital_call", `Please pay the ${usd(p.capital)} of capital into ${acc.account}.`, { to: [p.founder!], visible: [me, p.founder!], data: { account: acc.account, amount: p.capital } }))];
       }
-      for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.from !== acc.account && !setup.founderAccount) setup.founderAccount = tx.from;
       const steps: Step[] = [];
       if (setup.founderAccount && !setup.registered) {
         setup.registered = true;
@@ -159,6 +158,10 @@ export const retailer: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
+        winding.absorb(obs, ownAccount(obs)?.account);
+        // Setting up: the founder's capital, as it arrives (the account it comes from is theirs).
+        const mine = ownAccount(obs)?.account;
+        if (!setup.ready && setup.capitalCalled && !setup.founderAccount && mine) for (const tx of channels.transactions(obs)) if (tx.to === mine && tx.from !== mine) setup.founderAccount = tx.from;
         orders.take(obs, ownAccount(obs)?.account);
         for (const d of deliveries.take(book, me)) {
           const o = ours.get(d.order);

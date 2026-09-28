@@ -37,6 +37,8 @@ Rules every module follows (so re-runs are reproducible):
 | `city.councillor` | votes on council ballots (spatial voting) | [government.md](government.md) |
 | `city.finance_officer` | pays the town's invoices under the payments procedure | [government.md](government.md) |
 | `city.tax_clerk` | assesses reported tax, chases arrears (not in the generated town since C4a) | [government.md](government.md) |
+| `city.works` | the town's works office: hires the crew the budget's staff line pays for; collects waste from homes and keeps the town's assets up, from the depot; takes waste to the landfill | [services.md](services.md) |
+| `world.disposal` | the outside world's landfill: invoices monthly for what's delivered, at a price a tonne | [services.md](services.md) |
 | `city.rates_officer` | levies rates on the valuer's valuations under the rating law, records them as claims, charges penalty interest on what's overdue | [public-finance.md](public-finance.md) |
 | `world.valuer` | the outside world's valuer: values every private property yearly (land, plus the builder's price for its buildings) | [public-finance.md](public-finance.md) |
 | `world.grants` | the outside world's grants to the town: quarterly, per resident | [public-finance.md](public-finance.md) |

@@ -248,3 +248,11 @@ export function cellsOf(book: Book, lot: string): string[] {
 export function lotOf(book: Book, cell: string): string | undefined {
   return book.open("lot").find((l) => (l.data?.cells as string[] | undefined)?.includes(cell))?.id;
 }
+
+/** A state variable's value today, as perceived: its value on the day seen, plus its daily change since, within its
+ * bounds (docs/behaviour/services.md). */
+export function variableToday(v: { value: number; as_of_day: number; per_day: number; min: number; max: number } | undefined, t: number): number | undefined {
+  if (!v) return undefined;
+  const days = Math.max(0, Math.floor(t / DAY) - v.as_of_day);
+  return Math.min(v.max, Math.max(v.min, v.value + v.per_day * days));
+}

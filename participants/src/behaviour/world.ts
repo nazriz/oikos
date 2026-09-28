@@ -396,6 +396,49 @@ export const grants: BehaviourModule = {
   },
 };
 
+/**
+ * world.disposal: a place outside the town that takes a kind of material (a landfill taking waste). Whoever delivers
+ * gives it a docket with what they brought (the weighbridge's record); monthly, it invoices each for what they
+ * brought since, at its price per tonne (1,000 units). Documented in docs/behaviour/services.md.
+ */
+export const disposal: BehaviourModule = {
+  name: "world.disposal",
+  version: "0.1.0",
+  doc: "docs/behaviour/services.md",
+  cadence: () => DAY,
+  firstWake: () => 0,
+  create(ctx) {
+    const p = params({ kind: "waste", price_per_tonne: 0, account: "acc-outside", every_days: 30 }, ctx.params);
+    const me = ctx.entity;
+    const book = new Book();
+    const billed = new Set<string>();
+    let next = p.every_days * DAY;
+    return stepper(
+      (obs) => void book.absorb(obs),
+      (obs) => {
+        if (obs.t < next) return [];
+        next = obs.t + p.every_days * DAY;
+        const due = new Map<string, { quantity: number; dockets: string[] }>();
+        for (const d of book.open("disposal_docket").filter((r) => (r.addressed_to ?? []).includes(me) && !billed.has(r.id) && r.data?.kind === p.kind).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+          billed.add(d.id);
+          const x = due.get(d.speaks_for!) ?? { quantity: 0, dockets: [] };
+          x.quantity += Math.max(0, Math.floor(Number(d.data?.quantity) || 0));
+          x.dockets.push(d.id);
+          due.set(d.speaks_for!, x);
+        }
+        const steps: Step[] = [];
+        for (const [who, x] of [...due].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+          const amount = Math.ceil((x.quantity * p.price_per_tonne) / 1000);
+          if (amount <= 0) continue;
+          steps.push(because(`The month's ${p.kind} from ${who}: ${x.quantity} at ${usd(p.price_per_tonne)} a tonne, invoiced.`,
+            say("invoice", `Invoice: ${usd(amount)} for ${x.quantity} of ${p.kind} taken this month.`, { to: [who], visible: [me, who], basis: x.dockets[0], data: { outcome: { money: { to: p.account, amount: String(amount), for: `disposal of ${p.kind}` } }, dockets: x.dockets } })));
+        }
+        return steps;
+      },
+    );
+  },
+};
+
 /** idle: a participant that does nothing (placeholder, and a control condition). */
 export const idle: BehaviourModule = {
   name: "idle",

@@ -85,7 +85,9 @@ export interface Transaction { t: number; from: Id; to: Id; amount: string; curr
  * are in it, and who (in the capacity's own buildings, or where its channel shows names). */
 export interface Departure { occupant: Id; reason: "left" | "removed" | "demolition" | "departed" | "died"; at: number }
 export interface SiteSpace { space: Id; kind: string; capacity: number; attrs?: Json; count: number; occupants?: Id[]; left?: Departure[] }
-export interface SiteStructure { structure: Id; type: Id; at: Id; w: number; h: number; built_by?: Id; complete: boolean; completes_at?: number; spaces: SiteSpace[] }
+/** A state variable as perceived (phase B): its value on a day, its change each whole day since, and its bounds. */
+export interface VariableView { value: number; as_of_day: number; per_day: number; min: number; max: number }
+export interface SiteStructure { structure: Id; type: Id; at: Id; w: number; h: number; built_by?: Id; complete: boolean; completes_at?: number; coming_down?: boolean; variables?: { [id: Id]: VariableView }; spaces: SiteSpace[] }
 /** A cell of ground, and the building standing on it (the same on every cell of its footprint). */
 export interface SiteCell { cell: Id; x: number; y: number; terrain?: string; structure?: SiteStructure }
 export interface PositionItem { position: Id; entity: Id; title?: string; role?: string; holder?: Id; held_by?: string }

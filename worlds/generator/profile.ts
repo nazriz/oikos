@@ -51,6 +51,15 @@ export interface Profile {
       rates_penalty_interest_bps: number;
       median_house_price: number;
     };
+    services: {
+      waste_per_person_per_day_g: number;
+      landfill_levy_per_tonne: number;
+      council_staff_per_1000: number;
+      collect_seconds_per_10kg: number;
+      asset_life_years: number;
+      upkeep_hours_per_week_per_asset: number;
+      complain_bps: number;
+    };
   };
   /** A source for each value (a dotted path into `values`; a value is covered by its own path or a parent's). */
   sources: { [path: string]: string };
