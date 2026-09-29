@@ -626,10 +626,10 @@
     },
     "unions": {
       "membership_bps": {
-        "factory": 900,
-        "shop": 700,
-        "builder": 1170,
-        "city": 2310,
+        "manufacturing": 900,
+        "retail": 700,
+        "construction": 1170,
+        "public_administration": 2310,
         "other": 1310
       },
       "dues_per_month": 6000,
@@ -684,7 +684,7 @@
     "services.asset_life_years": "Placeholder: a park or civic building wears out in 15 years without upkeep (after VAGO, Maintaining Local Roads: spray seals last 10-15 years).",
     "services.upkeep_hours_per_week_per_asset": "Placeholder: a crew member's half a day a week keeps a park or the hall up (mowing, bins, repairs).",
     "services.complain_bps": "Placeholder: the chance a week that a household whose waste has gone two weeks uncollected writes to the town. Who reports and who doesn't varies (the service-request literature, e.g. Stowers 2022, State and Local Government Review); a rate is to be sourced.",
-    "unions.membership_bps": "ABS, Trade union membership, August 2024: 13.1% of employees; by industry, manufacturing 9.0%, construction 11.7%, retail trade 7.0%, public administration and safety 23.1% (the industry figures to confirm against the release's tables). A factory's staff take manufacturing's, a shop's retail's, the builder's construction's, the town's public administration's; anyone else (`other`) the overall rate.",
+    "unions.membership_bps": "ABS, Trade union membership, August 2024: 13.1% of employees; by industry, manufacturing 9.0%, construction 11.7%, retail trade 7.0%, public administration and safety 23.1% (the industry figures to confirm against the release's tables); `other`, the overall rate. Keyed by the industries employers' postings name.",
     "unions.dues_per_month": "Placeholder: about $14 a week, around what large Australian unions charge full-time members (to source).",
     "unions.claim_margin_bps": "Placeholder: a union claims the year's rise in prices and 2% more. Settlements are measured against the Department of Employment and Workplace Relations' Trends in Federal Enterprise Bargaining (average annualised wage increases in new agreements), a calibration target.",
     "households.age_bands_bps": "ABS, Census 2021 QuickStats, Rest of Vic. (GCCSA 2RVIC): people by five-year age group (median age 43); 85 and over taken to 99. The ages of adults living alone, as couples without children at home, or in groups are drawn from this, less the parents the family shares imply (the generator derives it: docs/behaviour/households.md).",

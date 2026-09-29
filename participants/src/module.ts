@@ -68,3 +68,14 @@ export const DAY = 86_400;
 export function params<D extends object>(defaults: D, given: { [k: string]: any }): D & { [k: string]: any } {
   return { ...defaults, ...given };
 }
+
+/**
+ * Parameters a world must give: who a module deals with (its supplier, the town, the account it pays from). A module's
+ * defaults never name a world's entities (docs/profiles.md: the platform has no world built in), so a world that
+ * doesn't say fails at once, saying what's missing, rather than dealing with someone who isn't there.
+ */
+export function need<P extends { [k: string]: any }>(p: P, keys: string[], module: string): P {
+  const missing = keys.filter((k) => p[k] === undefined || p[k] === null || p[k] === "");
+  if (missing.length) throw new Error(`${module}: the world must say ${missing.join(", ")} (whom it deals with; no module assumes a world's names)`);
+  return p;
+}

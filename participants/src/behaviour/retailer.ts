@@ -5,7 +5,7 @@ import * as C from "../calls";
 import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
-import { params, type BehaviourModule, type ParticipantContext } from "../module";
+import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
@@ -32,6 +32,7 @@ export const retailer: BehaviourModule = {
         premises: "", // the shop: where it keeps and sells things
         workplace: "", // the space its staff work in
         role: "shop assistant",
+        industry: "", // what the work is (its postings say; the world's vocabulary, e.g. its profile's industries)
         max_staff: 6,
         min_staff: 1,
         kind: "goods",
@@ -50,7 +51,7 @@ export const retailer: BehaviourModule = {
         // The share of its staff's hours a shop plans to fill with serving (placeholder): serving can't be stored, and
         // orders come in lumps, so hands for exactly the average leave queues that never clear (Kingman 1961).
         utilisation_bps: 8000,
-        lender: "bank", // whom it borrows from
+        lender: "", // whom it borrows from (none: it doesn't)
         // Insolvency (docs/behaviour/insolvency.md; placeholders): short of wages this long with no credit, or in default on
         // a loan, and it winds up over this long.
         short_days: 60,
@@ -58,21 +59,22 @@ export const retailer: BehaviourModule = {
         idle_days: 90, // nobody working for us this long, our owners close us (placeholder)
         reprice_days: 30, // closed, our premises unsold this long: the asking price comes down (placeholder)
         reprice_bps: 1000, // by this much (placeholder)
-        builder: "builder", // whose published prices say what our premises are worth
+        builder: "", // whose published prices say what our premises are worth (none: closed, they're not sold)
         premises_sale_bps: 5000,
         // A shop just founded (docs/behaviour/entry.md): who founded it, the capital they put in, the property listing it
         // buys its premises from, and its bank. None: a shop that's trading already.
         founder: null as string | null,
         capital: 0,
         listing: null as string | null,
-        bank: "bank", // closed, our premises are offered at this share of what building them new costs (placeholder)
+        bank: "", // a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
     );
+    if (p.founder) need(p, ["bank"], "firm.retailer");
     const me = ctx.entity;
     const book = new Book();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}) });
     const borrowing = new Borrowing(me, p.lender);
     const bargaining = new Bargaining(me);
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
@@ -182,12 +184,12 @@ export const retailer: BehaviourModule = {
         if (acc && winding.state === "closed") {
           const where = premisesOf(obs);
           const worth = where ? buildingPrice(book, p.builder, where.type) : undefined;
-          return winding.sell(obs, book, acc.account, acc.balance, where, worth ? Math.floor((worth * p.premises_sale_bps) / 10_000) : undefined, (x) => distribute(book, me, acc.account, x, "The proceeds of our premises: to our shareholders by their shares").steps);
+          return winding.sell(obs, book, acc.account, acc.balance, where, worth ? Math.floor((worth * p.premises_sale_bps) / 10_000) : undefined, (x) => distribute(book, me, acc, x, "The proceeds of our premises: to our shareholders by their shares").steps);
         }
         // A shop just founded sets itself up before it trades.
         if (!setup.ready) return settingUp(obs, acc);
         if (!acc) return steps;
-        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc.account, x, "Wound up: what's left, to our shareholders by their shares").steps);
+        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps);
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
         if (headcount < 0) headcount = Math.max(workers.length, p.min_staff); // (a new shop starts by hiring its minimum)
@@ -232,7 +234,7 @@ export const retailer: BehaviourModule = {
           // month's stock at cost, and Lengnick's chi of the wage bill.
           const bill = Math.floor((Math.max(workers.length, headcount) * wage * MONTH) / p.period);
           const buffer = bill + lastDemand * unitCost + Math.floor((bill * p.chi_bps) / 10_000);
-          const out = payOut(book, me, acc.account, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
+          const out = payOut(book, me, acc, acc.balance, buffer, acc.balance - monthStart, `a month's wages and stock, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;
           steps.push(...out.steps);
         }

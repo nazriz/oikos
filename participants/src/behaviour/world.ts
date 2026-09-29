@@ -4,7 +4,7 @@
 
 import * as C from "../calls";
 import { channels, type ParticipantAction, type SiteStructure, type StatementRecord } from "../contracts";
-import { DAY, params, wait, type BehaviourModule } from "../module";
+import { DAY, need, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
 import { because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step } from "./common";
 import { ownerOf } from "./institutions";
@@ -60,7 +60,7 @@ export const trade: BehaviourModule = {
   create(ctx) {
     const p = params(
       {
-        account: "acc-outside",
+        account: "", // the outside's account it pays from and is paid into (the world must say)
         sells: {} as { [kind: string]: number }, // unit prices, cents
         buys: {} as { [kind: string]: { unit_price: number; per_month: number; from?: { [seller: string]: number } } },
         wait_days: 14, // how long an invoice waits for its goods before it's declined
@@ -72,6 +72,7 @@ export const trade: BehaviourModule = {
       },
       ctx.params,
     );
+    need(p, ["account"], "world.trade");
     const me = ctx.entity;
     const book = new Book();
     const orders = new OrderBook(me);
@@ -227,12 +228,13 @@ export const transfers: BehaviourModule = {
   create(ctx) {
     const p = params(
       {
-        account: "acc-outside",
+        account: "", // the outside's account it pays from and is paid into (the world must say)
         year: 365 * DAY,
         payments: {} as { [kind: string]: { amount: number; every_days: number; from_age: number; to_age?: number } },
       },
       ctx.params,
     );
+    need(p, ["account"], "world.transfers");
     const me = ctx.entity;
     const book = new Book();
     const decided = new Set<string>();
@@ -291,7 +293,7 @@ export const funding: BehaviourModule = {
   cadence: () => DAY,
   firstWake: () => 0,
   create(ctx) {
-    const p = params({ account: "acc-outside" }, ctx.params);
+    const p = need(params({ account: "" }, ctx.params), ["account"], "world.funding");
     const me = ctx.entity;
     const book = new Book();
     const lent = new Set<string>();
@@ -324,7 +326,7 @@ export const valuer: BehaviourModule = {
   cadence: () => DAY,
   firstWake: () => 0,
   create(ctx) {
-    const p = params({ land_value: 0, builder: "builder", rating: "city", exempt: [] as string[], every_days: 365 }, ctx.params);
+    const p = need(params({ land_value: 0, builder: "", rating: "", exempt: [] as string[], every_days: 365 }, ctx.params), ["builder", "rating"], "world.valuer");
     const me = ctx.entity;
     const book = new Book();
     const seen = new Map<string, SiteStructure | undefined>(); // what we last saw on each cell (perception is changes)
@@ -372,7 +374,7 @@ export const grants: BehaviourModule = {
   cadence: () => DAY,
   firstWake: () => 0,
   create(ctx) {
-    const p = params({ account: "acc-outside", to: "city", to_account: "", per_resident_per_year: 0, every_days: 91, first_day: 30, dwelling: "dwelling" }, ctx.params);
+    const p = need(params({ account: "", to: "", to_account: "", per_resident_per_year: 0, every_days: 91, first_day: 30, dwelling: "dwelling" }, ctx.params), ["account", "to", "to_account"], "world.grants");
     const me = ctx.entity;
     const seen = new Map<string, SiteStructure | undefined>(); // what we last saw on each cell (perception is changes)
     let next = p.first_day * DAY;
@@ -408,7 +410,7 @@ export const disposal: BehaviourModule = {
   cadence: () => DAY,
   firstWake: () => 0,
   create(ctx) {
-    const p = params({ kind: "waste", price_per_tonne: 0, account: "acc-outside", every_days: 30 }, ctx.params);
+    const p = need(params({ kind: "waste", price_per_tonne: 0, account: "", every_days: 30 }, ctx.params), ["account"], "world.disposal");
     const me = ctx.entity;
     const book = new Book();
     const billed = new Set<string>();

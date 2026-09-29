@@ -10,7 +10,7 @@ import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
-import { params, type BehaviourModule, type ParticipantContext } from "../module";
+import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
@@ -45,7 +45,7 @@ export const planningOfficer: BehaviourModule = {
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ compliance_bps: 10_000, town: "city" }, ctx.params);
+    const p = params({ compliance_bps: 10_000, town: ctx.entity }, ctx.params); // (the town: the office's own)
     const book = new Book();
     const decided = new Set<string>();
     const letters = new Letters();
@@ -194,7 +194,8 @@ export const builder: BehaviourModule = {
       {
         types: {} as { [type: string]: { materials: { [kind: string]: number }; build_labour: number; demolition_labour: number } },
         yard: "",
-        supplier: "outside",
+        industry: "", // what the work is (its postings say)
+        supplier: "", // whom it buys materials from (the world must say)
         wage: 150_000, // the crew's pay, cents per period
         period: 14 * DAY,
         working_day: 8 * 3600, // seconds a worker works in a day
@@ -209,8 +210,9 @@ export const builder: BehaviourModule = {
       },
       ctx.params,
     );
+    need(p, ["supplier"], "firm.builder");
     const book = new Book();
-    const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker" });
+    const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker", ...(p.industry ? { industry: p.industry } : {}) });
     // What's recorded against us to pay (rates on our yard, a fine), paid as a firm pays its debts (we don't wind up).
     const dues = new WindingUp(ctx.entity, { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 });
     let lastLetGo = -Infinity;

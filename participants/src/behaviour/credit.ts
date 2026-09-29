@@ -42,7 +42,7 @@ export class Borrowing {
 
   /** Whether we'd apply now: not waiting, not refused lately, not in default. */
   canApply(t: number): boolean {
-    return !this.waiting(t) && !this.impaired && t >= this.repayingUntil && t - this.refusedAt >= (this.o.retry_days ?? 60) * DAY;
+    return !!this.lender && !this.waiting(t) && !this.impaired && t >= this.repayingUntil && t - this.refusedAt >= (this.o.retry_days ?? 60) * DAY;
   }
 
   /** Applying: how much, over how long, from and to which account, and why (the lender reads the account itself). */

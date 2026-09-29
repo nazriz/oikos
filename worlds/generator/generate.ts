@@ -181,23 +181,24 @@ export function generate(spec: TownSpec): any {
     own(lot, l);
     homes.push({ structure: id, space: `${id}/dwelling.1`, type: ht.id, landlord: l, rent: ht.rent, bedrooms: ht.bedrooms });
   }
-  const workplaces: { employer: string; structure: string; space: string; wage: number; capacity: number; start?: number }[] = [];
+  // Each workplace's industry (general categories, which the profile's figures are keyed by: union membership).
+  const workplaces: { employer: string; structure: string; space: string; wage: number; capacity: number; start?: number; industry: string }[] = [];
   // The builder's yard: where it keeps materials and its crew works from (phase B).
   const yardLot = site();
   structures.push({ id: "builder-yard", at: cellOf.get(yardLot), type: "yard", built_by: "builder" });
   own(yardLot, "builder");
-  workplaces.push({ employer: "builder", structure: "builder-yard", space: "builder-yard/workplace.1", wage: wages.construction, capacity: CREW.capacity, start: CREW.start });
+  workplaces.push({ employer: "builder", structure: "builder-yard", space: "builder-yard/workplace.1", wage: wages.construction, capacity: CREW.capacity, start: CREW.start, industry: "construction" });
   for (const s of shops) {
     const lot = site(), id = `${s}-premises`;
     structures.push({ id, at: cellOf.get(lot), type: "shop", built_by: "builder" });
     own(lot, s);
-    workplaces.push({ employer: s, structure: id, space: `${id}/workplace.1`, wage: wages.shop, capacity: 6, start: 0 }); // staffed below, to expected sales
+    workplaces.push({ employer: s, structure: id, space: `${id}/workplace.1`, wage: wages.shop, capacity: 6, start: 0, industry: "retail" }); // staffed below, to expected sales
   }
   for (const f of factories) {
     const lot = site(), id = `${f}-works`;
     structures.push({ id, at: cellOf.get(lot), type: "factory", built_by: "builder" });
     own(lot, f);
-    workplaces.push({ employer: f, structure: id, space: `${id}/workplace.1`, wage: wages.factory, capacity: 40 });
+    workplaces.push({ employer: f, structure: id, space: `${id}/workplace.1`, wage: wages.factory, capacity: 40, industry: "manufacturing" });
   }
   const hallLot = site();
   structures.push({ id: "town-hall", at: cellOf.get(hallLot), type: "civic", built_by: "builder" });
@@ -248,7 +249,7 @@ export function generate(spec: TownSpec): any {
   // the firms' staff (docs/behaviour/services.md).
   const townCrew = Math.max(1, Math.round((V.services.council_staff_per_1000 * everyone.length) / 1000));
   // (First, so it's filled whatever the size of the town's workforce.)
-  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: 20, start: townCrew });
+  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: 20, start: townCrew, industry: "public_administration" });
   for (const m of everyone) entities.push({ id: m.id, kind: "person", name: m.id, born_at: m.born_at, sex: m.sex, ...(m.parents ? { parents: m.parents } : {}) });
 
   // Jobs: adults, at the working-age employment rate.
@@ -310,9 +311,8 @@ export function generate(spec: TownSpec): any {
     records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
       text: `Please pay ${c.id}'s wages every 14 days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - withholding(taxLaw, w.wage, 14 * DAY)), for: "wages" } }, every: 14 * DAY, first: (1 + pick.below(14)) * DAY } });
     occupancy.push({ occupant: c.id, space: w.space });
-    // Union members at the start: the profile's membership rate for the employer's kind of work, dues by standing order.
-    const kind = w.employer.split("-")[0]!;
-    if (unionPick.below(10_000) < (U.membership_bps[kind] ?? U.membership_bps.other ?? 0)) {
+    // Union members at the start: the profile's membership rate for the work's industry, dues by standing order.
+    if (unionPick.below(10_000) < (U.membership_bps[w.industry] ?? U.membership_bps.other ?? 0)) {
       const mem = `member-${c.id}`;
       unionMembers.push({ member: c.id, employer: w.employer });
       records.push({ id: mem, record: "agreement", author: "genesis", at: 0, visible_to: ["union", c.id], terms: {
@@ -498,7 +498,7 @@ export function generate(spec: TownSpec): any {
   const servicesBudget = Math.ceil((everyone.length * SV.waste_per_person_per_day_g * 365 * SV.landfill_levy_per_tonne * 12) / 10_000_000); // a year's waste (tonnes) at the levy, and a fifth over
   // The code mayor's yearly budget: parks (placeholder: a park a year at about what the builder charges), the crew the
   // profile's staff per 1,000 residents gives, and the landfill for a year's waste.
-  const mayorParams = { population: adultCount, park_budget: 15_000_000, staff_budget: crew * crewAnnual, services_budget: servicesBudget };
+  const mayorParams = { population: adultCount, builder: "builder", park_budget: 15_000_000, staff_budget: crew * crewAnnual, services_budget: servicesBudget };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
     [{ id: "budget", title: "The town's accounts", kind: "accounts" }, { id: "laws", title: "Laws, the charter and procedures", kind: "records", match: { statement_kinds: ["charter", "law", "procedure"] } },
@@ -529,7 +529,7 @@ export function generate(spec: TownSpec): any {
   // It sees its crew at the yard, its supplier's prices and what it holds.
   office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, priceLists, lawBook, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } },
     { id: "ground", kind: "sites", area: "all", every: 7 * DAY }, { id: "yard", kind: "sites", area: [cellOf.get(yardLot)], occupants: "names" }],
-    code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS,
+    code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", industry: "construction", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS,
       workplace: "builder-yard/workplace.1", max_crew: CREW.capacity }));
   const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
   office("planning", "city", "Planning officer", "planning_officer",
@@ -552,7 +552,7 @@ export function generate(spec: TownSpec): any {
   const hallCell = structures.find((x) => x.id === "town-hall")!.at;
   office("works", "city", "Works manager", "works_manager", [mine("works-business"), civic("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
     { id: "town", kind: "sites", area: "all" }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" }],
-    code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
+    code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
       collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
       maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste" }));
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
@@ -610,7 +610,7 @@ export function generate(spec: TownSpec): any {
     if (w.employer.startsWith("factory")) {
       const cell = structures.find((x) => x.id === w.structure)!.at;
       office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, lawBook, { id: "stock", kind: "holdings" }, { id: "works", kind: "sites", area: [cell], occupants: "names" }],
-        code("firm.producer", { works: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY,
+        code("firm.producer", { works: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, industry: w.industry, lender: "bank", builder: "builder",
           per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside" }));
       continue;
     }
@@ -618,7 +618,7 @@ export function generate(spec: TownSpec): any {
     const cell = structures.find((x) => x.id === w.structure)!.at;
     const price = RETAIL_PRICE;
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
-      code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve,
+      code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
         suppliers: [...factories, "outside"], price, demand: SHOP.demand }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
@@ -639,7 +639,7 @@ export function generate(spec: TownSpec): any {
     kind: "shop", name: "Shop", capital: SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / (14 * DAY)) * Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / ((((WORKING_DAY * 6) / 7) * 30) * SHOP_UTILISATION_BPS))),
     channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer", "property_for_sale", "property_sold"] } },
       { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: ["{cell}"], occupants: "names" }],
-    role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", max_staff: 6, wage: wages.shop, period: 14 * DAY, working_day: WORKING_DAY,
+    role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", industry: "retail", lender: "bank", builder: "builder", max_staff: 6, wage: wages.shop, period: 14 * DAY, working_day: WORKING_DAY,
       serve_labour: SHOP.serve, suppliers: [...factories, "outside"], price: RETAIL_PRICE, demand: SHOP.demand, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank" } },
   };
   // "population" is who could sign a petition: the adults.

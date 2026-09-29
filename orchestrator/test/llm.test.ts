@@ -117,7 +117,7 @@ test("after opting out, a stand-in named in the world config carries the partici
   const config = town((c) => {
     const mayor = c.participants.find((x: any) => x.id === "mayor-system");
     mayor.controller.params.mock.opt_out_at = 20 * DAY;
-    mayor.on_opt_out = { code: "city.mayor_code", params: { population: 80 } };
+    mayor.on_opt_out = { code: "city.mayor_code", params: mayor.controller.params.mock.params }; // (the same brief as the mock's: whom the town deals with)
   });
   const s = await run("stand-in", config, 60 * DAY);
   const log = lines(s.logPath);

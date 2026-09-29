@@ -111,7 +111,7 @@ export const citizen: BehaviourModule = {
       complain_after_days: 14,
       complain_bps: 3000,
       // A union (docs/behaviour/unions.md): which (none: none to join), the chance of joining on starting a job, by the
-      // kind of employer (the part of its id before "-": the world's profile), and in a protected
+      // industry the job's posting said (the world's profile; "other" for the rest), and in a protected
       // action ballot, the chance of voting and of voting yes (placeholders). ("other": for the rest.)
       union: null as string | null,
       union_join_bps: {} as { [kind: string]: number },
@@ -128,6 +128,7 @@ export const citizen: BehaviourModule = {
     let striking: { employer: string; out: boolean; left?: string } | null = null; // on strike (protected action), from our job; the workplace we left
     let backTo: { employer: string; space: string } | null = null; // the stoppage is over: back into the workplace we left
     let joinAsked = ""; // the job we've asked to join the union for
+    const industryOf = new Map<string, string>(); // employer -> the industry its posting said
     let complainedOf: string | null = null; // the home we've complained about, until it's seen to
     // Moving to a better-paid job: the offer we've taken, to sign once our notice at the old one is worked out.
     let switching: { offer: string; wage: number } | null = null;
@@ -146,7 +147,7 @@ export const citizen: BehaviourModule = {
     let trip: { at: number; tried: Set<string> } | null = null;
     let nextUse = 0; // when we next use things up (weekly)
     let carried = 0; // budget not spent last trip (less than an item's price), carried to the next
-    const borrowing = new Borrowing(me, ctx.params.bank ?? "bank");
+    const borrowing = new Borrowing(me, ctx.params.bank ?? ""); // (no bank named: no borrowing)
     let nextVenture = ctx.rng("venture-day").below(30) * DAY;
     let founded: { firm?: string; capital: number; paid: boolean } | null = null;
     let pendingFirm = false; // a business we've just founded: its id comes back in the outcome
@@ -340,9 +341,9 @@ export const citizen: BehaviourModule = {
           const kids = survivors.filter((m) => m.parents?.includes(dead.person));
           const leaseholder = hh.leaseholder !== dead.person ? hh.leaseholder : (grown.find((m) => m.person === partner) ?? [...grown].sort((a, b) => a.born_at - b.born_at)[0])?.person;
           // The surviving adult first in the household's list reports it, and writes the household's new record.
-          if (grown[0]?.person === me) {
+          if (grown[0]?.person === me && p.registry) {
             steps.push(because(`${dead.person}, of our household, has died: reporting it to the registry.`, say("death_notification", `${dead.person} has died.`, {
-              to: [p.registry ?? "city"],
+              to: [p.registry],
               data: { deceased: dead.person, ...(partner && survivors.some((m) => m.person === partner) ? { partner } : {}),
                 children: kids.map((k) => k.person), adult_children: kids.filter((k) => ageAt(k, t, year) >= ADULT_YEARS).map((k) => k.person) },
             })));
@@ -547,10 +548,11 @@ export const citizen: BehaviourModule = {
       if (p.union && job && joinAsked !== job.agreement && !retired) {
         joinAsked = job.agreement;
         const member = book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && book.inForce(r.id));
-        const kind = job.employer.split("-")[0]!;
-        const chance = p.union_join_bps[kind] ?? p.union_join_bps.other ?? 0;
+        // The work's industry, as its posting said (none known: "other").
+        const industry = industryOf.get(job.employer) ?? "other";
+        const chance = p.union_join_bps[industry] ?? p.union_join_bps.other ?? 0;
         if (!member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance)
-          steps.push(because(`A new job: joining the union (${chance / 100}% of those working for a ${kind} do).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
+          steps.push(because(`A new job: joining the union (${chance / 100}% of those working in ${industry.replaceAll("_", " ")} do).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
       }
       for (const r of fresh) {
         if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me)) {
@@ -713,6 +715,7 @@ export const citizen: BehaviourModule = {
         const best = posts[0];
         if (best?.speaks_for) {
           applied.add(best.id);
+          if (typeof best.data?.industry === "string") industryOf.set(best.speaks_for, best.data.industry);
           steps.push(because(`Applying for the best-paid job we've seen (${usd(best.data?.wage ?? 0)} a fortnight)${job ? `, better than ours (${usd(job.wage)})` : told.length ? ", where someone told us to look" : ""}.`,
             say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account }, basis: best.id })));
         }
@@ -1002,10 +1005,10 @@ export const citizen: BehaviourModule = {
             const spaces = street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.occupants?.includes(me));
             const grown = household.members.filter((m) => ageAt(m, obs.t, year) >= ADULT_YEARS);
             const deadHere = new Set(spaces.flatMap((sp) => sp.left ?? []).filter((l) => l.reason === "died").map((l) => l.occupant));
-            if (spaces.length && grown.length && grown.every((m) => deadHere.has(m.person))) {
+            if (spaces.length && grown.length && grown.every((m) => deadHere.has(m.person)) && p.child_protection) {
               askedForCare = true;
               const kids = household.members.filter((m) => ageAt(m, obs.t, year) < ADULT_YEARS).map((m) => m.person);
-              return callAction(because("No adult of our household is left: asking for help.", say("care_request", "We have no adult at home any more.", { to: [p.child_protection ?? "city"], data: { children: kids } })));
+              return callAction(because("No adult of our household is left: asking for help.", say("care_request", "We have no adult at home any more.", { to: [p.child_protection], data: { children: kids } })));
             }
           }
           return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY));

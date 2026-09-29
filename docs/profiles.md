@@ -31,7 +31,8 @@ A town spec names its profile (`profile: au-vic-2026`); a spec can override a fi
 - **`orchestrator/test/generality.test.ts`:**
   - platform code (kernel, participants, orchestrator, translator, measure, the generator, contracts) must not name a place, its statistics offices, agencies, payments or currency;
   - every figure in every profile must have a source;
-  - a town must generate from every profile, taking its figures from it.
+  - a town must generate from every profile, taking its figures from it;
+  - platform code must not name any of a generated world's entities, accounts or buildings: a module is told whom it deals with (its parameters), and `need()` fails at once if a world doesn't say.
 - **CLAUDE.md** states the rule.
 - **Reviews:** a new place-specific figure goes in a profile, with its source, or it doesn't go in.
 
@@ -43,3 +44,4 @@ A town spec names its profile (`profile: au-vic-2026`); a spec can override a fi
   - Victoria's rules in the example legal code.
 
   The rules are general in form, but they were chosen with one place in mind. As a second profile is added, each should be checked.
+- **Some laws are still module parameters:** industrial action's ballot, notice and no-pay, and tenancy's rent reviews and notice. They should be law records a world configures (D18/D19).

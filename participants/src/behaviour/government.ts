@@ -9,9 +9,10 @@ import { cents } from "../money";
 import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { params, type BehaviourModule, type ParticipantContext } from "../module";
+import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, cellsOf, DAY, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote } from "./common";
 import { Staffing, stepper } from "./firms";
+import { ownerOf } from "./institutions";
 
 const YEAR = 365 * DAY;
 
@@ -31,9 +32,10 @@ export const mayorCode: BehaviourModule = {
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ responsiveness_bps: 7000, petition_threshold_bps: 1500, population: 200, park_budget: 8_000_000, builder: "builder", park_type: "park",
+    const p = params({ responsiveness_bps: 7000, petition_threshold_bps: 1500, population: 200, park_budget: 8_000_000, builder: "", park_type: "park",
       // The rest of the budget's lines (docs/behaviour/services.md): the town's staff, and its services' running costs.
       staff_budget: 0, services_budget: 0 }, ctx.params);
+    need(p, ["builder"], "city.mayor_code");
     const book = new Book();
     let nextBudget = 0;
     let lastTabled = 0;
@@ -69,7 +71,7 @@ export const mayorCode: BehaviourModule = {
           const free = new Set(cells.filter((c) => !c.structure).map((c) => c.cell));
           const lot = [...new Set(cells.filter((c) => free.has(c.cell)).map((c) => lotOf(book, c.cell)).filter((l): l is string => !!l))]
             .sort()
-            .find((l) => ownerIsCity(book, l) && cellsOf(book, l).every((c) => free.has(c)));
+            .find((l) => ownerOf(book, l) === me && cellsOf(book, l).every((c) => free.has(c)));
           if (lot) {
             parkYear = year;
             // The planning office's published form, like anyone else.
@@ -111,10 +113,6 @@ export const mayorCode: BehaviourModule = {
   },
 };
 
-function ownerIsCity(book: Book, lot: string): boolean {
-  const titles = book.ofType("claim").filter((r) => r.record === "claim" && r.about?.kind === "ownership" && r.about?.object === lot);
-  return titles.some((r) => r.record === "claim" && r.holder === "city");
-}
 
 /**
  * city.council_clerk: runs the council's votes, as the charter says. Puts each
@@ -497,17 +495,19 @@ export const works: BehaviourModule = {
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
   create(ctx: ParticipantContext) {
     const p = params({
-      depot: "town-hall", workplace: "town-hall/workplace.1", role: "works crew", wage: 0, period: 14 * DAY, notice_days: 14,
+      depot: "", workplace: "", role: "works crew", // (its depot, and the space the crew works in there: the world must say) wage: 0, period: 14 * DAY, notice_days: 14,
+      industry: "", // what the work is (its postings say)
       working_day: 8 * 3600, work_days: 5,
       waste: "waste", collect_task: "collect", collect_labour: 0, collect_per_unit: 0, collect_every_days: 7, // per unit: seconds of work, and waste taken
       wear: "wear", maintain_task: "maintain", maintain_labour: 0, maintain_per_unit: 0, maintain_over: 0, // wear worth a crew's time above this
-      staff_line: "staff", landfill: "outside", kind: "waste", dispose_every_days: 7,
+      staff_line: "staff", landfill: "", kind: "waste", dispose_every_days: 7,
       depot_channel: "depot", // the channel that shows the depot, with who's there by name
     }, ctx.params);
+    need(p, ["depot", "workplace", "landfill"], "city.works");
     const me = ctx.entity;
     const book = new Book();
     const letters = new Letters();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, does: { hire: true, pay: false } });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false } });
     const seen = new Map<string, SiteStructure | undefined>(); // cell -> what we last saw there (perception is changes)
     let depotView: SiteStructure | undefined; // the depot, as its own channel shows it (who's there, by name)
     let atDepot = 0; // what's been collected and is held at the depot (holdings are seen as they change)

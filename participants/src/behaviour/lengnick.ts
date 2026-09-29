@@ -75,14 +75,15 @@ export function shareholders(book: Book, firm: string): { holder: string; accoun
  * beyond the buffer, to the shareholders by their shares, in batches (a program has at most 32 lines). Returns the
  * steps and what was paid.
  */
-export function payOut(book: Book, firm: string, account: string, balance: number, buffer: number, earned: number, why: string): { steps: Step[]; paid: number } {
+export function payOut(book: Book, firm: string, account: { account: string; custodian: string }, balance: number, buffer: number, earned: number, why: string): { steps: Step[]; paid: number } {
   const surplus = Math.min(balance - buffer, earned);
   if (surplus <= 0) return { steps: [], paid: 0 };
   return distribute(book, firm, account, surplus, `Month's end: we took in ${usd(earned)} more than we paid out this month, and hold ${usd(balance)} against a buffer of ${usd(buffer)} (${why}): paying ${usd(surplus)} to our shareholders by their shares`);
 }
 
 /** Paying an amount to a firm's shareholders by their shares, in batches (a program has at most 32 lines). */
-export function distribute(book: Book, firm: string, account: string, amount: number, why: string, bankOf = "bank"): { steps: Step[]; paid: number } {
+export function distribute(book: Book, firm: string, from: { account: string; custodian: string }, amount: number, why: string): { steps: Step[]; paid: number } {
+  const { account, custodian: bankOf } = from; // (the bank that keeps the account carries out the instruction)
   const holders = shareholders(book, firm);
   const total = holders.reduce((x, h) => x + h.shares, 0);
   if (amount <= 0 || total <= 0) return { steps: [], paid: 0 };

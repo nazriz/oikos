@@ -29,7 +29,7 @@ export const bankPaymentSystem: BehaviourModule = {
     const maxBatch = Math.min(32, ctx.params.max_batch ?? 32);
     const done = new Set<string>(); // one-off instructions handled
     const settled = new Map<string, string[]>(); // death registration -> the heirs' accounts its estate goes to
-    const p = { town: (ctx.params.town as string | undefined) ?? "city" };
+    const p = { town: (ctx.params.town as string | undefined) ?? "" }; // an estate with no heirs goes to the town, if the world names one
     const nextDue = new Map<string, number>(); // standing order -> next due time
     // Instructions, read once as they arrive: a one-off is dealt with then; a standing order is kept until it's withdrawn
     // (so a plan never rescans every instruction ever made).

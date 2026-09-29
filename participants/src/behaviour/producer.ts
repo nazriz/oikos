@@ -5,7 +5,7 @@ import * as C from "../calls";
 import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
-import { params, type BehaviourModule, type ParticipantContext } from "../module";
+import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
@@ -32,13 +32,14 @@ export const producer: BehaviourModule = {
         works: "", // the factory: where it makes and keeps things
         workplace: "", // the space its workers work in
         role: "factory worker",
+        industry: "", // what the work is (its postings say)
         max_staff: 40,
         task: "make",
         output: "goods",
         per_unit: { inputs: 10 } as { [kind: string]: number }, // what a unit of the task uses (its own knowledge of its process)
         labour_per_unit: 5400, // seconds of work per unit
-        supplier: "outside", // whom it buys inputs from
-        market: "outside", // whom it exports to (its buying offer)
+        supplier: "", // whom it buys inputs from (the world must say)
+        market: "", // whom it exports to, under its buying offer (the world must say)
         wage: 150_000, // the wage it offers new hires, cents per period
         period: 14 * DAY,
         notice_days: 14,
@@ -46,7 +47,7 @@ export const producer: BehaviourModule = {
         work_days: 5, // of every 7
         price: 6000, // its wholesale price, cents each
         min_order: 50, // the least it sells in one order (it sells wholesale)
-        lender: "bank", // whom it borrows from
+        lender: "", // whom it borrows from (none: it doesn't)
         // Insolvency (docs/behaviour/insolvency.md; placeholders): short of wages this long with no credit, or in default on
         // a loan, and it winds up over this long.
         short_days: 60,
@@ -54,15 +55,16 @@ export const producer: BehaviourModule = {
         idle_days: 90, // nobody working for us this long, our owners close us (placeholder)
         reprice_days: 30, // closed, our premises unsold this long: the asking price comes down (placeholder)
         reprice_bps: 1000, // by this much (placeholder)
-        builder: "builder", // whose published prices say what our premises are worth
+        builder: "", // whose published prices say what our premises are worth (none: closed, they're not sold)
         premises_sale_bps: 5000, // closed, our premises are offered at this share of what building them new costs (placeholder)
         ...LENGNICK, // Lengnick (2013), Table 1
       },
       ctx.params,
     );
+    need(p, ["supplier", "market"], "firm.producer");
     const me = ctx.entity;
     const book = new Book();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}) });
     const borrowing = new Borrowing(me, p.lender);
     const bargaining = new Bargaining(me);
     const winding = new WindingUp(me, { short_days: p.short_days, wind_up_days: p.wind_up_days, idle_days: p.idle_days, reprice_days: p.reprice_days, reprice_bps: p.reprice_bps });
@@ -122,10 +124,10 @@ export const producer: BehaviourModule = {
         if (acc && winding.state === "closed") {
           const where = premisesOf(obs);
           const worth = where ? buildingPrice(book, p.builder, where.type) : undefined;
-          return winding.sell(obs, book, acc.account, acc.balance, where, worth ? Math.floor((worth * p.premises_sale_bps) / 10_000) : undefined, (x) => distribute(book, me, acc.account, x, "The proceeds of our premises: to our shareholders by their shares").steps);
+          return winding.sell(obs, book, acc.account, acc.balance, where, worth ? Math.floor((worth * p.premises_sale_bps) / 10_000) : undefined, (x) => distribute(book, me, acc, x, "The proceeds of our premises: to our shareholders by their shares").steps);
         }
         if (!acc) return steps;
-        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc.account, x, "Wound up: what's left, to our shareholders by their shares").steps);
+        if (winding.due(t)) return winding.finish(t, book, acc.account, acc.balance, (x) => distribute(book, me, acc, x, "Wound up: what's left, to our shareholders by their shares").steps);
         const trading = winding.state === "trading";
         const workers = staffing.workers(book, t);
         // Before a month's history: what our export customers want (our share of the market's offer), or failing that
@@ -182,7 +184,7 @@ export const producer: BehaviourModule = {
           const staffFor = Math.max(workers.length, headcount);
           const bill = Math.floor((staffFor * wage * MONTH) / p.period);
           const buffer = bill + monthlyUnits(staffFor) * inputCost + Math.floor((bill * p.chi_bps) / 10_000);
-          const out = payOut(book, me, acc.account, acc.balance, buffer, monthStart < 0 ? 0 : acc.balance - monthStart, `a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill`);
+          const out = payOut(book, me, acc, acc.balance, buffer, monthStart < 0 ? 0 : acc.balance - monthStart, `a month's wages and inputs, and ${p.chi_bps / 100}% of the wage bill`);
           monthStart = acc.balance - out.paid;
           steps.push(...out.steps);
         }

@@ -71,3 +71,20 @@ test("a town is generated from each profile, taking its figures from it", () => 
     expect(person.controller.params.retirement_age).toBe(p.values.retirement_age);
   }
 });
+
+test("platform code names none of a generated world's entities, accounts or buildings: modules are told whom they deal with", () => {
+  // Every id the generated town has (its organisations, people, accounts and buildings): none may be written into the
+  // platform's code (a module's default, a comparison), or the code would work only in worlds that happen to use it.
+  const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+  const config = generate(base);
+  const ids = new Set<string>([...config.world.entities.map((e: any) => e.id), ...config.world.accounts.map((a: any) => a.id), ...config.world.structures.map((s: any) => s.id)]);
+  const found: string[] = [];
+  for (const dir of ["participants/src", "orchestrator/src", "translator/src", "measure/src"]) for (const f of files(join(root, dir))) {
+    readFileSync(f, "utf8").split("\n").forEach((line, i) => {
+      const code = line.replace(/\/\/.*$/, "");
+      if (/^\s*\*/.test(code) || /\bneed\(/.test(code)) return; // doc comments; the names of parameters a world must give
+      for (const m of code.matchAll(/"([A-Za-z0-9_.-]+)"/g)) if (ids.has(m[1]!)) found.push(`${relative(root, f)}:${i + 1}: "${m[1]}" in ${line.trim().slice(0, 120)}`);
+    });
+  }
+  expect(found).toEqual([]);
+});

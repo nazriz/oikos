@@ -326,7 +326,7 @@ export const landlord: BehaviourModule = {
         income = 0;
         // The owners' draw: to the shareholders on our register, if we keep one (they spend it as they will); a world
         // without one keeps the money-only stand-in, spent at a local shop.
-        const draw = distribute(book, me, acc.account, spend, `Monthly: the owners draw ${p.spend_share_bps / 100}% of rent received, paid to our shareholders by their shares`);
+        const draw = distribute(book, me, acc, spend, `Monthly: the owners draw ${p.spend_share_bps / 100}% of rent received, paid to our shareholders by their shares`);
         steps.push(...draw.steps);
         const s: Step = because(`Monthly: ${p.upkeep_share_bps / 100}% of rent received goes on upkeep${draw.steps.length || !shops.length ? "" : `, and the owners spend ${p.spend_share_bps / 100}% locally`}.`);
         if (!draw.steps.length && spend > 0 && shops.length) s.push(pay(ctx.rng(`spend-${t}`).pick(shops), spend, { from: acc.account, for: "Owners' spending." }));
@@ -433,7 +433,7 @@ export class Staffing {
    * `does`: which half of it this office does. Most employers do both; an organisation where one office hires and
    * another runs the payroll (a town: its works manager, its finance officer) gives each its half.
    */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; does?: { hire?: boolean; pay?: boolean } }) {}
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean } }) {}
 
   absorb(obs: Observation) {
     for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) {
@@ -577,13 +577,13 @@ export class Staffing {
     // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
     for (const post of doesHire ? posts : []) if (!apps.some((a) => a.data?.posting === post.id) && Number.isInteger(post.data?.wage) && post.data!.wage !== want.wage && want.canPost) {
       steps.push(because(`Our posting is still open, at ${usd(post.data!.wage as number)}; we offer ${usd(want.wage)} now: posting it again at that.`, withdraw(post.id, "Superseded: a new wage."),
-        say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
+        say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
     }
 
     // Post a job if short-staffed (and the module says we can).
     const have = staff.length + offered.length + offersNow;
     if (doesHire && have < want.target && posts.length === 0 && want.canPost) {
-      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
+      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
     }
     return steps;
   }
