@@ -219,16 +219,24 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
 ## 8. Building it
 
 1. **The blocks** (2a–2e): the resolver and translator learn them, and firms, landlords, the union and the bank publish offers. Today's code migrates off the hidden conventions, and today's citizen still passes every test.
-2. **The new citizen, first scope:**
-   - values, temperament and needs;
-   - the four ways of deciding;
-   - EWA learning;
-   - work, housing, shopping, support and retirement, and leaving.
+2. **The new citizen, doing everything today's citizen does,** rebuilt on the new mind (values, temperament, needs, the four ways of deciding, EWA learning, imitation). At a big-bang switch, anything it can't do stops happening in the world, so nothing is left out. From docs/behaviour/citizen.md:
+   - homes: choosing, moving in, staying, rent increases;
+   - work: finding it, a better job, unpaid wages;
+   - the union: joining, as an offer;
+   - voice: complaining to the town, and starting, deciding on and signing petitions (Granovetter's thresholds, now as conformist imitation);
+   - business: starting one, a venture offer, learned by EWA;
+   - spending, shopping and using things up;
+   - retiring and support, and being in or out of the labour force;
+   - leaving town;
+   - word of mouth: ties, asking around, passing on, following up (as knowledge spreading, 5);
+   - its part in households, births and moving in together.
 3. **The switch, in one step:** the generator uses the new citizen, and tests move over (about 40 files touch citizen behaviour). It's judged against the last calibration runs, and `citizen.default` is retired.
 4. **Belonging:** unions and clubs as offers and practices; imitation and diffusion. The first test that a new institution just works.
-5. **Feelings and relationships** (3d).
-6. **Asking the model:** on Naz's go-ahead, in pilots.
-7. **Meaning and belief:** religion as content (VISION 16).
+5. **Then what's new, each when Naz says:**
+   - feelings and relationships (3d);
+   - goals with steps (3d);
+   - asking the model, in pilots;
+   - meaning and belief: religion as content (VISION 16).
 
 ## 9. What the literature taught, and where it's used
 
