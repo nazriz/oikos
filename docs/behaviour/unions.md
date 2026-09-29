@@ -11,7 +11,7 @@ A union is an organisation, and bargaining and protected action are procedures t
 
 - **At the start,** each employee is a member with the profile's membership rate for their kind of work. For Australia: ABS, *Trade union membership*, August 2024: 13.1% of employees overall; manufacturing 9.0%, construction 11.7%, retail 7.0%, public administration 23.1%.
   - A membership is an agreement between the union and the member: the member pays dues monthly by standing order (the profile's, a placeholder), and the union represents them.
-  - The union keeps a register of its members and where they work.
+  - The union keeps a register of its members and where they work. Members keep it up: a member who starts work elsewhere, or is out of work, tells the union (a `membership_update`). An employer that closes (its public `closure`) is bargained with no more, and a dispute where no member works any longer is over (union.organiser 0.3.0).
 - **Joining later:** someone starting a job joins at their kind of work's rate. They apply, the union offers the membership, and they sign and set up their dues.
 
 ## Bargaining
@@ -44,6 +44,6 @@ Measurement reads the logs; the platform doesn't judge. Profile targets:
 - Multi-year agreements, bargaining orders and the tribunal's intervention (an intractable bargaining declaration).
 - Lockouts, and employer response action.
 - Strike pay from the union.
-- Members moving jobs: the union knows where a member works from its register and their application to join, so a member who moves may be called out at an employer they've left; they ignore the call.
+- Members moving jobs: before 0.3.0 the union knew where a member worked only from its register and their application to join. A member who moved could be balloted and called out at an employer they'd left, and the union bargained on with a closed shop (five years: one dispute ran to 78 stoppages over nearly three years at a shop that had closed). Now members say where they work, and vote only in ballots about their own workplace.
 - Industrial action outside protected action.
 - A pro-rata payment at the return can be a couple of days off, from when a restarted wage order counts as starting.

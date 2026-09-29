@@ -345,7 +345,9 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
 
   - **Held:** the labour market and rents stay on target, and participation in groups holds near 50% for five years.
   - **Belief grows where it should fade:** the congregation's teaching, stated, goes from 12% of adults to 22–27%. Members' displays and telling outpace fading, while the census trend is decline (Christian affiliation 52% in 2016 to 43.9% in 2021). The union's teaching fades to nobody saying it: its members don't go to its meetings, so nothing keeps it up. Both are the placeholders in `belief`, to calibrate against a sourced trend.
-  - **Disputes that never end:** a few shops deadlock with the union (shop-25 in seed 2: 78 stoppages over nearly three years). Members vote, stop and return as they should. The world has no way out of a dispute: no tribunal (in Australia, the Fair Work Commission's intractable bargaining declarations), and no limit on how long a ballot authorises action. Institutions to add, and why those shops can't meet the claim to find out.
+  - **Disputes that never end, a bug, since fixed.** A few shops seemed to deadlock with the union (shop-25 in seed 2: 78 stoppages over nearly three years). In fact shop-25 had closed on day 738. The union never noticed closures or where its members had moved, and a member who'd moved on still voted in the ballots.
+    - Now members tell the union where they work, vote only about their own workplace, and the union stops at a closed employer or where no member works.
+    - First diagnosed as a missing tribunal. That's plausible for real deadlocks, but none arise here yet: employers concede the whole claim after three stoppages.
   - Complaints (41–52 over five years) aren't comparable with the earlier run's, which predates the works department's fix.
   - Migration still comes in bursts (0 to 45 arrivals a year).
 

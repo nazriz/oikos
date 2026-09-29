@@ -54,8 +54,10 @@ test("a town with the sparse mind on: citizens ask about joining the union, deci
   const asked = on.log.filter((e) => e.kind === "annotation" && e.body.annotation === "transcript" && String(e.body.data?.ref ?? "").startsWith("consult/"));
   expect(asked.length).toBeGreaterThan(0);
   // Decided with the answer; and remembered by kind: each kind of person asked once.
-  const thought = on.log.filter((e) => e.kind === "command" && e.body.command === "act" && /thinking what it would mean to me/.test(JSON.stringify(e.body)));
-  expect(thought.length).toBeGreaterThan(0); // someone joined, having thought about what it would mean to them
+  // Joining decided once answered: someone who asked makes the decision (recorded as the mind's) after the answer.
+  const thought = on.log.filter((e) => e.kind === "annotation" && e.body.annotation === "decision" && e.body.data?.domain === "membership" &&
+    asked.some((a) => a.body.subject === e.body.subject && a.t <= e.t));
+  expect(thought.length).toBeGreaterThan(0);
   const kinds = new Set(asked.map((e) => e.body.data.ref));
   expect(kinds.size).toBe(asked.length); // each kind asked once
   expect(on.log.some((e) => e.kind === "annotation" && e.body.annotation === "note" && e.body.data?.consult)).toBe(true);

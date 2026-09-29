@@ -645,7 +645,8 @@ export function generate(spec: TownSpec): any {
       maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste" }));
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
-  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }, lawBook],
+  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }, lawBook,
+    { id: "closures", kind: "records", match: { statement_kinds: ["closure"] } }],
     code("union.organiser", { employers: [...factories, ...shops, "builder"], claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, dues_account: "acc-union" }));
   office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"] } }],
     code("world.disposal", { kind: "waste", price_per_tonne: SV.landfill_levy_per_tonne, account: "acc-outside" }));

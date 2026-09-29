@@ -221,7 +221,9 @@ export function call(fn: Fn, args: { [k: string]: Arg }): Call {
 }
 
 export const text = (s: string) => ({ text: s });
-export const json = (v: unknown) => ({ json: v });
+/** A JSON value, as its text will read back: what JSON can't hold (an undefined field, say) is dropped now, so the
+ * program written and the program read from its text are the same. */
+export const json = (v: unknown) => ({ json: v === undefined ? v : JSON.parse(JSON.stringify(v)) });
 export const v = (name: string) => ({ var: name });
 /** Cents as a canonical amount text the parser reads back exactly: 123456 → "$1,234.56". */
 export const dollars = (cents: number) => text(`$${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`);

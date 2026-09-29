@@ -219,6 +219,7 @@ export const citizen: BehaviourModule = {
     let striking: { employer: string; out: boolean; left?: string } | null = null; // on strike (protected action), from our job; the workplace we left
     let backTo: { employer: string; space: string } | null = null; // the stoppage is over: back into the workplace we left
     let joinAsked = ""; // the job we've asked to join the union for
+    let toldUnion: string | undefined; // where we last said we work, as a member (the union's register, at the start)
     const industryOf = new Map<string, string>(); // employer -> the industry its posting said
     let complainedOf: string | null = null; // the home we've complained about, until it's seen to
     // Moving to a better-paid job: the offer we've taken, to sign once our notice at the old one is worked out.
@@ -833,6 +834,16 @@ export const citizen: BehaviourModule = {
       // The union (docs/behaviour/unions.md): joining on starting a job, with the chance for its kind of employer; the
       // membership offered, signed, and its dues paid monthly; a protected action ballot, voted in (or not); a
       // stoppage, observed (out of the workplace until the return to work); a rise in an enterprise agreement, taken.
+      // A member tells the union where they now work (or that they're out of work), as members keep their details up.
+      if (p.union && isMember()) {
+        const at = job?.employer ?? "";
+        if (toldUnion === undefined) toldUnion = at; // (the register we joined with has it)
+        else if (at !== toldUnion) {
+          toldUnion = at;
+          steps.push(because(at ? `Telling the union we now work at ${at}.` : "Telling the union we're out of work.",
+            say("membership_update", at ? `I now work at ${at}.` : "I'm no longer in work.", { to: [p.union], visible: [me, p.union], data: { employer: at } })));
+        }
+      }
       // What joining would mean to someone like us, if the run has the sparse mind (docs/design/ai-citizens.md 4): asked
       // once, and the decision waits for the answer (by the next wake).
       const saidJoin = p.union && job && joinAsked !== job.agreement && !retired && !isMember()
@@ -857,7 +868,11 @@ export const citizen: BehaviourModule = {
         // And by what the model says it would mean to someone like us, if asked.
         const meant = saidJoin ? (p.sway.consult * ((saidJoin.join ?? 0) - (saidJoin.not ?? 0))) / 10_000 : 0;
         const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform + creed + meant);
-        if (!member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance)
+        const joins = !member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance;
+        // Recorded as the mind's decision (docs/design/ai-citizens.md 7): weighed, from the chance as the person came to it.
+        if (!member) decided.push({ t, domain: "membership", strategy: "deliberate", choice: joins ? "join" : "not",
+          options: [{ key: "join", score: chance }, { key: "not", score: 10_000 - chance }] });
+        if (joins)
           steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%${saidJoin ? `, thinking what it would mean to me: ${Math.round((saidJoin.join ?? 0) / 1_000)} of 10 against ${Math.round((saidJoin.not ?? 0) / 1_000)} not to` : ""}).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
       }
       for (const r of fresh) {
@@ -871,7 +886,8 @@ export const citizen: BehaviourModule = {
         // Voting, and how, follow the person: those who value others' welfare (benevolence, universalism) turn out and
         // back action more; those who value security, less (the town's rates stay as calibrated).
         const solidarity = (zValue("benevolence") + zValue("universalism")) / 2;
-        if (r.kind === "action_ballot" && ctx.rng(`turnout-${r.id}`).below(10_000) < shifted(p.ballot_turnout_bps, p.sway.turnout * solidarity)) {
+        // (A ballot about a workplace we've left isn't ours to vote in.)
+        if (r.kind === "action_ballot" && r.data?.employer === job?.employer && ctx.rng(`turnout-${r.id}`).below(10_000) < shifted(p.ballot_turnout_bps, p.sway.turnout * solidarity)) {
           const yes = ctx.rng(`vote-${r.id}`).below(10_000) < shifted(p.strike_vote_yes_bps, p.sway.strike_vote * (solidarity - zValue("security")));
           steps.push(because(`The union's protected action ballot: voting ${yes ? "yes" : "no"}.`, vote(r.id, yes ? "yes" : "no")));
         }

@@ -41,7 +41,8 @@ test("claims are answered by offers; those accepted become enterprise agreements
   expect(eas.length).toBeGreaterThanOrEqual(1);
   for (const ea of eas) {
     expect(recs.some((r) => r.kind === "offer_accepted" && r.speaks_for === "union" && r.data.employer === ea.data.employer && r.at <= ea.at)).toBe(true);
-    const after = recs.filter((r) => r.kind === "request" && r.speaks_for === ea.data.employer && r.at === ea.at && r.data?.every && r.data?.outcome?.money?.for?.startsWith("Wages"));
+    // (With the agreement, or as soon after as the employer's wakes allow: a busy wake carries its steps to the next.)
+    const after = recs.filter((r) => r.kind === "request" && r.speaks_for === ea.data.employer && r.at >= ea.at && r.at <= ea.at + 2 * DAY && r.data?.every && r.data?.outcome?.money?.for?.startsWith("Wages"));
     if (ea.data.rise_bps > 0) expect(after.length).toBeGreaterThan(0);
     for (const o of after) {
       const net = Number(o.data.outcome.money.amount);
@@ -106,4 +107,32 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   expect(recs.some((r) => r.kind === "enterprise_agreement" && r.data.employer === "factory-1")).toBe(true);
   // Nobody on strike resigns over unpaid wages.
   expect(recs.filter((r) => r.record === "claim" && /Unpaid wages/.test(r.about?.for ?? "") && strikers.includes(r.holder)).length).toBe(0);
+}, 600_000);
+
+test("an employer that closes: the union stops bargaining there, and members who've moved on say where they work", async () => {
+  const config = generate(base);
+  // Shop 1 starts with nothing, no credit and no hiring, and closes (as in the entry test); its staff are all members.
+  config.world.accounts.find((a: any) => a.id === "acc-shop-1").balance = "0";
+  config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "shop-1");
+  Object.assign(config.participants.find((p: any) => p.id === "shop-1-manager-system").controller.params, { short_days: 10, wind_up_days: 10, idle_days: 30, lender: "", max_staff: 0 });
+  const staff = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "shop-1").map((r: any) => r.terms.parties[1]);
+  expect(staff.length).toBeGreaterThan(0);
+  const register = config.world.records.find((r: any) => r.id === "union-register");
+  for (const c of staff) {
+    if (register.data.members.some((m: any) => m.member === c)) continue;
+    register.data.members.push({ member: c, employer: "shop-1" });
+    config.world.records.push({ id: `member-${c}`, record: "agreement", author: "genesis", at: 0, visible_to: ["union", c], terms: { template: "membership", parties: ["union", c],
+      commitments: [{ who: "union", does: { text: "Represents them." } }], termination: [{ party: "union", notice: 30 * DAY }] } });
+    for (const party of ["union", c]) config.world.records.push({ id: `member-${c}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: ["union", c], speaks_for: party, agreement: `member-${c}`, as: party });
+  }
+  const { recs } = await run("closure", config, 400);
+  const closure = recs.find((r) => r.kind === "closure" && r.speaks_for === "shop-1");
+  expect(closure).toBeDefined();
+  // Nothing more asked of a firm that's gone: no claim, ballot or stoppage there after it closed.
+  const after = recs.filter((r) => ["wage_claim", "action_ballot", "stop_work"].includes(r.kind) && r.data?.employer === "shop-1" && r.at > closure.at);
+  expect(after).toEqual([]);
+  // Its staff, let go, told the union they were out of work (and, those who found work, where).
+  const updates = recs.filter((r) => r.kind === "membership_update" && staff.includes(r.speaks_for));
+  expect(updates.length).toBeGreaterThan(0);
+  expect(updates.every((u) => u.addressed_to?.includes("union") && typeof u.data.employer === "string")).toBe(true);
 }, 600_000);

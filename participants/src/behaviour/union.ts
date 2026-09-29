@@ -29,7 +29,7 @@ interface Dispute {
 
 export const organiser: BehaviourModule = {
   name: "union.organiser",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -98,6 +98,14 @@ export const organiser: BehaviourModule = {
             offer(who, { template: "membership", ourNotice: MONTH, we: C.text(`${me} represents ${who} at work, and bargains for them.`) as any,
               they: pay(p.dues_account, p.dues, { every: MONTH, for: "Union dues." }), text: `${who} is a member of ${me}, paying dues of ${p.dues} cents a month.`, basis: a.id })));
         }
+        // Members who've told us where they now work (or that they're out of work: no employer).
+        for (const u of book.open("membership_update")) {
+          if (handled.has(u.id) || !(u.addressed_to ?? []).includes(me)) continue;
+          handled.add(u.id);
+          employerOf.set(u.speaks_for!, typeof u.data?.employer === "string" ? u.data.employer : "");
+        }
+        // Employers that have closed (their public notice): nobody to bargain with.
+        const closed = new Set(book.open("closure").map((r) => (typeof r.data?.firm === "string" ? r.data.firm : r.speaks_for!)));
         const membersAt = (employer: string) => [...employerOf].filter(([m, e]) => e === employer && inForce.has(m)).map(([m]) => m).sort();
 
         // Prices: the mean of the shops' published prices, once a month.
@@ -109,6 +117,10 @@ export const organiser: BehaviourModule = {
         const inflation = yearAgo && prices.length ? Math.round(((prices.at(-1)!.mean - yearAgo.mean) * 10_000) / yearAgo.mean) : 0;
 
         for (const employer of p.employers) {
+          if (closed.has(employer)) {
+            if (disputes.delete(employer)) steps.push(because(`${employer} has closed: our dispute there is over.`));
+            continue;
+          }
           const members = membersAt(employer);
           const d = disputes.get(employer);
           const addressedToUs = (kind: string) => book.open(kind).filter((r) => !handled.has(r.id) && (r.addressed_to ?? []).includes(me) && r.data?.employer === employer);
@@ -130,6 +142,12 @@ export const organiser: BehaviourModule = {
             continue;
           }
           const x = d!;
+          // Nobody of ours works there now (they've moved on, and told us): there's no one to bargain for.
+          if (!members.length) {
+            disputes.delete(employer);
+            steps.push(because(`None of our members works at ${employer} now: our dispute there is over.`));
+            continue;
+          }
           // An offer: accepted if it's enough; otherwise (and if none comes) to a ballot, or the next stoppage.
           const offers = addressedToUs("wage_offer").filter((o) => o.data?.claim === x.claim);
           const best = offers.sort((a, b) => b.at - a.at)[0];

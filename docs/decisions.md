@@ -914,6 +914,19 @@ See the design note, §16.
   - **Built on the world's own questions** (`CONSULT_THINGS`, shared with the citizen) and people drawn from its profile, so the audit checks exactly what runs would ask.
   - **Revisit if:** the 2-point threshold proves too loose or tight on a real model; or the fidelity check says kinds are too coarse, in which case bin finer.
 
+- **Unions: closed employers, members who move, and ballots about one's own workplace** (union.organiser 0.3.0; docs/behaviour/unions.md).
+  - **Found in the 5-year calibration:** 78 stoppages over three years at a shop that had closed on day 738. The union's register changed only when people joined, and members voted in any ballot sent to them.
+  - **Now:**
+    - members tell the union where they work (`membership_update`);
+    - the union sees public closures, and ends a dispute at a closed employer or where no member works;
+    - citizens vote only about their own workplace.
+  - **Also:**
+    - a JSON value in a call is normalised as its text will read back (an undefined field dropped), so a program always matches its own text;
+    - the join decision is now recorded as the mind's (domain `membership`);
+    - a unions test allows a raise's new wage orders up to two days after the agreement (a busy wake carries steps over).
+  - **Not done: the tribunal I first proposed.** The stoppages were a bug, not a deadlock. A tribunal (conciliation, then an intractable bargaining declaration and arbitrated terms) is worth adding once real deadlocks can arise. They can't yet: employers concede the claim in full after three stoppages.
+  - **Revisit if:** members' updates should be less than certain (not every member tells the union); or disputes deadlock for real.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
