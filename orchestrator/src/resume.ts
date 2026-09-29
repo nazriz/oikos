@@ -7,7 +7,7 @@
 // recording (the code changed in between, say), serving stops and every later call goes to the live model, and the
 // log says from where.
 
-import { existsSync, readFileSync, renameSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync, renameSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { canonical } from "@terrarium/participants";
 import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "@terrarium/participants/llm";
@@ -27,24 +27,51 @@ const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("h
 /** The log stores annotations in canonical JSON (keys sorted), so recordings are compared in that form. */
 const same = (a: unknown, b: unknown) => canonical(a ?? "") === canonical(b ?? "");
 
+/**
+ * A log's lines, one at a time, read in chunks: a long code-only run's log is gigabytes, more than a string can hold.
+ * `fn` returns false to stop early.
+ */
+export function eachLine(path: string, fn: (line: string) => boolean | void): void {
+  const fd = openSync(path, "r");
+  const buf = Buffer.alloc(16 * 1024 * 1024);
+  const dec = new TextDecoder();
+  let carry = "";
+  try {
+    for (;;) {
+      const n = readSync(fd, buf, 0, buf.length, null);
+      const text = carry + dec.decode(buf.subarray(0, n), { stream: n > 0 });
+      const lines = text.split("\n");
+      carry = n > 0 ? lines.pop()! : "";
+      for (const line of lines) if (fn(line) === false) return;
+      if (n === 0) {
+        if (carry) fn(carry);
+        return;
+      }
+    }
+  } finally {
+    closeSync(fd);
+  }
+}
+
 /** Every model call a log recorded, by subject and purpose, in order: its usage and its transcript, paired. */
 export function recordedCalls(logPath: string): Map<string, Recorded[]> {
   const calls = new Map<string, Recorded[]>();
   const usage = new Map<string, any[]>(); // a call's usage, waiting for its transcript (same subject)
-  for (const line of readFileSync(logPath, "utf8").split("\n")) {
-    if (!line.trim()) continue;
+  let cut = false;
+  eachLine(logPath, (line) => {
+    if (cut || !line.trim() || !line.includes('"kind":"annotation"')) return;
     let e: any;
     try {
       e = JSON.parse(line);
     } catch {
-      break; // a last line cut off as the process ended
+      cut = true; // a last line cut off as the process ended
+      return false;
     }
-    if (e.kind !== "annotation") continue;
     const a = e.body;
     if (a.annotation === "usage") usage.set(a.subject, [...(usage.get(a.subject) ?? []), a]);
     if (a.annotation === "transcript") {
       const u = usage.get(a.subject)?.shift();
-      if (!u) continue;
+      if (!u) return;
       const key = `${a.subject}|${a.data.purpose}`;
       calls.set(key, [...(calls.get(key) ?? []), {
         systemSha256: a.data.system_sha256, input: a.data.input, output: a.data.output, provider: a.data.provider, model: a.data.model,
@@ -52,7 +79,7 @@ export function recordedCalls(logPath: string): Map<string, Recorded[]> {
         usage: { input_tokens: u.input_tokens, output_tokens: u.output_tokens, ...(u.cache_read_tokens !== undefined ? { cache_read_tokens: u.cache_read_tokens } : {}), ...(u.cache_write_tokens !== undefined ? { cache_write_tokens: u.cache_write_tokens } : {}) },
       }]);
     }
-  }
+  });
   return calls;
 }
 
@@ -92,9 +119,15 @@ export class Serving {
 /** A log's run id and config (the header), and where its files are. The old files are kept, renamed
  * `<run>.stopped-<n>.*`, and the resumed run is written in their place. */
 export function prepareResume(logPath: string): { runId: string; config: any; outDir: string; stoppedLog: string; consult: boolean; consultAvoid?: string[] } {
-  const first = readFileSync(logPath, "utf8").split("\n", 1)[0]!;
-  // Whether the run asked the sparse mind, and what it left out (its note, near the start: run.ts).
-  const noteLine = readFileSync(logPath, "utf8").split("\n", 200).find((l) => l.includes('"annotation":"note"') && l.includes('"consult":{'));
+  // The header, and whether the run asked the sparse mind and what it left out (its note, near the start: run.ts).
+  let first = "";
+  let noteLine: string | undefined;
+  let lines = 0;
+  eachLine(logPath, (l) => {
+    if (lines++ === 0) first = l;
+    else if (l.includes('"annotation":"note"') && l.includes('"consult":{')) noteLine = l;
+    return lines < 200 && !noteLine;
+  });
   const consult = !!noteLine;
   const consultAvoid: string[] | undefined = noteLine ? JSON.parse(noteLine).body?.data?.consult?.avoid : undefined;
   const header = JSON.parse(first);

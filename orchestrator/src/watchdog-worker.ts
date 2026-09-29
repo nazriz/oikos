@@ -11,7 +11,15 @@ self.onmessage = (e: MessageEvent) => {
   const counter = new Int32Array(sab, 0, 2);
   let last = Atomics.load(counter, 0);
   let since = Date.now();
+  const tick = Math.max(50, Math.min(1000, Math.floor(stallMs / 10)));
+  let ticked = Date.now();
   setInterval(() => {
+    // A gap between ticks far longer than the tick means the whole machine was asleep (everything frozen, the run
+    // included): time asleep isn't time stalled, so it doesn't count. (A laptop's lid closed overnight otherwise read
+    // as a model call or the kernel hanging.)
+    const wall = Date.now();
+    if (wall - ticked > Math.max(30_000, 20 * tick)) since += wall - ticked;
+    ticked = wall;
     const now = Atomics.load(counter, 0);
     if (now !== last) {
       last = now;
@@ -36,5 +44,5 @@ self.onmessage = (e: MessageEvent) => {
     }
     console.error(`${runId}: stalled for ${Math.round(diagnosis.stalled_for_ms / 1000)} s while ${JSON.stringify(doing)}; diagnosis in ${diagnosisPath}`);
     process.kill(process.pid, "SIGKILL");
-  }, Math.max(50, Math.min(1000, Math.floor(stallMs / 10))));
+  }, tick);
 };

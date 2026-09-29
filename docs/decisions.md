@@ -940,6 +940,14 @@ See the design note, §16.
     - **The labour market is behind it.** Unemployment is 0–2.4% (target 4.6%). Shops can't hire, and three closed because "nobody has worked for us for 90 days". Restoring the spending that was lost exposed a labour market with too little slack.
     - **Seed 3 went the other way:** shops shed 36 staff in year 5 and the builder 10, and unemployment reached 11.7%, after 119 newcomers in years 2–3 (migration's bursts).
   - **Revisit:** the labour market's frictions (how long a job search takes, how often jobs end) and migration's response, which now decide saving.
+  - **Belief, calibrated:** fading at 3% a month, five years (`runs/c10-run5`, seeds 1 and 3): affiliation −1.65 and −1.63 points a year (target −1.64). Firm belief holds near its start (19% to 18–22%).
+
+- **Runs that survive the machine sleeping, and resuming long runs** (docs/reliability.md).
+  - **Found overnight:** a laptop's lid closed, and the watchdog read the sleep as a stall. A model call "hung" 17 minutes, and a code-only run's kernel "hung" on a clock advance, both while the machine slept (pmset's log), and both runs were stopped.
+    - The watchdog now doesn't count a gap between its ticks far longer than a tick (the machine asleep, everything frozen).
+    - A run pauses through sleep and goes on when the machine wakes.
+  - **Resuming a long code-only run failed:** resume read the whole log into one string, and a 5-year log is 2.5 GB. It now reads it a line at a time, and only the first lines for the header and notes.
+  - **Revisit if:** a model call begun before a sleep fails on waking (the adapter retries, then the participant waits, as after any failed call: D59).
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 

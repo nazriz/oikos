@@ -111,7 +111,7 @@ Saving is off: it's negative in the first year, and 22–25% over five (target 6
   - patience 0.2 by tradition and 0.1 by security;
   - founding 0.4 by openness and 0.3 by achievement;
   - the sparse mind's answer 1.
-- **`belief`:** `beliefs` (the world's, per person), `fade_bps` 225 a month (calibrated), `display_bps` 500, `told_bps` 300, `tell_at_bps` 6000, `affiliate_bps` 3000, `meaning` 0.2
+- **`belief`:** `beliefs` (the world's, per person), `fade_bps` 300 a month (calibrated to the census's fall in affiliation), `display_bps` 500, `told_bps` 300, `tell_at_bps` 6000, `affiliate_bps` 3000, `meaning` 0.2
 - **`goals`:** `unmet_days` 60, `method_days` 90, `rest_days` 180, `security_bps` 3000, `social_bps` 4000, `spend_less_saving_bps` 2000, `cheaper_bps` 9000
 - **Supplied by the world:** `shop_accounts`, `outside_account`, `bank`, `registry`, `child_protection`, `population`
 
