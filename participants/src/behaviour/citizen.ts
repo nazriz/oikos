@@ -38,14 +38,14 @@ import { Borrowing } from "./credit";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, Pursuit, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
 /** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
- * certainty a gathering takes it (with 20 or more others there), and being told; how strongly it's held to say so; and
- * how much it adds to the worth of the gatherings of those who teach it. */
+ * certainty a gathering takes it (with 20 or more others there), and being told; how strongly it's held to say so, and
+ * to count it one's own (as a census asks); and how much it adds to the worth of the gatherings of those who teach it. */
 /** Goals (docs/behaviour/citizen.md "Goals"; placeholders): how long a need goes unmet before it becomes a goal, how long
  * each method is given, how long after giving up before trying again; the needs' levels that count as unmet; what
  * spending less saves, and how much cheaper a cheaper home is (of the old rent). */
 const GOALS = { unmet_days: 60, method_days: 90, rest_days: 180, security_bps: 3_000, social_bps: 4_000, spend_less_saving_bps: 2_000, cheaper_bps: 9_000 };
 
-const BELIEF = { fade_bps: 150, display_bps: 500, told_bps: 300, tell_at_bps: 6_000, meaning: 0.2 };
+const BELIEF = { fade_bps: 225, display_bps: 500, told_bps: 300, tell_at_bps: 6_000, affiliate_bps: 3_000, meaning: 0.2 };
 
 /** How far a person's values sway the cited rates (a fraction of the rate per standard deviation of the value):
  * placeholders, unsourced, chosen small so the town's rates stay as calibrated (docs/behaviour/citizen.md). */
@@ -79,9 +79,10 @@ export const CATCHING_UP = {
   union: (member: boolean) => (member ? "I'm in the union." : "I'm not in the union."),
   goes: (host: string) => `I go to ${host}'s gatherings.`,
   holds: (host: string) => `I hold to what ${host} teaches.`,
+  leans: (host: string) => `I lean towards what ${host} teaches.`,
   nothing: "Much the same.",
 };
-export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean; goesTo?: string[]; holdsTo?: string[] }
+export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean; goesTo?: string[]; holdsTo?: string[]; leansTo?: string[] }
 /** What someone's answer tells us, if it's in our phrasing (how well a shop serves: the middle of what the words say). */
 export function heardNews(text: string): News | undefined {
   const n: News = {};
@@ -99,6 +100,8 @@ export function heardNews(text: string): News | undefined {
   if (goes.length) n.goesTo = goes;
   const holds = [...text.matchAll(/I hold to what ([^\s;']+) teaches\./g)].map((x) => x[1]!);
   if (holds.length) n.holdsTo = holds;
+  const leans = [...text.matchAll(/I lean towards what ([^\s;']+) teaches\./g)].map((x) => x[1]!);
+  if (leans.length) n.leansTo = leans;
   return Object.keys(n).length ? n : undefined;
 }
 
@@ -294,6 +297,7 @@ export const citizen: BehaviourModule = {
     };
     let levelsNow: NeedLevels = { subsistence: 10_000, shelter: 10_000, security: 10_000, social: 10_000, status: 10_000 }; // as last judged
     let nextShop = ctx.rng("shop-day").below(p.shop_every_days) * DAY;
+    let lastShop: number | null = null; // when the last trip was
     let trip: { at: number; tried: Set<string> } | null = null;
     let nextUse = 0; // when we next use things up (weekly)
     let carried = 0; // budget not spent last trip (less than an item's price), carried to the next
@@ -496,8 +500,9 @@ export const citizen: BehaviourModule = {
           // Someone who keeps going somewhere finds it worth it (a placeholder for how much).
           // (All the more, if we hold with what it teaches.)
           for (const host of told.goesTo ?? []) for (const g of book.practices()) if ((g.speaks_for ?? g.author) === host) mind.hear("practice", g.id, Math.min(10_000, 7_000 + Math.round(holdTo(host) * p.belief.meaning)));
-          // Told what someone holds: nearer to holding it ourselves, the more so the more conformist we are.
-          for (const host of told.holdsTo ?? []) strengthen(host, Math.round((p.belief.told_bps * (5_000 + mind.person.temperament.conformity)) / 10_000));
+          // Told what someone holds: if we hold it too, surer of it, the more so the more conformist we are. (Words alone
+          // don't bring someone to a belief they don't hold; taking part, among those who keep to it, does: Henrich 2009.)
+          for (const host of told.holdsTo ?? []) if (holdTo(host) > 0) strengthen(host, Math.round((p.belief.told_bps * (5_000 + mind.person.temperament.conformity)) / 10_000));
           continue;
         }
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
@@ -1290,7 +1295,12 @@ export const citizen: BehaviourModule = {
           nextShop = t + p.shop_every_days * DAY;
           trip = { at: t, tried: new Set() };
           const r = ctx.rng(`shopping-${t}`);
-          const budget = Math.min(acc.balance, Math.floor((monthly() * p.shop_every_days * DAY) / MONTH) + carried + deferred);
+          // The trip's spending is for the time since the last one: a trip can only be made when we're awake, often a
+          // few days after it was due, and spending a fixed fortnight's worth left a tenth of what was meant to be spent
+          // unspent (23 trips a year, not 26). Up to two fortnights' worth: a long absence isn't made up at once.
+          const since = lastShop === null ? p.shop_every_days * DAY : Math.min(t - lastShop, 2 * p.shop_every_days * DAY);
+          lastShop = t;
+          const budget = Math.min(acc.balance, Math.floor((monthly() * since) / MONTH) + carried + deferred);
           // Which shop: the mind's decision among the shops' offers, each for what the trip's budget buys there.
           const offerOf = (shop: string) => book.open("price_list").filter((l) => l.speaks_for === shop && l.offer).sort((a, b) => b.at - a.at)[0]?.offer;
           // Those we know who shop there count as others going there.
@@ -1368,6 +1378,8 @@ export const citizen: BehaviourModule = {
       job && p.union ? CATCHING_UP.union(isMember()) : "",
       ...[...wentLast].sort().map((id) => book.records.get(id)).flatMap((r) => (r?.record === "statement" && r.speaks_for ? [CATCHING_UP.goes(r.speaks_for)] : [])),
       ...[...new Set(book.open("teaching").filter((r) => (beliefs.get(r.id) ?? 0) >= p.belief.tell_at_bps).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.holds),
+      // (Held less firmly, but still one's own, as someone would answer a census: said, without urging it on anyone.)
+      ...[...new Set(book.open("teaching").filter((r) => { const b = beliefs.get(r.id) ?? 0; return b >= p.belief.affiliate_bps && b < p.belief.tell_at_bps; }).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.leans),
     ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
     const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
       // The buildings around us; in our own we see who's there (they're the people we know).

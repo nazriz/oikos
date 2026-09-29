@@ -401,7 +401,8 @@ export function generate(spec: TownSpec): any {
       const holders = everyone.filter((c) => beliefs.get(c.id)?.[g.teaching!]).length;
       const others = everyone.filter((c) => !beliefs.get(c.id)?.[g.teaching!]);
       const share = Math.max(0, Math.round(((g.held * everyone.length) / 10_000 - holders) * 10_000 / Math.max(1, others.length)));
-      for (const c of others) if (hold.below(10_000) < share) believe(c.id, g.teaching, 5_000);
+      // (Nominally: some barely, some a good deal; evenly between the placeholder bounds.)
+      for (const c of others) if (hold.below(10_000) < share) believe(c.id, g.teaching, 2_000 + hold.below(5_000));
     }
   }
   if (unionMembers.length) records.push({ id: "union-register", record: "statement", author: "genesis", at: 0, visible_to: ["union"], speaks_for: "union", kind: "membership_register", text: `The union's ${unionMembers.length} members, and where they work.`, data: { members: unionMembers } });

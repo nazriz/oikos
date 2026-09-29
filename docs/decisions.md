@@ -927,6 +927,15 @@ See the design note, §16.
   - **Not done: the tribunal I first proposed.** The stoppages were a bug, not a deadlock. A tribunal (conciliation, then an intractable bargaining declaration and arbitrated terms) is worth adding once real deadlocks can arise. They can't yet: employers concede the claim in full after three stoppages.
   - **Revisit if:** members' updates should be less than certain (not every member tells the union); or disputes deadlock for real.
 
+- **Calibrating belief and saving** (docs/calibration.md; docs/behaviour/citizen.md).
+  - **Belief grew where the census shows decline.** Three changes:
+    - **Nominal starting strengths spread** evenly between placeholder bounds, not all at 5,000. With one level, uniform fading makes a cliff, not a decline.
+    - **Telling only firms up a belief already held.** Hearsay turned non-believers into believers. Conversion comes through taking part (Henrich 2009; Stark and Lofland 1965).
+    - **A census-like statement:** leaning towards a teaching, said once it's the citizen's own at all (`affiliate_bps`). The `town/beliefs` measure reports affiliation and its change a year.
+    - **The fade rate is calibrated** against the census's fall (the profile's target, −1.64 points a year): one year each at 1.5%, 3% and 2.75% a month gave +1.9, −2.1 and −2.9 points; 2.25% is being checked over five years.
+  - **Saving was 18–22% (target 6.5%): trips spent a fixed fortnight's worth, and came late.** A trip can only be made at a wake, often days after it was due: 23 trips a year, not 26, and a tenth of planned spending never happened. Each trip now spends for the time since the last, up to two fortnights. Two years: saving 2.4–3.2%, median rent share 20.2–20.4%, but employment rose to 68.5% (target 63.9%) with unemployment at 0.6% (4.6%): more spending, more hiring.
+  - **Revisit if:** the 5-year run shows saving or affiliation off target; the labour market stays too tight now that demand is right (labour supply, or firms' hiring).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
