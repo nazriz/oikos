@@ -29,9 +29,8 @@ export class Watchdog {
   /** Leave a breadcrumb: what the run is doing now. */
   mark(doing: object): void {
     this.last = doing;
-    const b = this.encoder.encode(JSON.stringify(doing)).slice(0, SIZE);
-    this.text.set(b);
-    Atomics.store(this.counter, 1, b.length);
+    const { written } = this.encoder.encodeInto(JSON.stringify(doing), this.text); // (straight into the shared buffer)
+    Atomics.store(this.counter, 1, written);
     Atomics.add(this.counter, 0, 1);
   }
 

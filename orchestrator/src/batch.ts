@@ -16,7 +16,7 @@ import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@terrarium/measure";
 import { costReport } from "./cost";
 import { chooseModel } from "./models";
-import { KernelDied } from "./kernel";
+import { KernelDied, kernelBinary } from "./kernel";
 import { compressLog } from "./logs";
 import { recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
@@ -130,6 +130,14 @@ export interface BatchOptions {
   logDetail?: string;
   /** Compress each log once the batch is measured (`.jsonl.zst`). */
   compress?: boolean;
+  /**
+   * What to keep of each run once measured (docs/reliability.md): "log" (the default), or "measures": the measurement
+   * tables, the summary and a recipe that regenerates the log exactly (the command, the commit, the final state hash),
+   * not the log. Only for runs that can be regenerated: no language-model participant (a model's answers aren't
+   * reproducible, and they're training data), no uncommitted changes, no modules from outside the repository.
+   * Otherwise the log is kept, and it says why.
+   */
+  keep?: "log" | "measures";
   translatorModel?: string;
   /** A real model for every language-model participant and the translator ("provider/model"); default: the mock. */
   model?: string;
@@ -211,18 +219,54 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     result.measureDir = measureDir;
     result.costText = cost.text;
   }
-  // Compressed once measured, if asked (about a seventh the size; everything that reads logs reads these too).
-  if (o.compress) for (const r of runs) r.logPath = await compressLog(r.logPath);
+  // Only the measures kept, if asked and the runs can be regenerated; else compressed once measured, if asked (about a
+  // seventh the size; everything that reads logs reads these too).
+  const recipes = new Map<string, string>();
+  if (o.keep === "measures") {
+    const why = !result.measureDir ? "they weren't measured" : cannotRegenerate(config, o);
+    if (why) log(`  ! keeping the logs: ${why}`);
+    else for (const r of runs) {
+      const recipe = join(out, `${r.runId}.recipe.json`);
+      writeFileSync(recipe, JSON.stringify({
+        about: "This run's log wasn't kept (--keep measures). Running the command at the commit regenerates it exactly: the final state hash says so.",
+        command: ["terrarium", "run-one", ...recipeArgs(o, r.seed)],
+        commit: gitCommit(), kernel: kernelVersion(), orchestrator: ORCHESTRATOR_VERSION, state_hash: r.stateHash, commands: r.commands, t: r.t,
+      }, null, 2));
+      for (const f of [r.logPath, r.anchorsPath]) rmSync(f, { force: true });
+      recipes.set(r.runId, recipe);
+      r.logPath = "";
+    }
+  }
+  if (o.compress) for (const r of runs) if (r.logPath) r.logPath = await compressLog(r.logPath);
   const finished = new Date();
   writeFileSync(join(out, "batch.json"), JSON.stringify({
     world: o.world, sets, ...(spec ? { spec, generator } : {}), config_seed: config.seed, seeds, parallel, until: o.until ?? null,
     orchestrator: ORCHESTRATOR_VERSION, measure: o.measure !== false ? MEASURE_VERSION : null,
     started: started.toISOString(), finished: finished.toISOString(), wall_ms: finished.getTime() - started.getTime(),
-    runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, log: r.logPath, anchors: r.anchorsPath, state_hash: r.stateHash, t: r.t, commands: r.commands, refused: r.refused, wakes: r.wakes, wall_ms: r.wallMs, health: r.health, warnings: healthWarnings(r) })),
+    runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, log: r.logPath || null, anchors: r.logPath ? r.anchorsPath : null, ...(recipes.has(r.runId) ? { recipe: recipes.get(r.runId) } : {}), state_hash: r.stateHash, t: r.t, commands: r.commands, refused: r.refused, wakes: r.wakes, wall_ms: r.wallMs, health: r.health, warnings: healthWarnings(r) })),
     failed,
   }, null, 2));
   return result;
 }
+
+/** The arguments to `terrarium run-one` that regenerate a batch's run of a seed (with `--out` for where). */
+export const recipeArgs = (o: BatchOptions, seed: number) => [o.world, "--seed", String(seed), ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...(o.sets ?? []).flatMap((s) => ["--set", s]),
+  ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : [])];
+
+/** Why a batch's runs couldn't be regenerated from a recipe (so their logs must be kept), or null if they can. */
+function cannotRegenerate(config: any, o: BatchOptions): string | null {
+  const models = [...(config.participants ?? []), ...(config.templates ?? [])].filter((p: any) => p.controller?.type === "llm");
+  if (models.length) return `language-model participants (${models.map((p: any) => p.id).slice(0, 3).join(", ")}${models.length > 3 ? "..." : ""}): their runs are kept whole`;
+  if (o.model) return "a model was given";
+  if (o.modules && !resolve(o.modules).startsWith(join(import.meta.dir, "../.."))) return "modules from outside the repository";
+  const status = Bun.spawnSync(["git", "status", "--porcelain", "--untracked-files=no"], { cwd: join(import.meta.dir, "../..") });
+  if (status.exitCode !== 0) return "not in a git checkout";
+  if (status.stdout.toString().trim()) return "uncommitted changes (the commit wouldn't regenerate them)";
+  return null;
+}
+
+const gitCommit = () => Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: join(import.meta.dir, "../..") }).stdout.toString().trim();
+const kernelVersion = () => Bun.spawnSync([kernelBinary(), "--version"]).stdout.toString().trim();
 
 /** `--record-observations` as the run takes it: "models", "code", "all", or participant ids, comma-separated. */
 export function recordWho(s: string): string[] | "models" | "code" | "all" {

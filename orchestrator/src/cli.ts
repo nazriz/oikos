@@ -13,6 +13,8 @@
 //   terrarium cost <DIR> [--translator-model provider/model]
 //   terrarium run ... [--no-compress]: logs are compressed once measured (<run>.jsonl.zst, about a seventh the size,
 //     checked to read back whole before the plain log goes); --no-compress keeps them plain.
+//   terrarium run ... [--keep log|measures]: what's kept of each run once measured. measures: the measurement tables,
+//     the summary and a recipe that regenerates the log exactly, not the log (only for code-only runs at a commit).
 //   terrarium run ... [--log lean|full]: how much the log keeps (full, the default; lean for quick test runs: no
 //     observation hashes, no written reasoning from code participants; replay still checks the state).
 //   terrarium dataset <DIR|log.jsonl> [--out DIR] [--actions]
@@ -68,7 +70,7 @@ try {
       world: positional()[0]!, seeds: Number(flag("seeds", "1")), out: flag("out"), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
       until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"),
+      recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
     });
     if (r.measureDir) {
       console.log(`\n${table(await runQuery(r.measureDir, "overview"))}`);

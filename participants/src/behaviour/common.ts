@@ -173,7 +173,11 @@ export type Step = (C.Call | [string, C.Call])[] & { why?: string; then?: (o: Ac
 /** A step with its reason: `because("Rent is due", pay(...))`. */
 export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): Step => Object.assign(lines, { why });
 
-export const callAction = (step: Step): ParticipantAction => ({ type: "call", call: C.program(...step), ...(step.why ? { reasoning: step.why } : {}) });
+export const callAction = (step: Step): ParticipantAction => {
+  const program = C.programOf(...step);
+  const action = { type: "call" as const, call: C.programText(program), ...(step.why ? { reasoning: step.why } : {}) };
+  return Object.defineProperty(action, C.PARSED, { value: program, enumerable: false });
+};
 
 /**
  * Letters to an office. Each is answered once, with the office's standard report: what a real office sends when

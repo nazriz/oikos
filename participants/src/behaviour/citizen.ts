@@ -1085,7 +1085,7 @@ export const citizen: BehaviourModule = {
           lookedAt = obs.t;
           looking = null;
           // (What the last wake didn't get to comes first: our state already counts on it.)
-          todo = [...todo, ...plan(obs)];
+          todo = [...todo, ...plan(obs).filter((s) => s.length)]; // (a step with nothing to do isn't sent: as the stepper)
           plannedAt = obs.t;
           leadFound.homes = [];
           leadFound.jobs = [];

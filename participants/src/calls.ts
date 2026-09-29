@@ -229,8 +229,21 @@ export const dollars = (cents: number) => text(`$${Math.floor(cents / 100)}.${St
 export const secs = (s: number) => text(s % 86_400 === 0 ? `${s / 86_400} days` : `${s} seconds`);
 
 export function program(...lines: (Call | [string, Call])[]): string {
-  return programText({ lines: lines.map((l) => (Array.isArray(l) ? { bind: l[0], call: l[1] } : { call: l })) });
+  return programText(programOf(...lines));
 }
+
+/** A program as its structure: what `program` writes out, with each call's arguments in the order its text has them. */
+export function programOf(...lines: (Call | [string, Call])[]): Program {
+  const sorted = (c: Call): Call => ({ fn: c.fn, args: Object.fromEntries(Object.keys(c.args).sort().map((k) => { const v = c.args[k]!; return [k, "call" in v ? { call: sorted(v.call) } : v]; })) });
+  return { lines: lines.map((l) => (Array.isArray(l) ? { bind: l[0], call: sorted(l[1]) } : { call: sorted(l) })) };
+}
+
+/**
+ * A call action's program as the structure it was written from (an in-process code participant's): the orchestrator
+ * uses it rather than reading its text back, which it would read as exactly this. Not part of the action (a symbol:
+ * never serialised); the text is what the participant said.
+ */
+export const PARSED = Symbol.for("terrarium.call-program");
 
 // ---------------------------------------------------------------- unit tables
 

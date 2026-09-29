@@ -3,10 +3,10 @@
 // what was spent apart from what it would cost on the configured models.
 
 import { expect, test } from "bun:test";
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { query, runQuery } from "@terrarium/measure";
-import { runBatch, runOne, setPath } from "../src/batch";
+import { recipeArgs, runBatch, runOne, setPath } from "../src/batch";
 import { costReport } from "../src/cost";
 import { kernelBinary } from "../src/kernel";
 
@@ -74,4 +74,34 @@ test("an all-code batch reports no model calls", async () => {
   rmSync(out, { recursive: true, force: true });
   const r = await runBatch({ world, seeds: 1, out, until: 20 * DAY, sets: ["citizens=40"] });
   expect((await costReport(r.measureDir!)).text).toContain("No model calls");
+}, 300_000);
+
+test("--keep measures: a code-only run's log gives way to its measures and a recipe that regenerates it; a model's run keeps its log", async () => {
+  const out = join(root, "runs", "test-keep");
+  rmSync(out, { recursive: true, force: true });
+  const messages: string[] = [];
+  const o = { world, seeds: 1, out, until: 20 * DAY, sets: ["citizens=40"], keep: "measures" as const, compress: false, log: (m: string) => messages.push(m) };
+  const r = await runBatch(o);
+  const run = r.runs[0]!;
+  const recipePath = join(out, `${run.runId}.recipe.json`);
+  const dirty = Bun.spawnSync(["git", "status", "--porcelain", "--untracked-files=no"], { cwd: root }).stdout.toString().trim() !== "";
+  if (dirty) {
+    // Uncommitted changes: the commit wouldn't regenerate it, so the log stays, and it says why.
+    expect(messages.some((m) => m.includes("uncommitted changes"))).toBe(true);
+    expect(existsSync(run.logPath)).toBe(true);
+  } else {
+    expect(existsSync(recipePath)).toBe(true);
+    expect(existsSync(join(out, `${run.runId}.jsonl`))).toBe(false);
+    expect(JSON.parse(readFileSync(recipePath, "utf8")).state_hash).toBe(run.stateHash);
+  }
+  expect(existsSync(join(out, "measure", "transfers"))).toBe(true);
+  // The recipe's command regenerates the run exactly.
+  const again = Bun.spawnSync([process.execPath, join(root, "orchestrator/src/cli.ts"), "run-one", ...recipeArgs(o, run.seed), "--out", join(out, "again")], { cwd: root });
+  expect(again.exitCode).toBe(0);
+  expect(JSON.parse(readFileSync(join(out, "again", `${run.runId}.summary.json`), "utf8")).stateHash).toBe(run.stateHash);
+
+  // A language-model participant (the mock mayor): the log is always kept.
+  const llm = await runBatch({ ...o, out: join(out, "llm"), sets: ["citizens=40", "mayor=llm"], log: (m: string) => messages.push(m) });
+  expect(messages.some((m) => m.includes("language-model participants"))).toBe(true);
+  expect(existsSync(llm.runs[0]!.logPath)).toBe(true);
 }, 300_000);

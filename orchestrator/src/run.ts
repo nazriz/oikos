@@ -36,6 +36,8 @@ export interface RunOptions {
   config: any;
   runId: string;
   outDir: string;
+  /** Check that every code participant's call text reads back as the program it was written from (tests). */
+  verifyCalls?: boolean;
   /** Stop early (simulated seconds); default: the world's run length. */
   until?: number;
   modules?: { [name: string]: BehaviourModule & { source?: string } };
@@ -602,9 +604,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // A structured intent: the resolver turns it into the participant's own acts (D36).
       const p1 = performance.now();
       let program: calls.Program;
+      // A code participant's program as it was written (the same as reading its text back: `verifyCalls` checks).
+      const w = (action as any)[calls.PARSED] as calls.Program | undefined;
+      const written = w && "lines" in w && w.lines.length ? w : undefined; // (an empty one is read, and refused, as before)
       try {
-        program = calls.parseProgram(action.call);
+        program = written ?? calls.parseProgram(action.call);
+        if (written && (o.verifyCalls ?? process.env.NODE_ENV === "test") && !Bun.deepEquals(calls.parseProgram(action.call), written, true)) throw new Error(`a call's text reads back differently from the program it was written from: ${action.call.slice(0, 400)}`);
       } catch (e) {
+        if (written) throw e;
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unreadable: action.call.slice(0, 4000), error: String((e as Error).message).slice(0, 500) } } });
         u.notices.push({ t, text: "That request couldn't be read. Could you say it more plainly?" });
         return true;
@@ -616,7 +623,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         for (const q of res.questions) u.notices.push({ t, text: q });
         return true;
       }
-      const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
+      const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: written ? action.call : calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
       if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
       return true;
     }
