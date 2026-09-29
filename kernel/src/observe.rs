@@ -629,7 +629,7 @@ fn capacities<'a>(st: &'a State, participant: &str) -> Vec<Capacity<'a>> {
 /// capacity ("self" or a position it holds); None: all of them.
 pub fn observe(s: &Statics, st: &mut State, index: &mut RecordIndex, participant: &str, only: Option<&str>, requested: &[LookRequest]) -> Observation {
     let (obs, looks, drained) = build(s, st, index, participant, Mode::Look, only, requested);
-    let p = st.participants.get_mut(participant).unwrap();
+    let p = std::sync::Arc::make_mut(st.participants.get_mut(participant).unwrap());
     for (id, look) in looks {
         p.looks.insert(id, look);
     }
@@ -721,7 +721,7 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                         }
                     }
                     accounts.sort_by(|a, b| a.account.cmp(&b.account));
-                    let transactions = if mode == Mode::Look { p.new_transactions.get(&me).cloned().unwrap_or_default() } else { vec![] };
+                    let transactions = if mode == Mode::Look { p.new_transactions.get(&me).map(|q| q.iter().cloned().collect()).unwrap_or_default() } else { vec![] };
                     if mode == Mode::Look {
                         drained.push(me.clone());
                     }

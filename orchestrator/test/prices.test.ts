@@ -55,7 +55,8 @@ test("rents are reviewed within the tenancy law, never down, and tenants pay the
       || ev.some((e) => e.event === "person_died" && e.person === tenant && e.t < before);
     if (pays && !ended && r.data.from < 15 * MONTH - 35 * DAY) {
       const landlordAccount = `acc-${r.speaks_for}`;
-      const paid = ev.filter((e) => e.event === "transfer" && e.to === landlordAccount && e.from === `acc-${tenant}`);
+      const from = order!.data.outcome.money.from; // (the tenant's account: a newcomer's isn't named for them)
+      const paid = ev.filter((e) => e.event === "transfer" && e.to === landlordAccount && e.from === from);
       expect(paid.some((e) => e.amount === String(r.data.rent) && e.t >= r.data.from)).toBe(true);
       for (let at = r.at; at + 31 * DAY <= r.data.from + 31 * DAY; at += 30 * DAY) expect(paid.some((e) => e.t >= at && e.t < at + 31 * DAY)).toBe(true);
     }

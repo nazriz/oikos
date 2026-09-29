@@ -218,6 +218,7 @@ fn end_participant(st: &mut State, participant: &str, reason: EndReason) -> Vec<
     let t = st.t;
     let c = st.stamp();
     let Some(p) = st.participants.get_mut(participant) else { return vec![] };
+    let p = Arc::make_mut(p);
     if p.status == ParticipantStatus::Ended {
         return vec![];
     }
@@ -289,7 +290,7 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
     let c = st.stamp();
     st.participants.insert(
         id.clone(),
-        Participant {
+        Arc::new(Participant {
             kind: tpl.kind,
             person: person.clone(),
             owner: owner.clone(),
@@ -307,7 +308,7 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
             pending: BTreeMap::new(),
             new_transactions: BTreeMap::new(),
             looks: BTreeMap::new(),
-        },
+        }),
     );
     let ev = Timed::new(t, EventBody::ParticipantCreated { participant: id.clone(), kind: tpl.kind, person, owner, template: template.into(), traits });
     (id, vec![ev])
@@ -705,7 +706,7 @@ impl<'a> Exec<'a> {
     }
 
     fn account(&self, id: &str) -> R<&Account> {
-        self.st.accounts.get(id).ok_or_else(|| refuse(RefusalCode::UnknownAccount, format!("no account {id}")))
+        self.st.accounts.get(id).map(|a| &**a).ok_or_else(|| refuse(RefusalCode::UnknownAccount, format!("no account {id}")))
     }
 
     fn record_of_kind(&self, id: &str, kind: &str) -> R<&Record> {
@@ -781,10 +782,10 @@ impl<'a> Exec<'a> {
                 return Err(refuse(RefusalCode::Overflow, format!("{to}'s balance would exceed the range of an amount")));
             }
             let c = self.st.stamp();
-            let a = self.st.accounts.get_mut(from).unwrap();
+            let a = Arc::make_mut(self.st.accounts.get_mut(from).unwrap());
             a.balance -= amount;
             a.changed = c;
-            let b = self.st.accounts.get_mut(to).unwrap();
+            let b = Arc::make_mut(self.st.accounts.get_mut(to).unwrap());
             b.balance += amount;
             b.changed = c;
         }
@@ -813,7 +814,7 @@ impl<'a> Exec<'a> {
         }
         for (p, e) in told {
             if let Some(x) = self.st.participants.get_mut(&p) {
-                x.new_transactions.entry(e).or_default().push(tx.clone());
+                Arc::make_mut(x).new_transactions.entry(e).or_default().push_back(tx.clone());
             }
         }
         self.emit(EventBody::Transfer {
@@ -926,7 +927,7 @@ impl<'a> Exec<'a> {
                 return Err(refuse(RefusalCode::UnknownEntity, format!("no participant, position or entity {id}")));
             }
         }
-        out.retain(|(p, _)| self.st.participants.get(p).is_some_and(can_act));
+        out.retain(|(p, _)| self.st.participants.get(p).is_some_and(|x| can_act(x)));
         Ok(out)
     }
 
@@ -999,7 +1000,7 @@ impl<'a> Exec<'a> {
                 }
                 let id = self.st.mint("acc");
                 let c = self.st.stamp();
-                self.st.accounts.insert(id.clone(), Account { holder: holder.clone(), custodian: self.entity.clone(), currency: currency.clone(), balance: 0, changed: c });
+                self.st.accounts.insert(id.clone(), Arc::new(Account { holder: holder.clone(), custodian: self.entity.clone(), currency: currency.clone(), balance: 0, changed: c }));
                 self.emit(EventBody::AccountOpened { account: id.clone(), holder, custodian: self.entity.clone(), currency, by: self.participant.into() });
                 self.bind(bind, &id)
             }
@@ -1018,7 +1019,7 @@ impl<'a> Exec<'a> {
                 }
                 let c = self.st.stamp();
                 if let Some(gone) = self.st.accounts.remove(&account) {
-                    self.st.closed_accounts.insert(account.clone(), crate::state::ClosedAccount { holder: gone.holder, custodian: gone.custodian, currency: gone.currency, changed: c });
+                    self.st.closed_accounts.insert(account.clone(), crate::state::ClosedAccount { holder: gone.holder.clone(), custodian: gone.custodian.clone(), currency: gone.currency.clone(), changed: c });
                 }
                 self.emit(EventBody::AccountClosed { account, by: self.participant.into() });
                 Ok(())
@@ -1227,7 +1228,7 @@ impl<'a> Exec<'a> {
                     let acc = self.st.mint("acc");
                     let c = self.st.stamp();
                     let currency = self.s.currency.clone();
-                    self.st.accounts.insert(acc.clone(), Account { holder: id.clone(), custodian: id.clone(), currency: currency.clone(), balance: 0, changed: c });
+                    self.st.accounts.insert(acc.clone(), Arc::new(Account { holder: id.clone(), custodian: id.clone(), currency: currency.clone(), balance: 0, changed: c }));
                     self.emit(EventBody::AccountOpened { account: acc.clone(), holder: id.clone(), custodian: id.clone(), currency, by: self.participant.into() });
                     let boundary = self.s.boundary_account(&self.entity).to_string();
                     self.move_money(&boundary, &acc, *amount, TransferReason::Carried, None, None, None)?;
@@ -1483,7 +1484,7 @@ impl<'a> Exec<'a> {
                 };
                 let mut reached = BTreeSet::new();
                 for (p, capacity) in &recipients {
-                    self.st.participants.get_mut(p).unwrap().pending.entry(capacity.clone()).or_default().inbox.push(msg.clone());
+                    Arc::make_mut(self.st.participants.get_mut(p).unwrap()).pending.entry(capacity.clone()).or_default().inbox.push(msg.clone());
                     reached.insert(p.clone());
                 }
                 self.emit(EventBody::MessageDelivered { message: mid, participant: self.participant.into(), to: reached.into_iter().collect() });

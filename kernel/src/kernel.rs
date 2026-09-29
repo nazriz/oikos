@@ -98,6 +98,20 @@ pub struct Kernel {
     state: State,
     /// Derived lookups for observations; not part of the state.
     index: observe::RecordIndex,
+    /// Canonical bytes already made for the state hash (not part of the state): see `write_state`.
+    canon_cache: std::cell::RefCell<CanonCache>,
+}
+
+/// Records never change once made, and the order they were made in only grows, so their canonical bytes are kept
+/// between checkpoints: a checkpoint encodes only what's new, not the whole history. The same bytes, so the same hash.
+#[derive(Default)]
+struct CanonCache {
+    /// record id -> the record it was made from (to be sure it's the same one), and its canonical bytes
+    records: BTreeMap<Id, (Arc<crate::blocks::Record>, u64, Arc<[u8]>)>,
+    /// `record_order`'s elements so far, canonical and comma-separated; how many; the last one
+    order: Vec<u8>,
+    order_n: usize,
+    order_last: Option<Id>,
 }
 
 fn refusal_info(r: &Refusal) -> RefusalInfo {
@@ -161,7 +175,7 @@ impl Kernel {
                     (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0, body })
                 })
                 .collect(),
-            accounts: w.accounts.iter().map(|a| (a.id.clone(), Account { holder: a.holder.clone(), custodian: a.custodian.clone(), currency: cur_of(a), balance: a.balance, changed: 0 })).collect(),
+            accounts: w.accounts.iter().map(|a| (a.id.clone(), Arc::new(Account { holder: a.holder.clone(), custodian: a.custodian.clone(), currency: cur_of(a), balance: a.balance, changed: 0 }))).collect(),
             labour_used: crate::state::Map::new(),
             holdings: w
                 .holdings
@@ -181,7 +195,7 @@ impl Kernel {
                 .map(|p| {
                     (
                         p.id.clone(),
-                        Participant {
+                        Arc::new(Participant {
                             kind: p.kind,
                             person: p.person.clone(),
                             owner: p.owner.clone(),
@@ -199,7 +213,7 @@ impl Kernel {
                             pending: BTreeMap::new(),
                             new_transactions: BTreeMap::new(),
                             looks: BTreeMap::new(),
-                        },
+                        }),
                     )
                 })
                 .collect(),
@@ -253,7 +267,7 @@ impl Kernel {
         for (id, born) in people {
             schedule_birthday(&s, &mut st, &id, born);
         }
-        let k = Kernel { s, state: st, index: Default::default() };
+        let k = Kernel { s, state: st, index: Default::default(), canon_cache: Default::default() };
         k.state_hash().map_err(|e| format!("initial state is not canonical: {e}"))?;
         Ok(k)
     }
@@ -272,11 +286,110 @@ impl Kernel {
 
     /// Canonical JSON of the full world state. Byte-identical replay means this is byte-identical.
     pub fn canonical_state(&self) -> Result<Vec<u8>, canon::CanonError> {
-        canon::canonical(&self.state)
+        let mut out = Vec::new();
+        self.write_state(&mut |b| out.extend_from_slice(b))?;
+        Ok(out)
     }
 
     pub fn state_hash(&self) -> Result<String, canon::CanonError> {
-        Ok(canon::hash_with_domain(canon::DOMAIN_STATE, &self.canonical_state()?))
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(canon::DOMAIN_STATE.as_bytes());
+        self.write_state(&mut |b| h.update(b))?;
+        Ok(canon::to_hex(&h.finalize()))
+    }
+
+    /// The state's canonical bytes (exactly `canon::canonical(&self.state)`), streamed: the records and their order
+    /// from the cache, encoding only those made since the last time; the rest (small by comparison) encoded afresh.
+    fn write_state(&self, sink: &mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> {
+        let mut rest = self.state.clone(); // (a persistent copy: cheap)
+        rest.records = crate::state::Map::new();
+        rest.record_order = imbl::Vector::new();
+        let v = serde_json::to_value(&rest).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
+        canon::check_integers(&v)?;
+        let Value::Object(m) = &v else { return Err(canon::CanonError::Serialize("the state is not an object".into())) };
+        let mut keys: Vec<&String> = m.keys().collect();
+        keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
+        let mut cache = self.canon_cache.borrow_mut();
+        let cache = &mut *cache;
+        sink(b"{");
+        for (i, k) in keys.into_iter().enumerate() {
+            let mut buf = Vec::new();
+            if i > 0 {
+                buf.push(b',');
+            }
+            canon::write_string(k, &mut buf);
+            buf.push(b':');
+            match k.as_str() {
+                "records" => {
+                    sink(&buf);
+                    self.write_records(cache, sink)?;
+                }
+                "record_order" => {
+                    sink(&buf);
+                    self.write_order(cache, sink);
+                }
+                _ => {
+                    canon::write_value(&m[k], &mut buf);
+                    sink(&buf);
+                }
+            }
+        }
+        sink(b"}");
+        Ok(())
+    }
+
+    fn write_records(&self, cache: &mut CanonCache, sink: &mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> {
+        let records = &self.state.records;
+        // Canonical key order is by UTF-16 code units; for ASCII ids (every id so far) that's the map's own order.
+        let mut ids: Vec<&Id> = records.keys().collect();
+        if !ids.iter().all(|k| k.is_ascii()) {
+            ids.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
+        }
+        let mut buf = Vec::new();
+        sink(b"{");
+        for (i, id) in ids.into_iter().enumerate() {
+            let stored = &records[id];
+            buf.clear();
+            if i > 0 {
+                buf.push(b',');
+            }
+            canon::write_string(id, &mut buf);
+            buf.push(b':');
+            sink(&buf);
+            let fresh = match cache.records.get(id) {
+                Some((r, seq, _)) => !(Arc::ptr_eq(r, &stored.record) && *seq == stored.seq),
+                None => true,
+            };
+            if fresh {
+                let bytes: Arc<[u8]> = canon::canonical(stored)?.into();
+                cache.records.insert(id.clone(), (stored.record.clone(), stored.seq, bytes));
+            }
+            sink(&cache.records[id].2);
+        }
+        sink(b"}");
+        Ok(())
+    }
+
+    fn write_order(&self, cache: &mut CanonCache, sink: &mut dyn FnMut(&[u8])) {
+        let order = &self.state.record_order;
+        // Only ever appended to; if it isn't what was cached (it always should be), start again.
+        let same = cache.order_n <= order.len() && (cache.order_n == 0 || order.get(cache.order_n - 1) == cache.order_last.as_ref());
+        if !same {
+            cache.order.clear();
+            cache.order_n = 0;
+        }
+        for id in order.iter().skip(cache.order_n) {
+            if cache.order_n > 0 {
+                cache.order.push(b',');
+            }
+            canon::write_string(id, &mut cache.order);
+            cache.order_n += 1;
+        }
+        cache.order_last = order.last().cloned();
+        sink(b"[");
+        sink(&cache.order);
+        sink(b"]");
     }
 
     fn check_only(&self, participant: &str, only: &Option<Id>) -> Result<(), ProtocolError> {
@@ -367,7 +480,7 @@ impl Kernel {
             Command::OptOut { participant, statement } => {
                 let t = self.state.t;
                 let c = self.state.stamp();
-                let p = self.state.participants.get_mut(participant).unwrap();
+                let p = Arc::make_mut(self.state.participants.get_mut(participant).unwrap());
                 p.status = ParticipantStatus::OptedOut;
                 p.status_changed = c;
                 let vacant = p.def.vacant_after_opt_out();
@@ -431,7 +544,7 @@ impl Kernel {
             ),
         };
         let key = pos.unwrap_or_else(|| SELF.into());
-        self.state.participants.get_mut(participant).unwrap().pending.entry(key).or_default().outcomes.push(outcome);
+        Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key).or_default().outcomes.push(outcome);
         Output { events, observation: None }
     }
 

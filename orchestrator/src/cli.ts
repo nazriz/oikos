@@ -11,7 +11,8 @@
 //     prices the cost projection.
 //   terrarium measure <DIR> [QUERY...] [--sql "select ..."] [--list]
 //   terrarium cost <DIR> [--translator-model provider/model]
-//   terrarium run ... [--compress]: logs compressed once measured (<run>.jsonl.zst, about a seventh the size).
+//   terrarium run ... [--no-compress]: logs are compressed once measured (<run>.jsonl.zst, about a seventh the size,
+//     checked to read back whole before the plain log goes); --no-compress keeps them plain.
 //   terrarium run ... [--log lean|full]: how much the log keeps (full, the default; lean for quick test runs: no
 //     observation hashes, no written reasoning from code participants; replay still checks the state).
 //   terrarium dataset <DIR|log.jsonl> [--out DIR] [--actions]
@@ -45,7 +46,7 @@ const flag = (name: string, dflt?: string) => {
 const flags = (name: string) => rest.flatMap((x, i) => (x === `--${name}` && rest[i + 1] !== undefined ? [rest[i + 1]!] : []));
 const has = (name: string) => rest.includes(`--${name}`);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--actions"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
@@ -67,7 +68,7 @@ try {
       world: positional()[0]!, seeds: Number(flag("seeds", "1")), out: flag("out"), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
       until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), logDetail: flag("log"), compress: has("compress"),
+      recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"),
     });
     if (r.measureDir) {
       console.log(`\n${table(await runQuery(r.measureDir, "overview"))}`);

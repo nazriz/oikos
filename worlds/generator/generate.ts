@@ -20,7 +20,7 @@ const WORKING_DAY = 8 * HOUR;
 /** The builder's crew: its yard's places, and the crew it starts with (sized to its usual work, not its room). */
 const CREW = { capacity: 12, start: 4 };
 
-export const GENERATOR_VERSION = "0.13.0";
+export const GENERATOR_VERSION = "0.14.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -325,6 +325,9 @@ export function generate(spec: TownSpec): any {
         text: "Please pay my union dues monthly.", data: { outcome: { money: { from: `acc-${c.id}`, to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } }, every: MONTH, first: (1 + unionPick.below(30)) * DAY } });
     }
   }
+  // The town's children, at the same participation once they're adults (drawn now: whether they'll look for work).
+  const youngPick = rng("participation-young");
+  for (const c of everyone.filter((m) => !m.adult)) if (youngPick.below(10_000) >= V.labour_force_participation_bps) outOfLabourForce.add(c.id);
   if (unionMembers.length) records.push({ id: "union-register", record: "statement", author: "genesis", at: 0, visible_to: ["union"], speaks_for: "union", kind: "membership_register", text: `The union's ${unionMembers.length} members, and where they work.`, data: { members: unionMembers } });
 
   // Homes: the housed share of households, the neediest (by the occupancy standard) into the most bedrooms, as far as they go.
@@ -658,6 +661,7 @@ export function generate(spec: TownSpec): any {
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps,
     union: "union", union_join_bps: V.unions.membership_bps,
+    participation_bps: V.labour_force_participation_bps, child_template_outside_lf: "child-outside-lf",
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,
     saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, support_from: "outside", support_kinds: { retired: "pension", unemployed: "unemployment" },
@@ -667,15 +671,18 @@ export function generate(spec: TownSpec): any {
   const outsideLabourForce = { ...citizenController, params: { ...citizenController.params, in_labour_force: false } };
   for (const m of everyone) participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: outOfLabourForce.has(m.id) ? outsideLabourForce : citizenController, framing: unstated });
   // People who may come later: newcomers from elsewhere, and children born here.
-  const templates = ["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated }));
+  // (Each also outside the labour force, at the profile's participation: a newcomer who didn't come for the job, a child.)
+  const templates = [...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),
+    ...["newcomer-outside-lf", "child-outside-lf"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: outsideLabourForce, framing: unstated }))];
   if (spec.migration !== false) {
-    office("migration", "outside", "People moving from elsewhere", undefined, [{ id: "jobs", kind: "records", match: { statement_kinds: ["job_posting"] }, on_request: true }, { id: "who", kind: "directory" }],
-      code("world.migration", { households: H, ...(spec.migration ?? {}) }));
+    office("migration", "outside", "People moving from elsewhere", undefined, [{ id: "jobs", kind: "records", match: { statement_kinds: ["job_posting"] }, on_request: true }, { id: "who", kind: "directory" },
+      { id: "statistics", kind: "records", match: { statement_kinds: ["support_statistics"] } }],
+      code("world.migration", { households: H, participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", jobseekers_payment: "unemployment", ...(spec.migration ?? {}) }));
   }
   // Support paid from outside the town (for a town, the national government's): the profile's payments.
   office("outside-support", "outside", "Support payments", undefined,
     [{ id: "ledger", kind: "accounts" }, { id: "claims", kind: "records", match: { statement_kinds: ["benefit_claim", "benefit_change", "death_registration", "departure"] } }],
-    code("world.transfers", { account: "acc-outside", payments: {
+    code("world.transfers", { account: "acc-outside", publish_every_days: 30, payments: {
       pension: { ...V.support.pension },
       unemployment: { ...V.support.unemployment, to_age: V.retirement_age - 1 },
     } }));

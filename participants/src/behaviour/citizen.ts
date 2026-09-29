@@ -73,6 +73,11 @@ export const citizen: BehaviourModule = {
       support_from: null as string | null, // who pays support (an entity: in a town, usually the outside world)
       support_kinds: { retired: "pension", unemployed: "unemployment" } as { retired?: string; unemployed?: string }, // what to claim, when
       in_labour_force: true, // false: not looking for work (studying, caring...), and not claiming support for being out of it
+      // A child born here: whether they'll look for work as an adult, at the world's participation (the template for
+      // those who won't; "": every child takes `child_template`).
+      child_template: "child",
+      child_template_outside_lf: "",
+      participation_bps: 10_000,
       // Looking for a better-paid job while employed (docs/behaviour/citizen.md): a month's chance, Lengnick (2013)'s pi.
       job_search_bps: 1000,
       // Starting a business (docs/behaviour/entry.md): the kinds of venture this world has (a template each: its capital
@@ -125,6 +130,7 @@ export const citizen: BehaviourModule = {
     ctx.params,
   );
     const me = ctx.entity;
+    const childTemplate = () => (p.child_template_outside_lf && ctx.rng("child-participation").below(10_000) >= p.participation_bps ? p.child_template_outside_lf : p.child_template);
     const book = new Book();
     let home: Home | null = null;
     let job: Job | null = null;
@@ -447,7 +453,7 @@ export const citizen: BehaviourModule = {
             const together = !man || (street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.occupants?.includes(me) && sp.occupants?.includes(man.person))));
             if (together) expectingUntil = t + p.gestation + MONTH;
             if (together) steps.push(because(`Having a child: at ${age}, the chance this month is ${rate} in 120,000 (${rate} births per 10,000 women a year at this age).`,
-              C.call("birth", { name: C.text(`baby of ${me}`), template: p.child_template ?? "child", ...(man ? { with: man.person } : {}) })));
+              C.call("birth", { name: C.text(`baby of ${me}`), template: childTemplate(), ...(man ? { with: man.person } : {}) })));
           }
         }
       }

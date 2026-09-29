@@ -216,12 +216,13 @@ export const trade: BehaviourModule = {
  * world.transfers: support paid to people from outside the world (a boundary condition, D31): for a town, a national
  * government's payments. It decides claims for the payment kinds the world names, each with its amount, how often, and
  * the ages it's for; pays those it grants on that schedule until the claimant says to stop, dies (a death
- * registration) or leaves (a departure). It takes the claim's date of birth as stated. Means tests are left out.
- * Documented in docs/behaviour/boundary.md.
+ * registration) or leaves (a departure). It takes the claim's date of birth as stated. Means tests are left out. Every
+ * `publish_every_days` (0: never), it publishes how many it pays of each kind (a `support_statistics` statement), as a
+ * payments department publishes its recipients by area. Documented in docs/behaviour/boundary.md.
  */
 export const transfers: BehaviourModule = {
   name: "world.transfers",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -231,10 +232,12 @@ export const transfers: BehaviourModule = {
         account: "", // the outside's account it pays from and is paid into (the world must say)
         year: 365 * DAY,
         payments: {} as { [kind: string]: { amount: number; every_days: number; from_age: number; to_age?: number } },
+        publish_every_days: 0,
       },
       ctx.params,
     );
     need(p, ["account"], "world.transfers");
+    let nextPublish = p.publish_every_days > 0 ? p.publish_every_days * DAY : Infinity;
     const me = ctx.entity;
     const book = new Book();
     const decided = new Set<string>();
@@ -274,6 +277,13 @@ export const transfers: BehaviourModule = {
           }
         }
         for (let i = 0; i < due.length; i += 30) steps.push(because(`Paying the support due (${due.length} payments).`, ...due.slice(i, i + 30)));
+        // The published figures: recipients of each payment.
+        if (t >= nextPublish) {
+          nextPublish = t + p.publish_every_days * DAY;
+          const recipients = Object.fromEntries(Object.keys(p.payments).sort().map((k) => [k, [...paying.values()].filter((x) => x.payment === k).length]));
+          steps.push(because("Publishing this period's figures: how many we pay, of each kind.",
+            say("support_statistics", `Support recipients: ${Object.entries(recipients).map(([k, n]) => `${k} ${n}`).join(", ")}.`, { visible: "public", data: { recipients } })));
+        }
         return steps;
       },
     );
@@ -456,15 +466,18 @@ export const idle: BehaviourModule = {
  * going beats what they have where they are, and what they expect is the wage times the chance of getting a job.
  *
  * Monthly, it looks at the town's standing job postings (as someone thinking of moving would). A newcomer expects the
- * mean posted wage times the chance of a job: postings / (postings + the adults it has brought in the last
- * `memory_days`, who are competing for them). For each posting, a household comes with probability
+ * mean posted wage times the chance of a job: postings / (postings + those competing for them: the town's jobseekers,
+ * as the latest published count of recipients of `jobseekers_payment` says, and the adults it has brought in the last
+ * `memory_days`). In Harris & Todaro the chance is the destination's employment rate: a town's own unemployed make it
+ * less. The one who came for the job looks for work; other adults do at `participation_bps` (`template_outside_lf`
+ * for those who don't). For each posting, a household comes with probability
  * `response_bps` x the gap over `outside_monthly_income` (capped). Households are drawn from the same census shares as
  * the town's; adults bring a few months' income elsewhere as savings. It writes the household's paperwork (the
  * `household` record the newcomers bring). Documented in docs/behaviour/boundary.md.
  */
 export const migration: BehaviourModule = {
   name: "world.migration",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => 30 * DAY,
   firstWake: () => 30 * DAY,
@@ -479,6 +492,9 @@ export const migration: BehaviourModule = {
         template: "newcomer",
         households: null as HouseholdSpec | null, // who comes, as the world's profile describes households (required)
         search_limit: 200,
+        jobseekers_payment: "", // the support payment whose published recipients count as jobseekers ("": none published)
+        participation_bps: 10_000, // of adults other than the one who came for the job, those looking for work
+        template_outside_lf: "", // the template for those who aren't ("": everyone takes `template`)
       },
       ctx.params,
     );
@@ -529,7 +545,9 @@ export const migration: BehaviourModule = {
           const monthly = postings.map((x) => Math.floor(((x.data?.wage ?? 0) * 30 * DAY) / (x.data?.period ?? 14 * DAY)));
           const mean = monthly.reduce((a, b) => a + b, 0) / monthly.length;
           const recent = brought.filter((b) => obs.t - b.t < p.memory_days * DAY).reduce((a, b) => a + b.adults, 0);
-          const chance = postings.length / (postings.length + recent);
+          const stats = book.open("support_statistics").sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))[0];
+          const jobseekers = p.jobseekers_payment ? Number(stats?.data?.recipients?.[p.jobseekers_payment] ?? 0) : 0;
+          const chance = postings.length / (postings.length + recent + jobseekers);
           const gapBps = Math.floor(((mean * chance - p.outside_monthly_income) * 10_000) / p.outside_monthly_income);
           const perPosting = Math.min(10_000, Math.max(0, Math.floor((gapBps * p.response_bps) / 10_000)));
           let n = 0;
@@ -539,8 +557,10 @@ export const migration: BehaviourModule = {
             const d = drawHousehold(H, (m) => r.below(m));
             const refs = d.members.map((_, j) => `m${j}`);
             const born_at = d.members.map((m) => obs.t - (m.age * 365 + m.day) * DAY);
+            // The one who came for the job looks for work; the others at the world's participation.
+            const templateOf = (j: number) => (j === d.leaseholder || !p.template_outside_lf || r.below(10_000) < p.participation_bps ? p.template : p.template_outside_lf);
             const blocks = d.members.map((m, j) => C.call("presence", {
-              name: C.text(`m${++arrivals}`), age: C.text(`${m.age * 365 + m.day} days`), sex: m.sex, template: p.template,
+              name: C.text(`m${++arrivals}`), age: C.text(`${m.age * 365 + m.day} days`), sex: m.sex, template: templateOf(j),
               ...(m.age >= 18 ? { carrying: C.dollars(Math.floor(((p.savings_months[0] + r.below(p.savings_months[1] - p.savings_months[0] + 1)) * p.outside_monthly_income))) } : {}),
             }));
             todo.push(because(`A household moves here: the town's expected wage (${usd(Math.floor(mean))} a month x a ${Math.round(chance * 100)}% chance of a job) beats ${usd(p.outside_monthly_income)} elsewhere.`, ...blocks.map((b, j) => [refs[j]!, b] as [string, C.Call])));

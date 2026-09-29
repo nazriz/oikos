@@ -23,7 +23,8 @@ async function run(name: string, config: any) {
 test("with jobs going, households move in, bank their savings, and find work and a home", async () => {
   // Four factories for 120 people, each keeping 32 staff (the simple employer module in the factories' seats: the
   // Lengnick factories grow a worker a month): more jobs than takers; and elsewhere pays less.
-  const config = generate({ ...spec, citizens: 120, factories: 4, migration: { outside_monthly_income: 200_000, response_bps: 3000 } });
+  // (Of newcomers other than the one who came for the job, none look for work here: participation 0.)
+  const config = generate({ ...spec, citizens: 120, factories: 4, migration: { outside_monthly_income: 200_000, response_bps: 3000, participation_bps: 0 } });
   for (const p of config.participants.filter((x: any) => /^factory-\d+-manager-system$/.test(x.id))) {
     const f = p.id.replace("-manager-system", "");
     p.controller = { type: "code", impl: "firm.employer", params: { wage: 150_000, target_staff: 32, workplace: `${f}-works/workplace.1`, role: "factory worker" } };
@@ -43,7 +44,31 @@ test("with jobs going, households move in, bank their savings, and find work and
   expect(occupied.some((e) => e.space.includes("/workplace."))).toBe(true);
   expect(occupied.some((e) => e.space.includes("/dwelling."))).toBe(true);
   expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
+  // The one who came for the job looks for work (the newcomer template); the others, at participation 0, don't.
+  const templateOf = new Map(ev.filter((e) => e.event === "participant_created").map((e) => [e.person, e.template]));
+  const households = ev.filter((e) => e.event === "recorded" && e.record.kind === "household").map((e) => e.record.data);
+  expect(households.length).toBeGreaterThan(0);
+  for (const h of households) for (const m of h.members) expect(templateOf.get(m.person)).toBe(m.person === h.leaseholder ? "newcomer" : "newcomer-outside-lf");
 }, 300_000);
+
+test("the town's own jobseekers make coming less worth it (Harris & Todaro: the chance of a job is the town's)", async () => {
+  const world = (jobseekers: number) => {
+    const config = generate({ ...spec, citizens: 120, factories: 4, migration: { outside_monthly_income: 200_000, response_bps: 3000 } });
+    for (const p of config.participants.filter((x: any) => /^factory-\d+-manager-system$/.test(x.id))) {
+      const f = p.id.replace("-manager-system", "");
+      p.controller = { type: "code", impl: "firm.employer", params: { wage: 150_000, target_staff: 32, workplace: `${f}-works/workplace.1`, role: "factory worker" } };
+    }
+    // The support office's published figures, as they stand: this many jobseekers already in the town.
+    config.participants.find((x: any) => x.id === "outside-support-system").controller.params.publish_every_days = 0;
+    config.world.records.push({ id: "stats-0", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "support_statistics", text: `Support recipients: unemployment ${jobseekers}.`, data: { recipients: { pension: 0, unemployment: jobseekers } } });
+    return config;
+  };
+  const arrivals = async (name: string, n: number) => (await run(name, world(n))).filter((e) => e.event === "person_arrived").length;
+  const none = await arrivals("no-jobseekers", 0);
+  const many = await arrivals("jobseekers", 400);
+  expect(none).toBeGreaterThan(0);
+  expect(many).toBeLessThan(none / 2);
+}, 600_000);
 
 test("with no jobs going, nobody comes", async () => {
   // One shop and one factory, whose export customers want less than it makes (so it isn't hiring); and elsewhere pays

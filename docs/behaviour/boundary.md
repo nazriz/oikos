@@ -57,9 +57,11 @@ A first-come-first-served quantity, shared by two factories, made the demand eac
 - exchange rates (one currency);
 - trade policy (tariffs, quotas): these would be laws, as records, applied by an office.
 
-## `world.transfers` (v0.1.0): support paid from outside
+## `world.transfers` (v0.2.0): support paid from outside
 
 Support paid to people in the world by someone outside it: for a town, a national government's payments. The world names the payments (`payments`: a kind, its amount, how often, and the ages it's for). A person claims (a `benefit_claim` to the payer, with the kind, the account to pay and their date of birth); the payer grants the claim if their age fits (taking the stated date of birth as true), says so (`benefit_decision`), and pays on schedule until the person asks to stop (`benefit_change`), dies (a death registration) or leaves (a departure). One payment a person: a new claim replaces the old.
+
+**Published figures** (0.2.0): every `publish_every_days` (none by default; the generated town, 30), it publishes how many it pays of each kind (a public `support_statistics` statement, `data: { recipients: { kind: n } }`), as a payments department publishes its recipients by area (DSS, *JobSeeker Payment and Youth Allowance recipients, monthly profile*, by SA2). Would-be migrants read it.
 
 **Leaves out:** means tests; couples' rates; checking what's claimed; payments for anything but age and being out of work. A world that needs a national government's decisions inside it replaces this module with a participant of its own, reading the same claims (phase F).
 
@@ -69,20 +71,22 @@ In the generated town, the profile's payments are "pension" (from the retirement
 
 For a town's bank, the wider market it funds itself from. It lends what's asked for at once (`funding_draw`: an amount and an account), paying it with the draw settled: the market is large next to a town. The interest and repayments are the borrower's to make (`bank.lending` pays them monthly); this module doesn't chase them.
 
-## `world.migration` (v0.1.0): people moving in from elsewhere
+## `world.migration` (v0.2.0): people moving in from elsewhere
 
 **Participant:** the outside world's `migration` position ("People moving from elsewhere"), held by a system. **Source:** `participants/src/behaviour/world.ts`. People cross into the world only through the boundary (the `arrive` block; contracts v0.4), so arrivals are the outside world's act. Who comes is the outside world's business.
 
 | Rule | Detail | Source |
 |---|---|---|
-| **When people come** | Monthly, it looks at the town's standing job postings, as someone thinking of moving would. A newcomer expects the mean posted wage times the chance of a job, where the chance is postings ÷ (postings + the adults it brought in the last 90 days, who compete for them). Where that beats `outside_monthly_income`, each posting draws a household with probability `response_bps` × the gap (as a share of the outside income). At most 8 households a month. | Harris & Todaro (1970), "Migration, Unemployment and Development: A Two-Sector Analysis", *AER* 60(1): migration responds to the *expected* wage gap, the wage times the probability of employment, so it can go on while there's unemployment. The response rate and the outside income are **placeholders** to calibrate against ABS regional internal migration. |
+| **When people come** | Monthly, it looks at the town's standing job postings, as someone thinking of moving would. A newcomer expects the mean posted wage times the chance of a job, where the chance is postings ÷ (postings + those competing for them: the town's jobseekers, as the latest published count of unemployment support recipients says (0.2.0), and the adults it brought in the last 90 days). Where that beats `outside_monthly_income`, each posting draws a household with probability `response_bps` × the gap (as a share of the outside income). At most 8 households a month. | Harris & Todaro (1970), "Migration, Unemployment and Development: A Two-Sector Analysis", *AER* 60(1): migration responds to the *expected* wage gap, the wage times the probability of employment, so it can go on while there's unemployment. The response rate and the outside income are **placeholders** to calibrate against ABS regional internal migration. |
 | **Who comes** | Households drawn from the same census shares as the town's ([households.md](households.md)) | ABS Census 2021 (a placeholder: movers are younger and more often single than the whole population) |
 | **What they bring** | Each adult carries 1–3 months of `outside_monthly_income` in savings, in their own keeping. It moves from the outside world's account, which may go negative. | Placeholder |
 | **Their paperwork** | It writes the `household` record the newcomers bring (members, couples, who will hold a lease), once it can see their participants in its directory | |
 
 **Once here,** newcomers are ordinary citizens (template `newcomer`, running `citizen.default`; their sex is physical, stated on arrival). They ask the bank for an account, deposit what they brought, and hunt for work and a home. If they can't find a home in 90 days, they leave again.
 
-**What it can't see:** the town's unemployment. It knows only the postings it can see and whom it has brought. A town that fills its vacancies quickly draws few people, whatever its unemployment; one with vacancies standing draws people even if many locals are out of work (Harris–Todaro's point).
+**What it sees of the town's unemployment** (0.2.0): the support office's published count of unemployment support recipients. Before, it saw only postings and whom it had brought, so a town whose postings stood for a while drew people however many locals were out of work: in the 1,000-person town's 5-year runs, a quarter of those who came were out of work at the end. In Harris & Todaro the chance of a job is the destination's employment rate; its own unemployed make coming less worth it. (People aged 18 to 21 aren't counted: the profile's unemployment payment starts at 22.)
+
+**Who looks for work** (0.2.0): the one who came for the job (the household's leaseholder); other adults at the world's participation (`participation_bps`, the profile's), the rest taking the `newcomer-outside-lf` template, outside the labour force.
 
 **Observed:** on the 1,000-person town, postings are filled within the month by the ~150 adults out of work, so almost nobody comes. With four factories for 120 people and a lower income elsewhere, households arrive, bank their savings, and find factory work within two weeks and a home within about four (`orchestrator/test/migration.test.ts`).
 

@@ -27,7 +27,9 @@ pub struct State {
     pub t: i64,
     pub counters: Counters,
     pub entities: Map<Id, Entity>,
-    pub accounts: Map<Id, Account>,
+    /// (Values behind `Arc`, here and in `participants`: a state's copy for an action then shares them, and changing one
+    /// copies only it, not the 64 values of the tree node it's in. Serialised as the values themselves.)
+    pub accounts: Map<Id, Arc<Account>>,
     /// Holdings of resources (phase B), keyed `holder|at|kind` (holding_key): who holds how much of what, where.
     #[serde(default)]
     pub holdings: Map<String, Holding>,
@@ -46,7 +48,7 @@ pub struct State {
     pub records: Map<Id, Stored>,
     /// Record ids in the order they were made (record i has seq i+1).
     pub record_order: imbl::Vector<Id>,
-    pub participants: Map<Id, Participant>,
+    pub participants: Map<Id, Arc<Participant>>,
     pub positions: Map<Id, Position>,
     /// Future physical effects, sorted by (at, seq).
     pub schedule: Schedule,
@@ -311,7 +313,8 @@ pub struct Participant {
     pub pending: BTreeMap<Id, Pending>,
     /// Delivered by its next look through an accounts channel of a capacity acting for that entity.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub new_transactions: BTreeMap<Id, Vec<Transaction>>,
+    /// (A persistent list: a busy custodian's queue holds a day's transfers, and a copy of the participant shares it.)
+    pub new_transactions: BTreeMap<Id, imbl::Vector<Transaction>>,
     /// When it last looked through each channel (`channel`, or `position/channel`), and how far it had seen.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub looks: BTreeMap<Id, Look>,
