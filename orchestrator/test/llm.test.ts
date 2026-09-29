@@ -159,6 +159,9 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   expect(read).toContain("council proposal form");
   // The budget brief: what the budget can pay for; what a park costs is the builder's published price, not something finance was told.
   expect(read).toContain("The budget's lines: parks, for building a park");
+  // The payroll, itemised (pilots 8 and 9: the mayor chased a recurring payment it couldn't place): who, how often,
+  // gross, what reaches them after tax, into which account, under which agreement.
+  expect(read).toMatch(/The town's payroll \(\d+, recurring payments from acc-city\): c\d+, every 14 days, \$[\d,.]+ gross, \$[\d,.]+ paid to acc-\S+ after tax withheld \(agreement /);
   expect(read).toMatch(/builder's published prices \(rec\.\d+\): .*park \$[\d,]+\.00/);
   // The land register: the town's lots, and the vacant ones by id.
   expect(read).toMatch(/The town owns \d+ lots; \d+ have nothing built on them: lot-/);
