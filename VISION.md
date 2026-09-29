@@ -1,6 +1,6 @@
 # Terrarium — Vision & Design Draft
 
-*Working name. First draft 2026-09-25; revised 2026-09-26 to match the decisions taken since (D18–D40 in docs/decisions.md). Stage 1 and most of Stage 2 are built; the rest is the thinking to date.*
+*Working name. First draft 2026-09-25; revised 2026-09-26 to match the decisions taken since (D18–D40 in docs/decisions.md), and 2026-09-29 (principles 15–17 and the direction). Stage 1 and most of Stage 2 are built; the rest is the thinking to date.*
 
 ---
 
@@ -64,6 +64,35 @@ Questions it opens up, without building any of them in:
 12. **Simulate the real world, not a game.** Institutions are people and procedures: a mayor works through budgets, offices and votes, not keys or permissions. Whenever something happens, ask who actually does it, how, and at what cost. Nothing happens automatically because a rule says so. *(D20, D26)*
 13. **Proportional fidelity.** Some parts of the world can be modelled at 100% and others at 10%. A shortcut may change *how much* or *how fast*, never *who acts* or *whether a safeguard works*. *(D25)*
 14. **The platform is invisible to participants.** Participants experience their world, in the world's own terms: people, money, land, letters, agreements, laws. They never see the machinery (the kernel, the translator, the resolver), and no part of the platform is dressed up as something in the world. *(D35)*
+
+**Added 2026-09-29** (Naz):
+
+15. **Everything goes through the building blocks; where one is missing, add a general one.**
+    - Every change to what can happen in a world is expressed through the kernel's building blocks.
+    - When something can't be expressed, the answer is a new, general block, proposed as a contract change. It is never a special case, a patch in one module, or a convention hidden in free-form data that only code participants know.
+    - Test: could a language model or a human, in the same seat, see it and use it the same way? If a code landlord obeys a law only because it reads a hidden field, a law a model mayor passes in plain words won't bind it, and that's a missing block.
+16. **Belief is as much the world's content as money.** Religion, mysticism, ritual, meaning:
+    - people who believe things, gather, keep practices and sacred places, and act on what they believe;
+    - built from the same blocks as everything else (organisations, positions, membership, statements, structures, gatherings, transfers), never as kernel rules;
+    - the platform records what's believed without judging whether it's true, as it records everything else.
+17. **The world can grow from within.**
+    - Participants, the AI in the driver's seat above all, can create new things *in* the world by composing the building blocks: an institution, an office, a kind of agreement, a practice.
+    - The platform's own code doesn't change for it. The blocks and the call language are judged by whether a participant can express something nobody anticipated.
+
+### Direction
+
+*Naz, 2026-09-29. Neither of 16 or 17 is for now. What matters now is that nothing built closes them off.*
+
+**Priorities, in order:**
+1. **A stable, mature, general, configurable platform**, a foundation that grows iteratively without rework.
+2. **Runs with real models in the driver's seat:** the source of data, and of what the platform is missing. Code-only simulations are a development tool (controls, tests, speed), not the product.
+3. **Training the translator, and eventually citizen models,** on the data those runs produce. Belief that shapes behaviour (16) is where hand-written citizen rules run out, and trained citizen models are likely how it comes alive.
+
+**Questions to ask before any change:**
+- Does it serve the priorities, or is it a side quest? Tuning the code economy is worth doing only where a wrong number would mislead a model steward.
+- Is it expressed through the building blocks? If not, which general block is missing?
+- Would a model or a human in the same seat see and use it the same way as a code participant does?
+- Does it keep 16 and 17 open, or close them off?
 
 ## 4. Architecture at a glance
 
