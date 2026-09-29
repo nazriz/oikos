@@ -141,8 +141,14 @@ export interface BatchOptions {
   translatorModel?: string;
   /** A real model for every language-model participant and the translator ("provider/model"); default: the mock. */
   model?: string;
-  /** Spending limit per run, in dollars (required with a model that costs money). */
+  /** Spending limit per run, in dollars (required with a model that costs money, unless `batchBudgetUsd` is given). */
   budgetUsd?: number;
+  /**
+   * The most the whole batch may spend, in dollars. Each run's limit is `budgetUsd` or what's left of this, whichever is
+   * less, held for it while it runs; what it didn't spend is freed when it ends. A seed that can't be given anything
+   * isn't started, and is reported.
+   */
+  batchBudgetUsd?: number;
   baseUrl?: string;
   measure?: boolean;
   /** A file of the researcher's own behaviour modules (`export const modules = {...}`), for every run. */
@@ -165,8 +171,13 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const log = o.log ?? (() => {});
   const sets = o.sets ?? [];
   const { config, spec, generator } = await loadWorld(o.world, sets);
-  if (o.model) chooseModel(o.model, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl }); // fail early: a price, a limit and a key
-  if (o.model && o.translatorModel) chooseModel(o.translatorModel, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl });
+  const perRunUsd = o.budgetUsd ?? o.batchBudgetUsd;
+  if (o.model) chooseModel(o.model, { budgetUsd: perRunUsd, baseUrl: o.baseUrl }); // fail early: a price, a limit and a key
+  if (o.model && o.translatorModel) chooseModel(o.translatorModel, { budgetUsd: perRunUsd, baseUrl: o.baseUrl });
+  // The batch's spending: what finished runs spent, and the limits held for runs under way (micro-USD).
+  const batchLimit = o.batchBudgetUsd !== undefined ? Math.round(o.batchBudgetUsd * 1e6) : undefined;
+  let batchSpent = 0;
+  let batchHeld = 0;
   const out = resolve(o.out ?? join("runs", basename(o.world).replace(/\.(json|ya?ml)$/, "")));
   mkdirSync(out, { recursive: true });
   const seeds = Array.from({ length: o.seeds }, (_, i) => Number(config.seed) + i);
@@ -180,11 +191,36 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const queue = [...seeds];
   const worker = async () => {
     for (let seed = queue.shift(); seed !== undefined; seed = queue.shift()) {
+      // This run's spending limit: the per-run limit, or what's left of the batch's, whichever is less.
+      let limitUsd = o.budgetUsd;
+      let held = 0;
+      if (batchLimit !== undefined) {
+        const left = batchLimit - batchSpent - batchHeld;
+        held = Math.min(o.budgetUsd !== undefined ? Math.round(o.budgetUsd * 1e6) : left, left);
+        if (held <= 0) {
+          failed.push({ seed, reason: `not started: the batch's spending limit ($${o.batchBudgetUsd}) is spent or held by runs under way` });
+          log(`  seed ${seed}: not started, the batch's spending limit is reached`);
+          continue;
+        }
+        batchHeld += held;
+        limitUsd = held / 1e6;
+      }
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : [])];
-      const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
+      const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: { ...process.env } }); // (the environment as it is now)
       const [code, err] = await Promise.all([p.exited, new Response(p.stderr).text()]);
+      // Freed: the limit held for it; counted: what it spent (a run that failed may have spent up to its limit).
+      if (batchLimit !== undefined) {
+        batchHeld -= held;
+        let spent = held;
+        try {
+          spent = JSON.parse(readFileSync(join(out, `${runIdFor(o.world, seed)}.summary.json`), "utf8")).spentMicroUsd ?? held;
+        } catch {
+          // no summary: count all of it
+        }
+        batchSpent += code === 0 ? spent : held;
+      }
       if (code !== 0) {
         // One seed failing doesn't sink the batch: it's reported with its diagnosis, and can be resumed on its own.
         let diagnosis: any;
@@ -241,6 +277,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const finished = new Date();
   writeFileSync(join(out, "batch.json"), JSON.stringify({
     world: o.world, sets, ...(spec ? { spec, generator } : {}), config_seed: config.seed, seeds, parallel, until: o.until ?? null,
+    ...(batchLimit !== undefined ? { spending: { limit_microusd: batchLimit, spent_microusd: batchSpent } } : {}),
     orchestrator: ORCHESTRATOR_VERSION, measure: o.measure !== false ? MEASURE_VERSION : null,
     started: started.toISOString(), finished: finished.toISOString(), wall_ms: finished.getTime() - started.getTime(),
     runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, log: r.logPath || null, anchors: r.logPath ? r.anchorsPath : null, ...(recipes.has(r.runId) ? { recipe: recipes.get(r.runId) } : {}), state_hash: r.stateHash, t: r.t, commands: r.commands, refused: r.refused, wakes: r.wakes, wall_ms: r.wallMs, health: r.health, warnings: healthWarnings(r) })),
@@ -268,9 +305,10 @@ function cannotRegenerate(config: any, o: BatchOptions): string | null {
 const gitCommit = () => Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: join(import.meta.dir, "../..") }).stdout.toString().trim();
 const kernelVersion = () => Bun.spawnSync([kernelBinary(), "--version"]).stdout.toString().trim();
 
-/** `--record-observations` as the run takes it: "models", "code", "all", or participant ids, comma-separated. */
-export function recordWho(s: string): string[] | "models" | "code" | "all" {
-  return s === "models" || s === "code" || s === "all" ? s : s.split(",").map((x) => x.trim()).filter(Boolean);
+/** `--record-observations` as the run takes it: "models" (the default), "code", "all", "none", or participant ids,
+ * comma-separated. */
+export function recordWho(s: string): string[] | "models" | "code" | "all" | "none" {
+  return s === "models" || s === "code" || s === "all" || s === "none" ? s : s.split(",").map((x) => x.trim()).filter(Boolean);
 }
 
 /** Refusals that are the world working as it should: same-moment races (D58), and moving in where the last tenants

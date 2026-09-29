@@ -14,6 +14,11 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ContentBlock, LlmAdapter, LlmMessage, LlmRequest, LlmResponse } from "./adapter";
+import { UsageLimitReached } from "./call";
+
+/** What the Codex CLI says when the subscription's usage limit is reached, or when its own retries on rate limits give
+ * up: either way, no call will go through for a while. */
+const LIMITED = /usage limit|usage_limit|hit your limit|limit reached|rate limit|too many requests|\b429\b/i;
 
 /** Runs the codex binary: args, stdin and a working directory in; stdout out; ended if it takes longer than
  * `timeoutMs`. Injectable for tests. */
@@ -107,6 +112,9 @@ export class CodexCliAdapter implements LlmAdapter {
       let r!: Awaited<ReturnType<CodexRunner>>;
       for (let n = 1; ; n++) {
         r = await this.run(args, codexPrompt(req), dir, timeoutMs);
+        // (Its error output only when it failed: a warning on a good answer isn't a limit.)
+        const limited = !r.timedOut && [...(r.code !== 0 ? [r.stderr] : []), ...r.stdout.split("\n").filter((l) => /"type":"(error|turn\.failed)"/.test(l))].find((s) => LIMITED.test(s));
+        if (limited) throw new UsageLimitReached(`the Codex subscription's usage limit was reached (${limited.trim().slice(0, 300)}): the run stops here; resume it once the limit resets (terrarium resume <log>)`);
         if (r.code === 0 && !r.timedOut) break;
         const why = r.timedOut ? `no answer within ${Math.round(timeoutMs / 1000)} s` : `exit ${r.code}: ${r.stderr.slice(0, 500)}`;
         if (n >= attempts) throw new Error(`codex exec failed after ${n} attempts (${why})`);

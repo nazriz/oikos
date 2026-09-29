@@ -19,6 +19,13 @@ export class SpendingLimitReached extends Error {
   override name = "SpendingLimitReached";
 }
 
+/** A provider's usage limit reached (a subscription's, per few hours): no call can be made for a while. The run stops as
+ * it does at a spending limit, cleanly and saying why, to be resumed later (`terrarium resume <log>`): every answer
+ * up to the stop is served from its log. */
+export class UsageLimitReached extends SpendingLimitReached {
+  override name = "UsageLimitReached";
+}
+
 /** A model call that failed after its adapter's own timeouts and retries (D59). The participant waits this wake, and
  * it's recorded: the run goes on, and replays exactly, because what the model said (nothing) is in the log. */
 export class ModelCallFailed extends Error {

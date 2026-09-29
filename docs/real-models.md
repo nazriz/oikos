@@ -27,7 +27,9 @@ terrarium run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claud
   - Anthropic's prices are there.
   - OpenAI's aren't yet; add them from OpenAI's price page before using one.
   - A local model costs nothing to call; its compute is yours.
-- **Recording:** every call is logged with its tokens and cost (a usage annotation) and its full exchange (a transcript).
+- **A spending limit for a batch** (`--batch-budget` in dollars): each run's limit is `--budget` or what's left of the batch's, whichever is less, held for it while it runs. A seed with nothing left isn't started, and the batch says so.
+- **Recording:** every call is logged with its tokens and cost (a usage annotation) and its full exchange (a transcript). Language-model participants' observations are recorded in full too, by default (`--record-observations none` to stop it): training data.
+- **Prompt caching** (Anthropic): the tools and system prompt, and the conversation so far within a wake, are marked for the provider's cache, so the repeated part of each call costs a tenth. The answer is the same; usage records the cached tokens and they're priced as the provider prices them.
 
 ## The translator's test set
 
@@ -56,7 +58,7 @@ terrarium translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out ru
 
 **Caveats, which is why it's for smoke tests and pilots:**
 - **Codex is a coding agent.** Its own instructions sit under ours, and there's no way to replace them. The model is being told two things at once, which confounds any study where the framing is the variable.
-- **The subscription's usage limits apply** (per few hours). The mock-LLM mayor makes about 130 calls a simulated year: fine for a pilot, not for batches.
+- **The subscription's usage limits apply** (per few hours). The mock-LLM mayor makes about 130 calls a simulated year: fine for a pilot, not for batches. When Codex says the limit is reached, the run stops cleanly, as at a spending limit, and says to resume it once the limit resets (`terrarium resume <log>`: every answer up to the stop is served from the log).
 - **The model version isn't pinned** as an API's is, so runs are less reproducible.
 - **Tested only against a stand-in:** no real `codex exec` has been run from here.
 

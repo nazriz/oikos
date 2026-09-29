@@ -66,12 +66,12 @@ who decides each open item.
 
 | | What | Why | Size |
 |---|---|---|---|
-| a | **Prompt caching** in the Anthropic adapter (the system prompt and standing documents, which repeat on every call) | Cost: most of each call's input is the same as the last | Small |
-| b | **Record observations by default for model runs** (`--record-observations models` unless told otherwise) | Training data (Naz's first priority): the structured observation beside the rendered prompt | Small |
-| c | **Translations in parallel** within a round, applied in order | With more than one model seat, each waits for every translation before it | Medium |
-| d | **A spending limit per batch**, and a projection before it starts (from the mock's call counts) | A 5-seed batch has 5 per-run limits and no total | Small |
-| e | **Subscription limits:** when the Codex CLI reports its usage limit, stop the run cleanly and say to resume later, rather than failing calls | Pilots will hit the per-few-hours limit on long runs | Small |
-| f | docs/real-models.md still opens with "nothing here has been run against a real model yet" | Stale since the pilots | Trivial |
+| a | ✓ Done, 2026-09-29. **Prompt caching** in the Anthropic adapter (the system prompt and standing documents, which repeat on every call) | Cost: most of each call's input is the same as the last | Small |
+| b | ✓ Done. **Record observations by default for model runs** (`--record-observations models` unless told otherwise) | Training data (Naz's first priority): the structured observation beside the rendered prompt | Small |
+| c | **Translations in parallel** within a round, applied in order | With more than one model seat, each waits for every translation before it. Deferred: translations share one subject, and the log's order and resume's serving depend on their order; only worth it for a design with several model seats | Medium |
+| d | ✓ Done (`--batch-budget`; the projection is the cost report of a mock batch). **A spending limit per batch**, and a projection before it starts (from the mock's call counts) | A 5-seed batch has 5 per-run limits and no total | Small |
+| e | ✓ Done. **Subscription limits:** when the Codex CLI reports its usage limit, stop the run cleanly and say to resume later, rather than failing calls | Pilots will hit the per-few-hours limit on long runs | Small |
+| f | ✓ Done. docs/real-models.md still opens with "nothing here has been run against a real model yet" | Stale since the pilots | Trivial |
 
 ### What a long run with a model costs in time
 

@@ -17,6 +17,27 @@ export interface HttpOptions {
   backoffMs?: number;
   /** How long one attempt may take before it's abandoned and retried (default 180 s; D59). */
   timeoutMs?: number;
+  /** Prompt caching (Anthropic only; default on): see `withCacheBreakpoints`. */
+  cache?: boolean;
+}
+
+const EPHEMERAL = { type: "ephemeral" } as const;
+
+/**
+ * The request with prompt-caching breakpoints (the provider's own feature; the answer is the same, the repeated input
+ * costs a tenth): one after the tools and the system prompt, which are the same on every call a participant or the
+ * translator makes (its standing documents, the call language), and one on the last message, so the next turn of the
+ * same wake reads the conversation so far from the cache. A copy: the conversation itself, and so the transcripts,
+ * are unchanged. (A prefix shorter than the provider's minimum isn't cached; it costs nothing extra.)
+ */
+export function withCacheBreakpoints(system: string, messages: LlmRequest["messages"]): { system: any; messages: any[] } {
+  const last = messages.at(-1);
+  const blocks = (c: string | ContentBlock[]): any[] => (typeof c === "string" ? [{ type: "text", text: c }] : c.map((b) => ({ ...b })));
+  const marked = last ? (() => { const b = blocks(last.content); b[b.length - 1] = { ...b[b.length - 1], cache_control: EPHEMERAL }; return { role: last.role, content: b }; })() : undefined;
+  return {
+    system: system ? [{ type: "text", text: system, cache_control: EPHEMERAL }] : system,
+    messages: marked ? [...messages.slice(0, -1), marked] : messages,
+  };
 }
 
 /** Retry a request on 429, 5xx, a timeout or a dropped connection, with exponential backoff. Other errors are thrown
@@ -54,11 +75,12 @@ export class AnthropicAdapter implements LlmAdapter {
   ) {}
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
+    const cached = this.o.cache === false ? { system: req.system, messages: req.messages } : withCacheBreakpoints(req.system, req.messages);
     const body = {
       model: this.model,
       max_tokens: req.maxTokens,
-      system: req.system,
-      messages: req.messages,
+      system: cached.system,
+      messages: cached.messages,
       ...(req.tools?.length ? { tools: req.tools } : {}),
       ...(this.o.temperatureMilli !== undefined ? { temperature: this.o.temperatureMilli / 1000 } : {}),
     };

@@ -60,7 +60,9 @@ export interface RunOptions {
   resumedFrom?: { log: string; serving: { served: number; diverged?: object } };
   /** Whose observations to record in full in the log (docs/design/run-datasets.md): participant ids, or "models",
    * "code" or "all". None by default: the log keeps each observation's hash, and a replay can make it again. */
-  recordObservations?: string[] | "models" | "code" | "all";
+  /** Whose observations are recorded in full (training data): by default, language-model participants' ("models");
+   * "none" for no one. */
+  recordObservations?: string[] | "models" | "code" | "all" | "none";
 }
 
 /** More than this many cohorts at one simulated moment means participants are waking each other without end: the run
@@ -101,6 +103,8 @@ export interface RunSummary {
   health: { cut_short: { [module: string]: { wakes: number; participants: number } }; refused: { [code: string]: number } };
   /** Where the time went (profiling only): each behaviour module's deciding, and each kind of kernel command. */
   profile: { modules: { [module: string]: { ms: number; steps: number } }; kernel: { [command: string]: { ms: number; n: number } } };
+  /** What the run spent on models, where it had a spending limit (micro-USD; the log's usage annotations say the same). */
+  spentMicroUsd?: number;
   /** Failures to decide that were recovered in place (a module that threw, a model call that failed; D59). */
   participantErrors: number;
 }
@@ -550,8 +554,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     platformMs += performance.now() - p00;
     if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
     // Recorded in full, if asked: what it received (what's new since its last observation), for training data.
-    const rec = o.recordObservations;
-    if (rec && (rec === "all" || (rec === "models" && u.llm) || (rec === "code" && !u.llm) || (Array.isArray(rec) && rec.includes(u.participant))))
+    const rec = o.recordObservations ?? "models";
+    if (rec !== "none" && (rec === "all" || (rec === "models" && u.llm) || (rec === "code" && !u.llm) || (Array.isArray(rec) && rec.includes(u.participant))))
       // (Its channels as a list, each with its path: a position's channel paths have a "/", which the log's free-form
       // data doesn't allow in a key.)
       await k.request({ op: "annotate", annotation: { annotation: "observation", subject: u.participant, data: { t, ...(u.capacity && u.capacity !== "self" ? { as: u.capacity } : {}),
@@ -792,7 +796,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
     health: { cut_short: Object.fromEntries(Object.entries(cutShort).map(([k, v]) => [k, { wakes: v.wakes, participants: v.participants.size }])), refused: { ...refusedBy } },
-    profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) } };
+    profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) },
+    ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}) };
 }
 
 /**

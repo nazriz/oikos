@@ -29,7 +29,7 @@ test("Anthropic: the request is the Messages API's, and the reply is read into c
     { status: 429, body: { error: "slow down" } }, // retried
     { status: 200, body: { content: [{ type: "text", text: "Hi." }, { type: "tool_use", id: "t2", name: "do", input: { what: "x" } }], usage: { input_tokens: 120, output_tokens: 30, cache_read_input_tokens: 50 } } },
   ]);
-  const a = new AnthropicAdapter("claude-sonnet-5", { apiKey: "sk-test", fetch: f, backoffMs: 0, temperatureMilli: 700 });
+  const a = new AnthropicAdapter("claude-sonnet-5", { apiKey: "sk-test", fetch: f, backoffMs: 0, temperatureMilli: 700, cache: false });
   const r = await a.complete(req);
   expect(sent.length).toBe(2);
   expect(sent[1]!.url).toBe("https://api.anthropic.com/v1/messages");
@@ -41,6 +41,26 @@ test("Anthropic: the request is the Messages API's, and the reply is read into c
   // A client error isn't retried; it's reported with the provider's message.
   const bad = fakeFetch([{ status: 400, body: { error: "bad request" } }]);
   await expect(new AnthropicAdapter("m", { apiKey: "k", fetch: bad.f }).complete(req)).rejects.toThrow("HTTP 400");
+});
+
+test("Anthropic: prompt caching marks the system prompt and the last message, without changing the conversation", async () => {
+  const { f, sent } = fakeFetch([{ status: 200, body: { content: [{ type: "text", text: "Hi." }], usage: { input_tokens: 20, output_tokens: 5, cache_read_input_tokens: 900, cache_creation_input_tokens: 100 } } }]);
+  const before = JSON.stringify(req);
+  const r = await new AnthropicAdapter("claude-sonnet-5", { apiKey: "k", fetch: f, backoffMs: 0 }).complete(req);
+  const body = sent[0]!.body;
+  expect(body.system).toEqual([{ type: "text", text: "You are the mayor.", cache_control: { type: "ephemeral" } }]);
+  expect(body.messages.slice(0, -1)).toEqual(req.messages.slice(0, -1));
+  expect(body.messages.at(-1)).toEqual({ role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "Done.", cache_control: { type: "ephemeral" } }] });
+  expect(JSON.stringify(req)).toBe(before); // the participant's own conversation is untouched
+  // A plain-text last message becomes a text block, marked.
+  const one = fakeFetch([{ status: 200, body: { content: [], usage: { input_tokens: 1, output_tokens: 1 } } }]);
+  await new AnthropicAdapter("m", { apiKey: "k", fetch: one.f }).complete({ ...req, messages: [{ role: "user", content: "It is day 1." }] });
+  expect(one.sent[0]!.body.messages).toEqual([{ role: "user", content: [{ type: "text", text: "It is day 1.", cache_control: { type: "ephemeral" } }] }]);
+  // Cached input is priced as the provider prices it: reads at a tenth, writes at 1.25x.
+  expect(r.usage).toEqual({ input_tokens: 20, output_tokens: 5, cache_read_tokens: 900, cache_write_tokens: 100 });
+  const price = { input: 2_000_000, output: 10_000_000, cache_read: 200_000, cache_write: 2_500_000 };
+  const { costMicroUsd } = await import("../src/llm/adapter");
+  expect(costMicroUsd(price, r.usage)).toBe(Math.ceil((20 * 2_000_000 + 5 * 10_000_000 + 900 * 200_000 + 100 * 2_500_000) / 1e6));
 });
 
 test("OpenAI-compatible: tool uses become tool_calls, tool results become tool messages, and replies map back", async () => {
@@ -118,4 +138,15 @@ test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-
   // A failed run is an error, with what codex said.
   const failing = async () => ({ code: 1, stdout: "", stderr: "not signed in" });
   await expect(new CodexCliAdapter("gpt-5", failing).complete(req)).rejects.toThrow("not signed in");
+  // The subscription's usage limit: not retried (it lasts hours); the run stops, to be resumed, as at a spending limit.
+  const { UsageLimitReached, SpendingLimitReached: Spending } = await import("../src/llm/call");
+  let tries = 0;
+  const limited = async () => (tries++, { code: 1, stdout: "", stderr: "ERROR: You've hit your usage limit. Try again in 2 hours." });
+  const e = await new CodexCliAdapter("gpt-5", limited).complete(req).catch((x) => x);
+  expect(e).toBeInstanceOf(UsageLimitReached);
+  expect(e).toBeInstanceOf(Spending);
+  expect(tries).toBe(1);
+  // Also when it's reported as an event and the process exits cleanly.
+  const asEvent = async () => ({ code: 0, stderr: "", stdout: '{"type":"turn.failed","error":{"message":"429 Too Many Requests: usage_limit_reached"}}' });
+  await expect(new CodexCliAdapter("gpt-5", asEvent).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
 });

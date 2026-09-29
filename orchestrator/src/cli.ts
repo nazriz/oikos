@@ -6,7 +6,8 @@
 //                 [--model provider/model --budget DOLLARS_PER_RUN [--base-url URL]]
 //     --model runs every language-model participant and the translator on a real model: anthropic/…, openai/…
 //     (keys from ANTHROPIC_API_KEY / OPENAI_API_KEY), or a local open-weight model: ollama/… or local/… --base-url.
-//     A model that costs money needs --budget: the run stops, and says why, rather than spend more.
+//     A model that costs money needs --budget: the run stops, and says why, rather than spend more. --batch-budget caps
+//     the whole batch: each run gets the per-run limit or what's left, whichever is less.
 //     With --model, --translator-model runs the translator on its own model (e.g. a smaller one); without, it only
 //     prices the cost projection.
 //   terrarium measure <DIR> [QUERY...] [--sql "select ..."] [--list]
@@ -20,7 +21,8 @@
 //   terrarium dataset <DIR|log.jsonl> [--out DIR] [--actions]
 //     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
 //     system prompts, translations, model participants' decisions; code participants' acts with --actions; and
-//     observations, if the run recorded them (run with --record-observations models|code|all|<ids>).
+//     observations, as the run recorded them (language-model participants' by default; --record-observations
+//     models|code|all|none|<ids>).
 //   terrarium corpus <DIR|log.jsonl> [--out FILE]
 //     The translator corpus: every translation in the logs (proposal, the translator's exchange, call, resolution, dry
 //     run, the participant's decision, what the kernel did), one JSON line each, for training the translator later.
@@ -71,6 +73,7 @@ try {
       until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
+      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined,
     });
     if (r.measureDir) {
       console.log(`\n${table(await runQuery(r.measureDir, "overview"))}`);

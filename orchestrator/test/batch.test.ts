@@ -105,3 +105,37 @@ test("--keep measures: a code-only run's log gives way to its measures and a rec
   expect(messages.some((m) => m.includes("language-model participants"))).toBe(true);
   expect(existsSync(llm.runs[0]!.logPath)).toBe(true);
 }, 300_000);
+
+test("a batch's spending limit caps the whole batch: each run gets what's left of it, and never spends past its own", async () => {
+  // A stand-in for a paid provider (no network): every answer is "done for now", billed as a provider would (about 4
+  // characters a token of what was sent).
+  const server = Bun.serve({ port: 0, fetch: async (req) => Response.json({ content: [{ type: "tool_use", id: "x", name: "done_for_now", input: { days: 3 } }], usage: { input_tokens: Math.ceil((await req.text()).length / 4), output_tokens: 10 } }) });
+  const out = join(root, "runs", "test-batch-budget");
+  rmSync(out, { recursive: true, force: true });
+  const env = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  try {
+    // Three at once: the first two hold $0.02 each, leaving the third $0.005 of the batch's $0.045.
+    const r = await runBatch({ world, seeds: 3, parallel: 3, out, until: 60 * DAY, sets: ["citizens=40", "mayor=llm"], model: "anthropic/claude-haiku-4-5", baseUrl: `http://localhost:${server.port}`,
+      budgetUsd: 0.02, batchBudgetUsd: 0.045, measure: false, compress: false });
+    expect(r.runs.length).toBe(3);
+    const entries = (p: string) => readFileSync(p, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const limitOf = (p: string) => entries(p).find((e) => e.kind === "annotation" && e.body.annotation === "orchestrator").body.data.llm.spending_limit_microusd;
+    expect(r.runs.map((x) => limitOf(x.logPath))).toEqual([20_000, 20_000, 5_000]);
+    for (const x of r.runs) expect(x.spentMicroUsd!).toBeLessThanOrEqual(limitOf(x.logPath)); // never past its own
+    const total = r.runs.reduce((a, x) => a + x.spentMicroUsd!, 0);
+    expect(total).toBeGreaterThan(0);
+    expect(total).toBeLessThanOrEqual(45_000);
+    expect(JSON.parse(readFileSync(join(out, "batch.json"), "utf8")).spending).toEqual({ limit_microusd: 45_000, spent_microusd: total });
+    // Each stopped at its limit, saying so.
+    for (const x of r.runs) {
+      const end = entries(x.logPath).at(-1)!.body;
+      expect(end.reason).toBe("aborted");
+      expect(String(end.detail)).toContain("spending limit");
+    }
+  } finally {
+    server.stop(true);
+    if (env === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = env;
+  }
+}, 300_000);
