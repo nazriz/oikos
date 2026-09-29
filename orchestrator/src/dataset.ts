@@ -59,6 +59,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   const actions = o.actions ? lines(join(outDir, "actions.jsonl")) : undefined;
   const actionRows = new Map<number, any>(); // seq -> row, until its outcome is known (the events follow at once)
   const observations = lines(join(outDir, "observations.jsonl"));
+  const citizenDecisions = lines(join(outDir, "citizen_decisions.jsonl"));
   const flushActions = (before: number) => {
     for (const [seq, row] of actionRows) if (seq < before) {
       actions!.write(row);
@@ -121,6 +122,8 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         tr(b.draft, e.t, b.participant).signoff = { decision: b.decision, ...(b.note ? { note: b.note } : {}) };
         const dec = openDecision.get(b.participant);
         if (dec && !dec.drafts.includes(b.draft)) dec.drafts.push(b.draft);
+      } else if (a === "decision") {
+        citizenDecisions.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, domain: b.data?.domain, strategy: b.data?.strategy, ...(b.data?.choice !== undefined ? { choice: b.data.choice } : {}), options: b.data?.options ?? [] });
       } else if (a === "observation") {
         observations.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, ...(b.data?.as ? { as: b.data.as } : {}), observation: b.data?.observation });
       }
@@ -165,6 +168,9 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   for (const d of decisions) dw.write(d);
   files["decisions.jsonl"] = await dw.close();
   if (actions) files["actions.jsonl"] = await actions.close();
+  const cd = await citizenDecisions.close();
+  if (cd.rows) files["citizen_decisions.jsonl"] = cd;
+  else await Bun.file(join(outDir, "citizen_decisions.jsonl")).delete();
   const obs = await observations.close();
   if (obs.rows) files["observations.jsonl"] = obs;
   else await Bun.file(join(outDir, "observations.jsonl")).delete();

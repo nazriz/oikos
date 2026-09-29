@@ -38,7 +38,7 @@ test("a run's dataset: a manifest, and every translation, decision, act and reco
   expect(m.seats.models["mayor-system"].adapter).toBe("mock/mock");
   expect(Object.keys(m.versions.modules)).toContain("citizen.default");
   // Every row of every file is valid, and the manifest's counts are right.
-  const kinds: Record<string, string> = { "systems.jsonl": "SystemPrompt", "translations.jsonl": "Translation", "decisions.jsonl": "Decision", "actions.jsonl": "Action", "observations.jsonl": "ObservationRow" };
+  const kinds: Record<string, string> = { "systems.jsonl": "SystemPrompt", "translations.jsonl": "Translation", "decisions.jsonl": "Decision", "actions.jsonl": "Action", "observations.jsonl": "ObservationRow", "citizen_decisions.jsonl": "CitizenDecision" };
   for (const [file, def] of Object.entries(kinds)) {
     const rs = rows(join(dir, file));
     expect(rs.length).toBe(m.files[file].rows);

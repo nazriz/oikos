@@ -841,6 +841,17 @@ See the design note, §16.
     - **A citizen counted unemployment support as income while in work,** and applied for homes only that income could afford. Once the claim stopped it couldn't sign, leaving the landlord's offer unsigned (the landlord then let the home to someone else). Support for being out of work is no longer counted once employed.
     - The migration test's world paid newcomers $1,500 a fortnight, which rents nothing here. It passed only through that bug; it now pays $3,000.
 
+- **AI citizens, steps 3 to 8: the mind, and its decisions recorded** (docs/design/ai-citizens.md "Progress").
+  - **The mind** (participants/src/behaviour/mind.ts): people drawn from the profile's values (Schwartz; a sourced placeholder, Schwartz and Bardi's pan-cultural order). Temperament and need weights follow from values. CONSUMAT picks how to decide; experience-weighted attraction learns.
+  - **Wired:** shopping, work, housing (each through the mind); petition thresholds and job search (from the person).
+  - **Kept as cited priors:** the union, business, leaving. Their worth is meaning, not facts.
+  - **Decisions are recorded:** a `decision` annotation per decision (the log contract gains the name; signed off in the design, section 6), for full logs, exported as `citizen_decisions.jsonl` (dataset contract: `CitizenDecision`).
+  - **Found while wiring:**
+    - an untried option needs a prior, or failing to serve teaches nothing;
+    - how a shop served should be judged by the usual shop, not a retry that made up for it;
+    - with nobody to copy, go by experience, not habit;
+    - the record must say what was done, not the quadrant it started in.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

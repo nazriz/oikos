@@ -254,6 +254,7 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - housing: which home, each offer's rent and the home's bedrooms appraised (room beyond the bedrooms needed counts for a little); friends' leads count as others having gone there. Homes unaffordable, or short of the bedrooms a household must have, aren't considered. It replaces "the dearest home within budget, rent standing for quality": one year of the 1,000-person town, median rent share 23.3 to 20.5% (target 20.2%), rental stress 32 to 26%.
   - petitions: a person's signing threshold (Granovetter) follows their temperament: the conformist waits for others, the least conformist starts it. Half their conformity, half their own draw, so thresholds keep the same mean and spread.
   - looking for a better job while employed: every month if life falls short of what the person wants (CONSUMAT), otherwise now and then, the more open the more often. It replaces a flat, unsourced 10% a month. One year: applications 873 to 583, hires 258 to 281.
+- **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
 - **Kept as cited priors, deliberately** (3e):
   - **Joining the union:** the ABS membership rates by industry.
   - **Starting a business:** a monthly chance, for those who can afford premises.

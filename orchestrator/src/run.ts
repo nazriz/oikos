@@ -24,7 +24,7 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
+import { calls, DECISIONS, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
 import { createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
@@ -756,6 +756,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
             continue;
           }
           failures.delete(x.u.key);
+          // A code citizen's decisions on the way to this action (docs/design/ai-citizens.md 7): training data, in full logs.
+          const decisions = (r.value as any)?.[DECISIONS] as DecisionRecord[] | undefined;
+          if (decisions?.length && !lean) for (const d of decisions) await k.request({ op: "annotate", annotation: { annotation: "decision", subject: x.u.participant, data: d } });
           const goesOn = await apply(x.u, r.value);
           if (goesOn && x.n + 1 < maxActions && units.get(x.u.key) === x.u) next.push({ u: x.u, n: x.n + 1 });
           else if (goesOn && x.n + 1 >= maxActions) {

@@ -27,7 +27,8 @@
 import { cents } from "../money";
 import type { LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
+import { DECISIONS, params, wait, type BehaviourModule, type DecisionRecord, type ParticipantContext } from "../module";
+import type { Rng } from "../rng";
 import * as C from "../calls";
 import { because, Book, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
@@ -160,6 +161,12 @@ export const citizen: BehaviourModule = {
     // (A shop not yet tried is expected to serve most of what's asked: one that serves nothing then counts against it.)
     const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000, job: 5_000 });
     let lastServed = 10_000; // how fully the last shop served us (basis points)
+    const decided: DecisionRecord[] = []; // the mind's decisions since the last action, carried with the next (7)
+    const decide = (domain: string, t: number, rng: Rng, o: Parameters<Mind["decide"]>[2]) => {
+      const d = mind.decide(domain, rng, o);
+      decided.push({ t, domain, strategy: d.strategy, ...(d.key !== undefined ? { choice: d.key } : {}), options: d.scores.length ? d.scores : o.options.map((x) => ({ key: x.key, score: 0 })) });
+      return d;
+    };
     let levelsNow: NeedLevels = { subsistence: 10_000, shelter: 10_000, security: 10_000, social: 10_000, status: 10_000 }; // as last judged
     let nextShop = ctx.rng("shop-day").below(p.shop_every_days) * DAY;
     let trip: { at: number; tried: Set<string> } | null = null;
@@ -728,7 +735,7 @@ export const citizen: BehaviourModule = {
         // without the bedrooms we must have, isn't considered.)
         const need = household ? bedroomsNeeded(household, t, year) : 1;
         const toldBy = new Set(told.map((l) => l.id));
-        const d = listings.length ? mind.decide("home", ctx.rng(`home-${t}`), {
+        const d = listings.length ? decide("home", t, ctx.rng(`home-${t}`), {
           options: listings.map((l) => {
             const f = l.offer ? factsOf(l.offer) : { money_per_month: -(l.data?.rent ?? 0), home: {} };
             return { key: l.id, facts: { ...f, home: { ...(f.home ?? {}), ...(Number.isInteger(l.data?.bedrooms) ? { bedrooms: l.data!.bedrooms as number } : {}) } }, others: toldBy.has(l.id) ? 1 : 0 };
@@ -783,7 +790,7 @@ export const citizen: BehaviourModule = {
         // Which one: the mind's (docs/design/ai-citizens.md 3). Each posting's offer appraised (its wage, its hours), with
         // what we've learned of each employer; where friends told us to look counts as others having gone there.
         const toldBy = new Set(told.map((j) => j.id));
-        const d = posts.length ? mind.decide("job", ctx.rng(`job-${t}`), {
+        const d = posts.length ? decide("job", t, ctx.rng(`job-${t}`), {
           options: posts.map((j) => ({ key: j.id, facts: j.offer ? factsOf(j.offer) : { money_per_month: Math.round(((j.data?.wage ?? 0) * MONTH) / (j.data?.period ?? 14 * DAY)), work_hours_per_month: 160 }, others: toldBy.has(j.id) ? 1 : 0 })),
           levels: needLevels(), circ: circumstances(), satisfied_here: job ? 10_000 : 0,
         }) : undefined;
@@ -901,7 +908,7 @@ export const citizen: BehaviourModule = {
             return { key: x.shop, facts: o ? factsOf(o, units) : { money_per_month: -units * x.price, goods_per_month: units } };
           });
           const was = favourite;
-          const d = mind.decide("shop", r, { options, current: priceAt(favourite) ? favourite : undefined, levels: needLevels(), circ: circumstances(), satisfied_here: lastServed });
+          const d = decide("shop", t, r, { options, current: priceAt(favourite) ? favourite : undefined, levels: needLevels(), circ: circumstances(), satisfied_here: lastServed });
           favourite = d.key ?? r.pick(shops).shop;
           const why = favourite === was ? "" : d.strategy === "imitate" ? `going to ${favourite}, where others go` : d.strategy === "compare" ? `going to ${favourite}, the best of the shops we know` : `choosing ${favourite}, weighing what each shop's prices buy${was ? ` (${was} served us ${Math.round(lastServed / 100)}% last time)` : ""}`;
           const s = priceAt(favourite)!;
@@ -1160,7 +1167,9 @@ export const citizen: BehaviourModule = {
         const next = todo.shift();
         lastWasMove = !!next && next === moveStep;
         if (leaving && todo.length === 0) departed = true; // the last of leaving is under way
-        return next ? callAction(next) : wait();
+        const action = next ? callAction(next) : wait();
+        if (decided.length) Object.defineProperty(action, DECISIONS, { value: decided.splice(0), enumerable: false });
+        return action;
       },
     };
   },

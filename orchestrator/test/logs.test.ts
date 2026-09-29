@@ -34,6 +34,11 @@ test("a lean log: no observation hashes, no code participants' reasoning (a mode
   const acts = (es: any[]) => es.filter((e) => e.kind === "command" && e.body.command === "act");
   expect(acts(f).some((e) => e.body.reasoning && e.body.participant !== "mayor-system")).toBe(true);
   expect(acts(l).some((e) => e.body.reasoning && e.body.participant !== "mayor-system")).toBe(false);
+  // Citizens' decisions, as their minds made them (training data), in the full log only.
+  const decisions = (es: any[]) => es.filter((e) => e.kind === "annotation" && e.body.annotation === "decision").map((e) => e.body.data);
+  expect(new Set(decisions(f).map((d) => d.domain))).toContain("shop");
+  expect(decisions(f).every((d) => Array.isArray(d.options) && d.options.every((o: any) => Number.isInteger(o.score)))).toBe(true);
+  expect(decisions(l)).toEqual([]);
   // A language model's observations are recorded without being asked (training data), and no one else's.
   const recorded = l.filter((e) => e.kind === "annotation" && e.body.annotation === "observation").map((e) => e.body.subject);
   expect(recorded.length).toBeGreaterThan(0);

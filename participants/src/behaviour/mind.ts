@@ -304,7 +304,7 @@ export class Mind {
       const familiar = options.filter((x) => learned.known(x.key));
       if (familiar.length) {
         const c = learned.choose(rng, familiar.map((x) => ({ key: x.key, value: 0 })), this.person.temperament.openness);
-        return { key: c.key, strategy: s, scores: scored(() => 0) };
+        return { key: c.key, strategy: "compare", scores: scored(() => 0) }; // (what was done, whatever the quadrant)
       }
     }
     // Deliberate: every option's facts appraised against needs, with what's been learned, chosen by logit.

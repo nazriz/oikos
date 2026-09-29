@@ -59,6 +59,14 @@ export interface BehaviourModule {
   create(ctx: ParticipantContext): Controller;
 }
 
+/**
+ * Decisions a code participant made on the way to an action (docs/design/ai-citizens.md 7), carried with the action in
+ * process (a symbol: never part of the action, never serialised). The orchestrator records them as `decision`
+ * annotations, for full logs.
+ */
+export const DECISIONS = Symbol.for("terrarium.decisions");
+export interface DecisionRecord { t: number; domain: string; strategy: string; choice?: string; options: { key: string; score: number }[] }
+
 export const wait = (until?: number): ParticipantAction => (until === undefined ? { type: "wait" } : { type: "wait", until });
 export const act = (blocks: Block[], reasoning?: string): ParticipantAction => (reasoning ? { type: "act", blocks, reasoning } : { type: "act", blocks });
 
