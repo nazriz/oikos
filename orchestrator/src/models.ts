@@ -43,7 +43,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
   const adapter =
     provider === "anthropic" ? new AnthropicAdapter(model, { apiKey: need("ANTHROPIC_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
-    : provider === "codex" ? new CodexCliAdapter(model)
+    : provider === "codex" ? new CodexCliAdapter(model) // ("model@effort": the effort is part of the model's name, so the log records it)
     : provider === "ollama" ? new OpenAICompatibleAdapter("ollama", model, { baseUrl: o.baseUrl ?? "http://localhost:11434/v1" })
     : provider === "local" ? new OpenAICompatibleAdapter("local", model, { baseUrl: o.baseUrl ?? (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })() })
     : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, codex, ollama or local`); })();

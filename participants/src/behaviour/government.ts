@@ -495,7 +495,8 @@ export const works: BehaviourModule = {
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
   create(ctx: ParticipantContext) {
     const p = params({
-      depot: "", workplace: "", role: "works crew", // (its depot, and the space the crew works in there: the world must say) wage: 0, period: 14 * DAY, notice_days: 14,
+      depot: "", workplace: "", // its depot, and the space the crew works in there (the world must say)
+      role: "works crew", wage: 0, period: 14 * DAY, notice_days: 14,
       industry: "", // what the work is (its postings say)
       working_day: 8 * 3600, work_days: 5,
       waste: "waste", collect_task: "collect", collect_labour: 0, collect_per_unit: 0, collect_every_days: 7, // per unit: seconds of work, and waste taken

@@ -95,9 +95,16 @@ export class CodexCliAdapter implements LlmAdapter {
   constructor(
     readonly model: string,
     private readonly run: CodexRunner = spawnCodex,
-    /** One attempt's time limit, and how many attempts (D59: a call that never answers mustn't hang the run). */
-    private readonly o: { timeoutMs?: number; attempts?: number } = {},
+    /** One attempt's time limit, and how many attempts (D59: a call that never answers mustn't hang the run); how hard
+     * the model reasons ("minimal", "low", "medium", "high": the Codex CLI's model_reasoning_effort; recorded with the
+     * model, as it changes what the model does). */
+    private readonly o: { timeoutMs?: number; attempts?: number; effort?: string } = {},
   ) {}
+
+  /** How hard the model reasons: "gpt-6-sol@low" names it with the model (so every log records it), or the option. */
+  private get effort(): string | undefined {
+    return this.model.includes("@") ? this.model.split("@")[1] : this.o.effort;
+  }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
     const dir = mkdtempSync(join(tmpdir(), "terrarium-codex-"));
@@ -106,7 +113,7 @@ export class CodexCliAdapter implements LlmAdapter {
       const last = join(dir, "answer.json");
       writeFileSync(schema, JSON.stringify(answerSchema((req.tools ?? []).map((t) => t.name))));
       const args = ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
-        ...(this.model !== "default" ? ["-m", this.model] : []), "--output-schema", schema, "--output-last-message", last, "-"];
+        ...(this.model !== "default" ? ["-m", this.model.split("@")[0]!] : []), ...(this.effort ? ["-c", `model_reasoning_effort="${this.effort}"`] : []), "--output-schema", schema, "--output-last-message", last, "-"];
       const timeoutMs = this.o.timeoutMs ?? 180_000;
       const attempts = this.o.attempts ?? 3;
       let r!: Awaited<ReturnType<CodexRunner>>;

@@ -520,7 +520,8 @@ export class Staffing {
         { who: this.me, does: { outcome: { money: { from: account, amount: String(wage), for: "wages" } } }, every: this.o.period },
         ...(this.o.workplace ? [{ who: "taker", does: { outcome: { occupancy: { in: this.o.workplace } } } } as const] : []),
       ],
-      termination: [{ party: this.me, notice: this.o.notice_days * DAY }, { party: "taker", notice: this.o.notice_days * DAY }] } };
+      // (Notice, where the employer says what it is.)
+      ...(Number.isInteger(this.o.notice_days) && this.o.notice_days > 0 ? { termination: [{ party: this.me, notice: this.o.notice_days * DAY }, { party: "taker" as const, notice: this.o.notice_days * DAY }] } : {}) } };
   }
 
   routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string }): Step[] {
