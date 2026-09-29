@@ -255,19 +255,18 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - petitions: a person's signing threshold (Granovetter) follows their temperament: the conformist waits for others, the least conformist starts it. Half their conformity, half their own draw, so thresholds keep the same mean and spread.
   - looking for a better job while employed: every month if life falls short of what the person wants (CONSUMAT), otherwise now and then, the more open the more often. It replaces a flat, unsourced 10% a month. One year: applications 873 to 583, hires 258 to 281.
 - **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
-- **Kept as cited priors, deliberately** (3e):
-  - **Joining the union:** the ABS membership rates by industry.
-  - **Starting a business:** a monthly chance, for those who can afford premises.
-  - **Leaving town:** Hirschman's exit after long without a home or work.
-  - Each turns on something facts can't carry: what representation is worth, what a business will earn, what staying means. By design, without the model a mind scores facts alone, and on facts these are pure costs, so nobody would join or found anything.
-  - The cited rule stands for what a person expects, until the model (4), or experience, says otherwise. For example, a member whose enterprise agreement raised their pay learns membership paid (a later step). These are the first places the sparse mind will matter.
-  - One year of the 1,000-person town, before and after:
-    - employment to population 64.9 to 66.2%;
-    - unemployment 3.1 to 0%;
-    - retail staff 80 to 88;
-    - shops served 82 and 80% of what was ordered.
+- **The cited priors, now swayed by the person** (3e; 2026-09-29):
+  - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).
+  - **Strike ballots:** turnout and voting yes, by the same solidarity; security counts against striking.
+  - **Starting a business:** the monthly chance, by openness (stimulation, self-direction) and achievement.
+  - **Leaving town:** Hirschman's thresholds stretch with tradition and security (half to one and a half times).
+  - Why these stay cited rates: each turns on something facts can't carry, such as what representation is worth, what a business will earn, or what staying means. A mind scoring facts alone would see pure costs, and nobody would join or found anything. The rate stands for what a person expects, until the model (4) or experience says otherwise. These are the first places the sparse mind will matter.
+  - **The sway is symmetric about the town's mean,** so the town's rates stay as calibrated. Its sizes are placeholders (`sway`, docs/behaviour/citizen.md).
+  - **One year of the 1,000-person town, two seeds, before and after:** employment to population 66.2/65.8 to 66.3/66.4%; ballots 7/9 to 8/7; stoppages 5/8 to 4/5; union applications 12/13 to 8/13; departures unchanged; businesses and other participants created 10/7 to 11/15.
+  - One year earlier (the first wiring): employment to population 64.9 to 66.2%, unemployment 3.1 to 0%, retail staff 80 to 88, shops served 82 and 80% of what was ordered.
 - **Still today's rules, not yet decisions of the mind:** support and retiring (claims by eligibility), word of mouth, households (the mechanics of living together).
 - **Found while wiring:**
+  - the generality test caught the learning domain named `union`, the same as the town's union: the domain is `membership`;
   - untried options need a prior (EWA's initial attractions), or a shop that serves nothing teaches nothing;
   - with no one to copy, a person should go by experience, not habit.
 

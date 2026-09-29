@@ -852,6 +852,12 @@ See the design note, §16.
     - with nobody to copy, go by experience, not habit;
     - the record must say what was done, not the quadrant it started in.
 
+- **AI citizens, finishing step 2: the cited priors swayed by the person** (docs/design/ai-citizens.md "Progress").
+  - Joining the union, strike ballots, starting a business and leaving town keep their cited rates. Each is now shifted by the person's values (standardised against the world's), and joining also by what membership has done for them (learned).
+  - **Why shift, not replace:** their worth is meaning, not facts, so a facts-only mind would never join or found anything. The shift makes people differ while the town's rates stay as calibrated, because it's symmetric about the mean. One year, two seeds: employment, ballots, stoppages and departures within seed noise.
+  - **The sizes are placeholders,** exposed as `sway`; a world may set any of them.
+  - **Revisit if:** the sparse mind (step 8) gives these decisions a better basis than a rate, or a survey links values to union membership or entrepreneurship well enough to calibrate `sway`.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

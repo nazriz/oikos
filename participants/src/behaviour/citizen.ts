@@ -35,7 +35,11 @@ import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Hea
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
-import { factsOf, Mind, MIND_DEFAULTS, satisfaction, type Circumstances, type MindParams, type NeedLevels, type PopulationValues } from "./mind";
+import { factsOf, Mind, MIND_DEFAULTS, satisfaction, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
+
+/** How far a person's values sway the cited rates (a fraction of the rate per standard deviation of the value):
+ * placeholders, unsourced, chosen small so the town's rates stay as calibrated (docs/behaviour/citizen.md). */
+const SWAY = { union_join: 0.3, turnout: 0.15, strike_vote: 0.08, patience_tradition: 0.2, patience_security: 0.1, enterprise_openness: 0.4, enterprise_achievement: 0.3 };
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
@@ -95,6 +99,7 @@ export const citizen: BehaviourModule = {
       values: { values: {} } as PopulationValues,
       essentials_units: 10, // goods a household uses in a fortnight, for how well subsistence is met (placeholder)
       mind: {} as Partial<MindParams>,
+      sway: SWAY, // how far a person's values sway the cited rates (above)
       goods: "goods",
       leave_after_homeless_days: 90,
       leave_after_jobless_days: 180,
@@ -133,6 +138,7 @@ export const citizen: BehaviourModule = {
     },
     ctx.params,
   );
+    p.sway = { ...SWAY, ...(ctx.params.sway ?? {}) }; // a world may set some and keep the rest
     const me = ctx.entity;
     const childTemplate = () => (p.child_template_outside_lf && ctx.rng("child-participation").below(10_000) >= p.participation_bps ? p.child_template_outside_lf : p.child_template);
     const book = new Book();
@@ -160,6 +166,15 @@ export const citizen: BehaviourModule = {
     // The mind: a person drawn once from the world's figures, and what it learns (docs/design/ai-citizens.md 3).
     // (A shop not yet tried is expected to serve most of what's asked: one that serves nothing then counts against it.)
     const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000, job: 5_000 });
+    // How far this person's value sits from their world's (standardised, -3..3): a person's rates follow their values,
+    // the town's stay as calibrated (docs/design/ai-citizens.md 3a).
+    const zValue = (v: Value) => {
+      const d = p.values.values[v] ?? { mean_bps: 5_000, sd_bps: 1_500 };
+      return Math.max(-3, Math.min(3, (mind.person.values[v] - d.mean_bps) / Math.max(1, d.sd_bps)));
+    };
+    const shifted = (bps: number, shift: number) => Math.max(0, Math.min(10_000, Math.round(bps * (1 + shift))));
+    /** A union member now: a membership agreement in force. */
+    const isMember = () => book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && book.inForce(r.id));
     let lastServed = 10_000; // how fully the last shop served us (basis points)
     const decided: DecisionRecord[] = []; // the mind's decisions since the last action, carried with the next (7)
     const decide = (domain: string, t: number, rng: Rng, o: Parameters<Mind["decide"]>[2]) => {
@@ -270,9 +285,13 @@ export const citizen: BehaviourModule = {
         if (r.kind === "enterprise_agreement" && r.data?.employer === job.employer && r.at >= job.since) {
           job.wage = Math.floor((job.wage * (10_000 + Number(r.data?.rise_bps ?? 0))) / 10_000);
           job.paidAt = obs.t;
+          if (isMember()) mind.learn("membership", "member", Math.min(10_000, 6_000 + Number(r.data?.rise_bps ?? 0) * 10)); // it paid
         }
         if (!(r.addressed_to ?? []).includes(me)) continue;
-        if (r.kind === "stop_work" && r.data?.employer === job.employer && !striking) striking = { employer: job.employer, out: false };
+        if (r.kind === "stop_work" && r.data?.employer === job.employer && !striking) {
+          striking = { employer: job.employer, out: false };
+          if (isMember()) mind.learn("membership", "member", 3_000); // pay lost for the time out
+        }
         if (r.kind === "return_to_work" && striking && r.data?.employer === striking.employer) {
           backTo = striking.left ? { employer: striking.employer, space: striking.left } : null;
           striking = null;
@@ -602,9 +621,13 @@ export const citizen: BehaviourModule = {
         const member = book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && book.inForce(r.id));
         // The work's industry, as its posting said (none known: "other").
         const industry = industryOf.get(job.employer) ?? "other";
-        const chance = p.union_join_bps[industry] ?? p.union_join_bps.other ?? 0;
+        // The industry's rate (the cited prior), shifted by the person's solidarity, and by what membership has done for
+        // them (learned: a raise it won paid, a strike's lost pay didn't).
+        const learnedMember = mind.learned("membership").known("member") ? (mind.learned("membership").get("member") - 5_000) / 10_000 : 0;
+        const rate = p.union_join_bps[industry] ?? p.union_join_bps.other ?? 0;
+        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember);
         if (!member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance)
-          steps.push(because(`A new job: joining the union (${chance / 100}% of those working in ${industry.replaceAll("_", " ")} do).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
+          steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
       }
       for (const r of fresh) {
         if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me)) {
@@ -614,8 +637,11 @@ export const citizen: BehaviourModule = {
           continue;
         }
         if (r.record !== "statement" || !(r.addressed_to ?? []).includes(me)) continue;
-        if (r.kind === "action_ballot" && ctx.rng(`turnout-${r.id}`).below(10_000) < p.ballot_turnout_bps) {
-          const yes = ctx.rng(`vote-${r.id}`).below(10_000) < p.strike_vote_yes_bps;
+        // Voting, and how, follow the person: those who value others' welfare (benevolence, universalism) turn out and
+        // back action more; those who value security, less (the town's rates stay as calibrated).
+        const solidarity = (zValue("benevolence") + zValue("universalism")) / 2;
+        if (r.kind === "action_ballot" && ctx.rng(`turnout-${r.id}`).below(10_000) < shifted(p.ballot_turnout_bps, p.sway.turnout * solidarity)) {
+          const yes = ctx.rng(`vote-${r.id}`).below(10_000) < shifted(p.strike_vote_yes_bps, p.sway.strike_vote * (solidarity - zValue("security")));
           steps.push(because(`The union's protected action ballot: voting ${yes ? "yes" : "no"}.`, vote(r.id, yes ? "yes" : "no")));
         }
       }
@@ -697,13 +723,17 @@ export const citizen: BehaviourModule = {
       // Leaving town (exit), decided by the leaseholder for the household: long without a home, or without
       // anyone earning and without money.
       const broke = acc.balance < Math.max(home?.rent ?? 0, p.essentials);
+      // Patience with a place follows the person: those who value tradition and security hold on longer.
+      const patience = Math.max(0.5, Math.min(1.5, 1 + p.sway.patience_tradition * zValue("tradition") + p.sway.patience_security * zValue("security")));
+      const homelessDays = Math.round(p.leave_after_homeless_days * patience);
+      const joblessDays = Math.round(p.leave_after_jobless_days * patience);
       const leave = isLeaseholder() && (
-        (homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY) ||
-        (joblessSince !== null && t - joblessSince >= p.leave_after_jobless_days * DAY && earnedIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0) === 0 && broke));
+        (homelessSince !== null && t - homelessSince >= homelessDays * DAY) ||
+        (joblessSince !== null && t - joblessSince >= joblessDays * DAY && earnedIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0) === 0 && broke));
       if (leave) {
-        const why = homelessSince !== null && t - homelessSince >= p.leave_after_homeless_days * DAY
-          ? `Leaving town: ${Math.floor((t - homelessSince) / DAY)} days without a home (we leave after ${p.leave_after_homeless_days}).`
-          : `Leaving town: ${Math.floor((t - joblessSince!) / DAY)} days with nobody in the household earning (we leave after ${p.leave_after_jobless_days}), and less money than a month's rent or essentials.`;
+        const why = homelessSince !== null && t - homelessSince >= homelessDays * DAY
+          ? `Leaving town: ${Math.floor((t - homelessSince) / DAY)} days without a home (we leave after ${homelessDays}).`
+          : `Leaving town: ${Math.floor((t - joblessSince!) / DAY)} days with nobody in the household earning (we leave after ${joblessDays}), and less money than a month's rent or essentials.`;
         const tell: Step[] = adults(t).map((a) => because(why, message([reach(a)], SAYING.leaving())));
         // What's already planned this wake (a newborn brought home and put on the household's record) comes first.
         return [...steps, ...tell, ...departure(acc, why)];
@@ -818,7 +848,10 @@ export const citizen: BehaviourModule = {
         const housing = home?.rent ?? share?.cents ?? 0;
         const listings = book.open("property_for_sale").filter((l) => p.ventures.some((v) => v.kind === l.data?.type)).sort((a, b) => (a.data.price as number) - (b.data.price as number) || (a.id < b.id ? -1 : 1));
         const l = listings.find((x) => acc.balance >= (x.data.price as number) + p.ventures.find((v) => v.kind === x.data.type)!.capital + 3 * (housing + p.essentials));
-        if (l && ctx.rng(`found-${t}`).below(10_000) < p.found_bps) {
+        // The month's chance (the cited prior), shifted by the person: the open (stimulation, self-direction) and those
+        // who value achievement found more often.
+        const enterprise = p.sway.enterprise_openness * (zValue("stimulation") + zValue("self_direction")) / 2 + p.sway.enterprise_achievement * zValue("achievement");
+        if (l && ctx.rng(`found-${t}`).below(10_000) < shifted(p.found_bps, enterprise)) {
           const v = p.ventures.find((x) => x.kind === l.data.type)!;
           const capital = (l.data.price as number) + v.capital;
           const fill = (x: unknown): unknown => typeof x === "string"
