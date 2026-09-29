@@ -204,8 +204,8 @@ export function timeCost(f: Facts): number {
 
 /** What the facts do to each need, as this person weighs them (basis points of need, can be negative). Response curves:
  * money matters less the more one has (a log), a home matters most without one, work costs time. */
-export function appraise(p: Person, f: Facts, circ: { monthly_income: number; savings: number; homeless: boolean; homeBedroomsNeeded?: number }): { [n in Need]: number } {
-  const scale = Math.max(100_000, circ.monthly_income + Math.floor(circ.savings / 12)); // a month's means, at least $1,000
+export function appraise(p: Person, f: Facts, circ: Circumstances): { [n in Need]: number } {
+  const scale = Math.max(1, circ.essentials ?? 0, circ.monthly_income + Math.floor(circ.savings / 12)); // a month's means, at least a month's essentials
   const money = f.money_per_month / scale; // this month's money against a month's means
   const moneyValue = Math.sign(money) * Math.log1p(Math.abs(money)) * 10_000;
   // A home: most to the homeless; half as much if it's short of the bedrooms needed; a little more for each spare one
@@ -255,7 +255,9 @@ export function factsOf(offer: { terms?: { commitments: { who: string; does: any
 // ---------------------------------------------------------------- a mind: the pieces together
 
 /** Where a person stands, for appraising (their means, whether they have a home, how many bedrooms they need). */
-export interface Circumstances { monthly_income: number; savings: number; homeless: boolean; homeBedroomsNeeded?: number }
+/** A person's circumstances: income and savings (cents), whether homeless, the bedrooms their household needs, and what a
+ * month's essentials cost in their world (the least a month's means is taken to be: the world's figure, not the code's). */
+export interface Circumstances { monthly_income: number; savings: number; homeless: boolean; homeBedroomsNeeded?: number; essentials?: number }
 
 /** An option in a decision: its key, its facts (from an offer), how many others the person knows took it, and what it
  * means to them beyond the facts (from what they believe; basis points). */

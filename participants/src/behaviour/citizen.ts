@@ -30,7 +30,7 @@ import { channels } from "../contracts";
 import { DECISIONS, params, wait, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { because, Book, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { because, Book, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
@@ -126,8 +126,7 @@ export const citizen: BehaviourModule = {
       child_template: "child",
       child_template_outside_lf: "",
       participation_bps: 10_000,
-      // Looking for a better-paid job while employed (docs/behaviour/citizen.md): a month's chance, Lengnick (2013)'s pi.
-      // (Looking for a better job while employed is the mind's: docs/design/ai-citizens.md 3b.)
+      // (Looking for a better-paid job while employed is the mind's: docs/design/ai-citizens.md 3b.)
       // Starting a business (docs/behaviour/entry.md): the kinds of venture this world has (a template each: its capital
       // beyond the premises, the founder's position's channels and rules, with "{structure}", "{cell}", "{listing}",
       // "{founder}" and "{capital}" filled in), and the monthly chance a person able to, seeing premises for sale, does.
@@ -177,7 +176,8 @@ export const citizen: BehaviourModule = {
       // Fertility (docs/behaviour/households.md): births per 10,000 women a year by age (the world's profile); a month's chance is a twelfth.
       fertility_per_10000: [] as { from: number; rate: number }[],
       // Complaining about a service (docs/behaviour/services.md): whom to (none: nobody), about which of our home's
-      // variables (waste building up), once it's this many days' worth, with this chance each week (placeholder).
+      // variables (waste building up); the days' worth at which anger with them is half-way; and, angry enough, the
+      // chance each week of writing (placeholder).
       complain_to: null as string | null,
       complain_about: "waste",
       complain_after_days: 14,
@@ -775,7 +775,7 @@ export const citizen: BehaviourModule = {
           }
         }
       }
-      const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt });
+      const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt, essentials: p.essentials });
       if (!job && joblessSince === null) joblessSince = t;
 
       // Offers made to us: sign what we asked for and can afford.
