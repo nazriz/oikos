@@ -1,7 +1,8 @@
 # AI citizens (design, for review)
 
-**Status:** proposed, 2026-09-29. It changes contracts (sections 2 and 6), so it waits for Naz's sign-off before code.
-The research behind it is in docs/research/citizen-minds-2026-09.md.
+**Status:** signed off by Naz, 2026-09-29 ("agreed on facts only, signed off"). Cutover: the building blocks first, with
+today's citizen still passing; then the new citizen replaces it in one step. The research behind it is in
+docs/research/citizen-minds-2026-09.md; section 9 maps each finding to where it's used.
 
 **Goal:** citizens that replace today's rule-based ones. They should:
 - be simple and fast (microseconds a decision, towns to cities);
@@ -75,6 +76,8 @@ An optional structured field on statements: a recurring situation people take pa
 
 Taking part is ordinary physics: being in the space at the time, and doing what one chooses to do there.
 
+Version one is thinner than Versu's practices. Those have stages and expectations, and people weigh how others will see what they do. The schema leaves room for `stages` and `expected` (per role, per stage) later, for rituals and ceremonies with a shape.
+
 ### 2c. A typed vocabulary for what people commit to
 
 Today an agreement's `does` is free-form data, a hidden convention (VISION 15). The proposal is a small typed vocabulary, used by agreements, offers and practices:
@@ -129,12 +132,19 @@ No new block is needed.
   - the archetype (binned traits);
   - the situation (binned needs and circumstances);
   - the option's kind or construct.
-- **A miss** (a construct no row covers): the sparse mind asks the teacher, with the construct's own words and the archetype's description, for scores over the candidates, K times. The mean and spread become the row, and everyone of that archetype after decides in microseconds.
+- **A miss** (a construct no row covers): the sparse mind asks the teacher for scores over the candidates, K times, with the construct's own words. The mean and spread become the row, and everyone of that archetype after decides in microseconds.
+  - **What the teacher is told about the person:** their circumstances and behavioural traits (needs now, money, household, obligations, how much others' example counts), never a demographic persona. Models asked to play a persona collapse toward an "average person", and pushing harder gives caricature (the survey and heterogeneity papers).
+  - **The spread is kept, not only the mean:** a row samples from the teacher's distribution.
+  - **Personal traits act after the lookup:** a person's own weights shift the row's scores. Otherwise everyone in an archetype would choose alike on meaning, which is AgentTorch's diversity cost.
 - **Held fixed like the translator:** teacher model, framing, K and binning are versioned and recorded in the log. Every teacher call is logged in full, so replay and resume are exact. The table is rebuilt from the log.
 - **Off by default.** Switching it on is a model in citizens' seats, however rarely, so it's Naz's call per run. Without it, a construct nobody's seen is scored on its facts alone.
+- **Before any table is trusted, two checks:**
+  - **A robustness audit** (TRAILS; framing alone swung cooperation 76 points in the audit paper): re-compile with the teacher's prompt reworded and the bins shifted, and check the rows barely move. Rows that swing are reported, not used.
+  - **Fidelity:** sample rows and compare them with fresh teacher answers. GenWorld leaves this unvalidated.
 
 ## 5. Knowledge and belief
 
+- **Memory is bounded** (Lyfe's summarise-and-forget): recent events are kept in full, then compressed to what mattered (needs moved, people involved), then forgotten. What's remembered can be wrong: Talk of the Town's misremembering is a later addition.
 - A citizen knows a construct only through perception:
   - seeing it put up where they can see;
   - hearing of it (messages; the existing word-of-mouth "ties");
@@ -172,6 +182,26 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
 4. **Belonging:** unions and clubs as offers and practices. The first test that a new institution just works.
 5. **The sparse mind:** on Naz's go-ahead, in pilots.
 6. **Meaning and belief:** religion as content (VISION 16).
+
+## 9. What the literature taught, and where it's used
+
+| Finding (docs/research/citizen-minds-2026-09.md) | In this design |
+|---|---|
+| The Sims: intelligence in the world's offers, not in the person | Offers and practices (2a, 2b); but facts, not advertised needs |
+| Utility AI: considerations and response curves (Dave Mark) | The body's appraisal (3) |
+| Versu: social practices give affordances; agents choose | Practices (2b); stages and expectations left for later |
+| Talk of the Town: symbolic knowledge that spreads, is misremembered, fades | Knowledge and belief (5); misremembering later |
+| Humanoid Agents, D2A: needs that decay, including spiritual satisfaction | Needs (3) |
+| Lyfe: options kept until a cheap signal; summarise-and-forget memory | Routines (3); bounded memory (5) |
+| Affordable Generative Agents: reuse the model's reasoning for similar situations | Compiled rows reused by everyone after a miss (4) |
+| AgentTorch: ask per archetype; diversity is the cost | Per-archetype rows; personal traits after the lookup (4) |
+| GenWorld: binned context, candidate sets, K samples compiled to tables; fidelity unvalidated; novel states fall back | Compiled policies (4); a fidelity check; compile on a miss instead of falling back |
+| SwiftSage, agent distillation: a small model imitates the large | Recorded decisions (7) train the citizen model |
+| Norms are hard to infer by watching when most comply | Constructs are legible records; nothing to infer about their shape (2) |
+| Credibility-enhancing displays (Henrich) | Belief strengthens with others' costly displays (5) |
+| Framing swings results up to 76 points (TRAILS) | Robustness audit before a table is used (4) |
+| Model personas collapse to an "average person" | No personas: circumstances and traits; spread kept (4) |
+| Concordia's model game master | Not taken: the kernel adjudicates, never a model |
 
 ## Open, for Naz
 
