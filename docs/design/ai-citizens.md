@@ -332,6 +332,23 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
     - the audit on a real model (gpt-6-luna, when Naz says);
     - gatherings and teachings as things to ask about;
     - a dedicated `consult` purpose in the log contract (proposed).
+- **Five years with the whole AI citizen** (2026-09-29, `runs/c7-run5`, 3 seeds; against `runs/c6-run5`, the mind's first wiring):
+
+  | Measure | Before | Now | Target |
+  |---|---|---|---|
+  | Employment to population | 64.3–67.0% | 64.4–66.6% | 63.9% |
+  | Unemployment | 0.6–2.0% | 0.8–2.7% | 4.6% |
+  | Saving | 22–25% | 18–22% | 6.5% |
+  | Median rent share | 19.7–20.4% | 19.5–20.5% | 20.2% |
+  | Group participation (last 12 months) | — | 48–54% | 50.0% |
+  | Hires after a tip | 66–116 | 51–124 | about half of hires |
+
+  - **Held:** the labour market and rents stay on target, and participation in groups holds near 50% for five years.
+  - **Belief grows where it should fade:** the congregation's teaching, stated, goes from 12% of adults to 22–27%. Members' displays and telling outpace fading, while the census trend is decline (Christian affiliation 52% in 2016 to 43.9% in 2021). The union's teaching fades to nobody saying it: its members don't go to its meetings, so nothing keeps it up. Both are the placeholders in `belief`, to calibrate against a sourced trend.
+  - **Disputes that never end:** a few shops deadlock with the union (shop-25 in seed 2: 78 stoppages over nearly three years). Members vote, stop and return as they should. The world has no way out of a dispute: no tribunal (in Australia, the Fair Work Commission's intractable bargaining declarations), and no limit on how long a ballot authorises action. Institutions to add, and why those shops can't meet the claim to find out.
+  - Complaints (41–52 over five years) aren't comparable with the earlier run's, which predates the works department's fix.
+  - Migration still comes in bursts (0 to 45 arrivals a year).
+
 - **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
 - **The cited priors, now swayed by the person** (3e; 2026-09-29):
   - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).
