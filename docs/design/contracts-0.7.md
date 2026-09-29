@@ -1,6 +1,6 @@
 # Contracts 0.7: sign-off sheet
 
-**Status:** for Naz's sign-off, 2026-09-30. It goes with the rebuild (docs/design/rebuild.md); nothing here is built until it's signed.
+**Status:** **signed off by Naz, 2026-09-30: "all as recommended"** (A1 option (b); A2 yes, core required; B1–B15 yes; C ratified). It goes with the rebuild (docs/design/rebuild.md).
 **How to answer:** a yes, no or change for each of the two decisions (part A), and for the batch (part B) as a whole or item by item. Part C ratifies what's already in 0.6 and was never signed.
 
 ---

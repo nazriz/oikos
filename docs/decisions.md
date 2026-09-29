@@ -959,6 +959,25 @@ See the design note, §16.
   - **Why:** the budget was an artificial limit, and wake timing decided outcomes (the 23-trip mole). "Who actually does it, at what cost" (principle 12) includes the time it takes.
   - **Revisit if:** act-time figures need sources per place (they'd move to profiles), or rounds at per-second resolution miss the performance targets.
 
+- **Contracts 0.7, signed off** (docs/design/contracts-0.7.md; Naz, 2026-09-30: "all as recommended").
+  - **A1:** a `claim` on statements (things put forward to be believed; messages pass one on by `re`).
+  - **A2:** citizens' state in decision records, the core (needs, satisfaction, certainty) required and emotion, beliefs and goal optional, versioned by mind.
+  - **B1–B15:** the rebuild's batch.
+  - **C:** `log.detail`, the dataset format and observation annotation, `notices`, and `framing.debrief_text`, ratified as built.
+- **The rebuild's engineering calls** (docs/design/rebuild.md section 15; made within Naz's principles, open to his overruling):
+  - **The architecture** is a Rust engine in-process with a TypeScript participant host. Models stay remote, so the AI under test is still isolated from the engine.
+  - **What goes where:** the rule in section 3.
+  - **The resolver and law reader** move to Rust.
+  - **Readings:** the kernel records, `terms` and `law` read, nothing rules.
+  - **Module manifests** are checked at world load.
+  - **The mole-proofing mechanisms** of section 8.
+  - **Payments reference what they settle,** as banks match payments.
+  - **Organisations close by a registrar's act,** as in the world.
+  - **Resume from checkpoints,** with every module's state serialisable. Per "don't defer", it's in the rebuild.
+  - **Pre-0.7 logs replay with the tagged v0 binary.**
+  - **The plan:** rebuild the architecture, not rewrite it, with parity gates against `v0-reference`.
+  - **Work happens on a `rebuild` branch,** so `main` keeps running (pilots, fixes) until the rebuild passes its gates.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

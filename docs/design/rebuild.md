@@ -1,6 +1,6 @@
 # The rebuild: an architecture that finds its own moles
 
-**Status:** draft for Naz's sign-off, 2026-09-30. Nothing is built until it's signed off; section 15 lists the decisions.
+**Status:** agreed, 2026-09-30. The time model (section 6) and contracts 0.7 (docs/design/contracts-0.7.md) are signed off by Naz; the other decisions in section 15 are engineering calls within his principles, recorded in docs/decisions.md, open to his overruling.
 **Diagram:** [Terrarium Architecture](https://claude.ai/artifact/4EawWxSAjwTZbhGzh7u5qY) (the "Proposed" tab).
 
 ## Contents
