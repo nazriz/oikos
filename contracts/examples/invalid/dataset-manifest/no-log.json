@@ -1,3 +1,3 @@
 { "dataset": "terrarium-run-dataset", "version": "0.1.0", "run": "town.seed1", "world": { "name": "Millbrook" },
   "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "initial_state_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "versions": { "contracts": "0.6", "kernel": {}, "orchestrator": "0.7.0" }, "seats": { "models": {} }, "end": { "t": 0 }, "files": {} }
+  "versions": { "contracts": "0.7", "kernel": {}, "orchestrator": "0.7.0" }, "seats": { "models": {} }, "end": { "t": 0 }, "files": {} }

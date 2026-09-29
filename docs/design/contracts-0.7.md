@@ -1,6 +1,8 @@
 # Contracts 0.7: sign-off sheet
 
 **Status:** **signed off by Naz, 2026-09-30: "all as recommended"** (A1 option (b); A2 yes, core required; B1–B15 yes; C ratified). It goes with the rebuild (docs/design/rebuild.md).
+
+**Named `assertion`, not `claim`** (building it, 2026-09-30): `claim` already means a legal position in these contracts (Hohfeld's claims: ownership, rights, debts; the `claim` record). A1 is built as `"assertion": { "that": "…", "about": [...] }`: the same thing, under a name that doesn't collide.
 **How to answer:** a yes, no or change for each of the two decisions (part A), and for the batch (part B) as a whole or item by item. Part C ratifies what's already in 0.6 and was never signed.
 
 ---

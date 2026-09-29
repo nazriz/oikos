@@ -3,7 +3,7 @@
 // its own book of the records relevant to it, as a person would.
 
 import * as C from "../calls";
-import type { Observation, Offer, Outcome as ActOutcome, Practice, Record, ParticipantAction, StatementRecord } from "../contracts";
+import type { Assertion, Observation, Offer, Outcome as ActOutcome, Practice, Record, ParticipantAction, Registry, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { cents, formatMoney } from "../money";
 import { evaluate } from "../law";
@@ -224,11 +224,12 @@ export function pay(to: string, amount: number, o: { from?: string; for?: string
 }
 
 /** A published statement: kind, text, and optional addressees, data, visibility and basis. */
-export function say(kind: string, text: string, o: { to?: string[]; data?: unknown; visible?: "public" | string[]; basis?: string; for?: string; adico?: unknown; formal?: string; on?: string; offer?: Offer; practice?: Practice } = {}): C.Call {
+export function say(kind: string, text: string, o: { to?: string[]; data?: unknown; visible?: "public" | string[]; basis?: string; for?: string; adico?: unknown; formal?: string; on?: string; offer?: Offer; practice?: Practice; assertion?: Assertion; registry?: Registry } = {}): C.Call {
   return C.call("statement", {
     kind, text: C.text(text), to: o.to ? C.json(o.to) : undefined, data: o.data !== undefined ? C.json(o.data) : undefined,
     adico: o.adico !== undefined ? C.json(o.adico) : undefined, formal: o.formal ? C.text(o.formal) : undefined,
     offer: o.offer !== undefined ? C.json(o.offer) : undefined, practice: o.practice !== undefined ? C.json(o.practice) : undefined,
+    assertion: o.assertion !== undefined ? C.json(o.assertion) : undefined, registry: o.registry !== undefined ? C.json(o.registry) : undefined,
     visible: o.visible === undefined ? undefined : o.visible === "public" ? "public" : C.json(o.visible), basis: o.basis, for: o.for, on: o.on,
   });
 }

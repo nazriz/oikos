@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:terrarium:contracts:0.7:module",
+  "title": "Behaviour module manifest",
+  "description": "What a behaviour module declares, checked when a world loads (docs/design/rebuild.md 5.2): its parameters (types, units, ranges, and each figure's source or that it's a placeholder), what it relies on perceiving, the beliefs it keeps (for truth audits), the decisions it records, and that its state can be saved (for checkpoints). A world that doesn't give a module what it declares is refused at load, naming the module.",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "doc",
+    "params",
+    "perceives"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_.]*$",
+      "description": "As worlds name it in controller.impl, e.g. citizen.default."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "doc": {
+      "type": "string",
+      "description": "Where its rules are documented, with their sources."
+    },
+    "params": {
+      "type": "object",
+      "description": "Each parameter, by name.",
+      "additionalProperties": {
+        "$ref": "#/$defs/Param"
+      }
+    },
+    "perceives": {
+      "type": "array",
+      "description": "What it relies on perceiving: the seat's channels must provide each.",
+      "items": {
+        "$ref": "#/$defs/Need"
+      },
+      "maxItems": 256
+    },
+    "beliefs": {
+      "type": "array",
+      "description": "Beliefs it reports each wake for truth audits (docs/design/rebuild.md 8.2).",
+      "items": {
+        "$ref": "#/$defs/Belief"
+      },
+      "maxItems": 64
+    },
+    "decisions": {
+      "type": "array",
+      "description": "Domains of the decisions it records.",
+      "items": {
+        "type": "string",
+        "maxLength": 64
+      },
+      "maxItems": 64
+    },
+    "state": {
+      "enum": [
+        "serialisable",
+        "none"
+      ],
+      "description": "Whether it saves and restores its state, for resuming from a checkpoint."
+    }
+  },
+  "$defs": {
+    "Param": {
+      "type": "object",
+      "required": [
+        "schema"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "A JSON Schema for its value."
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 32,
+          "description": "e.g. cents, bps, days, seconds, count."
+        },
+        "default": {},
+        "required": {
+          "type": "boolean",
+          "description": "The world must give it (whom a module deals with, a place's figures)."
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Where the default figure comes from; 'placeholder' when it's unsourced."
+        }
+      }
+    },
+    "Need": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "channel_kind": {
+          "enum": [
+            "accounts",
+            "holdings",
+            "records",
+            "sites",
+            "directory"
+          ]
+        },
+        "statement_kinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "maxItems": 64
+        },
+        "has": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "offer",
+              "practice",
+              "adico",
+              "formal",
+              "assertion",
+              "registry"
+            ]
+          },
+          "maxItems": 8
+        },
+        "why": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    },
+    "Belief": {
+      "type": "object",
+      "required": [
+        "name",
+        "about"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "e.g. job, home, members_at."
+        },
+        "about": {
+          "enum": [
+            "agreement",
+            "entity",
+            "occupancy",
+            "account"
+          ],
+          "description": "What in the world it's checked against."
+        },
+        "why": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    }
+  }
+}

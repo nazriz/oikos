@@ -11,7 +11,7 @@ import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
-const NS = "urn:terrarium:contracts:0.6";
+const NS = "urn:terrarium:contracts:0.7";
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
 const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });

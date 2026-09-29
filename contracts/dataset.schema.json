@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.6:dataset",
+  "$id": "urn:terrarium:contracts:0.7:dataset",
   "title": "Run dataset (0.1.0)",
   "description": "A run's data, derived deterministically from its log, joined and flattened into examples a training run can use (docs/design/run-datasets.md). A folder per run: manifest.json (Manifest), systems.jsonl (SystemPrompt), translations.jsonl (Translation), decisions.jsonl (Decision), and optionally actions.jsonl (Action) and observations.jsonl (ObservationRow). The log stays the record; a dataset can always be made again from it.",
   "$defs": {
@@ -68,10 +68,10 @@
           }
         },
         "config_hash": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Hash"
         },
         "initial_state_hash": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Hash"
         },
         "log": {
           "description": "The log it was made from: its file name, entries, and the last entry's hash (which pins the whole chain).",
@@ -87,10 +87,10 @@
               "type": "string"
             },
             "entries": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
             },
             "last_hash": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Hash"
             }
           }
         },
@@ -108,16 +108,16 @@
               "type": "string"
             },
             "kernel": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
             },
             "orchestrator": {
               "type": "string"
             },
             "modules": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
             },
             "translator": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
             }
           }
         },
@@ -130,10 +130,10 @@
           "additionalProperties": false,
           "properties": {
             "models": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
             },
             "prices": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
             }
           }
         },
@@ -145,7 +145,7 @@
           "additionalProperties": false,
           "properties": {
             "t": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
             },
             "reason": {
               "type": "string"
@@ -163,10 +163,10 @@
             "additionalProperties": false,
             "properties": {
               "rows": {
-                "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count"
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
               },
               "synthetic": {
-                "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count"
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
               }
             }
           }
@@ -186,7 +186,7 @@
           "type": "string"
         },
         "sha256": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Hash"
         },
         "text": {
           "type": "string"
@@ -208,10 +208,10 @@
           "minimum": 1
         },
         "input": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         },
         "output": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         }
       }
     },
@@ -225,13 +225,13 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
         },
         "applied": {
           "type": "boolean"
         },
         "refusal": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         }
       }
     },
@@ -256,7 +256,7 @@
           "type": "string"
         },
         "t": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
         },
         "participant": {
           "type": "string"
@@ -274,7 +274,7 @@
           "type": "boolean"
         },
         "system_sha256": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Hash"
         },
         "exchange": {
           "type": "array",
@@ -312,7 +312,7 @@
           ]
         },
         "translator": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         },
         "call": {
           "type": "string"
@@ -324,13 +324,13 @@
           "type": "string"
         },
         "check": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         },
         "caveats": {
           "type": "string"
         },
         "failure": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         },
         "signoff": {
           "type": "object",
@@ -362,7 +362,7 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
         },
         "command": {
           "type": "string"
@@ -377,7 +377,7 @@
           "type": "array"
         },
         "provenance": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         },
         "reasoning": {
           "type": "string"
@@ -386,7 +386,7 @@
           "type": "boolean"
         },
         "refusal": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         }
       }
     },
@@ -412,7 +412,7 @@
           "type": "string"
         },
         "t": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
         },
         "participant": {
           "type": "string"
@@ -427,17 +427,17 @@
           "type": "boolean"
         },
         "system_sha256": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Hash"
         },
         "turn": {
           "type": "integer",
           "minimum": 1
         },
         "input": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         },
         "output": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         },
         "tokens": {
           "type": "object",
@@ -485,10 +485,10 @@
           "type": "string"
         },
         "t": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
         },
         "seq": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
         },
         "participant": {
           "type": "string"
@@ -509,7 +509,7 @@
           "type": "boolean"
         },
         "refusal": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         }
       }
     },
@@ -528,7 +528,7 @@
           "type": "string"
         },
         "t": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
         },
         "participant": {
           "type": "string"
@@ -537,7 +537,7 @@
           "type": "string"
         },
         "observation": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
         }
       }
     },
@@ -558,7 +558,7 @@
           "type": "string"
         },
         "t": {
-          "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
         },
         "participant": {
           "type": "string"
@@ -593,6 +593,91 @@
               },
               "score": {
                 "type": "integer"
+              }
+            }
+          }
+        },
+        "state": {
+          "description": "The citizen's state behind the decision (docs/design/contracts-0.7.md A2): the core (needs, satisfaction, certainty) always; emotion, beliefs and goal when there are any. Versioned by the mind that produced it.",
+          "type": "object",
+          "required": [
+            "mind",
+            "needs",
+            "satisfaction",
+            "certainty"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "mind": {
+              "type": "string",
+              "maxLength": 32
+            },
+            "needs": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "satisfaction": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "certainty": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "emotion": {
+              "type": "object",
+              "required": [
+                "kind",
+                "about",
+                "bps"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                "about": {
+                  "type": "string",
+                  "maxLength": 128
+                },
+                "bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              }
+            },
+            "beliefs": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "goal": {
+              "type": "object",
+              "required": [
+                "goal",
+                "method"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "goal": {
+                  "type": "string",
+                  "maxLength": 64
+                },
+                "method": {
+                  "type": "string",
+                  "maxLength": 64
+                }
               }
             }
           }

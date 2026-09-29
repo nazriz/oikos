@@ -259,6 +259,12 @@ pub enum Block {
         /// A recurring situation people may take part in (contracts: Practice; 2b). It has no power.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         practice: Option<Value>,
+        /// Something put forward to be believed (contracts: Assertion; docs/design/contracts-0.7.md A1). No power.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        assertion: Option<Value>,
+        /// A registry's act: an organisation registered or dissolved (contracts: Registry). Content, never physics.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        registry: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         basis: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -502,6 +508,12 @@ pub enum RecordBody {
         /// A recurring situation people may take part in (contracts: Practice; 2b). It has no power.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         practice: Option<Value>,
+        /// Something put forward to be believed (contracts: Assertion; docs/design/contracts-0.7.md A1). No power.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        assertion: Option<Value>,
+        /// A registry's act: an organisation registered or dissolved (contracts: Registry). Content, never physics.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        registry: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<Id>>,
         /// The cell it's put up on, if any.

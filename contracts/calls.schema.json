@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.6:calls",
+  "$id": "urn:terrarium:contracts:0.7:calls",
   "title": "Calls (parsed form)",
   "description": "The parsed form of a program in the call language (contracts/calls.md): what the parser produces and the resolver consumes. Values keep what the participant wrote: amounts and durations stay as text until the parser's tables convert them (zero arithmetic in the translator).",
   "type": "object",
@@ -107,7 +107,7 @@
           "additionalProperties": false,
           "properties": {
             "json": {
-              "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque"
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Opaque"
             }
           }
         },
@@ -461,7 +461,9 @@
                     "formal",
                     "on",
                     "offer",
-                    "practice"
+                    "practice",
+                    "assertion",
+                    "registry"
                   ]
                 }
               }

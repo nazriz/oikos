@@ -436,6 +436,21 @@ Proposed together, for one sign-off:
   - Gate: the same world's log and anchors are byte-identical either way (180 days, 1,000 people); all suites pass in-process (83 kernel, 72 orchestrator, 38 participant tests).
   - **Speed:** a year of the 1,000-person town takes 134 s over stdio and 123 s in-process, with the same final state. Only 8% faster: the engine's own work (about 82 s: validating every input against the schemas, canonical hashing, building observations, the log) is the cost, not the pipe. That's R2's to take on.
 
+- **R0, contracts 0.7** (2026-09-30):
+  - **In the schemas:**
+    - `assertion` (A1, renamed from `claim`) and `registry` on statements, and `has` for both;
+    - `state` on `CitizenDecision` (A2);
+    - `readings`, `woke_for` and `since` on observations, and `from_entity` on messages;
+    - `act_time`, `thinking` and participants' `lanes`;
+    - the `consult` purpose (used by the sparse mind);
+    - the `audit` annotation;
+    - `contracts/module.schema.json`;
+    - version 0.7 throughout.
+  - **In the kernel:** it carries `assertion` and `registry`, and matches them in `has`.
+  - **Transitional:** `max_actions_per_wake` stays, optional, until acting time is in the engine (R2).
+  - **Not in R0:** checkpoints and compact logs (R4); acts taking effect when done (R2).
+  - **Gate:** kernel 83, contracts 142 (with a new invalid example: a 0.6 world config), participants 38, orchestrator 72.
+
 **After the rebuild,** on the new platform:
 1. The labour market (search frictions) and goods prices under shortage, calibrated with the health report watching every other measure.
 2. The Stage 3 renderer.

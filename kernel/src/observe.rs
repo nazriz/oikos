@@ -283,10 +283,12 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&s
     }
     if let Some(has) = &f.has {
         match &rec.body {
-            crate::blocks::RecordBody::Statement { offer, practice, adico, formal, .. }
+            crate::blocks::RecordBody::Statement { offer, practice, assertion, registry, adico, formal, .. }
                 if has.iter().all(|h| match h.as_str() {
                     "offer" => offer.is_some(),
                     "practice" => practice.is_some(),
+                    "assertion" => assertion.is_some(),
+                    "registry" => registry.is_some(),
                     "adico" => adico.is_some(),
                     "formal" => formal.is_some(),
                     _ => false,

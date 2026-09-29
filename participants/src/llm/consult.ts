@@ -7,7 +7,7 @@
 //   demographic persona (models asked to play one collapse toward an average, or caricature).
 // - What it answers: three independent judgements, 0 to 10 for each option, and why.
 // - Every call goes through callModel, so it's logged in full (usage and transcript) and a resumed run serves it from
-//   the log. It's a participant's own call (purpose "participant"), marked by its ref ("consult/<kind>").
+//   the log. Its purpose is "consult" (contracts 0.7), and its ref names the kind ("consult/<kind>").
 // - Remembered for the run only: a run's answers never leak into another's.
 
 import type { Consult, ConsultAnswer, ConsultQuestion } from "../module";
@@ -105,7 +105,7 @@ export function readJudgements(content: ContentBlock[], keys: string[]): { [key:
 export async function askOnce(io: LlmIO, q: ConsultQuestion, subject: string, seenSystems: Set<string>, w: Wording = WORDINGS.base!, ref = `consult/${kindOf(q)}`): Promise<ConsultAnswer["scores"] | undefined> {
   const keys = q.options.map((o) => o.key);
   const res = await callModel(io, {
-    purpose: "participant", subject, ref, system: w.system, maxTokens: 400,
+    purpose: "consult", subject, ref, system: w.system, maxTokens: 400,
     messages: [{ role: "user", content: prompt(q, w) }], context: { consult: { kind: kindOf(q), keys: w.reverseOptions ? [...keys].reverse() : keys } },
   }, seenSystems);
   const j = readJudgements(res.content, keys);

@@ -1175,7 +1175,7 @@ dependencies = [
 
 [[package]]
 name = "terrarium-contracts"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "jsonschema",
  "serde",
@@ -1185,7 +1185,7 @@ dependencies = [
 
 [[package]]
 name = "terrarium-core"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1194,7 +1194,7 @@ dependencies = [
 
 [[package]]
 name = "terrarium-kernel"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "imbl",
  "jsonschema",
@@ -1209,7 +1209,7 @@ dependencies = [
 
 [[package]]
 name = "terrarium-napi"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "mimalloc",
  "napi",

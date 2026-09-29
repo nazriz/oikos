@@ -520,8 +520,11 @@ class Resolver {
     // facts in the typed vocabulary, checked by the contract when the act is.
     const offer = this.json(c, "offer");
     const practice = this.json(c, "practice");
+    const assertion = this.json(c, "assertion");
+    const registry = this.json(c, "registry");
     return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(on ? { place: on } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}),
-      ...(offer !== undefined ? { offer } : {}), ...(practice !== undefined ? { practice } : {}), ...common }];
+      ...(offer !== undefined ? { offer } : {}), ...(practice !== undefined ? { practice } : {}),
+      ...(assertion !== undefined ? { assertion } : {}), ...(registry !== undefined ? { registry } : {}), ...common }];
   }
 
   private form(c: Call, bind?: string): Block[] {

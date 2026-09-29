@@ -24,7 +24,7 @@ export type Record =
   | (RecordBase & { record: "agreement"; terms: AgreementTerms })
   | (RecordBase & { record: "signature"; agreement: Id; as: Id })
   | (RecordBase & { record: "notice"; agreement: Id; as: Id; text?: string })
-  | (RecordBase & { record: "statement"; kind: string; text: string; data?: Json; adico?: Json; formal?: { language: "cel"; condition: string }; offer?: Offer; practice?: Practice; addressed_to?: Id[]; place?: Id })
+  | (RecordBase & { record: "statement"; kind: string; text: string; data?: Json; adico?: Json; formal?: { language: "cel"; condition: string }; offer?: Offer; practice?: Practice; assertion?: Assertion; registry?: Registry; addressed_to?: Id[]; place?: Id })
   | (RecordBase & { record: "withdrawal"; withdraws: Id; text?: string })
   | (RecordBase & { record: "vote"; ballot: Id; choice: string })
   | (RecordBase & { record: "entity_declaration"; entity: Id; kind: string; name: string });
@@ -57,6 +57,11 @@ export interface Offer {
   until?: number;
   practice?: Id;
 }
+
+/** Something put forward to be believed (blocks: Assertion; contracts 0.7 A1). No power; belief is the reader's. */
+export interface Assertion { that: string; about?: Id[] }
+/** A registry's act (blocks: Registry): an organisation registered or dissolved, as a registrar records it. */
+export interface Registry { entity: Id; event: "registered" | "dissolved" }
 
 /** A recurring situation people take part in (blocks: Practice; 2b). It has no power. */
 export interface Practice {
@@ -114,7 +119,9 @@ export interface Outcome {
   refusal?: { code: string; block?: number; detail?: string };
 }
 
-export interface Message { id: Id; t: number; from: Id; as?: Id; to: Id[]; text: string; re?: Id }
+/** A message: `from` the participant, `as` the position it wrote in, `from_entity` who acted (the person, or the
+ * organisation through the position: contracts 0.7). */
+export interface Message { id: Id; t: number; from: Id; as?: Id; from_entity?: Id; to: Id[]; text: string; re?: Id }
 
 /** Amounts and balances are decimal-string integers in the currency's smallest unit (D58); `cents` (money.ts) reads them. */
 export interface Transaction { t: number; from: Id; to: Id; amount: string; currency: string; by: Id; settles?: Id; per_instruction?: Id; memo?: string }
@@ -151,6 +158,16 @@ export type ChannelData =
  * organisation) and `as` the position (absent: as itself). A language-model participant sees all its capacities at
  * once, positions' channels as `<position>/<channel>`.
  */
+/** A record's reading by its own terms (contracts 0.7: Reading): beside the record, never in its place. */
+export interface Reading {
+  of: "agreement";
+  status?: "offered" | "in_force" | "ending" | "ended";
+  ends_at?: number;
+  ended_by?: "term" | "notice" | "parties";
+  obligations?: { commitment: number; next_due?: number; arrears?: string }[];
+  reader: string;
+}
+
 export interface Observation {
   participant: Id;
   t: number;
@@ -166,6 +183,12 @@ export interface Observation {
   drafts: Json[];
   /** The orchestrator's notes about the participant's own requests (not world state); absent when there are none. */
   notices?: { t: number; text: string; re?: string }[];
+  /** Readings of records it can see, by record id: their own terms, read mechanically (docs/design/rebuild.md 7). */
+  readings?: { [record: Id]: Reading };
+  /** Why this wake (contracts 0.7). */
+  woke_for?: "asked" | "cadence" | "news" | "done" | "start";
+  /** World seconds since its previous wake: flows are computed from it, never per wake (rebuild.md 6.5). */
+  since?: number;
   channels: { [id: string]: ChannelData };
 }
 

@@ -194,7 +194,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
   - **Retired:** `materials_cost`, `demolition_cost`, `materials_from`, `costs_from`, and the transfer reasons `materials` and `demolition`: money paid to nowhere.
   - **New events** `worked` and `demolition_started`; **refusal codes** `unknown_task`, `not_at_work`, `no_time_left`, `not_being_built`, `not_coming_down`, `coming_down`.
 - **The call language** (phase B, stage B3): `goods(...)` (move your own goods; a goods outcome in requests and agreements) and `work(...)`; `structure(...)` takes `materials_at` when you build yourself, and no longer pays for materials. Outcomes gain `goods`. The translator's test set has goods and work cases (one held out).
-- The version: every `$id` is `urn:terrarium:contracts:0.6:…`, and configs and log headers say `contracts: "0.6"` (0.6, 2026-09-29: typed commitments, offers and practices, `match.has`; docs/design/ai-citizens.md).
+- The version: every `$id` is `urn:terrarium:contracts:0.7:…`, and configs and log headers say `contracts: "0.7"` (0.6, 2026-09-29: typed commitments, offers and practices, `match.has`; docs/design/ai-citizens.md).
 
 ## Changes from v0.3
 

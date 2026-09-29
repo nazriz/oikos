@@ -32,7 +32,7 @@ export interface MockBrain {
 
 const PREFIX = "(mock) ";
 
-export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy } {
+export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy; consult: MockPolicy } {
   const queues = new Map<string, (ParticipantAction & { type: "call" | "message" })[]>();
   let n = 0;
   const tool = (name: string, input: object): ContentBlock => ({ type: "tool_use", id: `mock-${++n}`, name, input });
@@ -79,5 +79,6 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
 
   const debrief: MockPolicy = () => [{ type: "text", text: "(mock) No reaction: this is the mock adapter, not a model." }];
 
-  return { participant, translator, debrief };
+  // (A consultation of the sparse mind: its own purpose since contracts 0.7.)
+  return { participant, translator, debrief, consult: participant };
 }

@@ -772,7 +772,7 @@ export function generate(spec: TownSpec): any {
     } }));
 
   return {
-    contracts: "0.6",
+    contracts: "0.7",
     meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${everyone.length} people in ${households.length} households, ${homes.length} homes, ${jobSlots.length} jobs.`, canary: CANARY },
     seed: spec.seed,
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
