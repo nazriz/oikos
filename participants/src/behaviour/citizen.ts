@@ -25,7 +25,7 @@
 // asking the bank to pay. Nothing happens to them automatically.
 
 import { cents } from "../money";
-import type { LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
+import type { Eligibility, LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { DECISIONS, params, wait, type BehaviourModule, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
@@ -52,9 +52,10 @@ export const CATCHING_UP = {
   shop: (shop: string, served: number) => `I shop at ${shop}; ${served >= 9_000 ? "it has what I need" : served >= 6_000 ? "it mostly has what I need" : "it often runs short"}.`,
   work: (employer: string, paid: boolean) => `I work for ${employer}; ${paid ? "they pay on time" : "they've stopped paying me"}.`,
   union: (member: boolean) => (member ? "I'm in the union." : "I'm not in the union."),
+  goes: (host: string) => `I go to ${host}'s gatherings.`,
   nothing: "Much the same.",
 };
-export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean }
+export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean; goesTo?: string[] }
 /** What someone's answer tells us, if it's in our phrasing (how well a shop serves: the middle of what the words say). */
 export function heardNews(text: string): News | undefined {
   const n: News = {};
@@ -68,6 +69,8 @@ export function heardNews(text: string): News | undefined {
     n.paid = m[2] === "they pay on time";
   }
   if ((m = /I'm (not )?in the union\./.exec(text))) n.member = !m[1];
+  const goes = [...text.matchAll(/I go to ([^\s;']+)'s gatherings\./g)].map((x) => x[1]!);
+  if (goes.length) n.goesTo = goes;
   return Object.keys(n).length ? n : undefined;
 }
 
@@ -195,7 +198,7 @@ export const citizen: BehaviourModule = {
     let favourite: string | undefined;
     // The mind: a person drawn once from the world's figures, and what it learns (docs/design/ai-citizens.md 3).
     // (A shop not yet tried is expected to serve most of what's asked: one that serves nothing then counts against it.)
-    const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000, job: 5_000 });
+    const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000, job: 5_000, practice: 4_000 });
     // How far this person's value sits from their world's (standardised, -3..3): a person's rates follow their values,
     // the town's stay as calibrated (docs/design/ai-citizens.md 3a).
     const zValue = (v: Value) => {
@@ -203,8 +206,9 @@ export const citizen: BehaviourModule = {
       return Math.max(-3, Math.min(3, (mind.person.values[v] - d.mean_bps) / Math.max(1, d.sd_bps)));
     };
     const shifted = (bps: number, shift: number) => Math.max(0, Math.min(10_000, Math.round(bps * (1 + shift))));
-    /** A union member now: a membership agreement in force. */
-    const isMember = () => book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && book.inForce(r.id));
+    /** A member of an organisation now: a membership agreement with it in force. */
+    const memberOf = (org: string) => book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && r.terms.parties.includes(org) && book.inForce(r.id));
+    const isMember = () => !!p.union && memberOf(p.union);
     let lastServed = 10_000; // how fully the last shop served us (basis points)
     const decided: DecisionRecord[] = []; // the mind's decisions since the last action, carried with the next (7)
     const decide = (domain: string, t: number, rng: Rng, o: Parameters<Mind["decide"]>[2]) => {
@@ -243,6 +247,15 @@ export const citizen: BehaviourModule = {
     const talked = new Map<string, number>();
     let askedHow: string[] = [];
     let nextCatchUp: number | null = null;
+    // Taking part in gatherings (practices): the one we're at, those we mean to go to (practice -> the time it starts), the
+    // occurrences we've decided on, how many were there when we went, and those we went to last time.
+    let attending: { practice: string; host: string; space: string; until: number } | null = null;
+    const going = new Map<string, number>();
+    const decidedFor = new Map<string, number>();
+    const companyAt = new Map<string, number>();
+    const wentLast = new Set<string>();
+    const stayedLast = new Set<string>();
+    let practiceWake: number | null = null;
     const newsNow = (t: number) => [...toldUs.values()].filter((n) => t - n.t <= p.news_days * DAY);
 
     // Support paid to us, once our claim is granted (the decision says how much, how often), and whether it's the kind
@@ -384,6 +397,8 @@ export const citizen: BehaviourModule = {
           talked.set(person, obs.t);
           if (told.shop && told.served !== undefined) mind.hear("shop", told.shop, told.served);
           if (told.employer && told.paid !== undefined) mind.hear("job", told.employer, told.paid ? 10_000 : 0);
+          // Someone who keeps going somewhere finds it worth it (a placeholder for how much).
+          for (const host of told.goesTo ?? []) for (const g of book.practices()) if ((g.speaks_for ?? g.author) === host) mind.hear("practice", g.id, 7_000);
           continue;
         }
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
@@ -801,6 +816,82 @@ export const citizen: BehaviourModule = {
 
       wordOfMouth(obs, t, steps);
 
+      // Taking part (docs/design/ai-citizens.md 2b): gatherings the world holds (practices), where we may come. Going is
+      // physics: being in the space for its time. Whether to go is the mind's: the company it brings against the time it
+      // takes, how it went the times we went, and who we know goes.
+      {
+        const age = obs.body ? (t - obs.body.born_at) / year : 0;
+        const mayCome = (w?: Eligibility) => !w || ((!w.members_of || memberOf(w.members_of)) && !w.holds && (!w.entities || w.entities.includes(me)) && (!w.min_age_years || age >= w.min_age_years));
+        const there = (space: string) => street?.kind === "sites" ? (street.cells.flatMap((c) => c.structure?.spaces ?? []).find((sp) => sp.space === space)?.occupants ?? []).filter((o) => o !== me) : [];
+        // Back from one: who was there, and how it was (turned away, it counts for nothing).
+        if (attending && t >= attending.until) {
+          const others = there(attending.space);
+          const got = inside(attending.space);
+          mind.learn("practice", attending.practice, got ? Math.min(10_000, Math.round(Math.log1p(others.length) * 2_500)) : 0);
+          if (got) {
+            steps.push(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
+            companyAt.set(attending.practice, others.length);
+            for (const o of others) talked.set(o, t);
+          }
+          attending = null;
+        }
+        practiceWake = null;
+        const heard = newsNow(t);
+        for (const r of book.practices()) {
+          const pr = r.practice!;
+          if (!(pr.roles ?? [{ role: "attendee", open: true }]).some((x) => x.open && mayCome(x.who))) continue;
+          const first = pr.first ?? r.at;
+          const lasts = pr.lasts ?? 3_600;
+          const host = r.speaks_for ?? r.author;
+          let start = first + Math.max(0, Math.floor((t - first) / pr.every)) * pr.every;
+          if (t >= start + lasts) start += pr.every;
+          if (t >= start) {
+            // On now: there, if we meant to go.
+            if (going.get(r.id) === start && !attending) {
+              going.delete(r.id);
+              attending = { practice: r.id, host, space: pr.at, until: start + lasts };
+              if (!inside(pr.at)) steps.push(because(`Going to ${host}'s gathering.`, moveIn(pr.at)));
+            }
+          } else if (start - t <= 7 * DAY && decidedFor.get(r.id) !== start) {
+            // The first time: our routine, as it stands. We go if a membership of ours says we take part (and know it for
+            // what it's been); otherwise our evenings are our own.
+            if (!decidedFor.has(r.id)) {
+              if (!mind.learned("practice").known("stay")) mind.learn("practice", "stay", 5_000);
+              const ours = book.ofType("agreement").some((a) => a.record === "agreement" && a.terms.parties.includes(me) && book.inForce(a.id) &&
+                a.terms.commitments.some((c: any) => c.who === me && c.does?.outcome?.attend?.practice === r.id));
+              if (ours) {
+                wentLast.add(r.id);
+                if (!mind.learned("practice").known(r.id)) mind.learn("practice", r.id, 7_000);
+              } else stayedLast.add(r.id);
+            }
+            // Coming up this week: going or not. Its company as we found it, or as many as we know go; its time.
+            decidedFor.set(r.id, start);
+            const friends = heard.filter((n) => n.goesTo?.includes(host)).length;
+            const d = decide("practice", t, ctx.rng(`practice-${r.id}-${start}`), {
+              options: [
+                { key: r.id, facts: { money_per_month: 0, company: Math.max(companyAt.get(r.id) ?? 0, friends), time_hours_per_month: Math.round(((lasts / 3_600) * MONTH) / pr.every) }, others: friends },
+                { key: "stay", facts: { money_per_month: 0 } },
+              ],
+              current: wentLast.has(r.id) ? r.id : stayedLast.has(r.id) ? "stay" : undefined, // our routine, if we have one
+              levels: needLevels(), circ: circumstances(),
+            });
+            if (d.key === r.id) {
+              going.set(r.id, start);
+              wentLast.add(r.id);
+              stayedLast.delete(r.id);
+            } else {
+              wentLast.delete(r.id);
+              stayedLast.add(r.id);
+              // An evening at home: as good as the company we have there.
+              mind.learn("practice", "stay", levelsNow.social);
+            }
+          }
+          const next = going.get(r.id);
+          if (next !== undefined && next > t) practiceWake = Math.min(practiceWake ?? next, next);
+        }
+        if (attending) practiceWake = Math.min(practiceWake ?? attending.until, attending.until);
+      }
+
       // A service not done: waste piling up at home for `complain_after_days` days' worth. The leaseholder writes to
       // the town, with the week's chance, once until it's seen to.
       if (p.complain_to && home && isLeaseholder() && homeSite?.structure === home.structure) {
@@ -1064,6 +1155,7 @@ export const citizen: BehaviourModule = {
       favourite && mind.learned("shop").known(favourite) ? CATCHING_UP.shop(favourite, lastServed) : "",
       job ? CATCHING_UP.work(job.employer, !job.claimed) : "",
       job && p.union ? CATCHING_UP.union(isMember()) : "",
+      ...[...wentLast].sort().map((id) => book.records.get(id)).flatMap((r) => (r?.record === "statement" && r.speaks_for ? [CATCHING_UP.goes(r.speaks_for)] : [])),
     ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
     const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
       // The buildings around us; in our own we see who's there (they're the people we know).
@@ -1287,7 +1379,8 @@ export const citizen: BehaviourModule = {
         const next = todo.shift();
         lastWasMove = !!next && next === moveStep;
         if (leaving && todo.length === 0) departed = true; // the last of leaving is under way
-        const action = next ? callAction(next) : wait();
+        // (A gathering to go to, or come back from, before the week is out: awake then.)
+        const action = next ? callAction(next) : wait(practiceWake !== null ? Math.min(practiceWake, obs.t + 7 * DAY) : undefined);
         if (decided.length) Object.defineProperty(action, DECISIONS, { value: decided.splice(0), enumerable: false });
         return action;
       },

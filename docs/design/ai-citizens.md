@@ -267,6 +267,14 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
     - employment to population 66.6/66.3%; unemployment 0.9/0.4%;
     - hires 304/238 (from 277/224);
     - arrivals 10/8 (from 8/8); departures within seed noise.
+- **Practices, taken part in** (2026-09-29, citizen 0.18.0):
+  - **The world holds gatherings,** from the profile: one social group of each kind the ABS General Social Survey counts, per 1,000 people, and the union's monthly members' meeting. Each is a standing notice with a practice, in a hall added to the town hall. Groups are open to all; the union's meeting to members.
+  - **At the start, half of adults belong to a group** (the survey's 50.0%). Their membership's terms say they take part (the typed `attend` outcome), and that is their routine. The union's membership has no such term, so its members have no routine of going.
+  - **Whether to go is the mind's,** a week ahead: company against time. Afterwards it learns how many came; an evening at home is learned as the company there. Friends who say they go count as others going. Going is physics (occupancy for the gathering's time).
+  - **The mind gains one fact,** `time_hours_per_month`: one's own time given up (a placeholder cost), as distinct from paid work.
+  - **One year of the 1,000-person town, two seeds:** 50.6% and 54.3% of adults went at least once (target 50.0%); about 55 at each gathering; no refusals; employment 66.1/65.8%.
+  - **Found:** without a starting routine, first choices were near coin flips (the mind's logit is coarse for small differences), and whoever went found company, so nearly everyone went within three months. The routine is world content, as union membership at the start already was.
+  - **Seen, not caused here:** migration comes in bursts (59 and 0 arrivals in these two seeds; years of 0 to 64 in the 5-year runs before this step). It responds to postings open at each monthly look; for the step-9 calibration.
 - **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
 - **The cited priors, now swayed by the person** (3e; 2026-09-29):
   - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).

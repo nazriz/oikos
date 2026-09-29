@@ -62,7 +62,9 @@ export interface Profile {
       upkeep_hours_per_week_per_asset: number;
       complain_bps: number;
     };
-    unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; claim_margin_bps: number };
+    unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; claim_margin_bps: number; meeting_every_days?: number };
+    /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */
+    groups?: { kinds: { kind: string; name: string; every_days: number; lasts_minutes: number }[]; per_kind_per_1000_people: number; taking_part_bps: number };
   };
   /** A source for each value (a dotted path into `values`; a value is covered by its own path or a parent's). */
   sources: { [path: string]: string };

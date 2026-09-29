@@ -866,6 +866,16 @@ See the design note, §16.
   - **The entry test now makes shop 1 fail on purpose** (no credit, no hiring). With people hearing of work from friends, shop 1 hired and traded its way out, which is the world's business, not what the test is about.
   - **Revisit if:** catch-ups dominate message volume in bigger worlds (they're about 43 a day per 1,000 people), or survey data on how often people talk with friends calibrates `catch_up_days`.
 
+- **AI citizens, step 4: practices, taken part in** (docs/design/ai-citizens.md "Progress"; docs/behaviour/citizen.md "Taking part").
+  - **Gatherings are world content.** The profile's social groups and the union's meeting are standing notices with a practice, in a hall the town hall now has. There's no module for them: nothing happens unless people come.
+  - **A starting routine is a typed term,** `attend` in a membership's commitments. The share who belong at the start comes from the ABS General Social Survey 2019 (50.0%), as union membership at the start comes from the ABS.
+    - **Why:** without it, early choices were near coin flips, and everyone ended up going.
+    - Routine from a term, not from "being a member", because a union's members don't commit to its meetings.
+  - **Where people take part is physics:** occupancy for the gathering's time, which the kernel already had. No new block.
+  - **The union meets on its own evening** (it had shared the hall and hour with a group).
+  - **Tests:** a new gatherings test. The strike test checks that pay stops during any stoppage, since a one-day stoppage may end at the moment the employer next pays.
+  - **Revisit if:** participation drifts from the target over five years; groups need joining and leaving (offers taken up), fees, or leaders; or the mind's logit needs a per-domain sensitivity.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

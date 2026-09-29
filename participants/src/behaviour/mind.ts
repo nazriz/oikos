@@ -192,6 +192,14 @@ export interface Facts {
   goods_per_month?: number;
   /** Others around: members, workmates, fellow attendees, where known. */
   company?: number;
+  /** Hours a month it takes out of one's own time, unpaid (a meeting, a service, a class). */
+  time_hours_per_month?: number;
+}
+
+/** What giving up one's own time costs (basis points, whatever it's for): a placeholder, about 40 an hour a month, so an
+ * evening a week (about 9 hours a month) weighs a little against the company it brings. */
+export function timeCost(f: Facts): number {
+  return f.time_hours_per_month ? Math.min(2_000, Math.round(f.time_hours_per_month * 40)) : 0;
 }
 
 /** What the facts do to each need, as this person weighs them (basis points of need, can be negative). Response curves:
@@ -324,7 +332,7 @@ export class Mind {
       }
     }
     // Deliberate: every option's facts appraised against needs, with what's been learned, chosen by logit.
-    const appraised = (x: Choice) => (x.facts ? value(this.person, appraise(this.person, x.facts, o.circ)) : 0);
+    const appraised = (x: Choice) => (x.facts ? value(this.person, appraise(this.person, x.facts, o.circ)) - timeCost(x.facts) : 0);
     const c = learned.choose(rng, options.map((x) => ({ key: x.key, value: appraised(x) })), this.person.temperament.openness);
     return { key: c.key, strategy: "deliberate", scores: scored(appraised) };
   }

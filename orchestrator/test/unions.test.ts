@@ -90,7 +90,13 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   expect(back).toBeDefined();
   const strikers = first.data.members as string[];
   expect(ev.filter((e) => e.event === "vacated" && strikers.includes(e.occupant) && e.space === "factory-1-works/workplace.1" && e.t >= first.at && e.t < back.at).length).toBeGreaterThan(strikers.length / 2);
-  expect(recs.filter((r) => r.record === "withdrawal" && r.speaks_for === "factory-1" && r.at >= first.at && r.at < back.at).length).toBeGreaterThan(0);
+  // (Pay stops while they're out: in a stoppage, once the employer next sees to its payroll. A one-day stoppage may end
+  // at that moment, so any stoppage will do.)
+  const returns = recs.filter((r) => r.kind === "return_to_work");
+  expect(stops.some((st) => {
+    const end = returns.find((r) => r.at > st.at)?.at ?? Infinity;
+    return recs.some((r) => r.record === "withdrawal" && r.speaks_for === "factory-1" && r.at >= st.at && r.at < end);
+  })).toBe(true);
   expect(ev.filter((e) => e.event === "occupied" && strikers.includes(e.occupant) && e.space === "factory-1-works/workplace.1" && e.t >= back.at).length).toBeGreaterThan(strikers.length / 2);
   // No making at the works while everyone's out.
   expect(ev.some((e) => e.event === "worked" && e.task === "make" && e.at === "factory-1-works" && e.t > first.at + DAY / 2 && e.t < back.at)).toBe(false);

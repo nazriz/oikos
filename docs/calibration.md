@@ -33,6 +33,7 @@ Measured on `worlds/town-1000.yaml` (1,000 people, two years, several seeds), as
 | **Deaths** | The ABS life table, by age | ABS, *Life Tables 2021–2023* | Follows the table (kernel statistical tests); 1–3 deaths a run | `cast` | Matches, by construction |
 | **Births** | Total fertility rate **1.481**; ages 15–49 | ABS, *Births, Australia 2024* | About 10 births a run over two years, the first after nine months | `cast` | To check against the expected count for the town's women by age (roughly 11 a year once under way) |
 | **Migration** | To source: ABS regional internal migration rates | ABS, *Regional internal migration estimates* | Almost none on this town (vacancies fill within the month) | `cast` | The response and outside income are placeholders |
+| **Taking part in a social group** | **50.0%** of adults in the last 12 months | ABS, *General Social Survey 2019* | **50.6–54.3%** of adults went to a gathering in the year; about 55 at each (the 1,000-person town, one year, two seeds) | `town/gatherings` | Close. Half of adults belong to a group at the start (the same survey), so the test is that it holds: how many join through friends and drift away. |
 
 ## How to use this
 

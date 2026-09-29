@@ -651,7 +651,19 @@
         "other": 1310
       },
       "dues_per_month": 6000,
-      "claim_margin_bps": 200
+      "claim_margin_bps": 200,
+      "meeting_every_days": 30
+    },
+    "groups": {
+      "kinds": [
+        { "kind": "sport", "name": "sports club", "every_days": 7, "lasts_minutes": 120 },
+        { "kind": "religious", "name": "congregation", "every_days": 7, "lasts_minutes": 90 },
+        { "kind": "arts", "name": "arts society", "every_days": 14, "lasts_minutes": 120 },
+        { "kind": "hobby", "name": "hobby group", "every_days": 14, "lasts_minutes": 120 },
+        { "kind": "interest", "name": "community club", "every_days": 30, "lasts_minutes": 120 }
+      ],
+      "per_kind_per_1000_people": 1,
+      "taking_part_bps": 5000
     }
   },
   "sources": {
@@ -708,6 +720,10 @@
     "unions.dues_per_month": "Placeholder: about $14 a week, around what large Australian unions charge full-time members (to source).",
     "unions.claim_margin_bps": "Placeholder: a union claims the year's rise in prices and 2% more. Settlements are measured against the Department of Employment and Workplace Relations' Trends in Federal Enterprise Bargaining (average annualised wage increases in new agreements), a calibration target.",
     "households.age_bands_bps": "ABS, Census 2021 QuickStats, Rest of Vic. (GCCSA 2RVIC): people by five-year age group (median age 43); 85 and over taken to 99. The ages of adults living alone, as couples without children at home, or in groups are drawn from this, less the parents the family shares imply (the generator derives it: docs/behaviour/households.md).",
+    "unions.meeting_every_days": "Placeholder: a members' meeting a month.",
+    "groups.kinds": "The kinds of social group the ABS General Social Survey counts (sport or physical recreation; religious or spiritual; arts or heritage; craft or practical hobby; other recreational or special interest: the category list to confirm against the survey's glossary). How often each meets, and for how long, are placeholders. Whether people come is theirs: the survey's participation is a calibration target (targets), not a rate given to anyone.",
+    "groups.taking_part_bps": "ABS, General Social Survey 2019: 50.0% of people aged 18 and over took part in a social group in the last 12 months. At the start, that share of adults belongs to one group (which kind: evenly, a placeholder) and goes to its gatherings; after that, whether anyone goes is theirs, and the survey's share is a target.",
+    "groups.per_kind_per_1000_people": "Placeholder: one group of each kind for every 1,000 people.",
     "households.child_max_age": "The census counts children of any age living with their parents; the ABS family coding counts full-time students to 24 as dependent children. Children at home are drawn up to 24 (a simplification: older children at home are left out)."
   },
   "targets": [
@@ -765,6 +781,16 @@
       "what": "union_membership_pct_of_employees",
       "value": 13.1,
       "source": "ABS, Trade union membership, August 2024"
+    },
+    {
+      "what": "social_group_participation_pct",
+      "value": 50.0,
+      "source": "ABS, General Social Survey: Summary Results, Australia, 2019: 50.0% of people aged 18 and over took part in a social group in the last 12 months (2020, during the pandemic: 46.3%)"
+    },
+    {
+      "what": "weekly_contact_outside_household_pct",
+      "value": 67.8,
+      "source": "ABS, General Social Survey 2019: 67.8% of people aged 15 and over had face-to-face contact with family or friends living outside the household at least once a week"
     }
   ]
 }

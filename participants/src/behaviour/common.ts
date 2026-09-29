@@ -22,6 +22,7 @@ export class Book {
   // Kept as records arrive, so asking never rescans the whole history (docs/reliability.md, performance):
   private readonly standing = new Map<string, Map<string, StatementRecord>>(); // statement kind -> those not withdrawn, in the order seen
   private readonly byRecord = new Map<string, Record[]>(); // record type (agreement, claim...) -> records, in the order seen
+  private readonly withPractice = new Map<string, StatementRecord>(); // statements carrying a practice, not withdrawn
   /** participant -> the person it acts as (from a directory). */
   readonly participantPerson = new Map<string, string>();
   /** position -> its organisation, role and holder (from a directory). */
@@ -42,6 +43,7 @@ export class Book {
         this.withdrawn.add(r.withdraws);
         const w = this.records.get(r.withdraws);
         if (w?.record === "statement") this.standing.get(w.kind)?.delete(w.id);
+        this.withPractice.delete(r.withdraws);
       }
       if (r.record === "signature") {
         const s = this.signatures.get(r.agreement) ?? new Set();
@@ -57,6 +59,7 @@ export class Book {
           const open = this.standing.get(r.kind);
           if (open) open.set(r.id, r);
           else this.standing.set(r.kind, new Map([[r.id, r]]));
+          if (r.practice) this.withPractice.set(r.id, r);
         }
       }
       if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
@@ -82,6 +85,11 @@ export class Book {
   open(kind: string): StatementRecord[] {
     const open = this.standing.get(kind);
     return open ? [...open.values()] : [];
+  }
+
+  /** Statements carrying a practice (a gathering: docs/design/ai-citizens.md 2b), still standing, in the order seen. */
+  practices(): StatementRecord[] {
+    return [...this.withPractice.values()];
   }
 
   /** Records of a type (agreement, claim, notice...), in the order seen: rather than every record ever seen. */

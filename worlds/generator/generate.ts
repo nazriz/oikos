@@ -20,7 +20,7 @@ const WORKING_DAY = 8 * HOUR;
 /** The builder's crew: its yard's places, and the crew it starts with (sized to its usual work, not its room). */
 const CREW = { capacity: 12, start: 4 };
 
-export const GENERATOR_VERSION = "0.14.0";
+export const GENERATOR_VERSION = "0.15.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -38,6 +38,7 @@ export interface TownSpec {
   shops: number;
   factories: number;
   landlords: number;
+  hall_capacity?: number; // the town hall's hall: how many a gathering can hold (default 200)
   /** Superseded by apartment_units and house_types (generator 0.10). */
   rents?: { apartment: number; house: number };
   /** The profile the town's place-specific figures come from (worlds/profiles/<id>.json). Default: au-vic-2026. */
@@ -349,6 +350,41 @@ export function generate(spec: TownSpec): any {
   // The town's children, at the same participation once they're adults (drawn now: whether they'll look for work).
   const youngPick = rng("participation-young");
   for (const c of everyone.filter((m) => !m.adult)) if (youngPick.below(10_000) >= V.labour_force_participation_bps) outOfLabourForce.add(c.id);
+  // Gatherings (practices, docs/design/ai-citizens.md 2b), in the town hall's hall: the union's members' meeting, and the
+  // social groups the profile describes, each meeting on its own evening. Standing notices; nothing happens unless people
+  // come. (The groups are open to all; the union's meeting, to its members.)
+  const hall = "town-hall/hall.1";
+  const evening = (i: number) => (1 + (i % 7)) * DAY + 19 * HOUR;
+  if (U.meeting_every_days) records.push({ id: "union-meeting", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "union", kind: "notice",
+    text: `The union's members' meeting, at the town hall every ${U.meeting_every_days} days, 7pm, two hours. Members welcome.`,
+    practice: { at: hall, every: U.meeting_every_days * DAY, first: evening(6), lasts: 2 * HOUR, roles: [{ role: "member", who: { members_of: "union" }, open: true }] } });
+  const G = V.groups;
+  if (G) {
+    const per = Math.max(1, Math.round((G.per_kind_per_1000_people * spec.citizens) / 1000));
+    const groups: { id: string; name: string; gathering: string }[] = [];
+    let n = 0;
+    for (const g of G.kinds) for (let i = 1; i <= per; i++) {
+      const id = `${g.kind}-group-${i}`;
+      const name = per > 1 ? `${spec.name} ${g.name} ${i}` : `${spec.name} ${g.name}`;
+      entities.push({ id, kind: "group", name });
+      groups.push({ id, name, gathering: `${id}-gathering` });
+      records.push({ id: `${id}-gathering`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: id, kind: "notice",
+        text: `The ${g.name} meets at the town hall every ${g.every_days} days, 7pm, for ${g.lasts_minutes} minutes. All welcome.`,
+        practice: { at: hall, every: g.every_days * DAY, first: evening(n++), lasts: g.lasts_minutes * 60, roles: [{ role: "member", open: true }] } });
+    }
+    // Who already belongs, at the start (the profile's share of adults, each in one group): a membership whose terms say
+    // they take part. After that, whether anyone goes is theirs.
+    const pick = rng("groups");
+    for (const c of everyone) {
+      if (c.born_at > -18 * 365 * DAY || pick.below(10_000) >= G.taking_part_bps) continue;
+      const g = groups[pick.below(groups.length)]!;
+      const mem = `${g.id}-member-${c.id}`;
+      records.push({ id: mem, record: "agreement", author: "genesis", at: 0, visible_to: [g.id, c.id], terms: {
+        template: "membership", parties: [g.id, c.id],
+        commitments: [{ who: g.id, does: { text: `The ${g.name} counts ${c.id} among its members.` } }, { who: c.id, does: { outcome: { attend: { practice: g.gathering } } } }] } });
+      for (const party of [g.id, c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [g.id, c.id], speaks_for: party, agreement: mem, as: party });
+    }
+  }
   if (unionMembers.length) records.push({ id: "union-register", record: "statement", author: "genesis", at: 0, visible_to: ["union"], speaks_for: "union", kind: "membership_register", text: `The union's ${unionMembers.length} members, and where they work.`, data: { members: unionMembers } });
 
   // Homes: the housed share of households, the neediest (by the occupancy standard) into the most bedrooms, as far as they go.
@@ -462,7 +498,8 @@ export function generate(spec: TownSpec): any {
     { id: "shop", category: "commercial", materials: { materials: kg(250) }, build_labour: 8_000 * HOUR, demolition_labour: 500 * HOUR, build_time: 90 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 6 }], ...(spec.life === false ? {} : { injury_bps: INJURY.shop }) },
     { id: "factory", category: "industrial", materials: { materials: kg(1_600) }, build_labour: 50_000 * HOUR, demolition_labour: 3_000 * HOUR, build_time: 240 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 40 }], ...(spec.life === false ? {} : { injury_bps: INJURY.factory }) },
     { id: "yard", category: "industrial", materials: { materials: kg(30) }, build_labour: 1_000 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: CREW.capacity }], ...(spec.life === false ? {} : { injury_bps: INJURY.factory }) },
-    { id: "civic", category: "civic", materials: { materials: kg(330) }, build_labour: 10_000 * HOUR, demolition_labour: 800 * HOUR, build_time: 120 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }] },
+    // (A civic building has a hall, where groups and meetings gather: docs/design/ai-citizens.md 2b.)
+    { id: "civic", category: "civic", materials: { materials: kg(330) }, build_labour: 10_000 * HOUR, demolition_labour: 800 * HOUR, build_time: 120 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }, { kind: "hall", count: 1, capacity: spec.hall_capacity ?? 200 }] },
     { id: "park", category: "green", materials: { materials: kg(20) }, build_labour: 1_500 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [] },
   ];
   const builderTypes = Object.fromEntries(structureTypes.map((t) => [t.id, { materials: t.materials, build_labour: t.build_labour, demolition_labour: t.demolition_labour }]));
@@ -663,7 +700,9 @@ export function generate(spec: TownSpec): any {
   // Shops' prices (and others'), and what they hold and where (their shopping).
   const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street, { id: "prices", kind: "records", match: { statement_kinds: ["price_list", "property_for_sale"] } }, { id: "belongings", kind: "holdings" }, lawBook,
     // Enterprise agreements (a rise at work).
-    { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] } }];
+    { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] } },
+    // Gatherings: whatever holds one, in whatever words (a statement having a practice).
+    { id: "gatherings", kind: "records", match: { has: ["practice"] } }];
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {
