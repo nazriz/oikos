@@ -590,6 +590,9 @@ pub struct RecordFilter {
     /// Entity ids, or "self" for the entity of the capacity looking (the person, or a position's organisation).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub involving: Option<Vec<String>>,
+    /// Statements having all of these parts ("offer", "practice", "adico", "formal"), whatever their kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

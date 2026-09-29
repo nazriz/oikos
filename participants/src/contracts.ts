@@ -24,16 +24,54 @@ export type Record =
   | (RecordBase & { record: "agreement"; terms: AgreementTerms })
   | (RecordBase & { record: "signature"; agreement: Id; as: Id })
   | (RecordBase & { record: "notice"; agreement: Id; as: Id; text?: string })
-  | (RecordBase & { record: "statement"; kind: string; text: string; data?: Json; adico?: Json; formal?: { language: "cel"; condition: string }; addressed_to?: Id[]; place?: Id })
+  | (RecordBase & { record: "statement"; kind: string; text: string; data?: Json; adico?: Json; formal?: { language: "cel"; condition: string }; offer?: Offer; practice?: Practice; addressed_to?: Id[]; place?: Id })
   | (RecordBase & { record: "withdrawal"; withdraws: Id; text?: string })
   | (RecordBase & { record: "vote"; ballot: Id; choice: string })
   | (RecordBase & { record: "entity_declaration"; entity: Id; kind: string; name: string });
 
 export type StatementRecord = Extract<Record, { record: "statement" }>;
 
+/** What a commitment comes to, in the world's terms (blocks: Outcome; named apart from an act's Outcome): exactly one. */
+export type CommitmentOutcome =
+  | { money: { from?: Id; to?: Id; amount: string; for?: string; settles?: Id } }
+  | { goods: { kind: string; quantity: string; to?: Id; at?: Id; from?: Id } }
+  | { occupancy: { who?: Id; in: Id; leave?: boolean } }
+  | { structure: { type?: string; on?: Id; remove?: Id } }
+  | { account: { holder?: Id; close?: Id } }
+  | { work: { task: string; at?: Id; hours?: number; units?: string } }
+  | { attend: { practice: Id; role?: string } };
+
+/** What a party commits to (blocks: Does): an outcome, or anything else in words. */
+export type Does = { outcome: CommitmentOutcome } | { text: string };
+
+/** Who may take something up or take part (blocks: Eligibility): every condition given must hold. */
+export interface Eligibility { anyone?: true; members_of?: Id; holds?: Id; entities?: Id[]; min_age_years?: number }
+
+/** What someone may take up, on what terms, and how (blocks: Offer; docs/design/ai-citizens.md 2a). Facts only. */
+export interface Offer {
+  by?: Id;
+  to?: Eligibility;
+  take_up: "sign" | "apply" | "order" | "join" | "attend";
+  terms?: { commitments: { who: Id | "taker"; does: Does; every?: number; per?: "unit" }[]; term?: number; termination?: { party: Id | "taker"; notice: number }[]; template?: string };
+  available?: number;
+  until?: number;
+  practice?: Id;
+}
+
+/** A recurring situation people take part in (blocks: Practice; 2b). It has no power. */
+export interface Practice {
+  at: Id;
+  every: number;
+  first?: number;
+  lasts?: number;
+  roles?: { role: string; who?: Eligibility; open?: boolean }[];
+  during?: { role?: string; does: Does; optional?: boolean }[];
+}
+
 export interface AgreementTerms {
   template?: string;
   parties: Id[];
+  /** (`does` is typed in the contract, `Does`; read loosely here, and checked by the kernel.) */
   commitments: { who: Id; does: Json; every?: number }[];
   term?: number;
   termination?: { party: Id; notice: number }[];

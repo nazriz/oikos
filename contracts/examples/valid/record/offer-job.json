@@ -1,0 +1,24 @@
+{
+  "id": "rec.4812",
+  "record": "statement",
+  "author": "shop-3-manager-system",
+  "at": 2592000,
+  "visible_to": "public",
+  "speaks_for": "shop-3",
+  "kind": "job_posting",
+  "text": "Shop assistant wanted at shop-3: $2,113.56 a fortnight for 76 hours' serving.",
+  "offer": {
+    "by": "shop-3",
+    "to": { "min_age_years": 18 },
+    "take_up": "apply",
+    "terms": {
+      "template": "employment",
+      "commitments": [
+        { "who": "shop-3", "does": { "outcome": { "money": { "from": "acc-shop-3", "amount": "211356", "for": "wages" } } }, "every": 1209600 },
+        { "who": "taker", "does": { "outcome": { "work": { "task": "serve", "at": "shop-3-premises", "hours": 273600 } } }, "every": 1209600 }
+      ],
+      "termination": [{ "party": "shop-3", "notice": 1209600 }, { "party": "taker", "notice": 1209600 }]
+    },
+    "available": 1
+  }
+}

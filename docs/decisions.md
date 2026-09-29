@@ -816,6 +816,16 @@ See the design note, §16.
   - **Found:** the batch's child runs didn't see environment variables set after the orchestrator started (Bun reads the environment once); they're now given it explicitly.
   - **Deferred:** translations in parallel. They share one subject, and the log's order and resume's serving of recorded answers depend on their order; only worth it for several model seats.
 
+- **AI citizens, step 1: the building blocks** (docs/design/ai-citizens.md; signed off by Naz, 2026-09-29, "agreed on facts only, signed off"; kernel 0.6.0).
+  - **Offers and practices** are optional structured parts of a statement, like `adico` and `formal`:
+    - an offer is what someone may take up, on what terms, and how;
+    - a practice is a recurring situation people take part in.
+    - Facts only: the contract refuses an offer stating what it's worth ("gives": "belonging").
+  - **Commitments are typed** (`Does`: an outcome in the vocabulary the call language already wrote, or words), so no commitment is a convention only code can read. Nothing running used another shape; four contract examples and the kernel's tests did, and were migrated.
+  - **A channel can show statements having an offer or a practice (`match.has`),** whatever their kind, so a new kind of offer is seen without configuring for it. Kernel test: a festival fund's offer is seen; the fund's plain report isn't.
+  - **The call language's `statement` takes `offer` and `practice`,** so a model publishes them as code does.
+  - **Open (for Naz):** the contract family is still "0.5" though typed commitments are a breaking change. Recommended: rename to 0.6 in one mechanical commit once the blocks are done.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

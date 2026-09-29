@@ -88,3 +88,26 @@ fn a_bad_look_is_refused_before_it_reaches_the_log() {
     let money = serde_json::from_value(json!([{"channel": "money", "query": {}}])).unwrap();
     assert!(run.command(&Command::Look { participant: "bob-self".into(), only: None, looks: money }).is_err(), "only records channels can be searched");
 }
+
+#[test]
+fn a_channel_can_show_whatever_is_offered_whatever_it_is_called() {
+    // Bob's "offers" channel shows statements having an offer (docs/design/ai-citizens.md 2d): a kind of offer nobody
+    // configured for is seen as soon as it's put up, and a statement of the same kind without one isn't.
+    let mut c = riverbend();
+    let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "offers", "kind": "records", "match": {"has": ["offer"]}}));
+    let mut run = Run::start(c, "attention-offers", Vec::new(), None).unwrap();
+    let offered = post(&mut run, "mayor", json!([{"block": "publish", "kind": "festival_fund", "speaks_for": "city", "text": "Give to the harvest festival fund.",
+        "offer": {"take_up": "join", "terms": {"commitments": [{"who": "taker", "does": {"outcome": {"money": {"to": "acc-city", "amount": "500"}}}, "every": 2_592_000}]}}, "ref": "o"}]));
+    let plain = post(&mut run, "mayor", json!([{"block": "publish", "kind": "festival_fund", "speaks_for": "city", "text": "The fund raised $1,000.", "ref": "p"}]));
+    let o = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
+    let seen: Vec<String> = match o.channels.get("offers") {
+        Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect(),
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(seen, vec![offered]);
+    assert!(!seen.contains(&plain));
+    // An offer that says what it's worth to someone isn't one: facts only.
+    let r = run.command(&rb_act("mayor", json!([{"block": "publish", "kind": "notice", "speaks_for": "city", "text": "Join us.", "offer": {"take_up": "join", "gives": "belonging"}}])));
+    assert!(r.is_err(), "the contract refuses an offer stating its meaning");
+}

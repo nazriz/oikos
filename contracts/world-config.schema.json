@@ -82,7 +82,10 @@
         },
         "detail": {
           "description": "How much the log keeps beyond what replay needs. full (the default): each observation's hash, so a replay checks every observation came out the same. lean: no observation hashes (smaller, faster); a replay still checks the state through the chain and checkpoints. The orchestrator also leaves code participants' written reasoning out of a lean log (docs/reliability.md).",
-          "enum": ["full", "lean"]
+          "enum": [
+            "full",
+            "lean"
+          ]
         }
       }
     },
@@ -936,6 +939,20 @@
                     ]
                   },
                   "uniqueItems": true
+                },
+                "has": {
+                  "description": "Statements having all of these (an offer, a practice, an institutional-grammar breakdown, a formal condition), whatever their kind: so a new kind of offer is seen without configuring for it.",
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "offer",
+                      "practice",
+                      "adico",
+                      "formal"
+                    ]
+                  },
+                  "uniqueItems": true,
+                  "minItems": 1
                 }
               }
             },

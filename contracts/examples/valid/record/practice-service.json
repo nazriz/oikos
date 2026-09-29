@@ -1,0 +1,29 @@
+{
+  "id": "rec.9120",
+  "record": "statement",
+  "author": "st-marks-priest-system",
+  "at": 86400,
+  "visible_to": "public",
+  "speaks_for": "st-marks",
+  "kind": "notice",
+  "text": "A service at the hall every seventh day, from the third day, two hours. Members come; a collection is taken.",
+  "practice": {
+    "at": "hall/space.1",
+    "every": 604800,
+    "first": 259200,
+    "lasts": 7200,
+    "roles": [
+      { "role": "leader", "who": { "holds": "priest" } },
+      { "role": "attendee", "who": { "members_of": "st-marks" }, "open": true }
+    ],
+    "during": [
+      { "role": "attendee", "does": { "outcome": { "money": { "to": "acc-st-marks", "amount": "500", "for": "collection" } } }, "optional": true }
+    ]
+  },
+  "offer": {
+    "by": "st-marks",
+    "take_up": "join",
+    "terms": { "commitments": [{ "who": "st-marks", "does": { "text": "Counts the taker among its members." } }] },
+    "practice": "rec.9120"
+  }
+}

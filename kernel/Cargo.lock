@@ -1010,7 +1010,7 @@ dependencies = [
 
 [[package]]
 name = "terrarium-kernel"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "imbl",
  "jsonschema",

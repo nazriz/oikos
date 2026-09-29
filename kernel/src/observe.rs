@@ -281,6 +281,19 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&s
             _ => return false,
         }
     }
+    if let Some(has) = &f.has {
+        match &rec.body {
+            crate::blocks::RecordBody::Statement { offer, practice, adico, formal, .. }
+                if has.iter().all(|h| match h.as_str() {
+                    "offer" => offer.is_some(),
+                    "practice" => practice.is_some(),
+                    "adico" => adico.is_some(),
+                    "formal" => formal.is_some(),
+                    _ => false,
+                }) => {}
+            _ => return false,
+        }
+    }
     if let Some(want) = want {
         if !involved(st, rec).iter().any(|e| want.contains(e.as_str())) {
             return false;

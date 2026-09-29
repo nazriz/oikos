@@ -252,6 +252,13 @@ pub enum Block {
         adico: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         formal: Option<Value>,
+        /// What someone may take up, on what terms (contracts: Offer; docs/design/ai-citizens.md 2a). Facts only; the
+        /// kernel executes none of it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        offer: Option<Value>,
+        /// A recurring situation people may take part in (contracts: Practice; 2b). It has no power.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        practice: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         basis: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -488,6 +495,13 @@ pub enum RecordBody {
         adico: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         formal: Option<Value>,
+        /// What someone may take up, on what terms (contracts: Offer; docs/design/ai-citizens.md 2a). Facts only; the
+        /// kernel executes none of it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        offer: Option<Value>,
+        /// A recurring situation people may take part in (contracts: Practice; 2b). It has no power.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        practice: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<Id>>,
         /// The cell it's put up on, if any.

@@ -38,19 +38,22 @@ come; $5 is collected". The citizen's values and needs make of the facts what th
 
 An optional structured field on statements, alongside `adico` and `formal`. It says what someone may take up, on what terms, and how:
 
+A job posting as an offer (contracts/examples/valid/record/offer-job.json; amounts in cents as decimal strings,
+durations in seconds, as everywhere in the contracts):
+
 ```jsonc
 "offer": {
-  "by": "shop-3",                    // who offers (defaults to the statement's speaks_for)
-  "to": { "anyone": true },          // or { "members_of": "union" }, { "entities": [...] }, { "min_age": 18 }
-  "take_up": "order",                // how: sign (an agreement), apply (a form), order, join, attend
-  "terms": {                         // what the taker would enter into: an agreement's terms, in the typed vocabulary (2c)
+  "by": "shop-3",
+  "to": { "min_age_years": 18 },       // who may take it up: every condition given must hold
+  "take_up": "apply",                   // how: sign, apply, order, join, attend
+  "terms": {                            // what the taker would enter into, in the typed vocabulary (2c)
+    "template": "employment",
     "commitments": [
-      { "who": "taker", "does": { "pay": { "amount": "130.00", "to": "acc-shop-3" } }, "per": "unit" },
-      { "who": "shop-3", "does": { "deliver": { "kind": "goods", "quantity": "per_unit" } } }
+      { "who": "shop-3", "does": { "outcome": { "money": { "from": "acc-shop-3", "amount": "211356", "for": "wages" } } }, "every": 1209600 },
+      { "who": "taker",  "does": { "outcome": { "work": { "task": "serve", "at": "shop-3-premises", "hours": 273600 } } }, "every": 1209600 }
     ]
   },
-  "quantity": { "available": 400 }, // how many can take it (a posting: 1; a home: 1; a shop: its stock)
-  "until": "day 120"                 // standing until withdrawn, or until then
+  "available": 1                        // how many can take it up
 }
 ```
 
@@ -68,16 +71,18 @@ A new one, a church's membership or a festival fund, is the same shape.
 
 An optional structured field on statements: a recurring situation people take part in (Versu's social practices). It's the shape for rituals, services, meetings, markets and classes. It has no power: nothing happens unless people come.
 
+A weekly service (contracts/examples/valid/record/practice-service.json):
+
 ```jsonc
 "practice": {
-  "at": "hall/space.1",               // where (a space)
-  "every": "7 days", "first": "day 3", "lasts": "2 hours",
-  "roles": [                          // who may take part, as what
+  "at": "hall/space.1",
+  "every": 604800, "first": 259200, "lasts": 7200,
+  "roles": [
     { "role": "leader",   "who": { "holds": "priest" } },
     { "role": "attendee", "who": { "members_of": "st-marks" }, "open": true }
   ],
-  "during": [                         // what's expected, in the typed vocabulary (2c): facts, not effects
-    { "role": "attendee", "does": { "pay": { "amount": "5.00", "to": "acc-st-marks" } }, "optional": true }
+  "during": [
+    { "role": "attendee", "does": { "outcome": { "money": { "to": "acc-st-marks", "amount": "500", "for": "collection" } } }, "optional": true }
   ]
 }
 ```
@@ -88,15 +93,18 @@ Version one is thinner than Versu's practices. Those have stages and expectation
 
 ### 2c. A typed vocabulary for what people commit to
 
-Today an agreement's `does` is free-form data, a hidden convention (VISION 15). The proposal is a small typed vocabulary, used by agreements, offers and practices:
-- `pay` (an amount, to, every);
-- `deliver` (goods, a quantity);
-- `work` (a task, at, hours);
-- `allow` (occupy a space, use a thing);
-- `attend` (a practice);
-- `represent` / `text` (anything else, in words).
+Today an agreement's `does` is free-form data, a hidden convention (VISION 15). It's now typed (contracts: blocks `Does`, `Outcome`), formalising what the call language already wrote:
+- `{"outcome": {...}}`, one of:
+  - `money` (to, amount, from, for);
+  - `goods` (kind, quantity, to, at);
+  - `occupancy` (who, in);
+  - `structure` (type and on, or remove);
+  - `account` (holder, close);
+  - `work` (task, at, hours or units): new;
+  - `attend` (a practice, a role): new.
+- or `{"text": "..."}`: anything else, in words.
 
-It's validated by the schema, rendered in words for models and humans, and readable by code. Today's `does` shapes migrate to it.
+It's validated by the schema (the kernel refuses anything else), rendered in words for models and humans, and readable by code. Every world and module already conformed; four contract examples and the kernel's tests were migrated.
 
 ### 2d. Seeing offers and practices
 

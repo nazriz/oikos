@@ -149,7 +149,7 @@ pub fn world(p: &WorldParams) -> Value {
         "formal": {"language": "cel", "condition": "block.cells.exists(c, c in ['cell.3.0','cell.3.1','cell.3.2'])"}}),
     ));
     records.push(g("lease-bob", "agreement", json!({"visible_to": ["devco", "bob"], "terms": {"template": "lease", "parties": ["devco", "bob"],
-        "commitments": [{"who": "bob", "does": {"pay": 1800, "to": "devco"}, "every": MONTH}, {"who": "devco", "does": {"allow": {"occupy": "s-flats"}}}]}})));
+        "commitments": [{"who": "bob", "does": {"outcome": {"money": {"to": "acc-devco", "amount": "1800"}}}, "every": MONTH}, {"who": "devco", "does": {"outcome": {"occupancy": {"who": "bob", "in": "s-flats"}}}}]}})));
     records.push(g("sig-bob", "signature", json!({"visible_to": ["devco", "bob"], "agreement": "lease-bob", "as": "bob"})));
     records.push(g(
         "so-bob",
@@ -651,7 +651,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                                 }
                                 v
                             },
-                            commitments: vec![Commitment { who: e(*a), does: json!({"pay": 100}), every: Some(MONTH) }],
+                            commitments: vec![Commitment { who: e(*a), does: json!({"outcome": {"money": {"to": "acc-outside", "amount": "100"}}}), every: Some(MONTH) }],
                             term: None,
                             termination: None,
                             text: None,
@@ -669,6 +669,9 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         data: Some(json!({"n": *kind as i64})),
                         adico: None,
                         formal: None,
+                        // (Some statements are offers: the property tests carry them through replay too.)
+                        offer: (*kind % 3 == 0).then(|| json!({"take_up": "order"})),
+                        practice: None,
                         basis: None,
                         addressed_to: addressed.map(|a| vec![e(a)]),
                         place: place.map(|p| pick(&cells, p).unwrap()),

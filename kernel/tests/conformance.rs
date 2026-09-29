@@ -156,7 +156,7 @@ pub fn river_script() -> Vec<Command> {
         ),
         act(
             "developer",
-            json!([{"block": "propose_agreement", "speaks_for": "devco", "ref": "job", "terms": {"template": "construction", "parties": ["devco", "buildco"], "commitments": [{"who": "buildco", "does": {"build": "apartments", "on": "p12"}}, {"who": "devco", "does": {"pay": 30000000}}]}},
+            json!([{"block": "propose_agreement", "speaks_for": "devco", "ref": "job", "terms": {"template": "construction", "parties": ["devco", "buildco"], "commitments": [{"who": "buildco", "does": {"outcome": {"structure": {"type": "apartments", "on": "p12"}}}}, {"who": "devco", "does": {"outcome": {"money": {"to": "acc-buildco", "amount": "30000000"}}}}]}},
                                  {"block": "sign_agreement", "agreement": "$job", "as": "devco"}]),
         ),
         act(

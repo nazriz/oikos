@@ -516,7 +516,12 @@ class Resolver {
     const adico = this.json(c, "adico");
     const formal = this.str(c, "formal");
     const on = this.id(c, "on");
-    return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(on ? { place: on } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}), ...common }];
+    // What someone may take up, and a recurring situation people take part in (docs/design/ai-citizens.md 2a, 2b):
+    // facts in the typed vocabulary, checked by the contract when the act is.
+    const offer = this.json(c, "offer");
+    const practice = this.json(c, "practice");
+    return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(on ? { place: on } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}),
+      ...(offer !== undefined ? { offer } : {}), ...(practice !== undefined ? { practice } : {}), ...common }];
   }
 
   private form(c: Call, bind?: string): Block[] {

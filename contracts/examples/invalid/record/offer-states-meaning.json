@@ -1,0 +1,11 @@
+{
+  "id": "rec.9121",
+  "record": "statement",
+  "author": "st-marks-priest-system",
+  "at": 86400,
+  "visible_to": "public",
+  "speaks_for": "st-marks",
+  "kind": "notice",
+  "text": "Join us.",
+  "offer": { "take_up": "join", "gives": "belonging" }
+}

@@ -32,9 +32,7 @@
           "outcome": {
             "occupancy": {
               "who": "bob",
-              "in": "s-apts",
-              "slot": "dwelling",
-              "count": 1
+              "in": "s-apts"
             }
           }
         }

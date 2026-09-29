@@ -597,9 +597,7 @@
                 "outcome": {
                   "occupancy": {
                     "who": "bob",
-                    "in": "s-apts",
-                    "slot": "dwelling",
-                    "count": 1
+                    "in": "s-apts"
                   }
                 }
               }
@@ -661,9 +659,14 @@
             {
               "who": "carol",
               "does": {
-                "work": "shop assistant",
-                "hours_per_week": 38
-              }
+                "outcome": {
+                  "work": {
+                    "task": "serve",
+                    "hours": 136800
+                  }
+                }
+              },
+              "every": 604800
             },
             {
               "who": "devco",

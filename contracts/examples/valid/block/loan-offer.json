@@ -12,15 +12,23 @@
       {
         "who": "bank",
         "does": {
-          "lend": 100000000,
-          "into": "acc-devco"
+          "outcome": {
+            "money": {
+              "to": "acc-devco",
+              "amount": "100000000"
+            }
+          }
         }
       },
       {
         "who": "devco",
         "does": {
-          "repay": 2200000,
-          "into": "acc-bank"
+          "outcome": {
+            "money": {
+              "to": "acc-bank",
+              "amount": "2200000"
+            }
+          }
         },
         "every": 2592000
       }
