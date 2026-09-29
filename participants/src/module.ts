@@ -16,6 +16,21 @@
 import type { Block, Observation, ParticipantAction } from "./contracts";
 import type { Rng } from "./rng";
 
+/** A question for the sparse mind: a thing, in words, its options, and the person asking (docs/design/ai-citizens.md 4). */
+export interface ConsultQuestion {
+  /** What it's about, in words: the thing itself, not a persona. */
+  thing: string;
+  /** A stable name for the kind of thing (remembered answers are kept by it and by the kind of person). */
+  about: string;
+  options: { key: string; words: string }[];
+  /** The person: their values (basis points, the world's scale), how met their needs are, their means. */
+  person: { values: { [value: string]: number }; needs: { [need: string]: number }; monthly_income: number; savings: number; household: number };
+}
+/** How much each option would matter (basis points): the average of the judgements and their spread; and whether a model
+ * was asked this time (false: remembered, for this kind of person and thing). */
+export interface ConsultAnswer { scores: { [key: string]: { mean: number; sd: number } }; asked: boolean; kind: string }
+export type Consult = (q: ConsultQuestion, subject: string) => Promise<ConsultAnswer | undefined>;
+
 /**
  * What a module may know about the run itself: the clock's grain and when the run ends. Nothing about the world:
  * a module knows the world only through what it perceives and its own parameters, like any participant (P14).
@@ -34,6 +49,9 @@ export interface ParticipantContext {
   participant: string;
   entity: string;
   position?: string;
+  /** The sparse mind (docs/design/ai-citizens.md 4): asking a model how much each option would matter to someone like
+   * this. Present only when the run turns it on; a module decides without it otherwise. */
+  consult?: Consult;
   /** A deterministic stream for this participant, this moment and this purpose. */
   rng(purpose: string): Rng;
   world: WorldInfo;

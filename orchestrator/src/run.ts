@@ -25,7 +25,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { calls, DECISIONS, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
-import { createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
+import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
 import type { Watchdog } from "./watchdog";
@@ -63,6 +63,9 @@ export interface RunOptions {
   /** Whose observations are recorded in full (training data): by default, language-model participants' ("models");
    * "none" for no one. */
   recordObservations?: string[] | "models" | "code" | "all" | "none";
+  /** The sparse mind (docs/design/ai-citizens.md 4): code citizens may ask the run's model (the mock, or --model) how
+   * much their options would matter, with answers remembered by kind. Off by default. */
+  consult?: boolean;
 }
 
 /** More than this many cohorts at one simulated moment means participants are waking each other without end: the run
@@ -241,6 +244,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     prices: { ...PRICES, ...(o.prices ?? {}) },
     ...(o.budget ? { budget: o.budget } : {}),
   };
+  const consult = o.consult ? createConsult(io) : undefined;
 
   const typeOf = (() => {
     const types = new Map<string, any>((cfg.catalogue?.structure_types ?? []).map((x: any) => [x.id, x]));
@@ -276,6 +280,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     ...(cap === "self" ? {} : { position: cap }),
     rng: (purpose) => randomness.stream(["participant", pid, cap, String(t), purpose]),
     world: { tickSeconds: tick, runEnd },
+    ...(consult ? { consult } : {}),
     // Keys sorted: the log keeps the config in canonical form, so a resumed run must see its parameters exactly as the
     // original did, whatever order the world's author wrote them in.
     params: sortedKeys(params ?? {}) as any,
@@ -387,6 +392,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const modelPeople = [...cfg.participants, ...(cfg.templates ?? [])].filter((x: any) => x.kind === "person" && x.controller?.type === "llm").map((x: any) => x.id);
   if (cfg.life?.harm && modelPeople.length)
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { welfare: "this world lets language-model people physically harm others (life.harm is set)", participants: modelPeople } } });
+
+  // The sparse mind, if on: said at the start (a resumed run reads it back), with the model it asks.
+  if (consult) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { consult: { version: CONSULT_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` } } } });
 
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {

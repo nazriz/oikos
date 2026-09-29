@@ -16,6 +16,8 @@
 //     checked to read back whole before the plain log goes); --no-compress keeps them plain.
 //   terrarium run ... [--keep log|measures]: what's kept of each run once measured. measures: the measurement tables,
 //     the summary and a recipe that regenerates the log exactly, not the log (only for code-only runs at a commit).
+//   terrarium run ... [--consult]: the sparse mind (docs/design/ai-citizens.md 4): code citizens may ask the run's model
+//     (the mock, or --model) how much their options would matter, remembered by kind of person. Off by default.
 //   terrarium run ... [--log lean|full]: how much the log keeps (full, the default; lean for quick test runs: no
 //     observation hashes, no written reasoning from code participants; replay still checks the state).
 //   terrarium dataset <DIR|log.jsonl> [--out DIR] [--actions]
@@ -50,7 +52,7 @@ const flag = (name: string, dflt?: string) => {
 const flags = (name: string) => rest.flatMap((x, i) => (x === `--${name}` && rest[i + 1] !== undefined ? [rest[i + 1]!] : []));
 const has = (name: string) => rest.includes(`--${name}`);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
@@ -73,7 +75,7 @@ try {
       until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
-      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined,
+      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"),
     });
     if (r.measureDir) {
       console.log(`\n${table(await runQuery(r.measureDir, "overview"))}`);
@@ -88,7 +90,7 @@ try {
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"),
       model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), logDetail: flag("log") });
+      recordObservations: flag("record-observations"), logDetail: flag("log"), consult: has("consult") });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
     const r = await runOne({ resume: positional()[0]!, until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),

@@ -91,8 +91,10 @@ export class Serving {
 
 /** A log's run id and config (the header), and where its files are. The old files are kept, renamed
  * `<run>.stopped-<n>.*`, and the resumed run is written in their place. */
-export function prepareResume(logPath: string): { runId: string; config: any; outDir: string; stoppedLog: string } {
+export function prepareResume(logPath: string): { runId: string; config: any; outDir: string; stoppedLog: string; consult: boolean } {
   const first = readFileSync(logPath, "utf8").split("\n", 1)[0]!;
+  // Whether the run asked the sparse mind (its note, near the start: run.ts).
+  const consult = readFileSync(logPath, "utf8").split("\n", 200).some((l) => l.includes('"annotation":"note"') && l.includes('"consult":{'));
   const header = JSON.parse(first);
   if (header.kind !== "header") throw new Error(`${logPath} doesn't start with a run header`);
   const runId: string = header.body.run_id;
@@ -106,5 +108,5 @@ export function prepareResume(logPath: string): { runId: string; config: any; ou
     const f = join(outDir, `${runId}.${ext}`);
     if (existsSync(f)) renameSync(f, join(outDir, `${runId}.stopped-${n}.${ext}`));
   }
-  return { runId, config: header.body.config, outDir, stoppedLog };
+  return { runId, config: header.body.config, outDir, stoppedLog, consult };
 }

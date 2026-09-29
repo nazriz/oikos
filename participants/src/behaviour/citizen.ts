@@ -27,7 +27,7 @@
 import { cents } from "../money";
 import type { Eligibility, LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { DECISIONS, params, wait, type BehaviourModule, type DecisionRecord, type ParticipantContext } from "../module";
+import { DECISIONS, params, wait, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
 import { because, Book, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, ownAccount, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
@@ -49,7 +49,7 @@ const BELIEF = { fade_bps: 150, display_bps: 500, told_bps: 300, tell_at_bps: 6_
 
 /** How far a person's values sway the cited rates (a fraction of the rate per standard deviation of the value):
  * placeholders, unsourced, chosen small so the town's rates stay as calibrated (docs/behaviour/citizen.md). */
-const SWAY = { union_belief: 0.5, union_peers: 0.5, union_join: 0.3, turnout: 0.15, strike_vote: 0.08, patience_tradition: 0.2, patience_security: 0.1, enterprise_openness: 0.4, enterprise_achievement: 0.3 };
+const SWAY = { consult: 1, union_belief: 0.5, union_peers: 0.5, union_join: 0.3, turnout: 0.15, strike_vote: 0.08, patience_tradition: 0.2, patience_security: 0.1, enterprise_openness: 0.4, enterprise_achievement: 0.3 };
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
@@ -245,6 +245,30 @@ export const citizen: BehaviourModule = {
     const restUntil = new Map<string, number>();
     let cheaperThan: { rent: number; until: number } | null = null;
     const pursuing = (method: string) => [...pursuits.values()].some((x) => x.method === method);
+    // The sparse mind (docs/design/ai-citizens.md 4), when the run has it: the answers we've had (null: none to be had),
+    // what we've asked and not yet heard, and the questions out this wake (the orchestrator waits for them with our
+    // action, so they're answered by the next).
+    const consulted = new Map<string, ConsultAnswer | null>();
+    const awaiting = new Set<string>();
+    let asking: Promise<void>[] = [];
+    /** What the model says, for someone like us, of each option: our own draw from its answer's spread (basis points).
+     * "pending": asked, answered by the next wake; undefined: no sparse mind in this run, or no answer to be had. */
+    const consult = (about: string, thing: string, options: { key: string; words: string }[], savings: number, t: number): { [key: string]: number } | "pending" | undefined => {
+      if (!ctx.consult) return undefined;
+      if (awaiting.has(about)) return "pending";
+      const a = consulted.get(about);
+      if (a === null) return undefined;
+      if (a) {
+        const r = ctx.rng(`consult-${about}-${t}`);
+        const normal = () => { let z = -6 * 10_000; for (let i = 0; i < 12; i++) z += r.below(10_000); return z / 10_000; };
+        return Object.fromEntries(Object.entries(a.scores).map(([k, x]) => [k, Math.round(x.mean + x.sd * normal())]));
+      }
+      awaiting.add(about);
+      asking.push(ctx.consult({ thing, about, options, person: { values: { ...mind.person.values }, needs: { ...levelsNow }, monthly_income: householdIncome(), savings, household: household?.members.length ?? 1 } }, ctx.participant)
+        .then((ans) => consulted.set(about, ans ?? null), () => consulted.set(about, null))
+        .then(() => { awaiting.delete(about); }));
+      return "pending";
+    };
     // (Fear for our money makes us less sure of our options where money's at stake: we look harder at them.)
     const MONEY_MATTERS = new Set(["shop", "job", "home"]);
     const decide = (domain: string, t: number, rng: Rng, o: Parameters<Mind["decide"]>[2]) => {
@@ -794,7 +818,13 @@ export const citizen: BehaviourModule = {
       // The union (docs/behaviour/unions.md): joining on starting a job, with the chance for its kind of employer; the
       // membership offered, signed, and its dues paid monthly; a protected action ballot, voted in (or not); a
       // stoppage, observed (out of the workplace until the return to work); a rise in an enterprise agreement, taken.
-      if (p.union && job && joinAsked !== job.agreement && !retired) {
+      // What joining would mean to someone like us, if the run has the sparse mind (docs/design/ai-citizens.md 4): asked
+      // once, and the decision waits for the answer (by the next wake).
+      const saidJoin = p.union && job && joinAsked !== job.agreement && !retired && !isMember()
+        ? consult(`join:${p.union}`, "Joining the workers' union on starting a new job. The union represents its members at work and bargains for their pay and conditions; members pay dues each month, and may be called out on strike, unpaid.",
+          [{ key: "join", words: "join the union" }, { key: "not", words: "don't join" }], acc.balance, t)
+        : undefined;
+      if (p.union && job && joinAsked !== job.agreement && !retired && saidJoin !== "pending") {
         joinAsked = job.agreement;
         const member = book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && book.inForce(r.id));
         // The work's industry, as its posting said (none known: "other").
@@ -810,9 +840,11 @@ export const citizen: BehaviourModule = {
         const conform = peerShare === null ? 0 : (p.sway.union_peers * mind.person.temperament.conformity * (peerShare - rate)) / 10_000 / Math.max(1, rate);
         // And by whether we hold with what the union teaches.
         const creed = p.union ? (p.sway.union_belief * holdTo(p.union)) / 10_000 : 0;
-        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform + creed);
+        // And by what the model says it would mean to someone like us, if asked.
+        const meant = saidJoin ? (p.sway.consult * ((saidJoin.join ?? 0) - (saidJoin.not ?? 0))) / 10_000 : 0;
+        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform + creed + meant);
         if (!member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance)
-          steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
+          steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%${saidJoin ? `, thinking what it would mean to me: ${Math.round((saidJoin.join ?? 0) / 1_000)} of 10 against ${Math.round((saidJoin.not ?? 0) / 1_000)} not to` : ""}).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
       }
       for (const r of fresh) {
         if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me)) {
@@ -1140,7 +1172,13 @@ export const citizen: BehaviourModule = {
         // The month's chance (the cited prior), shifted by the person: the open (stimulation, self-direction) and those
         // who value achievement found more often.
         const enterprise = p.sway.enterprise_openness * (zValue("stimulation") + zValue("self_direction")) / 2 + p.sway.enterprise_achievement * zValue("achievement");
-        if (l && ctx.rng(`found-${t}`).below(10_000) < shifted(p.found_bps, enterprise)) {
+        // And by what the model says it would mean to someone like us, if the run has the sparse mind: we think it over
+        // (asked once, decided at the next wake).
+        const saidFound = l ? consult(`found:${l.data.type}`, `Starting a business: buying premises that are for sale and opening a ${l.data.type} there, putting most of one's savings into it, with the chance of losing them if it fails.`,
+          [{ key: "found", words: "start the business" }, { key: "not", words: "keep things as they are" }], acc.balance, t) : undefined;
+        if (saidFound === "pending") nextVenture = t;
+        const meantFound = saidFound && saidFound !== "pending" ? (p.sway.consult * ((saidFound.found ?? 0) - (saidFound.not ?? 0))) / 10_000 : 0;
+        if (l && saidFound !== "pending" && ctx.rng(`found-${t}`).below(10_000) < shifted(p.found_bps, enterprise + meantFound)) {
           const v = p.ventures.find((x) => x.kind === l.data.type)!;
           const capital = (l.data.price as number) + v.capital;
           const fill = (x: unknown): unknown => typeof x === "string"
@@ -1460,7 +1498,7 @@ export const citizen: BehaviourModule = {
     let childrenNow: Member[] = [];
 
     return {
-      step(obs): ParticipantAction {
+      step(obs): ParticipantAction | Promise<ParticipantAction> {
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
         // A child does nothing on their own (their parents house them) until they're 18, except ask for help if no
@@ -1536,6 +1574,15 @@ export const citizen: BehaviourModule = {
         // (A gathering to go to, or come back from, before the week is out: awake then.)
         const action = next ? callAction(next) : wait(practiceWake !== null ? Math.min(practiceWake, obs.t + 7 * DAY) : undefined);
         if (decided.length) Object.defineProperty(action, DECISIONS, { value: decided.splice(0), enumerable: false });
+        // Questions to the sparse mind out this wake: the action, once they're answered (and if waiting, awake again by
+        // the next hour, to decide with the answer).
+        if (asking.length) {
+          const out = Promise.all(asking.splice(0));
+          const then = action.type === "wait" ? wait(Math.min(action.until ?? Infinity, obs.t + ctx.world.tickSeconds)) : action;
+          const d = (action as any)[DECISIONS];
+          if (d && then !== action) Object.defineProperty(then, DECISIONS, { value: d, enumerable: false });
+          return out.then(() => then);
+        }
         return action;
       },
     };

@@ -316,6 +316,16 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
     - 53/52 gave up;
     - employment 67.3/65.6%; median rent share 20.4/20.6% (target 20.2%).
   - Better work is rare because the people short of money are mostly outside the labour force. Catching up more is never first, because those who form the goal have nobody to catch up with.
+- **Asking the model: the sparse mind** (section 4; 2026-09-29; consult 0.1.0). **Off by default;** `--consult` turns it on, with the run's model (the mock, or `--model`).
+  - **Where:** joining the union and starting a business, the decisions facts can't settle (3e). A citizen asks once, and decides at the next wake with the answer. Its own draw from the answer's spread shifts the cited rate (`sway.consult`).
+  - **What's asked:** the thing in words, and the person's values (ranked), needs (met well, partly or poorly) and means, in words. No persona. Three judgements, 0 to 10 per option, and why.
+  - **Remembered by kind,** for the run only. A kind is the thing, plus what they value most, what they lack most, whether they earn, how long their savings would last, and whether they live alone: relative bins, no place's figures. Someone of the same kind asking at the same moment shares the call.
+  - **Logged in full** through the run's model I/O (usage and transcript), as a participant's own call (purpose `participant`), marked `ref: consult/<kind>`. A resumed run serves it from the log, and reads back that it was on.
+  - **Tested on the mock:** judgements follow from the kind and option, so runs replay to the hash. 120 days of the small town: 12 kinds asked, 2 decisions made with an answer.
+  - **Not yet:**
+    - the robustness audit (reworded prompts, shifted bins) and the fidelity check (remembered against fresh answers), both before any real-model run;
+    - gatherings and teachings as things to ask about;
+    - a dedicated `consult` purpose in the log contract (proposed).
 - **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
 - **The cited priors, now swayed by the person** (3e; 2026-09-29):
   - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).

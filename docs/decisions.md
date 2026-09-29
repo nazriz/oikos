@@ -900,6 +900,13 @@ See the design note, §16.
   - **Recorded** as decisions in domain `goal` (the contract's `domain` is free text).
   - **Revisit if:** goals need sub-goals (moving house as a plan with its own steps), or methods need learning (EWA over methods: which worked for people like me).
 
+- **AI citizens, step 8: the sparse mind, plumbed and off by default** (docs/design/ai-citizens.md section 4 and "Progress"; participants/src/llm/consult.ts).
+  - **The plumbing:** code participants get a `consult` on their context when a run turns it on (`--consult`; recorded in a note; resume reads it back). It asks through the run's model I/O, so calls are logged, priced, budgeted and replayed like any other. Answers are remembered by kind of person and thing, for the run only. A citizen returns its pending question with its action, so the orchestrator waits for it inside the cohort and the log's order doesn't depend on which call came back first.
+  - **Used for** joining the union and starting a business: the answer shifts the cited rate.
+  - **Why purpose `participant`:** it is the participant's own call, and a new purpose would change the log contract. **Proposed for sign-off:** a `consult` purpose in the usage annotation.
+  - **Before any real-model run:** the design's robustness audit and fidelity check; and Naz's go-ahead for paid calls (mock-first rule; Codex pilots are approved).
+  - **Revisit if:** the kinds are too fine (every person asks) or too coarse (everyone alike); or answers swing with wording.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

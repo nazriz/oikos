@@ -38,6 +38,14 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
   const tool = (name: string, input: object): ContentBlock => ({ type: "tool_use", id: `mock-${++n}`, name, input });
 
   const participant: MockPolicy = async (req: LlmRequest) => {
+    // A code participant consulting the sparse mind (consult.ts): judgements that follow from the kind of person and
+    // the option, so a run replays exactly; three, a point apart.
+    if (req.context?.consult) {
+      const { kind, keys } = req.context.consult as { kind: string; keys: string[] };
+      const h = (s: string) => [...new Bun.CryptoHasher("sha256").update(s).digest()].slice(0, 4).reduce((a, b) => a * 256 + b, 0);
+      const judgements = [-1, 0, 1].map((d) => Object.fromEntries(keys.map((k) => [k, Math.max(0, Math.min(10, (h(`${kind}/${k}`) % 11) + d))])));
+      return [{ type: "text" as const, text: JSON.stringify({ judgements, why: "(mock) judged from the kind of person and the option." }) }];
+    }
     const { observation: obs, participant: id } = req.context;
     const brain = brains.get(id);
     if (!brain) return [tool("done_for_now", {})];
