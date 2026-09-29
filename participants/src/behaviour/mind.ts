@@ -301,11 +301,12 @@ export class Mind {
     this.learned(domain).hear(option, payoff_bps);
   }
 
-  decide(domain: string, rng: Rng, o: { options: Choice[]; current?: string; levels: NeedLevels; circ: Circumstances; satisfied_here?: number }): Decision {
+  /** `doubt`: how much a feeling (fear) takes from how sure the person is of their options (basis points). */
+  decide(domain: string, rng: Rng, o: { options: Choice[]; current?: string; levels: NeedLevels; circ: Circumstances; satisfied_here?: number; doubt?: number }): Decision {
     const learned = this.learned(domain);
     const options = [...o.options].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
     const known = options.filter((x) => learned.known(x.key)).length;
-    const certainty = options.length ? Math.round((known * 10_000) / options.length) : 10_000;
+    const certainty = Math.max(0, (options.length ? Math.round((known * 10_000) / options.length) : 10_000) - (o.doubt ?? 0));
     // Satisfaction: life as a whole, and, where the caller knows it, how this area has gone (the lower counts).
     const sat = Math.min(satisfaction(this.person, o.levels), o.satisfied_here ?? 10_000);
     const s = strategy(sat, certainty, this.p);
@@ -336,5 +337,57 @@ export class Mind {
     const appraised = (x: Choice) => (x.facts ? value(this.person, appraise(this.person, x.facts, o.circ)) - timeCost(x.facts) : 0) + (x.meaning ?? 0);
     const c = learned.choose(rng, options.map((x) => ({ key: x.key, value: appraised(x) })), this.person.temperament.openness);
     return { key: c.key, strategy: "deliberate", scores: scored(appraised) };
+  }
+}
+
+// ---------------------------------------------------------------- feelings (OCC, lite) and ties
+
+/**
+ * Emotions by appraisal (Ortony, Clore and Collins 1988, as FAtiMA computes them; docs/design/ai-citizens.md 3d), each
+ * about someone or something: events against one's goals (joy, distress; hope, fear of what's coming), others' acts
+ * against one's standards (anger, gratitude). Each fades by its half-life (placeholders: a grudge lasts longer than a
+ * disappointment).
+ */
+export type Emotion = "joy" | "distress" | "hope" | "fear" | "anger" | "gratitude";
+export const EMOTION_HALF_LIFE_DAYS: { [e in Emotion]: number } = { joy: 7, distress: 14, hope: 14, fear: 30, anger: 60, gratitude: 90 };
+
+export class Feelings {
+  private readonly felt = new Map<string, { bps: number; t: number }>(); // "emotion:about" -> intensity when last felt
+  constructor(private readonly halfLife: { [e in Emotion]: number } = EMOTION_HALF_LIFE_DAYS) {}
+
+  /** How strongly it's felt now (basis points), faded since. */
+  level(e: Emotion, about: string, t: number): number {
+    const f = this.felt.get(`${e}:${about}`);
+    return f ? Math.round(f.bps * Math.pow(0.5, (t - f.t) / (this.halfLife[e] * 86_400))) : 0;
+  }
+
+  /** Felt at least this strongly now (a stronger feeling isn't lessened by a milder cause). */
+  feel(e: Emotion, about: string, bps: number, t: number): void {
+    this.felt.set(`${e}:${about}`, { bps: Math.min(10_000, Math.max(this.level(e, about, t), Math.round(bps))), t });
+  }
+
+  /** Felt more: a share of the way to its strongest. */
+  add(e: Emotion, about: string, bps: number, t: number): void {
+    const now = this.level(e, about, t);
+    this.felt.set(`${e}:${about}`, { bps: now + Math.round(((10_000 - now) * Math.min(10_000, bps)) / 10_000), t });
+  }
+}
+
+/**
+ * Ties: affinity with each person known (Comme il Faut's and the Ensemble engine's social networks, lite;
+ * docs/design/ai-citizens.md 3d), from -10,000 to 10,000. It grows with time together and with favours, falls with
+ * wrongs, and fades toward none without contact (a placeholder half-life).
+ */
+export class Ties {
+  private readonly aff = new Map<string, { bps: number; t: number }>();
+  constructor(private readonly halfLifeDays = 180) {}
+
+  affinity(who: string, t: number): number {
+    const a = this.aff.get(who);
+    return a ? Math.round(a.bps * Math.pow(0.5, (t - a.t) / (this.halfLifeDays * 86_400))) : 0;
+  }
+
+  add(who: string, bps: number, t: number): void {
+    this.aff.set(who, { bps: Math.max(-10_000, Math.min(10_000, this.affinity(who, t) + Math.round(bps))), t });
   }
 }

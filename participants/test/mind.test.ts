@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Attractions, appraise, drawPerson, factsOf, satisfaction, strategy, value, NEEDS, VALUES } from "../src/behaviour/mind";
+import { Attractions, appraise, drawPerson, factsOf, Feelings, satisfaction, strategy, Ties, value, NEEDS, VALUES } from "../src/behaviour/mind";
 import { Randomness } from "../src/rng";
 
 const rng = (k: string) => new Randomness(7n).stream([k]);
@@ -93,4 +93,24 @@ test("word of mouth: what someone says they get from an option moves what's lear
   const before = seasoned.get("shop-a");
   seasoned.hear("shop-a", 1_000);
   expect(before - seasoned.get("shop-a")).toBeLessThan(5_000 - heard.get("shop-a"));
+});
+
+test("feelings fade by their half-life; a milder cause doesn't lessen a stronger feeling; ties fade without contact", () => {
+  const DAY = 86_400;
+  const f = new Feelings();
+  f.feel("anger", "landlord-1", 6_000, 0);
+  expect(f.level("anger", "landlord-1", 0)).toBe(6_000);
+  expect(f.level("anger", "landlord-1", 60 * DAY)).toBe(3_000); // anger's half-life: 60 days
+  f.feel("anger", "landlord-1", 1_000, 60 * DAY);
+  expect(f.level("anger", "landlord-1", 60 * DAY)).toBe(3_000);
+  f.add("anger", "landlord-1", 5_000, 60 * DAY); // half the way to its strongest
+  expect(f.level("anger", "landlord-1", 60 * DAY)).toBe(6_500);
+  expect(f.level("gratitude", "landlord-1", 0)).toBe(0); // about someone, one feeling doesn't make another
+  const t = new Ties();
+  t.add("c1", 2_000, 0);
+  t.add("c1", 300, 0);
+  expect(t.affinity("c1", 0)).toBe(2_300);
+  expect(t.affinity("c1", 180 * DAY)).toBe(1_150);
+  t.add("c2", -20_000, 0);
+  expect(t.affinity("c2", 0)).toBe(-10_000);
 });

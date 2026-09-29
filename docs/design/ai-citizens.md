@@ -284,6 +284,26 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - **One year, two seeds:** the congregation's teaching stated by 11.3 to 11.7% and 11.5 to 15.3% of adults; the union's about 6%; group participation 52.0 and 55.5% (target 50.0%).
   - **Found:** letting everyone who holds a teaching know its gatherings from the start sent every dissatisfied nominal believer to them (61% participation). Belief now enters when deliberating and through friends who go.
   - **Not in the contracts:** teachings are recognised by a statement kind, as job postings and price lists still are. A structured `claim` field (a statement asking to be believed) would be the building block. It's proposed in docs/decisions.md, for sign-off.
+- **Feelings and ties** (3d; 2026-09-29, citizen 0.18.0):
+  - **Emotions by appraisal** (OCC), each about someone, each fading by its half-life:
+    - anger with a landlord (a rent rise, a notice to go), an employer who stops paying, the town when waste isn't collected;
+    - fear for money;
+    - gratitude for a tip that found a home or work, and to the union for a raise.
+  - **They act:**
+    - complaining is anger past one's own threshold, while the waste is still there;
+    - a tenant's grievance (petitions) is anger with the landlord while it lasts (rent rises now count);
+    - fear makes a person less sure where money's at stake;
+    - gratitude and time together build ties.
+  - **Ties:** affinity per person known. Whom one catches up with, and whom one keeps as a contact, follow it.
+  - **One year, two seeds:**
+    - employment 67.0/65.6%;
+    - group participation 51.5/52.1%;
+    - hires after a tip 50/16 (from about 23/19);
+    - complaints 11/21 (from 1/2), since the less conformist now write after about eight days, not fourteen.
+  - **Found:**
+    - fear lowering certainty everywhere sent people's club-going to coin flips: with two options, being sure of one sits exactly at the certainty threshold. Fear now weighs only where money's at stake.
+    - Anger at the town lingered after the waste went, so a complaint now needs the waste still there.
+  - **Not yet:** the other social moves (help, snub, gossip), reputations, feelings toward things.
 - **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
 - **The cited priors, now swayed by the person** (3e; 2026-09-29):
   - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).

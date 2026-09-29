@@ -64,6 +64,6 @@ test("with no staff in the budget the crew is let go, nobody collects the waste,
   expect(complaints.length).toBeGreaterThan(5);
   for (const c of complaints) {
     expect(c.addressed_to).toEqual(["city"]);
-    expect(c.data.days).toBeGreaterThanOrEqual(14);
+    expect(c.data.days).toBeGreaterThanOrEqual(7); // (when is each person's: anger past their own threshold, from about a week)
   }
 }, 600_000);

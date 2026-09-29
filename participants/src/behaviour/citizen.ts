@@ -35,7 +35,7 @@ import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Hea
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
-import { factsOf, Mind, MIND_DEFAULTS, satisfaction, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
+import { factsOf, Feelings, Mind, MIND_DEFAULTS, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
 /** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
  * certainty a gathering takes it (with 20 or more others there), and being told; how strongly it's held to say so; and
@@ -154,6 +154,7 @@ export const citizen: BehaviourModule = {
       threshold_sd_bps: 1000, //   roughly normal with this mean and spread (Granovetter 1978)
       population: 200,
       rent_burden_grievance_bps: 4000,
+      aggrieved_bps: 2000, // anger with the landlord at which a tenant is aggrieved (placeholder: the anger at a notice to go lasts about 95 days)
       search_limit: 20, // how many listings or postings a search shows, best first
       // Word of mouth (docs/behaviour/citizen.md, D44).
       ask_home_bps: 3700, // chance a new home hunt starts by asking around (37% of renters ask friends or family: Apartments.com/NAA 2026)
@@ -226,8 +227,14 @@ export const citizen: BehaviourModule = {
     const isMember = () => !!p.union && memberOf(p.union);
     let lastServed = 10_000; // how fully the last shop served us (basis points)
     const decided: DecisionRecord[] = []; // the mind's decisions since the last action, carried with the next (7)
+    // Feelings, about people and things (docs/design/ai-citizens.md 3d), and ties with the people we know.
+    const feelings = new Feelings();
+    const ties = new Ties();
+    const leadFrom = new Map<string, string>(); // a building someone told us to look at -> who told us
+    // (Fear for our money makes us less sure of our options where money's at stake: we look harder at them.)
+    const MONEY_MATTERS = new Set(["shop", "job", "home"]);
     const decide = (domain: string, t: number, rng: Rng, o: Parameters<Mind["decide"]>[2]) => {
-      const d = mind.decide(domain, rng, o);
+      const d = mind.decide(domain, rng, { doubt: MONEY_MATTERS.has(domain) ? Math.round(feelings.level("fear", "money", t) / 2) : 0, ...o });
       decided.push({ t, domain, strategy: d.strategy, ...(d.key !== undefined ? { choice: d.key } : {}), options: d.scores.length ? d.scores : o.options.map((x) => ({ key: x.key, score: 0 })) });
       return d;
     };
@@ -362,7 +369,12 @@ export const citizen: BehaviourModule = {
         if (r.kind === "enterprise_agreement" && r.data?.employer === job.employer && r.at >= job.since) {
           job.wage = Math.floor((job.wage * (10_000 + Number(r.data?.rise_bps ?? 0))) / 10_000);
           job.paidAt = obs.t;
-          if (isMember()) mind.learn("membership", "member", Math.min(10_000, 6_000 + Number(r.data?.rise_bps ?? 0) * 10)); // it paid
+          if (p.union && isMember()) {
+            mind.learn("membership", "member", Math.min(10_000, 6_000 + Number(r.data?.rise_bps ?? 0) * 10)); // it paid
+            // Grateful to the union, and surer of what it says.
+            feelings.add("gratitude", p.union, 5_000, obs.t);
+            strengthen(p.union, 1_000);
+          }
         }
         if (!(r.addressed_to ?? []).includes(me)) continue;
         if (r.kind === "stop_work" && r.data?.employer === job.employer && !striking) {
@@ -416,6 +428,7 @@ export const citizen: BehaviourModule = {
         if (m.text === CATCHING_UP.ask) {
           askedHow.push(m.from);
           talked.set(person, obs.t);
+          ties.add(person, 300, obs.t);
           continue;
         }
         const told = heardNews(m.text);
@@ -423,6 +436,7 @@ export const citizen: BehaviourModule = {
           // What they do, and how it goes for them: counted as others doing it, and learned from as others' payoffs.
           toldUs.set(person, { ...told, t: obs.t });
           talked.set(person, obs.t);
+          ties.add(person, 300, obs.t);
           if (told.shop && told.served !== undefined) mind.hear("shop", told.shop, told.served);
           if (told.employer && told.paid !== undefined) mind.hear("job", told.employer, told.paid ? 10_000 : 0);
           // Someone who keeps going somewhere finds it worth it (a placeholder for how much).
@@ -435,7 +449,10 @@ export const citizen: BehaviourModule = {
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
         if (want) asked.push({ from: m.from, want });
         // A place someone names in reply to our asking (not a reply about a record: those are institutions answering requests).
-        else if (m.re && (askedAt.home !== undefined || askedAt.work !== undefined) && !book.records.has(m.re)) leads = [...leads.filter((x) => x !== m.re), m.re].slice(-5);
+        else if (m.re && (askedAt.home !== undefined || askedAt.work !== undefined) && !book.records.has(m.re)) {
+          leads = [...leads.filter((x) => x !== m.re), m.re].slice(-5);
+          leadFrom.set(m.re, book.participantPerson.get(m.from) ?? m.from);
+        }
       }
       // Did the move-in we just attempted work?
       if (moving && lastWasMove && obs.outcomes.length) {
@@ -631,6 +648,7 @@ export const citizen: BehaviourModule = {
         if (t - last > job.period + 5 * DAY) {
           job.claimed = true;
           mind.learn("job", job.employer, 0); // an employer that didn't pay: remembered
+          feelings.feel("anger", job.employer, 8_000, t);
           const missed = Math.max(1, Math.floor((t - last) / job.period));
           steps.push(because(`Our wages haven't been paid for ${Math.floor((t - last) / DAY)} days: resigning, and claiming the ${usd(missed * job.wage)} we're owed.`,
             notice(job.agreement, "Resigning: our wages haven't been paid."),
@@ -674,6 +692,8 @@ export const citizen: BehaviourModule = {
         };
       };
       levelsNow = needLevels();
+      // Afraid for our money when it's running short (the security need well below met).
+      if (levelsNow.security < 5_000) feelings.feel("fear", "money", (5_000 - levelsNow.security) * 2, t);
       const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt });
       if (!job && joblessSince === null) joblessSince = t;
 
@@ -686,7 +706,7 @@ export const citizen: BehaviourModule = {
           if (!space || !structure || !rentTo || !affordable(rent, acc.balance)) continue;
           // Signing (a record) and moving in (physics) are separate acts: the
           // flat may not be free yet if the last tenant hasn't left.
-          steps.push(because(`Signing the lease offered for ${space}: ${usd(rent)} a month is within our budget (a third of household income, ${usd(Math.floor((householdIncome() * p.rent_share_bps) / 10_000))}; or six months' rent in savings without income).`,
+          steps.push(because(`Signing the lease offered for ${space}: ${usd(rent)} a month is within our budget (a third of household income, ${usd(Math.floor((householdIncome() * p.rent_share_bps) / 10_000))}; or six months' rent in savings without income)${thank(structure, t)}.`,
             sign(r.id),
             ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: 0, basis: r.id, for: `Rent for ${space}, monthly in advance.` })],
           ));
@@ -695,7 +715,7 @@ export const citizen: BehaviourModule = {
           homelessSince = null;
         } else if (r.terms.template === "employment" && !job) {
           const terms = jobTerms(r, me);
-          const s: Step = because(`Taking the job offered: ${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days.`, sign(r.id));
+          const s: Step = because(`Taking the job offered: ${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days${thank(terms.workplace ? structureOf(terms.workplace) : undefined, t)}.`, sign(r.id));
           if (terms.workplace) s.push(moveIn(terms.workplace));
           steps.push(s);
           job = { agreement: r.id, employer: other, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER, since: t };
@@ -769,6 +789,9 @@ export const citizen: BehaviourModule = {
       if (home && isLeaseholder()) for (const r of fresh) {
         if (r.record !== "statement" || r.kind !== "rent_increase" || r.data?.lease !== home.agreement || !(r.addressed_to ?? []).includes(me)) continue;
         const rent = cents(r.data.rent);
+        // Angry with the landlord, the more so the more of our income it takes (a placeholder scale).
+        const riseShare = householdIncome() > 0 ? ((rent - home.rent) * 10_000) / householdIncome() : 10_000;
+        if (rent > home.rent) feelings.feel("anger", home.landlord, 2_000 + 20 * riseShare, t);
         const lease = book.records.get(home.agreement);
         const rentTo = lease ? leaseTerms(lease, me).rentTo : undefined;
         if (affordable(rent, acc.balance) && rentTo) {
@@ -868,7 +891,10 @@ export const citizen: BehaviourModule = {
           if (got) {
             steps.push(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
             companyAt.set(attending.practice, others.length);
-            for (const o of others) talked.set(o, t);
+            for (const o of others) {
+              talked.set(o, t);
+              ties.add(o, 100, t);
+            }
           }
           attending = null;
         }
@@ -942,7 +968,12 @@ export const citizen: BehaviourModule = {
         const now = variableToday(v, t) ?? 0;
         const rate = v?.per_day ?? 0;
         if (complainedOf === home.structure && now < rate * 7) complainedOf = null;
-        if (rate > 0 && now >= rate * p.complain_after_days && complainedOf !== home.structure && ctx.rng(`complain-${t}`).below(10_000) < p.complain_bps) {
+        // Angry with whoever should collect it, the more so the longer it's been (half-way at `complain_after_days`);
+        // we write once our anger passes our own threshold (the conformist bears it longer), with the week's chance.
+        if (rate > 0) feelings.feel("anger", p.complain_to, Math.min(10_000, (now * 5_000) / (rate * p.complain_after_days)), t);
+        const bearing = 5_000 + Math.round((mind.person.temperament.conformity - 5_000) * 0.4);
+        // (And only while it's still there: a week's worth or more.)
+        if (rate > 0 && now >= rate * 7 && feelings.level("anger", p.complain_to, t) >= bearing && complainedOf !== home.structure && ctx.rng(`complain-${t}`).below(10_000) < p.complain_bps) {
           complainedOf = home.structure;
           steps.push(because(`Our ${p.complain_about} hasn't been collected for about ${Math.floor(now / rate)} days: writing to the town.`,
             say("complaint", `Our ${p.complain_about} at ${home.structure} hasn't been collected for about ${Math.floor(now / rate)} days.`, { to: [p.complain_to], visible: [me, p.complain_to], data: { structure: home.structure, about: p.complain_about, days: Math.floor(now / rate) } })));
@@ -1193,6 +1224,15 @@ export const citizen: BehaviourModule = {
     // Word of mouth. Ties are the people we share (or shared) a home or workplace with: in our own
     // buildings we see who. Asked, we say where we can see room: where we live or next door for a
     // home, our own workplace for work (we're on the inside there). Hunting, we ask once per hunt.
+    /** Found a home or work where someone told us to look: grateful to them, and closer. */
+    const thank = (structure: string | undefined, t: number): string => {
+      const who = structure ? leadFrom.get(structure) : undefined;
+      if (!who) return "";
+      leadFrom.delete(structure!);
+      feelings.add("gratitude", who, 6_000, t);
+      ties.add(who, 2_000, t);
+      return ` (${who} told us to look there: we're grateful)`;
+    };
     /** What we'd tell someone who asks how we are. */
     const newsOfMine = () => [
       favourite && mind.learned("shop").known(favourite) ? CATCHING_UP.shop(favourite, lastServed) : "",
@@ -1206,7 +1246,9 @@ export const citizen: BehaviourModule = {
       const around: SiteStructure[] = obs.channels.street?.kind === "sites" ? channels.structures({ ...obs, channels: { street: obs.channels.street } }) : [];
       for (const st of around) for (const sp of st.spaces) for (const o of sp.occupants ?? []) if (o !== me) contacts.set(o, t);
       if (contacts.size > p.max_contacts) {
-        const keep = [...contacts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, p.max_contacts);
+        // Those we're close to, and those we've seen lately (a month counts as much as a fair friendship), kept.
+        const keeps = (k: string, seen: number) => ties.affinity(k, t) + (t - seen <= MONTH ? 2_000 : 0);
+        const keep = [...contacts].sort((a, b) => keeps(b[0], b[1]) - keeps(a[0], a[1]) || b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, p.max_contacts);
         contacts.clear();
         for (const [k, v] of keep) contacts.set(k, v);
       }
@@ -1231,7 +1273,11 @@ export const citizen: BehaviourModule = {
       if (t >= nextCatchUp) {
         nextCatchUp = t + p.catch_up_days * DAY;
         if (known.length) {
-          const who = ctx.rng(`catch-up-${t}`).pick([...known].sort());
+          // Whom: more often those we're closer to.
+          const pool = [...known].sort();
+          const weights = pool.map((k) => 1_000 + Math.max(0, ties.affinity(k, t)));
+          let r = ctx.rng(`catch-up-${t}`).below(weights.reduce((a, b) => a + b, 0));
+          const who = pool.find((_, i) => (r -= weights[i]!) < 0) ?? pool.at(-1)!;
           talked.set(who, t);
           steps.push(because("Catching up with someone we know.", message([who], CATCHING_UP.ask)));
         }
@@ -1262,12 +1308,13 @@ export const citizen: BehaviourModule = {
     // Whether we're someone who signs petitions at all (drawn once); thresholds apply among those who are.
     const willing = ctx.rng("petition-willing").below(10_000) < p.petition_willing_bps;
     const countsPublished = new Map<string, { n: number; at: number }>();
-    let aggrievedUntil = 0;
     const voice = (t: number, steps: Step[]) => {
       const burden = home && householdIncome() > 0 ? (home.rent * 10_000) / householdIncome() : 0;
       const noticed = [...book.notices.entries()].some(([ag, ns]) => ag === home?.agreement && ns.some((n) => n.as !== me));
-      if (home && (noticed || burden >= p.rent_burden_grievance_bps)) aggrievedUntil = t + 90 * DAY;
-      const aggrieved = t < aggrievedUntil;
+      // Aggrieved: angry with our landlord (given notice to go, or a rent rise), while it lasts; or while the rent
+      // takes too much of our income.
+      if (home && noticed) feelings.feel("anger", home.landlord, 6_000, t);
+      const aggrieved = !!home && (burden >= p.rent_burden_grievance_bps || feelings.level("anger", home.landlord, t) >= p.aggrieved_bps);
       const open = found.petitions.filter((x) => (x.data?.demand?.tags ?? []).includes("tenant_protection"));
       // An organiser closes their petition after `petition_days`; a new one can then start.
       for (const pet of open) if (pet.speaks_for === me && t - pet.at >= p.petition_days * DAY && !signed.has(`closed-${pet.id}`)) {

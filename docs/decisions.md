@@ -886,6 +886,14 @@ See the design note, §16.
     - belief strengths in `CitizenDecision`, for training data.
   - **Revisit if:** a practising-share or stated-affiliation target is sourced; belief needs to attach to any statement (rumour, news, a mayor's promise), which is the `claim` field; or conversion rates need calibrating.
 
+- **AI citizens, step 6: feelings and ties** (docs/design/ai-citizens.md "Progress"; docs/behaviour/citizen.md "Feelings and ties").
+  - **Emotions** (OCC-lite: anger, fear, gratitude, fading by half-lives) now drive complaining (anger past a personal threshold, while the cause is there) and tenants' grievance (anger with the landlord while it lasts, where rent rises now count).
+  - **Fear** lowers certainty in money decisions; gratitude and time together build affinity.
+  - **Affinity** decides whom people catch up with and keep as contacts.
+  - **Why emotions rather than rules:** the timing now differs by person and by how big the cause was. The old fixed 90 days and 14 days were uniform placeholders.
+  - **Changed tests:** complaints come from about a week's worth of waste, not exactly two weeks.
+  - **Revisit if:** a sourced complaint rate (complaints rose from 1–2 to 11–21 a year in the 1,000-person town); help, gossip and reputation; or emotions in decision records (a contract change).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
