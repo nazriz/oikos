@@ -347,6 +347,11 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - **Belief grows where it should fade:** the congregation's teaching, stated, goes from 12% of adults to 22–27%. Members' displays and telling outpace fading, while the census trend is decline (Christian affiliation 52% in 2016 to 43.9% in 2021). The union's teaching fades to nobody saying it: its members don't go to its meetings, so nothing keeps it up. Both are the placeholders in `belief`, to calibrate against a sourced trend.
   - **Disputes that never end, a bug, since fixed.** A few shops seemed to deadlock with the union (shop-25 in seed 2: 78 stoppages over nearly three years). In fact shop-25 had closed on day 738. The union never noticed closures or where its members had moved, and a member who'd moved on still voted in the ballots.
     - Now members tell the union where they work, vote only about their own workplace, and the union stops at a closed employer or where no member works.
+    - Five years again after the fix (`runs/c8-run5`):
+      - stoppages 5–7 per run (from 11–105), none twice at one employer;
+      - employment 65.7–65.8%; unemployment 1.7–3.4%; saving 18–22%;
+      - median rent share 19.9–20.2%; group participation 50–54%;
+      - belief still rising (12% to 22–26%).
     - First diagnosed as a missing tribunal. That's plausible for real deadlocks, but none arise here yet: employers concede the whole claim after three stoppages.
   - Complaints (41–52 over five years) aren't comparable with the earlier run's, which predates the works department's fix.
   - Migration still comes in bursts (0 to 45 arrivals a year).
