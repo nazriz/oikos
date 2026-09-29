@@ -66,6 +66,8 @@ export interface RunOptions {
   /** The sparse mind (docs/design/ai-citizens.md 4): code citizens may ask the run's model (the mock, or --model) how
    * much their options would matter, with answers remembered by kind. Off by default. */
   consult?: boolean;
+  /** Kinds (and things) the sparse mind leaves out: an audit's `avoid` (consult-audit). */
+  consultAvoid?: string[];
 }
 
 /** More than this many cohorts at one simulated moment means participants are waking each other without end: the run
@@ -244,7 +246,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     prices: { ...PRICES, ...(o.prices ?? {}) },
     ...(o.budget ? { budget: o.budget } : {}),
   };
-  const consult = o.consult ? createConsult(io) : undefined;
+  const consult = o.consult ? createConsult(io, { avoid: o.consultAvoid ?? [] }) : undefined;
 
   const typeOf = (() => {
     const types = new Map<string, any>((cfg.catalogue?.structure_types ?? []).map((x: any) => [x.id, x]));
@@ -394,7 +396,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { welfare: "this world lets language-model people physically harm others (life.harm is set)", participants: modelPeople } } });
 
   // The sparse mind, if on: said at the start (a resumed run reads it back), with the model it asks.
-  if (consult) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { consult: { version: CONSULT_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` } } } });
+  if (consult) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { consult: { version: CONSULT_VERSION, model: `${io.adapter.provider}/${io.adapter.model}`, ...(o.consultAvoid?.length ? { avoid: o.consultAvoid } : {}) } } } });
 
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {

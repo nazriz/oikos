@@ -18,6 +18,11 @@
 //     the summary and a recipe that regenerates the log exactly, not the log (only for code-only runs at a commit).
 //   terrarium run ... [--consult]: the sparse mind (docs/design/ai-citizens.md 4): code citizens may ask the run's model
 //     (the mock, or --model) how much their options would matter, remembered by kind of person. Off by default.
+//   terrarium run ... --consult [--consult-avoid <audit report.json>]: leave out what an audit found unstable.
+//   terrarium consult-audit <world> [--model provider/model --budget DOLLARS] [--kinds 8] [--fidelity 2] [--threshold 2]
+//                 [--seed 1] [--out FILE]
+//     The sparse mind's robustness audit: its questions reworded, options reversed, bins shifted, and remembered answers
+//     against fresh ones, on the world's own questions and people. The mock by default. Every call is kept beside it.
 //   terrarium run ... [--log lean|full]: how much the log keeps (full, the default; lean for quick test runs: no
 //     observation hashes, no written reasoning from code participants; replay still checks the state).
 //   terrarium dataset <DIR|log.jsonl> [--out DIR] [--actions]
@@ -38,7 +43,8 @@
 import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, queries, query, runQuery, table } from "@terrarium/measure";
-import { runBatch, runOne } from "./batch";
+import { loadWorld, runBatch, runOne } from "./batch";
+import { MockAdapter, mockPolicies, PRICES } from "@terrarium/participants/llm";
 import { costReport } from "./cost";
 import { isLog } from "./logs";
 import { kernelBinary } from "./kernel";
@@ -75,7 +81,7 @@ try {
       until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
-      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"),
+      batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), consultAvoid: flag("consult-avoid"),
     });
     if (r.measureDir) {
       console.log(`\n${table(await runQuery(r.measureDir, "overview"))}`);
@@ -90,7 +96,7 @@ try {
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"),
       model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), logDetail: flag("log"), consult: has("consult") });
+      recordObservations: flag("record-observations"), logDetail: flag("log"), consult: has("consult"), consultAvoid: flag("consult-avoid") });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
     const r = await runOne({ resume: positional()[0]!, until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
@@ -104,6 +110,21 @@ try {
       const names = positional().slice(1);
       for (const name of names.length ? names : ["overview"]) console.log(`## ${name}\n${table(await runQuery(dir, name))}\n`);
     }
+  } else if (cmd === "consult-audit" && positional()[0]) {
+    // The sparse mind's robustness audit (docs/design/ai-citizens.md 4), on the world's own questions and people.
+    const { consultAudit, auditText } = await import("./audit");
+    const { config } = await loadWorld(positional()[0]!, flags("set"));
+    const m = flag("model") ? chooseModel(flag("model")!, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") }) : undefined;
+    const adapter = m?.adapter ?? new MockAdapter("mock", mockPolicies(new Map()));
+    const { report, annotations } = await consultAudit({ config, adapter, prices: { ...PRICES, ...(m?.prices ?? {}) }, ...(m?.budget ? { budget: m.budget } : {}),
+      kinds: flag("kinds") ? Number(flag("kinds")) : undefined, fidelity: flag("fidelity") ? Number(flag("fidelity")) : undefined,
+      threshold: flag("threshold") ? Number(flag("threshold")) : undefined, seed: flag("seed") ? Number(flag("seed")) : undefined });
+    console.log(auditText(report));
+    const out = flag("out") ?? join("runs", `consult-audit-${adapter.provider}-${adapter.model.replace(/[^A-Za-z0-9.-]/g, "_")}.json`);
+    await Bun.write(out, JSON.stringify(report, null, 2));
+    // Every call, as a run would log it (model answers are data: kept beside the report).
+    await Bun.write(out.replace(/\.json$/, ".calls.jsonl"), annotations.map((a) => JSON.stringify(a)).join("\n") + "\n");
+    console.log(`\nReport: ${out}`);
   } else if (cmd === "translator-eval" && flag("model")) {
     const { evaluate, reportText } = await import("@terrarium/translator/eval");
     const m = chooseModel(flag("model")!, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });

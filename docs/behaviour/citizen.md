@@ -125,4 +125,4 @@ Unless a source is named above, a figure is a placeholder, to calibrate.
 - The other social moves: help, snub, gossip, reputation.
 - Goals with sub-goals; learning which methods work.
 - Memory that compresses and forgets, and misremembering.
-- The sparse mind's robustness audit and fidelity check, before real models.
+- The sparse mind on a real model: its robustness audit (`terrarium consult-audit`) is built and tested on the mock, not yet run on one.

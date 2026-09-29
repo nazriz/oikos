@@ -72,13 +72,16 @@ export async function loadModules(file?: string): Promise<RunOptions["modules"]>
 
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). */
-export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; logDetail?: string; consult?: boolean }): Promise<RunRecord> {
+export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   let consult = !!o.consult;
+  // What an audit found unstable (its report's avoid list), left out of the sparse mind.
+  let consultAvoid: string[] | undefined = o.consultAvoid ? (JSON.parse(await Bun.file(o.consultAvoid).text()).avoid as string[]) : undefined;
   if (o.resume) {
     const r = prepareResume(o.resume);
     ({ config, runId, outDir: out, stoppedLog } = r);
     consult = r.consult;
+    consultAvoid = r.consultAvoid;
     serving = new Serving(recordedCalls(r.stoppedLog));
   } else {
     config = { ...(await loadWorld(o.world!, o.sets)).config, seed: o.seed };
@@ -101,7 +104,7 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(modules ? { modules } : {}), ...(consult ? { consult } : {}), ...(o.recordObservations ? { recordObservations: recordWho(o.recordObservations) } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(o.recordObservations ? { recordObservations: recordWho(o.recordObservations) } : {}),
       ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
       ...(serving ? { resumedFrom: { log: basename(stoppedLog!), serving } } : {}) });
@@ -130,8 +133,9 @@ export interface BatchOptions {
   recordObservations?: string;
   /** How much the log keeps: "full" (the default) or "lean" (docs/reliability.md). */
   logDetail?: string;
-  /** The sparse mind on (docs/design/ai-citizens.md 4). */
+  /** The sparse mind on (docs/design/ai-citizens.md 4), leaving out what an audit report found unstable. */
   consult?: boolean;
+  consultAvoid?: string;
   /** Compress each log once the batch is measured (`.jsonl.zst`). */
   compress?: boolean;
   /**
@@ -210,7 +214,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         limitUsd = held / 1e6;
       }
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: { ...process.env } }); // (the environment as it is now)
       const [code, err] = await Promise.all([p.exited, new Response(p.stderr).text()]);
@@ -292,7 +296,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
 
 /** The arguments to `terrarium run-one` that regenerate a batch's run of a seed (with `--out` for where). */
 export const recipeArgs = (o: BatchOptions, seed: number) => [o.world, "--seed", String(seed), ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...(o.sets ?? []).flatMap((s) => ["--set", s]),
-  ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : [])];
+  ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : [])];
 
 /** Why a batch's runs couldn't be regenerated from a recipe (so their logs must be kept), or null if they can. */
 function cannotRegenerate(config: any, o: BatchOptions): string | null {

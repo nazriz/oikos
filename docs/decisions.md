@@ -907,6 +907,13 @@ See the design note, §16.
   - **Before any real-model run:** the design's robustness audit and fidelity check; and Naz's go-ahead for paid calls (mock-first rule; Codex pilots are approved).
   - **Revisit if:** the kinds are too fine (every person asks) or too coarse (everyone alike); or answers swing with wording.
 
+- **The sparse mind's robustness audit** (docs/design/ai-citizens.md section 4 and "Progress"; orchestrator/src/audit.ts; `terrarium consult-audit`).
+  - **The four wordings:** the base, reworded, options reversed, and the needs' bins shifted. Plus a fidelity check: other people of a kind asked afresh, against the kind's answer.
+  - **Unstable:** a swing over 2 points of 10, or a flipped preference. A run can leave unstable kinds (or whole things) out: `--consult-avoid`.
+  - **Why these checks:** the design names them (after the audit paper's 76-point framing swings). The option-order check is added, a known position bias in models.
+  - **Built on the world's own questions** (`CONSULT_THINGS`, shared with the citizen) and people drawn from its profile, so the audit checks exactly what runs would ask.
+  - **Revisit if:** the 2-point threshold proves too loose or tight on a real model; or the fidelity check says kinds are too coarse, in which case bin finer.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

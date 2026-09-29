@@ -55,6 +55,21 @@ const SWAY = { consult: 1, union_belief: 0.5, union_peers: 0.5, union_join: 0.3,
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
 type Want = keyof typeof ASKING;
 
+/** What a citizen asks the sparse mind about (docs/design/ai-citizens.md 4): the words a run uses, and an audit checks
+ * (consult-audit). */
+export const CONSULT_THINGS = {
+  join: (union: string) => ({
+    about: `join:${union}`,
+    thing: "Joining the workers' union on starting a new job. The union represents its members at work and bargains for their pay and conditions; members pay dues each month, and may be called out on strike, unpaid.",
+    options: [{ key: "join", words: "join the union" }, { key: "not", words: "don't join" }],
+  }),
+  found: (kind: string) => ({
+    about: `found:${kind}`,
+    thing: `Starting a business: buying premises that are for sale and opening a ${kind} there, putting most of one's savings into it, with the chance of losing them if it fails.`,
+    options: [{ key: "found", words: "start the business" }, { key: "not", words: "keep things as they are" }],
+  }),
+};
+
 /** Catching up with someone we know: the question, and a code citizen's answer (where they shop and how it serves them,
  * whom they work for and whether they're paid, whether they're in the union). Understood only in this phrasing. */
 export const CATCHING_UP = {
@@ -821,8 +836,7 @@ export const citizen: BehaviourModule = {
       // What joining would mean to someone like us, if the run has the sparse mind (docs/design/ai-citizens.md 4): asked
       // once, and the decision waits for the answer (by the next wake).
       const saidJoin = p.union && job && joinAsked !== job.agreement && !retired && !isMember()
-        ? consult(`join:${p.union}`, "Joining the workers' union on starting a new job. The union represents its members at work and bargains for their pay and conditions; members pay dues each month, and may be called out on strike, unpaid.",
-          [{ key: "join", words: "join the union" }, { key: "not", words: "don't join" }], acc.balance, t)
+        ? (({ about, thing, options }) => consult(about, thing, options, acc.balance, t))(CONSULT_THINGS.join(p.union))
         : undefined;
       if (p.union && job && joinAsked !== job.agreement && !retired && saidJoin !== "pending") {
         joinAsked = job.agreement;
@@ -1174,8 +1188,7 @@ export const citizen: BehaviourModule = {
         const enterprise = p.sway.enterprise_openness * (zValue("stimulation") + zValue("self_direction")) / 2 + p.sway.enterprise_achievement * zValue("achievement");
         // And by what the model says it would mean to someone like us, if the run has the sparse mind: we think it over
         // (asked once, decided at the next wake).
-        const saidFound = l ? consult(`found:${l.data.type}`, `Starting a business: buying premises that are for sale and opening a ${l.data.type} there, putting most of one's savings into it, with the chance of losing them if it fails.`,
-          [{ key: "found", words: "start the business" }, { key: "not", words: "keep things as they are" }], acc.balance, t) : undefined;
+        const saidFound = l ? (({ about, thing, options }) => consult(about, thing, options, acc.balance, t))(CONSULT_THINGS.found(String(l.data.type))) : undefined;
         if (saidFound === "pending") nextVenture = t;
         const meantFound = saidFound && saidFound !== "pending" ? (p.sway.consult * ((saidFound.found ?? 0) - (saidFound.not ?? 0))) / 10_000 : 0;
         if (l && saidFound !== "pending" && ctx.rng(`found-${t}`).below(10_000) < shifted(p.found_bps, enterprise + meantFound)) {
