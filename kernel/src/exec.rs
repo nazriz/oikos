@@ -803,8 +803,12 @@ impl<'a> Exec<'a> {
         let concerned: BTreeSet<&str> = [src.holder.as_str(), src.custodian.as_str(), dst.holder.as_str(), dst.custodian.as_str()].into();
         let mut told: BTreeSet<(Id, Id)> = BTreeSet::new();
         for e in concerned {
-            for (p, _) in self.st.acting_for(e) {
-                told.insert((p, e.to_string()));
+            // Only those who'd see it: a capacity with an accounts channel (others never look through one, and their
+            // queue would grow for ever: the whole state with it).
+            for (p, cap) in self.st.acting_for(e) {
+                if self.st.sees_accounts(&p, &cap) {
+                    told.insert((p, e.to_string()));
+                }
             }
         }
         for (p, e) in told {

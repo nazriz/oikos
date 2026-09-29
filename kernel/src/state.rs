@@ -49,7 +49,47 @@ pub struct State {
     pub participants: Map<Id, Participant>,
     pub positions: Map<Id, Position>,
     /// Future physical effects, sorted by (at, seq).
-    pub schedule: Vec<Scheduled>,
+    pub schedule: Schedule,
+}
+
+/// Future physical effects in (at, seq) order: a persistent map, so the state's copy for each action is cheap (a
+/// plain list was copied whole on every act). Serialised as the ordered list it always was.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Schedule(imbl::OrdMap<(i64, u64), Scheduled>);
+
+impl Schedule {
+    pub fn first(&self) -> Option<&Scheduled> {
+        self.0.get_min().map(|(_, v)| v)
+    }
+    pub fn pop_first(&mut self) -> Option<Scheduled> {
+        let k = self.0.get_min()?.0;
+        self.0.remove(&k)
+    }
+    pub fn insert(&mut self, item: Scheduled) {
+        self.0.insert((item.at, item.seq), item);
+    }
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+    pub fn iter(&self) -> impl Iterator<Item = &Scheduled> {
+        self.0.values()
+    }
+}
+
+impl Serialize for Schedule {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.collect_seq(self.0.values())
+    }
+}
+
+impl<'de> Deserialize<'de> for Schedule {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        let items: Vec<Scheduled> = Vec::deserialize(d)?;
+        Ok(Schedule(items.into_iter().map(|x| ((x.at, x.seq), x)).collect()))
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -453,8 +493,7 @@ impl State {
     pub fn schedule(&mut self, at: i64, what: Sched) {
         self.counters.sched += 1;
         let item = Scheduled { at, seq: self.counters.sched, what };
-        let pos = self.schedule.partition_point(|s| (s.at, s.seq) <= (item.at, item.seq));
-        self.schedule.insert(pos, item);
+        self.schedule.insert(item);
     }
 
     /// The next change stamp.
@@ -544,6 +583,17 @@ impl State {
 
     /// Participants who act for an entity now, with the capacity they act in: a person's own
     /// participant (as itself), and the holders of an organisation's positions.
+    /// Whether a participant, in a capacity ("self", or a position it holds), has an accounts channel: the only way
+    /// transactions reach it.
+    pub fn sees_accounts(&self, participant: &str, capacity: &str) -> bool {
+        let channels = if capacity == crate::config::SELF {
+            self.participants.get(participant).map(|p| p.def.channels.as_slice())
+        } else {
+            self.positions.get(capacity).map(|x| x.channels.as_slice())
+        };
+        channels.is_some_and(|cs| cs.iter().any(|c| matches!(c.kind, crate::config::ChannelKind::Accounts)))
+    }
+
     pub fn acting_for(&self, entity: &str) -> Vec<(Id, Id)> {
         if let Some(b) = self.body(entity) {
             return b.participant.iter().map(|p| (p.clone(), crate::config::SELF.to_string())).collect();

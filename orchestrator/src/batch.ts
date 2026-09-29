@@ -193,6 +193,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       const rec = JSON.parse(readFileSync(join(out, `${runIdFor(o.world, seed)}.summary.json`), "utf8")) as RunRecord;
       runs.push(rec);
       log(`  seed ${seed}: ${(rec.t / (365 * 86_400)).toFixed(2)} years, ${rec.commands.toLocaleString("en-US")} commands, ${rec.refused} refused, ${(rec.wallMs / 1000).toFixed(0)} s; final state ${rec.stateHash.slice(0, 16)}`);
+      for (const w of healthWarnings(rec)) log(`    ! ${w}`);
     }
   };
   await Promise.all(Array.from({ length: parallel }, worker));
@@ -217,7 +218,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     world: o.world, sets, ...(spec ? { spec, generator } : {}), config_seed: config.seed, seeds, parallel, until: o.until ?? null,
     orchestrator: ORCHESTRATOR_VERSION, measure: o.measure !== false ? MEASURE_VERSION : null,
     started: started.toISOString(), finished: finished.toISOString(), wall_ms: finished.getTime() - started.getTime(),
-    runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, log: r.logPath, anchors: r.anchorsPath, state_hash: r.stateHash, t: r.t, commands: r.commands, refused: r.refused, wakes: r.wakes, wall_ms: r.wallMs })),
+    runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, log: r.logPath, anchors: r.anchorsPath, state_hash: r.stateHash, t: r.t, commands: r.commands, refused: r.refused, wakes: r.wakes, wall_ms: r.wallMs, health: r.health, warnings: healthWarnings(r) })),
     failed,
   }, null, 2));
   return result;
@@ -226,4 +227,25 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
 /** `--record-observations` as the run takes it: "models", "code", "all", or participant ids, comma-separated. */
 export function recordWho(s: string): string[] | "models" | "code" | "all" {
   return s === "models" || s === "code" || s === "all" ? s : s.split(",").map((x) => x.trim()).filter(Boolean);
+}
+
+/** Refusals that are the world working as it should: same-moment races (D58), and moving in where the last tenants
+ * are still leaving. Anything else is worth a look. */
+const EXPECTED_REFUSALS = new Set(["not_present", "not_at_work", "capacity_exceeded"]);
+
+/**
+ * What in a run's summary is worth a look, in words (docs/reliability.md): a module that ran out of actions with more
+ * to do in more than 1% of its steps (it's falling behind, or plans more than a wake allows), refusals other than the
+ * expected races, and participants' errors. The run finished; these say it may not have gone as it should.
+ */
+export function healthWarnings(r: { health?: RunSummary["health"]; profile?: RunSummary["profile"]; participantErrors?: number }): string[] {
+  const out: string[] = [];
+  for (const [m, h] of Object.entries(r.health?.cut_short ?? {})) {
+    const steps = r.profile?.modules[m]?.steps ?? 0;
+    if (steps && h.wakes * 100 > steps) out.push(`${m}: ran out of actions with more to do in ${h.wakes.toLocaleString("en-US")} of ${steps.toLocaleString("en-US")} steps (${h.participants} participant${h.participants === 1 ? "" : "s"}): falling behind?`);
+  }
+  const odd = Object.entries(r.health?.refused ?? {}).filter(([code]) => !EXPECTED_REFUSALS.has(code));
+  if (odd.length) out.push(`refusals other than same-moment races: ${odd.map(([c, n]) => `${c} ${n}`).join(", ")}`);
+  if (r.participantErrors) out.push(`${r.participantErrors} participant error${r.participantErrors === 1 ? "" : "s"} (recovered in place: see the log's participant_error notes)`);
+  return out;
 }

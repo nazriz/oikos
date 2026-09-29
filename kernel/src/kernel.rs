@@ -221,7 +221,7 @@ impl Kernel {
                     )
                 })
                 .collect(),
-            schedule: vec![],
+            schedule: Default::default(),
         };
         for x in &w.structures {
             let f = s.types[&x.structure_type].footprint;
@@ -438,7 +438,7 @@ impl Kernel {
     fn advance(&mut self, to: i64) -> Output {
         let mut events = vec![];
         while self.state.schedule.first().is_some_and(|x| x.at <= to) {
-            let item = self.state.schedule.remove(0);
+            let item = self.state.schedule.pop_first().unwrap();
             self.state.t = item.at;
             events.extend(scheduled(&self.s, &mut self.state, item));
         }

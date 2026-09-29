@@ -14,6 +14,15 @@ A run never hangs silently or carries on against something broken. What happens 
 | One seed of a batch fails | Either | The other seeds finish and are measured. The CLI lists the failed seeds with their diagnoses, and exits 1. |
 | The spending limit is reached | By design | The run stops, says why, and debriefs from the 5% kept back. |
 
+## Signs of trouble that don't stop a run
+
+A run that finishes can still have gone wrong quietly. This session found two such bugs: steps a wake didn't get to were dropped, and the bank dropped payments at busy moments; nothing said so. Each run's summary has a `health` section, and `terrarium run` prints a `!` line under a seed for anything worth a look (`healthWarnings`, orchestrator/src/batch.ts):
+- **A module out of actions with more to do** in more than 1% of its steps. What a wake didn't get to carries over, so nothing is lost, but it may be falling behind: planning more than a wake allows (12 actions, `orchestration.max_actions_per_wake`), with a backlog that grows.
+- **Refusals other than the expected races** (someone who just left, or moving in where the last tenants are still leaving: D58). Anything else means a participant acted on something that wasn't so.
+- **Participants' errors,** recovered in place (above).
+
+`batch.json` keeps each run's health and warnings.
+
 ## Resuming a run
 
 ```bash
@@ -52,6 +61,8 @@ Where a run's time goes: each run's `<run>.summary.json` has a `profile`: each b
 | A lean log | 147 s | 88 s | 33 s |
 
 - **Modules rescanned their whole history on every decision,** so a run got slower as it went: a 5-year run took 46 minutes against 1 for 180 days. The bank reread every payment instruction ever made (3.6 ms a step by day 540); a shop reread every order it had ever had. `Book` now keeps each kind's standing statements as they arrive, and indexes records by type; order books, delivery notes and the bank read only what's new since last time. The same world comes out: the same commands, the same final state.
+- **The kernel's state grew for ever** (kernel 0.5.1). Every transfer was queued for every participant acting for an entity concerned, to be delivered through an accounts channel; a participant without one (the outside world's valuer and landfill, the town's councillors...) never took its queue, so it grew with every transaction the town or the outside world made, and the whole state with it. Each act runs on a copy of the state (to throw away if it's refused), so every act got slower. Transactions are now queued only for those with an accounts channel. And the schedule of future effects (birthdays, births, conditions) was a list copied whole on every act; it's a persistent map now, written out as the same list.
+- **A day's work isn't carried to the next day.** What a wake didn't get to carries over (above), but a step with work in it spent that day's hours; when the day's over it's dropped, and its module hears it wasn't done (as if refused), so a shop puts the order back in its queue.
 - **The kernel mostly waited on the orchestrator,** one request at a time over the pipe. Everyone's looks in a round (nothing acts in between) are now sent together and their replies read in order: the kernel takes its requests strictly in turn, so the log is the same.
 
 **Log size.** A 5-year run of the 1,000-person town wrote about 2.5 GB. Two flags, for `terrarium run`:

@@ -31,6 +31,9 @@ import { because, between, Book, callAction, usd, cellsOf, commitmentOf, DAY, jo
 export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observation) => Step[]) {
   let todo: Step[] = [];
   let plannedAt = -1;
+  /** A day's work (a step with a `work` call) left undone when the day's over is dropped, not carried: it spent that day's
+   * hours. Its `then` hears it wasn't done, as if refused, so the module puts back what it counted on (an order served). */
+  const worksToday = (s: Step) => s.some((l) => (Array.isArray(l) ? l[1] : l).fn === "work");
   let sent: Step | undefined;
   return {
     step(obs: Observation): ParticipantAction {
@@ -41,7 +44,13 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
       absorb(obs);
       if (plannedAt !== obs.t) {
         // What a wake didn't get to (it allows only so many actions) is done first at the next: a module's state already
-        // counts on it (a price it holds as published, a payment as made), so it's never dropped.
+        // counts on it (a price it holds as published, a payment as made), so it's never dropped, but for a day's work
+        // once the day's over.
+        if (plannedAt >= 0 && Math.floor(obs.t / DAY) !== Math.floor(plannedAt / DAY)) {
+          const stale = todo.filter(worksToday);
+          todo = todo.filter((s) => !worksToday(s));
+          for (const s of stale) todo.unshift(...((s.then?.({ action: "", t: obs.t, status: "refused", refusal: { code: "not_done", detail: "a day's work not got to that day" } } as any) ?? []).filter((x) => x.length)));
+        }
         todo = [...todo, ...plan(obs).filter((s) => s.length)];
         plannedAt = obs.t;
       }

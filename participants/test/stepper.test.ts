@@ -20,3 +20,19 @@ test("what a wake didn't get to is done first at the next, never dropped (a modu
   const next = Array.from({ length: 10 }, () => which(s.step(obs(86_400))));
   expect(next).toEqual([...Array.from({ length: 8 }, (_, i) => `step ${12 + i}`), "step 100", "wait"]);
 });
+
+test("a day's work left undone when the day's over is dropped, and the module hears it wasn't done", () => {
+  let wake = 0;
+  const heard: string[] = [];
+  const work = (i: number): Step => {
+    const s = because(`work ${i}`, C.call("work", { task: "serve", units: C.text("1"), at: "shop" }));
+    s.then = (o) => { heard.push(`${i} ${o.status} ${o.refusal?.code ?? ""}`.trim()); };
+    return s;
+  };
+  const s = stepper(() => {}, () => (wake++ === 0 ? [...Array.from({ length: 12 }, (_, i) => note(i)), work(50), note(51)] : [note(100)]));
+  for (let i = 0; i < 12; i++) s.step(obs(3600));
+  // The next day: the day's work is dropped (and told so); the other leftover step still comes first.
+  const next = Array.from({ length: 3 }, () => which(s.step(obs(86_400 + 3600))));
+  expect(next).toEqual(["step 51", "step 100", "wait"]);
+  expect(heard).toEqual(["50 refused not_done"]);
+});

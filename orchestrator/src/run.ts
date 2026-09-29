@@ -92,6 +92,11 @@ export interface RunSummary {
   moduleMs: number;
   /** The orchestrator's own work: keeping participants' knowledge, parsing and resolving calls (profiling only). */
   platformMs: number;
+  /**
+   * Signs of trouble that don't stop a run (docs/reliability.md): wakes that ran out of actions with more to do, by
+   * module (often: falling behind), and refusals by their code.
+   */
+  health: { cut_short: { [module: string]: { wakes: number; participants: number } }; refused: { [code: string]: number } };
   /** Where the time went (profiling only): each behaviour module's deciding, and each kind of kernel command. */
   profile: { modules: { [module: string]: { ms: number; steps: number } }; kernel: { [command: string]: { ms: number; n: number } } };
   /** Failures to decide that were recovered in place (a module that threw, a model call that failed; D59). */
@@ -188,6 +193,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   let t = 0;
   let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
   const profModules: { [m: string]: { ms: number; steps: number } } = {};
+  const cutShort: { [m: string]: { wakes: number; participants: Set<string> } } = {};
+  const refusedBy: { [code: string]: number } = {};
   const profKernel: { [c: string]: { ms: number; n: number } } = {};
   let participantErrors = 0; // failures to decide, recovered in place (D59)
   const failures = new Map<string, number>(); // failures to decide in a row, by unit
@@ -456,7 +463,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     for (const r of rs) {
       if (r === null) continue;
       commands++;
-      for (const e of r.events) if (e.event === "action_refused") refused++;
+      for (const e of r.events) if (e.event === "action_refused") {
+        refused++;
+        refusedBy[e.code] = (refusedBy[e.code] ?? 0) + 1;
+      }
       noteNews(r.events);
       for (const pid of changed) await syncUnits(pid, t);
       changed.clear();
@@ -737,6 +747,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           failures.delete(x.u.key);
           const goesOn = await apply(x.u, r.value);
           if (goesOn && x.n + 1 < maxActions && units.get(x.u.key) === x.u) next.push({ u: x.u, n: x.n + 1 });
+          else if (goesOn && x.n + 1 >= maxActions) {
+            // Out of actions with more to do: it carries on at its next wake. Often, it's falling behind (health).
+            const h = (cutShort[x.u.module.name] ??= { wakes: 0, participants: new Set() });
+            h.wakes++;
+            h.participants.add(x.u.participant);
+          }
         }
         awake = next;
       }
@@ -768,6 +784,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
+    health: { cut_short: Object.fromEntries(Object.entries(cutShort).map(([k, v]) => [k, { wakes: v.wakes, participants: v.participants.size }])), refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) } };
 }
 
