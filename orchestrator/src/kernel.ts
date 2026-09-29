@@ -1,5 +1,6 @@
-// A client for the kernel's NDJSON protocol (kernel/src/protocol.rs). The
-// kernel runs as a subprocess; one request line in, one response line out.
+// A client for the kernel's protocol (kernel/src/protocol.rs): one request in, one reply out. The engine runs
+// in-process through its native module (kernel/crates/napi; docs/design/rebuild.md section 5.1) when it's built, or as
+// a subprocess speaking the same requests over stdio (TERRARIUM_ENGINE=stdio, or no native module).
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -14,6 +15,28 @@ export function kernelBinary(): string {
   throw new Error("kernel binary not found: run `bun run kernel` (cargo build --release) or set TERRARIUM_KERNEL");
 }
 
+/** The engine's native module (kernel/crates/napi), if built: `bun run engine`. */
+export function engineModule(): string | undefined {
+  const env = process.env.TERRARIUM_ENGINE_MODULE;
+  if (env) return env;
+  const root = join(import.meta.dir, "../..");
+  for (const dir of ["kernel/target/release", "kernel/target/debug"]) for (const f of ["libterrarium_napi.dylib", "libterrarium_napi.so", "terrarium_napi.dll"]) {
+    if (existsSync(join(root, dir, f))) return join(root, dir, f);
+  }
+  return undefined;
+}
+
+interface NativeSession { request(line: string): string; close(): void }
+let native: { KernelSession: new () => NativeSession } | undefined;
+function loadNative(path: string) {
+  if (!native) {
+    const m = { exports: {} as any };
+    process.dlopen(m, path);
+    native = m.exports;
+  }
+  return native!;
+}
+
 /** The kernel refused a request (a protocol error: off-contract input, never logged). */
 export class KernelError extends Error {}
 
@@ -22,19 +45,37 @@ export class KernelError extends Error {}
 export class KernelDied extends Error {}
 
 export class Kernel {
-  private proc: Bun.Subprocess<"pipe", "pipe", "inherit">;
-  private reader: ReadableStreamDefaultReader<Uint8Array>;
+  private proc?: Bun.Subprocess<"pipe", "pipe", "inherit">;
+  private reader?: ReadableStreamDefaultReader<Uint8Array>;
+  private session?: NativeSession;
+  private dead?: string; // an in-process session ended by kill(): why
   private buf = "";
   private decoder = new TextDecoder();
   /** Called before each request is sent (the run's breadcrumbs, D59). */
   onRequest?: (req: any) => void;
+  /** How the engine runs: in this process, or as a subprocess. */
+  readonly transport: "inprocess" | "stdio";
 
-  constructor(binary = kernelBinary()) {
-    this.proc = Bun.spawn([binary, "serve"], { stdin: "pipe", stdout: "pipe", stderr: "inherit" });
-    this.reader = this.proc.stdout.getReader();
+  constructor(binary?: string) {
+    const mod = binary === undefined && process.env.TERRARIUM_ENGINE !== "stdio" ? engineModule() : undefined;
+    if (mod) {
+      this.transport = "inprocess";
+      this.session = new (loadNative(mod).KernelSession)();
+    } else {
+      this.transport = "stdio";
+      this.proc = Bun.spawn([binary ?? kernelBinary(), "serve"], { stdin: "pipe", stdout: "pipe", stderr: "inherit" });
+      this.reader = this.proc.stdout.getReader();
+    }
+  }
+
+  /** One request in-process: the same line in, the same line out. */
+  private local(req: object): any {
+    if (this.dead) throw new KernelDied(this.dead);
+    return JSON.parse(this.session!.request(JSON.stringify(req)));
   }
 
   private async line(): Promise<string> {
+    const proc = this.proc!, reader = this.reader!;
     for (;;) {
       const nl = this.buf.indexOf("\n");
       if (nl >= 0) {
@@ -42,10 +83,10 @@ export class Kernel {
         this.buf = this.buf.slice(nl + 1);
         return l;
       }
-      const { value, done } = await this.reader.read();
+      const { value, done } = await reader.read();
       if (done) {
-        const code = await Promise.race([this.proc.exited, Bun.sleep(1000).then(() => undefined)]);
-        throw new KernelDied(`the kernel process ended${code === undefined ? "" : ` (exit ${code}${this.proc.signalCode ? `, ${this.proc.signalCode}` : ""})`} while a request was waiting for its reply`);
+        const code = await Promise.race([proc.exited, Bun.sleep(1000).then(() => undefined)]);
+        throw new KernelDied(`the kernel process ended${code === undefined ? "" : ` (exit ${code}${proc.signalCode ? `, ${proc.signalCode}` : ""})`} while a request was waiting for its reply`);
       }
       this.buf += this.decoder.decode(value, { stream: true });
     }
@@ -54,9 +95,14 @@ export class Kernel {
   /** Send one request; resolves to the reply, or throws KernelError on {ok:false}. */
   async request(req: object): Promise<any> {
     this.onRequest?.(req);
+    if (this.session) {
+      const reply = this.local(req);
+      if (!reply.ok) throw new KernelError(reply.error);
+      return reply;
+    }
     try {
-      this.proc.stdin.write(JSON.stringify(req) + "\n");
-      this.proc.stdin.flush();
+      this.proc!.stdin.write(JSON.stringify(req) + "\n");
+      this.proc!.stdin.flush();
     } catch (e) {
       throw new KernelDied(`the kernel process can't be written to: ${(e as Error).message}`);
     }
@@ -73,9 +119,13 @@ export class Kernel {
   async tryRequestMany(reqs: object[]): Promise<(any | null)[]> {
     if (!reqs.length) return [];
     for (const r of reqs) this.onRequest?.(r);
+    if (this.session) return reqs.map((r) => {
+      const reply = this.local(r);
+      return reply.ok ? reply : null;
+    });
     try {
-      this.proc.stdin.write(reqs.map((r) => JSON.stringify(r)).join("\n") + "\n");
-      this.proc.stdin.flush();
+      this.proc!.stdin.write(reqs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+      this.proc!.stdin.flush();
     } catch (e) {
       throw new KernelDied(`the kernel process can't be written to: ${(e as Error).message}`);
     }
@@ -97,13 +147,21 @@ export class Kernel {
     }
   }
 
-  /** End the kernel process at once (a run that failed). */
+  /** End the kernel at once (a run that failed): a subprocess is killed; an in-process session is ended, and every
+   * request after it fails as a dead kernel's would. */
   kill(): void {
-    this.proc.kill();
+    if (this.session) {
+      this.dead = "the kernel was ended while the run was going on";
+      this.session.close();
+    } else this.proc!.kill();
   }
 
   async close(): Promise<void> {
-    this.proc.stdin.end();
-    await this.proc.exited;
+    if (this.session) {
+      this.session.close();
+      return;
+    }
+    this.proc!.stdin.end();
+    await this.proc!.exited;
   }
 }

@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "test": "bun test",
-    "kernel": "cargo build --release --manifest-path kernel/Cargo.toml",
+    "kernel": "cargo build --release --manifest-path kernel/Cargo.toml --workspace",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "engines": {

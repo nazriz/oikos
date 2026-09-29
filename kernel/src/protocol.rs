@@ -19,25 +19,58 @@ use serde_json::{json, Value};
 use std::fs::File;
 use std::io::{BufRead, BufWriter, Write};
 
+/// One connection's run: the same requests and replies whether they arrive over stdio (`serve`) or in-process
+/// (the engine's native module, docs/design/rebuild.md section 5.1).
+#[derive(Default)]
+pub struct Session {
+    run: Option<Run<BufWriter<File>>>,
+}
+
+impl Session {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// One request, one reply (never an error: a refused request is `{"ok":false,"error":..}`).
+    pub fn request(&mut self, req: &Value) -> Value {
+        handle(&mut self.run, req).unwrap_or_else(|e| json!({ "ok": false, "error": e }))
+    }
+
+    /// One request as a line of JSON, its reply as one.
+    pub fn request_line(&mut self, line: &str) -> String {
+        let reply = match serde_json::from_str::<Value>(line) {
+            Ok(req) => self.request(&req),
+            Err(e) => json!({ "ok": false, "error": format!("request is not JSON: {e}") }),
+        };
+        reply.to_string()
+    }
+
+    /// The connection closed: a run still open ends as aborted (errors if it already ended, which is fine).
+    pub fn close(&mut self) {
+        if let Some(mut r) = self.run.take() {
+            let _ = r.finish("aborted", Some("orchestrator closed the connection"));
+        }
+    }
+}
+
+impl Drop for Session {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()> {
-    let mut run: Option<Run<BufWriter<File>>> = None;
+    let mut session = Session::new();
     for line in input.lines() {
         let line = line?;
         if line.trim().is_empty() {
             continue;
         }
-        let reply = match serde_json::from_str::<Value>(&line) {
-            Ok(req) => handle(&mut run, &req).unwrap_or_else(|e| json!({ "ok": false, "error": e })),
-            Err(e) => json!({ "ok": false, "error": format!("request is not JSON: {e}") }),
-        };
-        serde_json::to_writer(&mut output, &reply)?;
+        output.write_all(session.request_line(&line).as_bytes())?;
         output.write_all(b"\n")?;
         output.flush()?;
     }
-    if let Some(mut r) = run {
-        // Errors if the run already ended, which is fine.
-        let _ = r.finish("aborted", Some("orchestrator closed the connection"));
-    }
+    session.close();
     Ok(())
 }
 

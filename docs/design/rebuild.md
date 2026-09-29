@@ -356,7 +356,7 @@ Proposed together, for one sign-off:
 ## 11. Performance and scale
 
 **Targets:**
-- The 1,000-person town: a year in under 15 seconds (about 22 today);
+- The 1,000-person town: a year in under 30 seconds (about 130 today, measured 2026-09-30 with today's citizens; the earlier 22 seconds predates the AI citizen);
 - five years across three seeds: under 10 minutes (about 40 today, in parallel);
 - 50,000 participants (cohorts, foundation-for-scale phase D) at a practical pace.
 
@@ -432,6 +432,9 @@ Proposed together, for one sign-off:
   - all 72 orchestrator and 38 participant tests pass.
 
   A 0.5 log (pilot 8) needs the 0.5 binary, as it always did.
+- **R1, second step** (2026-09-30): the engine in-process. The kernel's request handler is a `Session`, which both stdio and a native module (`terrarium-napi`, N-API) use; the orchestrator's `Kernel` runs in-process when the module is built (`TERRARIUM_ENGINE=stdio` for the subprocess).
+  - Gate: the same world's log and anchors are byte-identical either way (180 days, 1,000 people); all suites pass in-process (83 kernel, 72 orchestrator, 38 participant tests).
+  - **Speed:** a year of the 1,000-person town takes 134 s over stdio and 123 s in-process, with the same final state. Only 8% faster: the engine's own work (about 82 s: validating every input against the schemas, canonical hashing, building observations, the log) is the cost, not the pipe. That's R2's to take on.
 
 **After the rebuild,** on the new platform:
 1. The labour market (search frictions) and goods prices under shortage, calibrated with the health report watching every other measure.
