@@ -31,6 +31,7 @@ export interface Profile {
     retirement_age: number;
     labour_force_participation_bps: number;
     tenancy: { rent_review_months: number; rent_increase_notice_days: number };
+    values: { [value: string]: { mean_bps: number; sd_bps: number } };
     industrial_action: { ballot_turnout_bps: number; ballot_pass_bps: number; notice_days: number; paid_during_action: boolean };
     world_price_process: { [kind: string]: { sd_bps: number; persistence_bps: number } };
     credit: {

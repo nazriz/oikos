@@ -681,6 +681,7 @@ export function generate(spec: TownSpec): any {
     complain_to: "city", complain_bps: V.services.complain_bps,
     union: "union", union_join_bps: V.unions.membership_bps,
     participation_bps: V.labour_force_participation_bps, child_template_outside_lf: "child-outside-lf",
+    values: { values: V.values }, // (people's values, for their minds: docs/design/ai-citizens.md 3a)
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,
     saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
     retirement_age: V.retirement_age, support_from: "outside", support_kinds: { retired: "pension", unemployed: "unemployment" },
