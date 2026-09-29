@@ -824,7 +824,7 @@ See the design note, §16.
   - **Commitments are typed** (`Does`: an outcome in the vocabulary the call language already wrote, or words), so no commitment is a convention only code can read. Nothing running used another shape; four contract examples and the kernel's tests did, and were migrated.
   - **A channel can show statements having an offer or a practice (`match.has`),** whatever their kind, so a new kind of offer is seen without configuring for it. Kernel test: a festival fund's offer is seen; the fund's plain report isn't.
   - **The call language's `statement` takes `offer` and `practice`,** so a model publishes them as code does.
-  - **Open (for Naz):** the contract family is still "0.5" though typed commitments are a breaking change. Recommended: rename to 0.6 in one mechanical commit once the blocks are done.
+  - **Contracts 0.6** (Naz: "yes rename to 0.6"): typed commitments are a breaking change, so the contract family is renamed. Configs and logs say `contracts: "0.6"`; a log from 0.5 replays with a 0.5 kernel.
 
 - **AI citizens, step 2: laws without hidden fields, and offers published** (docs/design/ai-citizens.md 2a, 2e).
   - **Laws bind code participants only through their formal conditions,** as any participant reads a law (`breaches` in participants/src/behaviour/common.ts, lifted from the planning office).

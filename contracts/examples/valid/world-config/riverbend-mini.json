@@ -1,5 +1,5 @@
 {
-  "contracts": "0.5",
+  "contracts": "0.6",
   "meta": {
     "name": "Riverbend (mini)",
     "description": "Contract example for v0.3: a town whose laws, procedures and ownership are records, run by people in roles. The mayor works through a finance office, a planning office and an inspector; money is held and moved by a bank.",

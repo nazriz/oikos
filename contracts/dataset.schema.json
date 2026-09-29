@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.5:dataset",
+  "$id": "urn:terrarium:contracts:0.6:dataset",
   "title": "Run dataset (0.1.0)",
   "description": "A run's data, derived deterministically from its log, joined and flattened into examples a training run can use (docs/design/run-datasets.md). A folder per run: manifest.json (Manifest), systems.jsonl (SystemPrompt), translations.jsonl (Translation), decisions.jsonl (Decision), and optionally actions.jsonl (Action) and observations.jsonl (ObservationRow). The log stays the record; a dataset can always be made again from it.",
   "$defs": {
@@ -27,8 +27,8 @@
           "additionalProperties": false,
           "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "seed": { "type": "integer" } }
         },
-        "config_hash": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
-        "initial_state_hash": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "config_hash": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash" },
+        "initial_state_hash": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash" },
         "log": {
           "description": "The log it was made from: its file name, entries, and the last entry's hash (which pins the whole chain).",
           "type": "object",
@@ -36,8 +36,8 @@
           "additionalProperties": false,
           "properties": {
             "file": { "type": "string" },
-            "entries": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" },
-            "last_hash": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" }
+            "entries": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count" },
+            "last_hash": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash" }
           }
         },
         "versions": {
@@ -47,10 +47,10 @@
           "additionalProperties": false,
           "properties": {
             "contracts": { "type": "string" },
-            "kernel": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+            "kernel": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
             "orchestrator": { "type": "string" },
-            "modules": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
-            "translator": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+            "modules": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
+            "translator": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" }
           }
         },
         "seats": {
@@ -59,15 +59,15 @@
           "required": ["models"],
           "additionalProperties": false,
           "properties": {
-            "models": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
-            "prices": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+            "models": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
+            "prices": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" }
           }
         },
         "end": {
           "type": "object",
           "required": ["t"],
           "additionalProperties": false,
-          "properties": { "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" }, "reason": { "type": "string" } }
+          "properties": { "t": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime" }, "reason": { "type": "string" } }
         },
         "files": {
           "description": "Each file written: its rows, and how many are synthetic (from the mock).",
@@ -76,7 +76,7 @@
             "type": "object",
             "required": ["rows"],
             "additionalProperties": false,
-            "properties": { "rows": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" }, "synthetic": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" } }
+            "properties": { "rows": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count" }, "synthetic": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count" } }
           }
         }
       }
@@ -87,7 +87,7 @@
       "additionalProperties": false,
       "properties": {
         "run": { "type": "string" },
-        "sha256": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "sha256": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash" },
         "text": { "type": "string" }
       }
     },
@@ -98,8 +98,8 @@
       "additionalProperties": false,
       "properties": {
         "turn": { "type": "integer", "minimum": 1 },
-        "input": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
-        "output": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+        "input": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
+        "output": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" }
       }
     },
     "Executed": {
@@ -108,9 +108,9 @@
       "required": ["seq", "applied"],
       "additionalProperties": false,
       "properties": {
-        "seq": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" },
+        "seq": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count" },
         "applied": { "type": "boolean" },
-        "refusal": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+        "refusal": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" }
       }
     },
     "Translation": {
@@ -120,13 +120,13 @@
       "properties": {
         "run": { "type": "string" },
         "draft": { "type": "string" },
-        "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" },
+        "t": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime" },
         "participant": { "type": "string" },
         "as": { "type": "string" },
         "proposal": { "type": "string" },
         "model": { "type": "string" },
         "synthetic": { "type": "boolean" },
-        "system_sha256": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "system_sha256": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash" },
         "exchange": { "type": "array", "items": { "$ref": "#/$defs/Turn" } },
         "retries": {
           "type": "array",
@@ -138,13 +138,13 @@
           }
         },
         "result": { "enum": ["drafted", "failed", "unknown"] },
-        "translator": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "translator": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
         "call": { "type": "string" },
         "blocks": { "type": "array" },
         "summary": { "type": "string" },
-        "check": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "check": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
         "caveats": { "type": "string" },
-        "failure": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "failure": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
         "signoff": {
           "type": "object",
           "required": ["decision"],
@@ -160,15 +160,15 @@
       "required": ["seq", "command"],
       "additionalProperties": false,
       "properties": {
-        "seq": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" },
+        "seq": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count" },
         "command": { "type": "string" },
         "as": { "type": "string" },
         "blocks": { "type": "array" },
         "looks": { "type": "array" },
-        "provenance": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "provenance": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
         "reasoning": { "type": "string" },
         "applied": { "type": "boolean" },
-        "refusal": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+        "refusal": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" }
       }
     },
     "Decision": {
@@ -178,15 +178,15 @@
       "additionalProperties": false,
       "properties": {
         "run": { "type": "string" },
-        "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" },
+        "t": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime" },
         "participant": { "type": "string" },
         "purpose": { "type": "string" },
         "model": { "type": "string" },
         "synthetic": { "type": "boolean" },
-        "system_sha256": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "system_sha256": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Hash" },
         "turn": { "type": "integer", "minimum": 1 },
-        "input": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
-        "output": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "input": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
+        "output": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" },
         "tokens": {
           "type": "object",
           "additionalProperties": false,
@@ -203,15 +203,15 @@
       "additionalProperties": false,
       "properties": {
         "run": { "type": "string" },
-        "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" },
-        "seq": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" },
+        "t": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime" },
+        "seq": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Count" },
         "participant": { "type": "string" },
         "as": { "type": "string" },
         "reasoning": { "type": "string" },
         "call": { "type": "string" },
         "blocks": { "type": "array" },
         "applied": { "type": "boolean" },
-        "refusal": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+        "refusal": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" }
       }
     },
     "ObservationRow": {
@@ -221,10 +221,10 @@
       "additionalProperties": false,
       "properties": {
         "run": { "type": "string" },
-        "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" },
+        "t": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/SimTime" },
         "participant": { "type": "string" },
         "as": { "type": "string" },
-        "observation": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+        "observation": { "$ref": "urn:terrarium:contracts:0.6:common#/$defs/Opaque" }
       }
     }
   }

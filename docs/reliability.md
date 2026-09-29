@@ -44,6 +44,7 @@ This runs the world again from the log's own config: not the world file, which m
 - **The watchdog runs for runs started by the CLI** (`run`, `run-one`, `resume`). A program calling `runWorld` directly passes its own `watchdog`, or has none.
 - **Resume re-runs from the start.** For a two-year town that takes seconds. For very long runs (centuries), resuming from a kernel checkpoint would be needed, restoring the kernel's state and every module's. Not built yet.
 - **Logs from before contracts v0.5** (the pilots of 2026-09-28) can't be resumed: the v0.5 kernel won't load their config.
+- **Logs from contracts 0.5** (before 2026-09-29's typed commitments) replay and resume with a 0.5 kernel (kernel 0.5.x, before 0.6.0): the 0.6 kernel won't load their config.
 - **Resume is tested with the mock model** (including a log cut off mid-line), not yet against a real one.
 - **Resource growth over very long runs** (log size, memory) isn't addressed yet.
 
