@@ -391,3 +391,24 @@ export class Ties {
     this.aff.set(who, { bps: Math.max(-10_000, Math.min(10_000, this.affinity(who, t) + Math.round(bps))), t });
   }
 }
+
+// ---------------------------------------------------------------- goals with steps (HTN, lite)
+
+/**
+ * A goal pursued by methods tried in turn: hierarchical task networks, one level deep (each method a way to the goal,
+ * the way HTN planners choose among methods for a task; docs/design/ai-citizens.md 3d). Each method is given time to
+ * work; the goal is met when the need behind it recovers, and given up when no method is left.
+ */
+export class Pursuit {
+  step = 0;
+  constructor(readonly goal: string, readonly methods: string[], public since: number) {}
+  get method(): string | undefined {
+    return this.methods[this.step];
+  }
+  /** The next method (from now), if there's one left. */
+  next(t: number): string | undefined {
+    this.step += 1;
+    this.since = t;
+    return this.method;
+  }
+}

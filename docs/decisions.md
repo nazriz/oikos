@@ -894,6 +894,12 @@ See the design note, §16.
   - **Changed tests:** complaints come from about a week's worth of waste, not exactly two weeks.
   - **Revisit if:** a sourced complaint rate (complaints rose from 1–2 to 11–21 a year in the 1,000-person town); help, gossip and reputation; or emotions in decision records (a contract change).
 
+- **AI citizens, step 7: goals with steps** (HTN, one level; docs/design/ai-citizens.md "Progress"; docs/behaviour/citizen.md "Goals").
+  - A need long unmet becomes a goal, pursued by methods tried in turn (value-ordered, each with time to work), met when the need recovers, given up for a while when none is left. The methods act through what citizens already do: the job search, the saving share, the home hunt's budget, catching up, the practice decision.
+  - **Why one level:** the multi-step behaviours (a home hunt, switching jobs) already exist as sequences. What was missing was persistence and choosing among ways to a goal.
+  - **Recorded** as decisions in domain `goal` (the contract's `domain` is free text).
+  - **Revisit if:** goals need sub-goals (moving house as a plan with its own steps), or methods need learning (EWA over methods: which worked for people like me).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

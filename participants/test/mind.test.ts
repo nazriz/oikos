@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { Attractions, appraise, drawPerson, factsOf, Feelings, satisfaction, strategy, Ties, value, NEEDS, VALUES } from "../src/behaviour/mind";
+import { Attractions, appraise, drawPerson, factsOf, Feelings, Pursuit, satisfaction, strategy, Ties, value, NEEDS, VALUES } from "../src/behaviour/mind";
 import { Randomness } from "../src/rng";
 
 const rng = (k: string) => new Randomness(7n).stream([k]);
@@ -113,4 +113,12 @@ test("feelings fade by their half-life; a milder cause doesn't lessen a stronger
   expect(t.affinity("c1", 180 * DAY)).toBe(1_150);
   t.add("c2", -20_000, 0);
   expect(t.affinity("c2", 0)).toBe(-10_000);
+});
+
+test("a goal is pursued by one method after another, and runs out", () => {
+  const g = new Pursuit("make ends meet", ["spend less", "cheaper home"], 0);
+  expect(g.method).toBe("spend less");
+  expect(g.next(90)).toBe("cheaper home");
+  expect(g.since).toBe(90);
+  expect(g.next(180)).toBeUndefined();
 });

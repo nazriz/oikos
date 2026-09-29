@@ -35,11 +35,16 @@ import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Hea
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
-import { factsOf, Feelings, Mind, MIND_DEFAULTS, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
+import { factsOf, Feelings, Mind, MIND_DEFAULTS, Pursuit, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
 /** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
  * certainty a gathering takes it (with 20 or more others there), and being told; how strongly it's held to say so; and
  * how much it adds to the worth of the gatherings of those who teach it. */
+/** Goals (docs/behaviour/citizen.md "Goals"; placeholders): how long a need goes unmet before it becomes a goal, how long
+ * each method is given, how long after giving up before trying again; the needs' levels that count as unmet; what
+ * spending less saves, and how much cheaper a cheaper home is (of the old rent). */
+const GOALS = { unmet_days: 60, method_days: 90, rest_days: 180, security_bps: 3_000, social_bps: 4_000, spend_less_saving_bps: 2_000, cheaper_bps: 9_000 };
+
 const BELIEF = { fade_bps: 150, display_bps: 500, told_bps: 300, tell_at_bps: 6_000, meaning: 0.2 };
 
 /** How far a person's values sway the cited rates (a fraction of the rate per standard deviation of the value):
@@ -143,6 +148,7 @@ export const citizen: BehaviourModule = {
       // much it adds to the worth of the gatherings of those who teach it.
       beliefs: {} as { [teaching: string]: number },
       belief: BELIEF,
+      goals: GOALS,
       goods: "goods",
       leave_after_homeless_days: 90,
       leave_after_jobless_days: 180,
@@ -188,6 +194,7 @@ export const citizen: BehaviourModule = {
   );
     p.sway = { ...SWAY, ...(ctx.params.sway ?? {}) }; // a world may set some and keep the rest
     p.belief = { ...BELIEF, ...(ctx.params.belief ?? {}) };
+    p.goals = { ...GOALS, ...(ctx.params.goals ?? {}) };
     const me = ctx.entity;
     const childTemplate = () => (p.child_template_outside_lf && ctx.rng("child-participation").below(10_000) >= p.participation_bps ? p.child_template_outside_lf : p.child_template);
     const book = new Book();
@@ -231,6 +238,13 @@ export const citizen: BehaviourModule = {
     const feelings = new Feelings();
     const ties = new Ties();
     const leadFrom = new Map<string, string>(); // a building someone told us to look at -> who told us
+    // Goals: what we're pursuing, by which method; since when each need has gone unmet; when we may try again after
+    // giving up; and, looking for a cheaper home, the rent to beat (for the first month of the hunt).
+    const pursuits = new Map<string, Pursuit>();
+    const unmetSince = new Map<string, number>();
+    const restUntil = new Map<string, number>();
+    let cheaperThan: { rent: number; until: number } | null = null;
+    const pursuing = (method: string) => [...pursuits.values()].some((x) => x.method === method);
     // (Fear for our money makes us less sure of our options where money's at stake: we look harder at them.)
     const MONEY_MATTERS = new Set(["shop", "job", "home"]);
     const decide = (domain: string, t: number, rng: Rng, o: Parameters<Mind["decide"]>[2]) => {
@@ -629,7 +643,9 @@ export const citizen: BehaviourModule = {
       }
       // A tenancy that has ended: move out and stop paying rent.
       if (home && t >= home.endsAt) {
-        const s: Step = because(`Our tenancy of ${home.space} has ended: moving out and stopping the rent.`, ...(home.movedIn ? [moveOut(home.structure, me)] : []));
+        // Looking for somewhere cheaper (a goal's method): for the first month of the hunt, only homes that beat this rent.
+        if (pursuing("cheaper home")) cheaperThan = { rent: Math.floor((home.rent * p.goals.cheaper_bps) / 10_000), until: t + MONTH };
+        const s: Step = because(`Our tenancy of ${home.space} has ended: moving out and stopping the rent${cheaperThan ? `; we'll look for somewhere cheaper, under ${usd(cheaperThan.rent)} a month` : ""}.`, ...(home.movedIn ? [moveOut(home.structure, me)] : []));
         if (home.order) s.push(withdraw(home.order, "Tenancy ended; stop this standing order."));
         for (const x of home.retiring ?? []) s.push(withdraw(x.order, "Tenancy ended; stop this standing order."));
         home.retiring = [];
@@ -694,6 +710,47 @@ export const citizen: BehaviourModule = {
       levelsNow = needLevels();
       // Afraid for our money when it's running short (the security need well below met).
       if (levelsNow.security < 5_000) feelings.feel("fear", "money", (5_000 - levelsNow.security) * 2, t);
+      // Goals (HTN, lite): a need long unmet becomes a goal, pursued by one method, then another, in the order our values
+      // favour; met when the need recovers, given up (for a while) when nothing's left to try. Each choice is recorded.
+      {
+        const G = p.goals;
+        const ways: { [goal: string]: { need: "security" | "social"; below: number; methods: [string, boolean, number][] } } = {
+          "make ends meet": { need: "security", below: G.security_bps, methods: [
+            ["better work", !retired && p.in_labour_force, zValue("achievement") + zValue("stimulation")],
+            ["spend less", true, zValue("security") + zValue("conformity")],
+            ["cheaper home", !!home && isLeaseholder(), zValue("security") - zValue("tradition")],
+          ] },
+          "more company": { need: "social", below: G.social_bps, methods: [
+            ["catch up more", contacts.size > 0, zValue("benevolence")],
+            ["try a gathering", book.practices().length > 0, (zValue("stimulation") + zValue("benevolence")) / 2],
+          ] },
+        };
+        for (const [goal, w] of Object.entries(ways)) {
+          const pur = pursuits.get(goal);
+          if (levelsNow[w.need] >= w.below) {
+            unmetSince.delete(goal);
+            if (pur) pursuits.delete(goal);
+            continue;
+          }
+          if (!unmetSince.has(goal)) unmetSince.set(goal, t);
+          const record = (choice: string | undefined, options: [string, boolean, number][]) =>
+            decided.push({ t, domain: "goal", strategy: "deliberate", ...(choice ? { choice: `${goal}: ${choice}` } : {}), options: options.map(([m, , z]) => ({ key: `${goal}: ${m}`, score: Math.round(z * 1_000) })) });
+          if (!pur && t - unmetSince.get(goal)! >= G.unmet_days * DAY && t >= (restUntil.get(goal) ?? 0)) {
+            const open = w.methods.filter(([, ok]) => ok).sort((a, b) => b[2] - a[2] || (a[0] < b[0] ? -1 : 1));
+            if (open.length) {
+              pursuits.set(goal, new Pursuit(goal, open.map(([m]) => m), t));
+              record(open[0]![0], open);
+            }
+          } else if (pur && t - pur.since >= G.method_days * DAY) {
+            const next = pur.next(t);
+            record(next, w.methods.filter(([m]) => pur.methods.includes(m)));
+            if (!next) {
+              pursuits.delete(goal);
+              restUntil.set(goal, t + G.rest_days * DAY);
+            }
+          }
+        }
+      }
       const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt });
       if (!job && joblessSince === null) joblessSince = t;
 
@@ -943,6 +1000,8 @@ export const citizen: BehaviourModule = {
               ],
               current: wentLast.has(r.id) ? r.id : stayedLast.has(r.id) ? "stay" : undefined, // our routine, if we have one
               levels: needLevels(), circ: circumstances(),
+              // (Trying a gathering, for company: our evenings aren't enough, and we give each real thought.)
+              ...(pursuing("try a gathering") && !wentLast.has(r.id) ? { satisfied_here: 0, doubt: 10_000 } : {}),
             });
             if (d.key === r.id) {
               going.set(r.id, start);
@@ -1111,11 +1170,13 @@ export const citizen: BehaviourModule = {
       // A month's spending: out of income, what isn't saved (the saving ratio), less housing; never below essentials;
       // plus a little out of savings above a buffer (the wealth effect). Income is a month's worth of what came in lately
       // (before we've a window of it, what our job and payments say).
+      /** What we save of income: the household's usual share, or more while we're spending less (a goal's method). */
+      const saving = () => (pursuing("spend less") ? Math.max(p.saving_bps, p.goals.spend_less_saving_bps) : p.saving_bps);
       const monthly = () => {
         const housing = home?.rent ?? share?.cents ?? 0;
         const seen = t >= p.income_window_days * DAY;
         const income = seen ? Math.floor((inflows.reduce((x, f) => x + f.amount, 0) * MONTH) / (p.income_window_days * DAY)) : monthlyIncome();
-        const fromIncome = Math.max(p.essentials, Math.floor((income * (10_000 - p.saving_bps)) / 10_000) - housing);
+        const fromIncome = Math.max(p.essentials, Math.floor((income * (10_000 - saving())) / 10_000) - housing);
         const above = Math.max(0, acc.balance - housing - p.buffer_months * Math.max(income, p.essentials));
         const fromWealth = Math.floor((above * p.wealth_effect_bps_per_year) / 12 / 10_000);
         return Math.max(0, Math.min(acc.balance - housing, fromIncome + fromWealth));
@@ -1179,7 +1240,7 @@ export const citizen: BehaviourModule = {
           const s = priceAt(favourite)!;
           const q = Math.floor(budget / s.price);
           carried = Math.max(0, Math.min(budget - q * s.price, s.price));
-          buy(s, q, `Shopping for the fortnight: what we don't save of our income (${100 - p.saving_bps / 100}%) less the rent, and a little out of savings${deferred ? `, and ${usd(deferred)} we meant to spend last time and got back` : ""}, is ${usd(budget)}: ${q} at ${s.shop} (${usd(s.price)} each)${why ? `; ${why}` : ""}.`);
+          buy(s, q, `Shopping for the fortnight: what we don't save of our income (${100 - saving() / 100}%${pursuing("spend less") ? ": spending less, to make ends meet" : ""}) less the rent, and a little out of savings${deferred ? `, and ${usd(deferred)} we meant to spend last time and got back` : ""}, is ${usd(budget)}: ${q} at ${s.shop} (${usd(s.price)} each)${why ? `; ${why}` : ""}.`);
           deferred = 0;
         }
       } else if (t >= nextSpend) {
@@ -1271,7 +1332,7 @@ export const citizen: BehaviourModule = {
       askedHow = [];
       if (nextCatchUp === null) nextCatchUp = t + ctx.rng("catch-up").below(p.catch_up_days) * DAY;
       if (t >= nextCatchUp) {
-        nextCatchUp = t + p.catch_up_days * DAY;
+        nextCatchUp = t + Math.round((p.catch_up_days * DAY) / (pursuing("catch up more") ? 2 : 1));
         if (known.length) {
           // Whom: more often those we're closer to.
           const pool = [...known].sort();
@@ -1420,7 +1481,9 @@ export const citizen: BehaviourModule = {
         }
         if (plannedAt !== obs.t) {
           const acc = ownBanked(obs, me);
-          const budget = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
+          const usual = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
+          if (cheaperThan && (home || obs.t >= cheaperThan.until)) cheaperThan = null;
+          const budget = cheaperThan ? Math.min(usual, cheaperThan.rent) : usual;
           const needHome = isLeaseholder() && !home;
           const rooms = minBedrooms(obs.t);
           const roomy = rooms > 0 ? [{ field: "data.bedrooms", op: ">=" as const, value: rooms }] : [];
@@ -1443,7 +1506,7 @@ export const citizen: BehaviourModule = {
             // Looking for a better job (CONSUMAT, docs/design/ai-citizens.md 3b): every month if our life falls short of
             // what we want; otherwise now and then, the more open we are.
             const unsatisfied = satisfaction(mind.person, levelsNow) < mind.p.aspiration_bps;
-            searchingWork = unsatisfied || ctx.rng(`job-search-${obs.t}`).below(10_000) < Math.round(mind.person.temperament.openness / 10);
+            searchingWork = unsatisfied || pursuing("better work") || ctx.rng(`job-search-${obs.t}`).below(10_000) < Math.round(mind.person.temperament.openness / 10);
           }
           if (lookedAt !== obs.t && acc) {
             if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], order: { field: "data.rent", desc: true }, limit: p.search_limit } });

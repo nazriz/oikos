@@ -304,6 +304,18 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
     - fear lowering certainty everywhere sent people's club-going to coin flips: with two options, being sure of one sits exactly at the certainty threshold. Fear now weighs only where money's at stake.
     - Anger at the town lingered after the waste went, so a complaint now needs the waste still there.
   - **Not yet:** the other social moves (help, snub, gossip), reputations, feelings toward things.
+- **Goals with steps** (3d; HTN, one level; 2026-09-29, citizen 0.18.0):
+  - A need unmet for two months becomes a goal, pursued by methods in the order the person's values favour, each given three months.
+    - **Making ends meet:** better work, spending less, or a cheaper home at the lease's end.
+    - **More company:** catching up more, or trying a gathering.
+  - Met when the need recovers; given up, for a while, when nothing's left.
+  - **Recorded** as decisions (domain `goal`): what's chosen, and how each method scored.
+  - **One year, two seeds:**
+    - making ends meet, pursued by spending less 76/80 times, a cheaper home 22/22, better work 2/3;
+    - company, by trying a gathering 26/26;
+    - 53/52 gave up;
+    - employment 67.3/65.6%; median rent share 20.4/20.6% (target 20.2%).
+  - Better work is rare because the people short of money are mostly outside the labour force. Catching up more is never first, because those who form the goal have nobody to catch up with.
 - **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
 - **The cited priors, now swayed by the person** (3e; 2026-09-29):
   - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).
