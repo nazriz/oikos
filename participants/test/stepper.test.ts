@@ -36,3 +36,14 @@ test("a day's work left undone when the day's over is dropped, and the module he
   expect(next).toEqual(["step 51", "step 100", "wait"]);
   expect(heard).toEqual(["50 refused not_done"]);
 });
+
+test("a step that counts from when it's done is made again if it's done later than planned", () => {
+  let wake = 0;
+  const made: number[] = [];
+  const notice = (at: number): Step => { made.push(at); return Object.assign(because(`notice from ${at + 5}`, C.call("message", { to: C.json(["x"]), text: C.text("n") })), { redo: notice }); };
+  const s = stepper(() => {}, () => (wake++ === 0 ? [...Array.from({ length: 12 }, (_, i) => note(i)), notice(0)] : []));
+  for (let i = 0; i < 12; i++) s.step(obs(0));
+  // Carried to the next wake, at 3600: remade for then.
+  expect(which(s.step(obs(3600)))).toBe("notice from 3605");
+  expect(made).toEqual([0, 3600]);
+});

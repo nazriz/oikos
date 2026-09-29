@@ -22,9 +22,9 @@
 
 **Differs from the BoE model on purpose:** that model injects cash so tenants never miss rent. Here arrears happen, and what follows is up to the landlord.
 
-**Rent reviews (landlord 0.8.0):** where the world's tenancy law allows rent to rise (`rent_review_months`, and the notice due, `rent_increase_notice_days`: from the world's profile; none unless it's set), a landlord reviews each tenancy's rent once a review period:
+**Rent reviews (landlord 0.9.0):** a landlord reviews each tenancy's rent once a review period. The period and the notice it gives are its own practice (`rent_review_months`, `rent_increase_notice_days`: none, 0), bounded by the world's law on rent increases where there is one: a law statement with `data: { law: "rent_increases", review_months, notice_days }`, which the landlord reads like anyone else, so a law changed in the world (by its lawmakers, or a steward) changes what landlords do. It reviews as often as the law allows, and gives at least the notice the law requires. (The generator publishes the law from the profile's `tenancy`.) At each review:
 - it raises the rent to what it would ask for that home now (its markup over what similar homes in the building let for, or its base rent), if that's more;
-- it gives the notice the law requires, with a `rent_increase` statement to the tenant (`data: { lease, rent, from, was }`);
+- it gives the notice the law requires, with a `rent_increase` statement to the tenant (`data: { lease, rent, from, was }`), counted from when the notice is given (if a busy wake gives it a day late, the date moves with it);
 - it never lowers a tenancy's rent (an unlet home's asking rent falls instead);
 - the rent it expects, for arrears, follows the increases.
 

@@ -26,26 +26,38 @@ async function run(name: string, config: any, until: number) {
 
 test("rents are reviewed within the tenancy law, never down, and tenants pay the new rent or leave", async () => {
   const config = generate(base);
-  const law = { months: config.participants.find((p: any) => p.controller?.impl === "firm.landlord").controller.params.rent_review_months, notice: config.participants.find((p: any) => p.controller?.impl === "firm.landlord").controller.params.rent_increase_notice_days };
+  // The world's law, not the profile's: reviews every 6 months, with 45 days' notice. Landlords read the law.
+  const record = config.world.records.find((r: any) => r.kind === "law" && r.data?.law === "rent_increases");
+  Object.assign(record.data, { review_months: 6, notice_days: 45 });
+  const law = { months: 6, notice: 45 };
   const { ev, recs } = await run("rents", config, 15 * MONTH);
   const increases = recs.filter((r) => r.kind === "rent_increase");
   expect(increases.length).toBeGreaterThan(5);
   const byLease = new Map<string, any[]>();
   for (const r of increases) byLease.set(r.data.lease, [...(byLease.get(r.data.lease) ?? []), r]);
   for (const [, rs] of byLease) for (let i = 1; i < rs.length; i++) expect(rs[i].at - rs[i - 1].at).toBeGreaterThanOrEqual(law.months * MONTH);
+  // (As often as the law allows: some tenancies reviewed twice in 15 months.)
+  expect([...byLease.values()].some((rs) => rs.length >= 2)).toBe(true);
   for (const r of increases) {
     expect(r.data.from - r.at).toBeGreaterThanOrEqual(law.notice * DAY);
     expect(Number(r.data.rent)).toBeGreaterThan(Number(r.data.was));
     // The tenant answers (given a week to): a standing order for the new rent, or notice on the lease.
     if (r.at > 15 * MONTH - 7 * DAY) continue;
     const tenant = r.addressed_to[0];
-    const pays = recs.some((x) => x.kind === "request" && x.speaks_for === tenant && x.basis === r.data.lease && x.data?.outcome?.money?.amount === String(r.data.rent) && x.at >= r.at);
+    const order = recs.find((x) => x.kind === "request" && x.speaks_for === tenant && x.basis === r.data.lease && x.data?.outcome?.money?.amount === String(r.data.rent) && x.at >= r.at);
+    const pays = !!order;
     const leaves = recs.some((x) => x.record === "notice" && x.agreement === r.data.lease && x.as === tenant && x.at >= r.at);
     expect(pays || leaves).toBe(true);
-    // And pays it from when it starts (if still there then).
-    if (pays && r.data.from < 15 * MONTH - 35 * DAY) {
+    // And pays it from when it starts, having paid the old rent until then, no month missed (if the tenancy's still
+    // going: no notice on it, the new rent's order not stopped, as at a tenancy's end, and the tenant alive).
+    const before = r.data.from + 35 * DAY;
+    const ended = recs.some((x) => x.record === "notice" && x.agreement === r.data.lease && x.at < before) || recs.some((x) => x.record === "withdrawal" && x.withdraws === order?.id && x.at < before)
+      || ev.some((e) => e.event === "person_died" && e.person === tenant && e.t < before);
+    if (pays && !ended && r.data.from < 15 * MONTH - 35 * DAY) {
       const landlordAccount = `acc-${r.speaks_for}`;
-      expect(ev.some((e) => e.event === "transfer" && e.to === landlordAccount && e.amount === String(r.data.rent) && e.t >= r.data.from)).toBe(true);
+      const paid = ev.filter((e) => e.event === "transfer" && e.to === landlordAccount && e.from === `acc-${tenant}`);
+      expect(paid.some((e) => e.amount === String(r.data.rent) && e.t >= r.data.from)).toBe(true);
+      for (let at = r.at; at + 31 * DAY <= r.data.from + 31 * DAY; at += 30 * DAY) expect(paid.some((e) => e.t >= at && e.t < at + 31 * DAY)).toBe(true);
     }
   }
 }, 600_000);

@@ -44,4 +44,3 @@ A town spec names its profile (`profile: au-vic-2026`); a spec can override a fi
   - Victoria's rules in the example legal code.
 
   The rules are general in form, but they were chosen with one place in mind. As a second profile is added, each should be checked.
-- **Some laws are still module parameters:** industrial action's ballot, notice and no-pay, and tenancy's rent reviews and notice. They should be law records a world configures (D18/D19).

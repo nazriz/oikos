@@ -70,17 +70,19 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
     for (const party of ["union", c]) config.world.records.push({ id: `member-${c}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: ["union", c], speaks_for: party, agreement: `member-${c}`, as: party });
   }
   for (const p of config.participants) if (p.controller?.impl === "citizen.default") Object.assign(p.controller.params, { ballot_turnout_bps: 10_000, strike_vote_yes_bps: 10_000 });
+  // The world's industrial law, not the profile's: 5 days' notice. The union reads the law.
+  config.world.records.find((r: any) => r.kind === "law" && r.data?.law === "industrial_action").data.notice_days = 5;
   const { ev, recs } = await run("strike", config, 100);
   const ballot = recs.find((r) => r.kind === "action_ballot");
   expect(ballot).toBeDefined();
   const result = recs.find((r) => r.kind === "ballot_result" && r.data.ballot === ballot.id);
   expect(result.data.passed).toBe(true);
   expect(result.data.voted * 2).toBeGreaterThanOrEqual(result.data.eligible);
-  // Notice before each stoppage, at least the law's three days.
+  // Notice before each stoppage, at least the law's five days.
   const notices = recs.filter((r) => r.kind === "industrial_action");
   const stops = recs.filter((r) => r.kind === "stop_work");
   expect(stops.length).toBeGreaterThanOrEqual(1);
-  for (const s of stops) expect(notices.some((n) => n.at <= s.at - 3 * DAY)).toBe(true);
+  for (const s of stops) expect(notices.some((n) => n.at <= s.at - 5 * DAY && n.at > s.at - 8 * DAY)).toBe(true);
   // On strike: members leave the works, and their pay stops (their wage orders withdrawn); back: in again, paid again.
   const first = stops[0];
   const back = recs.find((r) => r.kind === "return_to_work" && r.at > first.at);

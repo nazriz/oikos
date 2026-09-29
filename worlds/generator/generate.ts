@@ -472,6 +472,18 @@ export function generate(spec: TownSpec): any {
     text: `Rates: every owner of land in the town (but the town) owes the town ${ratePpm / 10_000}% of its value a year, as the valuer values it, in ${V.public_finance.rates_instalments} instalments, each due ${V.public_finance.rates_due_days} days after its notice. Or else: interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year on what's overdue.`,
     adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, or_else: `interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year` },
     data: { tax: "rates", rate_ppm: ratePpm, instalments: V.public_finance.rates_instalments, due_days: V.public_finance.rates_due_days, penalty_interest_bps: V.public_finance.rates_penalty_interest_bps } });
+  // Laws on rent increases and on industrial action, from the profile: records the landlords and the union (and
+  // employers) read, and lawmakers can change, never module parameters (docs/profiles.md).
+  const TN = V.tenancy;
+  records.push({ id: "law-rent-increases", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
+    text: `A residential rent may be increased no more than once every ${TN.rent_review_months} months, and only with at least ${TN.rent_increase_notice_days} days' written notice to the tenant. Or else: the increase is invalid.`,
+    adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent", condition: `more than once in ${TN.rent_review_months} months, or with less than ${TN.rent_increase_notice_days} days' written notice`, or_else: "the increase is invalid" },
+    data: { law: "rent_increases", review_months: TN.rent_review_months, notice_days: TN.rent_increase_notice_days } });
+  const IA = V.industrial_action;
+  records.push({ id: "law-industrial-action", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
+    text: `Industrial action is protected only if a ballot of the members concerned approves it, with at least ${IA.ballot_turnout_bps / 100}% of them voting and more than ${IA.ballot_pass_bps / 100}% of the votes yes, and the employer has at least ${IA.notice_days} days' written notice.${IA.paid_during_action ? "" : " An employer must not pay employees for time on protected action."}`,
+    adico: { attribute: "unions", deontic: "must_not", aim: "take industrial action", condition: `without an approving ballot (${IA.ballot_turnout_bps / 100}% voting, more than ${IA.ballot_pass_bps / 100}% yes) and ${IA.notice_days} days' notice`, or_else: "the action is unprotected" },
+    data: { law: "industrial_action", ballot_turnout_bps: IA.ballot_turnout_bps, ballot_pass_bps: IA.ballot_pass_bps, notice_days: IA.notice_days, paid_during_action: IA.paid_during_action } });
   const mine = (id = "mine") => ({ id, kind: "records", match: { involving: ["self"] } });
   const votes = { id: "votes", kind: "records", match: { records: ["vote"] } };
   // Attention: the housing and job markets, and the petitions board, are looked at when the citizen wants to (on request),
@@ -557,7 +569,7 @@ export function generate(spec: TownSpec): any {
       maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste" }));
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
-  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }],
+  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }, lawBook],
     code("union.organiser", { employers: [...factories, ...shops, "builder"], claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, dues_account: "acc-union" }));
   office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"] } }],
     code("world.disposal", { kind: "waste", price_per_tonne: SV.landfill_levy_per_tonne, account: "acc-outside" }));
@@ -597,10 +609,9 @@ export function generate(spec: TownSpec): any {
       notes: { type: "text", description: "Anything else the office should know." } } } });
   for (const l of landlords) {
     const theirCells = records.filter((r) => r.record === "claim" && r.holder === l).map((r) => cellOf.get(r.about.object)!);
-    office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "own-sites", kind: "sites", area: theirCells.length ? theirCells : "all", occupants: "names" }, deaths],
+    office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "own-sites", kind: "sites", area: theirCells.length ? theirCells : "all", occupants: "names" }, deaths, lawBook],
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
-        city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000,
-        rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days }));
+        city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000 }));
   }
   // What the town's firms sell and buy: their price lists, and the world market's buying offers.
   const market = { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"] } };

@@ -3,13 +3,13 @@
 // A union is an organisation workers join (membership: dues by standing order). Its organiser bargains with each
 // employer where it has members, once a year: a claim for the year's rise in prices and a margin. An offer of at least
 // a share of the claim is accepted, and the employer makes it an enterprise agreement. Otherwise, protected action as
-// labour law commonly has it (the world's figures; the sources are in the doc): a ballot of the members there (enough
+// labour law commonly has it (the world's industrial law, a record it publishes): a ballot of the members there (enough
 // voting, a majority yes), notice to the employer, then stoppages, longer each time, until an offer it accepts.
 
 import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, MONTH, offer, pay, say, type Step } from "./common";
+import { because, Book, lawInForce, DAY, MONTH, offer, pay, say, type Step } from "./common";
 import { stepper } from "./firms";
 
 interface Dispute {
@@ -27,7 +27,7 @@ interface Dispute {
 
 export const organiser: BehaviourModule = {
   name: "union.organiser",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -41,9 +41,11 @@ export const organiser: BehaviourModule = {
         first_claim_days: 60, // its first claims, spread over this long (placeholder)
         respond_days: 14, // an offer awaited this long before balloting
         ballot_days: 10,
-        ballot_turnout_bps: 5000, // at least this share of the members voting (the law's)
-        ballot_pass_bps: 5000, // more than this share of the votes yes (the law's)
-        notice_days: 3, // notice of action (the law's)
+        // The union's own rules for taking action; the world's industrial law, where there is one, may ask more (the
+        // share voting, the share of votes yes, the notice): the stricter of the two is kept.
+        ballot_turnout_bps: 0, // at least this share of the members voting
+        ballot_pass_bps: 5000, // more than this share of the votes yes
+        notice_days: 0, // notice of action
         stoppage_days: [1, 2, 3] as number[], // each stoppage, longer each time (placeholder)
         between_days: 7, // after a stoppage, an improved offer awaited this long before the next
         price_kind: "goods", // prices tracked for the claim (shops' price lists)
@@ -65,6 +67,8 @@ export const organiser: BehaviourModule = {
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
+        const law = lawInForce(book, "industrial_action"); // what the law asks of action (none: only our own rules)
+        const noticeDays = Math.max(p.notice_days, Number(law?.notice_days ?? 0));
         // Members: the register at the start, and those who've joined since (membership agreements in force).
         for (const r of book.all("membership_register")) for (const m of (r.data?.members as { member: string; employer: string }[]) ?? []) if (!employerOf.has(m.member)) employerOf.set(m.member, m.employer);
         const inForce = new Set(book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties[0] === me && book.inForce(r.id)).map((r: any) => r.terms.parties[1] as string));
@@ -140,7 +144,9 @@ export const organiser: BehaviourModule = {
             const latest = new Map<string, string>();
             for (const v of votes.sort((a, b) => a.at - b.at)) latest.set(voter(v), v.choice);
             const yes = [...latest.values()].filter((c) => c === "yes").length;
-            const passed = latest.size * 10_000 >= p.ballot_turnout_bps * x.members.length && yes * 10_000 > p.ballot_pass_bps * latest.size;
+            const turnout = Math.max(p.ballot_turnout_bps, Number(law?.ballot_turnout_bps ?? 0));
+            const pass = Math.max(p.ballot_pass_bps, Number(law?.ballot_pass_bps ?? 0));
+            const passed = latest.size * 10_000 >= turnout * x.members.length && yes * 10_000 > pass * latest.size;
             steps.push(because(`The ballot at ${employer}: ${latest.size} of ${x.members.length} voted, ${yes} yes: ${passed ? "protected action is approved" : "not approved"}.`,
               say("ballot_result", `Protected action ballot at ${employer}: ${latest.size} of ${x.members.length} members voted, ${yes} yes; ${passed ? "approved" : "not approved"}.`, { to: [employer, ...x.members], visible: [me, employer, ...x.members], basis: x.ballot, data: { employer, ballot: x.ballot, voted: latest.size, yes, eligible: x.members.length, passed } })));
             if (!passed) {
@@ -156,11 +162,15 @@ export const organiser: BehaviourModule = {
           if (x.stage === "claimed" && x.ballot && t - x.since >= p.between_days * DAY) {
             const days = p.stoppage_days[Math.min(x.stoppages, p.stoppage_days.length - 1)]!;
             x.stage = "notified";
-            x.from = t + p.notice_days * DAY;
-            x.until = x.from + days * DAY;
             x.members = members;
-            steps.push(because(`Notice to ${employer}: our members there stop work for ${days} day${days > 1 ? "s" : ""}, in ${p.notice_days} days.`,
-              say("industrial_action", `Notice of protected action: our members at ${employer} will stop work for ${days} day${days > 1 ? "s" : ""} from day ${Math.floor(x.from / DAY)}.`, { to: [employer, ...members], visible: "public", data: { employer, from: x.from, until: x.until, members } })));
+            // The notice counts from when it's given (later than now, if a wake runs out of actions first).
+            const give = (at: number): Step => {
+              x.from = at + noticeDays * DAY;
+              x.until = x.from + days * DAY;
+              return Object.assign(because(`Notice to ${employer}: our members there stop work for ${days} day${days > 1 ? "s" : ""}, in ${noticeDays} days.`,
+                say("industrial_action", `Notice of protected action: our members at ${employer} will stop work for ${days} day${days > 1 ? "s" : ""} from day ${Math.floor(x.from / DAY)}.`, { to: [employer, ...members], visible: "public", data: { employer, from: x.from, until: x.until, members } })), { redo: give });
+            };
+            steps.push(give(t));
             continue;
           }
           if (x.stage === "notified" && t >= x.from!) {

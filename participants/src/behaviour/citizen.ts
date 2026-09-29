@@ -40,12 +40,16 @@ export const ASKING = { home: "I'm looking for somewhere to live. Do you know of
 type Want = keyof typeof ASKING;
 
 /** A home is a unit (a space) in a building. */
-interface Home { agreement: string; space: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean }
+interface Home {
+  agreement: string; space: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean;
+  /** Rent orders replaced by a new rent's, to stop once their last payment is made (when). */
+  retiring?: { order: string; at: number }[];
+}
 interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; endsAt: number; since: number; paidAt?: number; claimed?: boolean }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.15.0",
+  version: "0.16.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -458,10 +462,17 @@ export const citizen: BehaviourModule = {
         if (job?.agreement === r.agreement) job.endsAt = Math.min(job.endsAt, r.at + notice);
       }
 
+      // An old rent's last payment made: stopping its order (the new rent's has taken over).
+      if (home?.retiring?.some((x) => t >= x.at)) {
+        for (const x of home.retiring.filter((x) => t >= x.at)) steps.push(because("The old rent's last payment is made: stopping its order; the new rent's takes over.", withdraw(x.order, "Rent increased; replaced by a new standing order.")));
+        home.retiring = home.retiring.filter((x) => t < x.at);
+      }
       // A tenancy that has ended: move out and stop paying rent.
       if (home && t >= home.endsAt) {
         const s: Step = because(`Our tenancy of ${home.space} has ended: moving out and stopping the rent.`, ...(home.movedIn ? [moveOut(home.structure, me)] : []));
         if (home.order) s.push(withdraw(home.order, "Tenancy ended; stop this standing order."));
+        for (const x of home.retiring ?? []) s.push(withdraw(x.order, "Tenancy ended; stop this standing order."));
+        home.retiring = [];
         if (s.length) steps.push(s);
         // The children come out with us (each on its own, in case one isn't there); the other adults are told.
         if (home.movedIn) for (const k of children(t)) steps.push(because("Our tenancy has ended: taking the children out with us.", moveOut(home.structure, k.person)));
@@ -587,8 +598,20 @@ export const citizen: BehaviourModule = {
         const rentTo = lease ? leaseTerms(lease, me).rentTo : undefined;
         if (affordable(rent, acc.balance) && rentTo) {
           const s: Step = because(`Our rent goes up to ${usd(rent)} a month (from ${usd(home.rent)}): still within our budget, so we'll pay it from when it starts.`);
-          if (home.order) s.push(withdraw(home.order, "Rent increased; replaced by a new standing order."));
-          s.push(["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: Math.max(0, r.data.from - t), basis: home.agreement, for: `Rent for ${home.space}, monthly in advance.` })]);
+          // The new rent is paid on the same days as the old, from the first after it starts; the old order runs until
+          // then, and is stopped once its last payment is made (a bank's standing order has no end date to give it).
+          let starts = Math.max(t, Number(r.data.from));
+          let stopAt = t;
+          const old = home.order ? (book.records.get(home.order) as any) : undefined;
+          if (old && Number.isInteger(old.data?.every) && old.data.every > 0) {
+            const every = old.data.every as number;
+            const due0 = old.at + (Number.isInteger(old.data.first) ? old.data.first : every);
+            starts = due0 >= starts ? due0 : due0 + Math.ceil((starts - due0) / every) * every;
+            stopAt = starts - every + DAY;
+          }
+          if (home.order && stopAt <= t) s.push(withdraw(home.order, "Rent increased; replaced by a new standing order."));
+          else if (home.order) home.retiring = [...(home.retiring ?? []), { order: home.order, at: stopAt }];
+          s.push(["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: starts - t, basis: home.agreement, for: `Rent for ${home.space}, monthly in advance.` })]);
           steps.push(s);
           home.rent = rent;
           home.order = undefined;
@@ -980,6 +1003,8 @@ export const citizen: BehaviourModule = {
       const s: Step = because(why);
       if (home) {
         if (home.order) s.push(withdraw(home.order));
+        for (const x of home.retiring ?? []) s.push(withdraw(x.order));
+        home.retiring = [];
         s.push(notice(home.agreement, "Leaving town."));
       }
       if (share?.order) s.push(withdraw(share.order, "Leaving town."));

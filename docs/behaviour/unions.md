@@ -23,11 +23,11 @@ The union's organiser bargains once a year with each employer where it has membe
 
 ## Protected action
 
-This follows Australia's *Fair Work Act 2009*, Part 3-3; the figures are parameters.
+The rules come from the world's industrial law (union 0.2.0), a law statement with `data: { law: "industrial_action", ballot_turnout_bps, ballot_pass_bps, notice_days, paid_during_action }`. The union, and employers, read it like anyone else, so a law changed in the world changes what they do. The union's own rules (parameters: no turnout, a majority, no notice) apply where the world has no such law, and the stricter of the two where it has. The generated town's law is the profile's `industrial_action`; for Victoria, the *Fair Work Act 2009*, Part 3-3, as below.
 - **Ballot.** If the offer is too low, or none comes within 14 days, the union ballots its members at that employer on protected action. It needs at least half of them voting (s 459(1)(b)) and more than half of the votes yes (s 459(1)(c)). Members vote with the chance of voting and of voting yes (placeholders: 70%, 85%). Protected action ballots usually pass.
 - **Notice.** Approved, the union gives the employer 3 days' notice of a stoppage (s 414: three working days).
 - **Stoppages.** The members there stop work: they leave the workplace and come back when the union calls the return. The stoppages get longer each time (1, 2, 3 days: placeholders), a week apart while no acceptable offer comes.
-- **Pay.** Workers on strike aren't paid for the time (s 470). The employer stops their wage orders at the stoppage. At the return, it pays what they earned between their last pay day and the stoppage, and restarts their wages a period on. Nothing in the kernel docks anyone's pay: the employer does it.
+- **Pay.** Workers on strike aren't paid for the time (s 470; and no work, no pay where there's no such law, unless a law says they're paid: `paid_during_action`). The employer stops their wage orders at the stoppage. At the return, it pays what they earned between their last pay day and the stoppage, and restarts their wages a period on. Nothing in the kernel docks anyone's pay: the employer does it.
 - **Concession.** After each stoppage, the employer raises its offer by half the gap to the claim, and to all of it after three stoppages. This follows Hicks (1932), *The Theory of Wages*: the employer's concession grows with the cost of holding out, as the union's resistance falls. The dispute ends in an agreement.
 - **Not approved:** the union lets it rest and claims again in three months.
 

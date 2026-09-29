@@ -19,7 +19,7 @@ import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
-import { because, between, Book, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
+import { because, between, Book, lawInForce, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -51,12 +51,16 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
           todo = todo.filter((s) => !worksToday(s));
           for (const s of stale) todo.unshift(...((s.then?.({ action: "", t: obs.t, status: "refused", refusal: { code: "not_done", detail: "a day's work not got to that day" } } as any) ?? []).filter((x) => x.length)));
         }
-        todo = [...todo, ...plan(obs).filter((s) => s.length)];
+        const fresh = plan(obs).filter((s) => s.length);
+        for (const s of fresh) s.planned ??= obs.t;
+        todo = [...todo, ...fresh];
         plannedAt = obs.t;
       }
       todo.unshift(...follow.filter((s) => s.length));
-      const next = todo.shift();
+      let next = todo.shift();
       if (!next) return wait();
+      // Done later than planned: a step that counts from when it's done is made again for now (a notice's date).
+      if (next.redo && next.planned !== undefined && next.planned !== obs.t) next = next.redo(obs.t);
       sent = next;
       return callAction(next);
     },
@@ -72,7 +76,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.8.0",
+  version: "0.9.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -99,10 +103,11 @@ export const landlord: BehaviourModule = {
       // Occupancy policy: turn down a household with more than this many people per bedroom (0: no limit). Two is the
       // occupancy standard's own ceiling (CNOS); whether a landlord applies it is the landlord's choice (placeholder).
       max_people_per_bedroom: 2,
-      // Reviewing rents (docs/behaviour/firms.md): how often a tenancy's rent may rise, and the notice due, are the
-      // world's tenancy law (from its profile); none unless the world says.
+      // Reviewing rents (docs/behaviour/firms.md): the landlord's own practice, how often it reviews a tenancy's rent
+      // and the notice it gives (none: it doesn't, unless the law allows it). The world's law on rent increases, where
+      // there is one, bounds it: no more often than the law allows, and at least the notice it requires.
       rent_review_months: null as number | null,
-      rent_increase_notice_days: 60,
+      rent_increase_notice_days: 0,
     },
     ctx.params,
   );
@@ -285,10 +290,13 @@ export const landlord: BehaviourModule = {
 
       // Rent reviews: once a review period (the world's tenancy law), a tenancy's rent goes up to what we'd ask for the
       // home now, if that's more, with the notice the law requires. (It never goes down: an unlet home's asking rent does.)
-      if (p.rent_review_months) for (const a of active) {
+      const rentLaw = lawInForce(book, "rent_increases");
+      const reviewMonths = rentLaw ? Math.max(Number(rentLaw.review_months ?? 0), p.rent_review_months ?? 0) : p.rent_review_months;
+      const noticeDays = Math.max(p.rent_increase_notice_days, Number(rentLaw?.notice_days ?? 0));
+      if (reviewMonths) for (const a of active) {
         if (noticeGiven.has(a.id)) continue;
         const since = lastReview.get(a.id) ?? book.signedAt(a.id)!;
-        if (t - since < p.rent_review_months * MONTH) continue;
+        if (t - since < reviewMonths * MONTH) continue;
         lastReview.set(a.id, t);
         const tenant = tenantOf(a);
         const unit = owned.find((o) => o.space === leaseTerms(a, tenant).space);
@@ -300,10 +308,15 @@ export const landlord: BehaviourModule = {
         const ref = others.length ? Math.floor(others.reduce((x, y) => x + y, 0) / others.length) : Math.max(now, baseRent);
         const market = Math.floor((ref * (10_000 + p.markup_bps)) / 10_000);
         if (market <= now) continue;
-        const from = t + p.rent_increase_notice_days * DAY;
-        rentChanges.set(a.id, [...(rentChanges.get(a.id) ?? []), { from, rent: market }]);
-        steps.push(because(`A rent review (every ${p.rent_review_months} months, by law): what we'd ask for ${unit.space} now is ${usd(market)} a month (${p.markup_bps / 100}% over ${others.length ? "what similar homes in the building let for" : "the base rent"}), above the ${usd(now)} it lets for: raising it, with ${p.rent_increase_notice_days} days' notice.`,
-          say("rent_increase", `Notice of rent increase for ${unit.space}: ${usd(market)} a month from ${Math.floor(from / DAY)} (day), up from ${usd(now)}.`, { to: [tenant], visible: [me, tenant], basis: a.id, data: { lease: a.id, rent: market, from, was: now } })));
+        // The notice counts from when it's given: if that's later than now, the date moves with it.
+        const change = { from: t + noticeDays * DAY, rent: market };
+        rentChanges.set(a.id, [...(rentChanges.get(a.id) ?? []), change]);
+        const give = (at: number): Step => {
+          change.from = at + noticeDays * DAY;
+          return Object.assign(because(`A rent review (every ${reviewMonths} months${rentLaw ? ", as the law allows" : ""}): what we'd ask for ${unit.space} now is ${usd(market)} a month (${p.markup_bps / 100}% over ${others.length ? "what similar homes in the building let for" : "the base rent"}), above the ${usd(now)} it lets for: raising it, with ${noticeDays} days' notice.`,
+            say("rent_increase", `Notice of rent increase for ${unit.space}: ${usd(market)} a month from ${Math.floor(change.from / DAY)} (day), up from ${usd(now)}.`, { to: [tenant], visible: [me, tenant], basis: a.id, data: { lease: a.id, rent: market, from: change.from, was: now } })), { redo: give });
+        };
+        steps.push(give(t));
       }
 
       // Monthly: owners spend part of the income locally; upkeep is bought from outside.
@@ -749,6 +762,8 @@ export class Bargaining {
     }
     for (const s of book.open("stop_work").filter(mine)) {
       this.handled.add(s.id);
+      // No work, no pay, unless the law says strikers are paid.
+      if (lawInForce(book, "industrial_action")?.paid_during_action === true) continue;
       this.strikers = ((s.data?.members as string[]) ?? []).filter((w) => staff.some((a) => a.terms.parties[1] === w));
       steps.push(...staffing.stop(book, t, this.strikers, `A strike by ${s.speaks_for}'s members: no pay for the time on strike.`));
     }

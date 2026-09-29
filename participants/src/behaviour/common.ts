@@ -116,6 +116,18 @@ export class Book {
   }
 }
 
+/**
+ * The law in force on a matter, as far as we've seen: the latest law statement standing whose data names the matter
+ * (`data.law`), with what it says. Laws are records a world, or its lawmakers, publishes (D18/D19), never a module's
+ * parameters: a module reads the law as a person would, so a law changed in the world changes what everyone does. None:
+ * there's no such law.
+ */
+export function lawInForce(book: Book, matter: string): { [k: string]: any } | undefined {
+  let best: StatementRecord | undefined;
+  for (const r of book.open("law")) if ((r.data as any)?.law === matter && (!best || r.at > best.at || (r.at === best.at && r.id > best.id))) best = r;
+  return best ? { ...(best.data as object), id: best.id } : undefined;
+}
+
 /** Signatures on a petition this participant can see: votes with choice "sign", one per signing entity (the organiser sees them all). */
 export function petitionSignatures(book: Book, petition: string): number {
   const who = new Set<string>();
@@ -151,7 +163,12 @@ export function ownAccount(obs: Observation): { account: string; balance: number
  * One atomic act: lines of calls, optionally binding a name (whose id comes back in the outcome's `created`), and
  * optionally why: the rule that fired, in plain words, which goes into the log with the act (its `reasoning`).
  */
-export type Step = (C.Call | [string, C.Call])[] & { why?: string; then?: (o: ActOutcome) => Step[] | void };
+/**
+ * A step: calls in one action, with its reason, what follows from its outcome (`then`), and, for a step whose content
+ * depends on when it's done (a notice counting from today), how to make it again for a later moment (`redo`), should it
+ * be done later than planned (a wake allows only so many actions). `planned`: when it was planned (the stepper's).
+ */
+export type Step = (C.Call | [string, C.Call])[] & { why?: string; then?: (o: ActOutcome) => Step[] | void; redo?: (t: number) => Step; planned?: number };
 
 /** A step with its reason: `because("Rent is due", pay(...))`. */
 export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): Step => Object.assign(lines, { why });
