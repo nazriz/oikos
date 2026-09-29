@@ -189,7 +189,10 @@ export function appraise(p: Person, f: Facts, circ: { monthly_income: number; sa
   const scale = Math.max(100_000, circ.monthly_income + Math.floor(circ.savings / 12)); // a month's means, at least $1,000
   const money = f.money_per_month / scale; // this month's money against a month's means
   const moneyValue = Math.sign(money) * Math.log1p(Math.abs(money)) * 10_000;
-  const home = f.home ? (circ.homeless ? 10_000 : 2_000) * (f.home.bedrooms !== undefined && circ.homeBedroomsNeeded !== undefined && f.home.bedrooms < circ.homeBedroomsNeeded ? 0.5 : 1) : 0;
+  // A home: most to the homeless; half as much if it's short of the bedrooms needed; a little more for each spare one
+  // (room, up to two).
+  const spare = f.home?.bedrooms !== undefined && circ.homeBedroomsNeeded !== undefined ? f.home.bedrooms - circ.homeBedroomsNeeded : 0;
+  const home = f.home ? (circ.homeless ? 10_000 : 2_000) * (spare < 0 ? 0.5 : 1) + Math.min(2, Math.max(0, spare)) * 1_500 : 0;
   const workCost = f.work_hours_per_month ? Math.min(3_000, f.work_hours_per_month * 15) : 0; // ~160 h a month: -2,400
   return {
     subsistence: Math.round(f.goods_per_month ? Math.min(10_000, f.goods_per_month * 800) : 0),

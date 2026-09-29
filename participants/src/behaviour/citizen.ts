@@ -720,13 +720,25 @@ export const citizen: BehaviourModule = {
       if (isLeaseholder() && !home) {
         const fits = (l: StatementRecord) => !applied.has(l.id) && affordable(l.data?.rent ?? Infinity, acc.balance) && (l.data?.bedrooms ?? 0) >= minBedrooms(t);
         const told = leadFound.homes.filter(fits);
-        const listings = (told.length ? told : found.homes).filter(fits);
-        listings.sort((a, b) => b.data.rent - a.data.rent || (a.id < b.id ? -1 : 1));
-        const best = listings[0];
+        const listings = [...told, ...found.homes.filter((l) => !told.includes(l))].filter(fits);
+        // Which one: the mind's (docs/design/ai-citizens.md 3). Each home's offer (its rent) and its bedrooms appraised
+        // against needs; where friends told us to look counts as others having gone there. (A home we can't afford, or
+        // without the bedrooms we must have, isn't considered.)
+        const need = household ? bedroomsNeeded(household, t, year) : 1;
+        const toldBy = new Set(told.map((l) => l.id));
+        const d = listings.length ? mind.decide("home", ctx.rng(`home-${t}`), {
+          options: listings.map((l) => {
+            const f = l.offer ? factsOf(l.offer) : { money_per_month: -(l.data?.rent ?? 0), home: {} };
+            return { key: l.id, facts: { ...f, home: { ...(f.home ?? {}), ...(Number.isInteger(l.data?.bedrooms) ? { bedrooms: l.data!.bedrooms as number } : {}) } }, others: toldBy.has(l.id) ? 1 : 0 };
+          }),
+          levels: needLevels(), circ: { ...circumstances(), homeBedroomsNeeded: need }, satisfied_here: 0,
+        }) : undefined;
+        const best = listings.find((l) => l.id === d?.key);
         if (best?.speaks_for) {
           applied.add(best.id);
           const members = household?.members.map((m) => m.person) ?? [me];
-          steps.push(because(`Applying for ${best.data.space}: the dearest home we've seen (rent standing for quality) within a third of household income, with at least ${minBedrooms(t)} bedrooms${told.length ? ", where someone told us to look" : ""}.`,
+          const how = d!.strategy === "imitate" ? "where someone told us to look" : "weighing each home's rent and room";
+          steps.push(because(`Applying for ${best.data.space}: within a third of household income, with at least ${minBedrooms(t)} bedrooms, ${how}.`,
             say("rental_application", `Application for ${best.data.space ?? best.data.structure}, for a household of ${members.length}.`, { to: [best.speaks_for], visible: [me, best.speaks_for],
             data: { listing: best.id, account: acc.account, members, household: { people: members.length, bedrooms_needed: household ? bedroomsNeeded(household, t, year) : 0 } }, basis: best.id })));
         }

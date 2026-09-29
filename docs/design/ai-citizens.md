@@ -251,12 +251,13 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
 - **Wired through the mind** (participants/src/behaviour/mind.ts; each area passes the full suite):
   - shopping: which shop, by CONSUMAT and what's learned; retries by what's learned (2026-09-29).
   - work: which posting, each offer's wage and hours appraised, with what's learned of each employer (one that didn't pay is remembered); friends' leads count as others having gone there. In work, only better-paid postings are considered (2026-09-29).
+  - housing: which home, each offer's rent and the home's bedrooms appraised (room beyond the bedrooms needed counts for a little); friends' leads count as others having gone there. Homes unaffordable, or short of the bedrooms a household must have, aren't considered. It replaces "the dearest home within budget, rent standing for quality": one year of the 1,000-person town, median rent share 23.3 to 20.5% (target 20.2%), rental stress 32 to 26%.
   - One year of the 1,000-person town, before and after:
     - employment to population 64.9 to 66.2%;
     - unemployment 3.1 to 0%;
     - retail staff 80 to 88;
     - shops served 82 and 80% of what was ordered.
-- **Still today's rules:** housing, the union, voice, business, support, leaving, word of mouth, households.
+- **Still today's rules:** the union, voice, business, support, leaving, word of mouth, households.
 - **Found while wiring:**
   - untried options need a prior (EWA's initial attractions), or a shop that serves nothing teaches nothing;
   - with no one to copy, a person should go by experience, not habit.
