@@ -246,6 +246,20 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
    - asking the model, in pilots;
    - meaning and belief: religion as content (VISION 16).
 
+## Progress
+
+- **Wired through the mind** (participants/src/behaviour/mind.ts; each area passes the full suite):
+  - shopping: which shop, by CONSUMAT and what's learned; retries by what's learned (2026-09-29).
+  - One year of the 1,000-person town, before and after:
+    - employment to population 64.9 to 66.2%;
+    - unemployment 3.1 to 0%;
+    - retail staff 80 to 88;
+    - shops served 82 and 80% of what was ordered.
+- **Still today's rules:** work, housing, the union, voice, business, support, leaving, word of mouth, households.
+- **Found while wiring:**
+  - untried options need a prior (EWA's initial attractions), or a shop that serves nothing teaches nothing;
+  - with no one to copy, a person should go by experience, not habit.
+
 ## 9. What the literature taught, and where it's used
 
 Full citations: docs/research/references.md.

@@ -229,3 +229,84 @@ export function factsOf(offer: { terms?: { commitments: { who: string; does: any
   }
   return f;
 }
+
+// ---------------------------------------------------------------- a mind: the pieces together
+
+/** Where a person stands, for appraising (their means, whether they have a home, how many bedrooms they need). */
+export interface Circumstances { monthly_income: number; savings: number; homeless: boolean; homeBedroomsNeeded?: number }
+
+/** An option in a decision: its key, its facts (from an offer), and how many others the person knows took it. */
+export interface Choice { key: string; facts?: Facts; others?: number }
+
+export interface Decision { key?: string; strategy: Strategy; scores: { key: string; score: number }[] }
+
+export interface MindParams {
+  /** Satisfaction below which a person looks to change (CONSUMAT's aspiration; placeholder). */
+  aspiration_bps: number;
+  /** How well options must be known to count as certain (share of the options tried or heard of; placeholder). */
+  certainty_bps: number;
+  ewa: EwaParams;
+}
+export const MIND_DEFAULTS: MindParams = { aspiration_bps: 6_000, certainty_bps: 5_000, ewa: EWA_DEFAULTS };
+
+/**
+ * A citizen's mind: a person drawn once, and what they've learned in each area of life (a domain: "shop", "job"...).
+ * `decide` takes the options the world offers and returns a choice, the way CONSUMAT says a person like this, this
+ * satisfied, this sure of their options, would make it; `learn` records how a choice turned out.
+ */
+export class Mind {
+  readonly person: Person;
+  private readonly domains = new Map<string, Attractions>();
+
+  /** `expect`: what a person expects of an option not yet tried, by area (EWA's initial attractions, Camerer and Ho). */
+  constructor(rng: Rng, pop: PopulationValues, readonly p: MindParams = MIND_DEFAULTS, private readonly expect: { [domain: string]: number } = {}) {
+    this.person = drawPerson(rng, pop);
+  }
+
+  learned(domain: string): Attractions {
+    let a = this.domains.get(domain);
+    if (!a) this.domains.set(domain, (a = new Attractions(this.p.ewa, this.expect[domain] ?? 0)));
+    return a;
+  }
+
+  learn(domain: string, chosen: string, payoff_bps: number, forgone: { [option: string]: number } = {}): void {
+    this.learned(domain).update(chosen, payoff_bps, forgone);
+  }
+
+  decide(domain: string, rng: Rng, o: { options: Choice[]; current?: string; levels: NeedLevels; circ: Circumstances; satisfied_here?: number }): Decision {
+    const learned = this.learned(domain);
+    const options = [...o.options].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    const known = options.filter((x) => learned.known(x.key)).length;
+    const certainty = options.length ? Math.round((known * 10_000) / options.length) : 10_000;
+    // Satisfaction: life as a whole, and, where the caller knows it, how this area has gone (the lower counts).
+    const sat = Math.min(satisfaction(this.person, o.levels), o.satisfied_here ?? 10_000);
+    const s = strategy(sat, certainty, this.p);
+    const has = (k?: string) => k !== undefined && options.some((x) => x.key === k);
+    const scored = (value: (x: Choice) => number) => options.map((x) => ({ key: x.key, score: Math.round(learned.get(x.key) + value(x)) }));
+    if (!options.length) return { strategy: s, scores: [] };
+    if (s === "repeat" && has(o.current)) return { key: o.current, strategy: s, scores: [] };
+    if (s === "imitate") {
+      // What others do: conformists weigh how many took it (Boyd and Richerson). Without anyone to copy, one's own habit.
+      const told = options.filter((x) => (x.others ?? 0) > 0);
+      if (told.length) {
+        const weights = told.map((x) => Math.round(Math.pow(x.others!, 1 + this.person.temperament.conformity / 10_000) * 1000));
+        const total = weights.reduce((a, b) => a + b, 0);
+        let r = rng.below(Math.max(1, total));
+        for (let i = 0; i < told.length; i++) if ((r -= weights[i]!) < 0) return { key: told[i]!.key, strategy: s, scores: told.map((x, j) => ({ key: x.key, score: weights[j]! })) };
+      }
+      // Nobody to copy: what we know from experience (below), not habit alone.
+    }
+    if (s === "compare" || s === "imitate") {
+      // Among options known, the best by experience.
+      const familiar = options.filter((x) => learned.known(x.key));
+      if (familiar.length) {
+        const c = learned.choose(rng, familiar.map((x) => ({ key: x.key, value: 0 })), this.person.temperament.openness);
+        return { key: c.key, strategy: s, scores: scored(() => 0) };
+      }
+    }
+    // Deliberate: every option's facts appraised against needs, with what's been learned, chosen by logit.
+    const appraised = (x: Choice) => (x.facts ? value(this.person, appraise(this.person, x.facts, o.circ)) : 0);
+    const c = learned.choose(rng, options.map((x) => ({ key: x.key, value: appraised(x) })), this.person.temperament.openness);
+    return { key: c.key, strategy: "deliberate", scores: scored(appraised) };
+  }
+}

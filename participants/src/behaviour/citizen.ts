@@ -34,6 +34,7 @@ import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Hea
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
+import { factsOf, Mind, MIND_DEFAULTS, type Circumstances, type MindParams, type NeedLevels, type PopulationValues } from "./mind";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
@@ -85,12 +86,14 @@ export const citizen: BehaviourModule = {
       // "{founder}" and "{capital}" filled in), and the monthly chance a person able to, seeing premises for sale, does.
       ventures: [] as { kind: string; name: string; capital: number; channels: unknown[]; role_module: { code: string; params: { [k: string]: unknown } } }[],
       found_bps: 0,
-      // Shopping (Lengnick 2013, Table 1): how often, and the rules for changing shops.
+      // Shopping (Lengnick 2013, Table 1): how often, and how many shops a trip may try. Which shop is the mind's
+      // (docs/design/ai-citizens.md 3b, 3c): it replaces Lengnick's price and quantity switching rules.
       shop_every_days: 14,
-      psi_price_bps: 2500, // chance a trip starts by comparing the favourite with another shop's price
-      xi_bps: 100, // ... and switching if the other is more than this much cheaper
-      psi_quant_bps: 2500, // chance of giving up on a shop that couldn't serve us
       beta: 5, // shops tried in one trip, at most
+      // The mind (docs/design/ai-citizens.md 3): the world's figures for drawing people's values, and its thresholds.
+      values: { values: {} } as PopulationValues,
+      essentials_units: 10, // goods a household uses in a fortnight, for how well subsistence is met (placeholder)
+      mind: {} as Partial<MindParams>,
       goods: "goods",
       leave_after_homeless_days: 90,
       leave_after_jobless_days: 180,
@@ -153,6 +156,10 @@ export const citizen: BehaviourModule = {
     let nextSpend = ctx.rng("spend-day").below(30) * DAY;
     // Shopping: the shop we go to, this trip's shortfalls still to find elsewhere, and when we next shop.
     let favourite: string | undefined;
+    // The mind: a person drawn once from the world's figures, and what it learns (docs/design/ai-citizens.md 3).
+    // (A shop not yet tried is expected to serve most of what's asked: one that serves nothing then counts against it.)
+    const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000 });
+    let lastServed = 10_000; // how fully the last shop served us (basis points)
     let nextShop = ctx.rng("shop-day").below(p.shop_every_days) * DAY;
     let trip: { at: number; tried: Set<string> } | null = null;
     let nextUse = 0; // when we next use things up (weekly)
@@ -797,6 +804,21 @@ export const citizen: BehaviourModule = {
       // A month's spending: out of income, what isn't saved (the saving ratio), less housing; never below essentials;
       // plus a little out of savings above a buffer (the wealth effect). Income is a month's worth of what came in lately
       // (before we've a window of it, what our job and payments say).
+      // How well each need is met, as this citizen judges its own life (docs/design/ai-citizens.md 3a). Placeholders
+      // for how each is read from the world, to calibrate: goods in hand against a fortnight's use; a home of our own;
+      // savings against a month's outgoings; a household; work.
+      const needLevels = (): NeedLevels => {
+        const held = channels.holdings(obs).filter((h) => h.kind === p.goods).reduce((x, h) => x + Number(h.quantity), 0);
+        const outgoings = Math.max(p.essentials, (home?.rent ?? share?.cents ?? 0) + p.essentials);
+        return {
+          subsistence: Math.min(10_000, Math.round((held * 10_000) / Math.max(1, p.essentials_units))),
+          shelter: home ? 10_000 : livingAt ? 6_000 : 0,
+          security: Math.min(10_000, Math.round((acc.balance * 2_500) / Math.max(1, outgoings))),
+          social: household && household.members.length > 1 ? 7_000 : 4_000,
+          status: job ? 7_000 : retired ? 6_000 : 3_000,
+        };
+      };
+      const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt });
       const monthly = () => {
         const housing = home?.rent ?? share?.cents ?? 0;
         const seen = t >= p.income_window_days * DAY;
@@ -829,13 +851,18 @@ export const citizen: BehaviourModule = {
         for (const d of deliveries.take(book, me)) {
           if (d.refund > 0) inflows.push({ t, amount: -d.refund }); // a refund isn't income
           const short = d.ordered - d.delivered;
-          if (short <= 0 || d.kind !== p.goods) continue;
-          if (d.seller === favourite && ctx.rng(`quit-${d.order}`).below(10_000) < p.psi_quant_bps) favourite = undefined;
-          // Tried elsewhere now, if this trip can: another shop we know, at random (Lengnick's households visit their
-          // trading partners in random order; everyone short going to the town's cheapest shop at once overwhelms it).
-          // If not, what came back is spent on the next trip: it was meant for goods we didn't get, not saved.
+          if (d.kind !== p.goods || d.ordered <= 0) continue;
+          // What we learn of the shop: how fully it served us (experience-weighted attraction). How our own shop did is
+          // what we judge the next trip by (a retry elsewhere doesn't make up for it).
+          const served = Math.round((d.delivered * 10_000) / d.ordered);
+          mind.learn("shop", d.seller, served);
+          if (d.seller === favourite) lastServed = served;
+          if (short <= 0) continue;
+          // Tried elsewhere now, if this trip can: another shop we know, by what we've learned of each, weighted, not the
+          // town's cheapest (everyone short going there at once overwhelms it) and not one that's failed us. If not,
+          // what came back is spent on the next trip: it was meant for goods we didn't get, not saved.
           const untried = trip && trip.tried.size < p.beta ? shops.filter((x) => !trip!.tried.has(x.shop)) : [];
-          const next = untried.length ? ctx.rng(`retry-${d.order}`).pick(untried) : undefined;
+          const next = untried.length ? untried.find((x) => x.shop === mind.learned("shop").choose(ctx.rng(`retry-${d.order}`), untried.map((u) => ({ key: u.shop, value: 0 })), mind.person.temperament.openness).key) : undefined;
           const retried = !!next && buy(next, Math.min(short, Math.floor((short * (priceAt(d.seller)?.price ?? next.price)) / next.price)), `${d.seller} could serve ${d.delivered} of the ${d.ordered} we wanted: trying ${next.shop} for the rest.`, d.order);
           if (!retried && d.refund > 0) deferred += d.refund;
         }
@@ -843,20 +870,19 @@ export const citizen: BehaviourModule = {
           nextShop = t + p.shop_every_days * DAY;
           trip = { at: t, tried: new Set() };
           const r = ctx.rng(`shopping-${t}`);
-          let why = "";
-          if (!priceAt(favourite)) {
-            favourite = r.pick(shops).shop;
-            why = `choosing ${favourite}, one of the shops we know`;
-          } else if (shops.length > 1 && r.below(10_000) < p.psi_price_bps) {
-            const other = r.pick(shops.filter((x) => x.shop !== favourite));
-            const fav = priceAt(favourite)!;
-            if (other.price * 10_000 < fav.price * (10_000 - p.xi_bps)) {
-              why = `${other.shop} is cheaper than ${favourite} (${usd(other.price)} against ${usd(fav.price)}): going there from now on`;
-              favourite = other.shop;
-            }
-          }
-          const s = priceAt(favourite)!;
           const budget = Math.min(acc.balance, Math.floor((monthly() * p.shop_every_days * DAY) / MONTH) + carried + deferred);
+          // Which shop: the mind's decision among the shops' offers, each for what the trip's budget buys there.
+          const offerOf = (shop: string) => book.open("price_list").filter((l) => l.speaks_for === shop && l.offer).sort((a, b) => b.at - a.at)[0]?.offer;
+          const options = shops.map((x) => {
+            const units = Math.floor(budget / x.price);
+            const o = offerOf(x.shop);
+            return { key: x.shop, facts: o ? factsOf(o, units) : { money_per_month: -units * x.price, goods_per_month: units } };
+          });
+          const was = favourite;
+          const d = mind.decide("shop", r, { options, current: priceAt(favourite) ? favourite : undefined, levels: needLevels(), circ: circumstances(), satisfied_here: lastServed });
+          favourite = d.key ?? r.pick(shops).shop;
+          const why = favourite === was ? "" : d.strategy === "imitate" ? `going to ${favourite}, where others go` : d.strategy === "compare" ? `going to ${favourite}, the best of the shops we know` : `choosing ${favourite}, weighing what each shop's prices buy${was ? ` (${was} served us ${Math.round(lastServed / 100)}% last time)` : ""}`;
+          const s = priceAt(favourite)!;
           const q = Math.floor(budget / s.price);
           carried = Math.max(0, Math.min(budget - q * s.price, s.price));
           buy(s, q, `Shopping for the fortnight: what we don't save of our income (${100 - p.saving_bps / 100}%) less the rent, and a little out of savings${deferred ? `, and ${usd(deferred)} we meant to spend last time and got back` : ""}, is ${usd(budget)}: ${q} at ${s.shop} (${usd(s.price)} each)${why ? `; ${why}` : ""}.`);
