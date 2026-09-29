@@ -58,8 +58,15 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
       input_schema: { type: "object", required: ["text"], properties: { text: { type: "string", maxLength: 4000 } } } },
     { name: "opt_out", description: leave, input_schema: { type: "object", required: ["statement"], properties: { statement: { type: "string" } } } },
     ...(c.onRequest?.length
-      ? [{ name: "look", description: `Look at one of the reports you only read when you choose to: ${c.onRequest.map((id) => `"${c.titles.get(id) ?? id}" (${id})`).join(", ")}. You'll see what's there with your next report.`,
-          input_schema: { type: "object", required: ["report"], properties: { report: { enum: c.onRequest }, current_only: { type: "boolean", description: "Only what's still current (not withdrawn by whoever put it up)." } } } }]
+      ? [{ name: "look", description: `Look at one of the reports you only read when you choose to: ${c.onRequest.map((id) => `"${c.titles.get(id) ?? id}" (${id})`).join(", ")}. You'll see what's there with your next report. To look something up, say what to find: records where a field matches (kind, author, speaks_for, basis, at, or data.<name> for a detail, e.g. data.employer), newest first.`,
+          input_schema: { type: "object", required: ["report"], properties: {
+            report: { enum: c.onRequest },
+            current_only: { type: "boolean", description: "Only what's still current (not withdrawn by whoever put it up)." },
+            find: { type: "array", maxItems: 8, description: "Only records where each of these holds.", items: { type: "object", required: ["field", "value"], properties: {
+              field: { type: "string", description: "kind, author, speaks_for, basis, at, or data.<name>" },
+              op: { enum: ["=", "!=", "<", "<=", ">", ">="], description: "= if not given" },
+              value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } },
+            limit: { type: "integer", minimum: 1, maximum: 50, description: "At most this many (20 if not given)." } } } }]
       : []),
   ];
 }
@@ -162,8 +169,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         case "done_for_now":
           return done(Number.isInteger(i.days) && i.days > 0 ? { type: "wait", until: obs.t + i.days * 86_400 } : { type: "wait" });
         case "look":
-          if (text(i.report) && c.onRequest?.includes(i.report))
-            return done({ type: "look", looks: [{ channel: i.report, ...(i.current_only ? { query: { standing: true, limit: 20 } } : {}) }] });
+          if (text(i.report) && c.onRequest?.includes(i.report)) {
+            // A search, if asked for (what matches now, newest first): fields as the participant API's queries name them.
+            const FIELD = /^(record|kind|at|author|speaks_for|basis|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
+            const find = Array.isArray(i.find) ? i.find.filter((w: any) => text(w?.field) && FIELD.test(w.field) && ["string", "number", "boolean"].includes(typeof w.value)) : [];
+            const limit = Number.isInteger(i.limit) ? Math.min(50, Math.max(1, i.limit)) : 20;
+            const where = find.map((w: any) => ({ field: w.field, op: ["=", "!=", "<", "<=", ">", ">="].includes(w.op) ? w.op : "=", value: w.value }));
+            const query = find.length ? { query: { ...(i.current_only ? { standing: true } : {}), where, order: { field: "at", desc: true }, limit } }
+              : i.current_only ? { query: { standing: true, limit: 20 } } : {};
+            return done({ type: "look", looks: [{ channel: i.report, ...query }] });
+          }
           break;
         case "opt_out":
           if (text(i.statement)) return done({ type: "opt_out", statement: i.statement });

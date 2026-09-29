@@ -591,7 +591,7 @@ export function generate(spec: TownSpec): any {
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
     [{ id: "budget", title: "The town's accounts", kind: "accounts" }, { id: "laws", title: "Laws, the charter and procedures", kind: "records", match: { statement_kinds: ["charter", "law", "procedure"] } },
-      { ...mine("city-business"), title: "Correspondence and filings concerning the town" }, { ...forms, title: "Forms on file" }, { ...priceLists, title: "Price lists" }, { id: "who", title: "Who's who", kind: "directory" },
+      { ...mine("city-business"), title: "Correspondence and filings concerning the town" }, { id: "files", title: "The town's files: every record the town can see, looked up on request (look, with what to find)", kind: "records", match: {}, on_request: true }, { ...forms, title: "Forms on file" }, { ...priceLists, title: "Price lists" }, { id: "who", title: "Who's who", kind: "directory" },
       { id: "civic", title: "Petitions, budgets, invoices, council results and complaints", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "invoice", "ballot_result", "complaint"] } }, { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
     spec.mayor === "code" ? mayorCode : { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       // Until a real model is used, the mock runs the office with the code mayor as its brain (docs/design/m2-llm-participants.md).

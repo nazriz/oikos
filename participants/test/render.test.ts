@@ -48,6 +48,18 @@ test("a language-model participant with on-request reports can look at them, in 
   expect(a).toEqual({ type: "look", looks: [{ channel: "board", query: { standing: true, limit: 20 } }] });
 });
 
+test("a language-model participant can look things up in an on-request report: what to find, newest first", async () => {
+  const { createLlmParticipant } = await import("../src/llm/participant");
+  const { MockAdapter } = await import("../src/llm/adapter");
+  const input = { report: "files", find: [{ field: "kind", value: "petition" }, { field: "data.employer", op: "=", value: "works" }, { field: "id; drop table", value: "x" }], limit: 5 };
+  const adapter = new MockAdapter("mock", { participant: () => [{ type: "tool_use", id: "1", name: "look", input }] });
+  const participant = createLlmParticipant({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["files", "The town's files"]]), onRequest: ["files"], cadenceDays: 7, draftText: () => "" },
+    { adapter, annotate: async () => {}, now: () => 0 });
+  const a = await participant.step(obs({}), { world: { config: {} } } as any);
+  // (A field the participant API doesn't know is left out, not passed on.)
+  expect(a).toEqual({ type: "look", looks: [{ channel: "files", query: { where: [{ field: "kind", op: "=", value: "petition" }, { field: "data.employer", op: "=", value: "works" }], order: { field: "at", desc: true }, limit: 5 } }] });
+});
+
 test("a body, posts, buildings with their spaces, and the directory's posts read in the world's words", () => {
   const dw = (i: number, count: number, occupants?: string[]) => ({ space: `apts-1/dwelling.${i}`, kind: "dwelling", capacity: 6, attrs: { bedrooms: 2 }, count, ...(occupants ? { occupants } : {}) });
   const apts = { structure: "apts-1", type: "apartments", at: "cell.0.0", w: 1, h: 1, complete: true, spaces: [dw(0, 3, ["ada-p", "c2", "c3"]), dw(1, 0)] };
