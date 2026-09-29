@@ -482,7 +482,7 @@ export const citizen: BehaviourModule = {
           heard.push({ from, what });
           continue;
         }
-        const person = book.participantPerson.get(m.from) ?? m.from; // who wrote (the directory names their person)
+        const person = m.from_entity ?? book.participantPerson.get(m.from) ?? m.from; // who wrote (the directory names their person)
         if (m.text === CATCHING_UP.ask) {
           askedHow.push(m.from);
           talked.set(person, obs.t);
@@ -510,7 +510,7 @@ export const citizen: BehaviourModule = {
         // A place someone names in reply to our asking (not a reply about a record: those are institutions answering requests).
         else if (m.re && (askedAt.home !== undefined || askedAt.work !== undefined) && !book.records.has(m.re)) {
           leads = [...leads.filter((x) => x !== m.re), m.re].slice(-5);
-          leadFrom.set(m.re, book.participantPerson.get(m.from) ?? m.from);
+          leadFrom.set(m.re, m.from_entity ?? book.participantPerson.get(m.from) ?? m.from);
         }
       }
       // Did the move-in we just attempted work?

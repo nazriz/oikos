@@ -408,6 +408,9 @@ pub struct Message {
     pub from: Id,
     #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
     pub from_position: Option<Id>,
+    /// Who acted in writing it: the person, or the organisation acted for through the position (contracts 0.7).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_entity: Option<Id>,
     pub to: Vec<Id>,
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

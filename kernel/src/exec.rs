@@ -1482,6 +1482,7 @@ impl<'a> Exec<'a> {
                     t: self.now(),
                     from: self.participant.into(),
                     from_position: self.position.map(String::from),
+                    from_entity: Some(self.entity.clone()),
                     to: to.clone(),
                     text: text.clone(),
                     re: re.clone(),

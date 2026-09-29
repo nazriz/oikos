@@ -151,6 +151,11 @@ interface Unit {
   llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number };
   ctx: ParticipantContext;
   nextWake: number;
+  /** Why its next wake is due (contracts 0.7: woke_for), and why the current one happened; when it last woke. */
+  wakeFor: NonNullable<Observation["woke_for"]>;
+  wokeFor: NonNullable<Observation["woke_for"]>;
+  lastWake?: number;
+  since: number;
   wakesThisTick: number;
   wakeTick: number;
   /** What it has observed, for the resolver (P8). */
@@ -316,7 +321,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const ctx = ctxFor(p.id, cap, entity, params);
     return {
       key: `${p.id}|${cap}`, participant: p.id, capacity: cap, entity, module, controller: module.create(ctx), ctx,
-      nextWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wakesThisTick: 0, wakeTick: -1,
+      nextWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wakeFor: "start", wokeFor: "start", since: 0, wakesThisTick: 0, wakeTick: -1,
       knowledge: new Knowledge(), view: new View(), notices: [],
     };
   };
@@ -359,7 +364,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
       llm: { controller, config: p, drafts: [], drafted: 0 },
-      nextWake: wakeAt ?? 0, wakesThisTick: 0, wakeTick: -1,
+      nextWake: wakeAt ?? 0, wakeFor: "start", wokeFor: "start", since: 0, wakesThisTick: 0, wakeTick: -1,
       knowledge: new Knowledge(), view: new View(new Set(standingIds)), notices: [],
     };
   };
@@ -406,7 +411,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
 
   const unitsOf = (pid: string) => units.of(pid);
   const wakeParticipant = (pid: string) => {
-    for (const u of unitsOf(pid)) if (u.nextWake > t) u.nextWake = t;
+    for (const u of unitsOf(pid)) if (u.nextWake > t) [u.nextWake, u.wakeFor] = [t, "news"];
   };
   /**
    * Code units acting for an entity now: its person's own unit, or the units holding an organisation's positions.
@@ -416,12 +421,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const wakeEntity = (entity: string, except?: string) => {
     const pid = participantOf.get(entity);
     if (pid) {
-      if (pid !== except) for (const u of unitsOf(pid)) if (!u.llm && u.capacity === "self" && u.nextWake > t) u.nextWake = t;
+      if (pid !== except) for (const u of unitsOf(pid)) if (!u.llm && u.capacity === "self" && u.nextWake > t) [u.nextWake, u.wakeFor] = [t, "news"];
       return;
     }
     for (const x of positions.values()) {
       if (x.entity !== entity || !x.holder || x.holder === except) continue;
-      for (const u of unitsOf(x.holder)) if (!u.llm && u.capacity === x.id && u.nextWake > t) u.nextWake = t;
+      for (const u of unitsOf(x.holder)) if (!u.llm && u.capacity === x.id && u.nextWake > t) [u.nextWake, u.wakeFor] = [t, "news"];
     }
   };
   const changed = new Set<string>(); // participants whose units need syncing after this command
@@ -520,7 +525,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (standIn) {
       p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
       await syncUnits(u.participant, t);
-      for (const x of unitsOf(u.participant)) x.nextWake = t + ceilTo(x.module.cadence(x.ctx), tick);
+      for (const x of unitsOf(u.participant)) [x.nextWake, x.wakeFor] = [t + ceilTo(x.module.cadence(x.ctx), tick), "cadence"];
     } else p.ended = true;
   };
 
@@ -560,7 +565,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const raw: Observation = u.capacity ? slice(reply.observation, u.capacity, u.entity) : { ...reply.observation, entity: u.entity };
     // Knowledge takes in the changes themselves; the controller reads the view's full picture.
     u.knowledge.absorb(raw);
-    const obs: Observation = u.view.apply(raw);
+    const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
     platformMs += performance.now() - p00;
     if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
     // Recorded in full, if asked: what it received (what's new since its last observation), for training data.
@@ -579,7 +584,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const apply = async (u: Unit, action: ParticipantAction): Promise<boolean> => {
     const L = u.llm;
     if (action.type === "wait") {
-      if (action.until !== undefined) u.nextWake = Math.max(t + tick, ceilTo(action.until, tick));
+      if (action.until !== undefined) [u.nextWake, u.wakeFor] = [Math.max(t + tick, ceilTo(action.until, tick)), "asked"];
       return false;
     }
     if (action.type === "look") {
@@ -598,7 +603,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         // The stand-in carries the participant on, in the same capacities.
         p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
         await syncUnits(u.participant, t);
-        for (const x of unitsOf(u.participant)) x.nextWake = t + ceilTo(x.module.cadence(x.ctx), tick);
+        for (const x of unitsOf(u.participant)) [x.nextWake, x.wakeFor] = [t + ceilTo(x.module.cadence(x.ctx), tick), "cadence"];
       } else p.ended = true;
       return false;
     }
@@ -706,13 +711,17 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       for (let u = units.next(); u && u.nextWake <= t; u = units.next()) {
         // Guard against two code units waking each other forever within one tick.
         if (u.wakeTick === t && u.wakesThisTick >= 3) {
-          u.nextWake = t + tick;
+          [u.nextWake, u.wakeFor] = [t + tick, "cadence"];
           continue;
         }
         u.wakesThisTick = u.wakeTick === t ? u.wakesThisTick + 1 : 1;
         u.wakeTick = t;
         wakes++;
-        u.nextWake = t + ceilTo(u.module.cadence(u.ctx), tick); // default if it waits without a time
+        // Why it woke, and how long since the last time (contracts 0.7: flows are computed from `since`).
+        u.wokeFor = u.wakeFor;
+        u.since = u.lastWake === undefined ? 0 : t - u.lastWake;
+        u.lastWake = t;
+        [u.nextWake, u.wakeFor] = [t + ceilTo(u.module.cadence(u.ctx), tick), "cadence"]; // default if it waits without a time
         cohort.push(u);
       }
       // Rounds: everyone still awake looks (so all see the same state), all decide (model calls at once), then what
@@ -775,7 +784,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
             // Out of actions with more to do: it carries on shortly (the next tick), as someone with a queue keeps
             // working through the day, rather than at its usual time (a shop's orders a day late, a bank's payments).
             // Often, it's falling behind (health).
-            if (units.get(x.u.key) === x.u) x.u.nextWake = Math.min(x.u.nextWake, t + tick);
+            if (units.get(x.u.key) === x.u && t + tick < x.u.nextWake) [x.u.nextWake, x.u.wakeFor] = [t + tick, "done"];
             const h = (cutShort[x.u.module.name] ??= { wakes: 0, participants: new Set() });
             h.wakes++;
             h.participants.add(x.u.participant);
