@@ -17,6 +17,20 @@ A living list. Pilots with a real model (docs/real-models.md) are for **finding*
 | G7 | **Long lists are cut in reports.** For example "187 ownership claims: city … and 175 more". | P6 | Accept (offices answer specifics: the land register); or `look` with a filter | Accept |
 | G8 | **Every result within a wake repeats the whole report** (survey, who's who), and Codex adds about 14k tokens of its own each call. About 10 seconds a call. | all | Send only what changed within a wake; shorter pilots | Small fix (the within-wake report shows what's new) |
 
+## Pilot 9 (2026-09-30; `runs/codex/pilot9-1000-1y`; the mayor on codex/gpt-6-sol, the translator on codex/gpt-6-luna; the 1,000-person town, one full year)
+
+The first year run to the end. The mayor made 633 decisions: 285 letters, 8 requests drafted (7 confirmed, 1 declined), 18 requests that couldn't be translated. The town's economy had the bugs fixed the same day (shopping trips, the union), so read the mayor's behaviour, not its numbers.
+
+| # | Gap | Seen | Suggested |
+|---|---|---|---|
+| G6 | **The mayor can't look anything up.** 16 of the 18 untranslated requests were "inspect the ledger", "read the petition's text", "trace this payment". It chased one recurring $2,393.34 payment from day 95 to day 324 without ever finding what it was (the works crew's wages). | P9 | **The biggest gap.** A way to look up specific records (a `look` with filters, or offices that answer the question asked), in the rebuild (section 16) |
+| G4 | **The park was never built.** The mayor got a permit (day 23) and offered the builder a construction agreement (day 25), then wrote to it 26 times. The builder signs landlords' orders in its own form, and never answered or signed the town's. | P9 | The builder answers and takes up agreements proposed to it, as a firm would (world content) |
+| G9 | **The bank never answers letters** (34 letters, no replies). | P9 | The bank answers with its standard account report, as offices do |
+| G10 | **Finance's reports don't settle what's asked** (138 letters, 136 of them after an answer). Payroll isn't explained. | P8, P9 | The finance report itemises recurring payments (payroll), as pilot 8 already suggested |
+| G11 | **The debrief has no memory of the run.** The mayor said it had "no record of specific decisions", so it couldn't reflect on them. | P9 | The debrief carries the participant's notebook, or a factual summary of what it did (VISION §15.3) |
+
+The mayor's debrief suggested giving residents "meaningful ways to challenge decisions": recorded as data.
+
 ## From phase A
 
 | Gap | Status |
