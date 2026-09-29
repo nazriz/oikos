@@ -6,7 +6,9 @@ for AI citizens instead. They should be simple, scale to a town or a city at mic
 constructs they've never seen, learning in context. And they should be a path to training citizen models. Belief and
 religion (VISION principle 16) and a world that grows from within (principle 17) have to fit.
 
-This note is what exists, what to take from it, and a proposed architecture. The design itself comes next, for review.
+This note is what exists, what to take from it, and a proposed architecture. The design is docs/design/ai-citizens.md;
+every idea used, with its citation, is in docs/research/references.md. A second pass (below, "Beyond The Sims")
+followed Naz's question, "is there more we can do?"
 
 ## What exists
 
@@ -121,6 +123,28 @@ GenWorld compiles offline and falls back on the unseen. Affordable Generative Ag
 - deterministic replay of the whole.
 
 That combination is what lets a model mayor's invention reach a town of thousands the same day, affordably and verifiably.
+
+## Beyond The Sims (second pass, same day)
+
+What game AI and social simulation added after needs and advertisements, all cheap enough for thousands of citizens.
+Citations in docs/research/references.md.
+
+- **How people switch between ways of deciding** (CONSUMAT, Jager 2000; Jager and Janssen 2012).
+  - Repeating, imitating, comparing or deliberating, depending on how satisfied and how certain one is.
+  - The answer to "when should a citizen think hard", and so when to ask a model.
+- **Learning from experience** (experience-weighted attraction, Camerer and Ho, *Econometrica* 1999; reinforcement, Erev and Roth, *AER* 1998).
+  - Attractions updated by what one got and, less, by what one could have got; choice by their logit.
+  - Fitted to how people learn in experiments. It's how a citizen learns a new thing is worth taking up, by trying it, with no model.
+- **Learning from others** (Boyd and Richerson 1985: conformist and prestige-biased transmission).
+  - People copy what's common and what the respected do. How practices, and faiths, spread.
+- **How new things spread** (Rogers, *Diffusion of Innovations*): relative advantage, compatibility, complexity, trialability and observability; innovators to laggards.
+- **Values** (Schwartz's ten basic values, measured across cultures). Dwarf Fortress's split between values (what one believes) and facets (how one acts), with values setting needs.
+- **Emotions by appraisal** (OCC, Ortony, Clore and Collins 1988, "computationally friendly"; FAtiMA builds agents on it).
+- **Social physics** (Comme il Faut and Prom Week; the Ensemble engine 2015): relationships, history and norms drive social moves. "Paradise" (FDG 2024) extends Ensemble with language models; not read, paywalled.
+- **Goals with steps** (Orkin's goal-oriented action planning, F.E.A.R.; hierarchical task networks in Killzone and Horizon Zero Dawn).
+
+Taken together: values, habits, learning, imitation and feelings, in code. The model is only needed to say what
+something genuinely new *means*.
 
 ## Open, for Naz
 
