@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -47,7 +47,7 @@ export const retailer: BehaviourModule = {
         price: 9000, // its opening retail price, cents each
         demand: 250, // what it expects to sell in a month, before it knows
         unpaid_days: 7,
-        serve_within_days: 3, // what isn't served within this is refunded (the customer goes elsewhere)
+        serve_within_days: 3, // what isn't served within this (or the days the order says it's for) is refunded (the customer goes elsewhere)
         // The share of its staff's hours a shop plans to fill with serving (placeholder): serving can't be stored, and
         // orders come in lumps, so hands for exactly the average leave queues that never clear (Kingman 1961).
         utilisation_bps: 8000,
@@ -216,7 +216,11 @@ export const retailer: BehaviourModule = {
           wage = w.wage;
           fullMonths = w.fullMonths;
           if (w.why) why.push(w.why);
-          const moved = movePrice(p, rng, price, stock, lastDemand, marginalCost);
+          // Lengnick's firms deliver what their labour makes; a shop delivers what its staff's hours can serve. Short of
+          // hands for last month's demand, it's short as a firm short of stock is: it may raise its price, and never
+          // cuts it while it turns customers away.
+          const canServe = Math.floor((workers.length * hoursPerWorkerMonth) / p.serve_labour);
+          const moved = movePrice(p, rng, price, stock, lastDemand, marginalCost, canServe);
           price = moved.price;
           if (moved.why) priceWhy = moved.why;
           // Headcount: a worker at a time towards the hands last month's sales needed.
@@ -335,7 +339,9 @@ export const retailer: BehaviourModule = {
           const want = x.o.quantity - x.served;
           const minRoom = present.length ? Math.min(...present.map(room)) : 0;
           const q = Math.min(want, left, Math.floor((minRoom * present.length) / p.serve_labour));
-          const out = left === 0 || (q === want) ? "done" : t - x.since >= p.serve_within_days * DAY ? "late" : "wait";
+          // (An order for a fortnight's shopping is served over the fortnight: it's what the household uses until then.)
+          const within = x.o.forDays ?? p.serve_within_days;
+          const out = left === 0 || (q === want) ? "done" : t - x.since >= within * DAY ? "late" : "wait";
           if (q === 0 && out === "wait") break; // no hands left today: the rest wait their turn
           const share = q ? Math.ceil((q * p.serve_labour) / present.length) : 0;
           left -= q;
@@ -347,7 +353,7 @@ export const retailer: BehaviourModule = {
           const why = !finished ? `Serving ${q} of the ${x.o.quantity} ${x.o.kind} ${x.o.buyer} ordered today; the rest tomorrow.`
             : x.served === x.o.quantity ? `Serving an order paid in full: ${x.served} ${x.o.kind}${before ? " (the last of it)" : ""}.`
             : left === 0 && out !== "late" ? `Out of stock: served ${x.served} of the ${x.o.quantity} ordered; refunding the rest.`
-            : `We couldn't serve all of an order within ${p.serve_within_days} days: served ${x.served} of the ${x.o.quantity}; refunding the rest.`;
+            : `We couldn't serve all of an order within ${within} days: served ${x.served} of the ${x.o.quantity}; refunding the rest.`;
           const st = fillWith(x.o, q, finished ? x.served : -1, present, why);
           st.then = (res) => {
             if (res.status === "applied") return;

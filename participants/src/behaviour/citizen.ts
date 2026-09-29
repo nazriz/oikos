@@ -49,7 +49,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.16.0",
+  version: "0.17.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -157,6 +157,7 @@ export const citizen: BehaviourModule = {
     let trip: { at: number; tried: Set<string> } | null = null;
     let nextUse = 0; // when we next use things up (weekly)
     let carried = 0; // budget not spent last trip (less than an item's price), carried to the next
+    let deferred = 0; // money we meant to spend on goods and got back (a shop couldn't serve), spent on the next trip
     const borrowing = new Borrowing(me, ctx.params.bank ?? ""); // (no bank named: no borrowing)
     let nextVenture = ctx.rng("venture-day").below(30) * DAY;
     let founded: { firm?: string; capital: number; paid: boolean } | null = null;
@@ -812,11 +813,14 @@ export const citizen: BehaviourModule = {
       // somewhere we keep things), or else kept at the shop for us.
       const homeAt = home && inside(home.space) ? home.structure : livingAt && inside(livingAt) ? structureOf(livingAt) : undefined;
       const placeFor = (s: { at?: string }) => homeAt ?? s.at;
-      const buy = (s: (typeof shops)[number], q: number, why: string, retryOf?: string) => {
+      const buy = (s: (typeof shops)[number], q: number, why: string, retryOf?: string): boolean => {
         const place = placeFor(s);
-        if (!place || q < 1) return;
+        if (!place || q < 1) return false;
         trip!.tried.add(s.shop);
-        steps.push(order({ me, seller: s.shop, sellerAccount: s.account, kind: p.goods, quantity: q, unitPrice: s.price, at: place, from: acc.account, why, retryOf }));
+        // What it's for: until the next trip (it's what we use until then), and the shop may serve it over that time.
+        const forDays = Math.max(1, Math.ceil((nextShop - t) / DAY));
+        steps.push(order({ me, seller: s.shop, sellerAccount: s.account, kind: p.goods, quantity: q, unitPrice: s.price, at: place, from: acc.account, why, retryOf, forDays }));
+        return true;
       };
       if (shops.length) {
         // A shop that couldn't serve all we asked: now and then we give up on it; and we try another for what's missing.
@@ -825,9 +829,13 @@ export const citizen: BehaviourModule = {
           const short = d.ordered - d.delivered;
           if (short <= 0 || d.kind !== p.goods) continue;
           if (d.seller === favourite && ctx.rng(`quit-${d.order}`).below(10_000) < p.psi_quant_bps) favourite = undefined;
-          if (!trip || trip.tried.size >= p.beta) continue;
-          const next = shops.filter((x) => !trip!.tried.has(x.shop)).sort((a, b) => a.price - b.price || (a.shop < b.shop ? -1 : 1))[0];
-          if (next) buy(next, Math.min(short, Math.floor((short * (priceAt(d.seller)?.price ?? next.price)) / next.price)), `${d.seller} could serve ${d.delivered} of the ${d.ordered} we wanted: trying ${next.shop} for the rest.`, d.order);
+          // Tried elsewhere now, if this trip can: another shop we know, at random (Lengnick's households visit their
+          // trading partners in random order; everyone short going to the town's cheapest shop at once overwhelms it).
+          // If not, what came back is spent on the next trip: it was meant for goods we didn't get, not saved.
+          const untried = trip && trip.tried.size < p.beta ? shops.filter((x) => !trip!.tried.has(x.shop)) : [];
+          const next = untried.length ? ctx.rng(`retry-${d.order}`).pick(untried) : undefined;
+          const retried = !!next && buy(next, Math.min(short, Math.floor((short * (priceAt(d.seller)?.price ?? next.price)) / next.price)), `${d.seller} could serve ${d.delivered} of the ${d.ordered} we wanted: trying ${next.shop} for the rest.`, d.order);
+          if (!retried && d.refund > 0) deferred += d.refund;
         }
         if (t >= nextShop) {
           nextShop = t + p.shop_every_days * DAY;
@@ -846,10 +854,11 @@ export const citizen: BehaviourModule = {
             }
           }
           const s = priceAt(favourite)!;
-          const budget = Math.min(acc.balance, Math.floor((monthly() * p.shop_every_days * DAY) / MONTH) + carried);
+          const budget = Math.min(acc.balance, Math.floor((monthly() * p.shop_every_days * DAY) / MONTH) + carried + deferred);
           const q = Math.floor(budget / s.price);
           carried = Math.max(0, Math.min(budget - q * s.price, s.price));
-          buy(s, q, `Shopping for the fortnight: what we don't save of our income (${100 - p.saving_bps / 100}%) less the rent, and a little out of savings, is ${usd(budget)}: ${q} at ${s.shop} (${usd(s.price)} each)${why ? `; ${why}` : ""}.`);
+          buy(s, q, `Shopping for the fortnight: what we don't save of our income (${100 - p.saving_bps / 100}%) less the rent, and a little out of savings${deferred ? `, and ${usd(deferred)} we meant to spend last time and got back` : ""}, is ${usd(budget)}: ${q} at ${s.shop} (${usd(s.price)} each)${why ? `; ${why}` : ""}.`);
+          deferred = 0;
         }
       } else if (t >= nextSpend) {
         nextSpend = t + MONTH;

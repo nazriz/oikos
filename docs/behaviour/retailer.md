@@ -17,13 +17,13 @@ A shop buys goods wholesale and sells them to households. Selling takes its staf
 - Each item is a unit of the task `serve` (1.5 hours in the generated town), shared evenly among the staff there, each up to a working day. What's served goes to the customer: home, or kept at the shop for them.
 - A large order can take several days. When the day's hours run out, the rest of the queue waits for tomorrow.
 - **Out of stock:** what it couldn't serve is refunded at once, and the customer goes elsewhere.
-- **Not served within 3 days:** the rest is refunded.
+- **Not served within the days the order is for** (a household's order is for until its next trip; 3 days if it doesn't say): the rest is refunded.
 - **Can't be delivered** (the place or person is gone): the whole order is refunded.
 - Every order ends with a delivery note: ordered, delivered, refunded.
 
 **Monthly (Lengnick).**
 - **Demand** is what customers ordered and paid for last month, served or not.
-- **Price** moves within 1.025–1.15 × marginal cost when stock says so. Marginal cost is the wholesale price last paid plus an item's serving hours at the wage it offers.
+- **Price** moves within 1.025–1.15 × marginal cost when stock says so. Marginal cost is the wholesale price last paid plus an item's serving hours at the wage it offers. A shop whose staff can't serve last month's demand in a month is short as a firm short of stock is (0.3.0): it may raise its price, and never cuts it while it turns customers away. Lengnick's firms deliver what their labour makes; a shop delivers what its staff's hours serve.
 - **The wage offered** follows Lengnick's vacancy rule.
 - **Headcount** moves one worker a month toward the staff last month's demand needed to serve, planning to fill 80% of their hours (`utilisation_bps`, a placeholder; at least 1, at most the shop's room). Serving can't be stored and orders come in lumps: staff for exactly the average demand leave queues that never clear (Kingman 1961). At 100% (before C6), 17% of the goods ordered in the 200-person town weren't served within three days and were refunded; the unspent refunds showed up as households saving 9–11%, against the 6.5% their rule saves.
 - **Restocking keeps back** the next pay period's wages for this month's headcount (the staff it has or is hiring to), so a new shop's first stock doesn't take the wages of its first hire. It also lets someone go if it can't cover the next pay period, and doesn't hire again that month.

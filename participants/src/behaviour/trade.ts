@@ -19,7 +19,9 @@ import { because, type Book, DAY, pay, say, type Step, usd } from "./common";
 import { receipts } from "./firms";
 
 /** An order, as the seller reads it. */
-export interface Order { id: string; seller: string; buyer: string; kind: string; quantity: number; unitPrice: number; to: string; at: string; account: string; placed: number }
+export interface Order { id: string; seller: string; buyer: string; kind: string; quantity: number; unitPrice: number; to: string; at: string; account: string; placed: number;
+  /** The days the order is for, as the buyer says (a fortnight's shopping): served over that time. */
+  forDays?: number }
 
 /** A seller's current prices for goods (its latest standing price list), the account it's paid into, the least it
  * sells in one order (a wholesaler's minimum), and where it is (a shop's premises, for collection). */
@@ -43,13 +45,13 @@ export function priceList(prices: { [kind: string]: number }, account: string, t
  * An order for goods, paid with the order in the same act. `from` is the buyer's paying account; `sellerAccount`
  * the one the seller's price list names.
  */
-export function order(o: { me: string; seller: string; sellerAccount: string; kind: string; quantity: number; unitPrice: number; to?: string; at: string; from: string; why: string; ref?: string; retryOf?: string }): Step {
+export function order(o: { me: string; seller: string; sellerAccount: string; kind: string; quantity: number; unitPrice: number; to?: string; at: string; from: string; why: string; ref?: string; retryOf?: string; forDays?: number }): Step {
   const to = o.to ?? o.me;
   const total = o.quantity * o.unitPrice;
   return because(o.why,
     [o.ref ?? "order", say("order", `Order: ${o.quantity} ${o.kind} at ${usd(o.unitPrice)} each (${usd(total)}), delivered to ${to} at ${o.at}. Paid with this order.`, {
       to: [o.seller], visible: [o.me, o.seller],
-      data: { kind: o.kind, quantity: o.quantity, unit_price: o.unitPrice, deliver_to: to, at: o.at, account: o.from, ...(o.retryOf ? { retry_of: o.retryOf } : {}) },
+      data: { kind: o.kind, quantity: o.quantity, unit_price: o.unitPrice, deliver_to: to, at: o.at, account: o.from, ...(o.retryOf ? { retry_of: o.retryOf } : {}), ...(o.forDays ? { for_days: o.forDays } : {}) },
     })],
     pay(o.sellerAccount, total, { from: o.from, for: `Order: ${o.quantity} ${o.kind}.` }),
   );
@@ -96,6 +98,7 @@ export class OrderBook {
       this.waiting.set(r.id, {
         id: r.id, seller: this.me, buyer: r.speaks_for!, kind: String(r.data?.kind), quantity: Math.max(0, Math.floor(Number(r.data?.quantity) || 0)), unitPrice: Math.max(0, Math.floor(Number(r.data?.unit_price) || 0)),
         to: String(r.data?.deliver_to ?? r.speaks_for), at: String(r.data?.at), account: String(r.data?.account), placed: r.at,
+        ...(Number.isInteger(r.data?.for_days) && Number(r.data?.for_days) > 0 ? { forDays: Number(r.data!.for_days) } : {}),
       });
     }
     for (const id of this.waiting.keys()) if (this.settled.has(id) || book.withdrawn.has(id)) this.waiting.delete(id);

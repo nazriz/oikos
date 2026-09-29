@@ -25,15 +25,18 @@ export type LengnickParams = typeof LENGNICK;
 /**
  * The price rule: with stock low against last month's demand and the price under its upper bound over marginal cost,
  * raise it (with probability theta, by up to vartheta); with stock high and the price over its lower bound, cut it.
+ * `canSupply` (a firm whose sales take its staff's time: a shop): what it could deliver in a month. Below demand, it's
+ * short as a firm short of stock is, and it never cuts its price while it turns customers away.
  * Returns the new price and, if it changed, why.
  */
-export function movePrice(p: LengnickParams, rng: Rng, price: number, stock: number, demand: number, marginalCost: number): { price: number; why?: string } {
-  const low = stock * 10_000 < p.phi_low_bps * demand;
-  const high = stock * 10_000 > p.phi_high_bps * demand;
+export function movePrice(p: LengnickParams, rng: Rng, price: number, stock: number, demand: number, marginalCost: number, canSupply?: number): { price: number; why?: string } {
+  const shortHanded = canSupply !== undefined && canSupply < demand;
+  const low = stock * 10_000 < p.phi_low_bps * demand || shortHanded;
+  const high = stock * 10_000 > p.phi_high_bps * demand && !shortHanded;
   if (low && price * 10_000 < p.price_up_bound_bps * marginalCost && rng.below(10_000) < p.theta_bps) {
     const up = rng.below(p.vartheta_bps + 1);
     const next = Math.ceil((price * (10_000 + up)) / 10_000);
-    return { price: next, why: `Month's end: stock (${stock}) is low against last month's demand (${demand}), and our price is under ${p.price_up_bound_bps / 100}% of marginal cost (${usd(marginalCost)}): raising it ${up / 100}% to ${usd(next)}.` };
+    return { price: next, why: `Month's end: ${shortHanded ? `we could serve ${canSupply} of last month's demand (${demand})` : `stock (${stock}) is low against last month's demand (${demand})`}, and our price is under ${p.price_up_bound_bps / 100}% of marginal cost (${usd(marginalCost)}): raising it ${up / 100}% to ${usd(next)}.` };
   }
   if (high && price * 10_000 > p.price_down_bound_bps * marginalCost && rng.below(10_000) < p.theta_bps) {
     const down = rng.below(p.vartheta_bps + 1);

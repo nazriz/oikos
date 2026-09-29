@@ -30,7 +30,7 @@ import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_V
 import { Kernel } from "./kernel";
 import type { Watchdog } from "./watchdog";
 
-export const ORCHESTRATOR_VERSION = "0.7.0";
+export const ORCHESTRATOR_VERSION = "0.8.0";
 
 export interface RunOptions {
   config: any;
@@ -759,7 +759,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           const goesOn = await apply(x.u, r.value);
           if (goesOn && x.n + 1 < maxActions && units.get(x.u.key) === x.u) next.push({ u: x.u, n: x.n + 1 });
           else if (goesOn && x.n + 1 >= maxActions) {
-            // Out of actions with more to do: it carries on at its next wake. Often, it's falling behind (health).
+            // Out of actions with more to do: it carries on shortly (the next tick), as someone with a queue keeps
+            // working through the day, rather than at its usual time (a shop's orders a day late, a bank's payments).
+            // Often, it's falling behind (health).
+            if (units.get(x.u.key) === x.u) x.u.nextWake = Math.min(x.u.nextWake, t + tick);
             const h = (cutShort[x.u.module.name] ??= { wakes: 0, participants: new Set() });
             h.wakes++;
             h.participants.add(x.u.participant);
