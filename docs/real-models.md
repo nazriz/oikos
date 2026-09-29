@@ -1,6 +1,6 @@
 # Running with a real model
 
-Everything in Terrarium is built and tested on the mock adapter. This page is how to switch to a real model, and what guards the switch. **Nothing here has been run against a real model yet** (as agreed: mock until Naz says).
+Everything in Terrarium is built and tested on the mock adapter. This page is how to switch to a real model, and what guards the switch. Real models have run only in pilots, through the Codex CLI (below): directional testing, not evidence. What's needed before research runs is in docs/design/llm-readiness.md.
 
 ## The switch
 
