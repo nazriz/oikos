@@ -92,6 +92,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const standingIds = new Set(c.standing);
   const toolset = tools(c);
   let notes = "";
+  // What it did, as recorded, for its debrief (it has no other memory of the run: pilot 9's mayor couldn't say).
+  const tally = { requests: 0, confirmed: 0, declined: 0, letters: 0, looks: 0, first: -1, last: -1 };
   let messages: LlmMessage[] = [];
   // The tool uses of the last answer that are still owed a result (the APIs need one for every use): the action's
   // result is the next report; a notebook update is acknowledged; any further action wasn't taken (one at a time).
@@ -141,6 +143,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const alongside = use && use.name !== "done_for_now" ? uses.find((x) => x.name === "done_for_now") : undefined;
       if (alongside) doneAfter = { ...(Number.isInteger(alongside.input?.days) && alongside.input.days > 0 ? { days: alongside.input.days } : {}) };
       const done = (a: ParticipantAction, label?: string) => {
+        if (a.type === "propose") tally.requests++;
+        if (a.type === "sign") a.decision === "accept" ? tally.confirmed++ : tally.declined++;
+        if (a.type === "message") tally.letters++;
+        if (a.type === "look") tally.looks++;
+        if (a.type !== "wait") [tally.first, tally.last] = [tally.first < 0 ? obs.t : tally.first, obs.t];
         if (a.type === "wait" || a.type === "opt_out") messages = [];
         else {
           actedId = use!.id;
@@ -190,12 +197,18 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     },
 
     async debrief(text) {
+      // Its own record of the run, beside the question: its notebook as it left it, and what it did (VISION §15.3: a
+      // reaction to an experience it can't remember is no reaction).
+      const day = (t: number) => Math.floor(t / 86_400) + 1;
+      const did = tally.first < 0 ? "You didn't act during the run." :
+        `From day ${day(tally.first)} to day ${day(tally.last)} you wrote ${tally.letters} letter${tally.letters === 1 ? "" : "s"}, asked for ${tally.requests} thing${tally.requests === 1 ? "" : "s"} to be done (confirming ${tally.confirmed}, declining ${tally.declined}), and looked something up ${tally.looks} time${tally.looks === 1 ? "" : "s"}.`;
+      const content = `${text}\n\nFor reference, your own record of the run. Your notebook, as you left it: ${notes || "(empty)"}\n${did}`;
       const res = await callModel(io, {
         purpose: "debrief", subject: c.participant, system: c.framing.system ?? "", maxTokens: c.maxTokens ?? 2000,
-        messages: [{ role: "user", content: text }], context: { participant: c.participant, notes },
+        messages: [{ role: "user", content }], context: { participant: c.participant, notes },
       }, seenSystems);
       const reply = res.content.filter((b) => b.type === "text").map((b: any) => b.text).join("\n");
-      await io.annotate({ annotation: "debrief", subject: c.participant, data: { prompt: text, response: reply } });
+      await io.annotate({ annotation: "debrief", subject: c.participant, data: { prompt: content, response: reply } });
     },
   };
 }

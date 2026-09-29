@@ -111,6 +111,9 @@ test("a participant is told when a request can't be done, declines an unfaithful
   expect(recs.filter((r) => r.author === "mayor-system").map((r) => r.text)).toEqual(["The town hall opens at nine."]);
   expect(log.some((e) => e.kind === "event" && e.body.event === "participant_opted_out" && e.body.participant === "mayor-system")).toBe(true);
   expect(ann.find((a) => a.annotation === "debrief")?.data.response).toBe("Thanks for asking.");
+  // It's reminded of its own run in the debrief (pilot 9's mayor had no record of what it did): its notebook, and a
+  // tally of what it did.
+  expect(ann.find((a) => a.annotation === "debrief")?.data.prompt).toMatch(/Your notebook, as you left it: [\s\S]*(You didn't act during the run\.|From day \d+ to day \d+ you wrote \d+ letters?)/);
 }, 300_000);
 
 test("after opting out, a stand-in named in the world config carries the participant on", async () => {
