@@ -934,7 +934,12 @@ See the design note, §16.
     - **A census-like statement:** leaning towards a teaching, said once it's the citizen's own at all (`affiliate_bps`). The `town/beliefs` measure reports affiliation and its change a year.
     - **The fade rate is calibrated** against the census's fall (the profile's target, −1.64 points a year): one year each at 1.5%, 3% and 2.75% a month gave +1.9, −2.1 and −2.9 points; 2.25% is being checked over five years.
   - **Saving was 18–22% (target 6.5%): trips spent a fixed fortnight's worth, and came late.** A trip can only be made at a wake, often days after it was due: 23 trips a year, not 26, and a tenth of planned spending never happened. Each trip now spends for the time since the last, up to two fortnights. Two years: saving 2.4–3.2%, median rent share 20.2–20.4%, but employment rose to 68.5% (target 63.9%) with unemployment at 0.6% (4.6%): more spending, more hiring.
-  - **Revisit if:** the 5-year run shows saving or affiliation off target; the labour market stays too tight now that demand is right (labour supply, or firms' hiring).
+  - **Five years** (`runs/c9-run5`, fading at 2.25% a month):
+    - **Affiliation:** −1.1, +0.2 and −1.0 points a year (target −1.64). Too slow: the one-year runs overstated the fall. Now checking 3% a month (`runs/c10-run5`).
+    - **Saving:** creeps back to 15, 12 and 5.8% by year 5. It's no longer a spending bug. Shops fail to serve 20–30% of what's ordered in seeds 1 and 2 (0.2–1% before the fix), and refunds pile up as unspent money.
+    - **The labour market is behind it.** Unemployment is 0–2.4% (target 4.6%). Shops can't hire, and three closed because "nobody has worked for us for 90 days". Restoring the spending that was lost exposed a labour market with too little slack.
+    - **Seed 3 went the other way:** shops shed 36 staff in year 5 and the builder 10, and unemployment reached 11.7%, after 119 newcomers in years 2–3 (migration's bursts).
+  - **Revisit:** the labour market's frictions (how long a job search takes, how often jobs end) and migration's response, which now decide saving.
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 

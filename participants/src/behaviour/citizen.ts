@@ -45,7 +45,7 @@ import { factsOf, Feelings, Mind, MIND_DEFAULTS, Pursuit, satisfaction, Ties, ty
  * spending less saves, and how much cheaper a cheaper home is (of the old rent). */
 const GOALS = { unmet_days: 60, method_days: 90, rest_days: 180, security_bps: 3_000, social_bps: 4_000, spend_less_saving_bps: 2_000, cheaper_bps: 9_000 };
 
-const BELIEF = { fade_bps: 225, display_bps: 500, told_bps: 300, tell_at_bps: 6_000, affiliate_bps: 3_000, meaning: 0.2 };
+const BELIEF = { fade_bps: 300, display_bps: 500, told_bps: 300, tell_at_bps: 6_000, affiliate_bps: 3_000, meaning: 0.2 };
 
 /** How far a person's values sway the cited rates (a fraction of the rate per standard deviation of the value):
  * placeholders, unsourced, chosen small so the town's rates stay as calibrated (docs/behaviour/citizen.md). */
