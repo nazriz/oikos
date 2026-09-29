@@ -11,6 +11,10 @@
 //     prices the cost projection.
 //   terrarium measure <DIR> [QUERY...] [--sql "select ..."] [--list]
 //   terrarium cost <DIR> [--translator-model provider/model]
+//   terrarium dataset <DIR|log.jsonl> [--out DIR] [--actions]
+//     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
+//     system prompts, translations, model participants' decisions; code participants' acts with --actions; and
+//     observations, if the run recorded them (run with --record-observations models|code|all|<ids>).
 //   terrarium corpus <DIR|log.jsonl> [--out FILE]
 //     The translator corpus: every translation in the logs (proposal, the translator's exchange, call, resolution, dry
 //     run, the participant's decision, what the kernel did), one JSON line each, for training the translator later.
@@ -59,6 +63,7 @@ try {
       world: positional()[0]!, seeds: Number(flag("seeds", "1")), out: flag("out"), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
       until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
+      recordObservations: flag("record-observations"),
     });
     if (r.measureDir) {
       console.log(`\n${table(await runQuery(r.measureDir, "overview"))}`);
@@ -72,7 +77,8 @@ try {
     }
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"),
-      model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules") });
+      model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
+      recordObservations: flag("record-observations") });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
     const r = await runOne({ resume: positional()[0]!, until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
@@ -92,6 +98,16 @@ try {
     const r = await evaluate(m.adapter, { prices: m.prices, ...(m.budget ? { budget: m.budget } : {}) });
     console.log(reportText(r));
     if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(r, null, 2));
+  } else if (cmd === "dataset" && positional()[0]) {
+    // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
+    const { logsIn } = await import("./corpus");
+    const { exportDataset } = await import("./dataset");
+    const src = positional()[0]!;
+    for (const log of logsIn(src)) {
+      const out = join(flag("out") ?? join(log, ".."), `${log.split("/").at(-1)!.replace(/\.jsonl$/, "")}.dataset`);
+      const m = await exportDataset(log, out, { actions: has("actions") });
+      console.log(`${m.run}: ${Object.entries(m.files).map(([f, x]: [string, any]) => `${f} ${x.rows}${x.synthetic ? ` (${x.synthetic} synthetic)` : ""}`).join(", ")} -> ${out}`);
+    }
   } else if (cmd === "corpus" && positional()[0]) {
     // The translator corpus: every translation in the logs, as training examples (docs/measurement.md).
     const { corpusOf, logsIn } = await import("./corpus");

@@ -56,6 +56,9 @@ export interface RunOptions {
   watchdog?: Watchdog;
   /** A resumed run (resume.ts): the log it resumes, and how serving its recorded model calls went (noted at the end). */
   resumedFrom?: { log: string; serving: { served: number; diverged?: object } };
+  /** Whose observations to record in full in the log (docs/design/run-datasets.md): participant ids, or "models",
+   * "code" or "all". None by default: the log keeps each observation's hash, and a replay can make it again. */
+  recordObservations?: string[] | "models" | "code" | "all";
 }
 
 /** More than this many cohorts at one simulated moment means participants are waking each other without end: the run
@@ -502,6 +505,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const obs: Observation = u.view.apply(raw);
     platformMs += performance.now() - p00;
     if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
+    // Recorded in full, if asked: what it received (what's new since its last observation), for training data.
+    const rec = o.recordObservations;
+    if (rec && (rec === "all" || (rec === "models" && u.llm) || (rec === "code" && !u.llm) || (Array.isArray(rec) && rec.includes(u.participant))))
+      // (Its channels as a list, each with its path: a position's channel paths have a "/", which the log's free-form
+      // data doesn't allow in a key.)
+      await k.request({ op: "annotate", annotation: { annotation: "observation", subject: u.participant, data: { t, ...(u.capacity && u.capacity !== "self" ? { as: u.capacity } : {}),
+        observation: { ...raw, channels: Object.entries(raw.channels).map(([path, c]) => ({ path, ...c })) } } } });
     if (u.notices.length) obs.notices = u.notices.splice(0);
     if (u.llm) obs.drafts = u.llm.drafts.map((d) => d.draft);
     return obs;

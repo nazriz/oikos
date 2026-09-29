@@ -35,6 +35,9 @@
         "@terrarium/translator": "workspace:*",
         "@terrarium/worlds": "workspace:*",
       },
+      "devDependencies": {
+        "ajv": "^8.17.1",
+      },
     },
     "participants": {
       "name": "@terrarium/participants",

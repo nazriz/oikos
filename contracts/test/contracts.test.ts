@@ -19,6 +19,7 @@ const SCHEMA_FILES = [
   "log.schema.json",
   "calls.schema.json",
   "outcomes.schema.json",
+  "dataset.schema.json",
 ];
 
 // examples/<valid|invalid>/<dir>/*.json is checked against TARGETS[<dir>].
@@ -33,6 +34,8 @@ const TARGETS: Record<string, string> = {
   call: `${NS}:calls`,
   request: `${NS}:outcomes#/$defs/RequestData`,
   form: `${NS}:outcomes#/$defs/FormData`,
+  "dataset-manifest": `${NS}:dataset#/$defs/Manifest`,
+  "dataset-decision": `${NS}:dataset#/$defs/Decision`,
 };
 
 const readJson = (path: string) => JSON.parse(readFileSync(path, "utf8"));

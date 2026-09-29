@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:terrarium:contracts:0.5:dataset",
+  "title": "Run dataset (0.1.0)",
+  "description": "A run's data, derived deterministically from its log, joined and flattened into examples a training run can use (docs/design/run-datasets.md). A folder per run: manifest.json (Manifest), systems.jsonl (SystemPrompt), translations.jsonl (Translation), decisions.jsonl (Decision), and optionally actions.jsonl (Action) and observations.jsonl (ObservationRow). The log stays the record; a dataset can always be made again from it.",
+  "$defs": {
+    "Version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "Row": {
+      "description": "Fields every row carries.",
+      "type": "object",
+      "required": ["run"],
+      "properties": {
+        "run": { "description": "The run's id.", "type": "string", "maxLength": 200 }
+      }
+    },
+    "Manifest": {
+      "type": "object",
+      "required": ["dataset", "version", "run", "world", "config_hash", "initial_state_hash", "log", "versions", "seats", "end", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "dataset": { "const": "terrarium-run-dataset" },
+        "version": { "$ref": "#/$defs/Version" },
+        "run": { "type": "string", "maxLength": 200 },
+        "world": {
+          "type": "object",
+          "required": ["name"],
+          "additionalProperties": false,
+          "properties": { "name": { "type": "string" }, "description": { "type": "string" }, "seed": { "type": "integer" } }
+        },
+        "config_hash": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "initial_state_hash": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "log": {
+          "description": "The log it was made from: its file name, entries, and the last entry's hash (which pins the whole chain).",
+          "type": "object",
+          "required": ["file", "entries", "last_hash"],
+          "additionalProperties": false,
+          "properties": {
+            "file": { "type": "string" },
+            "entries": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" },
+            "last_hash": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" }
+          }
+        },
+        "versions": {
+          "description": "What made the run: contracts, kernel, orchestrator, behaviour modules (name -> {version, sha256}), translator.",
+          "type": "object",
+          "required": ["contracts", "kernel", "orchestrator"],
+          "additionalProperties": false,
+          "properties": {
+            "contracts": { "type": "string" },
+            "kernel": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+            "orchestrator": { "type": "string" },
+            "modules": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+            "translator": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+          }
+        },
+        "seats": {
+          "description": "The language-model seats: participant -> the model configured and the one used; and the price table.",
+          "type": "object",
+          "required": ["models"],
+          "additionalProperties": false,
+          "properties": {
+            "models": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+            "prices": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+          }
+        },
+        "end": {
+          "type": "object",
+          "required": ["t"],
+          "additionalProperties": false,
+          "properties": { "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" }, "reason": { "type": "string" } }
+        },
+        "files": {
+          "description": "Each file written: its rows, and how many are synthetic (from the mock).",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["rows"],
+            "additionalProperties": false,
+            "properties": { "rows": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" }, "synthetic": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" } }
+          }
+        }
+      }
+    },
+    "SystemPrompt": {
+      "type": "object",
+      "required": ["run", "sha256", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "run": { "type": "string" },
+        "sha256": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "text": { "type": "string" }
+      }
+    },
+    "Turn": {
+      "description": "One model call in an exchange: what it was shown (the last message) and what it answered, in full.",
+      "type": "object",
+      "required": ["turn", "input", "output"],
+      "additionalProperties": false,
+      "properties": {
+        "turn": { "type": "integer", "minimum": 1 },
+        "input": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "output": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+      }
+    },
+    "Executed": {
+      "description": "A command carried out: its place in the log, and whether the kernel applied it (and if not, why).",
+      "type": "object",
+      "required": ["seq", "applied"],
+      "additionalProperties": false,
+      "properties": {
+        "seq": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" },
+        "applied": { "type": "boolean" },
+        "refusal": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+      }
+    },
+    "Translation": {
+      "type": "object",
+      "required": ["run", "draft", "t", "participant", "synthetic", "exchange", "retries", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "run": { "type": "string" },
+        "draft": { "type": "string" },
+        "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" },
+        "participant": { "type": "string" },
+        "as": { "type": "string" },
+        "proposal": { "type": "string" },
+        "model": { "type": "string" },
+        "synthetic": { "type": "boolean" },
+        "system_sha256": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "exchange": { "type": "array", "items": { "$ref": "#/$defs/Turn" } },
+        "retries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["attempt", "reason"],
+            "additionalProperties": false,
+            "properties": { "attempt": { "type": "integer" }, "reason": { "type": "string" }, "call": { "type": "string" } }
+          }
+        },
+        "result": { "enum": ["drafted", "failed", "unknown"] },
+        "translator": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "call": { "type": "string" },
+        "blocks": { "type": "array" },
+        "summary": { "type": "string" },
+        "check": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "caveats": { "type": "string" },
+        "failure": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "signoff": {
+          "type": "object",
+          "required": ["decision"],
+          "additionalProperties": false,
+          "properties": { "decision": { "type": "string" }, "note": { "type": "string" } }
+        },
+        "executed": { "$ref": "#/$defs/Executed" }
+      }
+    },
+    "Command": {
+      "description": "A command a participant gave, as logged, and what came of it.",
+      "type": "object",
+      "required": ["seq", "command"],
+      "additionalProperties": false,
+      "properties": {
+        "seq": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" },
+        "command": { "type": "string" },
+        "as": { "type": "string" },
+        "blocks": { "type": "array" },
+        "looks": { "type": "array" },
+        "provenance": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "reasoning": { "type": "string" },
+        "applied": { "type": "boolean" },
+        "refusal": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+      }
+    },
+    "Decision": {
+      "description": "A language-model participant's model call: what it was shown, what it answered, and what followed in the world.",
+      "type": "object",
+      "required": ["run", "t", "participant", "model", "synthetic", "system_sha256", "turn", "input", "output", "commands", "drafts"],
+      "additionalProperties": false,
+      "properties": {
+        "run": { "type": "string" },
+        "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" },
+        "participant": { "type": "string" },
+        "purpose": { "type": "string" },
+        "model": { "type": "string" },
+        "synthetic": { "type": "boolean" },
+        "system_sha256": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Hash" },
+        "turn": { "type": "integer", "minimum": 1 },
+        "input": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "output": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" },
+        "tokens": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "input": { "type": "integer" }, "output": { "type": "integer" }, "cost_microusd": { "type": "integer" } }
+        },
+        "commands": { "type": "array", "items": { "$ref": "#/$defs/Command" } },
+        "drafts": { "description": "Drafts it proposed or signed (translations.jsonl).", "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Action": {
+      "description": "An act by a code participant: the rule it followed (in words), the call, the blocks, and whether it was applied.",
+      "type": "object",
+      "required": ["run", "t", "seq", "participant", "applied"],
+      "additionalProperties": false,
+      "properties": {
+        "run": { "type": "string" },
+        "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" },
+        "seq": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Count" },
+        "participant": { "type": "string" },
+        "as": { "type": "string" },
+        "reasoning": { "type": "string" },
+        "call": { "type": "string" },
+        "blocks": { "type": "array" },
+        "applied": { "type": "boolean" },
+        "refusal": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+      }
+    },
+    "ObservationRow": {
+      "description": "An observation a participant received (recorded only when the run was asked to): what's new since its last.",
+      "type": "object",
+      "required": ["run", "t", "participant", "observation"],
+      "additionalProperties": false,
+      "properties": {
+        "run": { "type": "string" },
+        "t": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/SimTime" },
+        "participant": { "type": "string" },
+        "as": { "type": "string" },
+        "observation": { "$ref": "urn:terrarium:contracts:0.5:common#/$defs/Opaque" }
+      }
+    }
+  }
+}

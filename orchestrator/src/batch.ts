@@ -71,7 +71,7 @@ export async function loadModules(file?: string): Promise<RunOptions["modules"]>
 
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). */
-export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string }): Promise<RunRecord> {
+export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   if (o.resume) {
     const r = prepareResume(o.resume);
@@ -96,7 +96,7 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(modules ? { modules } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(modules ? { modules } : {}), ...(o.recordObservations ? { recordObservations: recordWho(o.recordObservations) } : {}),
       ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
       ...(serving ? { resumedFrom: { log: basename(stoppedLog!), serving } } : {}) });
@@ -121,6 +121,8 @@ export interface BatchOptions {
   parallel?: number;
   until?: number;
   sets?: string[];
+  /** Whose observations to record in full (docs/design/run-datasets.md): "models", "code", "all", or ids, comma-separated. */
+  recordObservations?: string;
   translatorModel?: string;
   /** A real model for every language-model participant and the translator ("provider/model"); default: the mock. */
   model?: string;
@@ -164,7 +166,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const worker = async () => {
     for (let seed = queue.shift(); seed !== undefined; seed = queue.shift()) {
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
       const [code, err] = await Promise.all([p.exited, new Response(p.stderr).text()]);
@@ -210,4 +212,9 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     failed,
   }, null, 2));
   return result;
+}
+
+/** `--record-observations` as the run takes it: "models", "code", "all", or participant ids, comma-separated. */
+export function recordWho(s: string): string[] | "models" | "code" | "all" {
+  return s === "models" || s === "code" || s === "all" ? s : s.split(",").map((x) => x.trim()).filter(Boolean);
 }

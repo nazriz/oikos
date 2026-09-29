@@ -106,4 +106,6 @@ Every run with language-model participants is also training data for the transla
 
 `terrarium corpus <DIR|log.jsonl> [--out FILE]` joins these into one JSON line per translation (`orchestrator/src/corpus.ts`), by default `DIR/translator-corpus.jsonl`. Examples from the mock are marked `synthetic`: only real models' are fit to train on. `orchestrator/test/corpus.test.ts` checks every translation reads back whole.
 
+`terrarium dataset` (docs/design/run-datasets.md) goes further: a versioned folder per run, with a manifest, the translations, the model participants' decisions, and optionally the code participants' acts and recorded observations.
+
 **Keep every real-model run.** Its log is the only source of this data, and a real model's answers can't be made again. Never delete a language-model run's folder (or its log) to free space.

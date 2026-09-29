@@ -13,5 +13,8 @@
     "@terrarium/worlds": "workspace:*",
     "@terrarium/translator": "workspace:*",
     "@terrarium/measure": "workspace:*"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1"
   }
 }

@@ -1,0 +1,1 @@
+{ "run": "town.seed1", "t": 0, "participant": "mayor-system", "model": "mock/mock", "synthetic": true, "system_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "turn": 1, "input": "x", "commands": [], "drafts": [] }

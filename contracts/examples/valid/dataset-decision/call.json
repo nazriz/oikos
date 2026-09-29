@@ -1,0 +1,3 @@
+{ "run": "town.seed1", "t": 0, "participant": "mayor-system", "model": "anthropic/claude-sonnet-5", "synthetic": false, "system_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "turn": 1,
+  "input": "It is year 1, day 1.", "output": [{ "type": "tool_use", "id": "t1", "name": "propose", "input": { "what": "A budget." } }],
+  "tokens": { "input": 3000, "output": 120, "cost_microusd": 10800 }, "commands": [], "drafts": ["draft.mayor-system.1"] }

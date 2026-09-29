@@ -1609,13 +1609,14 @@
           "additionalProperties": false,
           "properties": {
             "annotation": {
-              "description": "transcript: raw exchange with a participant's controller (prompt as rendered, response). translation_failure: proposal the translator could not compile (the failure log that tells us which blocks are missing). debrief: post-run debrief exchange (VISION §15.3). orchestrator: orchestrator version, price tables, participant-controller bindings.",
+              "description": "transcript: raw exchange with a participant's controller (prompt as rendered, response). translation_failure: proposal the translator could not compile (the failure log that tells us which blocks are missing). debrief: post-run debrief exchange (VISION §15.3). orchestrator: orchestrator version, price tables, participant-controller bindings. observation: an observation a participant received, in full (data: t, as, observation), written only when the run is asked to record that participant's observations (docs/design/run-datasets.md).",
               "enum": [
                 "transcript",
                 "translation_failure",
                 "debrief",
                 "orchestrator",
-                "note"
+                "note",
+                "observation"
               ]
             },
             "subject": {
