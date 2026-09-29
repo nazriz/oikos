@@ -858,6 +858,14 @@ See the design note, §16.
   - **The sizes are placeholders,** exposed as `sway`; a world may set any of them.
   - **Revisit if:** the sparse mind (step 8) gives these decisions a better basis than a rate, or a survey links values to union membership or entrepreneurship well enough to calibrate `sway`.
 
+- **AI citizens, step 3: knowing what others do, by catching up** (docs/design/ai-citizens.md "Progress"; docs/behaviour/citizen.md).
+  - People ask someone they know how things are, every fortnight, with a message. The answer says where they shop and how it serves them, whom they work for and whether they're paid, and whether they're in the union.
+  - It feeds imitation (others going there), learning (others' payoffs, weighted as EWA's forgone payoffs), a conformist lean in joining the union, and the social need.
+  - **Why messages, not a shared view of what everyone does:** it's how people actually find out. It costs a message each way, and it reaches only people one knows. A language-model citizen can take part in its own words, and a code citizen understands only its own phrasing (as with asking around).
+  - **Found and fixed:** learning about employers never reached job choice, because options were postings and learning was of employers. Options are now employers. A message's sender (a participant) was being remembered as a person one knows.
+  - **The entry test now makes shop 1 fail on purpose** (no credit, no hiring). With people hearing of work from friends, shop 1 hired and traded its way out, which is the world's business, not what the test is about.
+  - **Revisit if:** catch-ups dominate message volume in bigger worlds (they're about 43 a day per 1,000 people), or survey data on how often people talk with friends calibrates `catch_up_days`.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

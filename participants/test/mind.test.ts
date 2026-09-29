@@ -78,3 +78,19 @@ test("appraising: a home matters most to the homeless; money matters less the mo
   const rich = appraise(p, raise, { monthly_income: 2_000_000, savings: 0, homeless: false }).security;
   expect(poor).toBeGreaterThan(rich);
 });
+
+test("word of mouth: what someone says they get from an option moves what's learned of it, less than one's own experience", () => {
+  const heard = new Attractions(undefined, 5_000);
+  heard.hear("shop-a", 1_000);
+  expect(heard.known("shop-a")).toBe(true); // heard of: known, so a person is surer of their options
+  expect(heard.get("shop-a")).toBeLessThan(5_000);
+  const tried = new Attractions(undefined, 5_000);
+  tried.update("shop-a", 1_000);
+  expect(tried.get("shop-a")).toBeLessThan(heard.get("shop-a")); // one's own experience counts for more
+  // The more one has tried, the less a single report moves it.
+  const seasoned = new Attractions(undefined, 5_000);
+  for (let i = 0; i < 10; i++) seasoned.update("shop-a", 9_000);
+  const before = seasoned.get("shop-a");
+  seasoned.hear("shop-a", 1_000);
+  expect(before - seasoned.get("shop-a")).toBeLessThan(5_000 - heard.get("shop-a"));
+});

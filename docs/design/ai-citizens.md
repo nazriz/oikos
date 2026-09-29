@@ -254,6 +254,19 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - housing: which home, each offer's rent and the home's bedrooms appraised (room beyond the bedrooms needed counts for a little); friends' leads count as others having gone there. Homes unaffordable, or short of the bedrooms a household must have, aren't considered. It replaces "the dearest home within budget, rent standing for quality": one year of the 1,000-person town, median rent share 23.3 to 20.5% (target 20.2%), rental stress 32 to 26%.
   - petitions: a person's signing threshold (Granovetter) follows their temperament: the conformist waits for others, the least conformist starts it. Half their conformity, half their own draw, so thresholds keep the same mean and spread.
   - looking for a better job while employed: every month if life falls short of what the person wants (CONSUMAT), otherwise now and then, the more open the more often. It replaces a flat, unsourced 10% a month. One year: applications 873 to 583, hires 258 to 281.
+- **Knowing what others do: catching up** (2026-09-29, citizen 0.18.0):
+  - Every fortnight a person asks someone they know how things are. The answer says where they shop and how well it serves them, whom they work for and whether they're paid, and whether they're in the union.
+  - It goes through the ordinary message block: word of mouth, in the code citizen's phrasing.
+  - **What's told feeds three things:**
+    - imitation: those we know who shop or work somewhere count as others going there;
+    - learning: their payoffs are weighed as EWA weighs forgone payoffs, below one's own experience;
+    - the union: a conformist leans toward the share of co-workers who belong.
+  - **Company now counts friends:** the social need is living with others, plus up to three people talked with in the past month.
+  - One year of the 1,000-person town, two seeds:
+    - about 43 catch-ups a day, nearly all answered;
+    - employment to population 66.6/66.3%; unemployment 0.9/0.4%;
+    - hires 304/238 (from 277/224);
+    - arrivals 10/8 (from 8/8); departures within seed noise.
 - **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
 - **The cited priors, now swayed by the person** (3e; 2026-09-29):
   - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).
@@ -266,6 +279,8 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - One year earlier (the first wiring): employment to population 64.9 to 66.2%, unemployment 3.1 to 0%, retail staff 80 to 88, shops served 82 and 80% of what was ordered.
 - **Still today's rules, not yet decisions of the mind:** support and retiring (claims by eligibility), word of mouth, households (the mechanics of living together).
 - **Found while wiring:**
+  - what's learned of employers never reached the choice: options were postings, learning was of employers. Options are now employers (their first posting), and being paid as agreed is learned too;
+  - a message's sender is a participant, and those we know are people: mixing them, people asked participants, which the word-of-mouth test caught;
   - the generality test caught the learning domain named `union`, the same as the town's union: the domain is `membership`;
   - untried options need a prior (EWA's initial attractions), or a shop that serves nothing teaches nothing;
   - with no one to copy, a person should go by experience, not habit.

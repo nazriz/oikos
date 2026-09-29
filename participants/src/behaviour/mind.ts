@@ -136,6 +136,17 @@ export class Attractions {
     }
   }
 
+  /**
+   * What someone else got from an option, as they told us: weighted as EWA weighs forgone payoffs (delta), against our
+   * own experience, and applied when heard rather than at our next choice (our adaptation: word of mouth arrives between
+   * choices). The option is then known.
+   */
+  hear(option: string, payoff: number): void {
+    const delta = this.e.delta_bps / 10_000;
+    const prev = this.get(option);
+    this.a.set(option, prev + (delta / (this.n + delta)) * (payoff - prev));
+  }
+
   /** Choose among options by the logit of attraction plus each option's appraised value, with openness to explore. */
   choose(rng: Rng, options: { key: string; value: number }[], openness_bps: number): { key: string; weights: number[] } {
     const lam = this.e.lambda * (1 - openness_bps / 20_000); // the more open, the more a person explores
@@ -274,6 +285,11 @@ export class Mind {
 
   learn(domain: string, chosen: string, payoff_bps: number, forgone: { [option: string]: number } = {}): void {
     this.learned(domain).update(chosen, payoff_bps, forgone);
+  }
+
+  /** What someone told us an option gave them (word of mouth). */
+  hear(domain: string, option: string, payoff_bps: number): void {
+    this.learned(domain).hear(option, payoff_bps);
   }
 
   decide(domain: string, rng: Rng, o: { options: Choice[]; current?: string; levels: NeedLevels; circ: Circumstances; satisfied_here?: number }): Decision {

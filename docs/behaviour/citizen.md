@@ -56,8 +56,9 @@ Word of mouth is people telling people, over ordinary messages; the platform pas
 | **Asking around.** Starting a hunt for a home, a citizen asks all its contacts with probability `ask_home_bps`; for work, `ask_work_bps`. Still hunting after `ask_again_days`, it counts as a new hunt. | Homes: 37% of renters ask friends or family (Apartments.com survey reported by the National Apartment Association, 2026, n > 15,000; a listing site's own audience, so likely an understatement). Work: 69% of 16–23-year-old job seekers used friends and relatives over a year (Holzer 1987, via Ioannides & Loury, *JEL* 2004); per month it's 15–23% (CPS). |
 | **Passing on.** Asked, a citizen names a building where it can see room: for a home, its own building or one next to it; for work, only its own workplace (it's on the inside there). It says only what it can see; it can't know whether the owner is letting or hiring. With probability `pass_on_bps`. | Placeholder. |
 | **Following up.** A citizen told about a building searches the listings or postings for it first, and applies to what it finds there before anything on the open market. | Schmidt, "Finding a Home during the Affordable Housing Crisis", *ASR* 2025 (qualitative; 69 renters): ties are leaned on heavily, and leads from them are acted on. |
+| **Catching up** (the mind, 0.18.0). Every `catch_up_days`, a citizen asks one of its contacts how things are. A contact answers with what it does: where it shops and how well that shop has it served ("it has what I need", "it mostly has", "it often runs short"), whom it works for and whether they pay, and whether it's in the union. What it's told counts, for `news_days`, as what that person does. Those who shop or work somewhere count as others going there (CONSUMAT's imitating). How it goes for them is learned as others' payoffs (EWA's forgone payoffs, weighted below one's own experience). For joining the union, a conformist leans toward the share of known co-workers who belong (`sway.union_peers`). Talking with people counts toward company (the social need: up to three people in the past month). | Conformist transmission: Boyd and Richerson, *Culture and the Evolutionary Process* (1985). Imitation in CONSUMAT: Jager (2000). Forgone payoffs: Camerer and Ho (1999); weighing them when heard, between one's own choices, is ours. Intervals and how long news lasts are placeholders. |
 
-Code citizens understand only their own phrasing of a question (`ASKING` in the module). A language-model citizen understands anything, and a code citizen won't understand its questions. That's a limit of code citizens, not of the world.
+Code citizens understand only their own phrasing of a question (`ASKING` and `CATCHING_UP` in the module). A language-model citizen understands anything, and a code citizen won't understand its questions. That's a limit of code citizens, not of the world.
 
 **No coded distortion.** A code citizen acts on the building named, not the words, so garbled wording would change nothing. Distortion arrives with language-model citizens; measurement can compare what was said with what was there.
 
@@ -84,11 +85,12 @@ Code citizens understand only their own phrasing of a question (`ASKING` in the 
 - `buffer_months` 3
 - `leave_after_homeless_days` 90
 - `leave_after_jobless_days` 180
-- `sway`: how far a person's values sway the cited rates above, as a fraction of the rate per standard deviation of the value (union joining 0.3, turnout 0.15, strike vote 0.08, patience 0.2 by tradition and 0.1 by security, founding 0.4 by openness and 0.3 by achievement). Placeholders, unsourced, kept small so the town's rates stay as calibrated: a value's effect is symmetric about the town's mean.
+- `sway`: how far a person's values sway the cited rates above, as a fraction of the rate per standard deviation of the value (union joining 0.3, a conformist's lean toward co-workers' membership 0.5, turnout 0.15, strike vote 0.08, patience 0.2 by tradition and 0.1 by security, founding 0.4 by openness and 0.3 by achievement). Placeholders, unsourced, kept small so the town's rates stay as calibrated: a value's effect is symmetric about the town's mean.
 - `petition_start_bps` 300, `petition_days` 180, `rent_burden_grievance_bps` 4000
 - `threshold_mean_bps` 2500, `threshold_sd_bps` 1000
 - `search_limit` 20
 - `ask_home_bps` 3700, `ask_work_bps` 6900, `ask_again_days` 60, `max_contacts` 15, `pass_on_bps` 10000
+- `catch_up_days` 14, `news_days` 90 (catching up; placeholders)
 - `shop_accounts`, `outside_account`, `population`: supplied by the world
 
 ## Leaves out (for now)

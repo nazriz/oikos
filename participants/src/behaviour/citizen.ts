@@ -39,11 +39,37 @@ import { factsOf, Mind, MIND_DEFAULTS, satisfaction, type Circumstances, type Mi
 
 /** How far a person's values sway the cited rates (a fraction of the rate per standard deviation of the value):
  * placeholders, unsourced, chosen small so the town's rates stay as calibrated (docs/behaviour/citizen.md). */
-const SWAY = { union_join: 0.3, turnout: 0.15, strike_vote: 0.08, patience_tradition: 0.2, patience_security: 0.1, enterprise_openness: 0.4, enterprise_achievement: 0.3 };
+const SWAY = { union_peers: 0.5, union_join: 0.3, turnout: 0.15, strike_vote: 0.08, patience_tradition: 0.2, patience_security: 0.1, enterprise_openness: 0.4, enterprise_achievement: 0.3 };
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
 type Want = keyof typeof ASKING;
+
+/** Catching up with someone we know: the question, and a code citizen's answer (where they shop and how it serves them,
+ * whom they work for and whether they're paid, whether they're in the union). Understood only in this phrasing. */
+export const CATCHING_UP = {
+  ask: "How are things with you?",
+  shop: (shop: string, served: number) => `I shop at ${shop}; ${served >= 9_000 ? "it has what I need" : served >= 6_000 ? "it mostly has what I need" : "it often runs short"}.`,
+  work: (employer: string, paid: boolean) => `I work for ${employer}; ${paid ? "they pay on time" : "they've stopped paying me"}.`,
+  union: (member: boolean) => (member ? "I'm in the union." : "I'm not in the union."),
+  nothing: "Much the same.",
+};
+export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean }
+/** What someone's answer tells us, if it's in our phrasing (how well a shop serves: the middle of what the words say). */
+export function heardNews(text: string): News | undefined {
+  const n: News = {};
+  let m: RegExpExecArray | null;
+  if ((m = /I shop at ([^\s;]+); (it has what I need|it mostly has what I need|it often runs short)\./.exec(text))) {
+    n.shop = m[1]!;
+    n.served = m[2] === "it has what I need" ? 9_500 : m[2] === "it mostly has what I need" ? 7_500 : 3_500;
+  }
+  if ((m = /I work for ([^\s;]+); (they pay on time|they've stopped paying me)\./.exec(text))) {
+    n.employer = m[1]!;
+    n.paid = m[2] === "they pay on time";
+  }
+  if ((m = /I'm (not )?in the union\./.exec(text))) n.member = !m[1];
+  return Object.keys(n).length ? n : undefined;
+}
 
 /** A home is a unit (a space) in a building. */
 interface Home {
@@ -55,7 +81,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.17.0",
+  version: "0.18.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -118,6 +144,10 @@ export const citizen: BehaviourModule = {
       ask_again_days: 60, // still hunting after this long: a new hunt, asked about again (placeholder)
       max_contacts: 15, // people remembered from homes and workplaces shared, most recent first (placeholder; Dunbar's ~15 "sympathy group")
       pass_on_bps: 10_000, // chance a contact who can see a lead passes it on (placeholder)
+      // Catching up (docs/behaviour/citizen.md): how often we ask someone we know how things are (placeholder), and for
+      // how long what they told us counts as what they do now (placeholder).
+      catch_up_days: 14,
+      news_days: 90,
       // Households (docs/behaviour/households.md).
       accept_fewer_bedrooms_after_days: 60, // still hunting after this long: accept one bedroom fewer than the standard asks, and so on (placeholder)
       // Fertility (docs/behaviour/households.md): births per 10,000 women a year by age (the world's profile); a month's chance is a twelfth.
@@ -208,6 +238,12 @@ export const citizen: BehaviourModule = {
     let leads: string[] = []; // buildings, most recent last
     let looking: "leads" | "market" | null = null; // which search the next observation answers
     const leadFound: { homes: StatementRecord[]; jobs: StatementRecord[] } = { homes: [], jobs: [] };
+    // Catching up: what the people we know told us they do, when; whom we've talked with, when; who asked us.
+    const toldUs = new Map<string, News & { t: number }>();
+    const talked = new Map<string, number>();
+    let askedHow: string[] = [];
+    let nextCatchUp: number | null = null;
+    const newsNow = (t: number) => [...toldUs.values()].filter((n) => t - n.t <= p.news_days * DAY);
 
     // Support paid to us, once our claim is granted (the decision says how much, how often), and whether it's the kind
     // we claim on retiring.
@@ -314,7 +350,10 @@ export const citizen: BehaviourModule = {
       for (const tx of channels.transactions(obs)) if (mine.has(tx.to) && !mine.has(tx.from)) {
         inflows.push({ t: tx.t, amount: cents(tx.amount) });
         // Our wages, as agreed: the wage, less the income tax the law says our employer withholds.
-        if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period))) job.paidAt = tx.t;
+        if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period))) {
+          job.paidAt = tx.t;
+          mind.learn("job", job.employer, 10_000); // an employer that pays, as agreed
+        }
       }
       while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
       for (const k of ["homes", "jobs", "petitions"] as const) {
@@ -330,6 +369,21 @@ export const citizen: BehaviourModule = {
         const what = from ? hear(m.text) : undefined;
         if (from && what) {
           heard.push({ from, what });
+          continue;
+        }
+        const person = book.participantPerson.get(m.from) ?? m.from; // who wrote (the directory names their person)
+        if (m.text === CATCHING_UP.ask) {
+          askedHow.push(m.from);
+          talked.set(person, obs.t);
+          continue;
+        }
+        const told = heardNews(m.text);
+        if (told) {
+          // What they do, and how it goes for them: counted as others doing it, and learned from as others' payoffs.
+          toldUs.set(person, { ...told, t: obs.t });
+          talked.set(person, obs.t);
+          if (told.shop && told.served !== undefined) mind.hear("shop", told.shop, told.served);
+          if (told.employer && told.paid !== undefined) mind.hear("job", told.employer, told.paid ? 10_000 : 0);
           continue;
         }
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
@@ -568,7 +622,8 @@ export const citizen: BehaviourModule = {
           subsistence: Math.min(10_000, Math.round((held * 10_000) / Math.max(1, p.essentials_units))),
           shelter: home ? 10_000 : livingAt ? 6_000 : 0,
           security: Math.min(10_000, Math.round((acc.balance * 2_500) / Math.max(1, outgoings))),
-          social: household && household.members.length > 1 ? 7_000 : 4_000,
+          // Company: living with others, and the people we've talked with this past month (up to three count).
+          social: (household && household.members.length > 1 ? 5_000 : 2_000) + 1_000 * Math.min(3, [...talked.values()].filter((x) => t - x <= MONTH).length),
           status: job ? 7_000 : retired ? 6_000 : 3_000,
         };
       };
@@ -625,7 +680,12 @@ export const citizen: BehaviourModule = {
         // them (learned: a raise it won paid, a strike's lost pay didn't).
         const learnedMember = mind.learned("membership").known("member") ? (mind.learned("membership").get("member") - 5_000) / 10_000 : 0;
         const rate = p.union_join_bps[industry] ?? p.union_join_bps.other ?? 0;
-        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember);
+        // And by what those we know who work there do: the conformist leans toward the share of them who belong (Boyd
+        // and Richerson's conformist transmission).
+        const peers = newsNow(t).filter((n) => n.employer === job!.employer && n.member !== undefined);
+        const peerShare = peers.length ? (peers.filter((n) => n.member).length * 10_000) / peers.length : null;
+        const conform = peerShare === null ? 0 : (p.sway.union_peers * mind.person.temperament.conformity * (peerShare - rate)) / 10_000 / Math.max(1, rate);
+        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform);
         if (!member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance)
           steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
       }
@@ -819,16 +879,21 @@ export const citizen: BehaviourModule = {
         searchingWork = false;
         // Which one: the mind's (docs/design/ai-citizens.md 3). Each posting's offer appraised (its wage, its hours), with
         // what we've learned of each employer; where friends told us to look counts as others having gone there.
+        // An employer is one option (its first posting: one we were told of, if any), as what we learn is of employers;
+        // those we know who work there count as others having gone there.
         const toldBy = new Set(told.map((j) => j.id));
-        const d = posts.length ? decide("job", t, ctx.rng(`job-${t}`), {
-          options: posts.map((j) => ({ key: j.id, facts: j.offer ? factsOf(j.offer) : { money_per_month: Math.round(((j.data?.wage ?? 0) * MONTH) / (j.data?.period ?? 14 * DAY)), work_hours_per_month: 160 }, others: toldBy.has(j.id) ? 1 : 0 })),
+        const byEmployer = new Map<string, StatementRecord>();
+        for (const j of posts) if (!byEmployer.has(j.speaks_for!)) byEmployer.set(j.speaks_for!, j);
+        const working = newsNow(t);
+        const d = byEmployer.size ? decide("job", t, ctx.rng(`job-${t}`), {
+          options: [...byEmployer].map(([e, j]) => ({ key: e, facts: j.offer ? factsOf(j.offer) : { money_per_month: Math.round(((j.data?.wage ?? 0) * MONTH) / (j.data?.period ?? 14 * DAY)), work_hours_per_month: 160 }, others: (toldBy.has(j.id) ? 1 : 0) + working.filter((n) => n.employer === e).length })),
           levels: needLevels(), circ: circumstances(), satisfied_here: job ? 10_000 : 0,
         }) : undefined;
-        const best = posts.find((j) => j.id === d?.key);
+        const best = d?.key ? byEmployer.get(d.key) : undefined;
         if (best?.speaks_for) {
           applied.add(best.id);
           if (typeof best.data?.industry === "string") industryOf.set(best.speaks_for, best.data.industry);
-          const how = d!.strategy === "imitate" ? ", where someone told us to look" : d!.strategy === "compare" ? ", with an employer we know" : ", weighing each job's pay and hours";
+          const how = d!.strategy === "imitate" ? ", where people we know told us to look or work" : d!.strategy === "compare" ? ", with an employer we know" : ", weighing each job's pay and hours";
           steps.push(because(`Applying for a job at ${usd(best.data?.wage ?? 0)} a fortnight${job ? `, better than ours (${usd(job.wage)})` : ""}${how}.`,
             say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account }, basis: best.id })));
         }
@@ -935,10 +1000,12 @@ export const citizen: BehaviourModule = {
           const budget = Math.min(acc.balance, Math.floor((monthly() * p.shop_every_days * DAY) / MONTH) + carried + deferred);
           // Which shop: the mind's decision among the shops' offers, each for what the trip's budget buys there.
           const offerOf = (shop: string) => book.open("price_list").filter((l) => l.speaks_for === shop && l.offer).sort((a, b) => b.at - a.at)[0]?.offer;
+          // Those we know who shop there count as others going there.
+          const heard = newsNow(t);
           const options = shops.map((x) => {
             const units = Math.floor(budget / x.price);
             const o = offerOf(x.shop);
-            return { key: x.shop, facts: o ? factsOf(o, units) : { money_per_month: -units * x.price, goods_per_month: units } };
+            return { key: x.shop, facts: o ? factsOf(o, units) : { money_per_month: -units * x.price, goods_per_month: units }, others: heard.filter((n) => n.shop === x.shop).length };
           });
           const was = favourite;
           const d = decide("shop", t, r, { options, current: priceAt(favourite) ? favourite : undefined, levels: needLevels(), circ: circumstances(), satisfied_here: lastServed });
@@ -992,6 +1059,12 @@ export const citizen: BehaviourModule = {
     // Word of mouth. Ties are the people we share (or shared) a home or workplace with: in our own
     // buildings we see who. Asked, we say where we can see room: where we live or next door for a
     // home, our own workplace for work (we're on the inside there). Hunting, we ask once per hunt.
+    /** What we'd tell someone who asks how we are. */
+    const newsOfMine = () => [
+      favourite && mind.learned("shop").known(favourite) ? CATCHING_UP.shop(favourite, lastServed) : "",
+      job ? CATCHING_UP.work(job.employer, !job.claimed) : "",
+      job && p.union ? CATCHING_UP.union(isMember()) : "",
+    ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
     const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
       // The buildings around us; in our own we see who's there (they're the people we know).
       const around: SiteStructure[] = obs.channels.street?.kind === "sites" ? channels.structures({ ...obs, channels: { street: obs.channels.street } }) : [];
@@ -1013,6 +1086,20 @@ export const citizen: BehaviourModule = {
       }
       asked = [];
       const known = [...contacts.keys()];
+      // Catching up: answering those who asked how we are, and now and then asking someone we know (one at a time).
+      for (const who of askedHow) {
+        steps.push(because("Asked how things are: telling them.", message([who], newsOfMine())));
+      }
+      askedHow = [];
+      if (nextCatchUp === null) nextCatchUp = t + ctx.rng("catch-up").below(p.catch_up_days) * DAY;
+      if (t >= nextCatchUp) {
+        nextCatchUp = t + p.catch_up_days * DAY;
+        if (known.length) {
+          const who = ctx.rng(`catch-up-${t}`).pick([...known].sort());
+          talked.set(who, t);
+          steps.push(because("Catching up with someone we know.", message([who], CATCHING_UP.ask)));
+        }
+      }
       for (const [want, needed, chance] of [["home", isLeaseholder() && !home, p.ask_home_bps], ["work", !job, p.ask_work_bps]] as [Want, boolean, number][]) {
         if (!needed) {
           delete askedAt[want];

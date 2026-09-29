@@ -14,12 +14,13 @@ const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 
 test("a failed shop's premises are bought by someone who founds a new shop there, which hires and trades", async () => {
   const config = generate(base);
-  // Shop 1 starts with nothing, and fails quickly (insolvent, or closed by its owners when it can't staff itself; short
-  // periods, for the test); people are keen to start businesses.
+  // Shop 1 starts with nothing, no credit and no hiring, and fails quickly (insolvent, or closed by its owners when it
+  // can't staff itself; short periods, for the test); people are keen to start businesses. (Otherwise it may trade its
+  // way out, if people come to work and shop there: whether it does is the world's, not what this test is about.)
   config.world.accounts.find((a: any) => a.id === "acc-shop-1").balance = "0";
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "shop-1");
   const shop1 = config.participants.find((p: any) => p.id === "shop-1-manager-system").controller.params;
-  Object.assign(shop1, { short_days: 10, wind_up_days: 10, idle_days: 30 });
+  Object.assign(shop1, { short_days: 10, wind_up_days: 10, idle_days: 30, lender: "", max_staff: 0 });
   for (const p of config.participants) if (p.controller?.impl === "citizen.default") p.controller.params.found_bps = 10_000;
   // Someone of working age in the labour force has the savings to buy the premises (an inheritance, say): in the
   // generated town, working-age savings are far short of a shop's price (docs/behaviour/entry.md).

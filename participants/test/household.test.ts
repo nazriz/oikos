@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { bedroomsNeeded, hear, SAYING, type HouseholdData, type Member } from "../src/behaviour/household";
+import { CATCHING_UP, heardNews } from "../src/behaviour/citizen";
 
 const YEAR = 365 * 86_400;
 const T = 40 * YEAR;
@@ -33,4 +34,12 @@ test("household members understand their own phrasing, and nothing else", () => 
   expect(hear(SAYING.share(0, "acc-c0001"))).toEqual({ kind: "share", cents: 0, account: "acc-c0001" });
   expect(hear(SAYING.pay(257_142))).toEqual({ kind: "pay", cents: 257_142 });
   expect(hear("We should move somewhere bigger.")).toBeUndefined();
+});
+
+test("catching up: a code citizen's news reads back as what it says", () => {
+  const text = [CATCHING_UP.shop("shop-3", 7_000), CATCHING_UP.work("factory-co-2", true), CATCHING_UP.union(false)].join(" ");
+  expect(heardNews(text)).toEqual({ shop: "shop-3", served: 7_500, employer: "factory-co-2", paid: true, member: false });
+  expect(heardNews(CATCHING_UP.shop("shop-1", 2_000))).toEqual({ shop: "shop-1", served: 3_500 });
+  expect(heardNews(CATCHING_UP.nothing)).toBeUndefined();
+  expect(heardNews("Lovely weather.")).toBeUndefined();
 });
