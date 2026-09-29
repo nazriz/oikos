@@ -114,3 +114,20 @@ test("the world market buys exports it has received, up to the month's demand, a
   const declined = recs.filter((r) => r.kind === "invoice_declined");
   expect(declined.map((r) => r.data.returned ?? "no goods")).toEqual([100, "no goods"]);
 }, 300_000);
+
+test("a construction contract is known by its terms, not its name; one offered below the builder's price is declined in writing", async () => {
+  // Pilot 9: the mayor's contract, drafted from plain words, had no template, and the builder ignored it all year.
+  const config = generate({ ...base, citizens: 60 });
+  const deal = (id: string, cents: string, on: string) => [
+    { id, record: "agreement", author: "genesis", at: 0, visible_to: ["city", "builder"], terms: { parties: ["city", "builder"], commitments: [
+      { who: "city", does: { outcome: { money: { amount: cents, from: "acc-city", to: "builder" } } } },
+      { who: "builder", does: { outcome: { structure: { on, type: "park" } } } }] } },
+    { id: `${id}-sig-city`, record: "signature", author: "genesis", at: 0, visible_to: ["city", "builder"], speaks_for: "city", agreement: id, as: "city" }];
+  config.world.records.push(...deal("town-park-fair", "90000000", "lot-00-00"), ...deal("town-park-cheap", "100", "lot-00-01"));
+  const { recs } = await run("by-terms", config, 30 * DAY);
+  expect(recs.some((r) => r.record === "signature" && r.agreement === "town-park-fair" && r.as === "builder")).toBe(true);
+  expect(recs.some((r) => r.record === "signature" && r.agreement === "town-park-cheap" && r.as === "builder")).toBe(false);
+  const no = recs.find((r) => r.kind === "offer_declined" && r.data?.agreement === "town-park-cheap");
+  expect(no?.addressed_to).toEqual(["city"]);
+  expect(no.text).toMatch(/our price is \$[\d,]+\.\d\d/);
+}, 300_000);
