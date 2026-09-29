@@ -252,12 +252,20 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - shopping: which shop, by CONSUMAT and what's learned; retries by what's learned (2026-09-29).
   - work: which posting, each offer's wage and hours appraised, with what's learned of each employer (one that didn't pay is remembered); friends' leads count as others having gone there. In work, only better-paid postings are considered (2026-09-29).
   - housing: which home, each offer's rent and the home's bedrooms appraised (room beyond the bedrooms needed counts for a little); friends' leads count as others having gone there. Homes unaffordable, or short of the bedrooms a household must have, aren't considered. It replaces "the dearest home within budget, rent standing for quality": one year of the 1,000-person town, median rent share 23.3 to 20.5% (target 20.2%), rental stress 32 to 26%.
+  - petitions: a person's signing threshold (Granovetter) follows their temperament: the conformist waits for others, the least conformist starts it. Half their conformity, half their own draw, so thresholds keep the same mean and spread.
+  - looking for a better job while employed: every month if life falls short of what the person wants (CONSUMAT), otherwise now and then, the more open the more often. It replaces a flat, unsourced 10% a month. One year: applications 873 to 583, hires 258 to 281.
+- **Kept as cited priors, deliberately** (3e):
+  - **Joining the union:** the ABS membership rates by industry.
+  - **Starting a business:** a monthly chance, for those who can afford premises.
+  - **Leaving town:** Hirschman's exit after long without a home or work.
+  - Each turns on something facts can't carry: what representation is worth, what a business will earn, what staying means. By design, without the model a mind scores facts alone, and on facts these are pure costs, so nobody would join or found anything.
+  - The cited rule stands for what a person expects, until the model (4), or experience, says otherwise. For example, a member whose enterprise agreement raised their pay learns membership paid (a later step). These are the first places the sparse mind will matter.
   - One year of the 1,000-person town, before and after:
     - employment to population 64.9 to 66.2%;
     - unemployment 3.1 to 0%;
     - retail staff 80 to 88;
     - shops served 82 and 80% of what was ordered.
-- **Still today's rules:** the union, voice, business, support, leaving, word of mouth, households.
+- **Still today's rules, not yet decisions of the mind:** support and retiring (claims by eligibility), word of mouth, households (the mechanics of living together).
 - **Found while wiring:**
   - untried options need a prior (EWA's initial attractions), or a shop that serves nothing teaches nothing;
   - with no one to copy, a person should go by experience, not habit.

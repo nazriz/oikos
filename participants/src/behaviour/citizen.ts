@@ -34,7 +34,7 @@ import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Hea
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
-import { factsOf, Mind, MIND_DEFAULTS, type Circumstances, type MindParams, type NeedLevels, type PopulationValues } from "./mind";
+import { factsOf, Mind, MIND_DEFAULTS, satisfaction, type Circumstances, type MindParams, type NeedLevels, type PopulationValues } from "./mind";
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
@@ -80,7 +80,7 @@ export const citizen: BehaviourModule = {
       child_template_outside_lf: "",
       participation_bps: 10_000,
       // Looking for a better-paid job while employed (docs/behaviour/citizen.md): a month's chance, Lengnick (2013)'s pi.
-      job_search_bps: 1000,
+      // (Looking for a better job while employed is the mind's: docs/design/ai-citizens.md 3b.)
       // Starting a business (docs/behaviour/entry.md): the kinds of venture this world has (a template each: its capital
       // beyond the premises, the founder's position's channels and rules, with "{structure}", "{cell}", "{listing}",
       // "{founder}" and "{capital}" filled in), and the monthly chance a person able to, seeing premises for sale, does.
@@ -160,6 +160,7 @@ export const citizen: BehaviourModule = {
     // (A shop not yet tried is expected to serve most of what's asked: one that serves nothing then counts against it.)
     const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000, job: 5_000 });
     let lastServed = 10_000; // how fully the last shop served us (basis points)
+    let levelsNow: NeedLevels = { subsistence: 10_000, shelter: 10_000, security: 10_000, social: 10_000, status: 10_000 }; // as last judged
     let nextShop = ctx.rng("shop-day").below(p.shop_every_days) * DAY;
     let trip: { at: number; tried: Set<string> } | null = null;
     let nextUse = 0; // when we next use things up (weekly)
@@ -545,6 +546,7 @@ export const citizen: BehaviourModule = {
           status: job ? 7_000 : retired ? 6_000 : 3_000,
         };
       };
+      levelsNow = needLevels();
       const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt });
       if (!job && joblessSince === null) joblessSince = t;
 
@@ -987,7 +989,12 @@ export const citizen: BehaviourModule = {
     const tr = ctx.rng("threshold");
     let z = -6 * 10_000;
     for (let i = 0; i < 12; i++) z += tr.below(10_000);
-    const threshold = Math.max(0, p.threshold_mean_bps + Math.trunc((z * p.threshold_sd_bps) / 10_000)); // z / 10000 ~ N(0, 1)
+    // A person's threshold follows their temperament (docs/design/ai-citizens.md 3a): the conformist waits for others,
+    // the least conformist starts it. Half their conformity (standardised, near its spread among people), half their own
+    // draw, so thresholds keep the same mean and spread.
+    const zc = Math.max(-3, Math.min(3, (mind.person.temperament.conformity - 5_000) / 1_060));
+    const zt = 0.5 * zc + 0.866 * (z / 10_000);
+    const threshold = Math.max(0, p.threshold_mean_bps + Math.trunc(zt * p.threshold_sd_bps));
     const signed = new Set<string>();
     // Whether we're someone who signs petitions at all (drawn once); thresholds apply among those who are.
     const willing = ctx.rng("petition-willing").below(10_000) < p.petition_willing_bps;
@@ -1123,7 +1130,10 @@ export const citizen: BehaviourModule = {
           // In work: a month's chance of looking for something better paid.
           if (job && !switching && !retired && p.in_labour_force && obs.t >= nextJobSearch) {
             nextJobSearch = obs.t + MONTH;
-            searchingWork = ctx.rng(`job-search-${obs.t}`).below(10_000) < p.job_search_bps;
+            // Looking for a better job (CONSUMAT, docs/design/ai-citizens.md 3b): every month if our life falls short of
+            // what we want; otherwise now and then, the more open we are.
+            const unsatisfied = satisfaction(mind.person, levelsNow) < mind.p.aspiration_bps;
+            searchingWork = unsatisfied || ctx.rng(`job-search-${obs.t}`).below(10_000) < Math.round(mind.person.temperament.openness / 10);
           }
           if (lookedAt !== obs.t && acc) {
             if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], order: { field: "data.rent", desc: true }, limit: p.search_limit } });
