@@ -158,7 +158,7 @@ export const citizen: BehaviourModule = {
     let favourite: string | undefined;
     // The mind: a person drawn once from the world's figures, and what it learns (docs/design/ai-citizens.md 3).
     // (A shop not yet tried is expected to serve most of what's asked: one that serves nothing then counts against it.)
-    const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000 });
+    const mind = new Mind(ctx.rng("person"), p.values, { ...MIND_DEFAULTS, ...p.mind, ewa: { ...MIND_DEFAULTS.ewa, ...(p.mind.ewa ?? {}) } }, { shop: 8_000, job: 5_000 });
     let lastServed = 10_000; // how fully the last shop served us (basis points)
     let nextShop = ctx.rng("shop-day").below(p.shop_every_days) * DAY;
     let trip: { at: number; tried: Set<string> } | null = null;
@@ -503,6 +503,7 @@ export const citizen: BehaviourModule = {
         const last = job.paidAt ?? job.since;
         if (t - last > job.period + 5 * DAY) {
           job.claimed = true;
+          mind.learn("job", job.employer, 0); // an employer that didn't pay: remembered
           const missed = Math.max(1, Math.floor((t - last) / job.period));
           steps.push(because(`Our wages haven't been paid for ${Math.floor((t - last) / DAY)} days: resigning, and claiming the ${usd(missed * job.wage)} we're owed.`,
             notice(job.agreement, "Resigning: our wages haven't been paid."),
@@ -530,6 +531,21 @@ export const citizen: BehaviourModule = {
         }
       }
       if (!home && homelessSince === null) homelessSince = t;
+      // How well each need is met, as this citizen judges its own life (docs/design/ai-citizens.md 3a). Placeholders
+      // for how each is read from the world, to calibrate: goods in hand against a fortnight's use; a home of our own;
+      // savings against a month's outgoings; a household; work.
+      const needLevels = (): NeedLevels => {
+        const held = channels.holdings(obs).filter((h) => h.kind === p.goods).reduce((x, h) => x + Number(h.quantity), 0);
+        const outgoings = Math.max(p.essentials, (home?.rent ?? share?.cents ?? 0) + p.essentials);
+        return {
+          subsistence: Math.min(10_000, Math.round((held * 10_000) / Math.max(1, p.essentials_units))),
+          shelter: home ? 10_000 : livingAt ? 6_000 : 0,
+          security: Math.min(10_000, Math.round((acc.balance * 2_500) / Math.max(1, outgoings))),
+          social: household && household.members.length > 1 ? 7_000 : 4_000,
+          status: job ? 7_000 : retired ? 6_000 : 3_000,
+        };
+      };
+      const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt });
       if (!job && joblessSince === null) joblessSince = t;
 
       // Offers made to us: sign what we asked for and can afford.
@@ -748,14 +764,21 @@ export const citizen: BehaviourModule = {
         // In work, only postings that pay better than ours, elsewhere.
         const better = (j: StatementRecord) => !job || (j.speaks_for !== job.employer && (j.data?.wage ?? 0) * job.period > job.wage * (j.data?.period ?? job.period));
         const told = job ? [] : leadFound.jobs.filter((j) => !applied.has(j.id));
-        const posts = (told.length ? told : found.jobs).filter((j) => !applied.has(j.id) && better(j));
+        const posts = [...told, ...found.jobs.filter((j) => !told.includes(j))].filter((j) => !applied.has(j.id) && better(j) && j.speaks_for);
         searchingWork = false;
-        posts.sort((a, b) => (b.data?.wage ?? 0) - (a.data?.wage ?? 0) || (a.id < b.id ? -1 : 1));
-        const best = posts[0];
+        // Which one: the mind's (docs/design/ai-citizens.md 3). Each posting's offer appraised (its wage, its hours), with
+        // what we've learned of each employer; where friends told us to look counts as others having gone there.
+        const toldBy = new Set(told.map((j) => j.id));
+        const d = posts.length ? mind.decide("job", ctx.rng(`job-${t}`), {
+          options: posts.map((j) => ({ key: j.id, facts: j.offer ? factsOf(j.offer) : { money_per_month: Math.round(((j.data?.wage ?? 0) * MONTH) / (j.data?.period ?? 14 * DAY)), work_hours_per_month: 160 }, others: toldBy.has(j.id) ? 1 : 0 })),
+          levels: needLevels(), circ: circumstances(), satisfied_here: job ? 10_000 : 0,
+        }) : undefined;
+        const best = posts.find((j) => j.id === d?.key);
         if (best?.speaks_for) {
           applied.add(best.id);
           if (typeof best.data?.industry === "string") industryOf.set(best.speaks_for, best.data.industry);
-          steps.push(because(`Applying for the best-paid job we've seen (${usd(best.data?.wage ?? 0)} a fortnight)${job ? `, better than ours (${usd(job.wage)})` : told.length ? ", where someone told us to look" : ""}.`,
+          const how = d!.strategy === "imitate" ? ", where someone told us to look" : d!.strategy === "compare" ? ", with an employer we know" : ", weighing each job's pay and hours";
+          steps.push(because(`Applying for a job at ${usd(best.data?.wage ?? 0)} a fortnight${job ? `, better than ours (${usd(job.wage)})` : ""}${how}.`,
             say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account }, basis: best.id })));
         }
       }
@@ -804,21 +827,6 @@ export const citizen: BehaviourModule = {
       // A month's spending: out of income, what isn't saved (the saving ratio), less housing; never below essentials;
       // plus a little out of savings above a buffer (the wealth effect). Income is a month's worth of what came in lately
       // (before we've a window of it, what our job and payments say).
-      // How well each need is met, as this citizen judges its own life (docs/design/ai-citizens.md 3a). Placeholders
-      // for how each is read from the world, to calibrate: goods in hand against a fortnight's use; a home of our own;
-      // savings against a month's outgoings; a household; work.
-      const needLevels = (): NeedLevels => {
-        const held = channels.holdings(obs).filter((h) => h.kind === p.goods).reduce((x, h) => x + Number(h.quantity), 0);
-        const outgoings = Math.max(p.essentials, (home?.rent ?? share?.cents ?? 0) + p.essentials);
-        return {
-          subsistence: Math.min(10_000, Math.round((held * 10_000) / Math.max(1, p.essentials_units))),
-          shelter: home ? 10_000 : livingAt ? 6_000 : 0,
-          security: Math.min(10_000, Math.round((acc.balance * 2_500) / Math.max(1, outgoings))),
-          social: household && household.members.length > 1 ? 7_000 : 4_000,
-          status: job ? 7_000 : retired ? 6_000 : 3_000,
-        };
-      };
-      const circumstances = (): Circumstances => ({ monthly_income: householdIncome(), savings: acc.balance, homeless: !home && !livingAt });
       const monthly = () => {
         const housing = home?.rent ?? share?.cents ?? 0;
         const seen = t >= p.income_window_days * DAY;
