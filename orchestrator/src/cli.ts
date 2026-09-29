@@ -11,6 +11,9 @@
 //     prices the cost projection.
 //   terrarium measure <DIR> [QUERY...] [--sql "select ..."] [--list]
 //   terrarium cost <DIR> [--translator-model provider/model]
+//   terrarium run ... [--compress]: logs compressed once measured (<run>.jsonl.zst, about a seventh the size).
+//   terrarium run ... [--log lean|full]: how much the log keeps (full, the default; lean for quick test runs: no
+//     observation hashes, no written reasoning from code participants; replay still checks the state).
 //   terrarium dataset <DIR|log.jsonl> [--out DIR] [--actions]
 //     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
 //     system prompts, translations, model participants' decisions; code participants' acts with --actions; and
@@ -25,11 +28,12 @@
 //
 // A DIR is a batch folder (its measure/ is used) or a folder of logs (exported to DIR/measure first).
 
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, queries, query, runQuery, table } from "@terrarium/measure";
 import { runBatch, runOne } from "./batch";
 import { costReport } from "./cost";
+import { isLog } from "./logs";
 import { kernelBinary } from "./kernel";
 import { chooseModel } from "./models";
 
@@ -41,14 +45,14 @@ const flag = (name: string, dflt?: string) => {
 const flags = (name: string) => rest.flatMap((x, i) => (x === `--${name}` && rest[i + 1] !== undefined ? [rest[i + 1]!] : []));
 const has = (name: string) => rest.includes(`--${name}`);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--actions"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
   if (existsSync(join(dir, "runs")) && existsSync(join(dir, "participants"))) return dir; // already a measurement folder
   const m = join(dir, "measure");
   if (!existsSync(m)) {
-    const logs = readdirSync(dir).filter((f) => f.endsWith(".jsonl") && !f.endsWith(".anchors.jsonl")).map((f) => join(dir, f));
+    const logs = readdirSync(dir).filter(isLog).map((f) => join(dir, f));
     if (!logs.length) throw new Error(`${dir}: no measurement tables and no logs`);
     await exportLogs(logs, m);
   }
@@ -63,7 +67,7 @@ try {
       world: positional()[0]!, seeds: Number(flag("seeds", "1")), out: flag("out"), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
       until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"),
+      recordObservations: flag("record-observations"), logDetail: flag("log"), compress: has("compress"),
     });
     if (r.measureDir) {
       console.log(`\n${table(await runQuery(r.measureDir, "overview"))}`);
@@ -78,7 +82,7 @@ try {
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"),
       model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations") });
+      recordObservations: flag("record-observations"), logDetail: flag("log") });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
     const r = await runOne({ resume: positional()[0]!, until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
@@ -104,7 +108,7 @@ try {
     const { exportDataset } = await import("./dataset");
     const src = positional()[0]!;
     for (const log of logsIn(src)) {
-      const out = join(flag("out") ?? join(log, ".."), `${log.split("/").at(-1)!.replace(/\.jsonl$/, "")}.dataset`);
+      const out = join(flag("out") ?? join(log, ".."), `${log.split("/").at(-1)!.replace(/\.jsonl(\.zst)?$/, "")}.dataset`);
       const m = await exportDataset(log, out, { actions: has("actions") });
       console.log(`${m.run}: ${Object.entries(m.files).map(([f, x]: [string, any]) => `${f} ${x.rows}${x.synthetic ? ` (${x.synthetic} synthetic)` : ""}`).join(", ")} -> ${out}`);
     }
@@ -123,7 +127,15 @@ try {
     const { story } = await import("./story");
     console.log(story(positional()[0]!, positional()[1]));
   } else if (cmd === "replay" && rest[0]) {
-    const p = Bun.spawnSync([kernelBinary(), "replay", rest[0], ...rest.slice(1)], { stdout: "inherit", stderr: "inherit" });
+    // A compressed log is replayed from a plain copy (the kernel reads plain logs).
+    let log = rest[0];
+    if (log.endsWith(".zst")) {
+      const { readLog } = await import("./logs");
+      log = join(process.env.TMPDIR ?? "/tmp", `terrarium-replay-${process.pid}.jsonl`);
+      await Bun.write(log, readLog(rest[0]));
+    }
+    const p = Bun.spawnSync([kernelBinary(), "replay", log, ...rest.slice(1)], { stdout: "inherit", stderr: "inherit" });
+    if (log !== rest[0]) rmSync(log, { force: true });
     process.exit(p.exitCode ?? 1);
   } else {
     console.error(usage);

@@ -7,9 +7,9 @@
 // Logs from real-model runs are the only source of this data and can't be made again: keep them (never delete a
 // language-model run's log).
 
-import { createReadStream, readdirSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { createInterface } from "node:readline";
+import { isLog, logLines, runOf } from "./logs";
 
 export interface CorpusExample {
   run: string;
@@ -44,12 +44,12 @@ export interface CorpusExample {
 /** The logs in a folder (a run's, or a batch's), or one log. */
 export function logsIn(path: string): string[] {
   if (!statSync(path).isDirectory()) return [path];
-  return readdirSync(path).filter((f) => f.endsWith(".jsonl") && !f.endsWith(".anchors.jsonl") && f !== "translator-corpus.jsonl").sort().map((f) => join(path, f));
+  return readdirSync(path).filter(isLog).sort().map((f) => join(path, f));
 }
 
 /** The translator corpus of one log. */
 export async function corpusOf(logPath: string): Promise<CorpusExample[]> {
-  const run = logPath.split("/").at(-1)!.replace(/\.jsonl$/, "");
+  const run = runOf(logPath);
   const systems = new Map<string, string>();
   const ex = new Map<string, CorpusExample>();
   const bySeq = new Map<number, string>(); // command seq -> draft
@@ -58,8 +58,7 @@ export async function corpusOf(logPath: string): Promise<CorpusExample[]> {
     if (!x) ex.set(draft, (x = { run, draft, t, participant, synthetic: false, exchange: [], retries: [], result: "unknown" }));
     return x;
   };
-  const lines = createInterface({ input: createReadStream(logPath), crlfDelay: Infinity });
-  for await (const line of lines) {
+  for await (const line of logLines(logPath)) {
     if (!line) continue;
     const e = JSON.parse(line);
     const b = e.body ?? {};

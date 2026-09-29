@@ -31,6 +31,10 @@ export const bankPaymentSystem: BehaviourModule = {
     const settled = new Map<string, string[]>(); // death registration -> the heirs' accounts its estate goes to
     const p = { town: (ctx.params.town as string | undefined) ?? "city" };
     const nextDue = new Map<string, number>(); // standing order -> next due time
+    // Instructions, read once as they arrive: a one-off is dealt with then; a standing order is kept until it's withdrawn
+    // (so a plan never rescans every instruction ever made).
+    let cursor = 0;
+    const standing = new Map<string, StatementRecord>();
     let queue: Payment[] = [];
     let queuedAt = -1;
     let inFlight: Payment[] = [];
@@ -49,7 +53,12 @@ export const bankPaymentSystem: BehaviourModule = {
       const me = obs.entity;
       const withdrawn = book.withdrawn;
       const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, { ...a, balance: cents(a.balance) }]));
-      const instructions = book.all("request").filter((r) => (r.addressed_to ?? []).includes(me)).sort((a, b) => (a.id < b.id ? -1 : 1));
+      const all = book.all("request");
+      const fresh = all.slice(cursor).filter((r) => (r.addressed_to ?? []).includes(me));
+      cursor = all.length;
+      for (const r of fresh) if (Number.isInteger(r.data?.every) && r.data!.every > 0 && !Array.isArray(r.data?.payments)) standing.set(r.id, r);
+      for (const id of [...standing.keys()]) if (withdrawn.has(id)) standing.delete(id);
+      const instructions = [...new Map([...standing, ...fresh.map((r) => [r.id, r] as const)]).values()].sort((a, b) => (a.id < b.id ? -1 : 1));
       const out: Payment[] = [];
       // Deaths registered: the dead person's instructions are no longer carried out (law-succession).
       const deaths = book.all("death_registration");

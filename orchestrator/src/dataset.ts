@@ -2,9 +2,9 @@
 // streaming pass, joined and flattened into examples a training run can use. The log stays the record: a dataset can
 // always be made again from it. The same log always gives the same dataset, byte for byte.
 
-import { createReadStream, mkdirSync, statSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import { createInterface } from "node:readline";
+import { logLines, runOf } from "./logs";
 import type { CorpusExample } from "./corpus";
 
 export const DATASET_VERSION = "0.1.0";
@@ -47,7 +47,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   let lastHash = "";
   let lastT = 0;
   let stopped: string | undefined;
-  const run = () => header?.run_id ?? basename(logPath).replace(/\.jsonl$/, "");
+  const run = () => header?.run_id ?? runOf(logPath);
   const systems = new Map<string, string>();
   const translations = new Map<string, CorpusExample>();
   const bySeqDraft = new Map<number, string>(); // command seq -> draft (a translation carried out)
@@ -71,8 +71,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     return x;
   };
 
-  const input = createInterface({ input: createReadStream(logPath), crlfDelay: Infinity });
-  for await (const line of input) {
+  for await (const line of logLines(logPath)) {
     if (!line) continue;
     const e = JSON.parse(line);
     entries++;
@@ -190,6 +189,6 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
 
 /** The dataset folder for a log: next to it, `<run>.dataset/` (or under `outRoot`). */
 export function datasetDirFor(logPath: string, outRoot?: string): string {
-  const name = `${basename(logPath).replace(/\.jsonl$/, "")}.dataset`;
+  const name = `${runOf(logPath)}.dataset`;
   return join(outRoot ?? (statSync(logPath).isDirectory() ? logPath : join(logPath, "..")), name);
 }

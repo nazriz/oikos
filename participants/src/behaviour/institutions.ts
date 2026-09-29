@@ -23,10 +23,9 @@ function prohibitions(book: Book): StatementRecord[] {
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
 export function ownerOf(book: Book, lot: string): string | undefined {
   let holder: string | undefined;
-  const all = [...book.records.values()];
-  const titles = standingClaims(all).filter((c) => c.about?.kind === "ownership" && c.about?.object === lot);
+  const titles = standingClaims([...book.ofType("claim"), ...book.ofType("claim_release"), ...book.ofType("withdrawal")]).filter((c) => c.about?.kind === "ownership" && c.about?.object === lot);
   for (const c of titles) holder = c.holder;
-  for (const r of all) if (r.record === "claim_transfer" && titles.some((c) => c.id === r.claim)) holder = r.to;
+  for (const r of book.ofType("claim_transfer")) if (titles.some((c) => c.id === r.claim)) holder = r.to;
   return holder;
 }
 
@@ -272,7 +271,7 @@ export const builder: BehaviourModule = {
         }
 
         // Contracts a client has signed: take them on (sign), and queue them.
-        for (const r of book.records.values()) {
+        for (const r of book.ofType("agreement")) {
           if (r.record !== "agreement" || r.terms.template !== "construction" || !r.terms.parties.includes(me) || handled.has(r.id)) continue;
           const client = r.terms.parties.find((x) => x !== me)!;
           if (!book.signedBy(r.id, client)) continue;

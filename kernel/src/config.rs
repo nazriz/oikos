@@ -67,6 +67,11 @@ pub struct Clock {
 pub struct LogParams {
     pub checkpoint_every: i64,
     pub anchor_every_entries: u64,
+    /// How much the log keeps beyond what replay needs: `full` (the default) logs each observation's hash (so a replay
+    /// checks every observation came out the same); `lean` doesn't (smaller and faster; a replay still checks the
+    /// state, entry by entry, through the chain and the checkpoints).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

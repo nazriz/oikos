@@ -17,6 +17,7 @@ import { exportLogs, MEASURE_VERSION } from "@terrarium/measure";
 import { costReport } from "./cost";
 import { chooseModel } from "./models";
 import { KernelDied } from "./kernel";
+import { compressLog } from "./logs";
 import { recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
 import type { LlmAdapter } from "@terrarium/participants/llm";
@@ -71,7 +72,7 @@ export async function loadModules(file?: string): Promise<RunOptions["modules"]>
 
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). */
-export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string }): Promise<RunRecord> {
+export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; logDetail?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   if (o.resume) {
     const r = prepareResume(o.resume);
@@ -79,9 +80,11 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
     serving = new Serving(recordedCalls(r.stoppedLog));
   } else {
     config = { ...(await loadWorld(o.world!, o.sets)).config, seed: o.seed };
+    // How much the log keeps (docs/reliability.md): lean for quick test runs, full (the default) when the data matters.
+    if (o.logDetail) config.log = { ...config.log, detail: o.logDetail };
     runId = runIdFor(o.world!, o.seed!);
     out = o.out ?? "runs";
-    for (const f of [`${runId}.jsonl`, `${runId}.anchors.jsonl`, `${runId}.summary.json`, `${runId}.failure.json`]) rmSync(join(out, f), { force: true });
+    for (const f of [`${runId}.jsonl`, `${runId}.jsonl.zst`, `${runId}.anchors.jsonl`, `${runId}.summary.json`, `${runId}.failure.json`]) rmSync(join(out, f), { force: true });
   }
   // A real model (or the mock, by default): its adapter, price and the run's spending limit.
   const real = o.model ? chooseModel(o.model, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl }) : undefined;
@@ -123,6 +126,10 @@ export interface BatchOptions {
   sets?: string[];
   /** Whose observations to record in full (docs/design/run-datasets.md): "models", "code", "all", or ids, comma-separated. */
   recordObservations?: string;
+  /** How much the log keeps: "full" (the default) or "lean" (docs/reliability.md). */
+  logDetail?: string;
+  /** Compress each log once the batch is measured (`.jsonl.zst`). */
+  compress?: boolean;
   translatorModel?: string;
   /** A real model for every language-model participant and the translator ("provider/model"); default: the mock. */
   model?: string;
@@ -166,7 +173,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const worker = async () => {
     for (let seed = queue.shift(); seed !== undefined; seed = queue.shift()) {
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
       const [code, err] = await Promise.all([p.exited, new Response(p.stderr).text()]);
@@ -203,6 +210,8 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     result.measureDir = measureDir;
     result.costText = cost.text;
   }
+  // Compressed once measured, if asked (about a seventh the size; everything that reads logs reads these too).
+  if (o.compress) for (const r of runs) r.logPath = await compressLog(r.logPath);
   const finished = new Date();
   writeFileSync(join(out, "batch.json"), JSON.stringify({
     world: o.world, sets, ...(spec ? { spec, generator } : {}), config_seed: config.seed, seeds, parallel, until: o.until ?? null,

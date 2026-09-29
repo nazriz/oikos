@@ -18,6 +18,9 @@ export class Book {
   readonly notices = new Map<string, { as: string; at: number }[]>(); // agreement -> notices
   readonly signedTimes = new Map<string, number[]>(); // agreement -> signature times
   private readonly byKind = new Map<string, StatementRecord[]>(); // statement kind -> statements, in the order seen
+  // Kept as records arrive, so asking never rescans the whole history (docs/reliability.md, performance):
+  private readonly standing = new Map<string, Map<string, StatementRecord>>(); // statement kind -> those not withdrawn, in the order seen
+  private readonly byRecord = new Map<string, Record[]>(); // record type (agreement, claim...) -> records, in the order seen
   /** participant -> the person it acts as (from a directory). */
   readonly participantPerson = new Map<string, string>();
   /** position -> its organisation, role and holder (from a directory). */
@@ -31,7 +34,14 @@ export class Book {
       if (this.records.has(r.id)) continue;
       this.records.set(r.id, r);
       fresh.push(r);
-      if (r.record === "withdrawal") this.withdrawn.add(r.withdraws);
+      const typed = this.byRecord.get(r.record);
+      if (typed) typed.push(r);
+      else this.byRecord.set(r.record, [r]);
+      if (r.record === "withdrawal") {
+        this.withdrawn.add(r.withdraws);
+        const w = this.records.get(r.withdraws);
+        if (w?.record === "statement") this.standing.get(w.kind)?.delete(w.id);
+      }
       if (r.record === "signature") {
         const s = this.signatures.get(r.agreement) ?? new Set();
         s.add(r.as);
@@ -42,6 +52,11 @@ export class Book {
         const list = this.byKind.get(r.kind);
         if (list) list.push(r);
         else this.byKind.set(r.kind, [r]);
+        if (!this.withdrawn.has(r.id)) {
+          const open = this.standing.get(r.kind);
+          if (open) open.set(r.id, r);
+          else this.standing.set(r.kind, new Map([[r.id, r]]));
+        }
       }
       if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
     }
@@ -62,9 +77,15 @@ export class Book {
     return this.byKind.get(kind) ?? [];
   }
 
-  /** Statements of a kind that are still standing (not withdrawn). */
+  /** Statements of a kind that are still standing (not withdrawn), in the order seen. */
   open(kind: string): StatementRecord[] {
-    return (this.byKind.get(kind) ?? []).filter((r) => !this.withdrawn.has(r.id));
+    const open = this.standing.get(kind);
+    return open ? [...open.values()] : [];
+  }
+
+  /** Records of a type (agreement, claim, notice...), in the order seen: rather than every record ever seen. */
+  ofType<T extends Record["record"]>(type: T): Extract<Record, { record: T }>[] {
+    return (this.byRecord.get(type) ?? []) as Extract<Record, { record: T }>[];
   }
 
   signedBy(agreement: string, party: string): boolean {
@@ -98,7 +119,7 @@ export class Book {
 /** Signatures on a petition this participant can see: votes with choice "sign", one per signing entity (the organiser sees them all). */
 export function petitionSignatures(book: Book, petition: string): number {
   const who = new Set<string>();
-  for (const r of book.records.values()) if (r.record === "vote" && r.ballot === petition && r.choice === "sign" && r.speaks_for) who.add(r.speaks_for);
+  for (const r of book.ofType("vote")) if (r.ballot === petition && r.choice === "sign" && r.speaks_for) who.add(r.speaks_for);
   return who.size;
 }
 

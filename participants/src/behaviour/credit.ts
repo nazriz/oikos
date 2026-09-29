@@ -65,7 +65,7 @@ export class Borrowing {
     }
     for (const r of book.all("loan_default")) if ((r.addressed_to ?? []).includes(this.me)) this.impaired = true;
     if (!account) return steps;
-    for (const r of book.records.values()) {
+    for (const r of book.ofType("agreement")) {
       if (r.record !== "agreement" || r.terms.template !== "loan" || !r.terms.parties.includes(this.me) || r.terms.parties[0] !== this.lender || this.taken.has(r.id) || book.signedBy(r.id, this.me)) continue;
       this.taken.add(r.id);
       this.applied = null;

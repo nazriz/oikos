@@ -65,6 +65,28 @@ export class Kernel {
     return reply;
   }
 
+  /**
+   * Several requests at once: all written, then the replies read, in order (the kernel takes its requests strictly in
+   * turn, so it's the same as sending them one by one, without waiting on each reply). Each reply, or null for a protocol
+   * error, as tryRequest.
+   */
+  async tryRequestMany(reqs: object[]): Promise<(any | null)[]> {
+    if (!reqs.length) return [];
+    for (const r of reqs) this.onRequest?.(r);
+    try {
+      this.proc.stdin.write(reqs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+      this.proc.stdin.flush();
+    } catch (e) {
+      throw new KernelDied(`the kernel process can't be written to: ${(e as Error).message}`);
+    }
+    const out: (any | null)[] = [];
+    for (let i = 0; i < reqs.length; i++) {
+      const reply = JSON.parse(await this.line());
+      out.push(reply.ok ? reply : null);
+    }
+    return out;
+  }
+
   /** Like request, but returns null instead of throwing on a protocol error. */
   async tryRequest(req: object): Promise<any | null> {
     try {

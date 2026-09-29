@@ -453,6 +453,10 @@ impl Kernel {
 
     fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[crate::config::LookRequest]) -> Output {
         let obs = observe::observe(&self.s, &mut self.state, &mut self.index, participant, only, looks);
+        // A lean log keeps no observation hashes (the log's `detail`): hashing a whole observation is much of the cost.
+        if self.s.config.log.detail.as_deref() == Some("lean") {
+            return Output { events: vec![], observation: Some(obs) };
+        }
         let hash = canon::hash_value(canon::DOMAIN_OBSERVATION, &obs).expect("observations are canonical");
         Output { events: vec![Timed::new(self.state.t, EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs) }
     }

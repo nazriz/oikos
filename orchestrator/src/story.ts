@@ -2,13 +2,13 @@
 // the translator made and whether it confirmed them, translations that failed, the letters it received and the
 // acts that took effect. For reading pilots (docs/real-models.md); measurement proper is measure/.
 
-import { readFileSync } from "node:fs";
+import { readLog } from "./logs";
 
 const clip = (s: string, n = 220) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 export function story(logPath: string, only?: string): string {
   const out: string[] = [];
-  const entries = readFileSync(logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const entries = readLog(logPath).trim().split("\n").map((l) => JSON.parse(l));
   const models = new Set<string>();
   for (const e of entries) if (e.kind === "annotation" && e.body.annotation === "usage" && e.body.purpose === "participant") models.add(e.body.subject);
   const who = only ? new Set([only]) : models;

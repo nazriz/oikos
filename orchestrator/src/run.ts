@@ -92,6 +92,8 @@ export interface RunSummary {
   moduleMs: number;
   /** The orchestrator's own work: keeping participants' knowledge, parsing and resolving calls (profiling only). */
   platformMs: number;
+  /** Where the time went (profiling only): each behaviour module's deciding, and each kind of kernel command. */
+  profile: { modules: { [module: string]: { ms: number; steps: number } }; kernel: { [command: string]: { ms: number; n: number } } };
   /** Failures to decide that were recovered in place (a module that threw, a model call that failed; D59). */
   participantErrors: number;
 }
@@ -185,6 +187,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const anchorsPath = join(o.outDir, `${o.runId}.anchors.jsonl`);
   let t = 0;
   let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
+  const profModules: { [m: string]: { ms: number; steps: number } } = {};
+  const profKernel: { [c: string]: { ms: number; n: number } } = {};
   let participantErrors = 0; // failures to decide, recovered in place (D59)
   const failures = new Map<string, number>(); // failures to decide in a row, by unit
   // Breadcrumbs (D59): what the run is doing, for the watchdog, at every point where it could hang.
@@ -437,17 +441,27 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       }
     }
   };
-  const command = async (cmd: object) => {
+  const command = async (cmd: object) => (await commands_([cmd]))[0];
+  /** Commands sent together (see Kernel.tryRequestMany), each reply then taken in turn as `command` takes one. */
+  const commands_ = async (cmds: object[]) => {
     const t0 = performance.now();
-    const r = await k.tryRequest({ op: "command", command: cmd });
-    kernelMs += performance.now() - t0;
-    if (r === null) return null;
-    commands++;
-    for (const e of r.events) if (e.event === "action_refused") refused++;
-    noteNews(r.events);
-    for (const pid of changed) await syncUnits(pid, t);
-    changed.clear();
-    return r;
+    const rs = await k.tryRequestMany(cmds.map((cmd) => ({ op: "command", command: cmd })));
+    const dt = performance.now() - t0;
+    kernelMs += dt;
+    for (const cmd of cmds) {
+      const pk = (profKernel[(cmd as any).command ?? "?"] ??= { ms: 0, n: 0 });
+      pk.ms += dt / cmds.length;
+      pk.n++;
+    }
+    for (const r of rs) {
+      if (r === null) continue;
+      commands++;
+      for (const e of r.events) if (e.event === "action_refused") refused++;
+      noteNews(r.events);
+      for (const pid of changed) await syncUnits(pid, t);
+      changed.clear();
+    }
+    return rs;
   };
 
   /** The capacity a language-model participant's acts are made in: its one position, or itself. (Several: see the resolver, D47.) */
@@ -484,19 +498,37 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     } else p.ended = true;
   };
 
-  /** A unit looks (its own looks first, if it asked), and gets its picture of the world: null if it no longer can. */
-  const perceive = async (u: Unit): Promise<Observation | null> => {
+  /** A lean log (the world's log.detail) leaves out a code participant's written reasoning; a model's is always kept. */
+  const lean = cfg.log?.detail === "lean";
+  const keepReasoning = (u: Unit) => !lean || !!u.llm;
+  /** What a unit asks the kernel for when it looks: its own looks, if it asked, or an observation. */
+  const perceiveCommand = (u: Unit): { cmd: object; looks?: LookRequest[] } => {
     const only = u.capacity ? { only: u.capacity } : {};
     const looks = u.looks;
     u.looks = undefined;
     const prefixed = looks && u.capacity && u.capacity !== "self" ? looks.map((l) => ({ ...l, channel: `${u.capacity}/${l.channel}` })) : looks;
-    let reply = prefixed ? await command({ command: "look", participant: u.participant, ...only, looks: prefixed }) : null;
+    return prefixed ? { cmd: { command: "look", participant: u.participant, ...only, looks: prefixed }, looks } : { cmd: { command: "observe", participant: u.participant, ...only } };
+  };
+  /** A unit looks (its own looks first, if it asked), and gets its picture of the world: null if it no longer can.
+   * `asked`: its request already sent, with the kernel's reply (a round's are sent together). */
+  const perceive = async (u: Unit, asked?: { reply: any | null; looks?: LookRequest[] }): Promise<Observation | null> => {
+    const only = u.capacity ? { only: u.capacity } : {};
+    let looks: LookRequest[] | undefined;
+    let reply: any | null;
+    if (asked) ({ reply, looks } = asked);
+    else {
+      const c = perceiveCommand(u);
+      looks = c.looks;
+      reply = await command(c.cmd);
+      if (!looks && reply === null) return null;
+      if (!looks) asked = { reply };
+    }
     if (looks && reply === null) {
       // A look the kernel won't take (an unknown channel, a bad query): recorded, and it observes as usual.
       await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { look_rejected: JSON.stringify(looks).slice(0, 4000) } } });
       u.notices.push({ t, text: "That couldn't be looked up." });
     }
-    reply ??= await command({ command: "observe", participant: u.participant, ...only });
+    if (looks && reply === null) reply = await command({ command: "observe", participant: u.participant, ...only });
     if (reply === null) return null; // it can no longer look (its capacity went away)
     const p00 = performance.now();
     const raw: Observation = u.capacity ? slice(reply.observation, u.capacity, u.entity) : { ...reply.observation, entity: u.entity };
@@ -549,7 +581,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const asField = as ? { as } : {};
     if (action.type === "act" || action.type === "message") {
       const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
-      const r = await command({ command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning ? { reasoning: action.reasoning } : {}) });
+      const r = await command({ command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
       if (r === null) {
         // Off-contract: never logged by the kernel, so record the attempt ourselves.
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(action).slice(0, 4000) } } });
@@ -574,7 +606,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         for (const q of res.questions) u.notices.push({ t, text: q });
         return true;
       }
-      const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program), resolver: RESOLVER }, ...(action.reasoning ? { reasoning: action.reasoning } : {}) });
+      const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
       if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
       return true;
     }
@@ -658,14 +690,26 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       let awake = cohort.map((u) => ({ u, n: 0 }));
       while (awake.length) {
         const looking: { u: Unit; n: number; obs: Observation }[] = [];
-        for (const a of awake) {
+        // Everyone's looks are sent together: nothing acts in between, so it's the same as one by one, without waiting.
+        const live = awake.filter((a) => units.get(a.u.key) === a.u);
+        const asks = live.map((a) => perceiveCommand(a.u));
+        const replies = await commands_(asks.map((x) => x.cmd));
+        for (const [i, a] of live.entries()) {
           if (units.get(a.u.key) !== a.u) continue;
-          const obs = await perceive(a.u);
+          const obs = await perceive(a.u, { reply: replies[i], looks: asks[i]!.looks });
           if (obs) looking.push({ ...a, obs });
         }
         const m0 = performance.now();
         holding = new Map();
-        const decided = await Promise.allSettled(looking.map((x) => Promise.resolve().then(() => (mark({ doing: "deciding", participant: x.u.key }), x.u.controller.step(x.obs, x.u.ctx)))));
+        const decided = await Promise.allSettled(looking.map((x) => Promise.resolve().then(() => {
+          mark({ doing: "deciding", participant: x.u.key });
+          const s0 = performance.now();
+          const r = x.u.controller.step(x.obs, x.u.ctx);
+          const pm = (profModules[x.u.module.name] ??= { ms: 0, steps: 0 });
+          pm.ms += performance.now() - s0;
+          pm.steps++;
+          return r;
+        })));
         moduleMs += performance.now() - m0;
         // Annotations made while deciding (usage, transcripts) go into the log in the cohort's order.
         const notes = holding;
@@ -723,7 +767,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const end = await k.request({ op: "finish", reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) });
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
-  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs) };
+  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
+    profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) } };
 }
 
 /**

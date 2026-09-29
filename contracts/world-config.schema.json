@@ -79,6 +79,10 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 1000000
+        },
+        "detail": {
+          "description": "How much the log keeps beyond what replay needs. full (the default): each observation's hash, so a replay checks every observation came out the same. lean: no observation hashes (smaller, faster); a replay still checks the state through the chain and checkpoints. The orchestrator also leaves code participants' written reasoning out of a lean log (docs/reliability.md).",
+          "enum": ["full", "lean"]
         }
       }
     },

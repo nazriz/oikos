@@ -67,7 +67,7 @@ export const organiser: BehaviourModule = {
         const steps: Step[] = [];
         // Members: the register at the start, and those who've joined since (membership agreements in force).
         for (const r of book.all("membership_register")) for (const m of (r.data?.members as { member: string; employer: string }[]) ?? []) if (!employerOf.has(m.member)) employerOf.set(m.member, m.employer);
-        const inForce = new Set([...book.records.values()].filter((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties[0] === me && book.inForce(r.id)).map((r: any) => r.terms.parties[1] as string));
+        const inForce = new Set(book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties[0] === me && book.inForce(r.id)).map((r: any) => r.terms.parties[1] as string));
         // Applications to join: a membership offered, its dues by standing order.
         for (const a of book.open("membership_application")) {
           if (handled.has(a.id) || !(a.addressed_to ?? []).includes(me)) continue;
@@ -136,7 +136,7 @@ export const organiser: BehaviourModule = {
           }
           if (x.stage === "balloting" && x.closes !== undefined && t >= x.closes) {
             const voter = (v: any) => (v.speaks_for ?? v.author) as string;
-            const votes = ([...book.records.values()] as any[]).filter((r) => r.record === "vote" && r.ballot === x.ballot && x.members.includes(voter(r)));
+            const votes = (book.ofType("vote") as any[]).filter((r) => r.ballot === x.ballot && x.members.includes(voter(r)));
             const latest = new Map<string, string>();
             for (const v of votes.sort((a, b) => a.at - b.at)) latest.set(voter(v), v.choice);
             const yes = [...latest.values()].filter((c) => c === "yes").length;

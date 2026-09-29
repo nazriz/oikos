@@ -207,14 +207,14 @@ export const citizen: BehaviourModule = {
 
     const learnFromInitialRecords = (obs: Observation) => {
       // Agreements already in force when we first look (the world's genesis records).
-      for (const r of book.records.values()) {
+      for (const r of book.ofType("agreement")) {
         if (r.record !== "agreement" || !r.terms.parties.includes(me) || !book.inForce(r.id)) continue;
         const since = book.signedAt(r.id) ?? 0;
         const end = r.terms.term ? since + r.terms.term : Number.MAX_SAFE_INTEGER;
         if (r.terms.template === "lease" && !home) {
           const lt = leaseTerms(r, me);
           const landlord = r.terms.parties.find((x) => x !== me)!;
-          const order = [...book.records.values()].find((x) => x.record === "statement" && x.kind === "request" && x.basis === r.id && x.speaks_for === me)?.id;
+          const order = book.all("request").find((x) => x.record === "statement" && x.kind === "request" && x.basis === r.id && x.speaks_for === me)?.id;
           home = { agreement: r.id, space: lt.space!, structure: lt.structure!, landlord, rent: lt.rent, order, endsAt: end, movedIn: true };
         }
         if (r.terms.template === "employment" && !job) {
@@ -224,7 +224,7 @@ export const citizen: BehaviourModule = {
         }
       }
       // Another adult's share of the rent, if one is already standing.
-      const mine = [...book.records.values()].find((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.data?.outcome?.money?.for === "Household share of the rent.");
+      const mine = book.all("request").find((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.data?.outcome?.money?.for === "Household share of the rent.");
       if (mine && !share) share = { cents: cents((mine as any).data.outcome.money.amount), order: mine.id };
       void obs;
     };
@@ -546,7 +546,7 @@ export const citizen: BehaviourModule = {
       // stoppage, observed (out of the workplace until the return to work); a rise in an enterprise agreement, taken.
       if (p.union && job && joinAsked !== job.agreement && !retired) {
         joinAsked = job.agreement;
-        const member = [...book.records.values()].some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && book.inForce(r.id));
+        const member = book.ofType("agreement").some((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && book.inForce(r.id));
         const kind = job.employer.split("-")[0]!;
         const chance = p.union_join_bps[kind] ?? p.union_join_bps.other ?? 0;
         if (!member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance)
@@ -956,7 +956,7 @@ export const citizen: BehaviourModule = {
     };
     /** At the start, the share of the rent another adult already pays us (a standing order in the world's genesis records). */
     const genesisShare = (a: Member) => {
-      const o = [...book.records.values()].find((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === a.person && r.data?.outcome?.money?.for === "Household share of the rent.");
+      const o = book.all("request").find((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === a.person && r.data?.outcome?.money?.for === "Household share of the rent.");
       const paid = (o as any)?.data?.outcome?.money?.amount;
       return paid === undefined ? -1 : cents(paid);
     };

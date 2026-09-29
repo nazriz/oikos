@@ -1,0 +1,61 @@
+// Log size (docs/reliability.md): a lean log keeps what replay needs (no observation hashes, no code participants'
+// written reasoning) and still replays; a compressed log reads back whole, and everything that reads logs reads it.
+
+import { expect, test } from "bun:test";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { generate } from "@terrarium/worlds/generator/generate";
+import { exportDataset } from "../src/dataset";
+import { kernelBinary } from "../src/kernel";
+import { compressLog, readLog } from "../src/logs";
+import { runWorld } from "../src/run";
+
+const root = join(import.meta.dir, "../..");
+const DAY = 86_400;
+const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+
+test("a lean log: no observation hashes, no code participants' reasoning (a model's kept), the same world, and it replays", async () => {
+  const out = join(root, "runs", "test-logs");
+  rmSync(out, { recursive: true, force: true });
+  const run = async (detail: string) => {
+    const config = generate({ ...spec, citizens: 80, mayor: "llm" });
+    config.log = { ...config.log, detail };
+    return runWorld({ config, runId: detail, outDir: out, until: 30 * DAY });
+  };
+  const full = await run("full");
+  const lean = await run("lean");
+  // The same world, whatever the log keeps.
+  expect(lean.stateHash).toBe(full.stateHash);
+  const entries = (p: string) => readFileSync(p, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const f = entries(full.logPath);
+  const l = entries(lean.logPath);
+  expect(f.some((e) => e.kind === "event" && e.body.event === "observation")).toBe(true);
+  expect(l.some((e) => e.kind === "event" && e.body.event === "observation")).toBe(false);
+  const acts = (es: any[]) => es.filter((e) => e.kind === "command" && e.body.command === "act");
+  expect(acts(f).some((e) => e.body.reasoning && e.body.participant !== "mayor-system")).toBe(true);
+  expect(acts(l).some((e) => e.body.reasoning && e.body.participant !== "mayor-system")).toBe(false);
+  // (The mayor, a model, keeps its reasoning.)
+  const mayorWhy = (es: any[]) => acts(es).filter((e) => e.body.participant === "mayor-system" && e.body.reasoning).length;
+  expect(mayorWhy(l)).toBe(mayorWhy(f));
+  expect(statSync(lean.logPath).size).toBeLessThan(statSync(full.logPath).size);
+  // It replays.
+  const replay = Bun.spawnSync([kernelBinary(), "replay", lean.logPath, "--anchors", lean.anchorsPath], { stdout: "pipe", stderr: "pipe" });
+  expect(replay.exitCode).toBe(0);
+
+  // Compressed: much smaller, reads back byte for byte, and gives the same dataset.
+  const plain = readFileSync(full.logPath, "utf8");
+  const before = statSync(full.logPath).size;
+  const plainSet = join(out, "plain.dataset");
+  await exportDataset(full.logPath, plainSet);
+  const zst = await compressLog(full.logPath);
+  expect(zst).toBe(`${full.logPath}.zst`);
+  expect(existsSync(full.logPath)).toBe(false);
+  expect(statSync(zst).size * 4).toBeLessThan(before);
+  expect(readLog(zst)).toBe(plain);
+  const zstSet = join(out, "zst.dataset");
+  await exportDataset(zst, zstSet);
+  for (const file of ["decisions.jsonl", "translations.jsonl", "systems.jsonl"]) expect(readFileSync(join(zstSet, file), "utf8")).toBe(readFileSync(join(plainSet, file), "utf8"));
+  // (The manifest names the file it was made from; the rest is the same.)
+  const manifest = (d: string) => JSON.parse(readFileSync(join(d, "manifest.json"), "utf8"));
+  expect({ ...manifest(zstSet), log: { ...manifest(zstSet).log, file: "" } }).toEqual({ ...manifest(plainSet), log: { ...manifest(plainSet).log, file: "" } });
+}, 600_000);

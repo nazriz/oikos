@@ -131,7 +131,7 @@ export const landlord: BehaviourModule = {
       if (!acc) return [];
       // What we own: the lots our ownership records name, the cells they cover (seen through our own sites),
       // and the homes (dwelling units) in finished buildings on them, including anything we've since built.
-      const ownLots = [...book.records.values()].flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object as string] : [])).sort();
+      const ownLots = book.ofType("claim").flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object as string] : [])).sort();
       const ownCells = new Set(ownLots.flatMap((l) => cellsOf(book, l)));
       const sites = channels.cells(obs).filter((c) => ownCells.has(c.cell));
       owned.length = 0;
@@ -146,7 +146,7 @@ export const landlord: BehaviourModule = {
       // Our leases: in force, or offered by us and still awaiting the tenant's
       // signature (up to a month). Both hold a unit; counting only signed ones
       // would let the same home twice.
-      const leases = [...book.records.values()].filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.signedBy(r.id, me));
+      const leases = book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.signedBy(r.id, me));
       const awaiting = (leases as any[]).filter((a) => !book.inForce(a.id) && t - a.at < MONTH);
       const active = (leases as any[]).filter((a: any) => {
         if (!book.inForce(a.id)) return false;
@@ -369,7 +369,7 @@ export const landlord: BehaviourModule = {
       }
 
       // Fines recorded against us, and demolition orders addressed to us.
-      for (const r of book.records.values()) {
+      for (const r of [...book.ofType("claim"), ...book.all("demolition_order")]) {
         if (answered.has(r.id)) continue;
         // (Rates are paid when there's the money for them; a fine or rates we don't mean to pay are let be.)
         if (r.record === "claim" && r.position === "right" && r.counterparty === me && ["fine", "tax_penalty", "rates", "rates_interest"].includes(r.about?.kind)) {
@@ -444,7 +444,7 @@ export class Staffing {
   }
 
   private contracts(book: Book): any[] {
-    return [...book.records.values()].filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me);
+    return book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me);
   }
   private endOf(book: Book, a: any): number {
     return Math.min(...(book.notices.get(a.id) ?? []).map((n) => n.at + (a.terms.termination?.find((x: any) => x.party === n.as)?.notice ?? 14 * DAY)), Infinity);
@@ -474,7 +474,7 @@ export class Staffing {
     const t = obs.t;
     const me = this.me;
     // Genesis standing orders for existing staff (what each withholds: the agreed wage less what it pays).
-    for (const r of book.records.values()) if (r.record === "statement" && r.kind === "request" && r.speaks_for === me && r.basis && !this.orders.has(r.basis) && !book.withdrawn.has(r.id)) {
+    for (const r of book.open("request")) if (r.speaks_for === me && r.basis && !this.orders.has(r.basis)) {
       this.orders.set(r.basis, r.id);
       const a = book.records.get(r.basis);
       const gross = a?.record === "agreement" ? cents(commitmentOf(a, me).outcome?.money?.amount ?? 0) : 0;
@@ -497,7 +497,7 @@ export class Staffing {
       const worker = a.terms.parties[1];
       const pays = { ...jobTerms(a, worker) };
       pays.wage = this.gross.get(a.id) ?? pays.wage;
-      const to = commitmentOf(a, me).outcome?.money?.to ?? (([...book.records.values()].find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
+      const to = commitmentOf(a, me).outcome?.money?.to ?? ((book.all("job_application").find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
       if (!to) continue;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);
@@ -590,7 +590,7 @@ export class Staffing {
   /** The account a worker's wages go to. */
   private payee(book: Book, a: any): string | undefined {
     const worker = a.terms.parties[1];
-    return commitmentOf(a, this.me).outcome?.money?.to ?? (([...book.records.values()].find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
+    return commitmentOf(a, this.me).outcome?.money?.to ?? ((book.all("job_application").find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
   }
 
   /** The wage an agreement pays now (after any rise). */
@@ -773,7 +773,7 @@ export class WindingUp {
 
   /** Debts recorded against us (a lender's on a loan in default, unpaid wages, a fine, rates) that we haven't paid, oldest first. */
   debts(book: Book): any[] {
-    return ([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.counterparty === this.me && DEBT_KINDS.includes(r.about?.kind) && !this.paid.has(r.id)) as any[]).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+    return (book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.counterparty === this.me && DEBT_KINDS.includes(r.about?.kind) && !this.paid.has(r.id)) as any[]).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
   }
 
   /** Paying debts recorded against us, oldest first, while we can do it and keep `keep` in hand. */
@@ -861,7 +861,7 @@ export class WindingUp {
       paid.push(d.id);
     }
     // Loans not in default: what's left of the repayments falls due now.
-    for (const a of [...book.records.values()].filter((r) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(this.me) && book.inForce(r.id) && !inDefault.has(r.id)) as any[]) {
+    for (const a of book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(this.me) && book.inForce(r.id) && !inDefault.has(r.id)) as any[]) {
       const owe = commitmentOf(a, this.me);
       const m = owe.outcome?.money;
       if (!m) continue;
@@ -873,7 +873,7 @@ export class WindingUp {
         left -= amount;
       }
     }
-    const stop = [...book.records.values()].filter((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === this.me && !book.withdrawn.has(r.id) && r.data?.outcome?.money?.for === "Loan repayment.");
+    const stop = book.all("request").filter((r) => r.record === "statement" && r.kind === "request" && r.speaks_for === this.me && !book.withdrawn.has(r.id) && r.data?.outcome?.money?.for === "Loan repayment.");
     const steps: Step[] = [];
     for (let i = 0; i < pays.length; i += 30) steps.push(because(`Winding up: paying what we owe from the ${usd(balance)} we have.`, ...pays.slice(i, i + 30)));
     if (stop.length) steps.push(because("Winding up: our loan repayments are settled (or can't be); stopping them.", ...stop.map((r) => withdraw(r.id, "Winding up."))));
@@ -902,7 +902,7 @@ export class WindingUp {
    */
   sell(obs: Observation, book: Book, account: string, balance: number, premises: { structure: string; type: string; cell: string } | undefined, price: number | undefined, distributeTo: (amount: number) => Step[]): Step[] {
     if (this.state !== "closed" || !premises || !price) return [];
-    const titles = ([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.holder === this.me && r.about?.kind === "ownership") as any[]).filter((c) => !book.withdrawn.has(c.id) && ![...book.records.values()].some((x) => x.record === "claim_transfer" && x.claim === c.id));
+    const titles = (book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === this.me && r.about?.kind === "ownership") as any[]).filter((c) => !book.withdrawn.has(c.id) && !book.ofType("claim_transfer").some((x) => x.record === "claim_transfer" && x.claim === c.id));
     const steps: Step[] = [];
     const t = obs.t;
     const listing = (why: string, at: number, old: string[]) => {
@@ -954,7 +954,7 @@ export const DEBT_KINDS = ["debt", "fine", "rates", "rates_interest"];
 /** The account a creditor is paid into (when the claim doesn't name one): a lender's (its loan agreement names it), or a worker's (their employment
  * agreement names it). */
 function creditorAccount(book: Book, holder: string): string | undefined {
-  for (const r of book.records.values()) {
+  for (const r of book.ofType("agreement")) {
     if (r.record !== "agreement" || !r.terms.parties.includes(holder)) continue;
     if (r.terms.template === "loan" && r.terms.parties[0] === holder) {
       const to = r.terms.commitments.find((c: any) => c.who !== holder)?.does?.outcome?.money?.to;

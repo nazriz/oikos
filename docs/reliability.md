@@ -37,3 +37,23 @@ This runs the world again from the log's own config: not the world file, which m
 - **Logs from before contracts v0.5** (the pilots of 2026-09-28) can't be resumed: the v0.5 kernel won't load their config.
 - **Resume is tested with the mock model** (including a log cut off mid-line), not yet against a real one.
 - **Resource growth over very long runs** (log size, memory) isn't addressed yet.
+
+## Speed and log size (2026-09-29)
+
+Where a run's time goes: each run's `<run>.summary.json` has a `profile`: each behaviour module's deciding time and steps, and each kind of kernel command's time and count.
+
+**What was slow, and what changed** (the 1,000-person town, 540 days, one seed):
+
+| | Wall | Kernel | Modules |
+|---|---|---|---|
+| Before | 260 s | 123 s | 113 s |
+| Modules stop rescanning history | 180 s | 123 s | 34 s |
+| A round's looks sent together | 154 s | 98 s | 33 s |
+| A lean log | 147 s | 88 s | 33 s |
+
+- **Modules rescanned their whole history on every decision,** so a run got slower as it went: a 5-year run took 46 minutes against 1 for 180 days. The bank reread every payment instruction ever made (3.6 ms a step by day 540); a shop reread every order it had ever had. `Book` now keeps each kind's standing statements as they arrive, and indexes records by type; order books, delivery notes and the bank read only what's new since last time. The same world comes out: the same commands, the same final state.
+- **The kernel mostly waited on the orchestrator,** one request at a time over the pipe. Everyone's looks in a round (nothing acts in between) are now sent together and their replies read in order: the kernel takes its requests strictly in turn, so the log is the same.
+
+**Log size.** A 5-year run of the 1,000-person town wrote about 2.5 GB. Two flags, for `terrarium run`:
+- **`--log lean`** keeps what replay needs and leaves out the rest: no observation hashes (a replay then checks the state through the chain and the checkpoints, not each observation), and no written reasoning from code participants (a model's is always kept). About 30% smaller, and a little faster. The world's config says so (`log.detail`), so a lean log replays as lean. For quick test runs; **full (the default) when the data matters**, and always for model runs.
+- **`--compress`** compresses each log once the batch is measured (`<run>.jsonl.zst`, zstd): about a seventh the size, checked to read back whole before the plain log goes. Measurement, `dataset`, `corpus`, `story` and `replay` all read compressed logs.

@@ -112,7 +112,7 @@ export const mayorCode: BehaviourModule = {
 };
 
 function ownerIsCity(book: Book, lot: string): boolean {
-  const titles = [...book.records.values()].filter((r) => r.record === "claim" && r.about?.kind === "ownership" && r.about?.object === lot);
+  const titles = book.ofType("claim").filter((r) => r.record === "claim" && r.about?.kind === "ownership" && r.about?.object === lot);
   return titles.some((r) => r.record === "claim" && r.holder === "city");
 }
 
@@ -154,7 +154,7 @@ export const councilClerk: BehaviourModule = {
           if (closed.has(ballot.id) || ballot.speaks_for !== me || t < (ballot.data?.closes_at ?? Infinity)) continue;
           closed.add(ballot.id);
           const latest = new Map<string, string>();
-          for (const r of book.records.values()) if (r.record === "vote" && r.ballot === ballot.id && r.in_position && councillors.has(r.in_position)) latest.set(r.in_position, r.choice);
+          for (const r of book.ofType("vote")) if (r.ballot === ballot.id && r.in_position && councillors.has(r.in_position)) latest.set(r.in_position, r.choice);
           const yes = [...latest.values()].filter((c) => c === "yes").length;
           const no = [...latest.values()].filter((c) => c === "no").length;
           const passed = yes > no && yes * 2 > councillors.size;
@@ -460,7 +460,7 @@ export const ratesOfficer: BehaviourModule = {
           for (let i = 0; i < lines.length; i += 30) steps.push(because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30)));
         }
         // Overdue: penalty interest, monthly, on what's still unpaid after its due date.
-        if (interestBps > 0) for (const c of [...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
+        if (interestBps > 0) for (const c of book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
           if (settled.has(c.id) || t < c.about.due) continue;
           if (t - (lastInterest.get(c.id) ?? c.about.due) < 30 * DAY) continue;
           lastInterest.set(c.id, t);
@@ -470,7 +470,7 @@ export const ratesOfficer: BehaviourModule = {
             message([c.counterparty], `Rates of ${usd(cents(c.about.amount))} are overdue; interest of ${usd(interest)} has been added.`, c.id)));
         }
         steps.push(...letters.answer(() => {
-          const overdue = [...new Set(([...book.records.values()].filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates" && !settled.has(r.id) && t >= (r as any).about.due) as any[]).map((c) => c.counterparty))];
+          const overdue = [...new Set((book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates" && !settled.has(r.id) && t >= (r as any).about.due) as any[]).map((c) => c.counterparty))];
           return `Report from the rates officer: rates at ${ratePpm / 10_000}% of value a year, in ${instalments} instalments; ${usd(levied)} levied so far, ${usd(received)} received.` +
             (overdue.length ? ` Overdue: ${overdue.join(", ")}.` : " Nothing is overdue.");
         }));

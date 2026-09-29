@@ -57,12 +57,13 @@ export function order(o: { me: string; seller: string; sellerAccount: string; ki
 
 /** Delivery notes addressed to us (the answers to our orders), not yet read: which order, how much came, what was refunded. */
 export class Deliveries {
-  private read = new Set<string>();
+  private cursor = 0; // how far through the delivery notes seen we've read (only new ones are read: no rescanning)
   take(book: Book, me: string): { order: string; kind: string; ordered: number; delivered: number; refund: number; seller: string }[] {
     const out = [];
-    for (const n of book.all("delivery_note")) {
-      if (this.read.has(n.id) || !(n.addressed_to ?? []).includes(me)) continue;
-      this.read.add(n.id);
+    const notes = book.all("delivery_note");
+    for (; this.cursor < notes.length; this.cursor++) {
+      const n = notes[this.cursor]!;
+      if (!(n.addressed_to ?? []).includes(me)) continue;
       const delivered = (n.data?.delivered as number) ?? 0;
       out.push({ order: n.data?.order as string, kind: String(n.data?.kind), ordered: (n.data?.ordered as number) ?? delivered, delivered, refund: (n.data?.refund as number) ?? 0, seller: n.speaks_for! });
     }
@@ -78,6 +79,8 @@ export class OrderBook {
   private readonly credit = new Map<string, number>(); // paying account -> money received not yet set against an order
   private readonly settled = new Set<string>();
   private readonly customers = new Set<string>(); // accounts that have ordered from us
+  private readonly waiting = new Map<string, Order>(); // orders to us not yet settled
+  private cursor = 0; // how far through the orders seen we've read (only new ones are read: no rescanning)
   constructor(private readonly me: string, private readonly unpaidDays = 7) {}
 
   take(obs: Observation, account: string | undefined) {
@@ -86,13 +89,17 @@ export class OrderBook {
 
   /** Open orders to us, oldest first, as orders. */
   private open(book: Book): Order[] {
-    return book.open("order")
-      .filter((r) => (r.addressed_to ?? []).includes(this.me) && !this.settled.has(r.id))
-      .map((r: StatementRecord) => ({
+    const orders = book.all("order");
+    for (; this.cursor < orders.length; this.cursor++) {
+      const r: StatementRecord = orders[this.cursor]!;
+      if (!(r.addressed_to ?? []).includes(this.me) || this.settled.has(r.id)) continue;
+      this.waiting.set(r.id, {
         id: r.id, seller: this.me, buyer: r.speaks_for!, kind: String(r.data?.kind), quantity: Math.max(0, Math.floor(Number(r.data?.quantity) || 0)), unitPrice: Math.max(0, Math.floor(Number(r.data?.unit_price) || 0)),
         to: String(r.data?.deliver_to ?? r.speaks_for), at: String(r.data?.at), account: String(r.data?.account), placed: r.at,
-      }))
-      .sort((a, b) => a.placed - b.placed || (a.id < b.id ? -1 : 1));
+      });
+    }
+    for (const id of this.waiting.keys()) if (this.settled.has(id) || book.withdrawn.has(id)) this.waiting.delete(id);
+    return [...this.waiting.values()].sort((a, b) => a.placed - b.placed || (a.id < b.id ? -1 : 1));
   }
 
   /**
@@ -136,6 +143,7 @@ export class OrderBook {
   /** An order taken on whose act didn't go through: it waits again, its payment set aside for it. */
   reopen(o: Order) {
     this.settled.delete(o.id);
+    this.waiting.set(o.id, o);
     this.credit.set(o.account, (this.credit.get(o.account) ?? 0) + o.quantity * o.unitPrice);
   }
 
