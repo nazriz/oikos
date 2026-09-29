@@ -89,7 +89,7 @@ The rebuild changes *where* things run and *what is declared*, not what the plat
                      │                  │                             ▼
                      │   ┌──────────────┴──────── Rust: the engine ────────────────────┐
                      └──▶│  engine    a run: config, the loop, log ordering, replay     │
-                         │  time      wakes, cohorts, same-moment rule, action budgets │
+                         │  time      the clock, simultaneity, acting and thinking time│
                          │  resolver  calls → a seat's own acts; the preview           │
                          │  perception channels, changes, attention; attaches readings │
                          │  terms     reads agreements by their terms (read-only)      │
@@ -129,7 +129,7 @@ One Cargo workspace. Crates depend downwards only, and the boundaries enforce th
 | `law` | Evaluates formal conditions (the CEL subset) against an act and the records | `contracts`, `core`, the read-only view | Being called on the kernel's write path |
 | `perception` | Channels, changes, attention, position; attaches readings | `kernel` (read-only view), `terms` | Changing state |
 | `resolver` | A call to the seat's own acts; the preview in world terms | `contracts`, `core`, the read-only view, `law` (warnings only) | Choosing how; acting for anyone else |
-| `time` | Wake rules, cohorts, the same-moment rule, action budgets and carry-over, invariance perturbations | `contracts`, `core` | Knowing what seats do |
+| `time` | The clock, simultaneity, wakes, acting time and thinking time, invariance perturbations | `contracts`, `core` | Knowing what seats do |
 | `engine` | A run: loads config, drives the loop, orders annotations, replays and resumes, serves hosts | all of the above | |
 | `engine-napi` | The engine inside the Bun process (N-API) | `engine` | |
 | `core-wasm` | `core`, `terms`, `law` and log reading for the browser and TypeScript tools | `core`, `terms`, `law` | |
@@ -164,7 +164,7 @@ The loop, seen from the host:
 
 1. `engine.nextCohort()` returns everyone waking at this moment, each with its observation (changes plus readings) and the reason it woke.
 2. The host runs each seat: code modules in-process; language-model seats through their adapters, concurrently.
-3. `engine.submit(unit, action, annotations)`. The engine resolves calls, applies acts, orders annotations by unit key (as the orchestrator's "holding" does today), and decides who goes on.
+3. `engine.submit(unit, action, annotations)`. The engine resolves calls, schedules each act to take effect when its actor has done it (section 6.3), orders annotations by unit key (as the orchestrator's "holding" does today), and wakes the unit again when it's free.
 4. Repeat. The engine advances time when the cohort is done.
 
 The same API is served over a socket (`engine serve`) for seats in other processes: a human's interface (foundation-for-scale §4.9), a Python seat, a renderer attached live.
@@ -184,31 +184,61 @@ This makes the participant side's contracts as checked as the kernel's.
 
 ## 6. Time and scheduling
 
-### 6.1 Why the scheduler moves into the engine
+*Decided (Naz, 2026-09-30): the clock and simultaneity are world semantics; acting costs time, now, replacing the action budget; thinking time in both modes, now.*
 
-Who wakes when shapes outcomes. Wake timing decided how much people spent. Same-moment ordering decides who gets the last home. The action budget decides whose payments slip. These are the world's time semantics, and they're currently implemented in glue code, specified only by that code.
+### 6.1 Four things, four homes
 
-The `time` crate owns them. It isn't the kernel, which stays physics. It's the engine's clock, and it's specified in the contract (section 9).
+| What | Home |
+|---|---|
+| **The clock and simultaneity:** the order of acts, and what happens when two act at once | The engine's `time` crate, written into the contract |
+| **When a seat wakes** (a time it asked for, or its cadence) | The seat's own choice; the engine honours it |
+| **Waking on news** (a message, a record naming it) | Perception: what reaches a seat's attention |
+| **How much a seat can do:** acting costs time (6.3) | World semantics, in the engine, parameterised in the world's config |
 
-### 6.2 The semantics (as today, now specified)
+The kernel (the only writer) doesn't change: it applies acts when the engine hands them over. Time's semantics live in the engine, beside it, not in glue code.
 
-- **A unit wakes** at the time it asked for, or at its cadence if it didn't ask, or on **news**: a message to it, or a record naming or addressed to the entity it acts for.
-- **The same-moment rule:** everyone due at a moment observes the same state; their acts are applied in unit-key order (foundation-for-scale §4.8).
-- **The action budget:** at most `max_actions_per_wake` actions a wake. A unit with more to do carries on at the next tick. This is recorded as a health signal.
-- **Runaway guard:** more than 1,000 rounds of wakes in one moment stops the run with a diagnosis.
-- **Thinking time** (VISION §8): "free" is implemented; "costs world time" gets its hook here. A language-model seat's wall-clock thinking maps to world time by a configured rate.
+### 6.2 The clock and simultaneity
 
-### 6.3 Time-invariance by construction
+- **Time is world seconds.** Events are scheduled at any second; the tick (`clock.tick_seconds`) is only the grain for cadence wakes.
+- **An act takes effect when it's done:** at the time its actor finishes it (6.3), not when they start.
+- **Simultaneity:** acts completing at the same second are applied in actor-key order. Everyone waking at the same second observes the same state (foundation-for-scale §4.8).
+- **Runaway guard:** more than 1,000 rounds at one second stops the run with a diagnosis. Since every act now costs time, this can only be tripped by waking without acting.
+
+### 6.3 Acting costs time (replaces the action budget)
+
+The action budget (at most 12 actions a wake, the rest carried over to the next tick) isn't how the world works. Nobody is capped at 12 things. Doing things takes time, and a busy actor falls behind. So:
+
+- **Every act takes its actor time,** by the act's kind and the actor's kind: writing a letter, signing, instructing a payment, publishing a notice, moving house. The table is world config (`act_time`), with each figure marked as sourced or a placeholder.
+- **The actor is busy until the act is done;** the act takes effect then (6.2); its next act starts after.
+- **One body, one timeline.** A person's time is shared across every capacity they act in. A mayor who is also a citizen can't do both at once. A system (software) has `lanes`: how many acts it carries out at once. A payment system with 50 lanes processes 50 payments together.
+- **A program of several steps** (a call with several lines) takes the sum of its lines' times, and each line takes effect as it's done.
+- **Physical durations stay separate.** Building (`build_time`), work tasks and future travel are physics with their own durations. Act time is the actor's effort to do the act.
+- **What goes away:** `max_actions_per_wake`, the carry-over rule, and the "cut short" health signal. Falling behind becomes visible as time: a backlog, and how late things happen. The health report measures it (8.4).
+
+The bank's month end then looks as it would: 1,152 payments take its payment system the time they take, the last ones land later, and anyone waiting on them sees that.
+
+### 6.4 Thinking time (both modes)
+
+`orchestration.thinking_time`, per seat or for all:
+- **`free`:** decisions take no world time (today's only mode).
+- **`costs_world_time`:** deciding takes world time, and the world moves on meanwhile:
+  - **models:** world seconds per output token (and optionally per input token), so it's deterministic, and the tokens are logged;
+  - **humans:** the wall clock, scaled by a configured rate, recorded in the log so replay is exact;
+  - **code seats:** a configured fixed decision time, zero by default.
+
+A slow mayor then falls behind a fast world. VISION §8 names this as a disempowerment dynamic worth studying.
+
+### 6.5 Time-invariance by construction
 
 Every observation carries `since`, the time since this unit's previous wake, and the engine offers `accrue(rate, since)`. The module rule, enforced by invariance tests (section 8.1): **any per-period quantity is computed from elapsed time, never per wake.** The 23-trip mole is then a test failure on day one.
 
-### 6.4 Perturbations for tests
+### 6.6 Perturbations for tests
 
 The `time` crate can perturb a run on purpose, in test mode only, never in a research run:
 - random extra wakes;
-- a smaller action budget;
-- shuffled order within a cohort (under a documented seed);
-- splitting a payment in two.
+- shuffled order among acts completing at the same second (under a documented seed);
+- splitting a payment in two;
+- act times scaled by ±10% (outcomes may move a little, and shouldn't jump).
 
 ---
 
@@ -254,7 +284,7 @@ An organisation closing is a registrar's act, not physics: a public record from 
 
 **What:** a run's aggregates must not move, beyond seed noise, under perturbations that shouldn't matter (section 6.4).
 **Where:** a test mode of the engine; a suite that runs the 200-person town for 90 days under each perturbation and compares against the unperturbed run on the health report's measures (8.4), with a statistical tolerance.
-**Catches:** time-accounting moles, dropped steps, order dependence, budget dependence.
+**Catches:** time-accounting moles, dropped steps, order dependence, sensitivity to act times.
 
 ### 8.2 Truth audits
 
@@ -273,7 +303,7 @@ This is section 7. It removes the class of bug instead of detecting it.
 - unserved demand (refunds as a share of orders);
 - vacancies, the job-finding rate, how long unemployment lasts;
 - disputes and stoppages per employer;
-- actions carried over, and refusals by code;
+- backlogs: how far behind each busy actor runs (acting time), and refusals by code;
 - truth-audit divergences;
 - the calibration targets from the profile.
 
@@ -303,7 +333,7 @@ Proposed together, for one sign-off:
 | **Readings on observations** (`readings`: per record id, the reading and its version), labelled as readings | Section 7 |
 | **The acting entity on messages** | Section 7.4 |
 | **`since` on observations** (time since the unit's last wake), and **wake reasons** | Section 6.3; legibility |
-| **Scheduling semantics in the contract** (`orchestration`): wake rules, the same-moment rule, the action budget, carry-over, thinking time | Section 6 |
+| **Time in the contract:** wake rules; acts take effect when done; simultaneity; `act_time` (by act and actor kind, with sources or placeholders) and systems' `lanes`, replacing `max_actions_per_wake`; `thinking_time` in both modes, with thinking durations logged | Section 6 |
 | **Module manifests:** a participant-side schema (parameters with units, ranges and sources; perception needs; beliefs; decision domains) | Section 5.2 |
 | **Payments reference what they settle** (`basis` or `settles` required on transfers made under an agreement) | Section 7.2 |
 | **Compact logs** (docs/design/compact-logs.md) and a **checkpoint snapshot** format | Section 10 |
@@ -363,6 +393,7 @@ Proposed together, for one sign-off:
 | Kernel invariants | Money conservation, physical feasibility, statements have no power, hash chain, replay, determinism lint | Every change |
 | Conformance | Every contract example validates; generated types round-trip | Every change |
 | Invariance tests | Section 8.1, on the 200-person town, 90 days | Every change (under 2 minutes) |
+| Time semantics | Acts take effect when done; one body, one timeline; lanes; thinking time in both modes replays exactly | Every change |
 | Truth audits | On in every orchestrator-level test; zero divergences expected | Every change |
 | Scenario tests | Today's 72 orchestrator tests, ported to the host (unions, closures, migration, gatherings, …) | Every change |
 | Parity | The rebuild against `v0-reference` on reference worlds (section 14) | During the rebuild |
@@ -381,7 +412,7 @@ Proposed together, for one sign-off:
 |---|---|---|
 | **R0. Contracts 0.7** | The contract changes of section 9, signed off; generated types; the workspace skeleton; CI tiers | Sign-off; conformance green |
 | **R1. Kernel split** | `contracts`, `core`, `kernel` (with `WorldView`), existing kernel code moved; `engine-napi` with today's command protocol | Every existing kernel test green; `v0-reference` logs replay byte-identically on the split kernel (before 0.7 changes take effect) |
-| **R2. The engine** | `time`, `perception`, `resolver` and the loop in Rust; the orchestrator becomes the host; invariance perturbations | All scenario tests ported and green; invariance tests green; parity: headline measures within seed noise of `v0-reference`, or each difference explained |
+| **R2. The engine** | `time` (acting and thinking time included), `perception`, `resolver` and the loop in Rust; the orchestrator becomes the host; invariance perturbations | All scenario tests ported and green; invariance tests green; parity in two steps: first with every act taking 1 second (close to today's semantics), within seed noise of `v0-reference`; then with the configured act times, each difference explained |
 | **R3. Readings** | `terms` and `law`; readings on observations; the acting entity on messages; modules migrated off the `Book`'s derivations; truth audits | Truth audits clean on reference runs; parity as R2 |
 | **R4. Declared and measured** | Module manifests and validation; the health report and diff; compact logs; checkpoints and resume from a checkpoint | Nightly calibration running; all parameters declared, with sources or marked as placeholders |
 | **R5. Clean-up** | Delete the TypeScript duplicates and the stdio protocol; docs rewritten (VISION §4, reliability, measurement, the behaviour README) | Nothing duplicated; docs match the code |
@@ -398,7 +429,7 @@ Proposed together, for one sign-off:
 
 1. **The architecture:** a Rust engine (kernel plus the semantics every consumer shares) in-process with a TypeScript participant host. **Recommend yes.**
 2. **The rule for what goes where** (section 3). **Recommend yes.**
-3. **The scheduler moves into the engine** as the `time` crate, with its semantics written into the contract. **Recommend yes.** It's the question I'm least certain of, and the one I'd most like to discuss.
+3. **Time** (section 6). **Decided, 2026-09-30:** the clock and simultaneity are world semantics, in the engine and the contract; acting costs time now, replacing the action budget; thinking time in both modes now.
 4. **The resolver moves to Rust.** **Recommend yes.**
 5. **Readings** (section 7): the kernel records, `terms` and `law` read, and nothing reads *for* anyone or rules. **Recommend yes.**
 6. **Payments must reference what they settle** for arrears to be read (7.2). **Recommend yes.**
@@ -418,7 +449,8 @@ Proposed together, for one sign-off:
 **Risks:**
 - **Rust iteration is slower.** That's right for stable semantics, and wrong for behaviour, which stays in TypeScript.
 - **N-API adds a build step** and native crashes take the process with them. The watchdog and resume already handle a dead run.
-- **Semantics made explicit may shift outcomes.** Parity is measured and every difference explained, not assumed away.
+- **Semantics made explicit may shift outcomes,** and acting time will shift them deliberately. Parity is measured, and every difference is explained, not assumed away. Acting time is compared against `v0-reference` separately, so its effect is seen on its own.
+- **More distinct moments.** Acts completing at their own seconds means more rounds than hourly wakes did. The engine runs rounds in Rust and calls the host once per cohort; the performance targets (section 11) include this.
 - **Scope creep.** New behaviour waits until after R5, except what a parity gate needs.
 - **Time.** The rebuild pauses calibration and pilots for its duration.
 

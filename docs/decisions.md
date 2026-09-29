@@ -949,6 +949,16 @@ See the design note, §16.
   - **Resuming a long code-only run failed:** resume read the whole log into one string, and a 5-year log is 2.5 GB. It now reads it a line at a time, and only the first lines for the header and notes.
   - **Revisit if:** a model call begun before a sleep fails on waking (the adapter retries, then the participant waits, as after any failed call: D59).
 
+- **The rebuild's time model** (docs/design/rebuild.md section 6; Naz, 2026-09-30: "yes to all three, acting costs time now in the rebuild … do any changes now, don't defer to later").
+  - **The clock and simultaneity are world semantics.** They're specified in the contract and run by the engine's `time` crate, not in orchestration glue. Acts take effect when done, and acts completing at the same second apply in actor-key order.
+  - **Acting costs time, replacing the action budget** (`max_actions_per_wake` and its carry-over).
+    - Every act takes its actor time, by act and actor kind (`act_time`, world config, sourced or marked as placeholders).
+    - A person has one timeline across all their capacities; a system has `lanes`.
+    - Falling behind shows as a backlog, measured.
+  - **Thinking time in both modes:** free, or costing world time. Models by tokens (deterministic, logged), humans by the wall clock (logged), code seats a configured fixed time.
+  - **Why:** the budget was an artificial limit, and wake timing decided outcomes (the 23-trip mole). "Who actually does it, at what cost" (principle 12) includes the time it takes.
+  - **Revisit if:** act-time figures need sources per place (they'd move to profiles), or rounds at per-second resolution miss the performance targets.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
