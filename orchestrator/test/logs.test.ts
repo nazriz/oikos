@@ -2,12 +2,12 @@
 // written reasoning) and still replays; a compressed log reads back whole, and everything that reads logs reads it.
 
 import { expect, test } from "bun:test";
-import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@terrarium/worlds/generator/generate";
 import { exportDataset } from "../src/dataset";
 import { kernelBinary } from "../src/kernel";
-import { compressLog, readLog } from "../src/logs";
+import { compressLog, logLines, readLog } from "../src/logs";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -59,3 +59,23 @@ test("a lean log: no observation hashes, no code participants' reasoning (a mode
   const manifest = (d: string) => JSON.parse(readFileSync(join(d, "manifest.json"), "utf8"));
   expect({ ...manifest(zstSet), log: { ...manifest(zstSet).log, file: "" } }).toEqual({ ...manifest(plainSet), log: { ...manifest(plainSet).log, file: "" } });
 }, 600_000);
+
+test("a compressed log much larger than a stream's buffers reads back whole, line by line (a 5-year run's is gigabytes)", async () => {
+  // Bun 1.3's zstd stream stalled after 64 MB, so every big compressed log hung on reading back (fixed in 1.4).
+  const dir = join(root, "runs", "test-logs-big");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, "big.jsonl");
+  const n = 1_200_000;
+  const w = Bun.file(path).writer();
+  for (let i = 0; i < n; i++) w.write(`{"seq":${i},"kind":"event","body":{"event":"transfer","amount":"${(i * 7919) % 100_000}","pad":"${"x".repeat(60)}"}}\n`);
+  await w.end();
+  expect(statSync(path).size).toBeGreaterThan(100 * 1024 * 1024);
+  const zst = await compressLog(path);
+  let lines = 0;
+  let last = "";
+  for await (const l of logLines(zst)) { lines++; last = l; }
+  expect(lines).toBe(n);
+  expect(JSON.parse(last).seq).toBe(n - 1);
+  rmSync(dir, { recursive: true, force: true });
+}, 120_000);
