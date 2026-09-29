@@ -1,0 +1,231 @@
+// A citizen's mind in code (docs/design/ai-citizens.md 3): who a person is (values, temperament, needs), how they decide
+// (CONSUMAT's four ways), and how they learn (experience-weighted attraction). Deterministic: randomness only from the
+// participant's own streams. No world knowledge: a mind scores facts it's given (offers' typed terms), in the world's
+// terms, and makes of them what its values make of them. Citations: docs/research/references.md.
+//
+// Numbers are basis points (0..10000) wherever they could reach a log, so records stay integers.
+
+import type { Rng } from "../rng";
+
+// ---------------------------------------------------------------- who a person is
+
+/** Schwartz's ten basic values (Schwartz 1992): what a person believes in, measured across cultures. */
+export const VALUES = ["self_direction", "stimulation", "hedonism", "achievement", "power", "security", "conformity", "tradition", "benevolence", "universalism"] as const;
+export type Value = (typeof VALUES)[number];
+
+/** Needs that rise and fall (Humanoid Agents; D2A). Belonging and meaning come later (docs/design/ai-citizens.md 8). */
+export const NEEDS = ["subsistence", "shelter", "security", "social", "status"] as const;
+export type Need = (typeof NEEDS)[number];
+
+/** A world's figures for drawing people: each value's importance (mean and spread, basis points), from its profile. */
+export interface PopulationValues {
+  values: { [v in Value]?: { mean_bps: number; sd_bps: number } };
+}
+
+/** How a person acts, apart from what they believe (Dwarf Fortress's facets beside its values). */
+export interface Temperament {
+  /** Trying what's new (stimulation, self-direction): exploration in learning, innovators to laggards (Rogers). */
+  openness: number;
+  /** Copying what most do (Boyd and Richerson's conformist bias; conformity, tradition). */
+  conformity: number;
+  /** Copying what the respected do (prestige bias; achievement, power). */
+  prestige: number;
+}
+
+export interface Person {
+  values: { [v in Value]: number };
+  temperament: Temperament;
+  /** How much each need weighs, set by values (Dwarf Fortress: values set needs). */
+  weights: { [n in Need]: number };
+}
+
+const clamp = (x: number, lo = 0, hi = 10_000) => Math.max(lo, Math.min(hi, Math.round(x)));
+
+/** A roughly normal draw (Irwin–Hall: the sum of 12 uniforms), as the petition thresholds are drawn. */
+function normal(rng: Rng, mean: number, sd: number): number {
+  let s = 0;
+  for (let i = 0; i < 12; i++) s += rng.below(1_000_001) / 1_000_000;
+  return mean + (s - 6) * sd;
+}
+
+/**
+ * A person, drawn from a world's figures. Temperament and need weights follow from values, by Schwartz's motivational
+ * goals: security weighs the security need; power and achievement, status; benevolence and conformity, company;
+ * hedonism, consumption; stimulation and self-direction make a person open; conformity and tradition, a conformist;
+ * achievement and power, one who copies the respected. (Our mapping, to test against data: docs/design/ai-citizens.md.)
+ */
+export function drawPerson(rng: Rng, pop: PopulationValues): Person {
+  const values = Object.fromEntries(VALUES.map((v) => {
+    const d = pop.values[v] ?? { mean_bps: 5000, sd_bps: 1500 };
+    return [v, clamp(normal(rng, d.mean_bps, d.sd_bps))];
+  })) as Person["values"];
+  const avg = (...xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const temperament: Temperament = {
+    openness: clamp(avg(values.stimulation, values.self_direction)),
+    conformity: clamp(avg(values.conformity, values.tradition)),
+    prestige: clamp(avg(values.achievement, values.power)),
+  };
+  // Each need weighs 1, plus up to 1 more as its values say (so no need is ever ignored).
+  const w = (x: number) => clamp(10_000 + x, 10_000, 20_000);
+  const weights: Person["weights"] = {
+    subsistence: w(values.hedonism * 0.5),
+    shelter: w(avg(values.security, values.tradition) * 0.5),
+    security: w(values.security),
+    social: w(avg(values.benevolence, values.conformity)),
+    status: w(avg(values.power, values.achievement)),
+  };
+  return { values, temperament, weights };
+}
+
+// ---------------------------------------------------------------- how satisfied
+
+/** How well each need is met now (0 unmet .. 10000 fully), as the citizen judges its own life. */
+export type NeedLevels = { [n in Need]: number };
+
+/** Overall satisfaction: needs met, weighted as this person weighs them (basis points). */
+export function satisfaction(p: Person, levels: NeedLevels): number {
+  let num = 0;
+  let den = 0;
+  for (const n of NEEDS) {
+    num += p.weights[n] * levels[n];
+    den += p.weights[n];
+  }
+  return den ? Math.round(num / den) : 0;
+}
+
+// ---------------------------------------------------------------- learning (EWA)
+
+/**
+ * Experience-weighted attraction (Camerer and Ho 1999): each option has an attraction, updated after each choice by
+ * the payoff it gave (and, weighted by delta, what the others would have given, where that's known); choice is by the
+ * logit of attractions. Parameters: phi (decay of past attraction), rho (decay of experience), delta (weight on forgone
+ * payoffs), lambda (sensitivity). Defaults are placeholders near the paper's estimates, to fit.
+ */
+export interface EwaParams { phi_bps: number; rho_bps: number; delta_bps: number; lambda: number }
+export const EWA_DEFAULTS: EwaParams = { phi_bps: 9000, rho_bps: 9000, delta_bps: 5000, lambda: 4 };
+
+export class Attractions {
+  private readonly a = new Map<string, number>(); // option -> attraction (a payoff scale: basis points of satisfaction)
+  private n = 1; // experience weight
+  constructor(private readonly e: EwaParams = EWA_DEFAULTS, private readonly prior = 0) {}
+
+  get(option: string): number {
+    return this.a.get(option) ?? this.prior;
+  }
+  /** Tried at least once, or heard of with a payoff: how well the option is known. */
+  known(option: string): boolean {
+    return this.a.has(option);
+  }
+  experience(): number {
+    return this.n;
+  }
+
+  /** After a choice: its payoff, and the forgone payoffs of the others where they're known (seen others get them). */
+  update(chosen: string, payoff: number, forgone: { [option: string]: number } = {}): void {
+    const phi = this.e.phi_bps / 10_000;
+    const rho = this.e.rho_bps / 10_000;
+    const delta = this.e.delta_bps / 10_000;
+    const n0 = this.n;
+    this.n = rho * n0 + 1;
+    const all = new Set([chosen, ...Object.keys(forgone), ...this.a.keys()]);
+    for (const o of [...all].sort()) {
+      const pay = o === chosen ? payoff : forgone[o];
+      const w = o === chosen ? 1 : delta;
+      const prev = this.get(o);
+      this.a.set(o, pay === undefined ? (phi * n0 * prev) / this.n : (phi * n0 * prev + w * pay) / this.n);
+    }
+  }
+
+  /** Choose among options by the logit of attraction plus each option's appraised value, with openness to explore. */
+  choose(rng: Rng, options: { key: string; value: number }[], openness_bps: number): { key: string; weights: number[] } {
+    const lam = this.e.lambda * (1 - openness_bps / 20_000); // the more open, the more a person explores
+    const scores = options.map((o) => (this.get(o.key) + o.value) / 10_000);
+    const max = Math.max(...scores);
+    const weights = scores.map((s) => Math.round(Math.exp(lam * (s - max)) * 1_000_000));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = rng.below(Math.max(1, total));
+    for (let i = 0; i < options.length; i++) {
+      r -= weights[i]!;
+      if (r < 0) return { key: options[i]!.key, weights };
+    }
+    return { key: options.at(-1)!.key, weights };
+  }
+}
+
+// ---------------------------------------------------------------- how to decide (CONSUMAT)
+
+export type Strategy = "repeat" | "imitate" | "compare" | "deliberate";
+
+/**
+ * CONSUMAT (Jager 2000; Jager and Janssen 2012): satisfied and certain, repeat; satisfied and uncertain, imitate;
+ * unsatisfied and certain, compare with similar others; unsatisfied and uncertain, deliberate. `aspiration` is the
+ * satisfaction below which a person looks to change; `certainty` how well they know their options (0..10000).
+ */
+export function strategy(satisfied_bps: number, certainty_bps: number, t: { aspiration_bps: number; certainty_bps: number }): Strategy {
+  const satisfied = satisfied_bps >= t.aspiration_bps;
+  const certain = certainty_bps >= t.certainty_bps;
+  return satisfied ? (certain ? "repeat" : "imitate") : certain ? "compare" : "deliberate";
+}
+
+// ---------------------------------------------------------------- appraising an offer's facts
+
+/** What taking up an option would change, in a month, in the world's terms (from an offer's typed terms). */
+export interface Facts {
+  /** Money a month: + in, - out (cents). */
+  money_per_month: number;
+  /** A place to live comes with it (and its bedrooms, if known). */
+  home?: { bedrooms?: number };
+  /** Hours of work a month it asks. */
+  work_hours_per_month?: number;
+  /** Goods it brings, a month (units). */
+  goods_per_month?: number;
+  /** Others around: members, workmates, fellow attendees, where known. */
+  company?: number;
+}
+
+/** What the facts do to each need, as this person weighs them (basis points of need, can be negative). Response curves:
+ * money matters less the more one has (a log), a home matters most without one, work costs time. */
+export function appraise(p: Person, f: Facts, circ: { monthly_income: number; savings: number; homeless: boolean; homeBedroomsNeeded?: number }): { [n in Need]: number } {
+  const scale = Math.max(100_000, circ.monthly_income + Math.floor(circ.savings / 12)); // a month's means, at least $1,000
+  const money = f.money_per_month / scale; // this month's money against a month's means
+  const moneyValue = Math.sign(money) * Math.log1p(Math.abs(money)) * 10_000;
+  const home = f.home ? (circ.homeless ? 10_000 : 2_000) * (f.home.bedrooms !== undefined && circ.homeBedroomsNeeded !== undefined && f.home.bedrooms < circ.homeBedroomsNeeded ? 0.5 : 1) : 0;
+  const workCost = f.work_hours_per_month ? Math.min(3_000, f.work_hours_per_month * 15) : 0; // ~160 h a month: -2,400
+  return {
+    subsistence: Math.round(f.goods_per_month ? Math.min(10_000, f.goods_per_month * 800) : 0),
+    shelter: Math.round(home),
+    security: Math.round(moneyValue),
+    social: Math.round(f.company ? Math.min(3_000, Math.log1p(f.company) * 1_000) : 0),
+    status: Math.round((f.work_hours_per_month ? 1_000 : 0) + Math.max(0, moneyValue) * 0.3 - workCost * 0.2),
+  };
+}
+
+/** One number: the appraisal weighted by this person's needs (basis points). */
+export function value(p: Person, a: { [n in Need]: number }): number {
+  let num = 0;
+  let den = 0;
+  for (const n of NEEDS) {
+    num += p.weights[n] * a[n];
+    den += p.weights[n];
+  }
+  return den ? Math.round(num / den) : 0;
+}
+
+/** An offer's facts, from its typed terms (contracts: Offer; docs/design/ai-citizens.md 2a): money a month in and out for
+ * the taker, a home, work hours, goods. Terms in words count for nothing here: their meaning is a mind's (4). */
+export function factsOf(offer: { terms?: { commitments: { who: string; does: any; every?: number; per?: string }[] } }, units = 1): Facts {
+  const MONTH = 30 * 86_400;
+  const f: Facts = { money_per_month: 0 };
+  for (const c of offer.terms?.commitments ?? []) {
+    const o = c.does?.outcome;
+    if (!o) continue;
+    const perMonth = (x: number) => (c.every ? Math.round((x * MONTH) / c.every) : x) * (c.per === "unit" ? units : 1);
+    const taker = c.who === "taker";
+    if (o.money) f.money_per_month += (taker ? -1 : 1) * perMonth(Number(o.money.amount));
+    if (o.occupancy && !taker) f.home = {};
+    if (o.occupancy && taker) f.work_hours_per_month = (f.work_hours_per_month ?? 0) + 160; // being at a workplace: a job's hours
+    if (o.work && taker) f.work_hours_per_month = (f.work_hours_per_month ?? 0) + Math.round(perMonth(o.work.hours ?? 0) / 3600);
+    if (o.goods && !taker) f.goods_per_month = (f.goods_per_month ?? 0) + perMonth(Number(o.goods.quantity));
+  }
+  return f;
+}
