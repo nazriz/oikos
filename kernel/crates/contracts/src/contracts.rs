@@ -7,12 +7,12 @@ use serde_json::{json, Value};
 use std::sync::OnceLock;
 
 const SCHEMAS: [&str; 6] = [
-    include_str!("../../contracts/common.schema.json"),
-    include_str!("../../contracts/blocks.schema.json"),
-    include_str!("../../contracts/records.schema.json"),
-    include_str!("../../contracts/world-config.schema.json"),
-    include_str!("../../contracts/participant-api.schema.json"),
-    include_str!("../../contracts/log.schema.json"),
+    include_str!("../../../../contracts/common.schema.json"),
+    include_str!("../../../../contracts/blocks.schema.json"),
+    include_str!("../../../../contracts/records.schema.json"),
+    include_str!("../../../../contracts/world-config.schema.json"),
+    include_str!("../../../../contracts/participant-api.schema.json"),
+    include_str!("../../../../contracts/log.schema.json"),
 ];
 
 pub struct Contracts {

@@ -11,22 +11,19 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
-pub mod blocks;
-pub mod canon;
-pub mod config;
-pub mod contracts;
-pub mod events;
 pub mod exec;
 pub mod geo;
 pub mod kernel;
 pub mod log;
-pub mod money;
 pub mod observe;
 pub mod protocol;
-pub mod rng;
 pub mod run;
 pub mod state;
 pub mod statics;
 
 pub use kernel::{Command, Kernel, ProtocolError};
 pub use run::{replay, Run};
+
+// The shared core and the contract types, re-exported where the kernel has always had them.
+pub use terrarium_contracts::{blocks, config, contracts, events, vocab};
+pub use terrarium_core::{canon, money, rng};

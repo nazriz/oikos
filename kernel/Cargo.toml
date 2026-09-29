@@ -15,19 +15,33 @@ name = "terrarium-kernel"
 path = "src/main.rs"
 
 [dependencies]
-serde = { version = "1", features = ["derive", "rc"] }
-serde_json = "1"
-sha2 = "0.10"
+terrarium-core = { path = "crates/core" }
+terrarium-contracts = { path = "crates/contracts" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
 # Validates every input (config, command, annotation) against the contract
 # schemas, which are compiled into the binary.
-jsonschema = { version = "0.30", default-features = false }
+jsonschema = { workspace = true }
 imbl = { version = "7.0.2", features = ["serde"] }
 # A faster allocator: the kernel allocates heavily (JSON values, canonical encoding). Results don't depend on it.
 mimalloc = { version = "0.1", default-features = false }
 
 # On ARM (Apple silicon), SHA-256 uses the CPU's SHA instructions (the same hashes, several times faster).
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-sha2 = { version = "0.10", features = ["asm"] }
+sha2 = { workspace = true, features = ["asm"] }
+
+# The platform core, as a workspace (docs/design/rebuild.md section 4): this crate is the kernel (the only
+# writer); crates/ holds what it and every other consumer share.
+[workspace]
+members = [".", "crates/core", "crates/contracts"]
+resolver = "2"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+sha2 = "0.10"
+jsonschema = { version = "0.30", default-features = false }
 
 [dev-dependencies]
 proptest = "1"

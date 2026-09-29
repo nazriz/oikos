@@ -92,7 +92,7 @@ pub fn canonical<T: Serialize + ?Sized>(x: &T) -> Result<Vec<u8>, CanonError> {
     canonical_value(&v)
 }
 
-pub(crate) fn write_value(v: &Value, out: &mut Vec<u8>) {
+pub fn write_value(v: &Value, out: &mut Vec<u8>) {
     match v {
         Value::Null => out.extend_from_slice(b"null"),
         Value::Bool(true) => out.extend_from_slice(b"true"),

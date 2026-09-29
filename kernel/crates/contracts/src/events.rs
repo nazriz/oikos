@@ -4,7 +4,7 @@
 
 use crate::blocks::{Id, Record};
 use crate::config::ParticipantKind;
-use crate::state::{ConditionKind, DeathCause};
+use crate::vocab::{ConditionKind, DeathCause};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -135,8 +135,8 @@ pub enum EventBody {
     Transfer {
         from: Id,
         to: Id,
-        #[serde(with = "crate::money::amount")]
-        amount: crate::money::Money,
+        #[serde(with = "terrarium_core::money::amount")]
+        amount: terrarium_core::money::Money,
         currency: Id,
         by: Id,
         reason: TransferReason,
@@ -165,8 +165,8 @@ pub enum EventBody {
     },
     GoodsMoved {
         kind: Id,
-        #[serde(with = "crate::money::amount")]
-        quantity: crate::money::Money,
+        #[serde(with = "terrarium_core::money::amount")]
+        quantity: terrarium_core::money::Money,
         from: Id,
         from_at: Id,
         to: Id,
@@ -217,7 +217,7 @@ pub enum EventBody {
         name: String,
         born_at: i64,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        sex: Option<crate::state::Sex>,
+        sex: Option<crate::vocab::Sex>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         parents: Vec<Id>,
         #[serde(default, skip_serializing_if = "Option::is_none")]

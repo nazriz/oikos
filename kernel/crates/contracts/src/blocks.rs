@@ -22,8 +22,8 @@ pub enum Block {
     Transfer {
         from: IdOrRef,
         to: IdOrRef,
-        #[serde(with = "crate::money::amount")]
-        amount: crate::money::Money,
+        #[serde(with = "terrarium_core::money::amount")]
+        amount: terrarium_core::money::Money,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         settles: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -35,8 +35,8 @@ pub enum Block {
     /// delivery, a handover, a shipment out of the world to an edge). Phase B.
     MoveGoods {
         kind: Id,
-        #[serde(with = "crate::money::amount")]
-        quantity: crate::money::Money,
+        #[serde(with = "terrarium_core::money::amount")]
+        quantity: terrarium_core::money::Money,
         /// Where the goods are now (a structure, or for an edge, itself).
         from_at: IdOrRef,
         to: IdOrRef,
@@ -105,11 +105,11 @@ pub enum Block {
         born_at: Option<i64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         template: Option<Id>,
-        #[serde(default, with = "crate::money::opt_amount", skip_serializing_if = "Option::is_none")]
-        carrying: Option<crate::money::Money>,
+        #[serde(default, with = "terrarium_core::money::opt_amount", skip_serializing_if = "Option::is_none")]
+        carrying: Option<terrarium_core::money::Money>,
         /// A newcomer's biological sex, where the world models it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        sex: Option<crate::state::Sex>,
+        sex: Option<crate::vocab::Sex>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },

@@ -1009,6 +1009,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "terrarium-contracts"
+version = "0.6.0"
+dependencies = [
+ "jsonschema",
+ "serde",
+ "serde_json",
+ "terrarium-core",
+]
+
+[[package]]
+name = "terrarium-core"
+version = "0.6.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "terrarium-kernel"
 version = "0.6.0"
 dependencies = [
@@ -1019,6 +1038,8 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "terrarium-contracts",
+ "terrarium-core",
 ]
 
 [[package]]

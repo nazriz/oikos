@@ -417,6 +417,22 @@ Proposed together, for one sign-off:
 | **R4. Declared and measured** | Module manifests and validation; the health report and diff; compact logs; checkpoints and resume from a checkpoint | Nightly calibration running; all parameters declared, with sources or marked as placeholders |
 | **R5. Clean-up** | Delete the TypeScript duplicates and the stdio protocol; docs rewritten (VISION §4, reliability, measurement, the behaviour README) | Nothing duplicated; docs match the code |
 
+**Order, as run:** R1 (the kernel split) before R0 (contracts 0.7). The split's gate (old logs replay byte-identically) is only meaningful before the contracts change, and doing them apart keeps one risk at a time.
+
+**Progress:**
+- **Reference** (2026-09-30): `v0-reference` tagged; reference runs in `runs/v0-reference/` (the 200- and 1,000-person towns, 3 seeds × 2 years) and `runs/c10-run5/` (1,000 people, 3 seeds × 5 years); work on the `rebuild` branch in a separate worktree.
+- **R1, first step** (2026-09-30): the kernel is now a workspace with three crates:
+  - `terrarium-core`: canonical JSON, money, randomness;
+  - `terrarium-contracts`: blocks, config, events, the compiled schemas, and the vocabularies they shared with the state;
+  - `terrarium-kernel`: re-exports them, so its code is unchanged.
+
+  Gate:
+  - all 83 kernel tests pass;
+  - 0.6 logs replay byte-identically on the new binary (a strike, gatherings, the sparse mind on);
+  - all 72 orchestrator and 38 participant tests pass.
+
+  A 0.5 log (pilot 8) needs the 0.5 binary, as it always did.
+
 **After the rebuild,** on the new platform:
 1. The labour market (search frictions) and goods prices under shortage, calibrated with the health report watching every other measure.
 2. The Stage 3 renderer.

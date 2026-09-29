@@ -1,0 +1,13 @@
+[package]
+name = "terrarium-contracts"
+version = "0.6.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Terrarium's contract types (blocks, records, world config, events) and the compiled schemas"
+rust-version = "1.85"
+
+[dependencies]
+terrarium-core = { path = "../core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+jsonschema = { workspace = true }

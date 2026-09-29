@@ -12,6 +12,7 @@
 use crate::blocks::{Id, Record};
 use crate::config::{Channel, ParticipantKind};
 use crate::events::RefusalCode;
+pub use crate::vocab::{ConditionKind, DeathCause, Sex};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -176,21 +177,6 @@ impl State {
         }
         self.departures.insert(space.into(), list);
     }
-}
-
-/// A body's biological sex, where the world models it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Sex {
-    Female,
-    Male,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ConditionKind {
-    Illness,
-    Injury,
 }
 
 /// Something wrong with a body for a while: a category and a severity band (the world's
@@ -450,14 +436,6 @@ pub struct Scheduled {
     pub at: i64,
     pub seq: u64,
     pub what: Sched,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DeathCause {
-    Illness,
-    Injury,
-    Other,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
