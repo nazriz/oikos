@@ -6,7 +6,7 @@ import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { withholding, type IncomeTaxLaw } from "@terrarium/participants";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { generate, industrialActionLaw } from "@terrarium/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -71,7 +71,8 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   }
   for (const p of config.participants) if (p.controller?.impl === "citizen.default") Object.assign(p.controller.params, { ballot_turnout_bps: 10_000, strike_vote_yes_bps: 10_000 });
   // The world's industrial law, not the profile's: 5 days' notice. The union reads the law.
-  config.world.records.find((r: any) => r.kind === "law" && r.data?.law === "industrial_action").data.notice_days = 5;
+  const i = config.world.records.findIndex((r: any) => r.id === "law-industrial-action");
+  config.world.records[i] = industrialActionLaw(5000, 5000, 5);
   const { ev, recs } = await run("strike", config, 100);
   const ballot = recs.find((r) => r.kind === "action_ballot");
   expect(ballot).toBeDefined();

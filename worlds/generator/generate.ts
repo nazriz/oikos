@@ -91,6 +91,27 @@ export function townLife(P: Profile) {
 /** How many bodies a home with this many bedrooms could physically hold: generous (what's suitable is content). */
 const capacityFor = (bedrooms: number) => 2 * bedrooms + 2;
 
+/**
+ * The law on rent increases, from its figures: a prohibition with a formal condition on the notice itself (when it
+ * takes effect, and when the rent last changed, as a notice of rent increase states). Landlords read it as any
+ * participant reads a law (docs/design/ai-citizens.md 2e), so a lawmaker who changes it changes what they do.
+ */
+export function rentIncreaseLaw(reviewMonths: number, noticeDays: number, id = "law-rent-increases", at = 0): any {
+  return { id, record: "statement", author: "genesis", at, visible_to: "public", speaks_for: "outside", kind: "law",
+    text: `A residential rent may be increased no more than once every ${reviewMonths} months, and only with at least ${noticeDays} days' written notice to the tenant. Or else: the increase is invalid.`,
+    adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent", condition: `more than once in ${reviewMonths} months, or with less than ${noticeDays} days' written notice`, or_else: "the increase is invalid" },
+    formal: { language: "cel", condition: `block.block == 'publish' && block.kind == 'rent_increase' && (block.data.from - now < ${noticeDays * DAY} || block.data.from - block.data.last_from < ${reviewMonths * MONTH})` } };
+}
+
+/** The law on industrial action, from its figures: a prohibition on a notice of action that the ballot it states, or
+ * the notice it gives, doesn't meet. */
+export function industrialActionLaw(turnoutBps: number, passBps: number, noticeDays: number, id = "law-industrial-action", at = 0): any {
+  return { id, record: "statement", author: "genesis", at, visible_to: "public", speaks_for: "outside", kind: "law",
+    text: `Industrial action is protected only if a ballot of the members concerned approves it, with at least ${turnoutBps / 100}% of them voting and more than ${passBps / 100}% of the votes yes, and the employer has at least ${noticeDays} days' written notice.`,
+    adico: { attribute: "unions", deontic: "must_not", aim: "take industrial action", condition: `without an approving ballot (${turnoutBps / 100}% voting, more than ${passBps / 100}% yes) and ${noticeDays} days' notice`, or_else: "the action is unprotected" },
+    formal: { language: "cel", condition: `block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < ${noticeDays * DAY} || block.data.voted * 10000 < ${turnoutBps} * block.data.eligible || block.data.yes * 10000 <= ${passBps} * block.data.voted)` } };
+}
+
 export function generate(spec: TownSpec): any {
   const P = loadProfile(spec.profile ?? "au-vic-2026");
   const V = P.values;
@@ -477,16 +498,12 @@ export function generate(spec: TownSpec): any {
     data: { tax: "rates", rate_ppm: ratePpm, instalments: V.public_finance.rates_instalments, due_days: V.public_finance.rates_due_days, penalty_interest_bps: V.public_finance.rates_penalty_interest_bps } });
   // Laws on rent increases and on industrial action, from the profile: records the landlords and the union (and
   // employers) read, and lawmakers can change, never module parameters (docs/profiles.md).
-  const TN = V.tenancy;
-  records.push({ id: "law-rent-increases", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
-    text: `A residential rent may be increased no more than once every ${TN.rent_review_months} months, and only with at least ${TN.rent_increase_notice_days} days' written notice to the tenant. Or else: the increase is invalid.`,
-    adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent", condition: `more than once in ${TN.rent_review_months} months, or with less than ${TN.rent_increase_notice_days} days' written notice`, or_else: "the increase is invalid" },
-    data: { law: "rent_increases", review_months: TN.rent_review_months, notice_days: TN.rent_increase_notice_days } });
+  records.push(rentIncreaseLaw(V.tenancy.rent_review_months, V.tenancy.rent_increase_notice_days));
   const IA = V.industrial_action;
-  records.push({ id: "law-industrial-action", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
-    text: `Industrial action is protected only if a ballot of the members concerned approves it, with at least ${IA.ballot_turnout_bps / 100}% of them voting and more than ${IA.ballot_pass_bps / 100}% of the votes yes, and the employer has at least ${IA.notice_days} days' written notice.${IA.paid_during_action ? "" : " An employer must not pay employees for time on protected action."}`,
-    adico: { attribute: "unions", deontic: "must_not", aim: "take industrial action", condition: `without an approving ballot (${IA.ballot_turnout_bps / 100}% voting, more than ${IA.ballot_pass_bps / 100}% yes) and ${IA.notice_days} days' notice`, or_else: "the action is unprotected" },
-    data: { law: "industrial_action", ballot_turnout_bps: IA.ballot_turnout_bps, ballot_pass_bps: IA.ballot_pass_bps, notice_days: IA.notice_days, paid_during_action: IA.paid_during_action } });
+  records.push(industrialActionLaw(IA.ballot_turnout_bps, IA.ballot_pass_bps, IA.notice_days));
+  if (!IA.paid_during_action) records.push({ id: "law-no-pay-for-action", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
+    text: "An employer must not pay employees for time on protected industrial action.",
+    adico: { attribute: "employers", deontic: "must_not", aim: "pay employees", condition: "for time on protected industrial action" } });
   const mine = (id = "mine") => ({ id, kind: "records", match: { involving: ["self"] } });
   const votes = { id: "votes", kind: "records", match: { records: ["vote"] } };
   // Attention: the housing and job markets, and the petitions board, are looked at when the citizen wants to (on request),
@@ -614,7 +631,9 @@ export function generate(spec: TownSpec): any {
     const theirCells = records.filter((r) => r.record === "claim" && r.holder === l).map((r) => cellOf.get(r.about.object)!);
     office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "own-sites", kind: "sites", area: theirCells.length ? theirCells : "all", occupants: "names" }, deaths, lawBook],
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
-        city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000 }));
+        city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000,
+        // Their practice: reviewing rents as often as the law allows here, with the notice it asks (the law itself is a record).
+        rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days }));
   }
   // What the town's firms sell and buy: their price lists, and the world market's buying offers.
   const market = { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"] } };

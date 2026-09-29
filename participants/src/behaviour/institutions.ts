@@ -11,14 +11,9 @@ import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
+import { because, Book, prohibitions, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
-
-/** Laws with a formal condition and a "must not" (prohibitions), in id order. */
-function prohibitions(book: Book): StatementRecord[] {
-  return book.open("law").filter((l) => l.formal?.condition && l.adico?.deontic === "must_not").sort((a, b) => (a.id < b.id ? -1 : 1));
-}
 
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
 export function ownerOf(book: Book, lot: string): string | undefined {

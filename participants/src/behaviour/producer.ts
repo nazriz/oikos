@@ -230,7 +230,7 @@ export const producer: BehaviourModule = {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our wholesale price is now ${usd(price)}.` : "Publishing our wholesale price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
-            priceList({ [p.output]: price }, acc.account, `Wholesale ${p.output} from ${me}: ${usd(price)} each, at least ${p.min_order} to an order, delivered. Order and pay with the order.`, { min_order: p.min_order })));
+            priceList({ [p.output]: price }, acc.account, `Wholesale ${p.output} from ${me}: ${usd(price)} each, at least ${p.min_order} to an order, delivered. Order and pay with the order.`, { min_order: p.min_order }, me)));
         }
 
         // ---- inputs: (s, S): below a month's use (with what's on order), order up to a month and a half's ----

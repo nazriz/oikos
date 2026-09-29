@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { generate, rentIncreaseLaw } from "@terrarium/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -24,20 +24,24 @@ async function run(name: string, config: any, until: number) {
   return { ev, cmds, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
 }
 
-test("rents are reviewed within the tenancy law, never down, and tenants pay the new rent or leave", async () => {
+test("rents are reviewed as landlords practise, within the law as a record says it, never down, and tenants pay or leave", async () => {
   const config = generate(base);
-  // The world's law, not the profile's: reviews every 6 months, with 45 days' notice. Landlords read the law.
-  const record = config.world.records.find((r: any) => r.kind === "law" && r.data?.law === "rent_increases");
-  Object.assign(record.data, { review_months: 6, notice_days: 45 });
-  const law = { months: 6, notice: 45 };
+  // Landlords review every 6 months; the law (a record, as a lawmaker would write it) allows an increase only 9 months
+  // after the last change, with 75 days' notice. They read the law as any participant does: its formal condition.
+  for (const p of config.participants.filter((x: any) => x.controller?.impl === "firm.landlord")) Object.assign(p.controller.params, { rent_review_months: 6, rent_increase_notice_days: 60 });
+  const i = config.world.records.findIndex((r: any) => r.id === "law-rent-increases");
+  config.world.records[i] = rentIncreaseLaw(9, 75);
+  const law = { months: 9, notice: 75 };
   const { ev, recs } = await run("rents", config, 15 * MONTH);
   const increases = recs.filter((r) => r.kind === "rent_increase");
   expect(increases.length).toBeGreaterThan(5);
   const byLease = new Map<string, any[]>();
   for (const r of increases) byLease.set(r.data.lease, [...(byLease.get(r.data.lease) ?? []), r]);
-  for (const [, rs] of byLease) for (let i = 1; i < rs.length; i++) expect(rs[i].at - rs[i - 1].at).toBeGreaterThanOrEqual(law.months * MONTH);
-  // (As often as the law allows: some tenancies reviewed twice in 15 months.)
-  expect([...byLease.values()].some((rs) => rs.length >= 2)).toBe(true);
+  // Reviews as practised (6 months apart), and every increase within the law: 9 months after the last change.
+  for (const [, rs] of byLease) for (let i = 1; i < rs.length; i++) expect(rs[i].at - rs[i - 1].at).toBeGreaterThanOrEqual(6 * MONTH);
+  for (const r of increases) expect(r.data.from - r.data.last_from).toBeGreaterThanOrEqual(law.months * MONTH);
+  // (The law held some back: an increase noticed at 6 months starts at 9, not after 60 days.)
+  expect(increases.some((r) => r.data.from - r.at > 60 * DAY)).toBe(true);
   for (const r of increases) {
     expect(r.data.from - r.at).toBeGreaterThanOrEqual(law.notice * DAY);
     expect(Number(r.data.rent)).toBeGreaterThan(Number(r.data.was));

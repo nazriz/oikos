@@ -13,7 +13,7 @@
 // transport.
 
 import * as C from "../calls";
-import type { Observation, StatementRecord } from "../contracts";
+import type { Observation, Offer, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { because, type Book, DAY, pay, say, type Step, usd } from "./common";
 import { receipts } from "./firms";
@@ -37,8 +37,16 @@ export function held(obs: Observation, at: string, kind: string): number {
 }
 
 /** Publishing (or republishing) a price list: the kinds of goods sold and their unit prices, and where to pay. */
-export function priceList(prices: { [kind: string]: number }, account: string, text: string, extra: object = {}): C.Call {
-  return say("price_list", text, { visible: "public", data: { goods: prices, account, ...extra } });
+export function priceList(prices: { [kind: string]: number }, account: string, text: string, extra: { min_order?: number; [k: string]: unknown } = {}, seller?: string): C.Call {
+  // With one kind of goods, it's also an offer (docs/design/ai-citizens.md 2a): order, pay the unit price, and the goods
+  // are delivered, per unit. (A list of several kinds isn't one offer: those are left as lists for now.)
+  const kinds = Object.keys(prices);
+  const k = kinds[0]!;
+  const offer: Offer | undefined = seller && kinds.length === 1 && prices[k]! > 0 ? { by: seller, take_up: "order", terms: { commitments: [
+    { who: "taker", does: { outcome: { money: { to: account, amount: String(prices[k]), for: k } } }, per: "unit" },
+    { who: seller, does: { outcome: { goods: { kind: k, quantity: "1" } } }, per: "unit" },
+  ] } } : undefined;
+  return say("price_list", text, { visible: "public", data: { goods: prices, account, ...extra }, ...(offer ? { offer } : {}) });
 }
 
 /**

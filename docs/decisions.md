@@ -826,6 +826,21 @@ See the design note, §16.
   - **The call language's `statement` takes `offer` and `practice`,** so a model publishes them as code does.
   - **Open (for Naz):** the contract family is still "0.5" though typed commitments are a breaking change. Recommended: rename to 0.6 in one mechanical commit once the blocks are done.
 
+- **AI citizens, step 2: laws without hidden fields, and offers published** (docs/design/ai-citizens.md 2a, 2e).
+  - **Laws bind code participants only through their formal conditions,** as any participant reads a law (`breaches` in participants/src/behaviour/common.ts, lifted from the planning office).
+    - The rent and strike laws are prohibitions with a CEL condition on the notice itself: when it takes effect and when the rent last changed; the ballot's figures and the notice given.
+    - Landlords and the union check an act before taking it: they look for a lawful version (a later start), wait, or, not complying, breach.
+    - The hidden `data.law` fields and `lawInForce` are gone. Tests change laws as a lawmaker would, by putting a different law in the world.
+  - **Offers are published alongside today's records:** job postings (employment terms), homes to let (the lease), shops' and producers' price lists (per unit), the union's membership, the bank's loan terms, premises for sale.
+    - Today's citizens keep reading the records' data; the new citizens will read the offers.
+    - **Limits for now:**
+      - a price list with several kinds of goods isn't one offer;
+      - a minimum order isn't in the offer's shape;
+      - transferring ownership is in words, since the vocabulary has no ownership outcome yet.
+  - **Found:**
+    - **A citizen counted unemployment support as income while in work,** and applied for homes only that income could afford. Once the claim stopped it couldn't sign, leaving the landlord's offer unsigned (the landlord then let the home to someone else). Support for being out of work is no longer counted once employed.
+    - The migration test's world paid newcomers $1,500 a fortnight, which rents nothing here. It passed only through that bug; it now pays $3,000.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

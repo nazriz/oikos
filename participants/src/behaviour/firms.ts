@@ -14,12 +14,12 @@
 
 import { cents } from "../money";
 import * as C from "../calls";
-import type { Observation, ParticipantAction, StatementRecord } from "../contracts";
+import type { Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
-import { because, between, Book, lawInForce, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
+import { because, between, Book, breaches, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -223,7 +223,12 @@ export const landlord: BehaviourModule = {
       // Vacancies: list each free unit, at a markup over what we currently get for homes in that building.
       const openListings = book.open("rental_listing").filter((l) => l.speaks_for === me);
       const listing = (o: (typeof owned)[number], rent: number) =>
-        say("rental_listing", `Home to let: ${o.space}${o.bedrooms ? `, ${o.bedrooms} bedrooms` : ""}, ${rent} cents a month.`, { data: { structure: o.structure, space: o.space, type: o.type, ...(o.bedrooms ? { bedrooms: o.bedrooms } : {}), rent } });
+        say("rental_listing", `Home to let: ${o.space}${o.bedrooms ? `, ${o.bedrooms} bedrooms` : ""}, ${rent} cents a month.`, { data: { structure: o.structure, space: o.space, type: o.type, ...(o.bedrooms ? { bedrooms: o.bedrooms } : {}), rent },
+          // The lease it's for (2a): the home to occupy, the rent monthly.
+          offer: { by: me, take_up: "apply", available: 1, terms: { template: "lease", commitments: [
+            { who: me, does: { outcome: { occupancy: { in: o.space } } } },
+            { who: "taker", does: { outcome: { money: { to: acc.account, amount: String(rent), for: "rent" } } }, every: MONTH },
+          ] } } });
       for (const o of owned) {
         const listed = openListings.filter((l) => l.data?.space === o.space && !lettingNow.has(l.id));
         if (!taken(o.space) && listed.length === 0) {
@@ -290,14 +295,13 @@ export const landlord: BehaviourModule = {
 
       // Rent reviews: once a review period (the world's tenancy law), a tenancy's rent goes up to what we'd ask for the
       // home now, if that's more, with the notice the law requires. (It never goes down: an unlet home's asking rent does.)
-      const rentLaw = lawInForce(book, "rent_increases");
-      const reviewMonths = rentLaw ? Math.max(Number(rentLaw.review_months ?? 0), p.rent_review_months ?? 0) : p.rent_review_months;
-      const noticeDays = Math.max(p.rent_increase_notice_days, Number(rentLaw?.notice_days ?? 0));
+      // Our practice: how often we review a tenancy's rent, and the notice we give. The law bounds it (below).
+      const reviewMonths = p.rent_review_months;
+      const noticeDays = p.rent_increase_notice_days;
       if (reviewMonths) for (const a of active) {
         if (noticeGiven.has(a.id)) continue;
         const since = lastReview.get(a.id) ?? book.signedAt(a.id)!;
         if (t - since < reviewMonths * MONTH) continue;
-        lastReview.set(a.id, t);
         const tenant = tenantOf(a);
         const unit = owned.find((o) => o.space === leaseTerms(a, tenant).space);
         if (!unit) continue;
@@ -307,14 +311,31 @@ export const landlord: BehaviourModule = {
         const baseRent = typeof base === "number" ? base : (base?.find((b) => b.bedrooms === unit.bedrooms)?.rent ?? now);
         const ref = others.length ? Math.floor(others.reduce((x, y) => x + y, 0) / others.length) : Math.max(now, baseRent);
         const market = Math.floor((ref * (10_000 + p.markup_bps)) / 10_000);
-        if (market <= now) continue;
+        if (market <= now) {
+          lastReview.set(a.id, t);
+          continue;
+        }
+        // The notice states when the rent last changed, as a notice of rent increase does. The law as we read it: the
+        // soonest the increase can start without breaching a law in force, a week at a time. If none within half a year,
+        // we wait and look again next month; unless we don't comply, and raise it anyway.
+        const lastFrom = (rentChanges.get(a.id) ?? []).at(-1)?.from ?? book.signedAt(a.id)!;
+        const notice = (from: number) => ({ lease: a.id, rent: market, from, was: now, last_from: lastFrom });
+        const act = (from: number) => ({ block: "publish", kind: "rent_increase", data: notice(from) });
+        let lead = noticeDays * DAY;
+        let broken = breaches(book, act(t + lead), me, t);
+        while (broken.length && lead < (noticeDays + 182) * DAY) broken = breaches(book, act(t + (lead += 7 * DAY)), me, t);
+        const complies = obeys(`rent-law-${a.id}-${t}`);
+        if (broken.length && complies) continue;
+        if (broken.length) lead = noticeDays * DAY; // (not complying: our own practice, whatever the law says)
+        lastReview.set(a.id, t);
+        const why = broken.length ? `; this breaches ${broken.map((l) => l.id).join(", ")}, and we raise it anyway` : lead > noticeDays * DAY ? `, from as soon as the law allows` : "";
         // The notice counts from when it's given: if that's later than now, the date moves with it.
-        const change = { from: t + noticeDays * DAY, rent: market };
+        const change = { from: t + lead, rent: market };
         rentChanges.set(a.id, [...(rentChanges.get(a.id) ?? []), change]);
         const give = (at: number): Step => {
-          change.from = at + noticeDays * DAY;
-          return Object.assign(because(`A rent review (every ${reviewMonths} months${rentLaw ? ", as the law allows" : ""}): what we'd ask for ${unit.space} now is ${usd(market)} a month (${p.markup_bps / 100}% over ${others.length ? "what similar homes in the building let for" : "the base rent"}), above the ${usd(now)} it lets for: raising it, with ${noticeDays} days' notice.`,
-            say("rent_increase", `Notice of rent increase for ${unit.space}: ${usd(market)} a month from ${Math.floor(change.from / DAY)} (day), up from ${usd(now)}.`, { to: [tenant], visible: [me, tenant], basis: a.id, data: { lease: a.id, rent: market, from: change.from, was: now } })), { redo: give });
+          change.from = at + lead;
+          return Object.assign(because(`A rent review (every ${reviewMonths} months): what we'd ask for ${unit.space} now is ${usd(market)} a month (${p.markup_bps / 100}% over ${others.length ? "what similar homes in the building let for" : "the base rent"}), above the ${usd(now)} it lets for: raising it, with ${Math.round(lead / DAY)} days' notice${why}.`,
+            say("rent_increase", `Notice of rent increase for ${unit.space}: ${usd(market)} a month from ${Math.floor(change.from / DAY)} (day), up from ${usd(now)}; it last changed on day ${Math.floor(lastFrom / DAY)}.`, { to: [tenant], visible: [me, tenant], basis: a.id, data: notice(change.from) })), { redo: give });
         };
         steps.push(give(t));
       }
@@ -492,6 +513,16 @@ export class Staffing {
    * The routine: start wages for new hires and stop them for the dead and the departed; offer each posting's job to
    * one applicant at random (at the posting's wage); post a job at `wage` while short of `target` and `canPost`.
    */
+  /** A posting's offer (docs/design/ai-citizens.md 2a): the terms of the employment it's for, in the typed vocabulary. */
+  jobOffer(wage: number, account: string): Offer {
+    return { by: this.me, to: { min_age_years: 18 }, take_up: "apply", available: 1, terms: { template: "employment",
+      commitments: [
+        { who: this.me, does: { outcome: { money: { from: account, amount: String(wage), for: "wages" } } }, every: this.o.period },
+        ...(this.o.workplace ? [{ who: "taker", does: { outcome: { occupancy: { in: this.o.workplace } } } } as const] : []),
+      ],
+      termination: [{ party: this.me, notice: this.o.notice_days * DAY }, { party: "taker", notice: this.o.notice_days * DAY }] } };
+  }
+
   routine(obs: Observation, book: Book, account: string, want: { target: number; wage: number; canPost: boolean; why?: string }): Step[] {
     const t = obs.t;
     const me = this.me;
@@ -590,13 +621,13 @@ export class Staffing {
     // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
     for (const post of doesHire ? posts : []) if (!apps.some((a) => a.data?.posting === post.id) && Number.isInteger(post.data?.wage) && post.data!.wage !== want.wage && want.canPost) {
       steps.push(because(`Our posting is still open, at ${usd(post.data!.wage as number)}; we offer ${usd(want.wage)} now: posting it again at that.`, withdraw(post.id, "Superseded: a new wage."),
-        say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
+        say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) }, offer: this.jobOffer(want.wage, account) })));
     }
 
     // Post a job if short-staffed (and the module says we can).
     const have = staff.length + offered.length + offersNow;
     if (doesHire && have < want.target && posts.length === 0 && want.canPost) {
-      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) } })));
+      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) }, offer: this.jobOffer(want.wage, account) })));
     }
     return steps;
   }
@@ -762,8 +793,7 @@ export class Bargaining {
     }
     for (const s of book.open("stop_work").filter(mine)) {
       this.handled.add(s.id);
-      // No work, no pay, unless the law says strikers are paid.
-      if (lawInForce(book, "industrial_action")?.paid_during_action === true) continue;
+      // No work, no pay (and, where the law says so, an employer mustn't pay for time on strike).
       this.strikers = ((s.data?.members as string[]) ?? []).filter((w) => staff.some((a) => a.terms.parties[1] === w));
       steps.push(...staffing.stop(book, t, this.strikers, `A strike by ${s.speaks_for}'s members: no pay for the time on strike.`));
     }
@@ -934,7 +964,12 @@ export class WindingUp {
       this.asking = at;
       return because(why, ...old.map((id) => withdraw(id, "Superseded: a new asking price.")),
         say("property_for_sale", `For sale: ${premises.structure} (a ${premises.type}) and its lot, ${usd(at)}. To buy, publish a purchase and pay with it.`, { visible: "public",
-          data: { seller: this.me, structure: premises.structure, type: premises.type, cell: premises.cell, lots: titles.map((c) => c.about.object), price: at, account } }));
+          data: { seller: this.me, structure: premises.structure, type: premises.type, cell: premises.cell, lots: titles.map((c) => c.about.object), price: at, account },
+          // The sale it's for (2a). (Transferring the title is in words: the vocabulary has no ownership outcome yet.)
+          offer: { by: this.me, take_up: "order", available: 1, terms: { template: "sale", commitments: [
+            { who: "taker", does: { outcome: { money: { to: account, amount: String(at), for: `${premises.structure} and its lot` } } } },
+            { who: this.me, does: { text: `Transfers ${premises.structure} and its lot (${titles.map((c) => c.about.object).join(", ")}) to the buyer.` } },
+          ] } } }));
     };
     if (this.listedAt < 0 && titles.length) return [listing(`Closed: offering our premises (${premises.structure}, a ${premises.type}) for sale at ${usd(price)}.`, price, [])];
     price = this.asking || price;

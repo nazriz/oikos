@@ -283,7 +283,7 @@ export const retailer: BehaviourModule = {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our price is now ${usd(price)}.` : "Publishing our price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
-            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises })));
+            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises }, me)));
         }
 
         // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----

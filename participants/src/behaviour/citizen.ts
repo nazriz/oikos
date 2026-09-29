@@ -187,7 +187,9 @@ export const citizen: BehaviourModule = {
     let retired = false;
     const inflows: { t: number; amount: number }[] = []; // money that came in (refunds counted negative), for what our income is
     const wageIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
-    const benefitIncome = () => (benefit ? Math.floor((benefit.amount * MONTH) / benefit.every) : 0);
+    // (Support for being out of work isn't income once we're in work: we stop claiming it. Counting it, a household applied
+    // for a home only that income could afford, and then couldn't sign.)
+    const benefitIncome = () => (benefit && (benefit.retired || !job) ? Math.floor((benefit.amount * MONTH) / benefit.every) : 0);
     const monthlyIncome = () => wageIncome() + benefitIncome();
     /** Income that keeps a household in town: work, or support in retirement (support while out of work is a stopgap). */
     const earnedIncome = () => wageIncome() + (benefit?.retired ? benefitIncome() : 0);

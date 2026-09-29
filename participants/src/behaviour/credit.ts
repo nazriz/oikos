@@ -127,6 +127,7 @@ export const lending: BehaviourModule = {
     let funderAccount: string | undefined;
     let nextInterest = MONTH;
     let own: string | undefined;
+    let termsOffered = false;
 
     return stepper(
       (obs: Observation) => {
@@ -161,6 +162,20 @@ export const lending: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
+        // What borrowing from us is, for anyone who might (docs/design/ai-citizens.md 2a): published once.
+        if (!termsOffered) {
+          termsOffered = book.open("loan_terms").some((r) => r.speaks_for === me);
+          if (!termsOffered) {
+            termsOffered = true;
+            const rates = Object.entries(p.rate_bps).map(([k, r]) => `${r / 100}% a year for ${k === "person" ? "people" : "organisations"}`).join(", ");
+            steps.push(because("Saying what borrowing from us is: apply, and we lend what we judge can be repaid.",
+              say("loan_terms", `Loans: apply to us, saying how much, over how long (up to ${p.max_months} months) and what for. Interest: ${rates}. Repaid monthly.`, { visible: "public",
+                offer: { by: me, take_up: "apply", terms: { template: "loan", commitments: [
+                  { who: me, does: { text: `Lends the amount applied for, if it judges it can be repaid, over up to ${p.max_months} months.` } },
+                  { who: "taker", does: { text: `Repays it monthly with interest (${rates}).` } },
+                ] } } })));
+          }
+        }
         if (!acc) return steps;
         const kindOf = (e: string) => (book.entityKind.get(e) === "person" ? "person" : "organisation"); // (the directory says)
         const accounts = new Map(channels.accounts(obs).map((a) => [a.account, a]));

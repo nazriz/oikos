@@ -3,9 +3,10 @@
 // its own book of the records relevant to it, as a person would.
 
 import * as C from "../calls";
-import type { Observation, Outcome as ActOutcome, Record, ParticipantAction, StatementRecord } from "../contracts";
+import type { Observation, Offer, Outcome as ActOutcome, Practice, Record, ParticipantAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { cents, formatMoney } from "../money";
+import { evaluate } from "../law";
 
 export const DAY = 86_400;
 export const MONTH = 30 * DAY;
@@ -116,16 +117,22 @@ export class Book {
   }
 }
 
+/** Laws seen and standing that prohibit (institutional grammar: must not) with a formal condition, in id order. */
+export function prohibitions(book: Book): StatementRecord[] {
+  return book.open("law").filter((l) => l.formal?.condition && (l.adico as any)?.deontic === "must_not").sort((a, b) => (a.id < b.id ? -1 : 1));
+}
+
 /**
- * The law in force on a matter, as far as we've seen: the latest law statement standing whose data names the matter
- * (`data.law`), with what it says. Laws are records a world, or its lawmakers, publishes (D18/D19), never a module's
- * parameters: a module reads the law as a person would, so a law changed in the world changes what everyone does. None:
- * there's no such law.
+ * The laws in force, as far as this participant has seen, that an act it's thinking of would breach: prohibitions whose
+ * formal condition is true of the act (docs/design/ai-citizens.md 2e; D27). A law binds a code participant only this
+ * way, whoever passed it (a world's genesis, a council, a model mayor through the translator), never through a field
+ * only code reads (VISION 15). Whether to comply is still the participant's: breaking a law is always possible.
  */
-export function lawInForce(book: Book, matter: string): { [k: string]: any } | undefined {
-  let best: StatementRecord | undefined;
-  for (const r of book.open("law")) if ((r.data as any)?.law === matter && (!best || r.at > best.at || (r.at === best.at && r.id > best.id))) best = r;
-  return best ? { ...(best.data as object), id: best.id } : undefined;
+export function breaches(book: Book, act: object, actor: string, now: number): StatementRecord[] {
+  return prohibitions(book).filter((l) => {
+    const v = evaluate(l.formal!.condition, { block: act, actor, now }, []);
+    return "value" in v && v.value;
+  });
 }
 
 /** Signatures on a petition this participant can see: votes with choice "sign", one per signing entity (the organiser sees them all). */
@@ -209,10 +216,11 @@ export function pay(to: string, amount: number, o: { from?: string; for?: string
 }
 
 /** A published statement: kind, text, and optional addressees, data, visibility and basis. */
-export function say(kind: string, text: string, o: { to?: string[]; data?: unknown; visible?: "public" | string[]; basis?: string; for?: string; adico?: unknown; formal?: string; on?: string } = {}): C.Call {
+export function say(kind: string, text: string, o: { to?: string[]; data?: unknown; visible?: "public" | string[]; basis?: string; for?: string; adico?: unknown; formal?: string; on?: string; offer?: Offer; practice?: Practice } = {}): C.Call {
   return C.call("statement", {
     kind, text: C.text(text), to: o.to ? C.json(o.to) : undefined, data: o.data !== undefined ? C.json(o.data) : undefined,
     adico: o.adico !== undefined ? C.json(o.adico) : undefined, formal: o.formal ? C.text(o.formal) : undefined,
+    offer: o.offer !== undefined ? C.json(o.offer) : undefined, practice: o.practice !== undefined ? C.json(o.practice) : undefined,
     visible: o.visible === undefined ? undefined : o.visible === "public" ? "public" : C.json(o.visible), basis: o.basis, for: o.for, on: o.on,
   });
 }
