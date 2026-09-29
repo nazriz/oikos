@@ -75,3 +75,29 @@ test("every refusal the kernel can give has world words", async () => {
   const log = JSON.parse(await Bun.file(new URL("../../contracts/log.schema.json", import.meta.url)).text());
   for (const code of log.$defs.RefusalCode.enum as string[]) expect(refusalText(code)).not.toBe("it isn't possible");
 });
+
+test("done for now alongside an action: the action, then no call until the next wake, whose report carries what came of it", async () => {
+  const { createLlmParticipant } = await import("../src/llm/participant");
+  const { MockAdapter } = await import("../src/llm/adapter");
+  const seen: any[] = [];
+  const adapter = new MockAdapter("mock", { participant: (req) => {
+    seen.push(req.messages);
+    return seen.length === 1
+      ? [{ type: "tool_use", id: "1", name: "write", input: { to: ["clerk"], text: "The figures, please." } }, { type: "tool_use", id: "2", name: "done_for_now", input: { days: 3 } }]
+      : [{ type: "tool_use", id: "3", name: "done_for_now", input: {} }];
+  } });
+  const participant = createLlmParticipant({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["board", "Noticeboard"]]), cadenceDays: 7, draftText: () => "" },
+    { adapter, annotate: async () => {}, now: () => 0 });
+  const ctx = { world: { config: {} } } as any;
+  const first = await participant.step(obs({}), ctx);
+  expect(first.type).toBe("message"); // the letter
+  // The step after it: no model call, asleep for the 3 days asked.
+  const second = await participant.step(obs({ board: { kind: "records", records: [{ id: "r1", record: "statement", kind: "notice", text: "Figures: $1,000.", author: "clerk", at: 1, visible_to: "public" }] } }, { t: 100 }), ctx);
+  expect(second).toEqual({ type: "wait", until: 100 + 3 * 86_400 });
+  expect(seen.length).toBe(1);
+  // The next wake: one call, and its report carries what the skipped step showed.
+  await participant.step(obs({}, { t: 3 * 86_400 + 100 }), ctx);
+  expect(seen.length).toBe(2);
+  expect(JSON.stringify(seen[1])).toContain("After your last action");
+  expect(JSON.stringify(seen[1])).toContain("Figures: $1,000.");
+});

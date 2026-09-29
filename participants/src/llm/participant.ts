@@ -52,7 +52,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
       input_schema: { type: "object", required: ["ref", "decision"], properties: { ref: { type: "string" }, decision: { enum: ["confirm", "decline"] }, note: { type: "string" } } } },
     { name: "write", description: "Write to people or organisations, by id. The words go exactly as you write them.",
       input_schema: { type: "object", required: ["to", "text"], properties: { to: { type: "array", items: { type: "string" } }, text: { type: "string" }, as: AS, about: { type: "string", description: "The reference it's about (optional)." } } } },
-    { name: "done_for_now", description: "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you.",
+    { name: "done_for_now", description: "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you. You can use it alongside another action: that action is done, and you're back after the days given, when you'll see how it went.",
       input_schema: { type: "object", properties: { days: { type: "integer", minimum: 1 } } } },
     { name: "notebook", description: "Replace your notebook: the only thing you'll remember from one day to the next. Use it alongside another action.",
       input_schema: { type: "object", required: ["text"], properties: { text: { type: "string", maxLength: 4000 } } } },
@@ -91,6 +91,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   let pending: { id: string; name: string }[] = [];
   let actedId: string | undefined;
   let lastAction: string | undefined;
+  // "Done for now" said alongside an action: after the action, no call until the next wake; what that step showed is
+  // carried into the next wake's report, so nothing it saw is lost.
+  let doneAfter: { days?: number } | undefined;
+  let carried = "";
   const seenSystems = new Set<string>();
   let standingText = "";
 
@@ -100,10 +104,20 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       if (standing) standingText = standing;
       const body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText });
       lastAction = undefined;
+      if (doneAfter) {
+        const days = doneAfter.days;
+        doneAfter = undefined;
+        carried = body;
+        messages = [];
+        actedId = undefined;
+        pending = [];
+        return days ? { type: "wait", until: obs.t + days * 86_400 } : { type: "wait" };
+      }
       if (actedId)
         messages.push({ role: "user", content: pending.map((u): ContentBlock => ({ type: "tool_result", tool_use_id: u.id,
           content: u.id === actedId ? body : u.name === "notebook" ? "Notebook updated." : "Not done: one action at a time." })) });
-      else messages = [{ role: "user", content: `Your notebook: ${notes || "(empty)"}\n\n${body}` }];
+      else messages = [{ role: "user", content: `Your notebook: ${notes || "(empty)"}\n\n${carried ? `After your last action:\n${carried}\n\nNow:\n` : ""}${body}` }];
+      carried = "";
       actedId = undefined;
       pending = [];
 
@@ -115,7 +129,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
 
       const uses = res.content.filter((b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use");
       for (const n of uses.filter((x) => x.name === "notebook")) if (typeof n.input?.text === "string") notes = n.input.text.slice(0, 4000);
-      const use = uses.find((x) => x.name !== "notebook");
+      const use = uses.find((x) => x.name !== "notebook" && x.name !== "done_for_now") ?? uses.find((x) => x.name === "done_for_now");
+      // Done for now, alongside an action: the action now, and no more until the next wake.
+      const alongside = use && use.name !== "done_for_now" ? uses.find((x) => x.name === "done_for_now") : undefined;
+      if (alongside) doneAfter = { ...(Number.isInteger(alongside.input?.days) && alongside.input.days > 0 ? { days: alongside.input.days } : {}) };
       const done = (a: ParticipantAction, label?: string) => {
         if (a.type === "wait" || a.type === "opt_out") messages = [];
         else {
