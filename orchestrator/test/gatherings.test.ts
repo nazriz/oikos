@@ -51,4 +51,13 @@ test("people go to the gatherings they may come to, while they're on, and go hom
   const firstWeek = inHall.filter((e) => e.t < 8 * DAY);
   expect(firstWeek.length).toBeGreaterThan(5);
   expect(firstWeek.filter((e) => belongs(e.occupant, on(e.t).id)).length / firstWeek.length).toBeGreaterThan(0.8);
+  // Belief (docs/design/ai-citizens.md 5): those who hold a teaching firmly at the start say so when asked how they are;
+  // those who hold none don't claim one they weren't given.
+  const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const said = log.filter((e) => e.kind === "command" && e.body.command === "act").flatMap((e) => e.body.blocks.filter((b: any) => b.block === "message" && b.text.includes("I hold to what")).map(() => e.body.participant));
+  const firm = config.participants.filter((p: any) => Object.values(p.controller?.params?.beliefs ?? {}).some((b: any) => b >= 6_000)).map((p: any) => p.id);
+  expect(firm.length).toBeGreaterThan(0);
+  expect(firm.filter((id: string) => said.includes(id)).length).toBeGreaterThan(firm.length / 2);
+  const unbelieving = new Set(config.participants.filter((p: any) => p.kind === "person" && !p.controller?.params?.beliefs).map((p: any) => p.id));
+  expect(said.filter((id) => unbelieving.has(id)).length).toBe(0);
 }, 600_000);

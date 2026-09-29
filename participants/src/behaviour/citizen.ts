@@ -37,9 +37,14 @@ import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
 import { factsOf, Mind, MIND_DEFAULTS, satisfaction, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
+/** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
+ * certainty a gathering takes it (with 20 or more others there), and being told; how strongly it's held to say so; and
+ * how much it adds to the worth of the gatherings of those who teach it. */
+const BELIEF = { fade_bps: 150, display_bps: 500, told_bps: 300, tell_at_bps: 6_000, meaning: 0.2 };
+
 /** How far a person's values sway the cited rates (a fraction of the rate per standard deviation of the value):
  * placeholders, unsourced, chosen small so the town's rates stay as calibrated (docs/behaviour/citizen.md). */
-const SWAY = { union_peers: 0.5, union_join: 0.3, turnout: 0.15, strike_vote: 0.08, patience_tradition: 0.2, patience_security: 0.1, enterprise_openness: 0.4, enterprise_achievement: 0.3 };
+const SWAY = { union_belief: 0.5, union_peers: 0.5, union_join: 0.3, turnout: 0.15, strike_vote: 0.08, patience_tradition: 0.2, patience_security: 0.1, enterprise_openness: 0.4, enterprise_achievement: 0.3 };
 
 /** What a code citizen says when it asks around, and recognises when asked (a code citizen only understands its own phrasing). */
 export const ASKING = { home: "I'm looking for somewhere to live. Do you know of anywhere?", work: "I'm looking for work. Do you know of anything going?" } as const;
@@ -53,9 +58,10 @@ export const CATCHING_UP = {
   work: (employer: string, paid: boolean) => `I work for ${employer}; ${paid ? "they pay on time" : "they've stopped paying me"}.`,
   union: (member: boolean) => (member ? "I'm in the union." : "I'm not in the union."),
   goes: (host: string) => `I go to ${host}'s gatherings.`,
+  holds: (host: string) => `I hold to what ${host} teaches.`,
   nothing: "Much the same.",
 };
-export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean; goesTo?: string[] }
+export interface News { shop?: string; served?: number; employer?: string; paid?: boolean; member?: boolean; goesTo?: string[]; holdsTo?: string[] }
 /** What someone's answer tells us, if it's in our phrasing (how well a shop serves: the middle of what the words say). */
 export function heardNews(text: string): News | undefined {
   const n: News = {};
@@ -71,6 +77,8 @@ export function heardNews(text: string): News | undefined {
   if ((m = /I'm (not )?in the union\./.exec(text))) n.member = !m[1];
   const goes = [...text.matchAll(/I go to ([^\s;']+)'s gatherings\./g)].map((x) => x[1]!);
   if (goes.length) n.goesTo = goes;
+  const holds = [...text.matchAll(/I hold to what ([^\s;']+) teaches\./g)].map((x) => x[1]!);
+  if (holds.length) n.holdsTo = holds;
   return Object.keys(n).length ? n : undefined;
 }
 
@@ -129,6 +137,12 @@ export const citizen: BehaviourModule = {
       essentials_units: 10, // goods a household uses in a fortnight, for how well subsistence is met (placeholder)
       mind: {} as Partial<MindParams>,
       sway: SWAY, // how far a person's values sway the cited rates (above)
+      // Belief (docs/design/ai-citizens.md 5; docs/behaviour/citizen.md "Belief"): what we hold at the start (teaching ->
+      // basis points: the world's), and how it changes. Placeholders: a month's fading; how much of the way to certainty
+      // a gathering takes it (with 20 or more others there), and being told; how strongly it's held to say so; and how
+      // much it adds to the worth of the gatherings of those who teach it.
+      beliefs: {} as { [teaching: string]: number },
+      belief: BELIEF,
       goods: "goods",
       leave_after_homeless_days: 90,
       leave_after_jobless_days: 180,
@@ -172,6 +186,7 @@ export const citizen: BehaviourModule = {
     ctx.params,
   );
     p.sway = { ...SWAY, ...(ctx.params.sway ?? {}) }; // a world may set some and keep the rest
+    p.belief = { ...BELIEF, ...(ctx.params.belief ?? {}) };
     const me = ctx.entity;
     const childTemplate = () => (p.child_template_outside_lf && ctx.rng("child-participation").below(10_000) >= p.participation_bps ? p.child_template_outside_lf : p.child_template);
     const book = new Book();
@@ -256,6 +271,19 @@ export const citizen: BehaviourModule = {
     const wentLast = new Set<string>();
     const stayedLast = new Set<string>();
     let practiceWake: number | null = null;
+    // Belief: each teaching we know of -> how strongly we hold it (basis points); when it last faded.
+    const beliefs = new Map<string, number>(Object.entries(p.beliefs as { [k: string]: number }));
+    let fadedAt: number | null = null;
+    const teachingsOf = (host: string) => book.open("teaching").filter((r) => (r.speaks_for ?? r.author) === host);
+    /** How strongly we hold what someone teaches (the most of their teachings). */
+    const holdTo = (host: string) => Math.max(0, ...teachingsOf(host).map((r) => beliefs.get(r.id) ?? 0));
+    /** Nearer certainty, by a share of the way (basis points of it). */
+    const strengthen = (host: string, bps: number) => {
+      for (const r of teachingsOf(host)) {
+        const b = beliefs.get(r.id) ?? 0;
+        beliefs.set(r.id, b + Math.round(((10_000 - b) * bps) / 10_000));
+      }
+    };
     const newsNow = (t: number) => [...toldUs.values()].filter((n) => t - n.t <= p.news_days * DAY);
 
     // Support paid to us, once our claim is granted (the decision says how much, how often), and whether it's the kind
@@ -398,7 +426,10 @@ export const citizen: BehaviourModule = {
           if (told.shop && told.served !== undefined) mind.hear("shop", told.shop, told.served);
           if (told.employer && told.paid !== undefined) mind.hear("job", told.employer, told.paid ? 10_000 : 0);
           // Someone who keeps going somewhere finds it worth it (a placeholder for how much).
-          for (const host of told.goesTo ?? []) for (const g of book.practices()) if ((g.speaks_for ?? g.author) === host) mind.hear("practice", g.id, 7_000);
+          // (All the more, if we hold with what it teaches.)
+          for (const host of told.goesTo ?? []) for (const g of book.practices()) if ((g.speaks_for ?? g.author) === host) mind.hear("practice", g.id, Math.min(10_000, 7_000 + Math.round(holdTo(host) * p.belief.meaning)));
+          // Told what someone holds: nearer to holding it ourselves, the more so the more conformist we are.
+          for (const host of told.holdsTo ?? []) strengthen(host, Math.round((p.belief.told_bps * (5_000 + mind.person.temperament.conformity)) / 10_000));
           continue;
         }
         const want = (Object.keys(ASKING) as Want[]).find((w) => ASKING[w] === m.text);
@@ -700,7 +731,9 @@ export const citizen: BehaviourModule = {
         const peers = newsNow(t).filter((n) => n.employer === job!.employer && n.member !== undefined);
         const peerShare = peers.length ? (peers.filter((n) => n.member).length * 10_000) / peers.length : null;
         const conform = peerShare === null ? 0 : (p.sway.union_peers * mind.person.temperament.conformity * (peerShare - rate)) / 10_000 / Math.max(1, rate);
-        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform);
+        // And by whether we hold with what the union teaches.
+        const creed = p.union ? (p.sway.union_belief * holdTo(p.union)) / 10_000 : 0;
+        const chance = shifted(rate, p.sway.union_join * (zValue("benevolence") + zValue("universalism")) / 2 + learnedMember + conform + creed);
         if (!member && ctx.rng(`join-${job.agreement}`).below(10_000) < chance)
           steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
       }
@@ -827,13 +860,23 @@ export const citizen: BehaviourModule = {
         if (attending && t >= attending.until) {
           const others = there(attending.space);
           const got = inside(attending.space);
-          mind.learn("practice", attending.practice, got ? Math.min(10_000, Math.round(Math.log1p(others.length) * 2_500)) : 0);
+          // (What it teaches, held, makes it mean more; and others there, keeping to it at a cost of their time, make it
+          // more credible: Henrich's credibility-enhancing displays.)
+          const meaning = Math.round(holdTo(attending.host) * p.belief.meaning);
+          mind.learn("practice", attending.practice, got ? Math.min(10_000, Math.round(Math.log1p(others.length) * 2_500) + meaning) : 0);
+          if (got) strengthen(attending.host, Math.round((p.belief.display_bps * Math.min(20, others.length)) / 20));
           if (got) {
             steps.push(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
             companyAt.set(attending.practice, others.length);
             for (const o of others) talked.set(o, t);
           }
           attending = null;
+        }
+        // Belief fades, a month at a time, unless something keeps it up.
+        if (fadedAt === null) fadedAt = t;
+        while (t - fadedAt >= MONTH) {
+          fadedAt += MONTH;
+          for (const [k, b] of beliefs) beliefs.set(k, b - Math.round((b * p.belief.fade_bps) / 10_000));
         }
         practiceWake = null;
         const heard = newsNow(t);
@@ -861,7 +904,7 @@ export const citizen: BehaviourModule = {
                 a.terms.commitments.some((c: any) => c.who === me && c.does?.outcome?.attend?.practice === r.id));
               if (ours) {
                 wentLast.add(r.id);
-                if (!mind.learned("practice").known(r.id)) mind.learn("practice", r.id, 7_000);
+                if (!mind.learned("practice").known(r.id)) mind.learn("practice", r.id, Math.min(10_000, 7_000 + Math.round(holdTo(host) * p.belief.meaning)));
               } else stayedLast.add(r.id);
             }
             // Coming up this week: going or not. Its company as we found it, or as many as we know go; its time.
@@ -869,7 +912,7 @@ export const citizen: BehaviourModule = {
             const friends = heard.filter((n) => n.goesTo?.includes(host)).length;
             const d = decide("practice", t, ctx.rng(`practice-${r.id}-${start}`), {
               options: [
-                { key: r.id, facts: { money_per_month: 0, company: Math.max(companyAt.get(r.id) ?? 0, friends), time_hours_per_month: Math.round(((lasts / 3_600) * MONTH) / pr.every) }, others: friends },
+                { key: r.id, facts: { money_per_month: 0, company: Math.max(companyAt.get(r.id) ?? 0, friends), time_hours_per_month: Math.round(((lasts / 3_600) * MONTH) / pr.every) }, others: friends, meaning: Math.round(holdTo(host) * p.belief.meaning) },
                 { key: "stay", facts: { money_per_month: 0 } },
               ],
               current: wentLast.has(r.id) ? r.id : stayedLast.has(r.id) ? "stay" : undefined, // our routine, if we have one
@@ -1156,6 +1199,7 @@ export const citizen: BehaviourModule = {
       job ? CATCHING_UP.work(job.employer, !job.claimed) : "",
       job && p.union ? CATCHING_UP.union(isMember()) : "",
       ...[...wentLast].sort().map((id) => book.records.get(id)).flatMap((r) => (r?.record === "statement" && r.speaks_for ? [CATCHING_UP.goes(r.speaks_for)] : [])),
+      ...[...new Set(book.open("teaching").filter((r) => (beliefs.get(r.id) ?? 0) >= p.belief.tell_at_bps).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.holds),
     ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
     const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
       // The buildings around us; in our own we see who's there (they're the people we know).

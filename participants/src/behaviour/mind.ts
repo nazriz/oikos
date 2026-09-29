@@ -257,8 +257,9 @@ export function factsOf(offer: { terms?: { commitments: { who: string; does: any
 /** Where a person stands, for appraising (their means, whether they have a home, how many bedrooms they need). */
 export interface Circumstances { monthly_income: number; savings: number; homeless: boolean; homeBedroomsNeeded?: number }
 
-/** An option in a decision: its key, its facts (from an offer), and how many others the person knows took it. */
-export interface Choice { key: string; facts?: Facts; others?: number }
+/** An option in a decision: its key, its facts (from an offer), how many others the person knows took it, and what it
+ * means to them beyond the facts (from what they believe; basis points). */
+export interface Choice { key: string; facts?: Facts; others?: number; meaning?: number }
 
 export interface Decision { key?: string; strategy: Strategy; scores: { key: string; score: number }[] }
 
@@ -332,7 +333,7 @@ export class Mind {
       }
     }
     // Deliberate: every option's facts appraised against needs, with what's been learned, chosen by logit.
-    const appraised = (x: Choice) => (x.facts ? value(this.person, appraise(this.person, x.facts, o.circ)) - timeCost(x.facts) : 0);
+    const appraised = (x: Choice) => (x.facts ? value(this.person, appraise(this.person, x.facts, o.circ)) - timeCost(x.facts) : 0) + (x.meaning ?? 0);
     const c = learned.choose(rng, options.map((x) => ({ key: x.key, value: appraised(x) })), this.person.temperament.openness);
     return { key: c.key, strategy: "deliberate", scores: scored(appraised) };
   }

@@ -358,16 +358,25 @@ export function generate(spec: TownSpec): any {
   if (U.meeting_every_days) records.push({ id: "union-meeting", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "union", kind: "notice",
     text: `The union's members' meeting, at the town hall every ${U.meeting_every_days} days, 7pm, two hours. Members welcome.`,
     practice: { at: hall, every: U.meeting_every_days * DAY, first: evening(6), lasts: 2 * HOUR, roles: [{ role: "member", who: { members_of: "union" }, open: true }] } });
+  // What people believe at the start (docs/design/ai-citizens.md 5): person -> teaching -> how strongly (basis points).
+  // Their minds', not the world's: given to each person's participant.
+  const beliefs = new Map<string, { [teaching: string]: number }>();
+  const believe = (who: string, teaching: string, bps: number) => beliefs.set(who, { ...(beliefs.get(who) ?? {}), [teaching]: Math.max(bps, beliefs.get(who)?.[teaching] ?? 0) });
+  if (U.teaching) {
+    records.push({ id: "union-teaching", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "union", kind: "teaching", text: U.teaching });
+    for (const m of unionMembers) believe(m.member, "union-teaching", 7_000);
+  }
   const G = V.groups;
   if (G) {
     const per = Math.max(1, Math.round((G.per_kind_per_1000_people * spec.citizens) / 1000));
-    const groups: { id: string; name: string; gathering: string }[] = [];
+    const groups: { id: string; name: string; gathering: string; teaching?: string; held?: number }[] = [];
     let n = 0;
     for (const g of G.kinds) for (let i = 1; i <= per; i++) {
       const id = `${g.kind}-group-${i}`;
       const name = per > 1 ? `${spec.name} ${g.name} ${i}` : `${spec.name} ${g.name}`;
       entities.push({ id, kind: "group", name });
-      groups.push({ id, name, gathering: `${id}-gathering` });
+      groups.push({ id, name, gathering: `${id}-gathering`, teaching: g.teaching ? `${id}-teaching` : undefined, held: g.held_at_start_bps });
+      if (g.teaching) records.push({ id: `${id}-teaching`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: id, kind: "teaching", text: g.teaching });
       records.push({ id: `${id}-gathering`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: id, kind: "notice",
         text: `The ${g.name} meets at the town hall every ${g.every_days} days, 7pm, for ${g.lasts_minutes} minutes. All welcome.`,
         practice: { at: hall, every: g.every_days * DAY, first: evening(n++), lasts: g.lasts_minutes * 60, roles: [{ role: "member", open: true }] } });
@@ -383,6 +392,16 @@ export function generate(spec: TownSpec): any {
         template: "membership", parties: [g.id, c.id],
         commitments: [{ who: g.id, does: { text: `The ${g.name} counts ${c.id} among its members.` } }, { who: c.id, does: { outcome: { attend: { practice: g.gathering } } } }] } });
       for (const party of [g.id, c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [g.id, c.id], speaks_for: party, agreement: mem, as: party });
+      if (g.teaching) believe(c.id, g.teaching, 8_000); // a member holds it strongly
+    }
+    // A teaching held by more than its members at the start (the profile's share of everyone, members included): the
+    // rest, less strongly.
+    const hold = rng("beliefs");
+    for (const g of groups) if (g.teaching && g.held) {
+      const holders = everyone.filter((c) => beliefs.get(c.id)?.[g.teaching!]).length;
+      const others = everyone.filter((c) => !beliefs.get(c.id)?.[g.teaching!]);
+      const share = Math.max(0, Math.round(((g.held * everyone.length) / 10_000 - holders) * 10_000 / Math.max(1, others.length)));
+      for (const c of others) if (hold.below(10_000) < share) believe(c.id, g.teaching, 5_000);
     }
   }
   if (unionMembers.length) records.push({ id: "union-register", record: "statement", author: "genesis", at: 0, visible_to: ["union"], speaks_for: "union", kind: "membership_register", text: `The union's ${unionMembers.length} members, and where they work.`, data: { members: unionMembers } });
@@ -701,8 +720,8 @@ export function generate(spec: TownSpec): any {
   const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street, { id: "prices", kind: "records", match: { statement_kinds: ["price_list", "property_for_sale"] } }, { id: "belongings", kind: "holdings" }, lawBook,
     // Enterprise agreements (a rise at work).
     { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] } },
-    // Gatherings: whatever holds one, in whatever words (a statement having a practice).
-    { id: "gatherings", kind: "records", match: { has: ["practice"] } }];
+    // Gatherings: whatever holds one, in whatever words (a statement having a practice); and what groups teach.
+    { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { statement_kinds: ["teaching"] } }];
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {
@@ -728,7 +747,11 @@ export function generate(spec: TownSpec): any {
     ventures: [shopVenture], found_bps: 200 });
   // Those outside the labour force don't look for work (their own controller settings).
   const outsideLabourForce = { ...citizenController, params: { ...citizenController.params, in_labour_force: false } };
-  for (const m of everyone) participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: outOfLabourForce.has(m.id) ? outsideLabourForce : citizenController, framing: unstated });
+  for (const m of everyone) {
+    const controller = outOfLabourForce.has(m.id) ? outsideLabourForce : citizenController;
+    const held = beliefs.get(m.id);
+    participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: held ? { ...controller, params: { ...controller.params, beliefs: held } } : controller, framing: unstated });
+  }
   // People who may come later: newcomers from elsewhere, and children born here.
   // (Each also outside the labour force, at the profile's participation: a newcomer who didn't come for the job, a child.)
   const templates = [...["newcomer", "child"].map((id) => ({ id, kind: "person", channels: citizenChannels, controller: citizenController, framing: unstated })),

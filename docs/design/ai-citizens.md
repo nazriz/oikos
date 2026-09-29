@@ -275,6 +275,15 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - **One year of the 1,000-person town, two seeds:** 50.6% and 54.3% of adults went at least once (target 50.0%); about 55 at each gathering; no refusals; employment 66.1/65.8%.
   - **Found:** without a starting routine, first choices were near coin flips (the mind's logit is coarse for small differences), and whoever went found company, so nearly everyone went within three months. The routine is world content, as union membership at the start already was.
   - **Seen, not caused here:** migration comes in bursts (59 and 0 arrivals in these two seeds; years of 0 to 64 in the 5-year runs before this step). It responds to postings open at each monthly look; for the step-9 calibration.
+- **Belief** (2026-09-29, citizen 0.18.0):
+  - **What can be believed is world content:** a group's teaching, a public statement (kind `teaching`). The profile gives the congregation one, and the union one.
+  - **Held at the start** by the census's share for the congregation (members strongly, others nominally), and by union members for the union's. Given as each person's participant parameters: belief is the mind's, not the world's.
+  - **Kept per citizen as a strength.** It fades monthly, grows at the host's gatherings with how many others came (credibility-enhancing displays), grows when told, and is said aloud once firm.
+  - **It matters:** it adds meaning to the host's gatherings (deliberating, learning, a friend's going) and to joining the union.
+  - **Measured as stated,** as a survey would (`town/beliefs`).
+  - **One year, two seeds:** the congregation's teaching stated by 11.3 to 11.7% and 11.5 to 15.3% of adults; the union's about 6%; group participation 52.0 and 55.5% (target 50.0%).
+  - **Found:** letting everyone who holds a teaching know its gatherings from the start sent every dissatisfied nominal believer to them (61% participation). Belief now enters when deliberating and through friends who go.
+  - **Not in the contracts:** teachings are recognised by a statement kind, as job postings and price lists still are. A structured `claim` field (a statement asking to be believed) would be the building block. It's proposed in docs/decisions.md, for sign-off.
 - **Recorded:** every decision the mind makes, as a `decision` annotation in full logs, exported as `citizen_decisions.jsonl` (section 7).
 - **The cited priors, now swayed by the person** (3e; 2026-09-29):
   - **Joining the union:** the ABS rate for the industry, shifted by the person's benevolence and universalism, and by what membership has done for them (the `membership` domain: a raise the union won counts for it, pay lost on strike against it).

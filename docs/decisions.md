@@ -876,6 +876,16 @@ See the design note, §16.
   - **Tests:** a new gatherings test. The strike test checks that pay stops during any stoppage, since a one-day stoppage may end at the moment the employer next pays.
   - **Revisit if:** participation drifts from the target over five years; groups need joining and leaving (offers taken up), fees, or leaders; or the mind's logit needs a per-domain sensitivity.
 
+- **AI citizens, step 5: belief** (docs/design/ai-citizens.md "Progress"; docs/behaviour/citizen.md "Belief").
+  - Teachings are world content. A citizen holds them with a strength. It fades, grows at gatherings with others' costly displays (Henrich), grows when told (conformity-weighted), and is stated in catching up once firm. It adds meaning to the host's gatherings and to joining the union.
+  - **Starting beliefs are per-person participant parameters,** from the census share and memberships: the mind's state, not the world's.
+  - **Measured as stated,** since belief is internal: `town/beliefs` reads what people say, as a survey would.
+  - **Why no decision-record change:** recording belief strengths would change the `CitizenDecision` contract, which needs sign-off.
+  - **Proposed for sign-off (not done):**
+    - a structured `claim` on statements, for things put forward to be believed, so code needn't recognise the kind `teaching`;
+    - belief strengths in `CitizenDecision`, for training data.
+  - **Revisit if:** a practising-share or stated-affiliation target is sourced; belief needs to attach to any statement (rumour, news, a mayor's promise), which is the `claim` field; or conversion rates need calibrating.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

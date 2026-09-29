@@ -41,6 +41,7 @@ test("catching up: a code citizen's news reads back as what it says", () => {
   expect(heardNews(text)).toEqual({ shop: "shop-3", served: 7_500, employer: "factory-co-2", paid: true, member: false });
   expect(heardNews(CATCHING_UP.shop("shop-1", 2_000))).toEqual({ shop: "shop-1", served: 3_500 });
   expect(heardNews([CATCHING_UP.goes("sport-group-1"), CATCHING_UP.goes("union")].join(" "))).toEqual({ goesTo: ["sport-group-1", "union"] });
+  expect(heardNews([CATCHING_UP.holds("religious-group-1"), CATCHING_UP.goes("religious-group-1")].join(" "))).toEqual({ goesTo: ["religious-group-1"], holdsTo: ["religious-group-1"] });
   expect(heardNews(CATCHING_UP.nothing)).toBeUndefined();
   expect(heardNews("Lovely weather.")).toBeUndefined();
 });
