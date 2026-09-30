@@ -503,10 +503,9 @@ Proposed together, for one sign-off:
   - **The count:** 294 parameters in 28 modules; 38 with a cited source, the rest placeholders. The key figures come from the profile (sourced) in generated worlds, over these defaults.
   - **Not yet:** `perceives` (what each module relies on perceiving) is empty, and `state` is "none" (no module saves its state yet: checkpoints).
 - **R4, the health report** (2026-09-30): `terrarium health <DIR>` sets a batch's measures against its profile's calibration targets, each within a stated tolerance. Breaches come first, then demand that went unmet. Targets not yet measured are listed as such. The rebuild's 10-seed batch breaches on unemployment (1.5% against 4.6%), saving (-10% against 6.5%), group participation (60% against 50%) and unmet demand (8%). These are the calibration work queued for after the rebuild (the labour market; goods under shortage).
-- **Next:**
-  1. R4: compact logs; checkpoints (see docs/decisions.md: resume by replay stays for now).
-  2. (R3's `law` stays in TypeScript for now: docs/decisions.md.)
-  3. R5: clean-up.
+- **R5** (2026-09-30): the docs match the platform (VISION §4 and §8, reliability, measurement, the behaviour modules' rules). What stays in TypeScript is kept for a stated reason (docs/decisions.md).
+- **Deferred, with reasons and when to revisit** (docs/decisions.md): the `law` reader in Rust; checkpoints (resume by replay stays); compact logs (B13) and generated types (B1), both to confirm with Naz; the rest of the loop in the engine (the rounds of look, decide, act).
+- **Next:** merge `rebuild` into `main` (Naz's call), then calibration on the new platform: the labour market and goods under shortage, with `terrarium health` and `diff` watching.
 
 **After the rebuild,** on the new platform:
 1. The labour market (search frictions) and goods prices under shortage, calibrated with the health report watching every other measure.
