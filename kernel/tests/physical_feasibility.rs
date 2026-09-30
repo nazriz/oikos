@@ -184,7 +184,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             Some(a) if a.balance != 0 => Err(RefusalCode::AccountNotEmpty),
             Some(_) => Ok(()),
         },
-        Block::Work { task, units, at, performers, on } => {
+        Block::Work { task, units, at, performers, on, .. } => {
             // Phase B: performers there, alive and present, with time left today; inputs held there; what's worked on.
             let builtin = task == "build" || task == "demolish";
             let spec = s.config.catalogue.tasks.iter().find(|x| &x.id == task);

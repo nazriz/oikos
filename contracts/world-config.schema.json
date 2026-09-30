@@ -190,6 +190,10 @@
                   "maximum": 9007199254740991
                 },
                 "maxProperties": 100
+              },
+              "surveys": {
+                "description": "Measurement (nature): a unit surveys one cell for a species or a field (the work block's `survey`), and only the actor learns the estimate.",
+                "type": "boolean"
               }
             }
           }
@@ -251,6 +255,223 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 86400
+        },
+        "land_covers": {
+          "description": "Nature (docs/design/world-expansion.md 2): kinds of land cover. A cell's terrain label names one; a building's cells count as its type's cover, else the reserved cover `built`. A cover may succeed to another after a number of unbuilt days (cleared land to scrub to woodland), so mature habitat is slow to come back. With land covers, every terrain label must be one.",
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "succeeds_to": {
+                "type": "object",
+                "required": [
+                  "cover",
+                  "after_days"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "cover": {
+                    "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+                  },
+                  "after_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
+              }
+            }
+          }
+        },
+        "default_cover": {
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId",
+          "description": "The cover of a cell with no terrain label and no building (absent: the reserved cover `open`)."
+        },
+        "cleared_cover": {
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId",
+          "description": "What a cell's cover becomes when a building on it comes down."
+        },
+        "fields": {
+          "description": "Integer quantities on cells (pollution, water level), stepped daily: sources (per cover, and per building of a type at its corner cell), decay toward the baseline, diffusion of what's above it to the four neighbours, and flow of what's above it downstream along the flow layer; within [min, max]. The kernel keeps them exactly and attaches no meaning to them.",
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "min",
+              "max"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "min": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "max": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "baseline": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "decay_bps_per_day": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "diffusion_bps_per_day": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "flow_bps_per_day": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "from_structures": {
+                "type": "object",
+                "propertyNames": {
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "maxProperties": 1000
+              },
+              "from_covers": {
+                "type": "object",
+                "propertyNames": {
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "maxProperties": 1000
+              }
+            }
+          }
+        },
+        "species": {
+          "description": "Living populations on cells, stepped daily: background deaths and deaths where a field passes what the species tolerates; births toward the carrying capacity of the cell's cover (logistic), only where at least min_viable are there to breed; none live where the cover gives no capacity; a share disperses to a neighbouring cell each year, lost crossing a barrier cover. Fractions are rounded by draws, so small populations can fail by chance. A species with none left anywhere is extinct, for good. Surveys find each one with detection_bps; a conspicuous one is seen by passers-by (never counted).",
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "capacity",
+              "growth_bps_per_year",
+              "detection_bps"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "name": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Name"
+              },
+              "capacity": {
+                "type": "object",
+                "propertyNames": {
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000
+                },
+                "maxProperties": 1000
+              },
+              "growth_bps_per_year": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "mortality_bps_per_year": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "dispersal_bps_per_year": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "barriers": {
+                "type": "array",
+                "items": {
+                  "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+                },
+                "maxItems": 100
+              },
+              "min_viable": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              },
+              "tolerance": {
+                "type": "object",
+                "propertyNames": {
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "required": [
+                    "above",
+                    "mortality_bps_per_day"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "above": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "mortality_bps_per_day": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 10000
+                    }
+                  }
+                },
+                "maxProperties": 1000
+              },
+              "detection_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "conspicuous": {
+                "type": "boolean"
+              }
+            }
+          }
         }
       }
     },
@@ -495,6 +716,10 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 10000
+        },
+        "cover": {
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId",
+          "description": "Nature: the land cover its cells count as while it stands (a park is grassland); absent, the reserved cover `built`."
         }
       }
     },
@@ -801,6 +1026,81 @@
               },
               "quantity": {
                 "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Holding"
+              }
+            }
+          }
+        },
+        "populations": {
+          "description": "Nature at the start: how many of a species are in a cell.",
+          "type": "array",
+          "maxItems": 1000000,
+          "items": {
+            "type": "object",
+            "required": [
+              "species",
+              "cell",
+              "count"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "species": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "cell": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000
+              }
+            }
+          }
+        },
+        "fields": {
+          "description": "Nature at the start: field values on cells (sparse; absent cells are at the baseline).",
+          "type": "array",
+          "maxItems": 1000000,
+          "items": {
+            "type": "object",
+            "required": [
+              "field",
+              "cell",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "field": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "cell": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          }
+        },
+        "flows": {
+          "description": "The flow layer (a river's course): each cell and the cell downstream of it. Fields that flow move along it.",
+          "type": "array",
+          "maxItems": 1000000,
+          "items": {
+            "type": "object",
+            "required": [
+              "from",
+              "to"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+              },
+              "to": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
               }
             }
           }

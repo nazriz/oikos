@@ -65,6 +65,10 @@ pub struct State {
     /// their body, shared by every participant and capacity acting as them; a system's by the participant.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub timelines: Map<Id, Vec<i64>>,
+    /// Nature (docs/design/world-expansion.md 2): fields, populations, extinctions, covers' succession. Changed once a
+    /// day, so kept behind an `Arc`: an action's copy of the state shares it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nature: Option<Arc<terrarium_nature::NatureState>>,
 }
 
 /// Future physical effects in (at, seq) order: a persistent map, so the state's copy for each action is cheap (a
@@ -430,6 +434,9 @@ pub struct Outcome {
     pub created: Option<BTreeMap<String, Id>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refusal: Option<RefusalInfo>,
+    /// A survey's estimates (nature), seen only by the one who surveyed: `{of, cells: {cell: estimate}}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surveyed: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -477,6 +484,8 @@ pub struct Scheduled {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Sched {
     StructureComplete { structure: Id },
+    /// Nature's day (docs/design/world-expansion.md 2): covers, fields and populations stepped.
+    NatureDay { day: i64 },
     /// A year of age: draws for the coming year (illness, injury, other causes).
     Birthday { person: Id },
     /// A drawn chance of injury, taken now against the danger of where the body is (thinning).

@@ -50,11 +50,14 @@ pub struct Exec<'a> {
     /// Local refs bound so far in this action.
     pub refs: BTreeMap<String, Id>,
     pub events: Vec<Timed>,
+    /// A survey's estimates, for the actor alone (nature).
+    pub surveyed: Option<Value>,
 }
 
 pub struct ExecResult {
     pub events: Vec<Timed>,
     pub created: BTreeMap<String, Id>,
+    pub surveyed: Option<Value>,
 }
 
 /// Can this participant act now? (Active, or opted out with a stand-in carrying on.)
@@ -83,14 +86,14 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![] };
+    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![], surveyed: None };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
             r
         })?;
     }
-    Ok(ExecResult { events: ex.events, created: ex.refs })
+    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed })
 }
 
 // ---------------- life: shared by acts and scheduled effects ----------------
@@ -360,10 +363,77 @@ fn uniform(s: &Statics, key: &[&str], n: i64) -> i64 {
     s.randomness.stream(key).below(n.max(1) as u64) as i64
 }
 
+/// The land as nature sees it today: each cell's cover, whether it's built on, and the building types with their corner
+/// there.
+fn nature_land(s: &Statics, st: &State, ground: &terrarium_nature::Ground) -> terrarium_nature::Land {
+    let cat = &s.config.catalogue;
+    let mut land = terrarium_nature::Land::default();
+    for id in &ground.cells {
+        let c = &st.cells[id];
+        let building = c.structure.as_ref().and_then(|x| st.structures.get(x));
+        land.cover.push(terrarium_nature::cover_of(cat, c.terrain.as_deref(), building.map(|b| s.types.get(&b.structure_type).and_then(|t| t.cover.as_deref()))));
+        land.built.push(building.is_some());
+        land.anchored.push(building.filter(|b| &b.at == id && b.complete).map(|b| vec![b.structure_type.clone()]).unwrap_or_default());
+    }
+    land
+}
+
+/// Nature's day: covers succeed, fields and populations step, extinctions are recorded; monthly, the truth is
+/// censused for measurement. Then the next day.
+fn nature_day(s: &Statics, st: &mut State, day: i64) -> Vec<Timed> {
+    let (Some(ground), Some(now)) = (s.nature.as_ref(), st.nature.clone()) else { return vec![] };
+    let t = day * 86_400;
+    let land = nature_land(s, st, ground);
+    let mut n = (*now).clone();
+    let out = terrarium_nature::step_day(&s.config.catalogue, ground, &land, &mut n, day, &s.randomness);
+    let mut events = vec![];
+    // Cells whose look changed: a cover that succeeded, or a conspicuous species come or gone (views deliver changes).
+    let mut touched: BTreeSet<Id> = out.cover_changes.iter().map(|(c, _)| c.clone()).collect();
+    for sp in s.config.catalogue.species.iter().filter(|sp| sp.conspicuous) {
+        let (before, after) = (now.populations.get(&sp.id), n.populations.get(&sp.id));
+        let cells: BTreeSet<&Id> = before.into_iter().chain(after).flat_map(|m| m.keys()).collect();
+        for cell in cells {
+            let had = before.is_some_and(|m| m.contains_key(cell));
+            let has = after.is_some_and(|m| m.contains_key(cell));
+            if had != has {
+                touched.insert(cell.clone());
+            }
+        }
+    }
+    if !touched.is_empty() {
+        let c = st.stamp();
+        for (cell, cover) in &out.cover_changes {
+            if let Some(x) = st.cells.get_mut(cell) {
+                x.terrain = Some(cover.clone());
+            }
+        }
+        for cell in &touched {
+            if let Some(x) = st.cells.get_mut(cell) {
+                x.changed = c;
+            }
+        }
+    }
+    for sp in out.extinct {
+        events.push(Timed::new(t, EventBody::SpeciesExtinct { species: sp }));
+    }
+    if day % 30 == 0 {
+        let land = nature_land(s, st, ground);
+        let c = terrarium_nature::census(&s.config.catalogue, &n, &land);
+        events.push(Timed::new(t, EventBody::NatureCensus {
+            species: c.species.into_iter().map(|(k, (count, cells))| (k, crate::events::CensusCount { count, cells })).collect(),
+            covers: c.covers,
+        }));
+    }
+    st.nature = Some(Arc::new(n));
+    st.schedule(t + 86_400, Sched::NatureDay { day: day + 1 });
+    events
+}
+
 /// Process one scheduled physical effect whose time has come.
 pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
     let t = item.at;
     match item.what {
+        Sched::NatureDay { day } => nature_day(s, st, day),
         Sched::StructureComplete { structure } => match st.structures.get_mut(&structure) {
             Some(x) if !x.complete && x.completes_at == Some(item.at) => {
                 // Its time is up; it's complete if its building work is done too (phase B), or else as soon as it is.
@@ -559,10 +629,15 @@ impl<'a> Exec<'a> {
     fn bring_down(&mut self, sid: &str) {
         let Some(x) = self.st.structures.remove(sid) else { return };
         let c = self.st.stamp();
+        let cleared = self.st.nature.is_some().then(|| self.s.config.catalogue.cleared_cover.clone()).flatten();
         for cell in &x.cells {
             let p = self.st.cells.get_mut(cell).unwrap();
             p.structure = None;
             p.changed = c;
+            // (Nature: the ground it stood on is cleared land, which grows back as its cover succeeds.)
+            if let Some(cl) = &cleared {
+                p.terrain = Some(cl.clone());
+            }
         }
         self.emit(EventBody::StructureDemolished { structure: sid.to_string(), by: self.participant.into() });
     }
@@ -570,7 +645,7 @@ impl<'a> Exec<'a> {
     /// Work (phase B): performers at a structure spend their time on units of a task. The kernel checks only physics:
     /// that they're there, alive, and have time left today; that the inputs are held there; that what's worked on can
     /// be. Who works for whom is content (D20).
-    fn work(&mut self, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>) -> R<()> {
+    fn work(&mut self, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>, survey: Option<&crate::blocks::Survey>) -> R<()> {
         use crate::config::{TASK_BUILD, TASK_DEMOLISH};
         let (at, on) = (self.r(at)?, self.ro(on)?);
         let builtin = task == TASK_BUILD || task == TASK_DEMOLISH;
@@ -581,6 +656,22 @@ impl<'a> Exec<'a> {
         };
         if units == 0 || units > 1_000_000_000_000 {
             return Err(refuse(RefusalCode::Overflow, "units out of range"));
+        }
+        // A survey (nature): a unit is a cell, of a species or a field the world has.
+        let surveys = spec.as_ref().is_some_and(|x| x.surveys);
+        match (surveys, survey) {
+            (true, None) => return Err(refuse(RefusalCode::BadSurvey, format!("{task} is a survey: say what of, and which cells"))),
+            (false, Some(_)) => return Err(refuse(RefusalCode::BadSurvey, format!("{task} isn't a survey"))),
+            (true, Some(sv)) => {
+                let cat = &self.s.config.catalogue;
+                if !cat.species.iter().any(|x| x.id == sv.of) && !cat.fields.iter().any(|x| x.id == sv.of) {
+                    return Err(refuse(RefusalCode::BadSurvey, format!("nothing called {} to survey", sv.of)));
+                }
+                if sv.cells.len() as u64 != units || sv.cells.iter().any(|c| !self.st.cells.contains_key(c)) {
+                    return Err(refuse(RefusalCode::BadSurvey, "a survey's units are its cells, each one that exists"));
+                }
+            }
+            (false, None) => {}
         }
         let per_unit = spec.as_ref().map_or(1, |x| x.labour);
         let total = per_unit.checked_mul(units as i64).ok_or_else(|| refuse(RefusalCode::Overflow, "too much work"))?;
@@ -675,6 +766,9 @@ impl<'a> Exec<'a> {
             }
         }
         self.emit(EventBody::Worked { task: task.into(), units, at: at.clone(), on: on.clone(), performers: who, labour: total, by: self.participant.into() });
+        if let Some(sv) = survey {
+            self.surveyed = Some(self.survey_estimates(sv));
+        }
         if task == TASK_BUILD {
             let needed = self.s.types[&self.st.structures[&target].structure_type].build_labour;
             let s = self.st.structures.get_mut(&target).unwrap();
@@ -699,6 +793,32 @@ impl<'a> Exec<'a> {
             }
         }
         Ok(())
+    }
+
+    /// What a survey finds: for a species, each one in the cell found with its detection chance; for a field, the value
+    /// with an error of up to (10,000 - detection) basis points (the survey task's own figure isn't needed: the species'
+    /// or, for a field, 9,000). Drawn from the action's keyed randomness.
+    fn survey_estimates(&self, sv: &crate::blocks::Survey) -> Value {
+        let cat = &self.s.config.catalogue;
+        let nature = self.st.nature.as_deref();
+        let mut rng = self.s.randomness.stream(&["survey", self.action, &sv.of]);
+        let species = cat.species.iter().find(|x| x.id == sv.of);
+        let mut found = serde_json::Map::new();
+        for cell in &sv.cells {
+            let est = match species {
+                Some(sp) => {
+                    let n = nature.and_then(|n| n.populations.get(&sp.id)).and_then(|m| m.get(cell)).copied().unwrap_or(0);
+                    terrarium_nature::survey_count(n, sp.detection_bps, &mut rng)
+                }
+                None => {
+                    let base = cat.fields.iter().find(|x| x.id == sv.of).map_or(0, |f| f.baseline);
+                    let v = nature.and_then(|n| n.fields.get(&sv.of)).and_then(|m| m.get(cell)).copied().unwrap_or(base);
+                    terrarium_nature::survey_value(v, 9_000, &mut rng)
+                }
+            };
+            found.insert(cell.clone(), Value::from(est));
+        }
+        serde_json::json!({ "of": sv.of, "cells": found })
     }
 
     /// Add to (or take from) a holding, stamping the change.
@@ -1128,7 +1248,7 @@ impl<'a> Exec<'a> {
                 Ok(())
             }
 
-            Block::Work { task, units, at, performers, on } => self.work(task, *units, at, performers, on),
+            Block::Work { task, units, at, performers, on, survey } => self.work(task, *units, at, performers, on, survey.as_ref()),
 
             Block::Occupy { space, who } => {
                 let space = self.r(space)?;

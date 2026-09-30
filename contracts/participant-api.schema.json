@@ -333,6 +333,28 @@
               "maxLength": 2000
             }
           }
+        },
+        "surveyed": {
+          "description": "A survey's estimates (nature), for the one who surveyed only: what of, and each cell's estimate.",
+          "type": "object",
+          "required": [
+            "of",
+            "cells"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "of": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+            },
+            "cells": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          }
         }
       }
     },
@@ -960,6 +982,14 @@
                         }
                       }
                     }
+                  },
+                  "seen": {
+                    "description": "Nature: conspicuous species anyone there would notice (never how many).",
+                    "type": "array",
+                    "items": {
+                      "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+                    },
+                    "maxItems": 100
                   }
                 }
               }

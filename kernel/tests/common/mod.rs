@@ -519,14 +519,14 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 // Work (phase B): carol makes goods at the shop for the developer; the builder's crew (bob, at the flats)
                 // builds or demolishes; alice eats; someone mends a building.
                 match a % 4 {
-                    0 => direct("developer-system", Some("developer"), vec![Block::Work { task: "make".into(), units: 1 + (*b as u64 % 6), at: "s-shop".into(), performers: vec!["carol".into()], on: None }]),
+                    0 => direct("developer-system", Some("developer"), vec![Block::Work { task: "make".into(), units: 1 + (*b as u64 % 6), at: "s-shop".into(), performers: vec!["carol".into()], on: None, survey: None }]),
                     1 => {
                         let site = st.structures.iter().find(|(_, x)| (!x.complete && x.demolition.is_none()) || x.demolition.is_some()).map(|(id, x)| (id.clone(), x.demolition.is_some()))?;
                         let task = if site.1 { "demolish" } else { "build" };
-                        direct("builder-system", Some("builder"), vec![Block::Work { task: task.into(), units: 600 + (*b as u64) * 150, at: "s-flats".into(), performers: vec!["bob".into()], on: Some(site.0) }])
+                        direct("builder-system", Some("builder"), vec![Block::Work { task: task.into(), units: 600 + (*b as u64) * 150, at: "s-flats".into(), performers: vec!["bob".into()], on: Some(site.0), survey: None }])
                     }
-                    2 => direct("alice-self", None, vec![Block::Work { task: "eat".into(), units: 1 + (*b as u64 % 3), at: "s-house".into(), performers: vec![], on: None }]),
-                    _ => direct("developer-system", Some("developer"), vec![Block::Work { task: "mend".into(), units: 1, at: "s-shop".into(), performers: vec!["carol".into()], on: if *flag { Some("s-house".into()) } else { None } }]),
+                    2 => direct("alice-self", None, vec![Block::Work { task: "eat".into(), units: 1 + (*b as u64 % 3), at: "s-house".into(), performers: vec![], on: None, survey: None }]),
+                    _ => direct("developer-system", Some("developer"), vec![Block::Work { task: "mend".into(), units: 1, at: "s-shop".into(), performers: vec!["carol".into()], on: if *flag { Some("s-house".into()) } else { None }, survey: None }]),
                 }
             }
             11 => {
@@ -602,6 +602,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                             at: pick(&structures, *at).unwrap_or_else(|| "s-none".into()),
                             performers: performers.iter().map(|p| pick(&persons, *p).unwrap()).collect(),
                             on: on.and_then(|o| pick(&structures, o)),
+                            survey: None,
                         }
                     }
                     B::Occupy { space, who } => Block::Occupy {

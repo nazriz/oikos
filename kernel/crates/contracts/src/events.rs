@@ -67,6 +67,8 @@ pub enum RefusalCode {
     NotAtWork,
     /// A performer has no time left today (the world's working day).
     NoTimeLeft,
+    /// A survey that doesn't say what of or where, of something the world has, or work that says so for a task that isn't one.
+    BadSurvey,
     /// Building work on something that isn't being built.
     NotBeingBuilt,
     /// Demolition work on something that isn't being demolished.
@@ -210,6 +212,16 @@ pub enum EventBody {
         structure: Id,
         by: Id,
     },
+    /// Nature: a species with none left anywhere. Once, and for good.
+    SpeciesExtinct {
+        species: Id,
+    },
+    /// Nature's truth, monthly, for measurement (no participant perceives it): each species' total and the cells it's
+    /// in, and the cells of each cover.
+    NatureCensus {
+        species: BTreeMap<Id, CensusCount>,
+        covers: BTreeMap<Id, i64>,
+    },
     Occupied {
         occupant: Id,
         space: Id,
@@ -344,6 +356,8 @@ impl EventBody {
             EventBody::StructureStarted { .. } => "structure_started",
             EventBody::StructureCompleted { .. } => "structure_completed",
             EventBody::StructureDemolished { .. } => "structure_demolished",
+            EventBody::SpeciesExtinct { .. } => "species_extinct",
+            EventBody::NatureCensus { .. } => "nature_census",
             EventBody::Occupied { .. } => "occupied",
             EventBody::Vacated { .. } => "vacated",
             EventBody::PersonCreated { .. } => "person_created",
@@ -405,4 +419,11 @@ impl Timed {
     pub fn new(t: i64, body: EventBody) -> Self {
         Timed { t, event: Event { cause: 0, body } }
     }
+}
+
+/// A species in a census: how many, in how many cells.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CensusCount {
+    pub count: i64,
+    pub cells: i64,
 }

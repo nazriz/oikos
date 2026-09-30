@@ -1,0 +1,173 @@
+//! Nature (docs/design/world-expansion.md 2): covers, fields and populations stepped daily by the kernel; building
+//! over habitat ends a population, and extinction is for good; surveys are work that finds an estimate only the
+//! surveyor sees; passers-by see a conspicuous species, never a count; cleared land grows back; the truth is censused
+//! monthly for measurement; and all of it replays exactly.
+
+mod common;
+
+use common::*;
+use serde_json::{json, Value};
+use terrarium_kernel::events::{EventBody, RefusalCode};
+use terrarium_kernel::observe::ChannelData;
+use terrarium_kernel::run::Run;
+use terrarium_kernel::Command;
+
+const DAY: i64 = 86_400;
+
+/// The test world, with nature: the east column is the river (water), the two cells west of its south end are
+/// wetland, the rest is grassland. Frogs live in the wetland; herons (conspicuous) on grassland and water. The shop
+/// pollutes, and the river carries it south.
+fn nature_world() -> Value {
+    let mut w = world(&default_params());
+    let cat = w["catalogue"].as_object_mut().unwrap();
+    cat.insert("land_covers".into(), json!([
+        {"id": "water"}, {"id": "wetland"}, {"id": "grassland"},
+        {"id": "cleared", "succeeds_to": {"cover": "grassland", "after_days": 10}}
+    ]));
+    cat.insert("default_cover".into(), json!("grassland"));
+    cat.insert("cleared_cover".into(), json!("cleared"));
+    cat.insert("fields".into(), json!([{"id": "pollution", "min": 0, "max": 1000000, "decay_bps_per_day": 100, "diffusion_bps_per_day": 1000, "flow_bps_per_day": 5000, "from_structures": {"shop": 50}}]));
+    cat.insert("species".into(), json!([
+        {"id": "frog", "capacity": {"wetland": 60, "water": 5}, "growth_bps_per_year": 15000, "mortality_bps_per_year": 3000, "dispersal_bps_per_year": 500,
+         "barriers": ["built"], "min_viable": 2, "tolerance": {"pollution": {"above": 5000, "mortality_bps_per_day": 100}}, "detection_bps": 5000},
+        {"id": "heron", "capacity": {"grassland": 2, "water": 3}, "growth_bps_per_year": 3000, "mortality_bps_per_year": 1500, "dispersal_bps_per_year": 2000,
+         "min_viable": 1, "detection_bps": 9000, "conspicuous": true}
+    ]));
+    cat["tasks"].as_array_mut().unwrap().push(json!({"id": "survey", "labour": 600, "surveys": true}));
+    // A park may be laid out on wetland (it's grassland while it stands).
+    for t in cat["structure_types"].as_array_mut().unwrap() {
+        if t["id"] == "park" {
+            t["terrains"] = json!(["wetland"]);
+            t["cover"] = json!("grassland");
+        }
+    }
+    let world = w["world"].as_object_mut().unwrap();
+    world["ground"]["terrain"].as_array_mut().unwrap().push(json!({"label": "wetland", "x": 2, "y": 1, "w": 1, "h": 2}));
+    world.insert("populations".into(), json!([
+        {"species": "frog", "cell": "cell.2.1", "count": 20}, {"species": "frog", "cell": "cell.2.2", "count": 20},
+        {"species": "heron", "cell": "cell.3.1", "count": 2}
+    ]));
+    world.insert("flows".into(), json!([{"from": "cell.3.0", "to": "cell.3.1"}, {"from": "cell.3.1", "to": "cell.3.2"}]));
+    w
+}
+
+fn start(w: &Value) -> Run<Vec<u8>> {
+    Run::start(w.clone(), "nature", Vec::new(), None).unwrap()
+}
+
+fn act(run: &mut Run<Vec<u8>>, participant: &str, position: Option<&str>, blocks: Value) -> Result<Vec<EventBody>, RefusalCode> {
+    let cmd = direct(participant, position, serde_json::from_value(blocks).unwrap()).unwrap();
+    let r = step(run, &cmd).unwrap();
+    match &r.events[0].body {
+        EventBody::ActionApplied { .. } => Ok(r.events.into_iter().map(|e| e.body).collect()),
+        EventBody::ActionRefused { code, .. } => Err(*code),
+        other => panic!("{other:?}"),
+    }
+}
+
+/// Advance, collecting the events on the way.
+fn advance(run: &mut Run<Vec<u8>>, to: i64) -> Vec<EventBody> {
+    run.command(&Command::Advance { to }).unwrap().events.into_iter().map(|e| e.body).collect()
+}
+
+fn total(run: &Run<Vec<u8>>, sp: &str) -> i64 {
+    run.kernel().state().nature.as_ref().and_then(|n| n.populations.get(sp)).map_or(0, |m| m.values().sum())
+}
+
+#[test]
+fn populations_live_on_their_covers_and_the_truth_is_censused_monthly() {
+    let mut run = start(&nature_world());
+    let ev = advance(&mut run, 300 * DAY);
+    // Frogs grew toward the wetland's capacity (two cells of 60): logistic from 40 at 150% a year is about 75 by now.
+    let frogs = total(&run, "frog");
+    assert!((60..=110).contains(&frogs), "frogs {frogs}");
+    // A census every 30 days, with the truth for measurement.
+    let censuses: Vec<_> = ev.iter().filter_map(|e| match e { EventBody::NatureCensus { species, covers } => Some((species.clone(), covers.clone())), _ => None }).collect();
+    assert_eq!(censuses.len(), 10);
+    assert_eq!(censuses.last().unwrap().0["frog"].count, frogs);
+    assert_eq!(censuses[0].1["wetland"], 2);
+    // The shop's pollution is on the ground near it, and the river carries some south.
+    let n = run.kernel().state().nature.clone().unwrap();
+    assert!(n.fields["pollution"]["cell.0.2"] > 0);
+    assert!(n.fields["pollution"].get("cell.3.2").is_some());
+}
+
+#[test]
+fn building_over_habitat_ends_a_population_for_good() {
+    let mut run = start(&nature_world());
+    advance(&mut run, 30 * DAY);
+    assert!(total(&run, "frog") > 0);
+    // Parks laid out over both wetland cells (the builder's crew): frogs can't live on grassland.
+    for cell in ["cell.2.1", "cell.2.2"] {
+        act(&mut run, "builder-system", Some("builder"), json!([{"block": "construct", "at": cell, "structure_type": "park", "materials_at": "s-flats"}])).unwrap();
+    }
+    let ev = advance(&mut run, 400 * DAY);
+    let extinct: Vec<_> = ev.iter().filter(|e| matches!(e, EventBody::SpeciesExtinct { species } if species == "frog")).collect();
+    assert_eq!(extinct.len(), 1, "extinct once");
+    assert_eq!(total(&run, "frog"), 0);
+    assert!(run.kernel().state().nature.as_ref().unwrap().extinct.contains_key("frog"));
+    // Herons, on grassland and water, carry on.
+    assert!(total(&run, "heron") > 0);
+}
+
+#[test]
+fn a_survey_is_work_whose_estimate_only_the_surveyor_sees() {
+    let mut run = start(&nature_world());
+    advance(&mut run, 60 * DAY + 3600);
+    let truth: i64 = ["cell.2.1", "cell.2.2"].iter().map(|c| run.kernel().state().nature.as_ref().unwrap().populations["frog"].get(*c).copied().unwrap_or(0)).sum();
+    // Carol (at the shop) surveys the two wetland cells for frogs: two units, 20 minutes of her time.
+    let ev = act(&mut run, "developer-system", Some("developer"),
+        json!([{"block": "work", "task": "survey", "units": 2, "at": "s-shop", "performers": ["carol"], "survey": {"of": "frog", "cells": ["cell.2.1", "cell.2.2"]}}])).unwrap();
+    assert!(ev.iter().any(|e| matches!(e, EventBody::Worked { labour: 1200, .. })));
+    let o = run.command(&Command::Observe { participant: "developer-system".into(), only: Some("developer".into()) }).unwrap().observation.unwrap();
+    let found = o.outcomes.iter().find_map(|x| x.surveyed.clone()).expect("the surveyor sees what was found");
+    assert_eq!(found["of"], "frog");
+    let est: i64 = found["cells"].as_object().unwrap().values().map(|v| v.as_i64().unwrap()).sum();
+    assert!(est <= truth && est * 4 >= truth, "found {est} of {truth} (half are found, on average)");
+    // Nobody else sees it.
+    let other = run.command(&Command::Observe { participant: "alice-self".into(), only: None }).unwrap().observation.unwrap();
+    assert!(other.outcomes.iter().all(|x| x.surveyed.is_none()));
+    // What a survey must say, and of what.
+    let bad = |run: &mut Run<Vec<u8>>, b: Value| act(run, "developer-system", Some("developer"), json!([b]));
+    assert_eq!(bad(&mut run, json!({"block": "work", "task": "survey", "units": 1, "at": "s-shop", "performers": ["carol"]})), Err(RefusalCode::BadSurvey));
+    assert_eq!(bad(&mut run, json!({"block": "work", "task": "survey", "units": 1, "at": "s-shop", "performers": ["carol"], "survey": {"of": "unicorn", "cells": ["cell.2.1"]}})), Err(RefusalCode::BadSurvey));
+    assert_eq!(bad(&mut run, json!({"block": "work", "task": "survey", "units": 2, "at": "s-shop", "performers": ["carol"], "survey": {"of": "frog", "cells": ["cell.2.1"]}})), Err(RefusalCode::BadSurvey));
+    assert_eq!(bad(&mut run, json!({"block": "work", "task": "make", "units": 1, "at": "s-shop", "performers": ["carol"], "survey": {"of": "frog", "cells": ["cell.2.1"]}})), Err(RefusalCode::BadSurvey));
+}
+
+#[test]
+fn passers_by_see_a_conspicuous_species_but_not_how_many() {
+    let mut run = start(&nature_world());
+    advance(&mut run, DAY + 3600);
+    let o = run.command(&Command::Observe { participant: "mayor-system".into(), only: None }).unwrap().observation.unwrap();
+    let ChannelData::Sites { cells, .. } = &o.channels["mayor/town"] else { panic!() };
+    let river = cells.iter().find(|c| c.cell == "cell.3.1").unwrap();
+    assert_eq!(river.seen, vec!["heron".to_string()]);
+    assert!(cells.iter().all(|c| !c.seen.contains(&"frog".to_string())), "frogs aren't conspicuous");
+    assert_eq!(cells.iter().find(|c| c.cell == "cell.2.1").unwrap().terrain.as_deref(), Some("wetland"));
+}
+
+#[test]
+fn cleared_land_grows_back() {
+    let mut run = start(&nature_world());
+    // The house comes down (an hour's demolition, by bob): its cell is cleared land, and grassland 10 days on.
+    act(&mut run, "developer-system", Some("developer"), json!([{"block": "demolish", "structure": "s-house"}])).unwrap();
+    act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "demolish", "units": 3600, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap();
+    assert_eq!(run.kernel().state().cells["cell.1.1"].terrain.as_deref(), Some("cleared"));
+    advance(&mut run, 12 * DAY);
+    assert_eq!(run.kernel().state().cells["cell.1.1"].terrain.as_deref(), Some("grassland"));
+}
+
+#[test]
+fn nature_replays_exactly() {
+    let w = nature_world();
+    let go = || {
+        let mut run = start(&w);
+        advance(&mut run, 90 * DAY);
+        run.kernel().state_hash().unwrap()
+    };
+    assert_eq!(go(), go());
+    // A world without nature has none (and no daily step).
+    let run = start(&world(&default_params()));
+    assert!(run.kernel().state().nature.is_none());
+}

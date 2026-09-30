@@ -92,6 +92,98 @@ pub struct Catalogue {
     /// The most a person can work in a day (seconds): a physical limit on a body. Required when any work takes time.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_day: Option<i64>,
+    /// Nature (docs/design/world-expansion.md 2): kinds of land cover (a cell's terrain names one).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub land_covers: Vec<LandCoverCfg>,
+    /// The cover of a cell with no terrain label and no building.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_cover: Option<Id>,
+    /// What a cell's cover becomes when a building on it comes down.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cleared_cover: Option<Id>,
+    /// Integer quantities on cells (pollution, water level): sources, decay, diffusion, flow.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<FieldCfg>,
+    /// Living populations on cells: growth, mortality, dispersal, tolerances. An extinct species never returns.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub species: Vec<SpeciesCfg>,
+}
+
+/// The reserved cover of a cell with a building whose type names none.
+pub const COVER_BUILT: &str = "built";
+/// The cover of unbuilt ground with no terrain label, in a world that names no default.
+pub const COVER_OPEN: &str = "open";
+
+/// A kind of land cover, and what it becomes if left unbuilt long enough (cleared land to scrub to woodland).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LandCoverCfg {
+    pub id: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub succeeds_to: Option<SuccessionCfg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SuccessionCfg {
+    pub cover: Id,
+    pub after_days: i64,
+}
+
+/// An integer quantity on cells, stepped daily: sources (by cover, and per building of a type, at its corner cell),
+/// then decay toward the baseline, then diffusion to the four neighbours, then flow downstream; within [min, max].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FieldCfg {
+    pub id: Id,
+    pub min: i64,
+    pub max: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub baseline: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub decay_bps_per_day: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub diffusion_bps_per_day: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub flow_bps_per_day: i64,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub from_structures: BTreeMap<Id, i64>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub from_covers: BTreeMap<Id, i64>,
+}
+
+/// A species: its carrying capacity per cell by cover, its intrinsic growth and background mortality (a year), the
+/// share that disperses to a neighbouring cell (a year), covers it can't cross, the least number in a cell that
+/// breeds (an Allee effect), deaths where a field passes what it tolerates, and how surveys and passers-by see it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpeciesCfg {
+    pub id: Id,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub capacity: BTreeMap<Id, i64>,
+    pub growth_bps_per_year: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub mortality_bps_per_year: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub dispersal_bps_per_year: i64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub barriers: Vec<Id>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub min_viable: i64,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub tolerance: BTreeMap<Id, ToleranceCfg>,
+    pub detection_bps: i64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub conspicuous: bool,
+}
+
+/// Where a field passes `above`, each individual there dies with `mortality_bps_per_day` a day.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ToleranceCfg {
+    pub above: i64,
+    pub mortality_bps_per_day: i64,
 }
 
 /// The built-in task that builds a structure begun with `construct` (one unit: one second of work).
@@ -118,6 +210,10 @@ pub struct TaskCfg {
     /// Per unit: added to state variables of the structure worked on (`on`, or the structure itself).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub changes: BTreeMap<Id, i64>,
+    /// Measurement (nature): a unit surveys one cell for a species or a field (`work`'s `survey`), and the actor learns
+    /// an estimate.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub surveys: bool,
 }
 
 /// A state variable of structures, with its dynamics: it changes by `per_day`, and `per_occupant_per_day` for each
@@ -186,6 +282,9 @@ pub struct StructureType {
     /// Yearly chance (basis points) that someone occupying one of its spaces is injured there.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub injury_bps: Option<u32>,
+    /// Nature: the land cover its cells count as while it stands (a park is grassland); absent, `built`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<Id>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -227,6 +326,37 @@ pub struct World {
     /// Holdings at the start (phase B).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub holdings: Vec<HoldingCfg>,
+    /// Nature at the start: populations and field values on cells (sparse), and the flow layer (a river's course).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub populations: Vec<PopulationCfg>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<FieldValueCfg>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flows: Vec<FlowCfg>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PopulationCfg {
+    pub species: Id,
+    pub cell: Id,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FieldValueCfg {
+    pub field: Id,
+    pub cell: Id,
+    pub value: i64,
+}
+
+/// A cell and the cell downstream of it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FlowCfg {
+    pub from: Id,
+    pub to: Id,
 }
 
 /// The ground: one plane of `w` by `h` cells (`cell.<x>.<y>`), each `cell` world units across (presentation only),
@@ -796,6 +926,113 @@ pub fn check_traits(owner: &str, traits: &Option<Value>) -> Result<(), String> {
 }
 
 /// Semantic validation beyond the JSON Schema.
+/// Nature's config (docs/design/world-expansion.md 2.4): everything it names exists, and its figures are in range.
+fn check_nature(c: &Config) -> Result<(), String> {
+    let (cat, w) = (&c.catalogue, &c.world);
+    let rects = detailed_rects(&w.places);
+    let cell_ok = |id: &str| cell_xy(id).is_some_and(|(x, y)| rects.iter().any(|r| x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h));
+    let bps = |v: i64, what: &str| if (0..=10_000).contains(&v) { Ok(()) } else { Err(format!("{what} must be 0..=10000 basis points")) };
+    let mut covers: BTreeSet<&str> = BTreeSet::new();
+    for lc in &cat.land_covers {
+        if lc.id == COVER_BUILT || !covers.insert(&lc.id) {
+            return Err(format!("land cover {:?} is reserved or named twice", lc.id));
+        }
+    }
+    covers.insert(COVER_BUILT);
+    covers.insert(COVER_OPEN);
+    let cover = |id: &str, what: &str| if covers.contains(id) { Ok(()) } else { Err(format!("{what}: no land cover {id:?}")) };
+    for lc in &cat.land_covers {
+        if let Some(sc) = &lc.succeeds_to {
+            cover(&sc.cover, "a cover's succession")?;
+            if sc.after_days < 1 {
+                return Err(format!("{}'s succession must take at least a day", lc.id));
+            }
+        }
+    }
+    for (x, what) in [(&cat.default_cover, "default_cover"), (&cat.cleared_cover, "cleared_cover")] {
+        if let Some(x) = x {
+            cover(x, what)?;
+        }
+    }
+    if !cat.land_covers.is_empty() {
+        for t in &w.ground.terrain {
+            cover(&t.label, "a terrain label, in a world with land covers,")?;
+        }
+    }
+    let types: BTreeSet<&str> = cat.structure_types.iter().map(|t| t.id.as_str()).collect();
+    for t in &cat.structure_types {
+        if let Some(cv) = &t.cover {
+            cover(cv, &format!("structure type {}", t.id))?;
+        }
+    }
+    let mut fields: BTreeSet<&str> = BTreeSet::new();
+    for f in &cat.fields {
+        if !fields.insert(&f.id) {
+            return Err(format!("field {:?} named twice", f.id));
+        }
+        if f.min > f.max || f.baseline < f.min || f.baseline > f.max {
+            return Err(format!("field {}: min <= baseline <= max", f.id));
+        }
+        bps(f.decay_bps_per_day, "a field's decay")?;
+        bps(f.diffusion_bps_per_day, "a field's diffusion")?;
+        bps(f.flow_bps_per_day, "a field's flow")?;
+        for k in f.from_covers.keys() {
+            cover(k, &format!("field {}", f.id))?;
+        }
+        for k in f.from_structures.keys() {
+            if !types.contains(k.as_str()) {
+                return Err(format!("field {}: no structure type {k:?}", f.id));
+            }
+        }
+    }
+    let mut species: BTreeSet<&str> = BTreeSet::new();
+    for sp in &cat.species {
+        if !species.insert(&sp.id) || fields.contains(sp.id.as_str()) {
+            return Err(format!("species {:?} named twice (or as a field)", sp.id));
+        }
+        for (k, v) in &sp.capacity {
+            cover(k, &format!("species {}", sp.id))?;
+            if *v < 0 || *v > 1_000_000_000 {
+                return Err(format!("species {}: a capacity out of range", sp.id));
+            }
+        }
+        for b in &sp.barriers {
+            cover(b, &format!("species {}", sp.id))?;
+        }
+        for (f, tol) in &sp.tolerance {
+            if !fields.contains(f.as_str()) {
+                return Err(format!("species {}: no field {f:?}", sp.id));
+            }
+            bps(tol.mortality_bps_per_day, "a tolerance's mortality")?;
+        }
+        bps(sp.detection_bps, "a species' detection")?;
+        for (v, what) in [(sp.growth_bps_per_year, "growth"), (sp.mortality_bps_per_year, "mortality"), (sp.dispersal_bps_per_year, "dispersal")] {
+            if !(0..=1_000_000).contains(&v) {
+                return Err(format!("species {}: {what} out of range", sp.id));
+            }
+        }
+        if sp.min_viable < 0 {
+            return Err(format!("species {}: min_viable can't be negative", sp.id));
+        }
+    }
+    for p in &w.populations {
+        if !species.contains(p.species.as_str()) || !cell_ok(&p.cell) || p.count < 1 || p.count > 1_000_000_000 {
+            return Err(format!("a population of {:?} at {:?}: an unknown species or cell, or a count out of range", p.species, p.cell));
+        }
+    }
+    for f in &w.fields {
+        if !fields.contains(f.field.as_str()) || !cell_ok(&f.cell) {
+            return Err(format!("a field value of {:?} at {:?}: an unknown field or cell", f.field, f.cell));
+        }
+    }
+    for f in &w.flows {
+        if !cell_ok(&f.from) || !cell_ok(&f.to) || f.from == f.to {
+            return Err(format!("a flow from {:?} to {:?}: unknown cells, or the same one", f.from, f.to));
+        }
+    }
+    Ok(())
+}
+
 pub fn validate(c: &Config) -> Result<(), String> {
     if c.contracts != CONTRACTS_VERSION {
         return Err(format!("contracts version {} is not {}", c.contracts, CONTRACTS_VERSION));
@@ -811,6 +1048,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
         return Err("the ground must be 1..=2^31-1 cells each way".into());
     }
     check_places(w)?;
+    check_nature(c)?;
 
     // Ids are unique across every kind.
     let mut ids: BTreeSet<String> = BTreeSet::new();

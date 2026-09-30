@@ -23,6 +23,8 @@ pub struct Statics {
     /// The detailed places' areas: where cells exist (D58).
     pub detailed: Vec<crate::config::PlaceRect>,
     pub randomness: Randomness,
+    /// Nature's ground (its cells, neighbours and flow layer), when the world has nature.
+    pub nature: Option<terrarium_nature::Ground>,
 }
 
 impl Statics {

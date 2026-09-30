@@ -11,6 +11,7 @@ terrarium-core = { path = "../core" }
 terrarium-contracts = { path = "../contracts" }
 terrarium-terms = { path = "../terms" }
 terrarium-time = { path = "../time" }
+terrarium-nature = { path = "../nature" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

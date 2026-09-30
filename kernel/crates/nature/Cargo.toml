@@ -1,0 +1,13 @@
+[package]
+name = "terrarium-nature"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Nature's physics (docs/design/world-expansion.md 2): land covers and their succession, fields on cells (sources, decay, diffusion, flow), populations (growth, mortality, dispersal, tolerances), extinction, and surveys' estimates. Pure: the world steps it a day at a time."
+rust-version = "1.85"
+
+[dependencies]
+terrarium-core = { path = "../core" }
+terrarium-contracts = { path = "../contracts" }
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1126,6 +1126,29 @@
         },
         "on": {
           "$ref": "urn:terrarium:contracts:0.7:common#/$defs/IdOrRef"
+        },
+        "survey": {
+          "description": "A survey (a task that `surveys`): of a species or a field, in these cells, one unit each. Only the actor learns the estimates (the outcome's `surveyed`).",
+          "type": "object",
+          "required": [
+            "of",
+            "cells"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "of": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+            },
+            "cells": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+              },
+              "minItems": 1,
+              "maxItems": 10000,
+              "uniqueItems": true
+            }
+          }
         }
       }
     },

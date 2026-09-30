@@ -823,6 +823,73 @@
           }
         },
         {
+          "description": "Nature: a species with none left anywhere in the world. Once, and for good: nothing can add it back.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "species"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "species_extinct"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "species": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+            }
+          }
+        },
+        {
+          "description": "Nature's truth, every 30 days, for measurement: each species' total and the cells it's in, and the cells of each cover. No participant perceives it.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "species",
+            "covers"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "nature_census"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "species": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "count",
+                  "cells"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "count": {
+                    "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+                  },
+                  "cells": {
+                    "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+                  }
+                }
+              }
+            },
+            "covers": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+              }
+            }
+          }
+        },
+        {
           "description": "A body went into a space.",
           "type": "object",
           "required": [
@@ -1448,6 +1515,8 @@
         "structure_started",
         "structure_completed",
         "structure_demolished",
+        "species_extinct",
+        "nature_census",
         "occupied",
         "vacated",
         "recorded",
@@ -1516,6 +1585,7 @@
         "unknown_task",
         "not_at_work",
         "no_time_left",
+        "bad_survey",
         "not_being_built",
         "not_coming_down",
         "coming_down"

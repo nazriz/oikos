@@ -19,7 +19,7 @@ use crate::state::{Account, Body, Cell, Counters, Entity, Outcome, OutcomeStatus
 use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::Arc;
 
@@ -143,6 +143,13 @@ impl World {
             tick: c.clock.tick_seconds,
             act_times: terrarium_time::ActTimes::from_orchestration(&c.orchestration),
             randomness: Randomness::new(c.seed),
+            nature: terrarium_nature::configured(&c.catalogue).then(|| {
+                let cells: BTreeSet<(Id, i64, i64)> = crate::config::detailed_rects(&w.places)
+                    .iter()
+                    .flat_map(|r| (r.y..r.y + r.h).flat_map(move |y| (r.x..r.x + r.w).map(move |x| (cell_id(x, y), x, y))))
+                    .collect();
+                terrarium_nature::Ground::new(&cells.into_iter().collect::<Vec<_>>(), &w.flows)
+            }),
             config: c.clone(),
         };
         let person_of: BTreeMap<&str, &str> = c.participants.iter().filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
@@ -240,6 +247,7 @@ impl World {
                 .collect(),
             schedule: Default::default(),
             timelines: Default::default(),
+            nature: None,
         };
         for x in &w.structures {
             let f = s.types[&x.structure_type].footprint;
@@ -265,6 +273,18 @@ impl World {
         }
         for r in &w.records {
             st.store(r.clone());
+        }
+        // Nature at the start (docs/design/world-expansion.md 2), stepped each day from the next.
+        if s.nature.is_some() {
+            let mut n = terrarium_nature::NatureState::default();
+            for p in &w.populations {
+                *n.populations.entry(p.species.clone()).or_default().entry(p.cell.clone()).or_insert(0) += p.count;
+            }
+            for f in &w.fields {
+                n.fields.entry(f.field.clone()).or_default().insert(f.cell.clone(), f.value);
+            }
+            st.nature = Some(Arc::new(n));
+            st.schedule(86_400, crate::state::Sched::NatureDay { day: 1 });
         }
         // Bodies age from the start.
         let people: Vec<(Id, i64)> = st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (id.clone(), b.born_at))).collect();
@@ -556,14 +576,14 @@ impl World {
                 let created = (!res.created.is_empty()).then_some(res.created);
                 let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), created: created.clone() })];
                 events.extend(res.events);
-                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None })
+                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed })
             }
             Err(r) => (
                 vec![Timed::new(
                     t,
                     EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: r.block, code: r.code, detail: r.detail.clone() },
                 )],
-                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)) },
+                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None },
             ),
         };
         let key = pos.unwrap_or_else(|| SELF.into());

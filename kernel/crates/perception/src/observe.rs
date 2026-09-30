@@ -135,6 +135,9 @@ pub struct SiteCell {
     pub terrain: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub structure: Option<SiteStructure>,
+    /// Nature: conspicuous species anyone there would notice (never how many).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub seen: Vec<Id>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -566,6 +569,9 @@ fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCel
         x: c.x,
         y: c.y,
         terrain: c.terrain.clone(),
+        seen: st.nature.as_deref().map_or(vec![], |n| {
+            s.config.catalogue.species.iter().filter(|sp| sp.conspicuous && n.populations.get(&sp.id).is_some_and(|m| m.get(id).is_some_and(|x| *x > 0))).map(|sp| sp.id.clone()).collect()
+        }),
         structure: c.structure.as_ref().map(|sid| {
             let x = &st.structures[sid];
             let f = s.types[&x.structure_type].footprint;

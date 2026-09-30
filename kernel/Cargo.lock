@@ -1281,6 +1281,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "terrarium-nature"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "terrarium-contracts",
+ "terrarium-core",
+]
+
+[[package]]
 name = "terrarium-perception"
 version = "0.7.0"
 dependencies = [
@@ -1323,6 +1333,7 @@ dependencies = [
  "sha2",
  "terrarium-contracts",
  "terrarium-core",
+ "terrarium-nature",
  "terrarium-terms",
  "terrarium-time",
 ]

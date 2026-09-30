@@ -81,6 +81,9 @@ pub enum Block {
         performers: Vec<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         on: Option<IdOrRef>,
+        /// A survey (a task that `surveys`): of a species or a field, in these cells (one unit each).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        survey: Option<Survey>,
     },
     /// A body goes into a space: the acting person, or someone they bring (`who`).
     Occupy {
@@ -399,6 +402,14 @@ pub struct NewPosition {
     pub role_module: Option<Value>,
     #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
     pub bind: Option<String>,
+}
+
+/// A survey (nature): what's counted or measured, and where.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Survey {
+    pub of: Id,
+    pub cells: Vec<Id>,
 }
 
 /// An agreement's terms. Apart from who the parties are, all of it is opaque data.
