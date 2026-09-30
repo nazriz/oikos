@@ -4,7 +4,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { diff, exportLogs } from "@terrarium/measure";
+import { diff, exportLogs, health } from "@terrarium/measure";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -22,4 +22,10 @@ test("the diff finds nothing between a batch and itself, and lists every measure
   expect(rows.length).toBeGreaterThan(20);
   expect(rows.filter((r) => r.flagged)).toEqual([]);
   expect(rows.every((r) => r.n[0] === 2 && r.base === r.change)).toBe(true);
+  // The health report: each target the town measures, against it (a breach outside its tolerance); others said so.
+  const h = await health(join(out, "measure"), [{ what: "employment_to_population_pct", value: 0 }, { what: "a_target_nothing_measures", value: 1 }]);
+  const employment = h.find((r) => r.what === "employment_to_population_pct")!;
+  expect(employment.measured?.runs).toBe(2);
+  expect(employment.breach).toBe(true); // (nobody's employment rate is 0 ± 3)
+  expect(h.find((r) => r.what === "a_target_nothing_measures")).toMatchObject({ breach: false, note: "not measured yet" });
 }, 300_000);

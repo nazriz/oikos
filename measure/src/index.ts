@@ -252,3 +252,4 @@ export function table(rows: Record<string, unknown>[]): string {
 }
 
 export { diff, diffText, DIFF_QUERIES, type DiffRow } from "./diff";
+export { health, healthText, TARGET_MEASURES, type HealthRow, type Target } from "./health";

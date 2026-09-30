@@ -12,6 +12,7 @@
 //     prices the cost projection.
 //   terrarium measure <DIR> [QUERY...] [--sql "select ..."] [--list]
 //   terrarium diff <BASELINE> <CHANGE> [QUERY...]: every measure of two batches compared (beyond seed noise: flagged)
+//   terrarium health <DIR> [--profile NAME]: the batch's measures against its profile's calibration targets
 //   terrarium cost <DIR> [--translator-model provider/model]
 //   terrarium run ... [--no-compress]: logs are compressed once measured (<run>.jsonl.zst, about a seventh the size,
 //     checked to read back whole before the plain log goes); --no-compress keeps them plain.
@@ -41,7 +42,7 @@
 //
 // A DIR is a batch folder (its measure/ is used) or a folder of logs (exported to DIR/measure first).
 
-import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, queries, query, runQuery, table } from "@terrarium/measure";
 import { loadWorld, runBatch, runOne } from "./batch";
@@ -73,7 +74,7 @@ async function measureDir(dir: string): Promise<string> {
   return m;
 }
 
-const usage = "usage: terrarium run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl> | story <log.jsonl> [participant]";
+const usage = "usage: terrarium run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -111,6 +112,14 @@ try {
       const names = positional().slice(1);
       for (const name of names.length ? names : ["overview"]) console.log(`## ${name}\n${table(await runQuery(dir, name))}\n`);
     }
+  } else if (cmd === "health" && positional()[0]) {
+    // The health report (docs/design/rebuild.md 8.4): the batch's measures against its profile's targets.
+    const { health, healthText } = await import("@terrarium/measure");
+    const { loadProfile } = await import("@terrarium/worlds/generator/profile");
+    const batch = join(positional()[0]!, "batch.json");
+    const profile = flag("profile") ?? (existsSync(batch) ? JSON.parse(readFileSync(batch, "utf8")).spec?.profile : undefined);
+    if (!profile) throw new Error("which profile's targets? (--profile NAME; a batch made from a generated world knows its own)");
+    console.log(healthText(await health(await measureDir(positional()[0]!), (loadProfile(profile) as any).targets ?? [])));
   } else if (cmd === "diff" && positional()[1]) {
     // Before and after (docs/design/rebuild.md 8.4): every measure of two batches of the same world, compared.
     const { diff, diffText } = await import("@terrarium/measure");
