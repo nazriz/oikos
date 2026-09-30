@@ -1011,6 +1011,11 @@ See the design note, §16.
   - **The health report watches for loops:** the same act by the same unit more than 24 times in a day is flagged ("a retry loop?").
 
 
+- **The loop's schedule is the engine's** (docs/design/rebuild.md 5.1, R2). The TypeScript host registers its units and runs them; the engine decides who wakes when.
+  - **Why this way first:** the whole loop in Rust, with the host as a callee, is a larger inversion. Moving the schedule gives every host the same semantics, and the host's execution order doesn't change, so it can be checked against the old one.
+  - **One semantic tidy-up:** a cohort is everyone due at a moment in key order. The old host ordered by (wake time, key) and set news wakes at the time before an advance. Same final state over 60 days; different order within moments.
+  - **Revisit if:** a second host (Python, human) needs the rounds (look, decide, act) in the engine too. Then the rest of the loop moves.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

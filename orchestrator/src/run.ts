@@ -162,21 +162,20 @@ interface Unit {
   controller: Controller;
   llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number };
   ctx: ParticipantContext;
-  nextWake: number;
+  /** How long it sleeps when it waits without saying until when, and when it first wakes: for the engine's schedule
+   * (kernel/src/schedule.rs), which decides every wake from then on. */
+  cadence: number;
+  firstWake: number;
   /** Truth audits: the divergences found at its last audit, by belief, and when each was first found. */
   diverged?: Map<string, number>;
-  /** Why its next wake is due (contracts 0.7: woke_for), and why the current one happened; when it last woke. */
-  wakeFor: NonNullable<Observation["woke_for"]>;
+  /** Why the current wake happened (contracts 0.7: woke_for), and how long since the last (the engine says). */
   wokeFor: NonNullable<Observation["woke_for"]>;
-  lastWake?: number;
   since: number;
-  /** Woken by news this tick (the tick it counts in, and how many times): two units writing to each other are held to
-   * three wakes a tick, then wait for the next (their own acts' completions don't count). */
-  wakesThisTick: number;
-  /** When the act it began is done (it goes on then), and the world seconds its current decision took to think. */
-  doneAt?: number;
+  /** This decision: whether it began an act (its wake goes on when that's done), the time it asked to wake if it
+   * waits, and the world seconds it took to think. */
+  acted?: boolean;
+  waitUntil?: number;
   thinking?: number;
-  wakeTick: number;
   /** What it has observed, for the resolver (P8). */
   knowledge: Knowledge;
   /** Its current picture, kept from its looks (perception is changes). */
@@ -343,7 +342,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const ctx = ctxFor(p.id, cap, entity, params);
     return {
       key: `${p.id}|${cap}`, participant: p.id, capacity: cap, entity, module, controller: module.create(ctx), ctx,
-      nextWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wakeFor: "start", wokeFor: "start", since: 0, wakesThisTick: 0, wakeTick: -1,
+      cadence: ceilTo(module.cadence(ctx), tick), firstWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wokeFor: "start", since: 0,
       knowledge: new Knowledge(), view: new View(), notices: [],
     };
   };
@@ -386,7 +385,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
       llm: { controller, config: p, drafts: [], drafted: 0 },
-      nextWake: wakeAt ?? 0, wakeFor: "start", wokeFor: "start", since: 0, wakesThisTick: 0, wakeTick: -1,
+      cadence: ceilTo(cadence, tick), firstWake: wakeAt ?? 0, wokeFor: "start", since: 0,
       knowledge: new Knowledge(), view: new View(new Set(standingIds)), notices: [],
     };
   };
@@ -403,12 +402,19 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         for (const x of held(pid)) want.add(`${pid}|${x.id}`);
       }
     }
-    for (const key of [...units.keys()]) if ((key === pid || key.startsWith(`${pid}|`)) && !want.has(key)) units.delete(key);
+    const gone = [...units.keys()].filter((key) => (key === pid || key.startsWith(`${pid}|`)) && !want.has(key));
+    for (const key of gone) units.delete(key);
+    if (gone.length) await k.request({ op: "units_remove", keys: gone });
+    const added: Unit[] = [];
     for (const key of want) {
       if (units.has(key)) continue;
       const u = isLlm(p) ? await llmUnit(p, wakeAt) : await codeUnit(p, key.slice(pid.length + 1), p.controller, wakeAt);
-      if (u) units.set(key, u);
+      if (u) {
+        units.set(key, u);
+        added.push(u);
+      }
     }
+    if (added.length) await k.request({ op: "units_add", units: added.map((u) => ({ key: u.key, participant: u.participant, ...(u.llm ? { llm: true } : { capacity: u.capacity }), cadence: u.cadence, next_wake: u.firstWake })) });
   };
   for (const pid of [...parts.keys()].sort()) await syncUnits(pid);
 
@@ -432,40 +438,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   } } });
 
   const unitsOf = (pid: string) => units.of(pid);
-  /** Busy with an act until it's done: news waits (its attention is on what it's doing), and it looks again then. */
-  const busy = (u: Unit) => u.wakeFor === "done" && u.nextWake > t;
-  const wakeParticipant = (pid: string) => {
-    for (const u of unitsOf(pid)) if (u.nextWake > t && !busy(u)) [u.nextWake, u.wakeFor] = [t, "news"];
-  };
-  /**
-   * Code units acting for an entity now: its person's own unit, or the units holding an organisation's positions.
-   * Language-model participants aren't woken by records: they read what's come in on their own cadence, as a
-   * person in an office does, and are woken only by letters (so a stream of filings never drives their cost).
-   */
-  const wakeEntity = (entity: string, except?: string) => {
-    const pid = participantOf.get(entity);
-    if (pid) {
-      if (pid !== except) for (const u of unitsOf(pid)) if (!u.llm && u.capacity === "self" && u.nextWake > t && !busy(u)) [u.nextWake, u.wakeFor] = [t, "news"];
-      return;
-    }
-    for (const x of positions.values()) {
-      if (x.entity !== entity || !x.holder || x.holder === except) continue;
-      for (const u of unitsOf(x.holder)) if (!u.llm && u.capacity === x.id && u.nextWake > t && !busy(u)) [u.nextWake, u.wakeFor] = [t, "news"];
-    }
-  };
+  // (Who news wakes, and when a unit busy with an act goes on, is the engine's: kernel/src/schedule.rs.)
   const changed = new Set<string>(); // participants whose units need syncing after this command
-  const noteNews = (events: any[]) => {
+  /** The cast as commands change it: participants and positions come and go, and units with them. */
+  const noteCast = (events: any[]) => {
     for (const e of events) {
       switch (e.event) {
-        case "message_delivered":
-          for (const p of e.to) wakeParticipant(p);
-          break;
-        case "recorded": {
-          const r = e.record;
-          const named = new Set<string>([...(r.addressed_to ?? []), r.holder, r.counterparty, r.as, r.to, ...(r.terms?.parties ?? [])].filter(Boolean));
-          for (const ent of named) wakeEntity(ent, r.author);
-          break;
-        }
         case "participant_created": {
           const tpl = templates.get(e.template);
           parts.set(e.participant, { id: e.participant, kind: e.kind, person: e.person, owner: e.owner, title: tpl?.title, controller: tpl?.controller, framing: tpl?.framing, on_opt_out: tpl?.on_opt_out, traits: e.traits, ended: false, ...({ template: e.template } as any) });
@@ -493,6 +471,17 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       }
     }
   };
+  /** A command's reply, taken in: counted, and the cast as it changed (with its units). */
+  const absorb = async (r: any) => {
+    commands++;
+    for (const e of r.events) if (e.event === "action_refused") {
+      refused++;
+      refusedBy[e.code] = (refusedBy[e.code] ?? 0) + 1;
+    }
+    noteCast(r.events);
+    for (const pid of changed) await syncUnits(pid, t);
+    changed.clear();
+  };
   const command = async (cmd: object) => (await commands_([cmd]))[0];
   /** Commands sent together (see Kernel.tryRequestMany), each reply then taken in turn as `command` takes one. */
   const commands_ = async (cmds: object[]) => {
@@ -505,17 +494,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       pk.ms += dt / cmds.length;
       pk.n++;
     }
-    for (const r of rs) {
-      if (r === null) continue;
-      commands++;
-      for (const e of r.events) if (e.event === "action_refused") {
-        refused++;
-        refusedBy[e.code] = (refusedBy[e.code] ?? 0) + 1;
-      }
-      noteNews(r.events);
-      for (const pid of changed) await syncUnits(pid, t);
-      changed.clear();
-    }
+    for (const r of rs) if (r !== null) await absorb(r);
     return rs;
   };
 
@@ -536,7 +515,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const r = await command({ ...cmd, ...(thinking > 0 ? { thinking } : {}) });
     const started = r?.events.find((e: any) => e.event === "action_started");
     if (started) {
-      u.doneAt = Math.max(u.doneAt ?? 0, started.done);
+      u.acted = true; // (its wake goes on when the act is done: the engine's schedule)
       const b = (backlog[u.module.name] ??= { acts: 0, waited: 0, longest: 0 });
       const waited = started.starts - (t + thinking);
       b.acts++;
@@ -566,14 +545,16 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const standIn = after && typeof after === "object" ? mods[after.code] : undefined;
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { participant_retired: { unit: u.key, after_failures: MAX_FAILURES_IN_A_ROW, ...(standIn ? { stand_in: after.code } : {}) } } } });
     log(`${o.runId}: ${u.participant} retired after ${MAX_FAILURES_IN_A_ROW} failures in a row${standIn ? `; ${after.code} stands in` : ""}`);
-    for (const x of unitsOf(u.participant)) {
-      units.delete(x.key);
-      failures.delete(x.key);
+    const gone = unitsOf(u.participant).map((x) => x.key);
+    for (const key of gone) {
+      units.delete(key);
+      failures.delete(key);
     }
+    await k.request({ op: "units_remove", keys: gone });
     if (standIn) {
       p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
       await syncUnits(u.participant, t);
-      for (const x of unitsOf(u.participant)) [x.nextWake, x.wakeFor] = [t + ceilTo(x.module.cadence(x.ctx), tick), "cadence"];
+      await k.request({ op: "to_cadence", participant: u.participant });
     } else p.ended = true;
   };
 
@@ -644,7 +625,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           if (since !== undefined) await k.request({ op: "annotate", annotation: { annotation: "audit", subject: u.participant, data: { t, unit: u.key, ...d, since } } });
         }
       }
-      if (action.until !== undefined) [u.nextWake, u.wakeFor] = [Math.max(t + tick, ceilTo(action.until, tick)), "asked"];
+      u.waitUntil = action.until;
       return false;
     }
     if (action.type === "look") {
@@ -658,12 +639,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const after = p.on_opt_out;
       const standIn = after && typeof after === "object" ? mods[after.code] : undefined;
       if (after && typeof after === "object" && !standIn) throw new Error(`participant ${u.participant}: no behaviour module "${after.code}" to stand in after opting out`);
-      for (const x of unitsOf(u.participant)) units.delete(x.key);
+      const gone = unitsOf(u.participant).map((x) => x.key);
+      for (const key of gone) units.delete(key);
+      await k.request({ op: "units_remove", keys: gone });
       if (standIn) {
         // The stand-in carries the participant on, in the same capacities.
         p.controller = { type: "code", impl: after.code, params: after.params ?? {} };
         await syncUnits(u.participant, t);
-        for (const x of unitsOf(u.participant)) [x.nextWake, x.wakeFor] = [t + ceilTo(x.module.cadence(x.ctx), tick), "cadence"];
+        await k.request({ op: "to_cadence", participant: u.participant });
       } else p.ended = true;
       return false;
     }
@@ -752,41 +735,33 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // Deciding takes world time if the world says so (docs/design/rebuild.md 6.4): a model by its tokens, code a fixed time.
   const thinkingCosts = cfg.orchestration.thinking_time === "costs_world_time";
   const rates = cfg.orchestration.thinking ?? {};
-  let momentAt = -1, cohortsNow = 0; // how many cohorts have woken at this moment (MAX_COHORTS_PER_MOMENT)
   let stopped: string | undefined; // why the run stopped early, if it did (a spending limit)
   try {
     for (;;) {
-      const first = units.next();
-      if (!first || first.nextWake > until) break;
-      if (first.nextWake > t) {
-        await command({ command: "advance", to: first.nextWake });
-        t = first.nextWake;
-        continue; // who's due now (some may have ended while time passed)
+      // What's next is the engine's (kernel/src/schedule.rs): time moving on, or everyone waking at this moment, in key
+      // order (D58 §4.8), each with why it woke and how long since its last wake (contracts 0.7).
+      mark({ doing: "scheduling" });
+      let due: any;
+      try {
+        due = await k.request({ op: "next", until });
+      } catch (e) {
+        if (e instanceof Error && /kept waking each other/.test(e.message)) throw new RunStuck(e.message);
+        throw e;
       }
-      if (t === momentAt) {
-        if (++cohortsNow > MAX_COHORTS_PER_MOMENT)
-          throw new RunStuck(`participants kept waking each other at t=${t} (${MAX_COHORTS_PER_MOMENT} rounds of wakes in one moment): ${units.next()?.key ?? "?"} was next`);
-      } else [momentAt, cohortsNow] = [t, 1];
-      // Everyone waking at this moment, in key order (D58 §4.8); a wake set in the past (a participant created during
-      // the run starts at 0) is due now.
+      if (due.end) break;
+      if (due.advanced !== undefined) {
+        t = due.advanced;
+        await absorb(due); // (the advance's events: who's come or gone while time passed)
+        continue;
+      }
+      t = due.t;
       const cohort: Unit[] = [];
-      for (let u = units.next(); u && u.nextWake <= t; u = units.next()) {
-        // Guard against units waking each other forever (letters back and forth): at most three news wakes a tick.
-        const tickNow = Math.floor(t / tick);
-        if (u.wakeFor === "news") {
-          if (u.wakeTick === tickNow && u.wakesThisTick >= 3) {
-            [u.nextWake, u.wakeFor] = [(tickNow + 1) * tick, "cadence"];
-            continue;
-          }
-          u.wakesThisTick = u.wakeTick === tickNow ? u.wakesThisTick + 1 : 1;
-          u.wakeTick = tickNow;
-        }
+      for (const c of due.cohort as { key: string; woke_for: NonNullable<Observation["woke_for"]>; since: number }[]) {
+        const u = units.get(c.key);
+        if (!u) continue;
         wakes++;
-        // Why it woke, and how long since the last time (contracts 0.7: flows are computed from `since`).
-        u.wokeFor = u.wakeFor;
-        u.since = u.lastWake === undefined ? 0 : t - u.lastWake;
-        u.lastWake = t;
-        [u.nextWake, u.wakeFor] = [t + ceilTo(u.module.cadence(u.ctx), tick), "cadence"]; // default if it waits without a time
+        u.wokeFor = c.woke_for;
+        u.since = c.since;
         cohort.push(u);
       }
       // Rounds: everyone still awake looks (so all see the same state), all decide (model calls at once), then what
@@ -854,13 +829,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
               ? used.reduce((s, a) => s + (a.output_tokens ?? 0) * (rates.model_seconds_per_output_token ?? 0) + (a.input_tokens ?? 0) * (rates.model_seconds_per_input_token ?? 0), 0)
               : (rates.code_seconds ?? 0);
           }
-          x.u.doneAt = undefined;
+          x.u.acted = false;
+          x.u.waitUntil = undefined;
           const goesOn = await apply(x.u, r.value);
           if (units.get(x.u.key) !== x.u) continue;
-          // It began an act: its wake goes on when the act is done. Otherwise, if it goes on (it looked, drafted), it
-          // does so in the next round, at this moment.
-          if (x.u.doneAt !== undefined) [x.u.nextWake, x.u.wakeFor] = [x.u.doneAt, "done"];
-          else if (goesOn) next.push({ u: x.u, n: x.n + 1 });
+          // It began an act: its wake goes on when the act is done. If it goes on otherwise (it looked, drafted), it does
+          // so in the next round, at this moment. Either way, or waiting, the engine sets its next wake.
+          if (goesOn && !x.u.acted) next.push({ u: x.u, n: x.n + 1 });
+          else await k.request({ op: "finished", key: x.u.key, ...(x.u.waitUntil !== undefined ? { until: x.u.waitUntil } : {}) });
         }
         awake = next;
       }
@@ -897,78 +873,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}) };
 }
 
-/**
- * The scheduled units, indexed by participant, with a priority queue of wake times: the next unit is the one with the
- * earliest wake, ties by key (exactly the order a scan of every unit would give). Every change to a unit's `nextWake`
- * queues it again; entries that no longer match (a later change, or the unit gone) are skipped.
- */
+/** The units a run has, by key, and by participant. (When each wakes is the engine's: kernel/src/schedule.rs.) */
 class Units extends Map<string, Unit> {
-  private byParticipant = new Map<string, Set<Unit>>();
-  private heap: { w: number; k: string; u: Unit }[] = [];
-
-  override set(key: string, u: Unit): this {
-    const old = super.get(key);
-    if (old) this.byParticipant.get(old.participant)?.delete(old);
-    super.set(key, u);
-    const set = this.byParticipant.get(u.participant) ?? new Set();
-    set.add(u);
-    this.byParticipant.set(u.participant, set);
-    let w = u.nextWake;
-    Object.defineProperty(u, "nextWake", { get: () => w, set: (v: number) => { w = v; this.push(v, u.key, u); }, enumerable: true, configurable: true });
-    this.push(w, key, u);
-    return this;
-  }
-
-  override delete(key: string): boolean {
-    const u = super.get(key);
-    if (u) this.byParticipant.get(u.participant)?.delete(u);
-    return super.delete(key);
-  }
-
   /** A participant's units, in key order. */
   of(participant: string): Unit[] {
-    return [...(this.byParticipant.get(participant) ?? [])].sort((a, b) => (a.key < b.key ? -1 : 1));
-  }
-
-  /** The unit to wake next (not removed from the queue). */
-  next(): Unit | undefined {
-    for (;;) {
-      const top = this.heap[0];
-      if (!top) return undefined;
-      if (this.get(top.k) === top.u && top.u.nextWake === top.w) return top.u;
-      this.pop();
-    }
-  }
-
-  private less(a: { w: number; k: string }, b: { w: number; k: string }) {
-    return a.w < b.w || (a.w === b.w && a.k < b.k);
-  }
-  private push(w: number, k: string, u: Unit) {
-    const h = this.heap;
-    h.push({ w, k, u });
-    let i = h.length - 1;
-    while (i > 0) {
-      const parent = (i - 1) >> 1;
-      if (!this.less(h[i]!, h[parent]!)) break;
-      [h[i], h[parent]] = [h[parent]!, h[i]!];
-      i = parent;
-    }
-  }
-  private pop() {
-    const h = this.heap;
-    const last = h.pop()!;
-    if (!h.length) return;
-    h[0] = last;
-    let i = 0;
-    for (;;) {
-      const l = 2 * i + 1, r = l + 1;
-      let m = i;
-      if (l < h.length && this.less(h[l]!, h[m]!)) m = l;
-      if (r < h.length && this.less(h[r]!, h[m]!)) m = r;
-      if (m === i) break;
-      [h[i], h[m]] = [h[m]!, h[i]!];
-      i = m;
-    }
+    return [...this.values()].filter((u) => u.participant === participant).sort((a, b) => (a.key < b.key ? -1 : 1));
   }
 }
 

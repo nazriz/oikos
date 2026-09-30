@@ -474,6 +474,14 @@ Proposed together, for one sign-off:
   - **Gate:** kernel 94 (3 new time tests), participants 39, orchestrator 281.
   - **Parity, a year of the 1,000-person town, 10 seeds each against `main`:** within noise on employment, participation, unemployment, saving, arrivals, departures, rent stress and belief change. **One known difference:** group attendance is about 4 points higher (59.7% against 55.8%, higher in 9 of 10 seeds). Likely cause: many decisions now fall a few seconds later (a message lands a second after it's sent), and a citizen's random draws are keyed by the exact second, so the draws differ; habit then amplifies. Not isolated further (Naz, 2026-09-30: record it and get on with the rebuild). The measure was already off its target (50%) on `main`; it's recalibrated on the new platform.
   - **Speed:** a year takes about 130 s, and building observations is 70% of the engine's time. Most of that was every citizen's gatherings channel (`has: practice`) scanning all new records at every look. The record index now covers `has`.
+- **R2, the loop's schedule in the engine** (2026-09-30): when each unit wakes is now the engine's (`kernel/src/schedule.rs`), served to the host as protocol operations (`units_add`, `units_remove`, `next`, `finished`, `to_cadence`):
+  - who's due and in what order;
+  - `woke_for` and `since`;
+  - news wakes (from every command's events, against the engine's own record of people and position holders);
+  - the per-tick news guard, a unit busy with an act, and the runaway guard.
+  The host runs the units and says when each wake is over. Any host (a Python seat, a human interface) gets the same schedule.
+  - **Checked:** 60 days of the 1,000-person town ends in the identical state as under the old host (the same state hash, about 104,000 commands). The logs differ only in order within a moment: the old host ordered a cohort by (wake time, key), because it set news wakes at the time before an advance, and could split one moment into two cohorts. The engine wakes everyone due at a moment together, in key order, as D58 says.
+  - **Gate:** kernel 97, TypeScript 281.
 - **Next:**
   1. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
   2. R4 and R5.

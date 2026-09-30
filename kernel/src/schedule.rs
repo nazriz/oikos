@@ -1,0 +1,327 @@
+//! When each unit wakes (docs/design/rebuild.md section 6): the engine's side of the loop. A unit is one participant's
+//! capacity run by a code module (`<participant>|<capacity>`), or a language-model participant (`<participant>`). The
+//! host (the participant host, orchestrator/src/run.ts) runs the units; this decides when: who wakes at a moment and in
+//! what order, why and how long since their last wake, who news wakes, and when a unit busy with an act goes on.
+//!
+//! The rules (the same for every host):
+//! - **The next wake:** the unit's cadence after each wake, unless it asks for a time (rounded up to a tick, and never
+//!   sooner than a tick on), or it began an act (then when the act is done).
+//! - **Order:** everyone due at a moment wakes together, in key order; a wake set in the past is due now.
+//! - **News:** a message wakes everyone it's delivered to; a record naming an entity wakes the code units acting for
+//!   it (a person's own unit; the units holding an organisation's positions), never its author, and never a
+//!   language-model participant (it reads what's come in on its own cadence, and letters wake it). A unit busy with an
+//!   act isn't woken: it sees the news when its act is done.
+//! - **Guards:** at most three news wakes a unit a tick (then the next tick); more than `MAX_COHORTS_PER_MOMENT`
+//!   cohorts at one moment stops the run.
+
+use crate::state::State;
+use serde_json::{json, Value};
+use std::collections::{BTreeMap, BTreeSet};
+
+/// More cohorts than this at one moment means units are waking each other without end.
+pub const MAX_COHORTS_PER_MOMENT: u32 = 1000;
+
+#[derive(Debug, Clone)]
+struct Unit {
+    participant: String,
+    /// "self", a position, or None (a language-model participant: all its capacities).
+    capacity: Option<String>,
+    llm: bool,
+    cadence: i64,
+    next_wake: i64,
+    wake_for: &'static str,
+    woke_for: &'static str,
+    last_wake: Option<i64>,
+    since: i64,
+    news_tick: i64,
+    news_wakes: u32,
+    done_at: Option<i64>,
+}
+
+#[derive(Debug, Default)]
+pub struct Scheduler {
+    tick: i64,
+    units: BTreeMap<String, Unit>,
+    /// (next wake, key): the queue.
+    queue: BTreeSet<(i64, String)>,
+    moment_at: i64,
+    cohorts_now: u32,
+}
+
+/// What the host should do next.
+pub enum Next {
+    /// Nothing more is due by `until`.
+    End,
+    /// Time must move on to `to` first (the host's reply then carries the advance's events).
+    Advance { to: i64 },
+    /// These units wake now, in key order: (key, why, seconds since their last wake).
+    Cohort(Vec<(String, &'static str, i64)>),
+}
+
+impl Scheduler {
+    pub fn new(tick: i64) -> Self {
+        Self { tick, moment_at: -1, ..Default::default() }
+    }
+
+    fn ceil(&self, t: i64) -> i64 {
+        t.div_euclid(self.tick) * self.tick + if t.rem_euclid(self.tick) == 0 { 0 } else { self.tick }
+    }
+
+    fn set_wake(&mut self, key: &str, at: i64, why: &'static str) {
+        if let Some(u) = self.units.get_mut(key) {
+            self.queue.remove(&(u.next_wake, key.to_string()));
+            u.next_wake = at;
+            u.wake_for = why;
+            self.queue.insert((at, key.to_string()));
+        }
+    }
+
+    /// Units the host runs, each with its cadence and first wake (a unit already there is replaced).
+    pub fn add(&mut self, units: &[Value]) -> Result<(), String> {
+        for u in units {
+            let key = u["key"].as_str().ok_or("a unit needs a key")?.to_string();
+            let next_wake = u["next_wake"].as_i64().ok_or("a unit needs next_wake")?;
+            let unit = Unit {
+                participant: u["participant"].as_str().ok_or("a unit needs a participant")?.to_string(),
+                capacity: u["capacity"].as_str().map(String::from),
+                llm: u["llm"].as_bool().unwrap_or(false),
+                cadence: u["cadence"].as_i64().filter(|c| *c > 0).ok_or("a unit needs a cadence (seconds)")?,
+                next_wake,
+                wake_for: "start",
+                woke_for: "start",
+                last_wake: None,
+                since: 0,
+                news_tick: -1,
+                news_wakes: 0,
+                done_at: None,
+            };
+            if let Some(old) = self.units.insert(key.clone(), unit) {
+                self.queue.remove(&(old.next_wake, key.clone()));
+            }
+            self.queue.insert((next_wake, key));
+        }
+        Ok(())
+    }
+
+    pub fn remove(&mut self, keys: &[String]) {
+        for k in keys {
+            if let Some(u) = self.units.remove(k) {
+                self.queue.remove(&(u.next_wake, k.clone()));
+            }
+        }
+    }
+
+    /// Every unit of a participant back to its cadence from now (a stand-in taking over, a participant carried on).
+    pub fn to_cadence(&mut self, participant: &str, t: i64) {
+        let keys: Vec<(String, i64)> = self.units.iter().filter(|(_, u)| u.participant == participant).map(|(k, u)| (k.clone(), u.cadence)).collect();
+        for (k, c) in keys {
+            let at = t + self.ceil(c);
+            self.set_wake(&k, at, "cadence");
+        }
+    }
+
+    /// A unit's wake is over: when its act is done, if it began one; at the time it asked for, if it did; otherwise as
+    /// set (its cadence from this wake, or sooner if news came meanwhile).
+    pub fn finished(&mut self, key: &str, until: Option<i64>, t: i64) {
+        let Some(u) = self.units.get_mut(key) else { return };
+        if let Some(done) = u.done_at.take() {
+            self.set_wake(key, done, "done");
+        } else if let Some(until) = until {
+            let at = (t + self.tick).max(self.ceil(until));
+            self.set_wake(key, at, "asked");
+        }
+    }
+
+    /// What's next, at or before `until`.
+    pub fn next(&mut self, t: i64, until: i64) -> Result<Next, String> {
+        let Some((first, _)) = self.queue.first().cloned() else { return Ok(Next::End) };
+        if first > until {
+            return Ok(Next::End);
+        }
+        if first > t {
+            return Ok(Next::Advance { to: first });
+        }
+        if t == self.moment_at {
+            self.cohorts_now += 1;
+            if self.cohorts_now > MAX_COHORTS_PER_MOMENT {
+                return Err(format!(
+                    "participants kept waking each other at t={t} ({MAX_COHORTS_PER_MOMENT} rounds of wakes in one moment): {} was next",
+                    self.queue.first().map(|x| x.1.as_str()).unwrap_or("?")
+                ));
+            }
+        } else {
+            self.moment_at = t;
+            self.cohorts_now = 1;
+        }
+        let tick_now = t.div_euclid(self.tick);
+        let due: Vec<(i64, String)> = self.queue.iter().take_while(|(w, _)| *w <= t).cloned().collect();
+        let mut cohort = vec![];
+        for (w, key) in due {
+            self.queue.remove(&(w, key.clone()));
+            let u = self.units.get_mut(&key).expect("queued units exist");
+            // Units writing to each other: at most three news wakes a tick, then the next tick.
+            if u.wake_for == "news" {
+                if u.news_tick == tick_now && u.news_wakes >= 3 {
+                    u.next_wake = (tick_now + 1) * self.tick;
+                    u.wake_for = "cadence";
+                    self.queue.insert((u.next_wake, key));
+                    continue;
+                }
+                u.news_wakes = if u.news_tick == tick_now { u.news_wakes + 1 } else { 1 };
+                u.news_tick = tick_now;
+            }
+            u.woke_for = u.wake_for;
+            u.since = u.last_wake.map_or(0, |l| t - l);
+            u.last_wake = Some(t);
+            // (Its cadence, if it waits without a time.)
+            u.next_wake = t + (u.cadence.div_euclid(self.tick) * self.tick + if u.cadence.rem_euclid(self.tick) == 0 { 0 } else { self.tick });
+            u.wake_for = "cadence";
+            self.queue.insert((u.next_wake, key.clone()));
+            cohort.push((key, u.woke_for, u.since));
+        }
+        Ok(Next::Cohort(cohort))
+    }
+
+    fn busy(u: &Unit, t: i64) -> bool {
+        u.wake_for == "done" && u.next_wake > t
+    }
+
+    fn wake_now(&mut self, keys: Vec<String>, t: i64) {
+        for k in keys {
+            self.set_wake(&k, t, "news");
+        }
+    }
+
+    /// What a command's events mean for wakes: news for those it reaches; an act begun keeps its unit busy until done.
+    pub fn note(&mut self, st: Option<&State>, events: &[Value], t: i64) {
+        for e in events {
+            match e["event"].as_str() {
+                Some("action_started") => {
+                    let p = e["participant"].as_str().unwrap_or_default();
+                    let cap = e["as"].as_str();
+                    let done = e["done"].as_i64().unwrap_or(t);
+                    // The unit that acted: a code unit's capacity, or the language-model participant.
+                    let key = [format!("{p}|{}", cap.unwrap_or("self")), p.to_string()].into_iter().find(|k| self.units.contains_key(k));
+                    if let Some(u) = key.and_then(|k| self.units.get_mut(&k)) {
+                        u.done_at = Some(u.done_at.map_or(done, |d| d.max(done)));
+                    }
+                }
+                Some("message_delivered") => {
+                    for to in e["to"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+                        let keys = self.units.iter().filter(|(_, u)| u.participant == to && u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
+                        self.wake_now(keys, t);
+                    }
+                }
+                Some("recorded") => {
+                    let Some(st) = st else { continue };
+                    let r = &e["record"];
+                    let mut named: BTreeSet<&str> = BTreeSet::new();
+                    for f in ["holder", "counterparty", "as", "to"] {
+                        if let Some(x) = r[f].as_str() {
+                            named.insert(x);
+                        }
+                    }
+                    for x in r["addressed_to"].as_array().into_iter().chain(r["terms"]["parties"].as_array()).flatten().filter_map(Value::as_str) {
+                        named.insert(x);
+                    }
+                    let author = r["author"].as_str().unwrap_or_default();
+                    for entity in named {
+                        let keys = self.acting_for(st, entity, author, t);
+                        self.wake_now(keys, t);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Code units acting for an entity now, not the author's: its person's own unit, or the units holding its positions.
+    fn acting_for(&self, st: &State, entity: &str, author: &str, t: i64) -> Vec<String> {
+        let wakeable = |u: &Unit| !u.llm && u.next_wake > t && !Self::busy(u, t);
+        if let Some(pid) = st.entities.get(entity).and_then(|e| e.body.as_ref()).and_then(|b| b.participant.as_deref()) {
+            if pid == author {
+                return vec![];
+            }
+            return self.units.iter().filter(|(_, u)| u.participant == pid && u.capacity.as_deref() == Some("self") && wakeable(u)).map(|(k, _)| k.clone()).collect();
+        }
+        let mut keys = vec![];
+        for (id, x) in st.positions.iter() {
+            let Some(holder) = x.holder.as_deref() else { continue };
+            if x.entity != entity || holder == author {
+                continue;
+            }
+            keys.extend(self.units.iter().filter(|(_, u)| u.participant == holder && u.capacity.as_deref() == Some(id.as_str()) && wakeable(u)).map(|(k, _)| k.clone()));
+        }
+        keys
+    }
+
+    pub fn cohort_json(cohort: &[(String, &'static str, i64)], t: i64) -> Value {
+        json!({ "t": t, "cohort": cohort.iter().map(|(k, w, s)| json!({ "key": k, "woke_for": w, "since": s })).collect::<Vec<_>>() })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unit(key: &str, cadence: i64, next: i64) -> Value {
+        let (p, cap) = key.split_once('|').unwrap_or((key, ""));
+        json!({ "key": key, "participant": p, "capacity": if cap.is_empty() { Value::Null } else { json!(cap) }, "cadence": cadence, "next_wake": next })
+    }
+
+    #[test]
+    fn units_wake_in_order_and_again_at_their_cadence() {
+        let mut s = Scheduler::new(3600);
+        s.add(&[unit("b|self", 86_400, 0), unit("a|self", 7_200, 0), unit("c|self", 86_400, 90_000)]).unwrap();
+        let Next::Cohort(c) = s.next(0, 1_000_000).unwrap() else { panic!() };
+        assert_eq!(c.iter().map(|x| (x.0.as_str(), x.1)).collect::<Vec<_>>(), vec![("a|self", "start"), ("b|self", "start")]);
+        for (k, _, _) in &c {
+            s.finished(k, None, 0);
+        }
+        // Nothing more now: time moves on to the earliest wake (a's cadence, 2 hours).
+        assert!(matches!(s.next(0, 1_000_000).unwrap(), Next::Advance { to: 7_200 }));
+        // Asked for a time: rounded up to a tick, and at least a tick on.
+        let Next::Cohort(c) = s.next(7_200, 1_000_000).unwrap() else { panic!() };
+        assert_eq!(c[0].0, "a|self");
+        assert_eq!(c[0].2, 7_200); // since its last wake
+        s.finished("a|self", Some(7_300), 7_200);
+        assert!(matches!(s.next(7_200, 1_000_000).unwrap(), Next::Advance { to: 10_800 }));
+        // Beyond `until`: the end.
+        assert!(matches!(s.next(7_200, 9_000).unwrap(), Next::End));
+    }
+
+    #[test]
+    fn a_unit_busy_with_an_act_goes_on_when_it_is_done() {
+        let mut s = Scheduler::new(3600);
+        s.add(&[unit("a|self", 86_400, 0)]).unwrap();
+        let _ = s.next(0, 1_000_000).unwrap();
+        s.note(None, &[json!({ "event": "action_started", "participant": "a", "done": 1 })], 0);
+        s.finished("a|self", None, 0);
+        assert!(matches!(s.next(0, 1_000_000).unwrap(), Next::Advance { to: 1 }));
+        let Next::Cohort(c) = s.next(1, 1_000_000).unwrap() else { panic!() };
+        assert_eq!(c[0].1, "done");
+        // News while busy doesn't wake it; at done it goes on.
+        s.note(None, &[json!({ "event": "action_started", "participant": "a", "done": 2 })], 1);
+        s.finished("a|self", None, 1);
+        s.note(None, &[json!({ "event": "message_delivered", "to": ["a"] })], 1);
+        assert!(matches!(s.next(1, 1_000_000).unwrap(), Next::Advance { to: 2 }));
+    }
+
+    #[test]
+    fn letters_back_and_forth_are_held_to_three_news_wakes_a_tick() {
+        let mut s = Scheduler::new(3600);
+        s.add(&[unit("a|self", 86_400, 0)]).unwrap();
+        let mut woken = 0;
+        for i in 0..4 {
+            let Next::Cohort(c) = s.next(i, 1_000_000).unwrap() else { panic!() };
+            woken += c.len();
+            s.finished("a|self", None, i);
+            s.note(None, &[json!({ "event": "message_delivered", "to": ["a"] })], i);
+        }
+        // The start wake, then three news wakes; the fourth waits for the next tick.
+        assert_eq!(woken, 4);
+        let Next::Cohort(c) = s.next(4, 1_000_000).unwrap() else { panic!() };
+        assert!(c.is_empty());
+        assert!(matches!(s.next(4, 1_000_000).unwrap(), Next::Advance { to: 3600 }));
+    }
+}
