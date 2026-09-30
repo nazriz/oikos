@@ -84,77 +84,87 @@ species listed under the state's Flora and Fauna Guarantee Act, with densities a
 statements (to source). Proportional fidelity: a few species, chosen for what they're sensitive to (a wetland frog to
 water quality, a woodland glider to fragmentation, a common grassland bird as a control), not an ecosystem.
 
-### 2.4 The contract, exactly (for sign-off)
+### 2.4 The contract, exactly (for sign-off; built on the `nature` branch, not merged)
 
 **Catalogue** (world config), all optional: a world without them has no nature, as now.
 
 ```yaml
-land_covers:                      # what unbuilt ground is; a cell's `terrain` names one
+land_covers:                      # what ground is; a cell's `terrain` names one
   - id: woodland
   - id: cleared                   # what's left when a building comes down
     succeeds_to: { cover: scrub, after_days: 1825 }
   - id: scrub
     succeeds_to: { cover: woodland, after_days: 7300 }
-  - id: water                     # the river: its cells carry the flow layer
+  - id: water
+default_cover: grassland          # unlabelled, unbuilt ground (absent: the reserved `open`)
+cleared_cover: cleared
 fields:                           # integer quantities on cells
   - id: pollution
     min: 0
     max: 1000000
     baseline: 0
     decay_bps_per_day: 200        # toward the baseline
-    diffusion_bps_per_day: 500    # to the four neighbours
-    flows: true                   # carried downstream along the flow layer
-    from_structures: { factory-works: 50 }   # per structure of the type, per day
+    diffusion_bps_per_day: 500    # of what's above it, to the four neighbours
+    flow_bps_per_day: 5000        # of what's above it, downstream along the flow layer
+    from_structures: { factory-works: 50 }   # per building of the type (at its corner cell), per day
     from_covers: { farmland: 1 }
 species:
-  - id: wetland-frog
-    capacity: { wetland: 60, water: 10 }     # a cell's carrying capacity, by cover
-    growth_bps_per_year: 9000                # r, the intrinsic rate (logistic)
-    dispersal_bps_per_year: 2000             # the share that leaves for a neighbour cell
-    barriers: [built]                        # covers it can't cross
-    min_viable: 4                            # below this in a cell, it fails there
+  - id: glider
+    capacity_per_1000_cells: { woodland: 125 }   # a fraction of one per cell, for sparse animals
+    home_range: 3                                # crowding is felt over a square this far each way
+    growth_bps_per_year: 3000                    # r (logistic)
+    mortality_bps_per_year: 2000                 # background deaths (births replace them at capacity)
+    dispersal_bps_per_year: 5000                 # the share that leaves for a neighbouring cell
+    barriers: [built]                            # covers it dies crossing
+    min_viable: 2                                # fewer in a home range don't breed (an Allee effect)
     tolerance: { pollution: { above: 500, mortality_bps_per_day: 50 } }
-    detection_bps: 6000                      # a survey's chance of finding each one there
-    conspicuous: false                       # whether passers-by notice it
+    detection_bps: 3000                          # a survey's chance of finding each one
+    conspicuous: false                           # whether passers-by notice it
 tasks:
-  - id: survey                    # measurement is work
+  - id: survey
     labour: 3600                  # per cell surveyed
     surveys: true
 ```
 
-- **Structure types** gain an optional `cover` (a park is `grassland`); built cells are otherwise the reserved cover
-  `built`.
+- **Reserved covers:** `built` (a building whose type names no cover) and `open`.
+- **Structure types** gain an optional `cover` (a park is `grassland`). In a world with land covers, every terrain
+  label must be one.
 - **World:**
-  - `populations: [{ species, cell, count }]` at the start;
+  - `populations: [{ species, cell, count }]`;
   - `fields: [{ field, cell, value }]`, sparse;
-  - `flows: [{ from, to }]`, cell to downstream cell, the river's course.
+  - `flows: [{ from, to }]`, the river's course.
 
-**Physics** (the kernel, daily, at the day's start; keyed randomness per species, cell and day):
+**Physics** (the kernel, daily; keyed randomness per species and day):
 
-1. Covers succeed after their unbuilt days.
-2. Fields: sources, then decay, then diffusion, then flow.
+1. Unbuilt covers succeed after their days; a demolished building's cells become `cleared_cover`.
+2. Fields: sources, then decay, then diffusion, then flow; bounded.
 3. Populations:
-   - growth, logistic toward capacity, stochastically rounded (so small populations can fail);
-   - deaths from fields past tolerance;
-   - dispersal to neighbours that aren't barriers;
-   - a cell below `min_viable` fails.
-4. A species at zero everywhere is **extinct**: recorded once, permanent. Nothing can add it back.
+   - background and tolerance deaths;
+   - births replacing background deaths plus logistic growth, against the home range's crowding (its individuals
+     against its covers' capacity);
+   - crowding deaths past capacity;
+   - dispersal to neighbours, lost crossing a barrier or off the world's edge;
+   - none survive in a cell whose cover gives no capacity.
+
+   Fractions are rounded by draws (stochastic rounding). Capacity is nominal: a population settles somewhat below it,
+   since each individual feels itself and those near it as crowding (Lloyd's mean crowding).
+4. A species at zero everywhere is **extinct**: recorded once, permanent.
 
 **Blocks and outcomes:**
-- `work` with a `surveys` task takes `survey: { of, cells }`: the species or field, and the cells.
-- Performers' time is charged per cell.
-- The outcome, seen only by the actor, carries estimates:
+- `work` with a `surveys` task takes `survey: { of, cells }`, one unit per cell, charged as work.
+- The outcome's `surveyed` goes to the actor only:
   - for a species, each individual found with `detection_bps`;
-  - for a field, the value with an error of ±`detection_bps` of it.
-- What the actor then publishes, honestly or not, is theirs.
+  - for a field, the value off by up to 10%.
+- Refusal `bad_survey`: no survey for a survey task, one for a task that isn't, an unknown species or field, or cells
+  that don't match the units or don't exist.
 
 **Events:**
 - `species_extinct`.
-- A monthly `nature_census` of the truth (species totals and cover areas by place), for measurement. No participant
-  perceives it.
+- `nature_census` every 30 days: each species' count and cells, and the cells of each cover. For measurement; no
+  participant perceives it.
 
-**Observation:** cells in `sites` views show their cover. A `conspicuous` species shows as `seen: true` where any are
-present, never as a count.
+**Observation:** `sites` cells already show their terrain (the cover). They gain `seen`: conspicuous species present,
+never a count. A cell's change stamp moves when one comes or goes, or its cover succeeds.
 
 **Why daily, not lazily** like structure variables: diffusion and dispersal couple neighbouring cells, so each day
 must be stepped. At 4,800 cells, three fields and three species, that's small next to a day of acts.

@@ -6,9 +6,10 @@
 //! - **Fields:** integer quantities on cells. Each day: sources (by cover, and per building of a type at its corner
 //!   cell), decay toward the baseline, diffusion to the four neighbours, flow downstream along the flow layer; bounded.
 //! - **Populations:** per species and cell, an integer count. Each day: background deaths and deaths where a field
-//!   passes what the species tolerates; births toward the carrying capacity of the cell's cover (logistic, Verhulst),
-//!   only where there are enough to breed (an Allee effect); none can live where the cover gives no capacity; a share
-//!   disperses to neighbouring cells, and dies crossing a barrier. Every fractional expectation is rounded by a draw
+//!   passes what the species tolerates; births toward the carrying capacity (logistic, Verhulst), with crowding felt
+//!   over the home range (the individuals there against the capacity of its covers, per 1,000 cells, so a sparse
+//!   animal can have a fraction of one per cell), only where there are enough to breed (an Allee effect); none can live
+//!   in a cell whose cover gives no capacity; a share disperses to neighbouring cells, and dies crossing a barrier. Every fractional expectation is rounded by a draw
 //!   (stochastic rounding), so small populations can fail by chance, as real ones do.
 //! - **Extinction:** a species with none left anywhere is extinct, once and for good.
 //!
@@ -41,6 +42,10 @@ pub struct Ground {
     pub index: BTreeMap<Id, usize>,
     pub neighbours: Vec<Vec<usize>>,
     pub downstream: Vec<Option<usize>>,
+    /// Each cell's place on the plane, and the bounding box's corner and size (for sums over home ranges).
+    pub xy: Vec<(i64, i64)>,
+    pub corner: (i64, i64),
+    pub size: (i64, i64),
 }
 
 impl Ground {
@@ -60,7 +65,10 @@ impl Ground {
                 downstream[a] = Some(b);
             }
         }
-        Ground { cells: sorted.into_iter().map(|c| c.0).collect(), index, neighbours, downstream }
+        let xy: Vec<(i64, i64)> = sorted.iter().map(|c| (c.1, c.2)).collect();
+        let corner = (xy.iter().map(|c| c.0).min().unwrap_or(0), xy.iter().map(|c| c.1).min().unwrap_or(0));
+        let size = (xy.iter().map(|c| c.0).max().map_or(0, |m| m - corner.0 + 1), xy.iter().map(|c| c.1).max().map_or(0, |m| m - corner.1 + 1));
+        Ground { cells: sorted.into_iter().map(|c| c.0).collect(), index, neighbours, downstream, xy, corner, size }
     }
 }
 
@@ -245,10 +253,51 @@ fn step_field(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: 
     v
 }
 
+/// Each cell's sum of `v` over the square of cells `r` each way around it (a home range), by 2D prefix sums.
+fn home_range_sums(ground: &Ground, v: &[i64], r: i64) -> Vec<i64> {
+    if r == 0 {
+        return v.to_vec();
+    }
+    let (w, h) = ground.size;
+    let (cx, cy) = ground.corner;
+    let at = |x: i64, y: i64| (y * (w + 1) + x) as usize;
+    let mut pre = vec![0i64; ((w + 1) * (h + 1)) as usize];
+    for (i, (x, y)) in ground.xy.iter().enumerate() {
+        pre[at(x - cx + 1, y - cy + 1)] += v[i];
+    }
+    for y in 1..=h {
+        for x in 1..=w {
+            pre[at(x, y)] += pre[at(x - 1, y)] + pre[at(x, y - 1)] - pre[at(x - 1, y - 1)];
+        }
+    }
+    ground
+        .xy
+        .iter()
+        .map(|(x, y)| {
+            let (x0, y0) = ((x - cx - r).max(0), (y - cy - r).max(0));
+            let (x1, y1) = ((x - cx + r + 1).min(w), (y - cy + r + 1).min(h));
+            pre[at(x1, y1)] - pre[at(x0, y1)] - pre[at(x1, y0)] + pre[at(x0, y0)]
+        })
+        .collect()
+}
+
+/// `sround` on wide numbers (a home range's capacity times a rate can pass 2^63), clamped to i64.
+fn sround_wide(num: i128, den: i128, rng: &mut Rng) -> i64 {
+    if num <= 0 || den <= 0 {
+        return 0;
+    }
+    let (q, r) = (num / den, num % den);
+    let extra = r > 0 && (rng.below(u64::try_from(den).unwrap_or(u64::MAX)) as i128) < r;
+    i64::try_from(q + i128::from(extra)).unwrap_or(i64::MAX)
+}
+
 fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields: &BTreeMap<Id, Vec<i64>>, rng: &mut Rng) -> Vec<i64> {
     let cells = ground.cells.len();
     let barriers: BTreeSet<&str> = sp.barriers.iter().map(String::as_str).collect();
     let year = BPS * DAYS_A_YEAR;
+    // Capacity per 1,000 cells, cell by cell; and the individuals and capacity over each cell's home range.
+    let cap: Vec<i64> = land.cover.iter().map(|c| sp.capacity_per_1000_cells.get(c).copied().unwrap_or(0)).collect();
+    let (crowd, room) = (home_range_sums(ground, n, sp.home_range), home_range_sums(ground, &cap, sp.home_range));
     let mut next = vec![0i64; cells];
     let mut arriving = vec![0i64; cells];
     for i in 0..cells {
@@ -256,7 +305,7 @@ fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields
         if here <= 0 {
             continue;
         }
-        let k = sp.capacity.get(&land.cover[i]).copied().unwrap_or(0);
+        let (local, k) = (i128::from(crowd[i]) * 1000, i128::from(room[i]));
         // Deaths: background, and where a field passes what it tolerates.
         let mut deaths = sround(here * sp.mortality_bps_per_year, year, rng);
         for (field, tol) in &sp.tolerance {
@@ -264,16 +313,14 @@ fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields
                 deaths += sround(here * tol.mortality_bps_per_day, BPS, rng);
             }
         }
-        // Births: replacing the background deaths, plus logistic growth toward the capacity (so it settles at the
-        // capacity), where there are enough to breed; crowding past it kills.
-        let births = if k > here && here >= sp.min_viable.max(1) {
-            sround(here * (sp.mortality_bps_per_year * k + sp.growth_bps_per_year * (k - here)), k * year, rng)
-        } else {
-            0
-        };
-        if k > 0 && here > k {
-            deaths += sround(here * sp.growth_bps_per_year * (here - k), k * year, rng);
+        // Births: replacing the background deaths, plus logistic growth toward the capacity of the home range (so it
+        // settles there), where there are enough to breed; crowding past it kills.
+        let (m, r, h) = (i128::from(sp.mortality_bps_per_year), i128::from(sp.growth_bps_per_year), i128::from(here));
+        let births = if k > local && crowd[i] >= sp.min_viable.max(1) { sround_wide(h * (m * k + r * (k - local)), k * i128::from(year), rng) } else { 0 };
+        if k > 0 && local > k {
+            deaths += sround_wide(h * r * (local - k), k * i128::from(year), rng);
         }
+        let k = cap[i];
         let mut alive = (here - deaths).max(0) + births;
         // Dispersal: a share leaves for a neighbouring cell at random; crossing a barrier (or off the world's edge),
         // it's lost.

@@ -375,14 +375,14 @@
           }
         },
         "species": {
-          "description": "Living populations on cells, stepped daily: background deaths and deaths where a field passes what the species tolerates; births toward the carrying capacity of the cell's cover (logistic), only where at least min_viable are there to breed; none live where the cover gives no capacity; a share disperses to a neighbouring cell each year, lost crossing a barrier cover. Fractions are rounded by draws, so small populations can fail by chance. A species with none left anywhere is extinct, for good. Surveys find each one with detection_bps; a conspicuous one is seen by passers-by (never counted).",
+          "description": "Living populations on cells, stepped daily: background deaths and deaths where a field passes what the species tolerates; births toward the carrying capacity (logistic), crowding felt over the home range, only where at least min_viable in it are there to breed; none live where the cover gives no capacity; a share disperses to a neighbouring cell each year, lost crossing a barrier cover. Fractions are rounded by draws, so small populations can fail by chance. A species with none left anywhere is extinct, for good. Surveys find each one with detection_bps; a conspicuous one is seen by passers-by (never counted).",
           "type": "array",
           "maxItems": 100,
           "items": {
             "type": "object",
             "required": [
               "id",
-              "capacity",
+              "capacity_per_1000_cells",
               "growth_bps_per_year",
               "detection_bps"
             ],
@@ -394,7 +394,8 @@
               "name": {
                 "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Name"
               },
-              "capacity": {
+              "capacity_per_1000_cells": {
+                "description": "Carrying capacity by cover, in individuals per 1,000 cells (so a sparse animal can have a fraction of one per cell). It's nominal: a population settles somewhat below it, since each individual feels itself and those near it as crowding.",
                 "type": "object",
                 "propertyNames": {
                   "minLength": 1,
@@ -406,6 +407,12 @@
                   "maximum": 1000000000
                 },
                 "maxProperties": 1000
+              },
+              "home_range": {
+                "description": "How far each way (a square of cells) crowding is felt: where an individual finds food and mates. 0: its own cell.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
               },
               "growth_bps_per_year": {
                 "type": "integer",

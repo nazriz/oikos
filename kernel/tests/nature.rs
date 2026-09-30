@@ -28,9 +28,9 @@ fn nature_world() -> Value {
     cat.insert("cleared_cover".into(), json!("cleared"));
     cat.insert("fields".into(), json!([{"id": "pollution", "min": 0, "max": 1000000, "decay_bps_per_day": 100, "diffusion_bps_per_day": 1000, "flow_bps_per_day": 5000, "from_structures": {"shop": 50}}]));
     cat.insert("species".into(), json!([
-        {"id": "frog", "capacity": {"wetland": 60, "water": 5}, "growth_bps_per_year": 15000, "mortality_bps_per_year": 3000, "dispersal_bps_per_year": 500,
+        {"id": "frog", "capacity_per_1000_cells": {"wetland": 60000, "water": 5000}, "growth_bps_per_year": 15000, "mortality_bps_per_year": 3000, "dispersal_bps_per_year": 500,
          "barriers": ["built"], "min_viable": 2, "tolerance": {"pollution": {"above": 5000, "mortality_bps_per_day": 100}}, "detection_bps": 5000},
-        {"id": "heron", "capacity": {"grassland": 2, "water": 3}, "growth_bps_per_year": 3000, "mortality_bps_per_year": 1500, "dispersal_bps_per_year": 2000,
+        {"id": "heron", "capacity_per_1000_cells": {"grassland": 2000, "water": 3000}, "growth_bps_per_year": 3000, "mortality_bps_per_year": 1500, "dispersal_bps_per_year": 2000,
          "min_viable": 1, "detection_bps": 9000, "conspicuous": true}
     ]));
     cat["tasks"].as_array_mut().unwrap().push(json!({"id": "survey", "labour": 600, "surveys": true}));

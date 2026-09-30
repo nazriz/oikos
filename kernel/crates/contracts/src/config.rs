@@ -152,16 +152,20 @@ pub struct FieldCfg {
     pub from_covers: BTreeMap<Id, i64>,
 }
 
-/// A species: its carrying capacity per cell by cover, its intrinsic growth and background mortality (a year), the
-/// share that disperses to a neighbouring cell (a year), covers it can't cross, the least number in a cell that
-/// breeds (an Allee effect), deaths where a field passes what it tolerates, and how surveys and passers-by see it.
+/// A species: its carrying capacity by cover (individuals per 1,000 cells, so a sparse animal can have a fraction of
+/// one per cell), felt over its home range (a square of cells this far each way: where it finds food and mates); its
+/// intrinsic growth and background mortality (a year); the share that disperses to a neighbouring cell (a year);
+/// covers it can't cross; the least number in a home range that breeds (an Allee effect); deaths where a field passes
+/// what it tolerates; and how surveys and passers-by see it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SpeciesCfg {
     pub id: Id,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    pub capacity: BTreeMap<Id, i64>,
+    pub capacity_per_1000_cells: BTreeMap<Id, i64>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub home_range: i64,
     pub growth_bps_per_year: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub mortality_bps_per_year: i64,
@@ -990,11 +994,14 @@ fn check_nature(c: &Config) -> Result<(), String> {
         if !species.insert(&sp.id) || fields.contains(sp.id.as_str()) {
             return Err(format!("species {:?} named twice (or as a field)", sp.id));
         }
-        for (k, v) in &sp.capacity {
+        for (k, v) in &sp.capacity_per_1000_cells {
             cover(k, &format!("species {}", sp.id))?;
-            if *v < 0 || *v > 1_000_000_000 {
+            if *v < 0 || *v > 1_000_000_000_000 {
                 return Err(format!("species {}: a capacity out of range", sp.id));
             }
+        }
+        if !(0..=100).contains(&sp.home_range) {
+            return Err(format!("species {}: a home range is 0..=100 cells each way", sp.id));
         }
         for b in &sp.barriers {
             cover(b, &format!("species {}", sp.id))?;

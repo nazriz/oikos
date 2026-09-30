@@ -1,5 +1,5 @@
 use super::*;
-use terrarium_contracts::config::{Catalogue, FieldCfg, LandCoverCfg, SuccessionCfg, ToleranceCfg};
+use terrarium_contracts::config::{Catalogue, LandCoverCfg, SuccessionCfg};
 
 fn cat(json: serde_json::Value) -> Catalogue {
     let mut base = serde_json::json!({ "structure_types": [] });
@@ -17,7 +17,7 @@ fn land(covers: &[&str]) -> Land {
 }
 
 fn frog() -> serde_json::Value {
-    serde_json::json!({ "id": "frog", "capacity": { "wetland": 100 }, "growth_bps_per_year": 20000, "mortality_bps_per_year": 2000,
+    serde_json::json!({ "id": "frog", "capacity_per_1000_cells": { "wetland": 100000 }, "growth_bps_per_year": 20000, "mortality_bps_per_year": 2000,
         "dispersal_bps_per_year": 1000, "barriers": ["built"], "min_viable": 4, "detection_bps": 6000 })
 }
 
@@ -73,7 +73,7 @@ fn a_barrier_between_habitats_keeps_them_apart() {
     // Without the barrier (grassland: no capacity, but crossable), some get through.
     let mut st2 = NatureState::default();
     st2.populations.insert("frog".into(), [("cell.0.0".to_string(), 80)].into());
-    let c2 = cat(serde_json::json!({ "species": [{ "id": "frog", "capacity": { "wetland": 100 }, "growth_bps_per_year": 20000, "mortality_bps_per_year": 2000,
+    let c2 = cat(serde_json::json!({ "species": [{ "id": "frog", "capacity_per_1000_cells": { "wetland": 100000 }, "growth_bps_per_year": 20000, "mortality_bps_per_year": 2000,
         "dispersal_bps_per_year": 20000, "min_viable": 1, "detection_bps": 6000 }] }));
     let mut l = land(&["wetland", "grassland", "wetland"]);
     l.built = vec![false; 3];
@@ -168,6 +168,30 @@ fn surveys_estimate_with_error_and_runs_replay() {
         st
     };
     assert_eq!(go(), go());
-    let _unused = ToleranceCfg { above: 0, mortality_bps_per_day: 0 };
-    let _f: Option<FieldCfg> = None;
 }
+
+#[test]
+fn a_sparse_species_lives_at_a_fraction_of_one_per_cell_over_its_home_range() {
+    // A glider at 0.125 per cell (125 per 1,000) in a 20 x 20 woodland: about 50 in all. Crowding is felt over a home
+    // range 3 cells each way; per cell alone it couldn't live (one in a cell is already past 0.125).
+    let glider = |range: i64| serde_json::json!({ "id": "glider", "capacity_per_1000_cells": { "woodland": 125 }, "home_range": range,
+        "growth_bps_per_year": 3000, "mortality_bps_per_year": 2000, "dispersal_bps_per_year": 5000, "min_viable": 2, "detection_bps": 3000 });
+    let cells: Vec<(String, i64, i64)> = (0..20).flat_map(|y| (0..20).map(move |x| (format!("cell.{x}.{y}"), x, y))).collect();
+    let g = Ground::new(&cells, &[]);
+    let l = land(&vec!["woodland"; 400]);
+    let run_with = |range: i64, seed: u64| {
+        let c = cat(serde_json::json!({ "species": [glider(range)] }));
+        let mut st = NatureState::default();
+        // (At its density: one per 8 cells. Scattered singletons, alone in their home ranges, couldn't breed: the Allee
+        // effect, as it should be.)
+        st.populations.insert("glider".into(), (0..50).map(|i| (g.cells[i * 8].clone(), 1)).collect());
+        run(&c, &g, &l, &mut st, 0..3650, &Randomness::new(seed));
+        total(&st, "glider")
+    };
+    // (Five seeds' mean. It settles below the nominal 50: each animal feels itself and its kin nearby as crowding,
+    // Lloyd's mean crowding, as individual-based models do; and some dispersers are lost off the woodland's edge.)
+    let mean = (1..=5).map(|seed| run_with(3, seed)).sum::<i64>() / 5;
+    assert!((20..=65).contains(&mean), "persists, near its capacity: {mean}");
+    assert_eq!(run_with(0, 1), 0, "crowded out of a single cell");
+}
+
