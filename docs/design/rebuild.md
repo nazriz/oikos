@@ -461,8 +461,9 @@ Proposed together, for one sign-off:
   - the `Book` keeps two meanings apart: `concluded` (signed by every party, a fact of the records) and `inForce` (by the reading, if one came). Merging them broke two things, the wages stopping at an employment's end and the builder's purchases, because code asked "in force" when it meant "concluded".
   - **A guard on the engine:** the binary and the native module carry a fingerprint of the sources they were built from (kernel/build.rs), and the host refuses a module that doesn't match the binary beside it. A `cargo test` rebuilds only the binary, and the stale module had written logs the binary couldn't replay.
   - **Gate:** kernel 88, participants 39, orchestrator 73.
+  - **Modules read ends from readings:** the landlord's leases in force, `Staffing`'s contract ends, and the citizen's job and home. They no longer work ends out themselves. That arithmetic had hard-coded notice periods (30 and 14 days, and a month when a clause was missing), each a place where code could drift from the terms. A job the citizen walks out of (wages unpaid) is the one end that isn't the terms'. A 90-day town's events are identical before and after (437,836 lines).
 - **Next:**
-  1. The rest of R3: modules read ends from readings instead of working them out (the landlord's leases, `Staffing.endOf`, the citizen's job and home), and truth audits.
+  1. The rest of R3: truth audits.
   2. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
   3. R4 and R5.
 

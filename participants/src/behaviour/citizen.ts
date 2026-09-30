@@ -107,11 +107,11 @@ export function heardNews(text: string): News | undefined {
 
 /** A home is a unit (a space) in a building. */
 interface Home {
-  agreement: string; space: string; structure: string; landlord: string; rent: number; order?: string; endsAt: number; movedIn: boolean;
+  agreement: string; space: string; structure: string; landlord: string; rent: number; order?: string; movedIn: boolean;
   /** Rent orders replaced by a new rent's, to stop once their last payment is made (when). */
   retiring?: { order: string; at: number }[];
 }
-interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; endsAt: number; since: number; paidAt?: number; claimed?: boolean }
+interface Job { agreement: string; employer: string; wage: number; period: number; workplace?: string; since: number; /** When we walked out (unpaid), whatever the terms say. */ leftAt?: number; paidAt?: number; claimed?: boolean }
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
@@ -396,16 +396,15 @@ export const citizen: BehaviourModule = {
       for (const r of book.ofType("agreement")) {
         if (r.record !== "agreement" || !r.terms.parties.includes(me) || !book.inForce(r.id)) continue;
         const since = book.signedAt(r.id) ?? 0;
-        const end = r.terms.term ? since + r.terms.term : Number.MAX_SAFE_INTEGER;
         if (r.terms.template === "lease" && !home) {
           const lt = leaseTerms(r, me);
           const landlord = r.terms.parties.find((x) => x !== me)!;
           const order = book.all("request").find((x) => x.record === "statement" && x.kind === "request" && x.basis === r.id && x.speaks_for === me)?.id;
-          home = { agreement: r.id, space: lt.space!, structure: lt.structure!, landlord, rent: lt.rent, order, endsAt: end, movedIn: true };
+          home = { agreement: r.id, space: lt.space!, structure: lt.structure!, landlord, rent: lt.rent, order, movedIn: true };
         }
         if (r.terms.template === "employment" && !job) {
           const employer = r.terms.parties.find((x) => x !== me)!;
-          job = { agreement: r.id, employer, ...jobTerms(r, me), endsAt: end, since };
+          job = { agreement: r.id, employer, ...jobTerms(r, me), since };
           joinAsked = r.id; // (whether we belong to a union at the start is the world's)
         }
       }
@@ -671,23 +670,13 @@ export const citizen: BehaviourModule = {
         }
       }
 
-      // Notices on our agreements move their end dates.
-      for (const r of fresh) {
-        if (r.record !== "notice" || r.as === me) continue;
-        const a = book.records.get(r.agreement);
-        if (a?.record !== "agreement") continue;
-        const notice = a.terms.termination?.find((x) => x.party === r.as)?.notice ?? MONTH;
-        if (home?.agreement === r.agreement) home.endsAt = Math.min(home.endsAt, r.at + notice);
-        if (job?.agreement === r.agreement) job.endsAt = Math.min(job.endsAt, r.at + notice);
-      }
-
       // An old rent's last payment made: stopping its order (the new rent's has taken over).
       if (home?.retiring?.some((x) => t >= x.at)) {
         for (const x of home.retiring.filter((x) => t >= x.at)) steps.push(because("The old rent's last payment is made: stopping its order; the new rent's takes over.", withdraw(x.order, "Rent increased; replaced by a new standing order.")));
         home.retiring = home.retiring.filter((x) => t < x.at);
       }
       // A tenancy that has ended: move out and stop paying rent.
-      if (home && t >= home.endsAt) {
+      if (home && t >= endsAt(home)) {
         // Looking for somewhere cheaper (a goal's method): for the first month of the hunt, only homes that beat this rent.
         if (pursuing("cheaper home")) cheaperThan = { rent: Math.floor((home.rent * p.goals.cheaper_bps) / 10_000), until: t + MONTH };
         const s: Step = because(`Our tenancy of ${home.space} has ended: moving out and stopping the rent${cheaperThan ? `; we'll look for somewhere cheaper, under ${usd(cheaperThan.rent)} a month` : ""}.`, ...(home.movedIn ? [moveOut(home.structure, me)] : []));
@@ -704,7 +693,7 @@ export const citizen: BehaviourModule = {
       }
       // Wages not paid: a pay period (and a few days' grace) without them, we resign, and claim what we're owed, as an
       // employee can (docs/behaviour/citizen.md). The claim is a debt recorded against the employer.
-      if (job && !job.claimed && t < job.endsAt && !striking) {
+      if (job && !job.claimed && t < jobEnds(job) && !striking) {
         const last = job.paidAt ?? job.since;
         if (t - last > job.period + 5 * DAY) {
           job.claimed = true;
@@ -714,11 +703,11 @@ export const citizen: BehaviourModule = {
           steps.push(because(`Our wages haven't been paid for ${Math.floor((t - last) / DAY)} days: resigning, and claiming the ${usd(missed * job.wage)} we're owed.`,
             notice(job.agreement, "Resigning: our wages haven't been paid."),
             record("right", me, { kind: "debt", amount: missed * job.wage, for: `Unpaid wages (${missed} pay period${missed > 1 ? "s" : ""}).` }, { against: job.employer, basis: job.agreement })));
-          job.endsAt = t;
+          job.leftAt = t;
         }
       }
       // A job that has ended.
-      if (job && t >= job.endsAt) {
+      if (job && t >= jobEnds(job)) {
         if (job.workplace && inside(job.workplace)) steps.push(because("Our job has ended: leaving the workplace.", moveOut(job.workplace, me)));
         job = null;
         joblessSince = t;
@@ -732,7 +721,7 @@ export const citizen: BehaviourModule = {
           const s: Step = because(`Our notice is worked out: starting the job we took (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days).`, sign(r.id));
           if (terms.workplace) s.push(moveIn(terms.workplace));
           steps.push(s);
-          job = { agreement: r.id, employer: r.terms.parties.find((x) => x !== me)!, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER, since: t };
+          job = { agreement: r.id, employer: r.terms.parties.find((x) => x !== me)!, ...terms, since: t };
           joblessSince = null;
         }
       }
@@ -812,7 +801,7 @@ export const citizen: BehaviourModule = {
             sign(r.id),
             ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: 0, basis: r.id, for: `Rent for ${space}, monthly in advance.` })],
           ));
-          home = { agreement: r.id, space, structure, landlord: other, rent, endsAt: t + (r.terms.term ?? 365 * DAY), movedIn: false };
+          home = { agreement: r.id, space, structure, landlord: other, rent, movedIn: false };
           pendingRef = { kind: "rent", agreement: r.id };
           homelessSince = null;
         } else if (r.terms.template === "employment" && !job) {
@@ -820,17 +809,14 @@ export const citizen: BehaviourModule = {
           const s: Step = because(`Taking the job offered: ${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days${thank(terms.workplace ? structureOf(terms.workplace) : undefined, t)}.`, sign(r.id));
           if (terms.workplace) s.push(moveIn(terms.workplace));
           steps.push(s);
-          job = { agreement: r.id, employer: other, ...terms, endsAt: r.terms.term ? t + r.terms.term : Number.MAX_SAFE_INTEGER, since: t };
+          job = { agreement: r.id, employer: other, ...terms, since: t };
           joblessSince = null;
         } else if (r.terms.template === "employment" && job && !switching && !retired && other !== job.employer) {
           // Offered a better-paid job while in one (we applied for it): we take it, give notice at ours, and start the
           // new one when the notice is worked out.
           const terms = jobTerms(r, me);
           if (terms.wage * job.period <= job.wage * terms.period) continue;
-          const old = book.records.get(job.agreement);
-          const noticeDays = old?.record === "agreement" ? old.terms.termination?.find((x) => x.party === me)?.notice ?? 14 * DAY : 14 * DAY;
           switching = { offer: r.id, wage: terms.wage };
-          job.endsAt = Math.min(job.endsAt, t + noticeDays);
           steps.push(because(`Offered a better-paid job (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days, against our ${usd(job.wage)} every ${Math.round(job.period / DAY)}): taking it, and giving our employer the notice our contract asks.`,
             notice(job.agreement, "Resigning: moving to another job.")));
         }
@@ -941,7 +927,6 @@ export const citizen: BehaviourModule = {
         } else {
           steps.push(because(`Our rent goes up to ${usd(rent)} a month, beyond what we can afford (a third of household income, ${usd(Math.floor((householdIncome() * p.rent_share_bps) / 10_000))}): giving notice, to find somewhere else.`,
             notice(home.agreement, "We can't afford the new rent.")));
-          home.endsAt = Math.min(home.endsAt, t + 30 * DAY);
         }
       }
 
@@ -1139,7 +1124,6 @@ export const citizen: BehaviourModule = {
         retired = true;
         if (job) {
           steps.push(because(`We've reached the retirement age (${p.retirement_age}): retiring, with the notice our job asks.`, notice(job.agreement, "Retiring.")));
-          job.endsAt = Math.min(job.endsAt, t + 14 * DAY);
         }
       }
       // Claims for support: once retired, and while out of work. A claim that no longer fits (work found, or retired)
@@ -1492,6 +1476,10 @@ export const citizen: BehaviourModule = {
       householdIncome() > 0 ? rent * 10_000 <= householdIncome() * p.rent_share_bps : rent * p.savings_rent_months <= balance;
 
     // The household's members by age now (a child is under 18).
+    // When our home or job ends: by the terms' reading (a term run out, or notice given by either side under its clause),
+    // or, for a job, when we walked out.
+    const endsAt = (x: { agreement: string }) => book.endsAt(x.agreement) ?? Number.MAX_SAFE_INTEGER;
+    const jobEnds = (j: Job) => Math.min(j.leftAt ?? Number.MAX_SAFE_INTEGER, endsAt(j));
     const children = (t: number) => others().filter((m) => ageAt(m, t, year) < ADULT_YEARS);
     const adults = (t: number) => others().filter((m) => ageAt(m, t, year) >= ADULT_YEARS);
     /** Fewest bedrooms to look for: what the standard asks, less one for each stretch spent hunting without finding it. */

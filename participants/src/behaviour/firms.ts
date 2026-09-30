@@ -162,12 +162,7 @@ export const landlord: BehaviourModule = {
       // would let the same home twice.
       const leases = book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.signedBy(r.id, me));
       const awaiting = (leases as any[]).filter((a) => !book.concluded(a.id) && t - a.at < MONTH);
-      const active = (leases as any[]).filter((a: any) => {
-        if (!book.concluded(a.id)) return false;
-        const since = book.signedAt(a.id)!;
-        const ends = Math.min(a.terms.term ? since + a.terms.term : Infinity, ...(book.notices.get(a.id) ?? []).map((n) => n.at + (a.terms.termination?.find((x: any) => x.party === n.as)?.notice ?? MONTH)));
-        return t < ends;
-      }) as any[];
+      const active = (leases as any[]).filter((a: any) => book.inForce(a.id)) as any[];
       const steps: Step[] = [];
       const offeredNow: string[] = []; // units offered this wake (they're held too)
       const tenantOf = (a: any) => a.terms.parties.find((x: string) => x !== me);
@@ -490,7 +485,7 @@ export class Staffing {
     return book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me);
   }
   private endOf(book: Book, a: any): number {
-    return Math.min(...(book.notices.get(a.id) ?? []).map((n) => n.at + (a.terms.termination?.find((x: any) => x.party === n.as)?.notice ?? 14 * DAY)), Infinity);
+    return book.endsAt(a.id) ?? Infinity;
   }
   /** Employment agreements in force and not yet ended, oldest first. */
   staff(book: Book, t: number): any[] {

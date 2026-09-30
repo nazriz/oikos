@@ -121,6 +121,11 @@ export class Book {
     return this.concluded(agreement);
   }
 
+  /** When it ends by its reading (its term run out, or notice under its terms), if one came with it and it has an end. */
+  endsAt(agreement: string): number | undefined {
+    return this.readings.get(agreement)?.ends_at;
+  }
+
   /** The time the last party signed, if all have. */
   signedAt(agreement: string): number | undefined {
     if (!this.concluded(agreement)) return undefined;
