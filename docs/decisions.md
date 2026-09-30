@@ -1048,6 +1048,25 @@ See the design note, §16.
   - **Batch after these (10 seeds, one year; before renewals and the loop fix):** 2 breaches of 15, from 4. Saving 6.9%, groups 52.8%, unmet demand 4.65%, renters' costs 19.8%, all inside tolerance. Still off: employment to population 67.1% (63.9 ± 3) and unemployment 1.0% (4.6 ± 1.5), with about 140 people a year leaving and 17 arriving.
   - **Revisit if:** departures stay well above arrivals (the town shrinking), or renters' housing costs overshoot 20.2% of income. Moving house while housed is the realistic fix for rents that can't be borne (docs/behaviour/citizen.md, "Leaves out").
 
+- **Calibration pass 1: where it stands** (batch c5: 10 seeds, one year, commit fb0f115). 2 breaches of 15, from 4.
+  - **In tolerance:**
+    - employment to population 64.6% (target 63.9);
+    - participation 65.6% (67.1);
+    - saving 5.8% (6.5);
+    - renters' housing costs 17.3% (20.2);
+    - group participation 51.8% (50.0);
+    - affiliation −2.0 points a year (−1.64).
+  - **Out:**
+    - unemployment 1.5% (4.6): hiring is too quick (below);
+    - unmet demand 11.8% (at most 5): the shortage spiral (below).
+  - **Still shrinking:** about 100 people a year leave and 21 arrive, about half of the leavers for want of a home. That's the next thing to look at, with the spiral.
+  - **Found on the way: renewals were evicting people.** The landlord works out a tenant's paying account from its leases in force. A renewal doesn't name it, so once the old lease ended the landlord saw nothing paid, counted two months' arrears, and gave notice. Now it looks at any of the tenant's leases (landlord 0.10.1).
+  - **Found, not fixed: a shortage spiral in some seeds.** In 2 of 10 seeds households went without 28–39% of what they ordered, against 1–12% in the rest.
+    - Shops run short, and the customer is refunded and orders the rest elsewhere.
+    - The repeat orders count as demand, both for the shops and for the measure.
+    - Shops order to that demand but are held back by cash (about 70% of restocks capped).
+    - To do: count an order that's refunded and placed again once; and see why shops' cash can't keep up (their payouts to shareholders against their buffer).
+
 - **Hiring that takes time: tried, and reverted** (2026-09-30). Unemployment sits near 1–2% (target 4.6%): employers choose among a posting's applicants at their next wake, so someone out of work is hired within days. A posting kept open 21 days before choosing (as employers advertise, then shortlist) sent unemployment to 38% (10 seeds, one year): firms post one job at a time, and a posting republished at a new wage starts its wait again, so they couldn't replace the people who left. Reverted.
   - **Next:** recruit as employers do: several postings at once for the headcount wanted, a closing date that doesn't restart when the wage moves, and all the applicants seen then. And the separation side: jobs ending run at about 2.8% of employment a month, against roughly 1–1.5% in labour force gross flows (to confirm).
 
