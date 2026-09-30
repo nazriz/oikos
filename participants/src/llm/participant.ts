@@ -58,8 +58,15 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
       input_schema: { type: "object", required: ["text"], properties: { text: { type: "string", maxLength: 4000 } } } },
     { name: "opt_out", description: leave, input_schema: { type: "object", required: ["statement"], properties: { statement: { type: "string" } } } },
     ...(c.onRequest?.length
-      ? [{ name: "look", description: `Look at one of the reports you only read when you choose to: ${c.onRequest.map((id) => `"${c.titles.get(id) ?? id}" (${id})`).join(", ")}. You'll see what's there with your next report.`,
-          input_schema: { type: "object", required: ["report"], properties: { report: { enum: c.onRequest }, current_only: { type: "boolean", description: "Only what's still current (not withdrawn by whoever put it up)." } } } }]
+      ? [{ name: "look", description: `Look at one of the reports you only read when you choose to: ${c.onRequest.map((id) => `"${c.titles.get(id) ?? id}" (${id})`).join(", ")}. You'll see what's there with your next report. To look something up, say what to find: records where a field matches (kind, author, speaks_for, basis, at, or data.<name> for a detail, e.g. data.employer), newest first.`,
+          input_schema: { type: "object", required: ["report"], properties: {
+            report: { enum: c.onRequest },
+            current_only: { type: "boolean", description: "Only what's still current (not withdrawn by whoever put it up)." },
+            find: { type: "array", maxItems: 8, description: "Only records where each of these holds.", items: { type: "object", required: ["field", "value"], properties: {
+              field: { type: "string", description: "kind, author, speaks_for, basis, at, or data.<name>" },
+              op: { enum: ["=", "!=", "<", "<=", ">", ">="], description: "= if not given" },
+              value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } },
+            limit: { type: "integer", minimum: 1, maximum: 50, description: "At most this many (20 if not given)." } } } }]
       : []),
   ];
 }
@@ -85,6 +92,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const standingIds = new Set(c.standing);
   const toolset = tools(c);
   let notes = "";
+  // What it did, as recorded, for its debrief (it has no other memory of the run: pilot 9's mayor couldn't say).
+  const tally = { requests: 0, confirmed: 0, declined: 0, letters: 0, looks: 0, first: -1, last: -1 };
   let messages: LlmMessage[] = [];
   // The tool uses of the last answer that are still owed a result (the APIs need one for every use): the action's
   // result is the next report; a notebook update is acknowledged; any further action wasn't taken (one at a time).
@@ -134,6 +143,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const alongside = use && use.name !== "done_for_now" ? uses.find((x) => x.name === "done_for_now") : undefined;
       if (alongside) doneAfter = { ...(Number.isInteger(alongside.input?.days) && alongside.input.days > 0 ? { days: alongside.input.days } : {}) };
       const done = (a: ParticipantAction, label?: string) => {
+        if (a.type === "propose") tally.requests++;
+        if (a.type === "sign") a.decision === "accept" ? tally.confirmed++ : tally.declined++;
+        if (a.type === "message") tally.letters++;
+        if (a.type === "look") tally.looks++;
+        if (a.type !== "wait") [tally.first, tally.last] = [tally.first < 0 ? obs.t : tally.first, obs.t];
         if (a.type === "wait" || a.type === "opt_out") messages = [];
         else {
           actedId = use!.id;
@@ -162,8 +176,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         case "done_for_now":
           return done(Number.isInteger(i.days) && i.days > 0 ? { type: "wait", until: obs.t + i.days * 86_400 } : { type: "wait" });
         case "look":
-          if (text(i.report) && c.onRequest?.includes(i.report))
-            return done({ type: "look", looks: [{ channel: i.report, ...(i.current_only ? { query: { standing: true, limit: 20 } } : {}) }] });
+          if (text(i.report) && c.onRequest?.includes(i.report)) {
+            // A search, if asked for (what matches now, newest first): fields as the participant API's queries name them.
+            const FIELD = /^(record|kind|at|author|speaks_for|basis|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
+            const find = Array.isArray(i.find) ? i.find.filter((w: any) => text(w?.field) && FIELD.test(w.field) && ["string", "number", "boolean"].includes(typeof w.value)) : [];
+            const limit = Number.isInteger(i.limit) ? Math.min(50, Math.max(1, i.limit)) : 20;
+            const where = find.map((w: any) => ({ field: w.field, op: ["=", "!=", "<", "<=", ">", ">="].includes(w.op) ? w.op : "=", value: w.value }));
+            const query = find.length ? { query: { ...(i.current_only ? { standing: true } : {}), where, order: { field: "at", desc: true }, limit } }
+              : i.current_only ? { query: { standing: true, limit: 20 } } : {};
+            return done({ type: "look", looks: [{ channel: i.report, ...query }] });
+          }
           break;
         case "opt_out":
           if (text(i.statement)) return done({ type: "opt_out", statement: i.statement });
@@ -175,12 +197,18 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     },
 
     async debrief(text) {
+      // Its own record of the run, beside the question: its notebook as it left it, and what it did (VISION §15.3: a
+      // reaction to an experience it can't remember is no reaction).
+      const day = (t: number) => Math.floor(t / 86_400) + 1;
+      const did = tally.first < 0 ? "You didn't act during the run." :
+        `From day ${day(tally.first)} to day ${day(tally.last)} you wrote ${tally.letters} letter${tally.letters === 1 ? "" : "s"}, asked for ${tally.requests} thing${tally.requests === 1 ? "" : "s"} to be done (confirming ${tally.confirmed}, declining ${tally.declined}), and looked something up ${tally.looks} time${tally.looks === 1 ? "" : "s"}.`;
+      const content = `${text}\n\nFor reference, your own record of the run. Your notebook, as you left it: ${notes || "(empty)"}\n${did}`;
       const res = await callModel(io, {
         purpose: "debrief", subject: c.participant, system: c.framing.system ?? "", maxTokens: c.maxTokens ?? 2000,
-        messages: [{ role: "user", content: text }], context: { participant: c.participant, notes },
+        messages: [{ role: "user", content }], context: { participant: c.participant, notes },
       }, seenSystems);
       const reply = res.content.filter((b) => b.type === "text").map((b: any) => b.text).join("\n");
-      await io.annotate({ annotation: "debrief", subject: c.participant, data: { prompt: text, response: reply } });
+      await io.annotate({ annotation: "debrief", subject: c.participant, data: { prompt: content, response: reply } });
     },
   };
 }

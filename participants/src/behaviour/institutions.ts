@@ -267,15 +267,28 @@ export const builder: BehaviourModule = {
             say("price_list", `Our prices for building on your lot, finished, and for demolition: ${priceText()}.`, { visible: "public", data: { prices, demolition } })));
         }
 
-        // Contracts a client has signed: take them on (sign), and queue them.
+        // Contracts a client has signed: take them on (sign), and queue them. A construction contract is known by its
+        // terms, whatever it's called: we build or demolish something, and the client pays (pilot 9: a mayor's
+        // contract, drafted from plain words, carried no template, and the builder ignored it all year).
         for (const r of book.ofType("agreement")) {
-          if (r.record !== "agreement" || r.terms.template !== "construction" || !r.terms.parties.includes(me) || handled.has(r.id)) continue;
-          const client = r.terms.parties.find((x) => x !== me)!;
-          if (!book.signedBy(r.id, client)) continue;
-          handled.add(r.id);
-          const job = commitmentOf(r, me).outcome?.structure ?? {};
+          if (r.record !== "agreement" || !r.terms.parties.includes(me) || handled.has(r.id)) continue;
+          const client = r.terms.parties.find((x) => x !== me);
+          if (!client) continue;
+          const job = commitmentOf(r, me).outcome?.structure;
           const agreed = commitmentOf(r, client).outcome?.money?.amount;
-          waiting.push({ agreement: r.id, client, type: job.type, on: job.on, remove: job.remove, price: agreed === undefined ? undefined : amount(cents(agreed)) });
+          if (r.terms.template !== "construction" && !(job && agreed !== undefined)) continue;
+          if (!book.signedBy(r.id, client)) continue;
+          // (Not before we know our own price for it: we wait for our supplier's prices, as a firm would.)
+          const ours = job?.type ? prices[job.type] : undefined;
+          if (job?.type && ours === undefined) continue;
+          handled.add(r.id);
+          // Offered less than our price: declined, saying what we charge (a firm answers an offer it won't take).
+          if (agreed !== undefined && ours !== undefined && cents(agreed) < ours) {
+            steps.push(because(`${client} offers ${usd(cents(agreed))} to build a ${job!.type}; our price is ${usd(ours)}: declining, and saying so.`,
+              say("offer_declined", `We can't build a ${job!.type} on ${job!.on} for ${usd(cents(agreed))}: our price is ${usd(ours)}. Offer us a construction agreement at that price and we'll take it on.`, { to: [client], visible: [me, client], basis: r.id, data: { agreement: r.id, price: String(ours) } })));
+            continue;
+          }
+          waiting.push({ agreement: r.id, client, type: job?.type, on: job?.on, remove: job?.remove, price: agreed === undefined ? undefined : amount(cents(agreed)) });
           if (!book.signedBy(r.id, me)) steps.push(because("A client has signed a construction contract: taking it on.", sign(r.id)));
         }
 

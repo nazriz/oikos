@@ -10,8 +10,9 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, cellsOf, DAY, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote } from "./common";
+import { because, Book, cellsOf, DAY, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote } from "./common";
 import { Staffing, stepper } from "./firms";
+import { incomeTaxLaw, withholding } from "./tax";
 import { ownerOf } from "./institutions";
 
 const YEAR = 365 * DAY;
@@ -311,7 +312,19 @@ export const financeOfficer: BehaviourModule = {
             ? `In the last 30 days the account received ${usd(sum(month, 1))}${top ? ` (largest: ${top})` : ""} and paid out ${usd(sum(month, -1))}. ` +
               `Over the last ${days} days it received ${usd(sum(year, 1))} and paid out ${usd(sum(year, -1))}: at that rate, about ${usd(Math.round((sum(year, 1) * 30) / days))} a month in and ${usd(Math.round((sum(year, -1) * 30) / days))} out. `
             : "No money has moved in or out of the account yet. ";
-          return `Report from the finance office: the town's account ${acc.account} holds ${usd(acc.balance)}. ` + history +
+          // The town's payroll, itemised: who's paid, how often, gross and what reaches them after the tax withheld, into
+          // which account, under which agreement (a mayor otherwise sees only recurring payments it can't place: pilots 8, 9).
+          const law = incomeTaxLaw(book);
+          const staff = payroll.staff(book, obs.t);
+          const payrollText = staff.length
+            ? `The town's payroll (${staff.length}, recurring payments from ${acc.account}): ${staff.map((a) => {
+                const period = jobTerms(a, a.terms.parties[1]).period;
+                const gross = payroll.wageOf(a);
+                const net = gross - withholding(law, gross, period);
+                return `${a.terms.parties[1]}, every ${Math.round(period / DAY)} days, ${usd(gross)} gross, ${usd(net)} paid to ${payroll.payee(book, a) ?? "their account"} after tax withheld (agreement ${a.id})`;
+              }).join("; ")}. `
+            : "The town employs nobody at present. ";
+          return `Report from the finance office: the town's account ${acc.account} holds ${usd(acc.balance)}. ` + history + payrollText +
             (budget ? `The adopted budget (${budget.id}, year ${budget.data?.year}): ${lines}; spent under it so far ${usd(spent + wages())} (${usd(wages())} of it the town's wages). ` : "No budget has been adopted for this year. ") +
             // The budget brief: what each line pays for (world config). The amounts are the mayor's and the council's to set.
             (Object.keys(p.budget_lines).length ? `The budget's lines: ${Object.entries(p.budget_lines).map(([k, v]) => `${k}, for ${v}`).join("; ")} Setting the amounts is for the mayor and the council; a budget goes to the council on the council proposal form. ` : "") +

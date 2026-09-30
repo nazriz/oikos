@@ -111,6 +111,9 @@ test("a participant is told when a request can't be done, declines an unfaithful
   expect(recs.filter((r) => r.author === "mayor-system").map((r) => r.text)).toEqual(["The town hall opens at nine."]);
   expect(log.some((e) => e.kind === "event" && e.body.event === "participant_opted_out" && e.body.participant === "mayor-system")).toBe(true);
   expect(ann.find((a) => a.annotation === "debrief")?.data.response).toBe("Thanks for asking.");
+  // It's reminded of its own run in the debrief (pilot 9's mayor had no record of what it did): its notebook, and a
+  // tally of what it did.
+  expect(ann.find((a) => a.annotation === "debrief")?.data.prompt).toMatch(/Your notebook, as you left it: [\s\S]*(You didn't act during the run\.|From day \d+ to day \d+ you wrote \d+ letters?)/);
 }, 300_000);
 
 test("after opting out, a stand-in named in the world config carries the participant on", async () => {
@@ -144,7 +147,7 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   const adapter = new MockAdapter("mock", {
     participant: (req: LlmRequest) => {
       seen.push(JSON.stringify(req.messages.at(-1)!.content));
-      if (calls === 0) return tool("write", { to: ["finance", "council-clerk", "planning"], text: "Please send me the town's figures.", as: "mayor" });
+      if (calls === 0) return tool("write", { to: ["finance", "council-clerk", "planning", "bank"], text: "Please send me the town's figures.", as: "mayor" });
       return tool("done_for_now", { days: 7 });
     },
     translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
@@ -156,9 +159,15 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   expect(ev.some((e) => e.event === "message_delivered" && e.participant === "council-clerk-system" && e.to.includes("mayor-system"))).toBe(true);
   const read = seen.join("\n");
   expect(read).toContain("Report from the finance office: the town's account acc-city holds");
+  // The bank answers too (pilot 9: 34 letters, no reply), with the writer's own accounts: the town's, as the mayor
+  // wrote in its office.
+  expect(read).toMatch(/Report from bank: your accounts with us: acc-city, balance \$[\d,]+\.\d\d/);
   expect(read).toContain("council proposal form");
   // The budget brief: what the budget can pay for; what a park costs is the builder's published price, not something finance was told.
   expect(read).toContain("The budget's lines: parks, for building a park");
+  // The payroll, itemised (pilots 8 and 9: the mayor chased a recurring payment it couldn't place): who, how often,
+  // gross, what reaches them after tax, into which account, under which agreement.
+  expect(read).toMatch(/The town's payroll \(\d+, recurring payments from acc-city\): c\d+, every 14 days, \$[\d,.]+ gross, \$[\d,.]+ paid to acc-\S+ after tax withheld \(agreement /);
   expect(read).toMatch(/builder's published prices \(rec\.\d+\): .*park \$[\d,]+\.00/);
   // The land register: the town's lots, and the vacant ones by id.
   expect(read).toMatch(/The town owns \d+ lots; \d+ have nothing built on them: lot-/);

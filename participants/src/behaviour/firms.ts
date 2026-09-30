@@ -642,7 +642,8 @@ export class Staffing {
   }
 
   /** The account a worker's wages go to. */
-  private payee(book: Book, a: any): string | undefined {
+  /** The account an employee is paid into, as their agreement says. */
+  payee(book: Book, a: any): string | undefined {
     const worker = a.terms.parties[1];
     return commitmentOf(a, this.me).outcome?.money?.to ?? ((book.all("job_application").find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
   }

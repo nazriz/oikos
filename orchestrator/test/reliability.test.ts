@@ -104,6 +104,9 @@ test("a stopped run resumes: model responses served from its log reproduce it ex
     return a;
   };
   const config = generate({ ...spec, citizens: 40, mayor: "llm" });
+  // (No debrief: a run stopped by a failure has none, and this one stands for such a run. A debrief carries the run's
+  // own record, so one taken at day 20 isn't one taken at day 40.)
+  for (const p of [...config.participants, ...config.positions]) if (p.framing?.debrief) p.framing = { ...p.framing, debrief: false };
   // The whole run, uninterrupted.
   const whole = counting();
   const u = await runWorld({ config, runId: "town.seed1", outDir: dir("resume-whole"), until: 40 * DAY, adapter: whole });

@@ -200,13 +200,14 @@ export const callAction = (step: Step): ParticipantAction => {
  * answers every one the same way). Office reports aren't answered, so offices never write to each other forever.
  */
 export class Letters {
-  private pending: { id: string; from: string }[] = [];
+  private pending: { id: string; from: string; as?: string }[] = [];
   take(obs: Observation) {
     // A note about one of our records (a bank saying a payment of ours wasn't made) isn't a question: it isn't answered.
-    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ") && !(m.re && !m.re.startsWith("msg."))) this.pending.push({ id: m.id, from: m.from });
+    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ") && !(m.re && !m.re.startsWith("msg."))) this.pending.push({ id: m.id, from: m.from, ...(m.as ? { as: m.as } : {}) });
   }
-  answer(report: () => string, why = "A letter to our office: answering with our standard report."): Step[] {
-    const out = this.pending.map((m) => because(why, message([m.from], report(), m.id)));
+  /** Each letter answered with the report (which may depend on who wrote: the participant, and the position it wrote in). */
+  answer(report: (from: { participant: string; as?: string }) => string, why = "A letter to our office: answering with our standard report."): Step[] {
+    const out = this.pending.map((m) => because(why, message([m.from], report({ participant: m.from, as: m.as }), m.id)));
     this.pending = [];
     return out;
   }
