@@ -147,7 +147,7 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   const adapter = new MockAdapter("mock", {
     participant: (req: LlmRequest) => {
       seen.push(JSON.stringify(req.messages.at(-1)!.content));
-      if (calls === 0) return tool("write", { to: ["finance", "council-clerk", "planning"], text: "Please send me the town's figures.", as: "mayor" });
+      if (calls === 0) return tool("write", { to: ["finance", "council-clerk", "planning", "bank"], text: "Please send me the town's figures.", as: "mayor" });
       return tool("done_for_now", { days: 7 });
     },
     translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
@@ -159,6 +159,9 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   expect(ev.some((e) => e.event === "message_delivered" && e.participant === "council-clerk-system" && e.to.includes("mayor-system"))).toBe(true);
   const read = seen.join("\n");
   expect(read).toContain("Report from the finance office: the town's account acc-city holds");
+  // The bank answers too (pilot 9: 34 letters, no reply), with the writer's own accounts: the town's, as the mayor
+  // wrote in its office.
+  expect(read).toMatch(/Report from bank: your accounts with us: acc-city, balance \$[\d,]+\.\d\d/);
   expect(read).toContain("council proposal form");
   // The budget brief: what the budget can pay for; what a park costs is the builder's published price, not something finance was told.
   expect(read).toContain("The budget's lines: parks, for building a park");

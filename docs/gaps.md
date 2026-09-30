@@ -23,11 +23,11 @@ The first year run to the end. The mayor made 633 decisions: 285 letters, 8 requ
 
 | # | Gap | Seen | Suggested |
 |---|---|---|---|
-| G6 | **The mayor can't look anything up.** 16 of the 18 untranslated requests were "inspect the ledger", "read the petition's text", "trace this payment". It chased one recurring $2,393.34 payment from day 95 to day 324 without ever finding what it was (the works crew's wages). | P9 | **The biggest gap.** A way to look up specific records (a `look` with filters, or offices that answer the question asked), in the rebuild (section 16) |
-| G4 | **The park was never built.** The mayor got a permit (day 23) and offered the builder a construction agreement (day 25), then wrote to it 26 times. The builder signs landlords' orders in its own form, and never answered or signed the town's. | P9 | The builder answers and takes up agreements proposed to it, as a firm would (world content) |
-| G9 | **The bank never answers letters** (34 letters, no replies). | P9 | The bank answers with its standard account report, as offices do |
-| G10 | **Finance's reports don't settle what's asked** (138 letters, 136 of them after an answer). Payroll isn't explained. | P8, P9 | The finance report itemises recurring payments (payroll), as pilot 8 already suggested |
-| G11 | **The debrief has no memory of the run.** The mayor said it had "no record of specific decisions", so it couldn't reflect on them. | P9 | The debrief carries the participant's notebook, or a factual summary of what it did (VISION §15.3) |
+| G6 | **The mayor can't look anything up.** 16 of the 18 untranslated requests were "inspect the ledger", "read the petition's text", "trace this payment". It chased one recurring $2,393.34 payment from day 95 to day 324 without ever finding what it was (the works crew's wages). | P9 | **Fixed (2026-09-30):** `look` takes what to find (records where fields match: kind, author, speaks_for, basis, at, data.<name>; newest first), and the mayor's office has the town's files (every record the town can see, on request) |
+| G4 | **The park was never built.** The mayor got a permit (day 23) and offered the builder a construction agreement (day 25), then wrote to it 26 times. The builder signs landlords' orders in its own form, and never answered or signed the town's. | P9 | **Fixed (2026-09-30):** the builder knows a construction contract by its terms (it builds, the client pays), declines one below its price in writing, and decides once it knows its prices |
+| G9 | **The bank never answers letters** (34 letters, no replies). | P9 | **Fixed (2026-09-30):** the bank answers each letter with the writer's own accounts, balances and latest payments |
+| G10 | **Finance's reports don't settle what's asked** (138 letters, 136 of them after an answer). Payroll isn't explained. | P8, P9 | **Fixed (2026-09-30):** the finance report itemises the payroll: who, how often, gross and net, into which account, under which agreement |
+| G11 | **The debrief has no memory of the run.** The mayor said it had "no record of specific decisions", so it couldn't reflect on them. | P9 | **Fixed (2026-09-30):** the debrief carries its notebook and a tally of what it did |
 
 The mayor's debrief suggested giving residents "meaningful ways to challenge decisions": recorded as data.
 

@@ -14,7 +14,7 @@ import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
-import { because, Book, callAction, message, pay, type Step } from "./common";
+import { because, Book, callAction, Letters, message, pay, type Step, usd } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
@@ -152,9 +152,24 @@ export const bankPaymentSystem: BehaviourModule = {
       return out;
     };
 
+    // Letters to the bank (pilot 9: a mayor wrote 34 times and heard nothing): each answered with the writer's own
+    // accounts here, their balances and their latest payments, and how to instruct the bank.
+    const letters = new Letters();
+    let replies: Step[] = [];
+    const accountReport = (obs: Observation, holder?: string) => {
+      const mine = channels.accounts(obs).filter((a) => a.custodian === obs.entity && a.holder === holder).sort((a, b) => (a.account < b.account ? -1 : 1));
+      if (!mine.length) return `Report from ${obs.entity}: we hold no account for you. To open one, ask us for one in writing.`;
+      const ids = new Set(mine.map((a) => a.account));
+      const recent = channels.transactions(obs).filter((x) => ids.has(x.from) || ids.has(x.to)).sort((a, b) => b.t - a.t).slice(0, 8);
+      return `Report from ${obs.entity}: your accounts with us: ${mine.map((a) => `${a.account}, balance ${usd(cents(a.balance))}`).join("; ")}. ` +
+        (recent.length ? `Latest payments: ${recent.map((x) => `day ${Math.floor(x.t / 86_400) + 1}: ${usd(cents(x.amount))} ${ids.has(x.from) ? `to ${x.to}` : `from ${x.from}`}${x.memo ? ` (${x.memo})` : ""}${x.per_instruction ? `, under your instruction ${x.per_instruction}` : ""}`).join("; ")}. ` : "No payments yet. ") +
+        "We pay on your written instruction (a request to pay, once or every so often), from an account you hold, if its balance covers it.";
+    };
+
     return {
       step(obs) {
         book.absorb(obs);
+        letters.take(obs);
         if (queuedAt !== obs.t) {
           // Payments a busy moment didn't get to (a wake allows only so many actions) are made first at the next: they're
           // already counted as due (a one-off as handled, a standing order's next date moved on), so never dropped.
@@ -173,6 +188,10 @@ export const bankPaymentSystem: BehaviourModule = {
         }
         inFlight = [];
         if (refusals.length) return callAction(because("Telling account holders about requests we couldn't carry out.", ...refusals.splice(0, 32)));
+        // (Who wrote: the organisation of the position written in, or the participant's person, from the directory.)
+        replies.push(...letters.answer(({ participant, as }) => accountReport(obs, as ? book.positions.get(as)?.entity : book.participantPerson.get(participant)),
+          "A letter to the bank: answering with the writer's own accounts and latest payments."));
+        if (replies.length) return callAction(replies.shift()!);
         if (opens.length) return callAction(because("Opening accounts people asked for.", ...opens.splice(0, 32)));
         if (queue.length === 0) return wait();
 
