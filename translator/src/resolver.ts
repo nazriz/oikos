@@ -239,12 +239,16 @@ class Resolver {
    * takes no one's time (using things up). */
   private work(c: Call): Block[] {
     const task = this.need(c, "task", "What work?");
-    const units = this.quantity(c, "units");
+    // A survey (nature): of a species or a field, in these cells, a unit each.
+    const survey = this.id(c, "survey");
+    const cells = survey ? this.ids(c, "cells") : undefined;
+    if (survey && !cells?.length) throw new Ask("Survey which cells?");
+    const units = this.quantity(c, "units") ?? (cells ? String(cells.length) : undefined);
     if (!units || units === "0") throw new Ask("How much of it?");
     const at = this.need(c, "at", "Where?");
     const by = this.has(c, "by") ? (this.ids(c, "by") ?? [this.id(c, "by")!]).map((p) => this.k.entityOf(p)) : [];
     const on = this.id(c, "on");
-    return [{ block: "work", task, units: Number(units), at, performers: by, ...(on ? { on } : {}) }];
+    return [{ block: "work", task, units: Number(units), at, performers: by, ...(on ? { on } : {}), ...(survey && cells ? { survey: { of: survey, cells } } : {}) }];
   }
 
   /** The money outcome of a call, for requests and commitments. */
