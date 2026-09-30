@@ -154,7 +154,9 @@ impl Scheduler {
         if let Some(done) = u.done_at.take() {
             self.set_wake(key, done, "done");
         } else if let Some(until) = until {
-            let at = (t + self.tick).max(self.ceil(until));
+            // (The next tick after now at the soonest: after a wake between ticks (news), that's the next boundary, not a
+            // whole tick on, so someone woken just before a gathering ends still leaves when it does.)
+            let at = self.ceil(t + 1).max(self.ceil(until));
             self.set_wake(key, at, "asked");
         }
     }

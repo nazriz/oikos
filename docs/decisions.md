@@ -1048,6 +1048,12 @@ See the design note, §16.
   - **Batch after these (10 seeds, one year; before renewals and the loop fix):** 2 breaches of 15, from 4. Saving 6.9%, groups 52.8%, unmet demand 4.65%, renters' costs 19.8%, all inside tolerance. Still off: employment to population 67.1% (63.9 ± 3) and unemployment 1.0% (4.6 ± 1.5), with about 140 people a year leaving and 17 arriving.
   - **Revisit if:** departures stay well above arrivals (the town shrinking), or renters' housing costs overshoot 20.2% of income. Moving house while housed is the realistic fix for rents that can't be borne (docs/behaviour/citizen.md, "Leaves out").
 
+- **Hiring that takes time: tried, and reverted** (2026-09-30). Unemployment sits near 1–2% (target 4.6%): employers choose among a posting's applicants at their next wake, so someone out of work is hired within days. A posting kept open 21 days before choosing (as employers advertise, then shortlist) sent unemployment to 38% (10 seeds, one year): firms post one job at a time, and a posting republished at a new wage starts its wait again, so they couldn't replace the people who left. Reverted.
+  - **Next:** recruit as employers do: several postings at once for the headcount wanted, a closing date that doesn't restart when the wage moves, and all the applicants seen then. And the separation side: jobs ending run at about 2.8% of employment a month, against roughly 1–1.5% in labour force gross flows (to confirm).
+
+- **A wake asked for between ticks takes the next tick, not a whole tick on** (2026-09-30; kernel `schedule.rs` `finished`). A unit woken by news between ticks, asking to wake again at a gathering's end ten minutes later, was put a whole tick (an hour) on: people stayed at the hall an hour past its end. Now the soonest is the next tick boundary after now; for a wake on a tick (the usual), that's the same as before.
+  - **Revisit if:** a finer clock is wanted for news (then wakes on exact times, which the tick exists to batch).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

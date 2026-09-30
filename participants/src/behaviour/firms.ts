@@ -79,7 +79,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.10.0",
+  version: "0.10.1",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -299,8 +299,9 @@ export const landlord: BehaviourModule = {
       // account on their first application, or the one the world started them with.
       const payingAccount = new Map<string, string>();
       for (const r of book.all("rental_application")) if (r.speaks_for && !payingAccount.has(r.speaks_for)) payingAccount.set(r.speaks_for, r.data?.account);
-      // Otherwise the account the lease itself says they pay from.
-      for (const a of active) {
+      // Otherwise the account a lease of theirs says they pay from (an earlier one, for a lease we've renewed: the new
+      // one doesn't name it).
+      for (const a of leases as any[]) {
         const tenant = tenantOf(a);
         const from = a.terms.commitments?.find((c: any) => c.who === tenant)?.does?.outcome?.money?.from;
         if (tenant && from && !payingAccount.get(tenant)) payingAccount.set(tenant, from);
