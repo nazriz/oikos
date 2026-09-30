@@ -17,11 +17,14 @@ A run never hangs silently or carries on against something broken. What happens 
 ## Signs of trouble that don't stop a run
 
 A run that finishes can still have gone wrong quietly. This session found two such bugs: steps a wake didn't get to were dropped, and the bank dropped payments at busy moments; nothing said so. Each run's summary has a `health` section, and `terrarium run` prints a `!` line under a seed for anything worth a look (`healthWarnings`, orchestrator/src/batch.ts):
-- **A module out of actions with more to do** in more than 1% of its steps. What a wake didn't get to carries over, so nothing is lost, but it may be falling behind: planning more than a wake allows (12 actions, `orchestration.max_actions_per_wake`), with a backlog that grows.
+- **Someone falling behind:** an act that waited more than a day for its actor to be free (acts take time: docs/design/rebuild.md 6.3). The summary's `backlog` has each module's acts, total and longest wait.
+- **A retry loop:** the same act by the same unit more than 24 times in a day (`repeats`): something tried again at every wake instead of by time. (Acting time exposed several, 2026-09-30.)
 - **Refusals other than the expected races** (someone who just left, or moving in where the last tenants are still leaving: D58). Anything else means a participant acted on something that wasn't so.
 - **Participants' errors,** recovered in place (above).
 
-`batch.json` keeps each run's health and warnings.
+`batch.json` keeps each run's health and warnings. For the batch as a whole:
+- **`terrarium health <DIR>`:** the batch's measures against its profile's calibration targets, each within a stated tolerance, breaches first, and the demand households went without.
+- **`terrarium diff <BASELINE> <CHANGE>`:** every measure of two batches of the same world, judged against seed-to-seed noise. Run it before and after any change to behaviour.
 
 ## Resuming a run
 
@@ -42,7 +45,7 @@ This runs the world again from the log's own config: not the world file, which m
 
 - **A hang stops the whole run**, not only the module that hung. That's consistent with the split: a hang is a timing failure. Isolating each module in its own thread, so one could be stopped alone, isn't built.
 - **The watchdog runs for runs started by the CLI** (`run`, `run-one`, `resume`). A program calling `runWorld` directly passes its own `watchdog`, or has none.
-- **Resume re-runs from the start.** For a two-year town that takes seconds. For very long runs (centuries), resuming from a kernel checkpoint would be needed, restoring the kernel's state and every module's. Not built yet.
+- **Resume re-runs from the start** (about 100 seconds a simulated year for the 1,000-person town). Checkpoints, which would need every module's state saved, wait until runs are long enough to need them (docs/decisions.md).
 - **Logs from before contracts v0.5** (the pilots of 2026-09-28) can't be resumed: the v0.5 kernel won't load their config.
 - **Logs from contracts 0.5** (before 2026-09-29's typed commitments) replay and resume with a 0.5 kernel (kernel 0.5.x, before 0.6.0): the 0.6 kernel won't load their config.
 - **Resume is tested with the mock model** (including a log cut off mid-line), not yet against a real one.

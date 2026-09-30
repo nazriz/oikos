@@ -65,6 +65,11 @@ The standing queries live in `measure/queries/`, one SQL file each, with a one-l
 
 From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@terrarium/measure`.
 
+## Health and diff
+
+- **`terrarium health <DIR> [--profile NAME]`:** the batch's measures against its profile's calibration targets (`targets` in worlds/profiles/), each within a tolerance stated in `measure/src/health.ts`, breaches first; targets nothing measures yet are listed as such; and the demand households went without.
+- **`terrarium diff <BASELINE> <CHANGE> [QUERY...]`:** every measure of two batches of the same world compared. With several seeds a side, a difference is flagged beyond three standard errors of the seed-to-seed spread; with one, beyond a tenth. The default measures are the town's calibration measures (`DIFF_QUERIES`).
+
 ## The cost report
 
 Every model call leaves a usage annotation in the log: tokens, and the cost at the price of the model that actually answered. The report (`terrarium cost <dir>`, also written with every batch) shows two figures and never mixes them:

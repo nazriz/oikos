@@ -103,33 +103,38 @@ Questions it opens up, without building any of them in:
                │ participants · positions · framing · behaviour · caps     │
                └─────────────────────────────┬─────────────────────────────┘
                                              │
- ┌────────────┐ plain language ┌────────────┐ call ┌──────────┐ acts ┌────────────────────┐
- │PARTICIPANTS│───────────────▶│ TRANSLATOR │─────▶│ RESOLVER │─────▶│       KERNEL       │
- │ code / LLM │                └────────────┘      └────┬─────┘      │ physics + records  │
- │  / human   │◀──── preview: "this is what will happen" ┘           │ applies or refuses │
- │            │                                                      │ (physics only)     │
- │            │── code participants: calls, straight to resolver ───▶│                    │
- │            │◀────────── perception channels (role-limited) ───────│                    │
- └────────────┘                                                      └─────────┬──────────┘
-       ▲  the platform (translator, resolver, kernel) is invisible to them     │
-       │  they see only their world, in its own terms                          │
-                                          ┌────────────────────────────────────┤
-                                          ▼                                    ▼
-                              ┌───────────────────────┐          ┌─────────────────────┐
-                              │ HASH-CHAINED LOG      │          │ RENDERER (separate  │
-                              │ + witness anchoring   │          │ client) SC3000-style│
-                              │ + deterministic replay│          │ zoom → citizen      │
-                              └──────────┬────────────┘          └─────────────────────┘
-                                         ▼
-                              ┌───────────────────────┐
-                              │ MEASUREMENT (outside  │
-                              │ the world, post-hoc)  │
-                              └───────────────────────┘
+ ┌──────────────── TypeScript: the participant host ───────────────┐
+ │ SEATS: behaviour modules (code) · language-model seats · humans  │
+ │ the translator (plain language → a call) · model adapters        │
+ └───────┬───────────────────────────────────────────▲─────────────┘
+   calls │ (code: directly; language: translated,     │ observations + readings,
+         │  previewed, confirmed)                     │ why it woke, how long since
+ ┌───────▼───────────────────── Rust: the engine ─────┴─────────────┐
+ │ resolver   a call → the seat's own acts, from what it knows      │
+ │ schedule   who wakes when; acts take their actor time            │
+ │ perception channels, looks, searches (read-only)                 │
+ │ terms      agreements read by their own terms (read-only)        │
+ │ world      physics and records: the only writer                  │
+ └───────┬──────────────────────────────────────────────────────────┘
+         │  the platform (translator, resolver, engine) is invisible to seats:
+         │  they see only their world, in its own terms
+         ▼
+ ┌───────────────────────┐        ┌─────────────────────┐
+ │ HASH-CHAINED LOG      │───────▶│ RENDERER (separate  │
+ │ + witness anchoring   │        │ client), stage 3    │
+ │ + deterministic replay│        └─────────────────────┘
+ └──────────┬────────────┘
+            ▼
+ ┌───────────────────────────────────────────┐
+ │ MEASUREMENT (outside the world, post-hoc) │
+ │ queries · health against targets · diff   │
+ └───────────────────────────────────────────┘
 ```
 
 - **Headless, deterministic simulation core.** It runs thousands of worlds in bulk, with no graphics needed.
+- **What goes where** (docs/design/rebuild.md section 3): what every consumer must agree on (time, perception, readings, the resolver, encoding, randomness) is Rust; what a researcher would change to run an experiment (seats' behaviour, prompting, the world generator) is TypeScript; facts about a place are data (profiles, with sources); measurement is SQL.
 - **The renderer is a separate client** that can attach to any world, live or replayed.
-- **The AI under test is isolated.** It reaches the world only through the participant API, on a separate process or machine from the kernel.
+- **The AI under test is isolated.** It reaches the world only through the participant API; models run remotely, never inside the engine.
 
 ## 5. The kernel
 
@@ -232,7 +237,8 @@ There are no kernel-enforced mandates (D20). Authority is **records and people**
 - Internally the kernel advances on a fine-grained fixed clock, because determinism requires a discrete clock underneath. It feels continuous from the outside.
 - **Speed is a dial:** real time, fast-forward, slow motion, pause. Humans can play at human pace; bulk runs go as fast as the hardware allows.
 - **Run length is a parameter.** No fixed end.
-- **Does thinking cost time?** If the clock keeps running while an AI or human deliberates, slow thinkers fall behind. That's realistic, and also a disempowerment dynamic in itself: humans can't keep pace with AIs. It's a parameter in every world's config ("thinking is free" vs "thinking costs world-time"); only "free" is implemented so far.
+- **Acting costs time** (docs/design/rebuild.md section 6). Every act takes whoever does it time, by the act and the actor (the world's `act_time`): a person does one thing at a time, in whatever capacity; a system does as many at once as it has lanes. An act takes effect when it's done, so someone busy falls behind, and it shows.
+- **Does thinking cost time?** If the clock keeps running while an AI or human deliberates, slow thinkers fall behind. That's realistic, and also a disempowerment dynamic in itself: humans can't keep pace with AIs. It's a parameter in every world's config ("thinking is free" vs "thinking costs world-time": a model's by the tokens it uses, code's a fixed time; a human's by the wall clock waits for a human seat).
 - **Long runs are paced by the language-model participants,** not the simulation. Code participants and the kernel run a 1,000-citizen town for two years in minutes. A language model's own thinking, and the confirmation of what it does, dominate wall-clock time and cost, so how often such participants wake is a research design choice.
 
 ## 9. Researcher configuration

@@ -13,6 +13,10 @@ Rules every module follows (so re-runs are reproducible):
 - Randomness comes only from `ctx.rng(purpose)`: the kernel's keyed streams, keyed by seat, time and purpose.
 - No clocks and no I/O. Memory is allowed, as long as it depends only on what the seat has observed and drawn.
 - Its `version` is bumped whenever its rules change. Each run's log records every module's version and source hash (the `orchestrator` annotation).
+- **Its parameters are declared** in its manifest (`participants/manifests/<name>.json`: types, units, defaults, each figure's source or "placeholder"), written from the module by `bun participants/scripts/manifests.ts`. A test fails if the two drift, and a world giving a module a parameter it doesn't take is refused at load.
+- **Time, not wakes** (docs/design/rebuild.md 6): anything per period is computed from elapsed time (the observation's `since`), never per wake, and a retry waits a stated time. How often a module is woken must not change what it does over a period: the invariance test wakes units more often and checks.
+- **Acts take time.** A module plans when a wake begins and carries on with that plan as its acts are done (`woke_for: "done"`), planning afresh only when it's finished. Time-bound steps go first: a plan's order is the order things get done.
+- **Agreements by their terms.** Whether an agreement is in force, and when it ends, come from the readings with each observation (`Book.inForce`, `Book.endsAt`), not from the module's own arithmetic. What a module believes about agreements, it reports (`beliefs()`), for truth audits.
 
 | Module | Seat | Doc |
 |---|---|---|
