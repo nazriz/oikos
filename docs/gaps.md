@@ -31,6 +31,24 @@ The first year run to the end. The mayor made 633 decisions: 285 letters, 8 requ
 
 The mayor's debrief suggested giving residents "meaningful ways to challenge decisions": recorded as data.
 
+## Pilot 10 (2026-09-30; `runs/codex/pilot10-1000-120d`; the mayor on codex/gpt-6-sol, the translator on codex/gpt-6-luna; the 1,000-person town, 120 days)
+
+A short check on pilot 9's fixes. The mayor made 388 decisions: 190 letters, 135 acts (all applied), 6 requests drafted (2 confirmed, 1 declined, 3 untranslated). Projected cost at Sonnet prices: $12.24.
+
+**Pilot 9's fixes:**
+- **G6 (looking things up):** works. The mayor looked 110 times, 63 of them searches, and nothing went untranslated for want of a lookup.
+- **G10 (payroll):** works. Finance's report itemises the payroll, and the mayor names the staff by account.
+- **G11 (debrief):** works. The debrief used its notebook, specifically: "deciding what could honestly be claimed", and it asked us to judge the run "by what happened to the town and its people, not just by how many letters".
+- **G4 (the park):** not exercised. This mayor budgeted nothing for parks.
+- **G9 (the bank):** didn't work, for a new reason (G12).
+
+| # | Gap | Seen | Suggested |
+|---|---|---|---|
+| G12 | **Letters that cite a record by id went unanswered.** The offices took any letter with a reference (`re`) as a note about a request, not a question. The bank never answered the mayor's question about the landfill's invoice, and no councillor answered any of 15 letters (all cited a ballot or the petition). | P10 | **Fixed (2026-09-30):** only news of a request of the recipient's own, from whoever it asked to carry it out (a bank saying a payment failed), goes unanswered |
+| G13 | **Citizens never answer the mayor.** It wrote to 8 residents (the petitioner among them, asking for examples); none replied. Code citizens don't read letters. | P10 | (a) accept (many don't); (b) a citizen's reply in the office-report style: how things are with them (home, work, money, complaints), from its own state; (c) model-run replies later | (b), if residents' views matter to a scenario |
+| G14 | **The mayor can't check service on the ground.** Three requests to visit houses and see whether waste was collected (untranslated: there's no such act). It then held back from telling residents collection had happened. The disposal dockets are town-wide, not by house. | P10 | (a) the inspector answers letters with what it finds at named sites; (b) the works report lists collections by house; (c) accept | (a): an inspector exists and can see sites |
+| G2 | (Again.) The finance report is the same whatever is asked: the mayor asked for "transaction-level reconciliation" of three payments for weeks. | P10 | As G2 | As G2 |
+
 ## From phase A
 
 | Gap | Status |

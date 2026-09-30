@@ -20,7 +20,7 @@ interface Payment { instruction: string; from: string; to: string; amount: numbe
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.9.0",
+  version: "0.9.1",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -169,7 +169,7 @@ export const bankPaymentSystem: BehaviourModule = {
     return {
       step(obs) {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
         if (queuedAt !== obs.t) {
           // Payments a busy moment didn't get to (a wake allows only so many actions) are made first at the next: they're
           // already counted as due (a one-off as handled, a standing order's next date moved on), so never dropped.
