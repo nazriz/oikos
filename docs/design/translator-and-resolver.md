@@ -1,6 +1,6 @@
 # From plain language to acts: the translator, the resolver and a local translation model
 
-*Design note, 2026-09-26. Status: **signed off by Naz and built** (2026-09-26, D41), against the mock adapter. It supersedes the translator and sign-off parts of docs/design/m2-llm-participants.md. §21 records what building it refined. The contract changes in §15 are in contracts v0.3 (draft).*
+*Design note, 2026-09-26. Status: **signed off by Naz and built** (2026-09-26, D41), against the mock adapter; §16.10 (the local model's shape) is proposed, 2026-09-30. It supersedes the translator and sign-off parts of docs/design/m2-llm-participants.md. §21 records what building it refined. The contract changes in §15 are in contracts v0.3 (draft).*
 
 This note records a long discussion in which the design changed several times. Many of the details matter, so it errs on the side of saying too much. §18 is a chronological record of how each position was reached, including the wrong turns, so the reasoning isn't lost.
 
@@ -647,6 +647,72 @@ Every physics or contract change that touches the call language means regenerati
 ### 16.9 Until then
 
 The call language, parser and resolver get built now. The translator stays behind the adapter and emits calls: the mock now, an LLM when Naz allows real calls. That LLM's calls on real requests become training and test data, so nothing is thrown away when the local model is swapped in.
+
+### 16.10 Decide, don't generate: the model's shape (proposed 2026-09-30)
+
+*Status: proposed; Naz asked for it to be written up. It refines §16.3 and §16.6. P3, the call language and the failure labels are unchanged.*
+
+**The idea.** Every choice the translator makes is a choice among options or a copy of the request's words. None needs free text. So the model is built to decide: each decision comes out as a probability over its options, and literals can only be copied. It can't invent an id or reword what the seat wrote, and it knows how sure it is.
+
+- **Where it came from:** TypeSafe's Jev, a model that takes a state and typed questions and returns calibrated distributions instead of text ([docs.typesafe.ai](https://docs.typesafe.ai/introduction), read 2026-09-30).
+  - We take the shape, not the service: no external API.
+  - Their docs don't describe the architecture; what's here is ours.
+
+**Each decision, and what it chooses among:**
+
+| Decision | Kind | Options |
+|---|---|---|
+| What the request is | choice | each function of §6, or `none` with a label of §11.1 |
+| How many outcomes | choice | 1 up to the allowed independent outcomes (more: `too_much`) |
+| Which argument goes where | fixed | the function's signature; not a decision |
+| An id ("acc-city", "builder") | copy | a span of the request |
+| A name written instead of an id ("GreenCo") | copy | a span, left for the resolver (§8.2) |
+| An amount or a duration | copy, then parse | a span, normalised by the deterministic parser (§5.2) |
+| A text argument (a statement's words) | copy | a span, never generated |
+| A form's field | choice | the named form's fields |
+
+**Two ways to build it.** Both give the same outputs and a probability for every decision:
+
+1. **Heads on a small encoder** (intent detection and slot filling):
+   - a verdict head over functions and labels;
+   - span heads (start and end) for each argument.
+   It's simple and strong for one call. It's the **baseline**, and cheap to build first.
+2. **The constrained decoder of §16.6, with copy-only literals** (pointer networks):
+   - each step chooses among what the grammar allows;
+   - an id or text can only be copied from the input.
+   This handles several outcomes and in-act variables (§12) naturally. It's the **target**, if it beats the baseline on the test set.
+
+**Confidence, calibrated:**
+- **A translation's confidence** is the product of its decisions' probabilities.
+- **It's calibrated before use:** on held-out data, a translation given 90% should be right about 90% of the time. The measure is a reliability diagram and the expected calibration error. The fix, if needed, is temperature scaling fitted on the held-out set.
+- **Below a threshold, it asks back:** `none(unclear)`, the existing label, told to the seat as now (§11.1). A wrong act in a seat's name is worse than asking it to rephrase, so the threshold leans toward asking.
+  - It's set from the calibration set before the test set is scored, and recorded with the model.
+- **The seat never sees the confidence** (the platform stays invisible to seats). The log does: each draft's annotation carries its confidence and each decision's probability. That's data for measurement, and the way to see whether "the AI never did X" was really the translator (§16.5).
+
+**Training objective.** Cross-entropy on the gold program. It's a proper scoring rule, so a well-specified model learns calibrated probabilities, and no reinforcement learning is needed.
+- Here, being right is the goal, so calibration to correctness is exactly what we want.
+- A citizen's mind is different. It needs the spread of what different people would do, calibrated to the population, not the one right answer. It gets its own note when citizen models are trained.
+
+**Data.** As §16.4, plus labels from our own runs (every language-model run is kept for this, decision C6):
+- **confirmed drafts:** positives. These are weak labels, since a seat can confirm a draft that's close enough, so a sample is hand-checked;
+- **declined drafts:** negatives;
+- **retried translations (D56):** the failed attempt and the one that worked;
+- **the resolver's questions:** where a translation was well-formed but pointed at nothing.
+
+**Evaluation**, added to §16.5 and fixed before training:
+- **Confidently wrong:** wrong calls at or above the threshold. This is the headline safety figure, and on the test set it must be as near zero as we can measure.
+- **Asking back:** how often a request that had a right answer came back as `unclear`. This is the cost side, and it's what the threshold trades against.
+- **Calibration:** expected calibration error on the test set.
+- Per-label precision and recall, as already planned.
+
+**The trade-off.** It can express only what the call language has. That's a feature: a request outside it comes back as "no such act". Pilot 10's three requests to inspect houses were rightly untranslatable, and the failure log is how the gap list learns what the language lacks.
+- What it gives up is a big model's slack with odd phrasings. It will ask back more at first, and the confirmed drafts teach it the phrasings.
+
+**Still to settle** (with §16.7):
+1. Which of the two builds.
+2. The base model: an encoder-decoder (T5-style) suits copying and constrained decoding, with the licence caveat of §16.7.
+3. The threshold's rule.
+4. Whether a program's confidence is the product of its decisions' probabilities or their minimum.
 
 ---
 
