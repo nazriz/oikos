@@ -75,3 +75,15 @@ sources); this list is for the architecture and design ideas.
 | Framing swings results in model social simulations; audits needed (TRAILS) | "Stop Drawing Scientific Claims from LLM Social Simulations Without Robustness Audits" (2026), [arXiv:2605.18890](https://arxiv.org/abs/2605.18890) | The robustness audit of remembered answers (4) |
 | Model personas collapse to an "average person"; segmentation helps a little | "From Individual to Society" (ACM Computing Surveys), [doi:10.1145/3800683](https://dl.acm.org/doi/10.1145/3800683); "Restoring Heterogeneity in LLM-based Social Simulation" (2026), [arXiv:2604.06663](https://arxiv.org/abs/2604.06663) | No personas: circumstances and traits (4) |
 | Norms are hard to infer by watching when most comply | Savarimuthu, B. T. R. et al. (2010), "Obligation Norm Identification in Agent Societies", [*JASSS* 13(4) 3](https://www.jasss.org/13/4/3.html) | Constructs as legible records (2) |
+
+## The translator (docs/design/translator-and-resolver.md)
+
+### The local model's shape (16.10, proposed)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A model that answers typed questions about a state with calibrated distributions, not text ("System One" models) | TypeSafe AI, Jev documentation, [docs.typesafe.ai](https://docs.typesafe.ai/introduction) (read 2026-09-30); its architecture isn't described there | The idea: the translator decides and copies, never generates |
+| Intent detection and slot filling as one model | Liu, B. & Lane, I. (2016), "Attention-Based Recurrent Neural Network Models for Joint Intent Detection and Slot Filling", Interspeech 2016 **(to confirm)** | The baseline build: a verdict head and span heads |
+| Pointing at the input instead of generating: outputs that are positions in the input | Vinyals, O., Fortunato, M. & Jaitly, N. (2015), "Pointer Networks", NeurIPS 2015 **(to confirm)**; copying in sequence-to-sequence models: See, A., Liu, P. J. & Manning, C. D. (2017), "Get To The Point", ACL 2017 **(to confirm)** | Copy-only ids and text in the target build |
+| Proper scoring rules: log loss rewards honest probabilities | Gneiting, T. & Raftery, A. E. (2007), "Strictly Proper Scoring Rules, Prediction, and Estimation", *Journal of the American Statistical Association* 102(477), 359–378 **(to confirm)** | The training objective, and why no reinforcement learning is needed |
+| Modern networks are overconfident; temperature scaling and expected calibration error | Guo, C., Pleiss, G., Sun, Y. & Weinberger, K. Q. (2017), "On Calibration of Modern Neural Networks", ICML 2017 **(to confirm)** | Calibrating the translation's confidence; the calibration measure |

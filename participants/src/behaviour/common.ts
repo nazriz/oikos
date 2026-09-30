@@ -220,9 +220,17 @@ export const callAction = (step: Step): ParticipantAction => {
  */
 export class Letters {
   private pending: { id: string; from: string; as?: string }[] = [];
-  take(obs: Observation) {
-    // A note about one of our records (a bank saying a payment of ours wasn't made) isn't a question: it isn't answered.
-    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ") && !(m.re && !m.re.startsWith("msg."))) this.pending.push({ id: m.id, from: m.from, ...(m.as ? { as: m.as } : {}) });
+  /** Letters in: all but our own, reports (answers to letters), and news of a request of ours from those we asked to
+   * carry it out (a bank saying a payment we asked for wasn't made), which isn't a question. A letter about anything
+   * else is (pilot 10: a mayor asking the bank about an invoice, by its id, went unanswered). */
+  take(obs: Observation, book: Book) {
+    const newsOfOurRequest = (m: Observation["inbox"][number]) => {
+      const r = m.re ? book.records.get(m.re) : undefined;
+      if (r?.record !== "statement" || r.kind !== "request" || r.speaks_for !== obs.entity) return false;
+      const sender = m.as ? book.positions.get(m.as)?.entity : book.participantPerson.get(m.from);
+      return !!sender && (r.addressed_to ?? []).includes(sender);
+    };
+    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ") && !newsOfOurRequest(m)) this.pending.push({ id: m.id, from: m.from, ...(m.as ? { as: m.as } : {}) });
   }
   /** Each letter answered with the report (which may depend on who wrote: the participant, and the position it wrote in). */
   answer(report: (from: { participant: string; as?: string }) => string, why = "A letter to our office: answering with our standard report."): Step[] {

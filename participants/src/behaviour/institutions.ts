@@ -36,7 +36,7 @@ export function ownerOf(book: Book, lot: string): string | undefined {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.7.0",
+  version: "0.7.1",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -49,7 +49,7 @@ export const planningOfficer: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
         for (const c of channels.cells(obs)) built.set(c.cell, !!c.structure);
       },
       (obs) => {
@@ -110,7 +110,7 @@ export const planningOfficer: BehaviourModule = {
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
-  version: "0.5.0",
+  version: "0.5.1",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -125,7 +125,7 @@ export const inspector: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
       },
       (obs) => {
         const me = obs.entity;
@@ -233,7 +233,7 @@ export const builder: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
         for (const d of deliveries.take(book, obs.entity)) {
           const o = orderQty.get(d.order);
           if (!o) continue;
@@ -443,7 +443,7 @@ export const builder: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
-  version: "0.3.0",
+  version: "0.3.1",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(_ctx: ParticipantContext) {
@@ -453,7 +453,7 @@ export const registry: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
       },
       (obs) => {
         const me = obs.entity;
@@ -484,7 +484,7 @@ export const registry: BehaviourModule = {
  */
 export const childProtection: BehaviourModule = {
   name: "city.child_protection",
-  version: "0.3.0",
+  version: "0.3.1",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(_ctx: ParticipantContext) {
@@ -494,7 +494,7 @@ export const childProtection: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
       },
       () => {
         const steps: Step[] = [];

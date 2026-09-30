@@ -149,6 +149,9 @@ test("offices answer the mayor's letters with their reports, in figures", async 
     participant: (req: LlmRequest) => {
       seen.push(JSON.stringify(req.messages.at(-1)!.content));
       if (calls === 0) return tool("write", { to: ["finance", "council-clerk", "planning", "bank"], text: "Please send me the town's figures.", as: "mayor" });
+      // A question about a record by its id (pilot 10: a letter to the bank about an invoice went unanswered, taken for
+      // news of a request): here the town's own wage order, asked of the bank.
+      if (calls === 1) return tool("write", { to: ["bank"], text: "What has been paid under this order?", about: wageOrder, as: "mayor" });
       // Again a week on: what's been published since (the builder's prices) is in the answer.
       const day = Number(/It is year 1, day (\d+)/.exec(JSON.stringify(req.messages.at(-1)!.content))?.[1] ?? 0);
       if (!again && day >= 8) {
@@ -160,7 +163,9 @@ test("offices answer the mayor's letters with their reports, in figures", async 
     translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
     debrief: () => [{ type: "text", text: "Thanks." }],
   });
-  const s = await run("letters", town(), 20 * DAY, { adapter });
+  const config = town();
+  const wageOrder: string = config.world.records.find((r: any) => r.kind === "request" && r.speaks_for === "city" && r.addressed_to?.includes("bank")).id;
+  const s = await run("letters", config, 20 * DAY, { adapter });
   const ev = lines(s.logPath).filter((e) => e.kind === "event").map((e) => e.body);
   expect(ev.some((e) => e.event === "message_delivered" && e.participant === "finance-system" && e.to.includes("mayor-system"))).toBe(true);
   expect(ev.some((e) => e.event === "message_delivered" && e.participant === "council-clerk-system" && e.to.includes("mayor-system"))).toBe(true);
@@ -169,6 +174,7 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   // The bank answers too (pilot 9: 34 letters, no reply), with the writer's own accounts: the town's, as the mayor
   // wrote in its office.
   expect(read).toMatch(/Report from bank: your accounts with us: acc-city, balance \$[\d,]+\.\d\d/);
+  expect(read.match(/Report from bank: your accounts with us/g)?.length).toBeGreaterThanOrEqual(2);
   expect(read).toContain("council proposal form");
   // The budget brief: what the budget can pay for; what a park costs is the builder's published price, not something finance was told.
   expect(read).toContain("The budget's lines: parks, for building a park");

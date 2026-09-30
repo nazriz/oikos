@@ -124,7 +124,7 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.5.0",
+  version: "0.5.1",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -136,7 +136,7 @@ export const councilClerk: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
       },
       (obs) => {
         const me = obs.entity;
@@ -192,7 +192,7 @@ export const councilClerk: BehaviourModule = {
  */
 export const councillor: BehaviourModule = {
   name: "city.councillor",
-  version: "0.5.0",
+  version: "0.5.1",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -205,7 +205,7 @@ export const councillor: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
       },
       (obs) => {
         const steps: Step[] = [];
@@ -241,7 +241,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.8.0",
+  version: "0.8.1",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -261,7 +261,7 @@ export const financeOfficer: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         payroll.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
         const mine = ownAccount(obs)?.account;
         if (mine) for (const x of channels.transactions(obs)) {
           if (x.to === mine && x.from !== mine) flows.push({ t: x.t, amount: cents(x.amount), party: x.from });
@@ -348,7 +348,7 @@ export const financeOfficer: BehaviourModule = {
  */
 export const taxClerk: BehaviourModule = {
   name: "city.tax_clerk",
-  version: "0.4.0",
+  version: "0.4.1",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -360,7 +360,7 @@ export const taxClerk: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
         const acc = ownAccount(obs);
         if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account) received.set(tx.from, (received.get(tx.from) ?? 0) + cents(tx.amount));
       },
@@ -414,7 +414,7 @@ export const taxClerk: BehaviourModule = {
  */
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
-  version: "0.1.0",
+  version: "0.1.1",
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -429,7 +429,7 @@ export const ratesOfficer: BehaviourModule = {
     return stepper(
       (obs) => {
         book.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
         const acc = ownAccount(obs);
         if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.settles) {
           settled.add(tx.settles);
@@ -502,7 +502,7 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
-  version: "0.1.0",
+  version: "0.1.1",
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -538,7 +538,7 @@ export const works: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
-        letters.take(obs);
+        letters.take(obs, book);
         for (const c of channels.cells(obs)) seen.set(c.cell, c.structure);
         for (const h of channels.holdings(obs)) if (h.at === p.depot && h.kind === p.kind) atDepot = Number(h.quantity);
         const depot = obs.channels[p.depot_channel];
