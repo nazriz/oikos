@@ -482,6 +482,9 @@ Proposed together, for one sign-off:
   The host runs the units and says when each wake is over. Any host (a Python seat, a human interface) gets the same schedule.
   - **Checked:** 60 days of the 1,000-person town ends in the identical state as under the old host (the same state hash, about 104,000 commands). The logs differ only in order within a moment: the old host ordered a cohort by (wake time, key), because it set news wakes at the time before an advance, and could split one moment into two cohorts. The engine wakes everyone due at a moment together, in key order, as D58 says.
   - **Gate:** kernel 97, TypeScript 281.
+- **R2, the resolver in the engine** (2026-09-30): `kernel/crates/resolver`, which holds the call language, what each seat knows, and the resolver. It's a port of `translator/src/{resolver,knowledge}.ts` and `participants/src/calls.ts`. The engine keeps each seat's knowledge from the observations it delivers, and resolves calls itself (the protocol's `resolve`): every code module's act, and a model seat's drafts.
+  - **Checked:** shadow mode (`TERRARIUM_RESOLVER=shadow`) resolves every call both ways. There were no differences in 26,920 calls over 60 days of the 1,000-person town, and none across the whole test suite, where a difference fails the test. The same final state.
+  - **Still in TypeScript:** a model seat's draft preview and law warnings (they read the seat's knowledge there too). They move with the `law` crate.
 - **Next:**
   1. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
   2. R4 and R5.

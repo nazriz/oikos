@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
-import { LABEL_TEXT, RESOLVER, resolve, type StructureTypeInfo } from "./resolver";
+import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
 export const TRANSLATOR_VERSION = "0.4.0";
 
@@ -152,7 +152,11 @@ export function draftHash(d: Draft): string {
  * exchange; it may still answer none(...) if that's right. Each earlier attempt comes back in `retries` (the run logs
  * them), so what the participant sees is the last attempt's.
  */
-export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2) {
+/** The resolver the translator uses: the engine's, when the host gives one (its seat's knowledge is the engine's), or
+ * this package's, from the request's knowledge. */
+export type ResolveFn = (req: TranslateRequest, program: calls.Program) => Promise<Resolution>;
+
+export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {
   const tid: TranslatorId = { id, version: TRANSLATOR_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` };
   const seen = new Set<string>();
   type Failure = Extract<Translation, { ok: false }>;
@@ -167,7 +171,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
       return { ok: false, notices: [LABEL_TEXT.unclear], call: text };
     }
     const call = calls.programText(program);
-    const r = resolve(program, req.knowledge, typeOf, req.as);
+    const r = resolver ? await resolver(req, program) : resolve(program, req.knowledge, typeOf, req.as);
     if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}) };
     const k = await check(req.participant, req.as, r.blocks);
     if (k.error) return { ok: false, notices: [LABEL_TEXT.unclear], call, final: true };

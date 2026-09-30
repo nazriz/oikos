@@ -26,6 +26,11 @@ pub struct Session {
     run: Option<Run<BufWriter<File>>>,
     /// When each unit wakes (the engine's side of the loop: crate::schedule), once the host registers its units.
     sched: Option<crate::schedule::Scheduler>,
+    /// What each seat knows (`<participant>|<capacity>`, or `<participant>` for all its capacities), from the
+    /// observations delivered to it: the resolver's only source (P8).
+    knowledge: std::collections::BTreeMap<String, terrarium_resolver::Knowledge>,
+    /// The world's structure types (its catalogue), by id: what the resolver reads of a kind of building.
+    types: std::collections::BTreeMap<String, Value>,
 }
 
 impl Session {
@@ -35,7 +40,7 @@ impl Session {
 
     /// One request, one reply (never an error: a refused request is `{"ok":false,"error":..}`).
     pub fn request(&mut self, req: &Value) -> Value {
-        handle(&mut self.run, &mut self.sched, req).unwrap_or_else(|e| json!({ "ok": false, "error": e }))
+        handle(self, req).unwrap_or_else(|e| json!({ "ok": false, "error": e }))
     }
 
     /// One request as a line of JSON, its reply as one.
@@ -76,7 +81,8 @@ pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()>
     Ok(())
 }
 
-fn handle(run: &mut Option<Run<BufWriter<File>>>, sched: &mut Option<crate::schedule::Scheduler>, req: &Value) -> Result<Value, String> {
+fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
+    let Session { run, sched, knowledge, types } = session;
     let op = req.get("op").and_then(Value::as_str).ok_or("missing op")?;
     let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
     if op == "start" {
@@ -91,6 +97,8 @@ fn handle(run: &mut Option<Run<BufWriter<File>>>, sched: &mut Option<crate::sche
         let config = req.get("config").cloned().ok_or("missing config")?;
         let r = Run::start(config, str_field("run_id")?, BufWriter::new(log), anchors).map_err(|e| e.to_string())?;
         let reply = json!({ "ok": true, "seq": 0, "head": r.head(), "t": r.kernel().t() });
+        *types = req["config"]["catalogue"]["structure_types"].as_array().into_iter().flatten().filter_map(|t| Some((t["id"].as_str()?.to_string(), t.clone()))).collect();
+        knowledge.clear();
         *sched = Some(crate::schedule::Scheduler::new(r.kernel().statics().tick));
         *run = Some(r);
         return Ok(reply);
@@ -102,11 +110,35 @@ fn handle(run: &mut Option<Run<BufWriter<File>>>, sched: &mut Option<crate::sche
                 serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|e| format!("bad command: {e}"))?;
             let resp = r.command(&cmd).map_err(|e| e.to_string())?;
             let mut v = serde_json::to_value(&resp).map_err(|e| e.to_string())?;
+            // What the seat now knows: each observation delivered to it, as it received it.
+            if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(obs)) = (&cmd, v.get("observation")) {
+                let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
+                knowledge.entry(key).or_default().absorb(obs);
+            }
             if let Some(s) = sched.as_mut() {
                 s.note(Some(r.kernel().state()), v["events"].as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());
             }
             v["ok"] = Value::Bool(true);
             Ok(v)
+        }
+        // A call to the seat's own acts (the resolver, from what the seat knows): blocks, or questions for the seat.
+        "resolve" => {
+            let participant = str_field("participant")?;
+            let key = req["only"].as_str().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
+            let program = terrarium_resolver::calls::parse_program(str_field("program")?).map_err(|e| format!("the call doesn't parse: {}", e.0))?;
+            let empty = terrarium_resolver::Knowledge::default();
+            let k = knowledge.get(&key).unwrap_or(&empty);
+            let type_of = |t: &str| types.get(t).cloned();
+            Ok(match terrarium_resolver::resolve(&program, k, &type_of, req["as"].as_str()) {
+                terrarium_resolver::Resolution::Blocks(blocks) => json!({ "ok": true, "blocks": blocks }),
+                terrarium_resolver::Resolution::Questions { questions, invalid } => {
+                    let mut v = json!({ "ok": true, "questions": questions });
+                    if !invalid.is_empty() {
+                        v["invalid"] = json!(invalid);
+                    }
+                    v
+                }
+            })
         }
         // The loop's schedule (crate::schedule): the host's units, when each wakes, and what's next.
         "units_add" => {

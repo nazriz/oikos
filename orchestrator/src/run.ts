@@ -24,9 +24,9 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, DECISIONS, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
+import { calls, canonical, DECISIONS, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
-import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
+import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution } from "@terrarium/translator";
 import { Kernel } from "./kernel";
 import { divergences } from "./truth";
 import type { Watchdog } from "./watchdog";
@@ -124,6 +124,9 @@ export interface RunSummary {
   spentMicroUsd?: number;
   /** Failures to decide that were recovered in place (a module that threw, a model call that failed; D59). */
   participantErrors: number;
+  /** Resolver shadow checks (TERRARIUM_RESOLVER=shadow): calls resolved both ways, and how many the engine's resolved
+   * differently (examples in <run>.resolver-diffs.json). */
+  resolverShadow?: { checked: number; differed: number };
 }
 
 /** A participant, as the orchestrator runs it. */
@@ -188,6 +191,10 @@ interface Unit {
 
 const ceilTo = (t: number, tick: number) => Math.ceil(t / tick) * tick;
 
+/** Whose resolver turns calls into acts: the engine's (kernel/crates/resolver; the default), this package's ("ts"), or
+ * both, compared ("shadow": every difference recorded, and under test an error). */
+const RESOLVER_MODE = (process.env.TERRARIUM_RESOLVER ?? "engine") as "engine" | "ts" | "shadow";
+
 const DAY = 86_400;
 
 /** What a participant is told when the run ends, if its framing asks for a debrief (VISION §15.3). */
@@ -234,6 +241,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const refusedBy: { [code: string]: number } = {};
   const profKernel: { [c: string]: { ms: number; n: number } } = {};
   let participantErrors = 0; // failures to decide, recovered in place (D59)
+  // Resolver shadow checks: calls resolved both ways, and where the engine's resolver differed (the latest 200).
+  let resolverChecked = 0, resolverDiffCount = 0;
+  const resolverDiffs: object[] = [];
   const failures = new Map<string, number>(); // failures to decide in a row, by unit
   // Breadcrumbs (D59): what the run is doing, for the watchdog, at every point where it could hang.
   const mark = (doing: object) => o.watchdog?.mark({ t, ...doing });
@@ -421,7 +431,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const translator = createTranslator(o.translatorAdapter ? { ...io, adapter: watched(o.translatorAdapter) } : io, async (participant, position, blocks) => {
     const r = await k.tryRequest({ op: "check", participant, ...(position ? { as: position } : {}), blocks });
     return r === null ? { ok: false, error: "the blocks could not be read" } : r.check;
-  }, typeOf);
+  }, typeOf, undefined, undefined, RESOLVER_MODE === "ts" ? undefined : async (req, program) => {
+    // (A language-model seat perceives all its capacities: its knowledge is the engine's under its participant.)
+    const e = await k.request({ op: "resolve", participant: req.participant, ...(req.as ? { as: req.as } : {}), program: calls.programText(program) });
+    return (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as Resolution;
+  });
 
   // Welfare (VISION §15; D55): a world that offers violence (life.harm) to language-model people says so in the log.
   const modelPeople = [...cfg.participants, ...(cfg.templates ?? [])].filter((x: any) => x.kind === "person" && x.controller?.type === "llm").map((x: any) => x.id);
@@ -593,7 +607,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const p00 = performance.now();
     const raw: Observation = u.capacity ? slice(reply.observation, u.capacity, u.entity) : { ...reply.observation, entity: u.entity };
     // Knowledge takes in the changes themselves; the controller reads the view's full picture.
-    u.knowledge.absorb(raw);
+    // (What a seat knows is the engine's now (the resolver's source); a language-model seat's is kept here too, for its
+    // drafts' previews and law warnings.)
+    if (u.llm || RESOLVER_MODE !== "engine") u.knowledge.absorb(raw);
     const obs: Observation = { ...u.view.apply(raw), woke_for: u.wokeFor, since: u.since };
     platformMs += performance.now() - p00;
     if (o.inspect) await o.inspect(u.participant, obs, k, u.capacity, raw);
@@ -678,8 +694,26 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         u.notices.push({ t, text: "That request couldn't be read. Could you say it more plainly?" });
         return true;
       }
-      const res = resolve(program, u.knowledge, typeOf, as);
+      // The resolver: the engine's (kernel/crates/resolver), from what the engine delivered to this seat; or, in
+      // shadow mode (TERRARIUM_RESOLVER=shadow, while the engine's is checked against it), both, compared.
+      const resolverMode = RESOLVER_MODE;
+      let res: ReturnType<typeof resolve> | undefined = resolverMode === "engine" ? undefined : resolve(program, u.knowledge, typeOf, as);
+      if (resolverMode !== "ts") {
+        const e = await k.request({ op: "resolve", participant: u.participant, ...(u.capacity ? { only: u.capacity } : {}), ...(as ? { as } : {}), program: calls.programText(program) });
+        const byEngine = (e.blocks ? { ok: true, blocks: e.blocks } : { ok: false, questions: e.questions, ...(e.invalid ? { invalid: e.invalid } : {}) }) as ReturnType<typeof resolve>;
+        if (res === undefined) res = byEngine;
+        else {
+          resolverChecked++;
+          if (canonical(res) !== canonical(byEngine)) {
+            resolverDiffs.push({ t, unit: u.key, call: calls.programText(program).slice(0, 1000), ts: canonical(res).slice(0, 2000), engine: canonical(byEngine).slice(0, 2000) });
+            if (resolverDiffs.length > 200) resolverDiffs.shift();
+            resolverDiffCount++;
+            if (process.env.NODE_ENV === "test") throw new Error(`the engine's resolver differs on ${calls.programText(program).slice(0, 300)}:\n  here:   ${canonical(res).slice(0, 600)}\n  engine: ${canonical(byEngine).slice(0, 600)}`);
+          }
+        }
+      }
       platformMs += performance.now() - p1;
+      if (!res) throw new Error("no resolver ran");
       if (!res.ok) {
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { call_unresolved: calls.programText(program), questions: res.questions, ...(res.invalid ? { invalid: res.invalid } : {}) } } });
         for (const q of res.questions) u.notices.push({ t, text: q });
@@ -867,7 +901,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const end = await k.request({ op: "finish", reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) });
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
-  return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
+  if (resolverDiffCount) await Bun.write(join(o.outDir, `${o.runId}.resolver-diffs.json`), JSON.stringify(resolverDiffs, null, 1));
+  return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
     health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) },
     ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}) };
