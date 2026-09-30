@@ -665,7 +665,7 @@
         { "kind": "interest", "name": "community club", "every_days": 30, "lasts_minutes": 120 }
       ],
       "per_kind_per_1000_people": 1,
-      "taking_part_bps": 5000,
+      "taking_part_bps": 4000,
       "leave_notice_days": 0
     }
   },
@@ -727,7 +727,7 @@
     "households.age_bands_bps": "ABS, Census 2021 QuickStats, Rest of Vic. (GCCSA 2RVIC): people by five-year age group (median age 43); 85 and over taken to 99. The ages of adults living alone, as couples without children at home, or in groups are drawn from this, less the parents the family shares imply (the generator derives it: docs/behaviour/households.md).",
     "unions.meeting_every_days": "Placeholder: a members' meeting a month.",
     "groups.kinds": "The kinds of social group the ABS General Social Survey counts (sport or physical recreation; religious or spiritual; arts or heritage; craft or practical hobby; other recreational or special interest: the category list to confirm against the survey's glossary). How often each meets, and for how long, are placeholders. Whether people come is theirs: the survey's participation is a calibration target (targets), not a rate given to anyone.",
-    "groups.taking_part_bps": "ABS, General Social Survey 2019: 50.0% of people aged 18 and over took part in a social group in the last 12 months. At the start, that share of adults belongs to one group (which kind: evenly, a placeholder) and goes to its gatherings; after that, whether anyone goes is theirs, and the survey's share is a target.",
+    "groups.taking_part_bps": "Calibrated (2026-09-30): the share of adults who belong to a group at the start (which kind: evenly, a placeholder) and go to its gatherings; after that, whether anyone goes is theirs. The survey counts anyone who took part over 12 months (ABS, General Social Survey 2019: 50.0% of people aged 18 and over), which is more than belong at any one time, so it is the target (targets), not this share. At 50% here, a year's participation came out at 60%.",
     "groups.kinds.teaching": "What a group asks people to hold, in its words: content, for belief to attach to (docs/design/ai-citizens.md 5). The congregation's stands for the Christian denominations together (one congregation per town is a simplification).",
     "groups.kinds.held_at_start_bps": "ABS, Census of Population and Housing 2021: 43.9% of people reported a Christian affiliation (to confirm against the release; other religions, 10.0%, aren't represented yet). At the start, the congregation's members hold its teaching strongly, and others up to this share hold it less; after that it strengthens, spreads and fades.",
     "unions.teaching": "The union movement's claim, in words (content for belief). Its members hold it at the start.",

@@ -6,7 +6,7 @@ import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
+import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
@@ -22,7 +22,7 @@ import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from
  */
 export const producer: BehaviourModule = {
   name: "firm.producer",
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -266,18 +266,25 @@ export const producer: BehaviourModule = {
         // Beyond the top of Lengnick's band, more stock is no use: the workers are paid, but nothing is made today.
         const enough = stock * 10_000 > p.phi_high_bps * lastDemand;
         if (workDay(t) && present.length && !enough && winding.state === "trading") {
-          const avail = Math.min(...present.map((w) => p.working_day - (used.get(w) ?? 0)));
-          const byHours = Math.floor((avail * present.length) / p.labour_per_unit);
+          const crew = team(present, (w) => p.working_day - (used.get(w) ?? 0));
+          const byHours = Math.floor((crew.each * crew.who.length) / p.labour_per_unit);
           const byInputs = Math.min(...Object.entries(p.per_unit).map(([k, q]) => Math.floor(held(obs, p.works, k) / q)));
           // No further than the top of the band: a day's making can be a lot next to a month's demand.
           const room = Math.max(0, Math.ceil((p.phi_high_bps * lastDemand) / 10_000) - stock);
           const units = Math.min(byHours, byInputs, room);
           if (units > 0) {
-            const share = Math.ceil((units * p.labour_per_unit) / present.length);
-            for (const w of present) used.set(w, (used.get(w) ?? 0) + share);
-            const st = because(`The day's work: ${present.length} of our workers making ${units} ${p.output}${byInputs < byHours ? ` (all our inputs allow)` : ""}.`,
-              C.call("work", { task: p.task, units: C.text(String(units)), at: p.works, by: C.json(present) }));
-            st.then = (out) => { if (out.status !== "applied") for (const w of present) used.set(w, Math.max(0, (used.get(w) ?? 0) - share)); };
+            const share = Math.ceil((units * p.labour_per_unit) / crew.who.length);
+            for (const w of crew.who) used.set(w, (used.get(w) ?? 0) + share);
+            const st = because(`The day's work: ${crew.who.length} of our workers making ${units} ${p.output}${byInputs < byHours ? ` (all our inputs allow)` : ""}${crew.who.length < present.length ? ` (the others here have done a day's work already)` : ""}.`,
+              C.call("work", { task: p.task, units: C.text(String(units)), at: p.works, by: C.json(crew.who) }));
+            st.then = (out) => {
+              if (out.status === "applied") return;
+              for (const w of crew.who) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
+              // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
+              const short = outOfTime(out);
+              if (short?.who) used.set(short.who, p.working_day - short.left);
+              else if (short) for (const w of crew.who) used.set(w, p.working_day);
+            };
             steps.push(st);
           }
         }

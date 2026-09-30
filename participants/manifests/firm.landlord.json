@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "arrears_months_before_notice": {
@@ -132,6 +132,13 @@
     "outside_account": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "renew": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": true,
+      "source": "placeholder"
     },
     "rent_increase_notice_days": {
       "schema": {

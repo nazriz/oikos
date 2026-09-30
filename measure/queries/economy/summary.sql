@@ -1,4 +1,4 @@
--- The economy against its calibration targets (docs/calibration.md), per run: at the end, adults, those of working age (below the retirement age its citizens were given) and in the labour force, and people in jobs; employment and participation as shares of adults, and the unemployment rate; over the last 12 months, households' saving (what came into people's accounts less what went out, over what came in).
+-- The economy against its calibration targets (docs/calibration.md), per run: at the end, adults, those of working age (below the retirement age its citizens were given) and in the labour force, and people in jobs; employment and participation as shares of adults, and the unemployment rate; over the last 12 months, households' saving (what came into people's accounts less what went out, over what came in; people's accounts are those people hold, and wealth moving with people leaving or arriving isn't counted).
 with r as (select run_id, world, seed, end_t, greatest(0, end_t - 12 * 2592000) as from_t from runs),
 ret as (select distinct run_id, (json_extract_string(params, '$.retirement_age'))::INTEGER as age from participants where impl = 'citizen.default' and json_extract_string(params, '$.retirement_age') is not null),
 gone as (select run_id, person, min(t) as t from life where event in ('person_left', 'person_died') group by all),
@@ -11,11 +11,15 @@ at_end as (select r.run_id,
     count(*) filter (where p.born_at + 18 * 365 * 86400 <= r.end_t and (ret.age is null or p.born_at + ret.age * 365 * 86400 > r.end_t) and not p.outside_lf) as labour_force
   from r join people p on p.run_id = r.run_id and p.created_t <= r.end_t and (p.gone_t is null or p.gone_t > r.end_t) left join ret on ret.run_id = r.run_id group by all),
 jobs as (select o.run_id, sum(case when o.event = 'occupied' then 1 else -1 end) as employed from occupancy o join r on r.run_id = o.run_id where o.t <= r.end_t and o.space_kind = 'workplace' group by all),
-person_accounts as (select distinct t.run_id, t."to" as account from transfers t where t."to" like 'acc-c%' union select distinct t.run_id, t."from" from transfers t where t."from" like 'acc-c%'),
+person_accounts as (select distinct a.run_id, a.account, a.holder, l.t as left_t, ar.t as arrived_t from accounts a join entities e on e.run_id = a.run_id and e.entity = a.holder and e.kind = 'person'
+  left join (select run_id, person, min(t) as t from life where event = 'person_left' group by all) l on l.run_id = a.run_id and l.person = a.holder
+  left join (select run_id, person, max(t) as t from life where event = 'person_arrived' group by all) ar on ar.run_id = a.run_id and ar.person = a.holder),
+-- (Not income or spending but wealth moving, as the national accounts treat it: what a leaver's account pays out once they've gone, and what comes in with a newcomer on the day they arrive.)
 flows as (select t.run_id,
-    sum(t.amount) filter (where t."to" in (select account from person_accounts pa where pa.run_id = t.run_id) and t."from" not in (select account from person_accounts pa where pa.run_id = t.run_id)) as came_in,
-    sum(t.amount) filter (where t."from" in (select account from person_accounts pa where pa.run_id = t.run_id) and t."to" not in (select account from person_accounts pa where pa.run_id = t.run_id)) as went_out
-  from transfers t join r on r.run_id = t.run_id where t.t >= r.from_t group by all)
+    sum(t.amount) filter (where ti.account is not null and fi.account is null and not (ti.arrived_t is not null and t.t between ti.arrived_t and ti.arrived_t + 86400)) as came_in,
+    sum(t.amount) filter (where fi.account is not null and ti.account is null and not (fi.left_t is not null and t.t >= fi.left_t)) as went_out
+  from transfers t join r on r.run_id = t.run_id left join person_accounts ti on ti.run_id = t.run_id and ti.account = t."to" left join person_accounts fi on fi.run_id = t.run_id and fi.account = t."from"
+  where t.t >= r.from_t group by all)
 select r.run_id, r.seed, e.adults, e.working_age, e.labour_force, j.employed,
   round(100.0 * j.employed / nullif(e.adults, 0), 1) as employment_to_population_pct,
   round(100.0 * e.labour_force / nullif(e.adults, 0), 1) as participation_pct,

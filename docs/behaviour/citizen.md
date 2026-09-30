@@ -1,4 +1,4 @@
-# `citizen.default` (v0.18.0): the AI citizen in code
+# `citizen.default` (v0.21.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -33,7 +33,8 @@ It wakes weekly, whenever something names it (an offer, a notice, a message), an
 | **Choosing a home** | Among the listings seen that are affordable and have the bedrooms the household needs, the mind's choice: each offer's rent and the home's bedrooms appraised (room beyond the bedrooms needed counts for a little); homes friends named count as others having gone there. One application a week, never the same listing twice. Still hunting after `accept_fewer_bedrooms_after_days`, one bedroom fewer will do, and so on. | Replaces the BoE's "highest quality they can afford" (rent standing for quality). One year: median rent share 23.3 to 20.5% (target 20.2%) |
 | **Signing and moving in** | Sign the landlord's offer and set up a monthly standing order for rent, paid in advance. Then move in as a separate physical act, trying again the next day until the home is free (by time, not by how often they happen to look: 2026-09-30). | Rent in advance is standard practice. Signing and moving in are separate: someone can hold a lease before the last tenant has left |
 | **Staying** | Never ends a tenancy early. Leaves when the term ends or the landlord's notice runs out (making ends meet, it then looks for somewhere cheaper first). | BoE model §3.4.2 |
-| **A rent increase** | Given notice of one, the leaseholder is angry with the landlord, the more so the more of their income it takes. It pays the new rent from when it starts if still within budget. If not, it gives notice and looks for somewhere else. The new rent is paid on the old one's days, from the first after it starts; the old standing order stops after its last payment. | The rent rule; the notice is the lease's |
+| **A rent increase** | Given notice of one, the leaseholder is angry with the landlord, the more so the more of their income it takes. It keeps the home and pays the new rent from when it starts while it can bear it: up to half of household income (`rent_bearable_share_bps`), in rental stress past a third. Beyond that, it gives notice and looks for somewhere else. The new rent is paid on the old one's days, from the first after it starts; the old standing order stops after its last payment. (Until 2026-09-30 it gave notice past a third: at the first annual review about a third of renting households did, and most of them left town.) | Many renters pay over 30% of income and stay: rental stress, as income and housing surveys measure it (ABS, *Survey of Income and Housing*). The half is a placeholder |
+| **Rent the bank couldn't pay** | Told by the bank that a rent payment (or its share of the rent) failed, it still owes it: it pays it as soon as its balance covers it, before shopping, oldest first. | Rent missed is owed; a standing order that fails isn't retried by the bank |
 | **Work** | Unemployed, in the labour force and below retirement age: apply for a posting seen, one a week. Which employer is the mind's: each offer's wage and hours appraised, with what's learned of each employer (one that paid as agreed, or didn't, is remembered; what friends say of theirs counts); employers friends named or work for count as others having gone there. | Search on the postings; the labour-market literature (Dosi et al.) is the planned refinement |
 | **A better job** | In work: looking at the postings every month while unsatisfied (CONSUMAT) or making ends meet (a goal), and otherwise now and then, the more open the more often. It applies only to better-paid postings elsewhere. Offered one: take it, give notice at the old job (the contract's notice), and start once it's worked out. | Replaces Lengnick's (2013) flat monthly chance (π = 0.1) |
 | **Unpaid wages** | Wages that haven't come for a pay period plus five days: resign (ending it now), record the wages owed as a debt against the employer (a claim), and be angry with them. | Employees are creditors for unpaid wages |
@@ -91,7 +92,7 @@ Saving is off: it's negative in the first year, and 22–25% over five (target 6
 
 ## Parameters (defaults; a world's profile sets the place-specific ones)
 
-- **Homes:** `rent_share_bps` 3300, `savings_rent_months` 6, `accept_fewer_bedrooms_after_days` 60, `search_limit` 20
+- **Homes:** `rent_share_bps` 3300, `rent_bearable_share_bps` 5000, `savings_rent_months` 6, `accept_fewer_bedrooms_after_days` 60, `search_limit` 20
 - **Spending:** `essentials` 40000 (cents a month), `saving_bps` 500, `wealth_effect_bps_per_year` 300, `income_window_days` 90, `buffer_months` 3
 - **Shopping:** `shop_every_days` 14, `beta` 5, `essentials_units` 10
 - **Work and support:** `retirement_age`, `support_from`, `support_kinds`, `in_labour_force`, `participation_bps` (the world's)
@@ -122,6 +123,7 @@ Unless a source is named above, a figure is a placeholder, to calibrate.
 - Voice beyond petitions and complaints: voting in elections, protest, contacting councillors.
 - Knowing which laws already exist (a citizen may petition for a law already passed).
 - Buying homes; commuting; housing quality beyond price and bedrooms; renegotiating rent.
+- Moving house while housed: looking for somewhere cheaper or better while keeping the home, and giving notice once a new lease is signed. A household hunts only once it's without a home, so a rent it can't bear means notice first, then the hunt (the realistic order is the other way round).
 - The other social moves: help, snub, gossip, reputation.
 - Goals with sub-goals; learning which methods work.
 - Memory that compresses and forgets, and misremembering.

@@ -6,7 +6,7 @@ import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
+import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.3.0",
+  version: "0.3.1",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -334,18 +334,20 @@ export const retailer: BehaviourModule = {
         }
         // Each worker's time left today; serving is shared evenly among those here, as the work is.
         const room = (w: string) => (workDay(t) ? p.working_day - (used.get(w) ?? 0) : 0);
+        // (Who serves today: those here with the most time between them, the work shared evenly.)
+        const crew = team(present, room).who;
         let left = stock;
         for (const x of [...queue]) {
           const want = x.o.quantity - x.served;
-          const minRoom = present.length ? Math.min(...present.map(room)) : 0;
-          const q = Math.min(want, left, Math.floor((minRoom * present.length) / p.serve_labour));
+          const minRoom = crew.length ? Math.min(...crew.map(room)) : 0;
+          const q = Math.min(want, left, Math.floor((minRoom * crew.length) / p.serve_labour));
           // (An order for a fortnight's shopping is served over the fortnight: it's what the household uses until then.)
           const within = x.o.forDays ?? p.serve_within_days;
           const out = left === 0 || (q === want) ? "done" : t - x.since >= within * DAY ? "late" : "wait";
           if (q === 0 && out === "wait") break; // no hands left today: the rest wait their turn
-          const share = q ? Math.ceil((q * p.serve_labour) / present.length) : 0;
+          const share = q ? Math.ceil((q * p.serve_labour) / crew.length) : 0;
           left -= q;
-          for (const w of present) if (share) used.set(w, (used.get(w) ?? 0) + share);
+          for (const w of crew) if (share) used.set(w, (used.get(w) ?? 0) + share);
           const before = x.served;
           x.served += q;
           const finished = out !== "wait";
@@ -354,10 +356,14 @@ export const retailer: BehaviourModule = {
             : x.served === x.o.quantity ? `Serving an order paid in full: ${x.served} ${x.o.kind}${before ? " (the last of it)" : ""}.`
             : left === 0 && out !== "late" ? `Out of stock: served ${x.served} of the ${x.o.quantity} ordered; refunding the rest.`
             : `We couldn't serve all of an order within ${within} days: served ${x.served} of the ${x.o.quantity}; refunding the rest.`;
-          const st = fillWith(x.o, q, finished ? x.served : -1, present, why);
+          const st = fillWith(x.o, q, finished ? x.served : -1, q ? crew : [], why);
           st.then = (res) => {
             if (res.status === "applied") return;
-            for (const w of present) if (share) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
+            for (const w of crew) if (share) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
+            // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
+            const short = outOfTime(res);
+            if (short?.who) used.set(short.who, p.working_day - short.left);
+            else if (short) for (const w of crew) used.set(w, p.working_day);
             x.served = before;
             // Where it was to go, or whom to, is gone: refund what's left of it. Otherwise (someone left in the same
             // moment, say) it waits its turn again.

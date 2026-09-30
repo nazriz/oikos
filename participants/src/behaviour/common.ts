@@ -204,6 +204,28 @@ export function ownAccount(obs: Observation): { account: string; balance: number
  */
 export type Step = (C.Call | [string, C.Call])[] & { why?: string; then?: (o: ActOutcome) => Step[] | void; redo?: (t: number) => Step; planned?: number };
 
+/**
+ * A day's shared work: of those here, the team that gets most done when the work is shared evenly (each does the same
+ * share, so a team's hours are its size times the least time any of them has left today). Someone who's already done
+ * a day's work elsewhere (a new starter, arriving from their old job) joins tomorrow.
+ */
+export function team(here: string[], hoursLeft: (w: string) => number): { who: string[]; each: number } {
+  const byHours = [...here].sort((a, b) => hoursLeft(b) - hoursLeft(a) || (a < b ? -1 : 1));
+  let best = { who: [] as string[], each: 0 };
+  byHours.forEach((w, i) => {
+    const each = Math.max(0, hoursLeft(w));
+    if (each * (i + 1) > best.each * best.who.length) best = { who: byHours.slice(0, i + 1), each };
+  });
+  return { who: best.who.sort(), each: best.each };
+}
+
+/** Out of time (a `no_time_left` refusal): whose, and how long they have left today, as the world counts it. */
+export function outOfTime(res: { refusal?: { code?: string; detail?: string } }): { who?: string; left: number } | undefined {
+  if (res.refusal?.code !== "no_time_left") return undefined;
+  const m = /^(\S+) has (\d+) s of work left today/.exec(res.refusal.detail ?? "");
+  return m ? { who: m[1]!, left: Number(m[2]) } : { left: 0 };
+}
+
 /** A step with its reason: `because("Rent is due", pay(...))`. */
 export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): Step => Object.assign(lines, { why });
 

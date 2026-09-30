@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.20.0",
+  version: "0.22.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -126,6 +126,9 @@ export const citizen: BehaviourModule = {
       births: false, // whether this world has births (its life physics), so whether having a child is possible
       gestation: 266 * DAY, // how long a pregnancy lasts (the world's birth physics: the standard 38 weeks from conception)
       rent_share_bps: 3300, // BoE: renters bid 33% of income
+      // A rent rise on the home we have: kept, and paid, up to this share of household income (in rental stress: many
+      // renters pay over 30%, as income and housing surveys find); beyond it, notice, to find somewhere else. Placeholder.
+      rent_bearable_share_bps: 5000,
       savings_rent_months: 6, // without income, rent only if savings cover this many months
       // Place-specific figures are placeholders here: a world sets them from its profile (docs/profiles.md).
       essentials: 40_000, // cents per month: what's spent however little comes in
@@ -330,7 +333,8 @@ export const citizen: BehaviourModule = {
     let nextCatchUp: number | null = null;
     // Taking part in gatherings (practices): the one we're at, those we mean to go to (practice -> the time it starts), the
     // occurrences we've decided on, how many were there when we went, and those we went to last time.
-    let attending: { practice: string; host: string; space: string; until: number } | null = null;
+    // (`gone`: we went home as it ended, in the middle of a long plan, with those still there then: `seen`.)
+    let attending: { practice: string; host: string; space: string; until: number; gone?: boolean; seen?: string[] } | null = null;
     const going = new Map<string, number>();
     const decidedFor = new Map<string, number>();
     const companyAt = new Map<string, number>();
@@ -381,6 +385,8 @@ export const citizen: BehaviourModule = {
     // As another adult: where we live, our share of the rent, and the pay we last told the leaseholder.
     let livingAt: string | null = null;
     let share: { cents: number; order?: string } | null = null;
+    // Rent (or our share of it) the bank told us it couldn't pay: still owed, and paid as soon as we can.
+    const missed: { instruction: string; to: string; amount: number; what: string }[] = [];
     let payTold = -1;
     // Deaths in the household: those we've seen (in our own home, someone leaving because they died).
     const mourned = new Set<string>();
@@ -476,6 +482,13 @@ export const citizen: BehaviourModule = {
       // Words from people: someone asking around, or someone telling us where to look.
       household = householdOf(book, me)?.data;
       for (const m of obs.inbox) {
+        // The bank couldn't make a payment of our rent (or our share of it): we still owe it.
+        const ours = [home?.order, share?.order, ...(home?.retiring ?? []).map((x) => x.order)];
+        if (m.re && ours.includes(m.re) && /failed/.test(m.text)) {
+          const money = (book.records.get(m.re) as any)?.data?.outcome?.money;
+          if (money?.to && Number.isInteger(cents(money.amount))) missed.push({ instruction: m.re, to: money.to, amount: cents(money.amount), what: m.re === share?.order ? "our share of the rent" : "the rent" });
+          continue;
+        }
         const from = household?.members.find((x) => x.participant === m.from && x.person !== me);
         const what = from ? hear(m.text) : undefined;
         if (from && what) {
@@ -541,6 +554,12 @@ export const citizen: BehaviourModule = {
       const acc = ours.find((a) => a.custodian !== me);
       const steps: Step[] = [];
       if (acc) for (const k of ours) if (k.custodian === me && k.balance > 0) steps.push(because("Depositing the money we brought into our bank account.", pay(acc.account, k.balance, { from: k.account, for: "Deposit." })));
+      // Rent the bank couldn't pay: paid now, before anything else, once there's enough (oldest first).
+      while (acc && missed.length && missed[0]!.amount <= acc.balance) {
+        const x = missed.shift()!;
+        acc.balance -= x.amount;
+        steps.push(because(`The bank couldn't pay ${x.what} (${usd(x.amount)}) when it was due: paying it now.`, pay(x.to, x.amount, { from: acc.account, for: `${x.what === "the rent" ? "Rent" : "Share of the rent"} missed (${x.instruction}).` })));
+      }
       moveStep = null;
       childrenNow = children(t);
       // Are we in a building? Around us we see who's in our own buildings; without that view, assume we are.
@@ -673,7 +692,7 @@ export const citizen: BehaviourModule = {
 
       // An old rent's last payment made: stopping its order (the new rent's has taken over).
       if (home?.retiring?.some((x) => t >= x.at)) {
-        for (const x of home.retiring.filter((x) => t >= x.at)) steps.push(because("The old rent's last payment is made: stopping its order; the new rent's takes over.", withdraw(x.order, "Rent increased; replaced by a new standing order.")));
+        for (const x of home.retiring.filter((x) => t >= x.at)) steps.push(because("The old rent's last payment is made: stopping its order; the new one takes over.", withdraw(x.order, "Replaced by a new standing order.")));
         home.retiring = home.retiring.filter((x) => t < x.at);
       }
       // A tenancy that has ended: move out and stop paying rent.
@@ -793,7 +812,29 @@ export const citizen: BehaviourModule = {
       for (const r of fresh) {
         if (r.record !== "agreement" || !r.terms.parties.includes(me) || book.signedBy(r.id, me)) continue;
         const other = r.terms.parties.find((x) => x !== me)!;
-        if (r.terms.template === "lease" && !home) {
+        if (r.terms.template === "lease" && home && isLeaseholder() && r.basis === home.agreement && r.terms.parties.includes(home.landlord)) {
+          // A new lease for the home we have, as the old one runs out: signed if we can bear its rent (moving costs
+          // too), its rent paid on the old one's days from the first after the old ends; the old order stops after its
+          // last payment.
+          const { rent, rentTo, space } = leaseTerms(r, me);
+          const bearable = householdIncome() > 0 ? rent * 10_000 <= householdIncome() * p.rent_bearable_share_bps : affordable(rent, acc.balance);
+          if (!rentTo || space !== home.space || !bearable) continue;
+          let starts = Math.max(t, endsAt(home));
+          let stopAt = t;
+          const old = home.order ? (book.records.get(home.order) as any) : undefined;
+          if (old && Number.isInteger(old.data?.every) && old.data.every > 0) {
+            const every = old.data.every as number;
+            const due0 = old.at + (Number.isInteger(old.data.first) ? old.data.first : every);
+            starts = due0 >= starts ? due0 : due0 + Math.ceil((starts - due0) / every) * every;
+            stopAt = starts - every + DAY;
+          }
+          steps.push(because(`Our landlord offers a new lease on ${home.space} as ours runs out, at ${usd(rent)} a month: staying, and signing it.`,
+            sign(r.id), ["so", pay(rentTo, rent, { from: acc.account, every: MONTH, first: Math.max(0, starts - t), basis: r.id, for: `Rent for ${home.space}, monthly in advance.` })]));
+          if (home.order && stopAt <= t) steps.push(because("The old lease's rent is replaced by the new one's.", withdraw(home.order, "Replaced by a new standing order.")));
+          else if (home.order) home.retiring = [...(home.retiring ?? []), { order: home.order, at: stopAt }];
+          home = { ...home, agreement: r.id, rent, order: undefined };
+          pendingRef = { kind: "rent", agreement: r.id };
+        } else if (r.terms.template === "lease" && !home) {
           const { rent, rentTo, space, structure } = leaseTerms(r, me);
           if (!space || !structure || !rentTo || !affordable(rent, acc.balance)) continue;
           // Signing (a record) and moving in (physics) are separate acts: the
@@ -905,8 +946,11 @@ export const citizen: BehaviourModule = {
         if (rent > home.rent) feelings.feel("anger", home.landlord, 2_000 + 20 * riseShare, t);
         const lease = book.records.get(home.agreement);
         const rentTo = lease ? leaseTerms(lease, me).rentTo : undefined;
-        if (affordable(rent, acc.balance) && rentTo) {
-          const s: Step = because(`Our rent goes up to ${usd(rent)} a month (from ${usd(home.rent)}): still within our budget, so we'll pay it from when it starts.`);
+        const bearable = householdIncome() > 0 ? rent * 10_000 <= householdIncome() * p.rent_bearable_share_bps : affordable(rent, acc.balance);
+        if (bearable && rentTo) {
+          const s: Step = because(affordable(rent, acc.balance)
+            ? `Our rent goes up to ${usd(rent)} a month (from ${usd(home.rent)}): still within our budget, so we'll pay it from when it starts.`
+            : `Our rent goes up to ${usd(rent)} a month (from ${usd(home.rent)}): more than a third of household income, but we can bear it (up to ${usd(Math.floor((householdIncome() * p.rent_bearable_share_bps) / 10_000))}), and moving costs too: we'll pay it from when it starts.`);
           // The new rent is paid on the same days as the old, from the first after it starts; the old order runs until
           // then, and is stopped once its last payment is made (a bank's standing order has no end date to give it).
           let starts = Math.max(t, Number(r.data.from));
@@ -926,7 +970,7 @@ export const citizen: BehaviourModule = {
           home.order = undefined;
           pendingRef = { kind: "rent", agreement: home.agreement };
         } else {
-          steps.push(because(`Our rent goes up to ${usd(rent)} a month, beyond what we can afford (a third of household income, ${usd(Math.floor((householdIncome() * p.rent_share_bps) / 10_000))}): giving notice, to find somewhere else.`,
+          steps.push(because(`Our rent goes up to ${usd(rent)} a month, beyond what we can bear (${usd(Math.floor((householdIncome() * p.rent_bearable_share_bps) / 10_000))} of household income): giving notice, to find somewhere else.`,
             notice(home.agreement, "We can't afford the new rent.")));
         }
       }
@@ -993,8 +1037,8 @@ export const citizen: BehaviourModule = {
         const there = (space: string) => street?.kind === "sites" ? (street.cells.flatMap((c) => c.structure?.spaces ?? []).find((sp) => sp.space === space)?.occupants ?? []).filter((o) => o !== me) : [];
         // Back from one: who was there, and how it was (turned away, it counts for nothing).
         if (attending && t >= attending.until) {
-          const others = there(attending.space);
-          const got = inside(attending.space);
+          const others = attending.seen ?? there(attending.space);
+          const got = !!attending.gone || inside(attending.space);
           // (What it teaches, held, makes it mean more; and others there, keeping to it at a cost of their time, make it
           // more credible: Henrich's credibility-enhancing displays.)
           const meaning = Math.round(holdTo(attending.host) * p.belief.meaning);
@@ -1002,7 +1046,7 @@ export const citizen: BehaviourModule = {
           if (got) strengthen(attending.host, Math.round((p.belief.display_bps * Math.min(20, others.length)) / 20));
           if (got) {
             // (Before anything else: it's over now. Acts take time, so a plan's order is the order things get done.)
-            steps.unshift(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
+            if (!attending.gone) steps.unshift(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
             companyAt.set(attending.practice, others.length);
             for (const o of others) {
               talked.set(o, t);
@@ -1615,6 +1659,17 @@ export const citizen: BehaviourModule = {
           plannedAt = obs.t;
           leadFound.homes = [];
           leadFound.jobs = [];
+        }
+        // A gathering we're at ends while we're busy with a long plan (a move, say): going home comes first; the rest of
+        // the plan follows, and how it went is learned at the next plan.
+        if (attending && !attending.gone && obs.t >= attending.until && todo.length) {
+          const street = obs.channels.street;
+          const here = street?.kind === "sites" ? street.cells.flatMap((c) => c.structure?.spaces ?? []).find((sp) => sp.space === attending!.space)?.occupants ?? [] : [];
+          if (here.includes(me)) {
+            attending.gone = true;
+            attending.seen = here.filter((o) => o !== me);
+            todo.unshift(because(`${attending.host}'s gathering is over (${attending.seen.length} others were there): going home.`, moveOut(attending.space, me)));
+          }
         }
         const next = todo.shift();
         lastWasMove = !!next && next === moveStep;

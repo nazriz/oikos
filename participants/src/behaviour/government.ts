@@ -10,7 +10,7 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, cellsOf, DAY, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote } from "./common";
+import { because, Book, cellsOf, DAY, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote, outOfTime, team } from "./common";
 import { Staffing, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownerOf } from "./institutions";
@@ -502,7 +502,7 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
-  version: "0.1.1",
+  version: "0.1.2",
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -590,7 +590,9 @@ export const works: BehaviourModule = {
           used.clear();
         }
         const mine = new Set(workers);
-        const present = [...new Set(room?.occupants ?? [])].filter((w) => mine.has(w)).sort();
+        // (Those here with the most time between them, the work shared evenly: someone who's done a day's work elsewhere
+        // today joins tomorrow.)
+        const present = team([...new Set(room?.occupants ?? [])].filter((w) => mine.has(w)).sort(), (w) => p.working_day - (used.get(w) ?? 0)).who;
         if (day % 7 < p.work_days && present.length) {
           const left = () => Math.min(...present.map((w) => p.working_day - (used.get(w) ?? 0))) * present.length;
           const spend = (seconds: number) => { for (const w of present) used.set(w, (used.get(w) ?? 0) + Math.ceil(seconds / present.length)); };
@@ -627,6 +629,10 @@ export const works: BehaviourModule = {
             st.then = (out) => {
               if (out.status === "applied") return;
               for (const x of part) if (x.before === undefined) collectedAt.delete(x.on); else collectedAt.set(x.on, x.before);
+              // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
+              const short = outOfTime(out);
+              if (short?.who) used.set(short.who, p.working_day - short.left);
+              else if (short) for (const w of present) used.set(w, p.working_day);
             };
             steps.push(st);
           }

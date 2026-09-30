@@ -11,7 +11,7 @@ import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, prohibitions, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
+import { because, Book, prohibitions, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 
@@ -181,7 +181,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.9.0",
+  version: "0.9.1",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -380,7 +380,10 @@ export const builder: BehaviourModule = {
         }
         // Our own crew, there now.
         const ours = new Set(staffing.workers(book, t));
-        const crew = [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.yard).flatMap((c) => c.structure!.spaces.flatMap((sp) => sp.occupants ?? [])))].filter((w) => ours.has(w)).sort();
+        const here = [...new Set(channels.cells(obs).filter((c) => c.structure?.structure === p.yard).flatMap((c) => c.structure!.spaces.flatMap((sp) => sp.occupants ?? [])))].filter((w) => ours.has(w)).sort();
+        // (Those here with the most time between them, the work shared evenly: someone who's done a day's work elsewhere
+        // today joins tomorrow.)
+        const crew = team(here, (w) => p.working_day - (used.get(w) ?? 0)).who;
         if (day % 7 < p.work_days && crew.length) {
           const standing = new Set(channels.cells(obs).flatMap((c) => (c.structure ? [c.structure.structure] : [])));
           for (const pr of [...projects]) {
@@ -401,6 +404,10 @@ export const builder: BehaviourModule = {
               if (out.status === "applied") pr.left -= units;
               else {
                 for (const w of crew) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
+                // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
+                const short = outOfTime(out);
+                if (short?.who) used.set(short.who, p.working_day - short.left);
+                else if (short) for (const w of crew) used.set(w, p.working_day);
                 // Not (or no longer) there to work on: the job is over.
                 if (["not_being_built", "not_coming_down", "unknown_structure"].includes(out.refusal?.code ?? "")) pr.left = 0;
               }

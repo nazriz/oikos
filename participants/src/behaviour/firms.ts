@@ -79,7 +79,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.9.0",
+  version: "0.10.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -111,6 +111,9 @@ export const landlord: BehaviourModule = {
       // there is one, bounds it: no more often than the law allows, and at least the notice it requires.
       rent_review_months: null as number | null,
       rent_increase_notice_days: 0,
+      // Offering the sitting tenant a new lease as one runs out (placeholder: landlords mostly do; to calibrate against
+      // how long renters stay).
+      renew: true,
     },
     ctx.params,
   );
@@ -131,6 +134,7 @@ export const landlord: BehaviourModule = {
     const answered = new Set<string>(); // fines and orders we've responded to
     const rentChanges = new Map<string, { from: number; rent: number }[]>(); // lease -> rent increases we've given notice of
     const lastReview = new Map<string, number>(); // lease -> when its rent was last reviewed
+    const renewed = new Set<string>(); // leases whose tenant we've offered a new one
     const obeys = (key: string) => ctx.rng(`comply-${key}`).below(10_000) < p.compliance_bps;
 
     const absorb = (obs: Observation) => {
@@ -221,6 +225,29 @@ export const landlord: BehaviourModule = {
         offeredNow.push(listing.data.space);
       }
 
+      // Renewals: a tenancy whose term ends within our notice period, with no notice given, is offered again to the
+      // sitting tenant: the home, at its rent then, for a new term from when this one ends (what landlords and their
+      // agents do as a lease runs out; letting it run out and relisting the home costs a vacancy and a search).
+      if (p.renew) for (const a of active) {
+        const ends = book.endsAt(a.id);
+        if (ends === undefined || renewed.has(a.id) || noticeGiven.has(a.id) || ends - t > p.landlord_notice_days * DAY) continue;
+        const tenant = tenantOf(a);
+        const lt = leaseTerms(a, tenant);
+        if (!lt.space || !owned.some((o) => o.space === lt.space)) continue;
+        renewed.add(a.id);
+        const rent = rentAt(a, ends);
+        const months = between(p.min_term_months, p.max_term_months, ctx.rng(`renew-${a.id}`).below(1_000_000) / 1_000_000);
+        const household = (a.terms.text as string | undefined)?.match(/household: (.*)\.$/)?.[1];
+        steps.push(because(`The tenancy of ${lt.space} ends on day ${Math.floor(ends / DAY)}: offering ${tenant} a new lease at ${usd(rent)} a month, for ${months} months from then.`,
+          ["lease", offer(tenant, {
+            template: "lease", term: ends - t + months * MONTH, ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
+            we: C.call("occupancy", { who: tenant, in: lt.space }),
+            they: pay(acc.account, rent, { every: MONTH, for: "rent" }),
+            text: `${tenant} rents home ${lt.space} from ${me} for ${rent} cents a month, renewing their lease (${a.id}) for ${months} months from day ${Math.floor(ends / DAY)}${household ? `, to live there with their household: ${household}` : ""}.`,
+            basis: a.id,
+          })]));
+      }
+
       // Vacancies: list each free unit, at a markup over what we currently get for homes in that building.
       const openListings = book.open("rental_listing").filter((l) => l.speaks_for === me);
       const listing = (o: (typeof owned)[number], rent: number) =>
@@ -300,7 +327,8 @@ export const landlord: BehaviourModule = {
       const reviewMonths = p.rent_review_months;
       const noticeDays = p.rent_increase_notice_days;
       if (reviewMonths) for (const a of active) {
-        if (noticeGiven.has(a.id)) continue;
+        // (A lease we've offered to renew isn't reviewed: the new one carries its rent, and its own reviews.)
+        if (noticeGiven.has(a.id) || renewed.has(a.id)) continue;
         const since = lastReview.get(a.id) ?? book.signedAt(a.id)!;
         if (t - since < reviewMonths * MONTH) continue;
         const tenant = tenantOf(a);

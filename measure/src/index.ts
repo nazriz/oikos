@@ -91,6 +91,14 @@ const TABLES: { [name: string]: string } = {
     select $run as run_id, seq, t, json_extract_string(body, '$.from') as "from", json_extract_string(body, '$.to') as "to", (json_extract_string(body, '$.amount'))::HUGEINT as amount, json_extract_string(body, '$.currency') as currency,
       json_extract_string(body, '$.reason') as reason, json_extract_string(body, '$.by') as "by", json_extract_string(body, '$.settles') as settles, json_extract_string(body, '$.per_instruction') as per_instruction, json_extract_string(body, '$.memo') as memo
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'transfer'`,
+  // Accounts and who holds them: the world config's, and those opened during the run (a newcomer's, a newborn's).
+  accounts: `
+    select $run as run_id, 0::BIGINT as opened_t, json_extract_string(a, '$.id') as account, json_extract_string(a, '$.holder') as holder, json_extract_string(a, '$.custodian') as custodian,
+      json_extract_string(a, '$.currency') as currency
+    from (select unnest(from_json(json_extract(body, '$.config.world.accounts'), '["JSON"]')) as a from raw where kind = 'header')
+    union all
+    select $run, t, json_extract_string(body, '$.account'), json_extract_string(body, '$.holder'), json_extract_string(body, '$.custodian'), json_extract_string(body, '$.currency')
+    from raw where kind = 'event' and json_extract_string(body, '$.event') = 'account_opened'`,
   // Goods moved (phase B): a quantity of a kind, from a holder at a place to a holder at a place.
   goods: `
     select $run as run_id, seq, t, json_extract_string(body, '$.kind') as kind, (json_extract_string(body, '$.quantity'))::HUGEINT as quantity,

@@ -39,7 +39,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.17.0";
+export const GENERATOR_VERSION = "0.19.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -310,6 +310,12 @@ export function generate(spec: TownSpec): any {
     const hoursPerWorkerMonth = ((WORKING_DAY * 6) / 7) * 30; // a shop opens 6 days of 7
     // (At the shops' planned utilisation of their staff's hours: docs/behaviour/retailer.md.)
     for (const w of workplaces) if (w.employer.startsWith("shop-")) w.start = Math.min(w.capacity, Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / (hoursPerWorkerMonth * SHOP_UTILISATION_BPS))));
+    // A shop's opening money: its working capital, as a shop founded in the run is given (the venture's rule, below): a
+    // month's stock at the wholesale price and three months' wages for its opening staff.
+    for (const a of accounts) {
+      const w = workplaces.find((x) => `acc-${x.employer}` === a.id && x.employer.startsWith("shop-"));
+      if (w) a.balance = SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / (14 * DAY)) * (w.start ?? 1);
+    }
   }
   const jobSlots = workplaces.flatMap((w) => Array.from({ length: w.start ?? w.capacity }, () => w));
   let job = 0;
@@ -470,15 +476,17 @@ export function generate(spec: TownSpec): any {
       termination: [{ party: home.landlord, notice: 60 * DAY }, { party: lh, notice: 30 * DAY }],
       text: `${lh} rents home ${home.space} from ${home.landlord}${others.length ? `, to live there with their household: ${others.map((m) => m.id).join(", ")}` : ""}.` } });
     for (const party of visible) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: visible, speaks_for: party, agreement: ag, as: party });
+    // (Each tenancy's rent day; the others' shares of it reach the leaseholder the day before, as a household arranges it.)
+    const rentDay = 2 + pick.below(29);
     records.push({ id: `${ag}-rent`, record: "statement", author: "genesis", at: 0, visible_to: [lh, "bank"], speaks_for: lh, kind: "request", addressed_to: ["bank"], basis: ag,
-      text: "Please pay my rent monthly.", data: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } }, every: MONTH, first: (1 + pick.below(30)) * DAY } });
+      text: "Please pay my rent monthly.", data: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } }, every: MONTH, first: rentDay * DAY } });
     // The other adults who earn pay the leaseholder an even share of the rent.
     const earners = h.members.filter((m) => (monthlyPay.get(m.id) ?? 0) > 0);
     for (const m of others) {
       if (!earners.includes(m)) continue;
       const due = Math.floor(home.rent / earners.length);
       records.push({ id: `share-${m.id}`, record: "statement", author: "genesis", at: 0, visible_to: [m.id, "bank"], speaks_for: m.id, kind: "request", addressed_to: ["bank"],
-        text: "Please pay my share of the rent monthly.", data: { outcome: { money: { from: `acc-${m.id}`, to: `acc-${lh}`, amount: String(due), for: "Household share of the rent." } }, every: MONTH, first: (1 + pick.below(30)) * DAY } });
+        text: "Please pay my share of the rent monthly.", data: { outcome: { money: { from: `acc-${m.id}`, to: `acc-${lh}`, amount: String(due), for: "Household share of the rent." } }, every: MONTH, first: (rentDay - 1) * DAY } });
     }
     for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
   }
