@@ -283,6 +283,17 @@ impl World {
             for f in &w.fields {
                 n.fields.entry(f.field.clone()).or_default().insert(f.cell.clone(), f.value);
             }
+            // (Spun up: days before the start, over the land as it starts; covers don't succeed meanwhile.)
+            if w.nature_spin_up_days > 0 {
+                let ground = s.nature.as_ref().unwrap();
+                let land = crate::exec::nature_land(&s, &st, ground);
+                let cat = crate::config::Catalogue { land_covers: vec![], ..c.catalogue.clone() };
+                for day in -w.nature_spin_up_days..0 {
+                    terrarium_nature::step_day(&cat, ground, &land, &mut n, day, &s.randomness);
+                }
+                n.since.clear();
+                n.day = 0;
+            }
             st.nature = Some(Arc::new(n));
             st.schedule(86_400, crate::state::Sched::NatureDay { day: 1 });
         }

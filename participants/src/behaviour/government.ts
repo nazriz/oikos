@@ -29,13 +29,13 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
     const p = params({ responsiveness_bps: 7000, petition_threshold_bps: 1500, population: 200, park_budget: 8_000_000, builder: "", park_type: "park",
       // The rest of the budget's lines (docs/behaviour/services.md): the town's staff, and its services' running costs.
-      staff_budget: 0, services_budget: 0 }, ctx.params);
+      staff_budget: 0, services_budget: 0, environment_budget: 0 }, ctx.params);
     need(p, ["builder"], "city.mayor_code");
     const book = new Book();
     let nextBudget = 0;
@@ -57,7 +57,7 @@ export const mayorCode: BehaviourModule = {
           const newYear = t >= nextBudget;
           if (newYear) nextBudget = t + YEAR;
           lastTabled = t;
-          const lines = { parks: p.park_budget, ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}) };
+          const lines = { parks: p.park_budget, ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
           steps.push(because(newYear ? "A new year: tabling the town's budget." : "No budget adopted for this year yet: tabling it again.", say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: ${Object.entries(lines).map(([k, v]) => `${k} ${v} cents`).join(", ")}.`, { to: [me],
             data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines } }, tags: ["budget"] } })));
         }
@@ -521,7 +521,7 @@ export const works: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const letters = new Letters();
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false } });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed" });
     const seen = new Map<string, SiteStructure | undefined>(); // cell -> what we last saw there (perception is changes)
     let depotView: SiteStructure | undefined; // the depot, as its own channel shows it (who's there, by name)
     let atDepot = 0; // what's been collected and is held at the depot (holdings are seen as they change)

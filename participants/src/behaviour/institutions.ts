@@ -36,11 +36,14 @@ export function ownerOf(book: Book, lot: string): string | undefined {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.7.1",
+  version: "0.8.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ compliance_bps: 10_000, town: ctx.entity }, ctx.params); // (the town: the office's own)
+    const p = params({ compliance_bps: 10_000, town: ctx.entity, // (the town: the office's own)
+      // A law against building where a listed species lives, if the world has one: applied by the latest habitat
+      // register the environment office publishes (the lots it found them on).
+      habitat_law: "" }, ctx.params);
     const book = new Book();
     const decided = new Set<string>();
     const letters = new Letters();
@@ -67,10 +70,13 @@ export const planningOfficer: BehaviourModule = {
             continue;
           }
           const granting = { block: "grant_permit", lot: app.data?.lot, structure_type: app.data?.structure_type };
+          const habitat = p.habitat_law ? book.records.get(p.habitat_law) : undefined;
+          const register = book.open("habitat_register").sort((a, b) => b.at - a.at)[0];
+          const onHabitat = habitat && ((register?.data?.lots as string[] | undefined) ?? []).includes(app.data?.lot);
           const breached = prohibitions(book).find((l) => {
             const v = evaluate(l.formal!.condition, { block: granting, actor: applicant, now: obs.t }, []);
             return "value" in v && v.value;
-          });
+          }) ?? (onHabitat ? habitat : undefined);
           const follows = ctx.rng(`comply-${app.id}`).below(10_000) < p.compliance_bps;
           const refuse = breached && follows;
           const decision = say("permit_decision",

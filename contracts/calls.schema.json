@@ -247,7 +247,6 @@
                 "type": "object",
                 "required": [
                   "task",
-                  "units",
                   "at"
                 ],
                 "propertyNames": {
@@ -257,7 +256,9 @@
                     "at",
                     "by",
                     "on",
-                    "for"
+                    "for",
+                    "survey",
+                    "cells"
                   ]
                 }
               }

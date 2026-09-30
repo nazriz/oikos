@@ -9,6 +9,7 @@
 import { adultAgeBands, drawHousehold, Randomness, withholding, type HouseholdSpec, type IncomeTaxLaw } from "@terrarium/participants";
 import law from "../law/basic.json";
 import { loadProfile, type Profile } from "./profile";
+import { landscape } from "./nature";
 
 /** The share of its staff's hours a shop plans to fill with serving (firm.retailer's default; placeholder). */
 const SHOP_UTILISATION_BPS = 8000;
@@ -58,6 +59,9 @@ export interface TownSpec {
   factories: number;
   landlords: number;
   hall_capacity?: number; // the town hall's hall: how many a gathering can hold (default 200)
+  /** Nature around the town (the profile's `nature`: docs/design/world-expansion.md 2). Default: where the profile
+   * describes it; false: none. */
+  nature?: boolean;
   /** Superseded by apartment_units and house_types (generator 0.10). */
   rents?: { apartment: number; house: number };
   /** The profile the town's place-specific figures come from (worlds/profiles/<id>.json). Default: au-vic-2026. */
@@ -252,6 +256,22 @@ export function generate(spec: TownSpec): any {
     adico: { attribute: "the planning office", deontic: "must_not", aim: "grant a building permit", condition: "for a river lot" },
     formal: { language: "cel", condition: `block.block == 'grant_permit' && block.lot in [${riverList.map((x) => `'${x}'`).join(",")}]` } });
   for (const p of parcels) if (!records.some((r) => r.id === `title-${p.id}`)) own(p.id, "city");
+  // ---- nature: the landscape around the town, where the profile describes one (docs/design/world-expansion.md 2) ----
+  const L = V.nature && spec.nature !== false ? landscape(V.nature, spec.grid, spec.name, rng, "factory") : undefined;
+  if (L) {
+    for (const lot of L.lots) records.push({ id: lot.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "lot", text: `Lot ${lot.id.slice(4)}.`, data: { cells: lot.cells } });
+    // Land to develop: each landlord after the first owns a block of dry landscape (at random); the rest is the town's.
+    const dry = L.lots.filter((x) => x.cover !== "wetland");
+    const lr = rng("land-owners");
+    const owners = new Map<string, string>();
+    for (const l of landlords.slice(1)) if (dry.length) owners.set(dry.splice(lr.below(dry.length), 1)[0]!.id, l);
+    for (const lot of L.lots) own(lot.id, owners.get(lot.id) ?? "city");
+    // A law protecting listed species' habitat, applied through the environment office's habitat register (where the
+    // profile lists any species).
+    if (L.listed.length) records.push({ id: "law-habitat", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
+      text: `The planning office may not grant a permit for building on a lot where the town's environment office has recorded a species listed as threatened (${L.listed.map((s) => s.name).join(", ")}).`,
+      adico: { attribute: "the planning office", deontic: "must_not", aim: "grant a building permit", condition: "on a lot where the environment office has recorded a listed species" } });
+  }
 
   // ---- people: savings, homes, jobs ----
   const accounts: any[] = [
@@ -616,7 +636,9 @@ export function generate(spec: TownSpec): any {
   const servicesBudget = Math.ceil((everyone.length * SV.waste_per_person_per_day_g * 365 * SV.landfill_levy_per_tonne * 12) / 10_000_000); // a year's waste (tonnes) at the levy, and a fifth over
   // The code mayor's yearly budget: parks (placeholder: a park a year at about what the builder charges), the crew the
   // profile's staff per 1,000 residents gives, and the landfill for a year's waste.
-  const mayorParams = { population: adultCount, builder: "builder", park_budget: 15_000_000, staff_budget: crew * crewAnnual, services_budget: servicesBudget };
+  // (With nature, the town's environment office: its scientists, at the public wage.)
+  const envStaff = L ? V.nature!.survey_staff : 0;
+  const mayorParams = { population: adultCount, builder: "builder", park_budget: 15_000_000, staff_budget: crew * crewAnnual, services_budget: servicesBudget, ...(envStaff ? { environment_budget: envStaff * crewAnnual } : {}) };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
     [{ id: "budget", title: "The town's accounts", kind: "accounts" }, { id: "laws", title: "Laws, the charter and procedures", kind: "records", match: { statement_kinds: ["charter", "law", "procedure"] } },
@@ -653,8 +675,9 @@ export function generate(spec: TownSpec): any {
   office("planning", "city", "Planning officer", "planning_officer",
     [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
       // The land register: lots, who owns them, and a monthly survey of what's built.
-      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
-    code("city.planning_officer"));
+      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY },
+      ...(L ? [{ id: "habitat", kind: "records", match: { statement_kinds: ["habitat_register"] } }] : [])],
+    code("city.planning_officer", L?.listed.length ? { habitat_law: "law-habitat" } : {}));
   office("inspector", "city", "Building inspector", "inspector",
     [laws, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "patrol", kind: "sites", area: "all", every: 14 * DAY }],
     code("city.inspector"));
@@ -665,14 +688,22 @@ export function generate(spec: TownSpec): any {
       parks: "building a park on one of the town's free lots, commissioned from a builder.",
       staff: `the wages of the town's works crew, who collect waste from every home each week and keep the town's parks and hall up (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody collects the waste).`,
       services: "the services' running costs: the landfill's charge for the waste collected (invoiced monthly).",
+      ...(L ? { environment: `the wages of the town's environment office, whose scientists survey the district's wildlife each quarter and report on it (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody counts).` } : {}),
     } }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
   const hallCell = structures.find((x) => x.id === "town-hall")!.at;
   office("works", "city", "Works manager", "works_manager", [mine("works-business"), civic("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
-    { id: "town", kind: "sites", area: "all" }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" }],
+    { id: "town", kind: "sites", area: { place: "town" } }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" }],
     code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
       collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
       maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste" }));
+  // The environment office (nature): surveys the district's wildlife with the scientists its budget line pays for, and
+  // reports; tells planning where it found listed species.
+  if (L) office("environment", "city", "Environment officer", "environment_officer", [mine("environment-business"), civic("budgets", ["budget"]),
+    { id: "land", kind: "sites", area: { place: "district" }, every: 30 * DAY }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" },
+    { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }],
+    code("city.environment", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
+      survey_labour: L.survey_labour, species: V.nature!.species.map((s) => ({ id: s.id, name: s.name, covers: Object.keys(s.density_per_ha), ...(s.listed ? { listed: true } : {}) })), planning: "city" }));
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
   office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }, lawBook,
@@ -715,7 +746,8 @@ export function generate(spec: TownSpec): any {
       structure_type: { type: "structure_type", required: true, description: "The kind of building." },
       notes: { type: "text", description: "Anything else the office should know." } } } });
   for (const l of landlords) {
-    const theirCells = records.filter((r) => r.record === "claim" && r.holder === l).map((r) => cellOf.get(r.about.object)!);
+    // (A town lot is a cell; a block of the landscape, many.)
+    const theirCells = records.filter((r) => r.record === "claim" && r.holder === l).flatMap((r) => cellOf.has(r.about.object) ? [cellOf.get(r.about.object)!] : (L?.lots.find((x) => x.id === r.about.object)?.cells ?? []));
     office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "own-sites", kind: "sites", area: theirCells.length ? theirCells : "all", occupants: "names" }, deaths, lawBook],
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
         city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000,
@@ -808,7 +840,9 @@ export function generate(spec: TownSpec): any {
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },
     // Amounts and quantities on the wire are decimal strings (D58); the generator counts in numbers.
     catalogue: {
-      structure_types: structureTypes.map((t) => ({ ...t, materials: Object.fromEntries(Object.entries(t.materials).map(([k, q]) => [k, String(q)])) })),
+      // (With nature: every cell has a cover, so each type says which it can stand on; a park is grassland.)
+      structure_types: structureTypes.map((t) => ({ ...t, materials: Object.fromEntries(Object.entries(t.materials).map(([k, q]) => [k, String(q)])),
+        ...(L ? { terrains: L.buildable, ...(t.id === "park" ? { cover: L.default_cover } : {}) } : {}) })),
       resources: [{ id: "goods", unit: "item" }, { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }, { id: "waste", unit: "kg" }],
       // What builds up and wears out (docs/behaviour/services.md): waste in homes (grams), by the people living there;
       // wear on the town's parks and hall (0 to 100,000 over their life).
@@ -826,12 +860,16 @@ export function generate(spec: TownSpec): any {
         // The works crew's: collecting 10 kg of a home's waste (to the depot), and an hour's upkeep of an asset.
         { id: "collect", labour: V.services.collect_seconds_per_10kg, in: "workplace", produces: { waste: "10" }, changes: { waste: -10_000 } },
         { id: "maintain", labour: upkeep.labour, in: "workplace", changes: { wear: -upkeep.per_unit } },
+        // Surveying a cell of the landscape for a species or a field (nature): fieldwork, from the office.
+        ...(L ? [{ id: "survey", labour: L.survey_labour, surveys: true }] : []),
       ],
       working_day: WORKING_DAY,
+      ...(L ? { land_covers: L.land_covers, default_cover: L.default_cover, cleared_cover: L.cleared_cover, fields: L.fields, species: L.species } : {}),
     },
-    world: { boundaries: ["outside"], currencies: [V.currency], ground: { w: spec.grid.w, h: spec.grid.h },
-      // One place (D58): the town, detailed, covering its ground.
-      places: [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }], entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
+    world: { boundaries: ["outside"], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
+      // The places (D58): the town, detailed, covering its ground; with nature, within its district, the landscape.
+      places: L ? L.places : [{ id: "town", kind: "town", name: spec.name, area: { x: 0, y: 0, w: spec.grid.w, h: spec.grid.h }, detailed: true }],
+      ...(L ? { populations: L.populations, flows: L.flows, ...(V.nature!.spin_up_years ? { nature_spin_up_days: Math.round(V.nature!.spin_up_years * 365) } : {}) } : {}), entities, accounts: accounts.map((a) => ({ ...a, balance: String(a.balance) })), structures, occupancy, records,
       // The builder's stock at its yard: a house's worth of materials.
       holdings: [{ kind: "materials", holder: "builder", at: "builder-yard", quantity: String(kg(120)) }, ...factoryStock] },
     participants,

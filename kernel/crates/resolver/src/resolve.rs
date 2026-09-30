@@ -335,7 +335,16 @@ impl Resolver<'_> {
     /// Work: units of a task at a place, by the people named.
     fn work(&self, c: &Call) -> R<Vec<Json>> {
         let task = self.need(c, "task", "What work?")?;
-        let units = Self::quantity(c, "units")?;
+        // A survey (nature): of a species or a field, in these cells, a unit each.
+        let survey = self.id(c, "survey")?;
+        let cells = if survey.is_some() { self.ids(c, "cells")?.filter(|l| !l.is_empty()) } else { None };
+        if survey.is_some() && cells.is_none() {
+            return ask("Survey which cells?");
+        }
+        let units = match (&cells, Self::quantity(c, "units")?) {
+            (Some(l), None) => Some(l.len().to_string()),
+            (_, u) => u,
+        };
         let Some(units) = units.filter(|u| u != "0") else { return ask("How much of it?") };
         let at = self.need(c, "at", "Where?")?;
         let by: Vec<String> = if Self::has(c, "by") {
@@ -348,7 +357,8 @@ impl Resolver<'_> {
             vec![]
         };
         let on = self.id(c, "on")?;
-        Ok(vec![obj(vec![("block", some("work")), ("task", some(task)), ("units", some(units.parse::<i64>().unwrap_or(0))), ("at", some(at)), ("performers", some(json!(by))), ("on", on.map(Json::from))])])
+        let survey = survey.zip(cells).map(|(of, cells)| json!({ "of": of, "cells": cells }));
+        Ok(vec![obj(vec![("block", some("work")), ("task", some(task)), ("units", some(units.parse::<i64>().unwrap_or(0))), ("at", some(at)), ("performers", some(json!(by))), ("on", on.map(Json::from)), ("survey", survey)])])
     }
 
     /// The money outcome of a call, for requests and commitments.

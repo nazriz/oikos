@@ -365,7 +365,7 @@ fn uniform(s: &Statics, key: &[&str], n: i64) -> i64 {
 
 /// The land as nature sees it today: each cell's cover, whether it's built on, and the building types with their corner
 /// there.
-fn nature_land(s: &Statics, st: &State, ground: &terrarium_nature::Ground) -> terrarium_nature::Land {
+pub fn nature_land(s: &Statics, st: &State, ground: &terrarium_nature::Ground) -> terrarium_nature::Land {
     let cat = &s.config.catalogue;
     let mut land = terrarium_nature::Land::default();
     for id in &ground.cells {

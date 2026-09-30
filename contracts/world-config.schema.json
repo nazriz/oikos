@@ -429,6 +429,12 @@
                 "minimum": 0,
                 "maximum": 1000000
               },
+              "dispersal_range": {
+                "description": "How far a disperser can go, a cell at a time, through ground it can't live on before it dies there (0: one step). It settles on the first cell it can live on; a barrier kills it.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              },
               "barriers": {
                 "type": "array",
                 "items": {
@@ -1111,6 +1117,12 @@
               }
             }
           }
+        },
+        "nature_spin_up_days": {
+          "description": "Nature's spin-up: this many days stepped before the run begins, over the land as it starts, so nature starts in its own balance rather than the generator's guess at it. No events; covers don't succeed meanwhile; the census begins with the run.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 36500
         }
       }
     },

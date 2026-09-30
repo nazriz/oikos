@@ -1,6 +1,6 @@
 {
   "name": "city.planning_officer",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "compliance_bps": {
@@ -9,6 +9,13 @@
       },
       "unit": "bps",
       "default": 10000,
+      "source": "placeholder"
+    },
+    "habitat_law": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "town": {

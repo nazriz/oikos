@@ -7,9 +7,9 @@
 //!   cell), decay toward the baseline, diffusion to the four neighbours, flow downstream along the flow layer; bounded.
 //! - **Populations:** per species and cell, an integer count. Each day: background deaths and deaths where a field
 //!   passes what the species tolerates; births toward the carrying capacity (logistic, Verhulst), with crowding felt
-//!   over the home range (the individuals there against the capacity of its covers, per 1,000 cells, so a sparse
+//!   over the home range (the others there against the capacity of its covers, per 1,000 cells, so a sparse
 //!   animal can have a fraction of one per cell), only where there are enough to breed (an Allee effect); none can live
-//!   in a cell whose cover gives no capacity; a share disperses to neighbouring cells, and dies crossing a barrier. Every fractional expectation is rounded by a draw
+//!   in a cell whose cover gives no capacity; a share disperses, a step at a time, choosing ground by how good it is (dying crossing a barrier or with nowhere to live at its range's end; the world's edge turns it back). Every fractional expectation is rounded by a draw
 //!   (stochastic rounding), so small populations can fail by chance, as real ones do.
 //! - **Extinction:** a species with none left anywhere is extinct, once and for good.
 //!
@@ -46,6 +46,19 @@ pub struct Ground {
     pub xy: Vec<(i64, i64)>,
     pub corner: (i64, i64),
     pub size: (i64, i64),
+    /// The cell at each place in the bounding box (row by row), if one exists there.
+    pub grid: Vec<Option<usize>>,
+}
+
+impl Ground {
+    /// The cell at (x, y), if there is one.
+    pub fn at(&self, x: i64, y: i64) -> Option<usize> {
+        let (dx, dy) = (x - self.corner.0, y - self.corner.1);
+        if dx < 0 || dy < 0 || dx >= self.size.0 || dy >= self.size.1 {
+            return None;
+        }
+        self.grid[(dy * self.size.0 + dx) as usize]
+    }
 }
 
 impl Ground {
@@ -68,7 +81,11 @@ impl Ground {
         let xy: Vec<(i64, i64)> = sorted.iter().map(|c| (c.1, c.2)).collect();
         let corner = (xy.iter().map(|c| c.0).min().unwrap_or(0), xy.iter().map(|c| c.1).min().unwrap_or(0));
         let size = (xy.iter().map(|c| c.0).max().map_or(0, |m| m - corner.0 + 1), xy.iter().map(|c| c.1).max().map_or(0, |m| m - corner.1 + 1));
-        Ground { cells: sorted.into_iter().map(|c| c.0).collect(), index, neighbours, downstream, xy, corner, size }
+        let mut grid = vec![None; (size.0 * size.1).max(0) as usize];
+        for (i, (x, y)) in xy.iter().enumerate() {
+            grid[((y - corner.1) * size.0 + (x - corner.0)) as usize] = Some(i);
+        }
+        Ground { cells: sorted.into_iter().map(|c| c.0).collect(), index, neighbours, downstream, xy, corner, size, grid }
     }
 }
 
@@ -297,6 +314,7 @@ fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields
     let year = BPS * DAYS_A_YEAR;
     // Capacity per 1,000 cells, cell by cell; and the individuals and capacity over each cell's home range.
     let cap: Vec<i64> = land.cover.iter().map(|c| sp.capacity_per_1000_cells.get(c).copied().unwrap_or(0)).collect();
+    let best = sp.capacity_per_1000_cells.values().copied().max().unwrap_or(1).max(1);
     let (crowd, room) = (home_range_sums(ground, n, sp.home_range), home_range_sums(ground, &cap, sp.home_range));
     let mut next = vec![0i64; cells];
     let mut arriving = vec![0i64; cells];
@@ -305,7 +323,9 @@ fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields
         if here <= 0 {
             continue;
         }
-        let (local, k) = (i128::from(crowd[i]) * 1000, i128::from(room[i]));
+        // (Crowding is the others there: counting itself, a sparse animal whose home range holds about two would settle
+        // at half its capacity.)
+        let (local, k) = (i128::from((crowd[i] - 1).max(0)) * 1000, i128::from(room[i]));
         // Deaths: background, and where a field passes what it tolerates.
         let mut deaths = sround(here * sp.mortality_bps_per_year, year, rng);
         for (field, tol) in &sp.tolerance {
@@ -321,17 +341,45 @@ fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields
             deaths += sround_wide(h * r * (local - k), k * i128::from(year), rng);
         }
         let k = cap[i];
-        let mut alive = (here - deaths).max(0) + births;
-        // Dispersal: a share leaves for a neighbouring cell at random; crossing a barrier (or off the world's edge),
-        // it's lost.
+        // The young of a species with a home range leave it: each newborn disperses from here (natal dispersal); one
+        // without is born in place. A share of the rest disperse each year.
+        // A disperser walks a step at a time in random directions and settles out of the home range it left, on ground
+        // it can live on, with a chance as good as the ground is next to its best (so it passes poor ground by, as
+        // dispersers choose habitat); at the end of its range, on whatever ground it can live on, or it dies there. It
+        // dies crossing a barrier; so a gap wider than its range cuts a patch off. The world's edge turns it back
+        // (beyond it is more of the same: as many come in as go out).
+        let mut alive = (here - deaths).max(0);
         let leaving = sround(alive * sp.dispersal_bps_per_year, year, rng).min(alive);
-        let nb = &ground.neighbours[i];
-        for _ in 0..leaving {
-            // (Four ways out; where there's no cell that way, it's gone.)
-            let way = rng.below(4) as usize;
-            if let Some(&j) = nb.get(way) {
-                if !barriers.contains(land.cover[j].as_str()) {
+        let (x0, y0) = ground.xy[i];
+        let (hr, range) = (sp.home_range.max(0), sp.dispersal_range.max(0));
+        let natal = if hr > 0 { births } else { 0 };
+        alive += births - natal;
+        const WAYS: [(i64, i64); 4] = [(0, -1), (-1, 0), (1, 0), (0, 1)];
+        let steps = range.max(2 * (hr + 1));
+        for _ in 0..(leaving + natal) {
+            let mut at = i;
+            // (A correlated walk: it keeps its heading, turning at random one step in four, as dispersers head off.)
+            let mut way = rng.below(4) as usize;
+            for step in 0..=steps {
+                if rng.below(4) == 0 {
+                    way = rng.below(4) as usize;
+                }
+                let (x, y) = ground.xy[at];
+                // (Where there's no cell that way, the world's edge, it turns about and doesn't move this step.)
+                let Some(j) = ground.at(x + WAYS[way].0, y + WAYS[way].1) else {
+                    way = 3 - way;
+                    continue;
+                };
+                if barriers.contains(land.cover[j].as_str()) {
+                    break;
+                }
+                at = j;
+                let (x, y) = ground.xy[j];
+                let away = (x - x0).abs().max((y - y0).abs()) > hr;
+                let last = step == steps;
+                if cap[j] > 0 && (last || (away && (rng.below(best as u64) as i64) < cap[j])) {
                     arriving[j] += 1;
+                    break;
                 }
             }
         }

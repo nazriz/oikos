@@ -119,6 +119,8 @@ export interface Outcome {
   status: "applied" | "refused";
   created?: { [ref: string]: Id };
   refusal?: { code: string; block?: number; detail?: string };
+  /** A survey's estimates (nature), for the one who surveyed only. */
+  surveyed?: { of: Id; cells: { [cell: string]: number } };
 }
 
 /** A message: `from` the participant, `as` the position it wrote in, `from_entity` who acted (the person, or the
@@ -136,7 +138,8 @@ export interface SiteSpace { space: Id; kind: string; capacity: number; attrs?: 
 export interface VariableView { value: number; as_of_day: number; per_day: number; min: number; max: number }
 export interface SiteStructure { structure: Id; type: Id; at: Id; w: number; h: number; built_by?: Id; complete: boolean; completes_at?: number; coming_down?: boolean; variables?: { [id: Id]: VariableView }; spaces: SiteSpace[] }
 /** A cell of ground, and the building standing on it (the same on every cell of its footprint). */
-export interface SiteCell { cell: Id; x: number; y: number; terrain?: string; structure?: SiteStructure }
+/** `terrain`: the cell's cover when unbuilt (nature); `seen`: conspicuous species present, never a count. */
+export interface SiteCell { cell: Id; x: number; y: number; terrain?: string; structure?: SiteStructure; seen?: Id[] }
 export interface PositionItem { position: Id; entity: Id; title?: string; role?: string; holder?: Id; held_by?: string }
 export interface Condition { id: Id; kind: "illness" | "injury"; severity: string; since: number; until: number }
 export type Sex = "female" | "male";

@@ -173,9 +173,10 @@ fn surveys_estimate_with_error_and_runs_replay() {
 #[test]
 fn a_sparse_species_lives_at_a_fraction_of_one_per_cell_over_its_home_range() {
     // A glider at 0.125 per cell (125 per 1,000) in a 20 x 20 woodland: about 50 in all. Crowding is felt over a home
-    // range 3 cells each way; per cell alone it couldn't live (one in a cell is already past 0.125).
+    // range 3 cells each way (about 6 there). (A home range should hold about one or more: a sparse species with none
+    // would feel no one in its own cell and pay no heed to its capacity.)
     let glider = |range: i64| serde_json::json!({ "id": "glider", "capacity_per_1000_cells": { "woodland": 125 }, "home_range": range,
-        "growth_bps_per_year": 3000, "mortality_bps_per_year": 2000, "dispersal_bps_per_year": 5000, "min_viable": 2, "detection_bps": 3000 });
+        "growth_bps_per_year": 3000, "mortality_bps_per_year": 2000, "dispersal_bps_per_year": 1000, "dispersal_range": 8, "min_viable": 2, "detection_bps": 3000 });
     let cells: Vec<(String, i64, i64)> = (0..20).flat_map(|y| (0..20).map(move |x| (format!("cell.{x}.{y}"), x, y))).collect();
     let g = Ground::new(&cells, &[]);
     let l = land(&vec!["woodland"; 400]);
@@ -188,10 +189,30 @@ fn a_sparse_species_lives_at_a_fraction_of_one_per_cell_over_its_home_range() {
         run(&c, &g, &l, &mut st, 0..3650, &Randomness::new(seed));
         total(&st, "glider")
     };
-    // (Five seeds' mean. It settles below the nominal 50: each animal feels itself and its kin nearby as crowding,
-    // Lloyd's mean crowding, as individual-based models do; and some dispersers are lost off the woodland's edge.)
+    // (Five seeds' mean; a few dispersers are lost off the woodland's edge.)
     let mean = (1..=5).map(|seed| run_with(3, seed)).sum::<i64>() / 5;
-    assert!((20..=65).contains(&mean), "persists, near its capacity: {mean}");
-    assert_eq!(run_with(0, 1), 0, "crowded out of a single cell");
+    assert!((35..=65).contains(&mean), "near its capacity: {mean}");
 }
+
+
+#[test]
+fn a_gap_wider_than_the_dispersal_range_cuts_a_patch_off() {
+    // Wetland, then grassland (crossable, but nothing lives there), then wetland: frogs start on the west only.
+    let sp = |range: i64| serde_json::json!({ "id": "frog", "capacity_per_1000_cells": { "wetland": 50000 }, "growth_bps_per_year": 20000, "mortality_bps_per_year": 2000,
+        "dispersal_bps_per_year": 20000, "dispersal_range": range, "min_viable": 1, "detection_bps": 5000 });
+    // (Three rows, so a walk can wander; the wetland columns are at either end.)
+    let reach = |gap: usize, range: i64| {
+        let w = gap as i64 + 2;
+        let cells: Vec<(String, i64, i64)> = (0..3).flat_map(|y| (0..w).map(move |x| (format!("cell.{x}.{y}"), x, y))).collect();
+        let g = Ground::new(&cells, &[]);
+        let covers: Vec<&str> = g.xy.iter().map(|(x, _)| if *x == 0 || *x == w - 1 { "wetland" } else { "grassland" }).collect();
+        let mut st = NatureState::default();
+        st.populations.insert("frog".into(), [("cell.0.1".to_string(), 40)].into());
+        run(&cat(serde_json::json!({ "species": [sp(range)] })), &g, &land(&covers), &mut st, 0..1500, &Randomness::new(4));
+        (0..3).map(|y| st.populations["frog"].get(&format!("cell.{}.{y}", w - 1)).copied().unwrap_or(0)).sum::<i64>()
+    };
+    assert!(reach(2, 6) > 0, "a gap of 2 within a range of 6: crossed");
+    assert_eq!(reach(8, 3), 0, "a gap of 8 beyond a range of 3: never crossed");
+}
+
 

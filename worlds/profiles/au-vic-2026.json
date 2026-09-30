@@ -668,10 +668,48 @@
       "per_kind_per_1000_people": 1,
       "taking_part_bps": 4000,
       "leave_notice_days": 0
+    },
+    "nature": {
+      "cell_m": 25,
+      "landscape": {
+        "margin_cells": 100,
+        "block_cells": 16,
+        "shares_bps": { "woodland": 2500, "scrub": 1500, "grassland": 2500, "farmland": 3000, "wetland": 500 },
+        "woodland_patches": 2
+      },
+      "covers": [
+        { "id": "woodland" },
+        { "id": "scrub", "succeeds_to": { "cover": "woodland", "after_years": 40 } },
+        { "id": "grassland" },
+        { "id": "cleared", "succeeds_to": { "cover": "grassland", "after_years": 1 } },
+        { "id": "farmland" },
+        { "id": "wetland" },
+        { "id": "riverbank" }
+      ],
+      "default_cover": "grassland",
+      "cleared_cover": "cleared",
+      "river_cover": "riverbank",
+      "pollution": { "decay_bps_per_day": 300, "diffusion_bps_per_day": 800, "flow_bps_per_day": 5000, "per_factory_per_day": 40, "per_farmland_cell_per_day": 1 },
+      "species": [
+        { "id": "squirrel-glider", "name": "squirrel glider", "density_per_ha": { "woodland": 0.38 }, "home_range_ha": 4,
+          "growth_bps_per_year": 3000, "mortality_bps_per_year": 2000, "dispersal_bps_per_year": 1000, "dispersal_m": 75, "barriers": ["built", "farmland"], "min_viable": 1,
+          "detection_bps": 3000, "listed": true },
+        { "id": "growling-grass-frog", "name": "growling grass frog", "density_per_ha": { "wetland": 68, "riverbank": 8 }, "home_range_ha": 0.5,
+          "growth_bps_per_year": 12000, "mortality_bps_per_year": 4000, "dispersal_bps_per_year": 1500, "dispersal_m": 200, "barriers": ["built"], "min_viable": 4,
+          "tolerance": { "pollution": { "above": 400, "mortality_bps_per_day": 50 } }, "detection_bps": 5000, "listed": true },
+        { "id": "superb-fairy-wren", "name": "superb fairy-wren", "density_per_ha": { "scrub": 1.7, "woodland": 0.8, "riverbank": 1.2, "grassland": 0.2 }, "home_range_ha": 1.5,
+          "growth_bps_per_year": 5000, "mortality_bps_per_year": 3000, "dispersal_bps_per_year": 1000, "dispersal_m": 500, "min_viable": 1,
+          "detection_bps": 8000, "conspicuous": true }
+      ],
+      "survey_hours_per_ha": 1,
+      "survey_staff": 1,
+      "spin_up_years": 20
     }
   },
   "sources": {
     "currency": "Australian dollars, in cents.",
+    "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a cell is a 25 m lot (a town of 1,000 at about 13 people a hectare). The landscape around the town (margin_cells, block_cells, shares_bps, woodland_patches), the covers' succession (cleared land to grassland in a year; scrub to woodland in about 40), the pollution figures, survey_hours_per_ha and survey_staff (the town's environment office: one scientist) are placeholders. spin_up_years: nature is run alone this long before the start, so it begins in its own balance (as ecological and climate models spin up).",
+    "nature.species": "Placeholders for growth, mortality, dispersal, min_viable and detection. Gliders and fairy-wrens live in family groups sharing a home range, which isn't modelled, so their breeding threshold is one; frogs breed where at least four share a pond (a home range of half a hectare). How far each crosses ground it can\u2019t live on (dispersal_m): frogs up to 200 m from water (the frog\u2019s guidelines above); gliders glide gaps of tens of metres (75 m, a placeholder); fairy-wrens, placeholder. The young always leave their parents' home range (natal dispersal, in the physics); the share of adults moving a year is a placeholder. Densities and ranges: squirrel glider (listed under Victoria's Flora and Fauna Guarantee Act 1988), 0.38 a hectare in Victoria and a home range of 3-5 ha (van der Ree and others, from the studies summarised in 'Large area used by squirrel gliders in an urban area', PMC8216951; to confirm against the originals), crossing cleared gaps badly; growling grass frog (listed; nationally vulnerable), about 68 adults at a Melbourne wetland (45 males and 23 females, Heard and others; to confirm), moving 15-200 m between waterbodies and living as a metapopulation, sensitive to water quality ('Guidelines for managing the endangered Growling Grass Frog in urbanising landscapes'; the EPBC species profile); superb fairy-wren, a common and conspicuous control, territories of 1-2 ha held by a pair and helpers (Museums Victoria), densities by cover a placeholder.",
     "households": "ABS, Census of Population and Housing 2021 (QuickStats, Australia): lone person 25.6%, group 3.9%, family 70.5% of households; of families, couple without children 38.8%, with children 43.7%, one parent 15.9%, other 1.6% (counted with groups). Children per family: AIFS, from the 2021 Census (3+ taken as 3). Same-sex couples 1.4% (Census 2021); one in five lone parents male (Census 2021); 105.8 boys per 100 girls (ABS, Births, Australia 2024). Placeholders: adult_female_bps (about half), group_size, mother_age_at_first_birth (around the median age of mothers, 32.1, ABS Births 2024), adult_ages (18 to 99: the bounds; adults' ages are drawn from the census bands, households.age_bands_bps).",
     "life.qx_per_100000": "ABS, Life Tables 2021-2023 (Table 9, Australia): the probability of dying within a year, ages 0-100, per 100,000, males and females.",
     "life.illness": "Placeholder shaped by AIHW's age gradient of hospitalisations (99 per 1,000 at 5-14, 1,511 at 85+; 153 overnight per 1,000 overall, 2022-23); to replace with age-specific overnight rates.",

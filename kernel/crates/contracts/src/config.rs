@@ -171,6 +171,10 @@ pub struct SpeciesCfg {
     pub mortality_bps_per_year: i64,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub dispersal_bps_per_year: i64,
+    /// How far a disperser can go (cells, a step at a time) through ground it can't live on before it dies there;
+    /// 0: one step.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub dispersal_range: i64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub barriers: Vec<Id>,
     #[serde(default, skip_serializing_if = "is_zero")]
@@ -337,6 +341,10 @@ pub struct World {
     pub fields: Vec<FieldValueCfg>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub flows: Vec<FlowCfg>,
+    /// Nature's spin-up: this many days stepped before the run begins, over the land as it starts, so nature starts
+    /// in its own balance, not the generator's guess at it (no events; the census begins with the run).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub nature_spin_up_days: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1000,6 +1008,9 @@ fn check_nature(c: &Config) -> Result<(), String> {
                 return Err(format!("species {}: a capacity out of range", sp.id));
             }
         }
+        if !(0..=1000).contains(&sp.dispersal_range) {
+            return Err(format!("species {}: a dispersal range is 0..=1000 cells", sp.id));
+        }
         if !(0..=100).contains(&sp.home_range) {
             return Err(format!("species {}: a home range is 0..=100 cells each way", sp.id));
         }
@@ -1031,6 +1042,9 @@ fn check_nature(c: &Config) -> Result<(), String> {
         if !fields.contains(f.field.as_str()) || !cell_ok(&f.cell) {
             return Err(format!("a field value of {:?} at {:?}: an unknown field or cell", f.field, f.cell));
         }
+    }
+    if !(0..=36_500).contains(&w.nature_spin_up_days) {
+        return Err("nature_spin_up_days is 0..=36500".into());
     }
     for f in &w.flows {
         if !cell_ok(&f.from) || !cell_ok(&f.to) || f.from == f.to {

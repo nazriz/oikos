@@ -1,6 +1,6 @@
 {
   "name": "city.mayor_code",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "doc": "docs/behaviour/government.md",
   "params": {
     "builder": {
@@ -9,6 +9,13 @@
       },
       "default": "",
       "required": true,
+      "source": "placeholder"
+    },
+    "environment_budget": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
       "source": "placeholder"
     },
     "park_budget": {

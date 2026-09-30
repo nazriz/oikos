@@ -500,7 +500,17 @@ export class Staffing {
    * `does`: which half of it this office does. Most employers do both; an organisation where one office hires and
    * another runs the payroll (a town: its works manager, its finance officer) gives each its half.
    */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean } }) {}
+  /** `own`: when several offices of one organisation hire (the town's works and environment offices), which staff and
+   * postings are this office's: those in its `role` ("role"), or those or ones that name no role (the staff the world
+   * started with: "role_or_unnamed"). Absent: all of the organisation's (a payroll). */
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed" }) {}
+  /** The role an employment agreement names ("... works for X as <role> for N cents ..."), if any. */
+  private roleOf(a: any): string | undefined {
+    return / as (.+?) for \d+ cents/.exec(a.terms?.text ?? "")?.[1];
+  }
+  private ours(role: string | undefined): boolean {
+    return !this.o.own || role === this.o.role || (this.o.own === "role_or_unnamed" && role === undefined);
+  }
 
   absorb(obs: Observation) {
     for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) {
@@ -520,7 +530,7 @@ export class Staffing {
   }
 
   private contracts(book: Book): any[] {
-    return book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me);
+    return book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === this.me && this.ours(this.roleOf(r)));
   }
   private endOf(book: Book, a: any): number {
     return book.endsAt(a.id) ?? Infinity;
@@ -539,7 +549,7 @@ export class Staffing {
   }
   /** Our standing job postings. */
   postings(book: Book) {
-    return book.open("job_posting").filter((j) => j.speaks_for === this.me);
+    return book.open("job_posting").filter((j) => j.speaks_for === this.me && this.ours(j.data?.role as string | undefined));
   }
   /** The workers we're paying, by person. */
   workers(book: Book, t: number): string[] {
@@ -554,7 +564,8 @@ export class Staffing {
   jobOffer(wage: number, account: string): Offer {
     return { by: this.me, to: { min_age_years: 18 }, take_up: "apply", available: 1, terms: { template: "employment",
       commitments: [
-        { who: this.me, does: { outcome: { money: { from: account, amount: String(wage), for: "wages" } } }, every: this.o.period },
+        // (The account it's paid from, where the office says; a payroll elsewhere in the organisation pays it otherwise.)
+        { who: this.me, does: { outcome: { money: { ...(account ? { from: account } : {}), amount: String(wage), for: "wages" } } }, every: this.o.period },
         ...(this.o.workplace ? [{ who: "taker", does: { outcome: { occupancy: { in: this.o.workplace } } } } as const] : []),
       ],
       // (Notice, where the employer says what it is.)
