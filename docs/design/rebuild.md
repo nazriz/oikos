@@ -471,7 +471,9 @@ Proposed together, for one sign-off:
   - the `time` crate (act times by block and actor kind; timelines, one per person and lanes per system); the kernel holds acts in progress and applies them when done, and `advance` goes to any second; `thinking` is logged with the act; `max_actions_per_wake` is gone, with a backlog and a repeated-act count in the health report in its place;
   - modules plan when a wake begins and carry on through its acts (`woke_for: "done"`); retries are paced by time;
   - **first parity step** (every act a second): a 30-day, 80-person town is within noise of `main`: 266 payments against 275, 345 work events against 344, citizens' acts 745 against 712, no refusals in either;
-  - **Gate:** kernel 94 (3 new time tests), participants 39, orchestrator by file (below).
+  - **Gate:** kernel 94 (3 new time tests), participants 39, orchestrator 281.
+  - **Parity, a year of the 1,000-person town, 10 seeds each against `main`:** within noise on employment, participation, unemployment, saving, arrivals, departures, rent stress and belief change. **One known difference:** group attendance is about 4 points higher (59.7% against 55.8%, higher in 9 of 10 seeds). Likely cause: many decisions now fall a few seconds later (a message lands a second after it's sent), and a citizen's random draws are keyed by the exact second, so the draws differ; habit then amplifies. Not isolated further (Naz, 2026-09-30: record it and get on with the rebuild). The measure was already off its target (50%) on `main`; it's recalibrated on the new platform.
+  - **Speed:** a year takes about 130 s, and building observations is 70% of the engine's time. Most of that was every citizen's gatherings channel (`has: practice`) scanning all new records at every look. The record index now covers `has`.
 - **Next:**
   1. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
   2. R4 and R5.

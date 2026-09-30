@@ -319,9 +319,10 @@ export function recordWho(s: string): string[] | "models" | "code" | "all" | "no
   return s === "models" || s === "code" || s === "all" || s === "none" ? s : s.split(",").map((x) => x.trim()).filter(Boolean);
 }
 
-/** Refusals that are the world working as it should: same-moment races (D58), and moving in where the last tenants
- * are still leaving. Anything else is worth a look. */
-const EXPECTED_REFUSALS = new Set(["not_present", "not_at_work", "capacity_exceeded"]);
+/** Refusals that are the world working as it should: same-moment races (D58), moving in where the last tenants are
+ * still leaving, and a new employer naming, on their first day, someone who has worked a full day at the job they just
+ * left (acts take time). Anything else is worth a look. */
+const EXPECTED_REFUSALS = new Set(["not_present", "not_at_work", "capacity_exceeded", "no_time_left"]);
 
 /** The same act by the same unit more often than this in a day (hourly): a retry paced by wakes rather than time. */
 export const REPEAT_WARNING = 24;

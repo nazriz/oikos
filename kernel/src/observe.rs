@@ -321,6 +321,8 @@ pub struct RecordIndex {
     by_record: BTreeMap<&'static str, Vec<u64>>,
     by_kind: BTreeMap<String, Vec<u64>>,
     by_entity: BTreeMap<String, Vec<u64>>,
+    /// Statements by the structured fields they carry (what a channel's `has` asks for): a practice, an offer...
+    by_has: BTreeMap<&'static str, Vec<u64>>,
     /// Records still standing (not withdrawn by their own author or whoever they speak for), by
     /// statement kind and by record kind: what a search for standing records scans.
     standing_kind: BTreeMap<String, BTreeSet<u64>>,
@@ -343,8 +345,12 @@ impl RecordIndex {
             let stored = &st.records[&st.record_order[i]];
             let (seq, rec) = (stored.seq, &*stored.record);
             self.by_record.entry(rec.body.kind_name()).or_default().push(seq);
-            if let crate::blocks::RecordBody::Statement { kind, .. } = &rec.body {
+            if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &rec.body {
                 self.by_kind.entry(kind.clone()).or_default().push(seq);
+                let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some())];
+                for (field, _) in carries.into_iter().filter(|(_, x)| *x) {
+                    self.by_has.entry(field).or_default().push(seq);
+                }
             }
             let who: BTreeSet<String> = involved(st, rec).into_iter().collect();
             for e in who {
@@ -396,6 +402,10 @@ impl RecordIndex {
         }
         if let Some(w) = want {
             options.push(w.iter().filter_map(|e| self.by_entity.get(*e)).map(|v| tail(v, after)).collect());
+        }
+        // A statement must carry every field `has` names, so those carrying any one of them are enough to look through.
+        for h in f.has.iter().flatten() {
+            options.push(self.by_has.get(h.as_str()).map(|v| tail(v, after)).into_iter().collect());
         }
         let best = options.into_iter().min_by_key(|lists| lists.iter().map(|l| l.len()).sum::<usize>())?;
         let mut seqs: Vec<u64> = best.into_iter().flatten().copied().collect();
