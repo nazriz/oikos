@@ -4,7 +4,8 @@ adults as (select e.run_id, e.entity from entities e join runs r on r.run_id = e
   where e.kind = 'person' and g.t is null and e.born_at + 18 * 365 * 86400 <= r.end_t),
 went as (select o.run_id, o.occupant, o.t, o.space from occupancy o join runs r on r.run_id = o.run_id
   where o.event = 'occupied' and o.space_kind = 'hall' and o.t >= r.end_t - 365 * 86400),
-held as (select run_id, space, t, count(*) as n from went group by all),
+-- (A gathering: arrivals at a hall in the same hour. Acts take time, so people get there seconds apart, not at one instant.)
+held as (select run_id, space, t // 3600 as hour, count(distinct occupant) as n from went group by all),
 counts as (select a.run_id, count(*) as adults,
     count(*) filter (where exists (select 1 from went w where w.run_id = a.run_id and w.occupant = a.entity)) as took_part,
     count(*) filter (where exists (select 1 from went w join runs r on r.run_id = w.run_id where w.run_id = a.run_id and w.occupant = a.entity and w.t >= r.end_t - 30 * 86400)) as last_month
