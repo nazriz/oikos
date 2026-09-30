@@ -1205,6 +1205,7 @@ dependencies = [
  "sha2",
  "terrarium-contracts",
  "terrarium-core",
+ "terrarium-terms",
 ]
 
 [[package]]
@@ -1216,6 +1217,15 @@ dependencies = [
  "napi-build",
  "napi-derive",
  "terrarium-kernel",
+]
+
+[[package]]
+name = "terrarium-terms"
+version = "0.7.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "terrarium-contracts",
 ]
 
 [[package]]

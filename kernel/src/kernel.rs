@@ -188,6 +188,7 @@ impl Kernel {
             occupancy: crate::state::Map::new(),
             departures: crate::state::Map::new(),
             records: crate::state::Map::new(),
+            marks: Default::default(),
             record_order: imbl::Vector::new(),
             participants: c
                 .participants

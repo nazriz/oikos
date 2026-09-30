@@ -50,7 +50,7 @@ fn main() -> ExitCode {
             Ok(())
         })(),
         Some("version") => {
-            println!("terrarium-kernel {} ({})", run::KERNEL_VERSION, run::KERNEL_BUILD);
+            println!("terrarium-kernel {} ({}) source {}", run::KERNEL_VERSION, run::KERNEL_BUILD, run::KERNEL_SOURCE);
             Ok(())
         }
         _ => Err("usage: terrarium-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | version".into()),

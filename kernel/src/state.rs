@@ -47,6 +47,10 @@ pub struct State {
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub departures: Map<Id, Vec<Departure>>,
     pub records: Map<Id, Stored>,
+    /// Each agreement's signatures and notices, as they're made: derived from the records (never serialised, so the
+    /// state and its hash are unchanged), for reading agreements by their terms without scanning every record.
+    #[serde(skip)]
+    pub marks: Map<Id, AgreementMarks>,
     /// Record ids in the order they were made (record i has seq i+1).
     pub record_order: imbl::Vector<Id>,
     pub participants: Map<Id, Arc<Participant>>,
@@ -240,6 +244,23 @@ pub struct Structure {
 
 fn is_zero_i64(x: &i64) -> bool {
     *x == 0
+}
+
+/// An agreement's signatures and notices (State::marks).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AgreementMarks {
+    pub signatures: Vec<terrarium_terms::Mark>,
+    pub notices: Vec<terrarium_terms::Mark>,
+}
+
+impl State {
+    /// The reading of an agreement by its terms, now (docs/design/rebuild.md section 7), if it's an agreement.
+    pub fn reading(&self, agreement: &str) -> Option<terrarium_terms::Reading> {
+        let stored = self.records.get(agreement)?;
+        let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
+        let m = self.marks.get(agreement).cloned().unwrap_or_default();
+        Some(terrarium_terms::read(terms, &m.signatures, &m.notices, self.t))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -507,6 +528,17 @@ impl State {
 
     /// Store a record, giving it the next sequence number.
     pub fn store(&mut self, record: Record) {
+        match &record.body {
+            crate::blocks::RecordBody::Signature { agreement, party } => {
+                let m = self.marks.entry(agreement.clone()).or_default();
+                m.signatures.push(terrarium_terms::Mark { party: party.clone(), at: record.at });
+            }
+            crate::blocks::RecordBody::Notice { agreement, party, .. } => {
+                let m = self.marks.entry(agreement.clone()).or_default();
+                m.notices.push(terrarium_terms::Mark { party: party.clone(), at: record.at });
+            }
+            _ => {}
+        }
         self.counters.record_seq += 1;
         let seq = self.counters.record_seq;
         self.record_order.push_back(record.id.clone());

@@ -1,0 +1,14 @@
+[package]
+name = "terrarium-terms"
+version = "0.7.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Reads agreements by their own terms (read-only): status, when it ends, and why. A reading changes nothing."
+rust-version = "1.85"
+
+[dependencies]
+terrarium-contracts = { path = "../contracts" }
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

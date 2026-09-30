@@ -15,7 +15,7 @@ export function kernelBinary(): string {
   throw new Error("kernel binary not found: run `bun run kernel` (cargo build --release) or set TERRARIUM_KERNEL");
 }
 
-/** The engine's native module (kernel/crates/napi), if built: `bun run engine`. */
+/** The engine's native module (kernel/crates/napi), if built: `bun run kernel` builds it with the binary. */
 export function engineModule(): string | undefined {
   const env = process.env.TERRARIUM_ENGINE_MODULE;
   if (env) return env;
@@ -27,11 +27,21 @@ export function engineModule(): string | undefined {
 }
 
 interface NativeSession { request(line: string): string; close(): void }
-let native: { KernelSession: new () => NativeSession } | undefined;
+let native: { KernelSession: { new (): NativeSession; source(): string } } | undefined;
+/** Loads the native module, refusing one built from other sources than the kernel binary found beside it (kernel/build.rs's
+ * fingerprint): building only the binary (`cargo test`, say) leaves a stale module that would write logs the binary
+ * can't replay, and a quiet divergence costs more than a loud stop. */
 function loadNative(path: string) {
   if (!native) {
     const m = { exports: {} as any };
     process.dlopen(m, path);
+    const bin = process.env.TERRARIUM_ENGINE_MODULE ? undefined : join(path, "..", "terrarium-kernel");
+    if (bin && existsSync(bin)) {
+      const theirs = /source (\w+)/.exec(Bun.spawnSync([bin, "version"]).stdout.toString())?.[1];
+      const ours = m.exports.KernelSession.source?.();
+      if (theirs !== ours)
+        throw new Error(`the engine's native module (source ${ours ?? "unknown"}) and the kernel binary beside it (source ${theirs ?? "unknown"}) were built from different sources: run \`bun run kernel\` (or TERRARIUM_ENGINE=stdio)`);
+    }
     native = m.exports;
   }
   return native!;

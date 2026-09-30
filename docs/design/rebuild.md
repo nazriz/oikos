@@ -455,8 +455,14 @@ Proposed together, for one sign-off:
   - messages carry who acted (`from_entity`, stamped by the kernel; the citizen reads it instead of mapping ids by hand);
   - observations say why a seat woke and how long since its last wake (`woke_for`, `since`, from the orchestrator).
 - **Merged from `main`** (2026-09-30): pilot 9's gaps fixed there. All suites pass on the rebuild branch: kernel 83, contracts 142, participants 39, orchestrator 73.
+- **R3, readings** (2026-09-30):
+  - the `terms` crate (`terms-0.1.0`) reads an agreement from its terms, signatures and notices: offered, in force, ending or ended, when it ends, and whether by its term or by notice. A notice counts only under its giver's own termination clause;
+  - the kernel's state indexes each agreement's signatures and notices (derived, never serialised), and an observation carries the reading of every agreement its records refer to;
+  - the `Book` keeps two meanings apart: `concluded` (signed by every party, a fact of the records) and `inForce` (by the reading, if one came). Merging them broke two things, the wages stopping at an employment's end and the builder's purchases, because code asked "in force" when it meant "concluded".
+  - **A guard on the engine:** the binary and the native module carry a fingerprint of the sources they were built from (kernel/build.rs), and the host refuses a module that doesn't match the binary beside it. A `cargo test` rebuilds only the binary, and the stale module had written logs the binary couldn't replay.
+  - **Gate:** kernel 88, participants 39, orchestrator 73.
 - **Next:**
-  1. Readings: the `terms` crate, and an index from agreements to their signatures and notices in the kernel's state, so readings ride along with any agreement, signature or notice a seat receives. Then the `Book` reads them.
+  1. The rest of R3: modules read ends from readings instead of working them out (the landlord's leases, `Staffing.endOf`, the citizen's job and home), and truth audits.
   2. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
   3. R4 and R5.
 

@@ -40,4 +40,10 @@ impl KernelSession {
     pub fn version() -> String {
         terrarium_kernel::run::KERNEL_VERSION.to_string()
     }
+
+    /// The fingerprint of the sources it was built from (kernel/build.rs), to match against the binary's.
+    #[napi]
+    pub fn source() -> String {
+        terrarium_kernel::run::KERNEL_SOURCE.to_string()
+    }
 }

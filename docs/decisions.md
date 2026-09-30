@@ -978,6 +978,13 @@ See the design note, §16.
   - **The plan:** rebuild the architecture, not rewrite it, with parity gates against `v0-reference`.
   - **Work happens on a `rebuild` branch,** so `main` keeps running (pilots, fixes) until the rebuild passes its gates.
 
+- **Readings in the `Book`: "concluded" and "in force" kept apart** (docs/design/rebuild.md section 7, R3 progress).
+  - Code asks "concluded" (signed by every party) when it needs the history, such as a contract's start, wages still to stop, or a loan's repayments. It asks "in force" (the terms' reading) when it needs the present, such as membership or a job held now.
+  - **Why:** merging them broke wages stopping at an employment's end: an ended contract no longer read "in force", so the employer never withdrew the order.
+  - **Revisit if:** readings carry obligations (B2), so a loan's arrears come from the reading and no longer from the Book's arithmetic.
+- **The engine's binary and native module must come from the same sources:** a fingerprint in each (kernel/build.rs), checked when the host loads the module. It's a loud stop, not a fallback to stdio: a quiet mismatch writes logs that don't replay.
+  - **Revisit if:** the stdio binary is retired, and the module is the only engine.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

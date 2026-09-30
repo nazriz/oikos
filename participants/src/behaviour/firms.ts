@@ -161,9 +161,9 @@ export const landlord: BehaviourModule = {
       // signature (up to a month). Both hold a unit; counting only signed ones
       // would let the same home twice.
       const leases = book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.signedBy(r.id, me));
-      const awaiting = (leases as any[]).filter((a) => !book.inForce(a.id) && t - a.at < MONTH);
+      const awaiting = (leases as any[]).filter((a) => !book.concluded(a.id) && t - a.at < MONTH);
       const active = (leases as any[]).filter((a: any) => {
-        if (!book.inForce(a.id)) return false;
+        if (!book.concluded(a.id)) return false;
         const since = book.signedAt(a.id)!;
         const ends = Math.min(a.terms.term ? since + a.terms.term : Infinity, ...(book.notices.get(a.id) ?? []).map((n) => n.at + (a.terms.termination?.find((x: any) => x.party === n.as)?.notice ?? MONTH)));
         return t < ends;
@@ -498,7 +498,7 @@ export class Staffing {
   }
   /** Offers we've made in the last month that the worker hasn't signed yet. */
   offered(book: Book, t: number): any[] {
-    return this.contracts(book).filter((a) => !book.inForce(a.id) && !book.signedBy(a.id, a.terms.parties[1]) && t - a.at < MONTH);
+    return this.contracts(book).filter((a) => !book.concluded(a.id) && !book.signedBy(a.id, a.terms.parties[1]) && t - a.at < MONTH);
   }
   /** Our standing job postings. */
   postings(book: Book) {
@@ -573,7 +573,7 @@ export class Staffing {
       steps.push(s);
     }
     // Ended (notice served): stop the wages.
-    for (const a of doesPay ? contracts : []) if (book.inForce(a.id) && t >= this.endOf(book, a) && this.orders.has(a.id)) {
+    for (const a of doesPay ? contracts : []) if (book.concluded(a.id) && t >= this.endOf(book, a) && this.orders.has(a.id)) {
       steps.push(because("Employment has ended: stopping the wages.", withdraw(this.orders.get(a.id)!, "Employment ended; stop wages.")));
       this.orders.delete(a.id);
     }
@@ -917,7 +917,7 @@ export class WindingUp {
       paid.push(d.id);
     }
     // Loans not in default: what's left of the repayments falls due now.
-    for (const a of book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(this.me) && book.inForce(r.id) && !inDefault.has(r.id)) as any[]) {
+    for (const a of book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(this.me) && book.concluded(r.id) && !inDefault.has(r.id)) as any[]) {
       const owe = commitmentOf(a, this.me);
       const m = owe.outcome?.money;
       if (!m) continue;

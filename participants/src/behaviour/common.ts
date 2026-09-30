@@ -3,7 +3,7 @@
 // its own book of the records relevant to it, as a person would.
 
 import * as C from "../calls";
-import type { Assertion, Observation, Offer, Outcome as ActOutcome, Practice, Record, ParticipantAction, Registry, StatementRecord } from "../contracts";
+import type { Assertion, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { cents, formatMoney } from "../money";
 import { evaluate } from "../law";
@@ -28,10 +28,16 @@ export class Book {
   /** position -> its organisation, role and holder (from a directory). */
   readonly positions = new Map<string, { entity: string; role?: string; holder?: string }>();
   readonly entityKind = new Map<string, string>();
+  /** Agreements read by their own terms, as last delivered with them (contracts 0.7: readings; docs/design/rebuild.md
+   * section 7), and the time of the latest observation. */
+  readonly readings = new Map<string, Reading>();
+  now = 0;
   private lastDirectory: unknown; // the directory lists last read (the view hands back the same lists until they change)
 
   absorb(obs: Observation): Record[] {
     const fresh: Record[] = [];
+    this.now = obs.t;
+    for (const [id, r] of Object.entries(obs.readings ?? {})) this.readings.set(id, r);
     for (const r of channels.records(obs)) {
       if (this.records.has(r.id)) continue;
       this.records.set(r.id, r);
@@ -101,15 +107,23 @@ export class Book {
     return this.signatures.get(agreement)?.has(party) ?? false;
   }
 
-  /** Signed by every party. */
-  inForce(agreement: string): boolean {
+  /** Concluded: signed by every party (whether or not it has since ended). */
+  concluded(agreement: string): boolean {
     const a = this.records.get(agreement);
     return a?.record === "agreement" && a.terms.parties.every((p) => this.signedBy(agreement, p));
   }
 
+  /** In force now: by its reading, if one came with it (concluded, and not yet ended by its term or by notice under its
+   * terms); otherwise, concluded. */
+  inForce(agreement: string): boolean {
+    const r = this.readings.get(agreement);
+    if (r) return (r.status === "in_force" || r.status === "ending") && (r.ends_at === undefined || this.now < r.ends_at);
+    return this.concluded(agreement);
+  }
+
   /** The time the last party signed, if all have. */
   signedAt(agreement: string): number | undefined {
-    if (!this.inForce(agreement)) return undefined;
+    if (!this.concluded(agreement)) return undefined;
     return Math.max(...(this.signedTimes.get(agreement) ?? []));
   }
 

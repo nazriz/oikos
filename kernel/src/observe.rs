@@ -37,6 +37,10 @@ pub struct Observation {
     pub inbox: Vec<Message>,
     pub drafts: Vec<Value>,
     pub channels: BTreeMap<Id, ChannelData>,
+    /// Readings of the agreements this observation brings (an agreement, or a signature or notice on one), by their own
+    /// terms (contracts 0.7; docs/design/rebuild.md section 7): beside the records, never in their place.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", skip_deserializing)]
+    pub readings: BTreeMap<Id, terrarium_terms::Reading>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -839,6 +843,26 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
         .filter(|(_, x)| x.holder.as_deref() == Some(participant))
         .map(|(id, x)| HeldPosition { position: id.clone(), entity: x.entity.clone(), title: x.title.clone(), role: x.role.clone() })
         .collect();
+    // Readings of the agreements the records here bring.
+    let mut readings = BTreeMap::new();
+    for ch in channels.values() {
+        if let ChannelData::Records { records, .. } = ch {
+            for r in records {
+                let agreement = match &r.body {
+                    crate::blocks::RecordBody::Agreement { .. } => Some(&r.id),
+                    crate::blocks::RecordBody::Signature { agreement, .. } | crate::blocks::RecordBody::Notice { agreement, .. } => Some(agreement),
+                    _ => None,
+                };
+                if let Some(a) = agreement {
+                    if !readings.contains_key(a) {
+                        if let Some(x) = st.reading(a) {
+                            readings.insert(a.clone(), x);
+                        }
+                    }
+                }
+            }
+        }
+    }
     let obs = Observation {
         participant: participant.into(),
         t: st.t,
@@ -850,6 +874,7 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
         inbox: vec![],
         drafts: vec![],
         channels,
+        readings,
     };
     (obs, looks, drained)
 }

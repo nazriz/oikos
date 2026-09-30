@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 terrarium-core = { path = "crates/core" }
 terrarium-contracts = { path = "crates/contracts" }
+terrarium-terms = { path = "crates/terms" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
@@ -34,7 +35,7 @@ sha2 = { workspace = true, features = ["asm"] }
 # The platform core, as a workspace (docs/design/rebuild.md section 4): this crate is the kernel (the only
 # writer); crates/ holds what it and every other consumer share.
 [workspace]
-members = [".", "crates/core", "crates/contracts", "crates/napi"]
+members = [".", "crates/core", "crates/contracts", "crates/terms", "crates/napi"]
 resolver = "2"
 
 [workspace.dependencies]
