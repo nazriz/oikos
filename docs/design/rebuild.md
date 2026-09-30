@@ -451,6 +451,15 @@ Proposed together, for one sign-off:
   - **Not in R0:** checkpoints and compact logs (R4); acts taking effect when done (R2).
   - **Gate:** kernel 83, contracts 142 (with a new invalid example: a 0.6 world config), participants 38, orchestrator 72.
 
+- **R3, started** (2026-09-30):
+  - messages carry who acted (`from_entity`, stamped by the kernel; the citizen reads it instead of mapping ids by hand);
+  - observations say why a seat woke and how long since its last wake (`woke_for`, `since`, from the orchestrator).
+- **Merged from `main`** (2026-09-30): pilot 9's gaps fixed there. All suites pass on the rebuild branch: kernel 83, contracts 142, participants 39, orchestrator 73.
+- **Next:**
+  1. Readings: the `terms` crate, and an index from agreements to their signatures and notices in the kernel's state, so readings ride along with any agreement, signature or notice a seat receives. Then the `Book` reads them.
+  2. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
+  3. R4 and R5.
+
 **After the rebuild,** on the new platform:
 1. The labour market (search frictions) and goods prices under shortage, calibrated with the health report watching every other measure.
 2. The Stage 3 renderer.
