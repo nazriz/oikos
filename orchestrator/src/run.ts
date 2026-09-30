@@ -24,7 +24,7 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical, DECISIONS, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
+import { calls, canonical, DECISIONS, paramErrors, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution } from "@terrarium/translator";
 import { Kernel } from "./kernel";
@@ -352,6 +352,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (!impl || impl === "test") return undefined;
     const module = mods[impl];
     if (!module) throw new Error(`participant ${p.id}: no behaviour module "${impl}"`);
+    // Checked against the module's manifest (participants/manifests): a parameter it doesn't take, or of the wrong type,
+    // is refused at load, not ignored for the run. (A person's traits aren't checked: each role uses what it needs.)
+    const given = cap === "self" || p.kind === "system" ? controller?.params ?? {} : positions.get(cap)?.role_module?.params ?? {};
+    const wrong = paramErrors(impl, given);
+    if (wrong.length) throw new Error(`participant ${p.id}${cap !== "self" ? ` (as ${cap})` : ""}: ${wrong.join("; ")} (its manifest: participants/manifests/${impl}.json)`);
     await hashSource(module);
     const ctx = ctxFor(p.id, cap, entity, params);
     return {

@@ -494,8 +494,16 @@ Proposed together, for one sign-off:
   - the root crate is the engine: the kernel interface, the log, the protocol and the schedule.
   Observing is now perception building, then the world delivering (marking what was seen, handing over outcomes and messages). Public paths are unchanged (`terrarium_kernel::{state, observe, ...}`). The same final state over 60 days.
 - **R4, the diff** (2026-09-30): `terrarium diff <baseline> <change> [QUERY...]` compares every measure of two batches of the same world. With several seeds a side, a difference is judged against seed-to-seed spread and flagged beyond three standard errors; with one, the relative change is flagged beyond a tenth. On the parity batches (10 seeds each) it finds the known gatherings difference by itself (attendance z 4.7). It also finds first-quarter religious affiliation 1.4 points lower on the rebuild (z -4.2), part of the same difference.
+- **R4, module manifests** (2026-09-30): every built-in module has a manifest (`participants/manifests/<name>.json`, valid against `contracts/module.schema.json`). They're written from the modules themselves by `participants/scripts/manifests.ts`:
+  - the parameters and their defaults, as the module's `params` call has them, plus what it reads as it goes;
+  - each figure's source, where the comment beside it cites one, or "placeholder";
+  - what the world must give;
+  - the decisions it records and the beliefs it keeps.
+  A test fails if a module changes without its manifest being written again. **At load,** a world giving a module a parameter it doesn't take, or of the wrong type, is refused, naming the participant, the module and the parameter. The first run found one: `builder_account`, given to landlords and read by nothing.
+  - **The count:** 294 parameters in 28 modules; 38 with a cited source, the rest placeholders. The key figures come from the profile (sourced) in generated worlds, over these defaults.
+  - **Not yet:** `perceives` (what each module relies on perceiving) is empty, and `state` is "none" (no module saves its state yet: checkpoints).
 - **Next:**
-  1. R4: module manifests checked at load; the health report (the diff is done); compact logs; checkpoints and resuming from one.
+  1. R4: the health report (the diff is done); compact logs; checkpoints and resuming from one.
   2. (R3's `law` stays in TypeScript for now: docs/decisions.md.)
   3. R5: clean-up.
 

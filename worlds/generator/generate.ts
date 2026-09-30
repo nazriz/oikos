@@ -709,7 +709,7 @@ export function generate(spec: TownSpec): any {
     const theirCells = records.filter((r) => r.record === "claim" && r.holder === l).map((r) => cellOf.get(r.about.object)!);
     office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "own-sites", kind: "sites", area: theirCells.length ? theirCells : "all", occupants: "names" }, deaths, lawBook],
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
-        city: "city", city_account: "acc-city", builder: "builder", builder_account: "acc-builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000,
+        city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000,
         // Their practice: reviewing rents as often as the law allows here, with the notice it asks (the law itself is a record).
         rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days }));
   }

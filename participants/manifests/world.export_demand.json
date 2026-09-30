@@ -1,0 +1,32 @@
+{
+  "name": "world.export_demand",
+  "version": "0.2.0",
+  "doc": "docs/behaviour/boundary.md",
+  "params": {
+    "amount": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "every": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "memo": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "purchases": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "to": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

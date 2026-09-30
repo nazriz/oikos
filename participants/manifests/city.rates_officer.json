@@ -1,0 +1,23 @@
+{
+  "name": "city.rates_officer",
+  "version": "0.1.1",
+  "doc": "docs/behaviour/public-finance.md",
+  "params": {
+    "first_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 30,
+      "source": "placeholder"
+    },
+    "law": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "law-rates",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

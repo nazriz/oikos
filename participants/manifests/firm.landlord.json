@@ -1,0 +1,218 @@
+{
+  "name": "firm.landlord",
+  "version": "0.9.0",
+  "doc": "docs/behaviour/firms.md",
+  "params": {
+    "arrears_months_before_notice": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 2,
+      "source": "placeholder"
+    },
+    "base_rent": {
+      "schema": {
+        "type": "object",
+        "description": "a rent per type, or per type and bedrooms"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "builder": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "city": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "city_account": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "compliance_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "how often it obeys a refusal, a fine, an order, or reports rent honestly"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "concede_after": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "cut_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "BoE: unlet rentals cut 5% a month"
+      },
+      "unit": "bps",
+      "default": 500,
+      "source": "BoE: unlet rentals cut 5% a month"
+    },
+    "develop": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": true,
+      "source": "placeholder"
+    },
+    "develop_max_vacancy_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "build when average vacancy is at most 10% of homes"
+      },
+      "unit": "bps",
+      "default": 1000,
+      "source": "placeholder"
+    },
+    "develop_type": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "house",
+      "source": "placeholder"
+    },
+    "develop_window_days": {
+      "schema": {
+        "type": "integer",
+        "description": "look at average occupancy over this window"
+      },
+      "unit": "days",
+      "default": 90,
+      "source": "placeholder"
+    },
+    "idle_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
+    },
+    "landlord_notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 60,
+      "source": "placeholder"
+    },
+    "markup_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 500,
+      "source": "placeholder"
+    },
+    "max_people_per_bedroom": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 2,
+      "source": "placeholder"
+    },
+    "max_term_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 24,
+      "source": "placeholder"
+    },
+    "min_term_months": {
+      "schema": {
+        "type": "integer",
+        "description": "BoE/ARLA: 12-24 months, uniform"
+      },
+      "unit": "months",
+      "default": 12,
+      "source": "BoE/ARLA: 12-24 months, uniform"
+    },
+    "outside_account": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "rent_increase_notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "rent_review_months": {
+      "schema": {},
+      "unit": "months",
+      "default": null,
+      "source": "placeholder"
+    },
+    "reprice_bps": {
+      "schema": {},
+      "unit": "bps",
+      "source": "the world gives it (no default)"
+    },
+    "reprice_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
+    },
+    "shop_accounts": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "short_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
+    },
+    "spend_share_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "owners' spending of rental income, at local shops"
+      },
+      "unit": "bps",
+      "default": 6000,
+      "source": "placeholder"
+    },
+    "tax_rate_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "the rate it believes the tax law sets (the world supplies it)"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "tenant_notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "upkeep_share_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "maintenance bought from outside"
+      },
+      "unit": "bps",
+      "default": 2000,
+      "source": "placeholder"
+    },
+    "wind_up_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
+    }
+  },
+  "perceives": [],
+  "beliefs": [
+    {
+      "name": "held",
+      "about": "agreement"
+    }
+  ],
+  "state": "none"
+}

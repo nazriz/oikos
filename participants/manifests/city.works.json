@@ -1,0 +1,189 @@
+{
+  "name": "city.works",
+  "version": "0.1.1",
+  "doc": "docs/behaviour/services.md",
+  "params": {
+    "collect_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    },
+    "collect_labour": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "collect_per_unit": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "collect_task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "collect",
+      "source": "placeholder"
+    },
+    "depot": {
+      "schema": {
+        "type": "string",
+        "description": "its depot, and the space the crew works in there (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "its depot, and the space the crew works in there (the world must say)"
+    },
+    "depot_channel": {
+      "schema": {
+        "type": "string",
+        "description": "the channel that shows the depot, with who's there by name"
+      },
+      "default": "depot",
+      "source": "placeholder"
+    },
+    "dispose_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    },
+    "industry": {
+      "schema": {
+        "type": "string",
+        "description": "what the work is (its postings say)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "kind": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "waste",
+      "source": "placeholder"
+    },
+    "landfill": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    },
+    "maintain_labour": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "maintain_over": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "maintain_per_unit": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "maintain_task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "maintain",
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "role": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "works crew",
+      "source": "placeholder"
+    },
+    "staff_line": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "staff",
+      "source": "placeholder"
+    },
+    "wage": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "waste": {
+      "schema": {
+        "type": "string",
+        "description": "per unit: seconds of work, and waste taken"
+      },
+      "default": "waste",
+      "source": "placeholder"
+    },
+    "wear": {
+      "schema": {
+        "type": "string",
+        "description": "wear worth a crew's time above this"
+      },
+      "default": "wear",
+      "source": "placeholder"
+    },
+    "work_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 5,
+      "source": "placeholder"
+    },
+    "working_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 28800,
+      "source": "placeholder"
+    },
+    "workplace": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

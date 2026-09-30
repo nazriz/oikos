@@ -1,0 +1,68 @@
+{
+  "name": "city.mayor_code",
+  "version": "0.5.0",
+  "doc": "docs/behaviour/government.md",
+  "params": {
+    "builder": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    },
+    "park_budget": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 8000000,
+      "source": "placeholder"
+    },
+    "park_type": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "park",
+      "source": "placeholder"
+    },
+    "petition_threshold_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 1500,
+      "source": "placeholder"
+    },
+    "population": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 200,
+      "source": "placeholder"
+    },
+    "responsiveness_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 7000,
+      "source": "placeholder"
+    },
+    "services_budget": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "staff_budget": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

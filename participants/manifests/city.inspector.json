@@ -1,0 +1,24 @@
+{
+  "name": "city.inspector",
+  "version": "0.5.1",
+  "doc": "docs/behaviour/institutions.md",
+  "params": {
+    "compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "fine": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 5000000,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

@@ -1,0 +1,47 @@
+{
+  "name": "bank.payment_system",
+  "version": "0.9.1",
+  "doc": "docs/behaviour/bank-payment-system.md",
+  "params": {
+    "amount": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "from": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "instruction": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "max_batch": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 32,
+      "source": "placeholder"
+    },
+    "settles": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "to": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "town": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "verify_author": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": true,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

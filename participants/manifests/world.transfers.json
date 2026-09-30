@@ -1,0 +1,40 @@
+{
+  "name": "world.transfers",
+  "version": "0.2.0",
+  "doc": "docs/behaviour/boundary.md",
+  "params": {
+    "account": {
+      "schema": {
+        "type": "string",
+        "description": "the outside's account it pays from and is paid into (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "the outside's account it pays from and is paid into (the world must say)"
+    },
+    "payments": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "publish_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "year": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 31536000,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

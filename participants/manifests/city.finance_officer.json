@@ -1,0 +1,53 @@
+{
+  "name": "city.finance_officer",
+  "version": "0.8.1",
+  "doc": "docs/behaviour/government.md",
+  "params": {
+    "approval_over": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 5000000,
+      "source": "placeholder"
+    },
+    "budget_lines": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "mayor_position": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "mayor",
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

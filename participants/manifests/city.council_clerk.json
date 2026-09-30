@@ -1,0 +1,17 @@
+{
+  "name": "city.council_clerk",
+  "version": "0.5.1",
+  "doc": "docs/behaviour/government.md",
+  "params": {
+    "vote_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

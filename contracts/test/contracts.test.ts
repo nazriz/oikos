@@ -20,6 +20,7 @@ const SCHEMA_FILES = [
   "calls.schema.json",
   "outcomes.schema.json",
   "dataset.schema.json",
+  "module.schema.json",
 ];
 
 // examples/<valid|invalid>/<dir>/*.json is checked against TARGETS[<dir>].
@@ -129,5 +130,19 @@ describe("world-config mutations are rejected", () => {
       mutate(c);
       expect(v(c)).toBe(false);
     });
+  }
+});
+
+// The behaviour modules' manifests (participants/manifests, written from the modules) are what the contract says.
+test("every behaviour module's manifest is a valid manifest", () => {
+  const ajv = new Ajv2020({ strict: true, allErrors: true });
+  for (const f of SCHEMA_FILES) ajv.addSchema(JSON.parse(readFileSync(join(root, f), "utf8")));
+  const validate = ajv.getSchema(`${NS}:module`)!;
+  const dir = join(root, "../participants/manifests");
+  const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
+  expect(files.length).toBeGreaterThan(20);
+  for (const f of files) {
+    const ok = validate(JSON.parse(readFileSync(join(dir, f), "utf8")));
+    expect({ file: f, errors: ok ? [] : validate.errors }).toEqual({ file: f, errors: [] });
   }
 });

@@ -1,5 +1,6 @@
 export * from "./contracts";
 export * from "./module";
+export { manifests, paramErrors, type Manifest } from "./manifests";
 export * from "./rng";
 export * from "./law";
 export * from "./canon";

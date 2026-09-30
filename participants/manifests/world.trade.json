@@ -1,0 +1,64 @@
+{
+  "name": "world.trade",
+  "version": "0.2.0",
+  "doc": "docs/behaviour/boundary.md",
+  "params": {
+    "account": {
+      "schema": {
+        "type": "string",
+        "description": "the outside's account it pays from and is paid into (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "the outside's account it pays from and is paid into (the world must say)"
+    },
+    "buys": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "min_order": {
+      "schema": {
+        "type": "integer",
+        "description": "the least it sells in one order (it sells wholesale)"
+      },
+      "default": 100,
+      "source": "placeholder"
+    },
+    "price_process": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "sells": {
+      "schema": {
+        "type": "object",
+        "description": "unit prices, cents"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "shocks": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "wait_days": {
+      "schema": {
+        "type": "integer",
+        "description": "how long an invoice waits for its goods before it's declined"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

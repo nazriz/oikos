@@ -1,0 +1,67 @@
+{
+  "name": "firm.employer",
+  "version": "0.6.0",
+  "doc": "docs/behaviour/firms.md",
+  "params": {
+    "buffer_periods": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 2,
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "outside_account": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "role": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "supplier_share_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "cost of goods bought from outside, as a share of revenue"
+      },
+      "unit": "bps",
+      "default": 4000,
+      "source": "placeholder"
+    },
+    "target_staff": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 5,
+      "source": "placeholder"
+    },
+    "wage": {
+      "schema": {
+        "type": "integer",
+        "description": "cents per period"
+      },
+      "default": 140000,
+      "source": "placeholder"
+    },
+    "workplace": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

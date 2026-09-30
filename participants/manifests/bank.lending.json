@@ -1,0 +1,92 @@
+{
+  "name": "bank.lending",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/credit.md",
+  "params": {
+    "arrears_days": {
+      "schema": {
+        "type": "integer",
+        "description": "this far behind: arrears (a notice)"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "buffer_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "assessed at the rate plus this (serviceability)"
+      },
+      "unit": "bps",
+      "default": 300,
+      "source": "placeholder"
+    },
+    "default_days": {
+      "schema": {
+        "type": "integer",
+        "description": "this far behind: default"
+      },
+      "unit": "days",
+      "default": 90,
+      "source": "placeholder"
+    },
+    "funding_from": {
+      "schema": {
+        "description": "who lends the bank money when it's short (an entity outside)"
+      },
+      "default": null,
+      "source": "placeholder"
+    },
+    "funding_rate_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "what that funding costs, a year"
+      },
+      "unit": "bps",
+      "default": 500,
+      "source": "placeholder"
+    },
+    "max_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 60,
+      "source": "placeholder"
+    },
+    "max_share_bps": {
+      "schema": {
+        "type": "object",
+        "description": "of monthly income, for repayments"
+      },
+      "unit": "bps",
+      "default": {
+        "person": 3000,
+        "organisation": 2000
+      },
+      "source": "placeholder"
+    },
+    "rate_bps": {
+      "schema": {
+        "type": "object",
+        "description": "lending rates, a year"
+      },
+      "unit": "bps",
+      "default": {
+        "person": 1200,
+        "organisation": 800
+      },
+      "source": "placeholder"
+    },
+    "reserve": {
+      "schema": {
+        "type": "integer",
+        "description": "kept in the bank's own account, cents"
+      },
+      "default": 5000000,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

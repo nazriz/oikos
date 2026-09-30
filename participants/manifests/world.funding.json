@@ -1,0 +1,16 @@
+{
+  "name": "world.funding",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/boundary.md",
+  "params": {
+    "account": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

@@ -1,0 +1,138 @@
+{
+  "name": "firm.builder",
+  "version": "0.9.0",
+  "doc": "docs/behaviour/institutions.md",
+  "params": {
+    "build_markup_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 2000,
+      "source": "placeholder"
+    },
+    "horizon_days": {
+      "schema": {
+        "type": "integer",
+        "description": "the crew it wants: enough to do the work in hand within this"
+      },
+      "unit": "days",
+      "default": 90,
+      "source": "placeholder"
+    },
+    "industry": {
+      "schema": {
+        "type": "string",
+        "description": "what the work is (its postings say)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "let_go_every_days": {
+      "schema": {
+        "type": "integer",
+        "description": "at most one let go in this time"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    },
+    "max_crew": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 12,
+      "source": "placeholder"
+    },
+    "min_crew": {
+      "schema": {
+        "type": "integer",
+        "description": "a core crew, kept through quiet times"
+      },
+      "default": 2,
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "quote_valid_days": {
+      "schema": {
+        "type": "integer",
+        "description": "a published price is honoured this long (placeholder: a common term for a builder's quote)"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "a published price is honoured this long (placeholder: a common term for a builder's quote)"
+    },
+    "supplier": {
+      "schema": {
+        "type": "string",
+        "description": "whom it buys materials from (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "whom it buys materials from (the world must say)"
+    },
+    "types": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {},
+      "source": "placeholder"
+    },
+    "wage": {
+      "schema": {
+        "type": "integer",
+        "description": "the crew's pay, cents per period"
+      },
+      "default": 150000,
+      "source": "placeholder"
+    },
+    "work_days": {
+      "schema": {
+        "type": "integer",
+        "description": "of every 7"
+      },
+      "unit": "days",
+      "default": 5,
+      "source": "placeholder"
+    },
+    "working_day": {
+      "schema": {
+        "type": "integer",
+        "description": "seconds a worker works in a day"
+      },
+      "default": 28800,
+      "source": "placeholder"
+    },
+    "workplace": {
+      "schema": {
+        "type": "string",
+        "description": "the space in the yard its crew works in"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "yard": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

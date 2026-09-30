@@ -1,0 +1,329 @@
+{
+  "name": "firm.retailer",
+  "version": "0.3.0",
+  "doc": "docs/behaviour/retailer.md",
+  "params": {
+    "bank": {
+      "schema": {
+        "type": "string",
+        "description": "a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)"
+      },
+      "default": "",
+      "required": true,
+      "source": "a shop just founded opens its account here (the world must say, for one); closed, our premises are offered at this share of what building them new costs (placeholder)"
+    },
+    "builder": {
+      "schema": {
+        "type": "string",
+        "description": "whose published prices say what our premises are worth (none: closed, they're not sold)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "capital": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "chi_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 1000,
+      "source": "placeholder"
+    },
+    "delta_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 190,
+      "source": "placeholder"
+    },
+    "demand": {
+      "schema": {
+        "type": "integer",
+        "description": "what it expects to sell in a month, before it knows"
+      },
+      "default": 250,
+      "source": "placeholder"
+    },
+    "founder": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "gamma_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 24,
+      "source": "placeholder"
+    },
+    "idle_days": {
+      "schema": {
+        "type": "integer",
+        "description": "nobody working for us this long, our owners close us (placeholder)"
+      },
+      "unit": "days",
+      "default": 90,
+      "source": "nobody working for us this long, our owners close us (placeholder)"
+    },
+    "industry": {
+      "schema": {
+        "type": "string",
+        "description": "what the work is (its postings say; the world's vocabulary, e.g. its profile's industries)"
+      },
+      "default": "",
+      "source": "what the work is (its postings say; the world's vocabulary, e.g. its profile's industries)"
+    },
+    "kind": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "goods",
+      "source": "placeholder"
+    },
+    "lender": {
+      "schema": {
+        "type": "string",
+        "description": "whom it borrows from (none: it doesn't)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "listing": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "max_staff": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 6,
+      "source": "placeholder"
+    },
+    "min_staff": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1,
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "phi_high_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "phi_low_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 2500,
+      "source": "placeholder"
+    },
+    "premises": {
+      "schema": {
+        "type": "string",
+        "description": "the shop: where it keeps and sells things"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "premises_sale_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 5000,
+      "source": "placeholder"
+    },
+    "price": {
+      "schema": {
+        "type": "integer",
+        "description": "its opening retail price, cents each"
+      },
+      "default": 9000,
+      "source": "placeholder"
+    },
+    "price_down_bound_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10250,
+      "source": "placeholder"
+    },
+    "price_up_bound_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 11500,
+      "source": "placeholder"
+    },
+    "reprice_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "by this much (placeholder)"
+      },
+      "unit": "bps",
+      "default": 1000,
+      "source": "by this much (placeholder)"
+    },
+    "reprice_days": {
+      "schema": {
+        "type": "integer",
+        "description": "closed, our premises unsold this long: the asking price comes down (placeholder)"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "closed, our premises unsold this long: the asking price comes down (placeholder)"
+    },
+    "role": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "shop assistant",
+      "source": "placeholder"
+    },
+    "serve_labour": {
+      "schema": {
+        "type": "integer",
+        "description": "seconds of work to serve an item"
+      },
+      "default": 5400,
+      "source": "placeholder"
+    },
+    "serve_task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "serve",
+      "source": "placeholder"
+    },
+    "serve_within_days": {
+      "schema": {
+        "type": "integer",
+        "description": "what isn't served within this (or the days the order says it's for) is refunded (the customer goes elsewhere)"
+      },
+      "unit": "days",
+      "default": 3,
+      "source": "placeholder"
+    },
+    "short_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 60,
+      "source": "placeholder"
+    },
+    "suppliers": {
+      "schema": {
+        "type": "array",
+        "description": "whom it may buy from (their price lists)"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "theta_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 7500,
+      "source": "placeholder"
+    },
+    "unpaid_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    },
+    "utilisation_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 8000,
+      "source": "placeholder"
+    },
+    "vartheta_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 200,
+      "source": "placeholder"
+    },
+    "wage": {
+      "schema": {
+        "type": "integer",
+        "description": "the wage it offers new hires, cents per period"
+      },
+      "default": 120000,
+      "source": "placeholder"
+    },
+    "wind_up_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 60,
+      "source": "placeholder"
+    },
+    "work_days": {
+      "schema": {
+        "type": "integer",
+        "description": "of every 7: shops open on Saturdays"
+      },
+      "unit": "days",
+      "default": 6,
+      "source": "placeholder"
+    },
+    "working_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 28800,
+      "source": "placeholder"
+    },
+    "workplace": {
+      "schema": {
+        "type": "string",
+        "description": "the space its staff work in"
+      },
+      "default": "",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

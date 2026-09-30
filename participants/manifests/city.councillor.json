@@ -1,0 +1,32 @@
+{
+  "name": "city.councillor",
+  "version": "0.5.1",
+  "doc": "docs/behaviour/government.md",
+  "params": {
+    "budget_yes_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 9000,
+      "source": "placeholder"
+    },
+    "leaning": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "noise_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 1500,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

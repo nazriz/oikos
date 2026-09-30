@@ -1,0 +1,165 @@
+{
+  "name": "union.organiser",
+  "version": "0.4.0",
+  "doc": "docs/behaviour/unions.md",
+  "params": {
+    "accept_share_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "an offer of at least this share of the claim is accepted (placeholder)"
+      },
+      "unit": "bps",
+      "default": 5000,
+      "source": "an offer of at least this share of the claim is accepted (placeholder)"
+    },
+    "ballot_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 10,
+      "source": "placeholder"
+    },
+    "ballot_pass_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "more than this share of the votes yes"
+      },
+      "unit": "bps",
+      "default": 5000,
+      "source": "placeholder"
+    },
+    "ballot_turnout_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "at least this share of the members voting"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "bargain_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 365,
+      "source": "placeholder"
+    },
+    "between_days": {
+      "schema": {
+        "type": "integer",
+        "description": "after a stoppage, an improved offer awaited this long before the next"
+      },
+      "unit": "days",
+      "default": 7,
+      "source": "placeholder"
+    },
+    "claim_margin_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "claimed over the year's rise in prices (the world's profile)"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "claimed over the year's rise in prices (the world's profile)"
+    },
+    "compliance_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "how often it keeps to the law when the law forbids an action it would take"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "dues": {
+      "schema": {
+        "type": "integer",
+        "description": "cents a month (the world's profile)"
+      },
+      "default": 0,
+      "source": "cents a month (the world's profile)"
+    },
+    "dues_account": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "employers": {
+      "schema": {
+        "type": "array",
+        "description": "whom it bargains with, where it has members"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "first_claim_days": {
+      "schema": {
+        "type": "integer",
+        "description": "its first claims, spread over this long (placeholder)"
+      },
+      "unit": "days",
+      "default": 60,
+      "source": "its first claims, spread over this long (placeholder)"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer",
+        "description": "notice of action"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "price_kind": {
+      "schema": {
+        "type": "string",
+        "description": "prices tracked for the claim (shops' price lists)"
+      },
+      "default": "goods",
+      "source": "placeholder"
+    },
+    "resignation_notice_days": {
+      "schema": {
+        "type": "integer",
+        "description": "a member's notice of resigning, written into each membership (the world's profile; 0: none written)"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "a member's notice of resigning, written into each membership (the world's profile; 0: none written)"
+    },
+    "respond_days": {
+      "schema": {
+        "type": "integer",
+        "description": "an offer awaited this long before balloting"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "stoppage_days": {
+      "schema": {
+        "type": "array",
+        "description": "each stoppage, longer each time (placeholder)"
+      },
+      "unit": "days",
+      "default": [
+        1,
+        2,
+        3
+      ],
+      "source": "each stoppage, longer each time (placeholder)"
+    }
+  },
+  "perceives": [],
+  "beliefs": [
+    {
+      "name": "between",
+      "about": "agreement"
+    }
+  ],
+  "state": "none"
+}

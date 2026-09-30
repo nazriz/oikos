@@ -1,0 +1,24 @@
+{
+  "name": "city.planning_officer",
+  "version": "0.7.1",
+  "doc": "docs/behaviour/institutions.md",
+  "params": {
+    "compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "town": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "e",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

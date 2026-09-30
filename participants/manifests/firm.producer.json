@@ -1,0 +1,292 @@
+{
+  "name": "firm.producer",
+  "version": "0.2.0",
+  "doc": "docs/behaviour/producer.md",
+  "params": {
+    "builder": {
+      "schema": {
+        "type": "string",
+        "description": "whose published prices say what our premises are worth (none: closed, they're not sold)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "chi_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 1000,
+      "source": "placeholder"
+    },
+    "delta_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 190,
+      "source": "placeholder"
+    },
+    "gamma_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 24,
+      "source": "placeholder"
+    },
+    "idle_days": {
+      "schema": {
+        "type": "integer",
+        "description": "nobody working for us this long, our owners close us (placeholder)"
+      },
+      "unit": "days",
+      "default": 90,
+      "source": "nobody working for us this long, our owners close us (placeholder)"
+    },
+    "industry": {
+      "schema": {
+        "type": "string",
+        "description": "what the work is (its postings say)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "labour_per_unit": {
+      "schema": {
+        "type": "integer",
+        "description": "seconds of work per unit"
+      },
+      "default": 5400,
+      "source": "placeholder"
+    },
+    "lender": {
+      "schema": {
+        "type": "string",
+        "description": "whom it borrows from (none: it doesn't)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "market": {
+      "schema": {
+        "type": "string",
+        "description": "whom it exports to, under its buying offer (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "whom it exports to, under its buying offer (the world must say)"
+    },
+    "max_staff": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 40,
+      "source": "placeholder"
+    },
+    "min_order": {
+      "schema": {
+        "type": "integer",
+        "description": "the least it sells in one order (it sells wholesale)"
+      },
+      "default": 50,
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "output": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "goods",
+      "source": "placeholder"
+    },
+    "per_unit": {
+      "schema": {
+        "type": "object",
+        "description": "what a unit of the task uses (its own knowledge of its process)"
+      },
+      "default": {
+        "inputs": 10
+      },
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "phi_high_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
+    "phi_low_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 2500,
+      "source": "placeholder"
+    },
+    "premises_sale_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "closed, our premises are offered at this share of what building them new costs (placeholder)"
+      },
+      "unit": "bps",
+      "default": 5000,
+      "source": "closed, our premises are offered at this share of what building them new costs (placeholder)"
+    },
+    "price": {
+      "schema": {
+        "type": "integer",
+        "description": "its wholesale price, cents each"
+      },
+      "default": 6000,
+      "source": "placeholder"
+    },
+    "price_down_bound_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10250,
+      "source": "placeholder"
+    },
+    "price_up_bound_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 11500,
+      "source": "placeholder"
+    },
+    "reprice_bps": {
+      "schema": {
+        "type": "integer",
+        "description": "by this much (placeholder)"
+      },
+      "unit": "bps",
+      "default": 1000,
+      "source": "by this much (placeholder)"
+    },
+    "reprice_days": {
+      "schema": {
+        "type": "integer",
+        "description": "closed, our premises unsold this long: the asking price comes down (placeholder)"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "closed, our premises unsold this long: the asking price comes down (placeholder)"
+    },
+    "role": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "factory worker",
+      "source": "placeholder"
+    },
+    "short_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 60,
+      "source": "placeholder"
+    },
+    "supplier": {
+      "schema": {
+        "type": "string",
+        "description": "whom it buys inputs from (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "whom it buys inputs from (the world must say)"
+    },
+    "task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "make",
+      "source": "placeholder"
+    },
+    "theta_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 7500,
+      "source": "placeholder"
+    },
+    "vartheta_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 200,
+      "source": "placeholder"
+    },
+    "wage": {
+      "schema": {
+        "type": "integer",
+        "description": "the wage it offers new hires, cents per period"
+      },
+      "default": 150000,
+      "source": "placeholder"
+    },
+    "wind_up_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 60,
+      "source": "placeholder"
+    },
+    "work_days": {
+      "schema": {
+        "type": "integer",
+        "description": "of every 7"
+      },
+      "unit": "days",
+      "default": 5,
+      "source": "placeholder"
+    },
+    "working_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 28800,
+      "source": "placeholder"
+    },
+    "workplace": {
+      "schema": {
+        "type": "string",
+        "description": "the space its workers work in"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "works": {
+      "schema": {
+        "type": "string",
+        "description": "the factory: where it makes and keeps things"
+      },
+      "default": "",
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}
