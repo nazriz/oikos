@@ -170,7 +170,7 @@ export const bankPaymentSystem: BehaviourModule = {
       step(obs) {
         book.absorb(obs);
         letters.take(obs);
-        if (queuedAt !== obs.t) {
+        if (queuedAt !== obs.t && obs.woke_for !== "done") { // (a wake's payments, planned when it begins: the stepper)
           // Payments a busy moment didn't get to (a wake allows only so many actions) are made first at the next: they're
           // already counted as due (a one-off as handled, a standing order's next date moved on), so never dropped.
           queue = [...queue, ...plan(obs)];

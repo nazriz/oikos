@@ -48,8 +48,10 @@ test("with jobs going, households move in, bank their savings, and find work and
   expect(ev.filter((e) => e.event === "action_refused")).toEqual([]);
   // The one who came for the job looks for work (the newcomer template); the others, at participation 0, don't.
   const templateOf = new Map(ev.filter((e) => e.event === "participant_created").map((e) => [e.person, e.template]));
-  // (Newcomers' households, as they came: a household may later put a newborn on its record.)
-  const households = ev.filter((e) => e.event === "recorded" && e.record.kind === "household" && arrived.includes(e.record.data.leaseholder)).map((e) => e.record.data);
+  // (Newcomers' households, as they came, recorded by the migration office: a household may later put a newborn on its
+  // record, or record itself again when the one holding the lease dies.)
+  const migration = config.participants.find((p: any) => p.controller?.impl === "world.migration").id;
+  const households = ev.filter((e) => e.event === "recorded" && e.record.kind === "household" && e.record.author === migration && arrived.includes(e.record.data.leaseholder)).map((e) => e.record.data);
   expect(households.length).toBeGreaterThan(0);
   for (const h of households) for (const m of h.members.filter((x: any) => !x.parents)) expect(templateOf.get(m.person)).toBe(m.person === h.leaseholder ? "newcomer" : "newcomer-outside-lf");
 }, 300_000);

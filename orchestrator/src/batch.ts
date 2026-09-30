@@ -323,17 +323,24 @@ export function recordWho(s: string): string[] | "models" | "code" | "all" | "no
  * are still leaving. Anything else is worth a look. */
 const EXPECTED_REFUSALS = new Set(["not_present", "not_at_work", "capacity_exceeded"]);
 
+/** The same act by the same unit more often than this in a day (hourly): a retry paced by wakes rather than time. */
+export const REPEAT_WARNING = 24;
+
+/** An act waiting longer than this for its actor to be free: someone is falling behind. */
+export const BACKLOG_WARNING_SECONDS = 86_400;
+
 /**
- * What in a run's summary is worth a look, in words (docs/reliability.md): a module that ran out of actions with more
- * to do in more than 1% of its steps (it's falling behind, or plans more than a wake allows), refusals other than the
- * expected races, and participants' errors. The run finished; these say it may not have gone as it should.
+ * What in a run's summary is worth a look, in words (docs/reliability.md): a module whose acts waited more than a day
+ * for their actor to be free (it's falling behind: acting costs time, docs/design/rebuild.md 6.3), refusals other
+ * than the expected races, and participants' errors. The run finished; these say it may not have gone as it should.
  */
 export function healthWarnings(r: { health?: RunSummary["health"]; profile?: RunSummary["profile"]; participantErrors?: number }): string[] {
   const out: string[] = [];
-  for (const [m, h] of Object.entries(r.health?.cut_short ?? {})) {
-    const steps = r.profile?.modules[m]?.steps ?? 0;
-    if (steps && h.wakes * 100 > steps) out.push(`${m}: ran out of actions with more to do in ${h.wakes.toLocaleString("en-US")} of ${steps.toLocaleString("en-US")} steps (${h.participants} participant${h.participants === 1 ? "" : "s"}): falling behind?`);
-  }
+  const days = (s: number) => `${(s / 86_400).toLocaleString("en-US", { maximumFractionDigits: 1 })} days`;
+  for (const [m, h] of Object.entries(r.health?.backlog ?? {}))
+    if (h.longest > BACKLOG_WARNING_SECONDS) out.push(`${m}: an act waited ${days(h.longest)} for its actor to be free (${h.acts.toLocaleString("en-US")} acts, ${days(h.waited / Math.max(1, h.acts))} on average): falling behind?`);
+  for (const [m, h] of Object.entries(r.health?.repeats ?? {}))
+    if (h.times > REPEAT_WARNING) out.push(`${m}: ${h.unit} did the same thing ${h.times.toLocaleString("en-US")} times in one day (${h.act.slice(0, 80)}): a retry loop?`);
   const odd = Object.entries(r.health?.refused ?? {}).filter(([code]) => !EXPECTED_REFUSALS.has(code));
   if (odd.length) out.push(`refusals other than same-moment races: ${odd.map(([c, n]) => `${c} ${n}`).join(", ")}`);
   if (r.participantErrors) out.push(`${r.participantErrors} participant error${r.participantErrors === 1 ? "" : "s"} (recovered in place: see the log's participant_error notes)`);

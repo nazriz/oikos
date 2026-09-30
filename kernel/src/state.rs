@@ -59,8 +59,12 @@ pub struct State {
     pub record_order: imbl::Vector<Id>,
     pub participants: Map<Id, Arc<Participant>>,
     pub positions: Map<Id, Position>,
-    /// Future physical effects, sorted by (at, seq).
+    /// Future physical effects and acts in progress, sorted by (at, seq).
     pub schedule: Schedule,
+    /// Each actor's timeline (docs/design/rebuild.md 6.3): when each of its lanes is next free. A person's is keyed by
+    /// their body, shared by every participant and capacity acting as them; a system's by the participant.
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
+    pub timelines: Map<Id, Vec<i64>>,
 }
 
 /// Future physical effects in (at, seq) order: a persistent map, so the state's copy for each action is cheap (a
@@ -295,6 +299,9 @@ pub struct ParticipantDef {
     pub framing: Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_opt_out: Option<Value>,
+    /// A system's lanes (acts at once); absent: one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lanes: Option<u32>,
 }
 
 impl ParticipantDef {
@@ -478,6 +485,14 @@ pub enum Sched {
     ConditionEnds { person: Id, condition: Id },
     Death { person: Id, cause: DeathCause },
     BirthDue { parents: Vec<Id>, name: String, template: Id },
+    /// An act in progress: it takes effect when its actor is done with it (docs/design/rebuild.md 6.2).
+    Act {
+        action: Id,
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
+        blocks: Vec<crate::blocks::Block>,
+    },
 }
 
 impl State {

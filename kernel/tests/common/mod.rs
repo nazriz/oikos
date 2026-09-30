@@ -11,6 +11,7 @@ use proptest::prelude::*;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use terrarium_kernel::blocks::{AgreementTerms, Block, Commitment, Position, Visibility};
+use terrarium_kernel::events::EventBody;
 use terrarium_kernel::kernel::Command;
 use terrarium_kernel::run::{Response, Run, RunError};
 use terrarium_kernel::state::ParticipantStatus;
@@ -35,7 +36,7 @@ pub fn rb(participant: &str) -> (String, Option<String>) {
 /// An act command for a Riverbend actor (see `rb`).
 pub fn rb_act(participant: &str, blocks: Value) -> Command {
     let (participant, position) = rb(participant);
-    Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: None }
+    Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: None, thinking: None }
 }
 
 pub const TICK: i64 = 3600;
@@ -242,7 +243,7 @@ pub fn world(p: &WorldParams) -> Value {
             "birth": {"ages": [16, 45], "gestation": 20 * 86_400, "reach": 1}
         },
         "caps": {"max_created_entities": 6},
-        "orchestration": {"thinking_time": "free", "max_actions_per_wake": 5}
+        "orchestration": {"thinking_time": "free"}
     })
 }
 
@@ -343,7 +344,7 @@ fn pick<T: Clone>(v: &[T], i: u8) -> Option<T> {
 }
 
 pub fn direct(participant: &str, position: Option<&str>, blocks: Vec<Block>) -> Option<Command> {
-    Some(Command::Act { participant: participant.into(), position: position.map(String::from), blocks, provenance: json!({"via": "direct"}), reasoning: None })
+    Some(Command::Act { participant: participant.into(), position: position.map(String::from), blocks, provenance: json!({"via": "direct"}), reasoning: None, thinking: None })
 }
 
 /// Everyone who can act now, in each capacity: (participant, position, entity acted for).
@@ -723,9 +724,39 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
 
 /// Run a command. Commands the kernel rejects outright (off-contract) return
 /// None and must leave the log untouched.
+/// Acts take effect when done (docs/design/rebuild.md 6.2). For tests of what an act does: the command, and for an act,
+/// the clock advanced to when it's done (unless that's past the run's end). The act's own result comes first among the
+/// events (applied or refused, with what followed from it), then anything else that happened meanwhile, then its start.
+pub trait Done {
+    fn done(&mut self, cmd: &Command) -> Result<Response, RunError>;
+}
+
+impl<W: std::io::Write> Done for Run<W> {
+    fn done(&mut self, cmd: &Command) -> Result<Response, RunError> {
+        let r = self.command(cmd)?;
+        let Some((action, done)) = r.events.iter().find_map(|e| match &e.body {
+            EventBody::ActionStarted { action, done, .. } => Some((action.clone(), *done)),
+            _ => None,
+        }) else {
+            return Ok(r);
+        };
+        if done > self.kernel().statics().run_end() {
+            return Ok(r);
+        }
+        let mut later = self.command(&Command::Advance { to: done })?.events;
+        let i = later
+            .iter()
+            .position(|e| matches!(&e.body, EventBody::ActionApplied { action: a, .. } | EventBody::ActionRefused { action: a, .. } if *a == action))
+            .unwrap_or(0);
+        later.rotate_left(i);
+        later.extend(r.events);
+        Ok(Response { seq: r.seq, events: later, observation: None })
+    }
+}
+
 pub fn step<W: std::io::Write>(run: &mut Run<W>, cmd: &Command) -> Option<Response> {
     let head = run.head().to_string();
-    match run.command(cmd) {
+    match run.done(cmd) {
         Ok(r) => Some(r),
         Err(RunError::Protocol(_)) => {
             assert_eq!(run.head(), head, "a rejected command reached the log");

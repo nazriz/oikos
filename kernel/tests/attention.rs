@@ -18,7 +18,7 @@ fn town() -> Run<Vec<u8>> {
 }
 
 fn post(run: &mut Run<Vec<u8>>, participant: &str, blocks: serde_json::Value) -> String {
-    let r = run.command(&rb_act(participant, blocks)).unwrap();
+    let r = run.done(&rb_act(participant, blocks)).unwrap();
     match &r.events[0].body {
         terrarium_kernel::events::EventBody::ActionApplied { created: Some(c), .. } => c.values().next().unwrap().clone(),
         other => panic!("{other:?}"),
@@ -108,6 +108,6 @@ fn a_channel_can_show_whatever_is_offered_whatever_it_is_called() {
     assert_eq!(seen, vec![offered]);
     assert!(!seen.contains(&plain));
     // An offer that says what it's worth to someone isn't one: facts only.
-    let r = run.command(&rb_act("mayor", json!([{"block": "publish", "kind": "notice", "speaks_for": "city", "text": "Join us.", "offer": {"take_up": "join", "gives": "belonging"}}])));
+    let r = run.done(&rb_act("mayor", json!([{"block": "publish", "kind": "notice", "speaks_for": "city", "text": "Join us.", "offer": {"take_up": "join", "gives": "belonging"}}])));
     assert!(r.is_err(), "the contract refuses an offer stating its meaning");
 }

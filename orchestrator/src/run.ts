@@ -109,7 +109,15 @@ export interface RunSummary {
    * Signs of trouble that don't stop a run (docs/reliability.md): wakes that ran out of actions with more to do, by
    * module (often: falling behind), and refusals by their code.
    */
-  health: { cut_short: { [module: string]: { wakes: number; participants: number } }; refused: { [code: string]: number } };
+  /** backlog: how long acts waited for their actor to be free (docs/design/rebuild.md 6.3), by module: acts begun, their
+   * total and longest wait (world seconds). */
+  health: {
+    backlog: { [module: string]: { acts: number; waited: number; longest: number } };
+    /** The same act, by the same unit, most often in one day, by module (a retry loop shows here): how many times, and
+     * which unit and act. */
+    repeats: { [module: string]: { times: number; unit: string; act: string } };
+    refused: { [code: string]: number };
+  };
   /** Where the time went (profiling only): each behaviour module's deciding, and each kind of kernel command. */
   profile: { modules: { [module: string]: { ms: number; steps: number } }; kernel: { [command: string]: { ms: number; n: number } } };
   /** What the run spent on models, where it had a spending limit (micro-USD; the log's usage annotations say the same). */
@@ -162,7 +170,12 @@ interface Unit {
   wokeFor: NonNullable<Observation["woke_for"]>;
   lastWake?: number;
   since: number;
+  /** Woken by news this tick (the tick it counts in, and how many times): two units writing to each other are held to
+   * three wakes a tick, then wait for the next (their own acts' completions don't count). */
   wakesThisTick: number;
+  /** When the act it began is done (it goes on then), and the world seconds its current decision took to think. */
+  doneAt?: number;
+  thinking?: number;
   wakeTick: number;
   /** What it has observed, for the resolver (P8). */
   knowledge: Knowledge;
@@ -215,7 +228,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   let t = 0;
   let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
   const profModules: { [m: string]: { ms: number; steps: number } } = {};
-  const cutShort: { [m: string]: { wakes: number; participants: Set<string> } } = {};
+  const backlog: { [m: string]: { acts: number; waited: number; longest: number } } = {};
+  const repeats: { [m: string]: { times: number; unit: string; act: string } } = {};
+  let repeatDay = -1;
+  let sameActs = new Map<string, number>(); // unit + act -> times today
   const refusedBy: { [code: string]: number } = {};
   const profKernel: { [c: string]: { ms: number; n: number } } = {};
   let participantErrors = 0; // failures to decide, recovered in place (D59)
@@ -411,13 +427,15 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
 
   // What code ran this world is part of the record (D30).
   await k.request({ op: "annotate", annotation: { annotation: "orchestrator", subject: "orchestrator", data: {
-    version: ORCHESTRATOR_VERSION, modules: used, thinking_time: cfg.orchestration.thinking_time, max_actions_per_wake: cfg.orchestration.max_actions_per_wake, confirm,
+    version: ORCHESTRATOR_VERSION, modules: used, thinking_time: cfg.orchestration.thinking_time, confirm,
     ...(Object.keys(bindings).length ? { llm: { participant_version: LLM_PARTICIPANT_VERSION, translator: translator.id, translator_version: TRANSLATOR_VERSION, mock_version: MOCK_VERSION, prices: Object.entries(io.prices!).filter(([key]) => key === `${io.adapter.provider}/${io.adapter.model}` || key === translator.id.model || key === "mock/mock").map(([key, price]) => ({ model: key, ...price })), participants: bindings, ...(o.budget ? { spending_limit_microusd: o.budget.limitMicroUsd } : {}) } } : {}),
   } } });
 
   const unitsOf = (pid: string) => units.of(pid);
+  /** Busy with an act until it's done: news waits (its attention is on what it's doing), and it looks again then. */
+  const busy = (u: Unit) => u.wakeFor === "done" && u.nextWake > t;
   const wakeParticipant = (pid: string) => {
-    for (const u of unitsOf(pid)) if (u.nextWake > t) [u.nextWake, u.wakeFor] = [t, "news"];
+    for (const u of unitsOf(pid)) if (u.nextWake > t && !busy(u)) [u.nextWake, u.wakeFor] = [t, "news"];
   };
   /**
    * Code units acting for an entity now: its person's own unit, or the units holding an organisation's positions.
@@ -427,12 +445,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const wakeEntity = (entity: string, except?: string) => {
     const pid = participantOf.get(entity);
     if (pid) {
-      if (pid !== except) for (const u of unitsOf(pid)) if (!u.llm && u.capacity === "self" && u.nextWake > t) [u.nextWake, u.wakeFor] = [t, "news"];
+      if (pid !== except) for (const u of unitsOf(pid)) if (!u.llm && u.capacity === "self" && u.nextWake > t && !busy(u)) [u.nextWake, u.wakeFor] = [t, "news"];
       return;
     }
     for (const x of positions.values()) {
       if (x.entity !== entity || !x.holder || x.holder === except) continue;
-      for (const u of unitsOf(x.holder)) if (!u.llm && u.capacity === x.id && u.nextWake > t) [u.nextWake, u.wakeFor] = [t, "news"];
+      for (const u of unitsOf(x.holder)) if (!u.llm && u.capacity === x.id && u.nextWake > t && !busy(u)) [u.nextWake, u.wakeFor] = [t, "news"];
     }
   };
   const changed = new Set<string>(); // participants whose units need syncing after this command
@@ -504,13 +522,37 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   /** The capacity a language-model participant's acts are made in: its one position, or itself. (Several: see the resolver, D47.) */
   const capacityOf = (u: Unit) => (u.capacity && u.capacity !== "self" ? u.capacity : held(u.participant).length === 1 && parts.get(u.participant)?.kind === "system" ? held(u.participant)[0]!.id : undefined);
 
+  /** An act begun (docs/design/rebuild.md 6.3): after its thinking, if deciding takes world time, it takes its actor the
+   * act's time and takes effect when done; the unit's wake goes on then, when it sees the outcome. */
+  const begin = async (u: Unit, cmd: object) => {
+    // The same act again and again in a day: counted, for the health report (a retry paced by wakes, not time).
+    if (Math.floor(t / 86_400) !== repeatDay) [repeatDay, sameActs] = [Math.floor(t / 86_400), new Map()];
+    const act = JSON.stringify((cmd as any).blocks);
+    const n = (sameActs.get(u.key + act) ?? 0) + 1;
+    sameActs.set(u.key + act, n);
+    if (n > (repeats[u.module.name]?.times ?? 0)) repeats[u.module.name] = { times: n, unit: u.key, act: act.slice(0, 200) };
+    const thinking = u.thinking ?? 0;
+    u.thinking = 0; // a decision's thinking comes before its first act
+    const r = await command({ ...cmd, ...(thinking > 0 ? { thinking } : {}) });
+    const started = r?.events.find((e: any) => e.event === "action_started");
+    if (started) {
+      u.doneAt = Math.max(u.doneAt ?? 0, started.done);
+      const b = (backlog[u.module.name] ??= { acts: 0, waited: 0, longest: 0 });
+      const waited = started.starts - (t + thinking);
+      b.acts++;
+      b.waited += waited;
+      b.longest = Math.max(b.longest, waited);
+    }
+    return r;
+  };
+
   /** A confirmed (or declined) draft: the signoff is recorded, and if accepted the acts go to the kernel with their full provenance. */
   const submit = async (u: Unit, p: { draft: Draft; hash: string; reasoning?: string }, decision: "accept" | "reject", note?: string) => {
     const d = p.draft;
     await k.request({ op: "annotate", annotation: { annotation: "signoff", participant: u.participant, draft: d.id, draft_hash: p.hash, decision, ...(note ? { note } : {}) } });
     if (decision !== "accept") return;
     const as = d.as ?? capacityOf(u);
-    const r = await command({ command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks,
+    const r = await begin(u, { command: "act", participant: u.participant, ...(as ? { as } : {}), blocks: d.blocks,
       provenance: { via: "translator", proposal: d.proposal, draft: d.id, draft_hash: p.hash, translator: d.translator, call: d.call, resolver: d.resolver }, ...(p.reasoning ? { reasoning: p.reasoning } : {}) });
     if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_draft: d.id } } });
   };
@@ -630,7 +672,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const asField = as ? { as } : {};
     if (action.type === "act" || action.type === "message") {
       const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
-      const r = await command({ command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
+      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks, provenance: { via: "direct" }, ...(action.type === "act" && action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
       if (r === null) {
         // Off-contract: never logged by the kernel, so record the attempt ourselves.
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(action).slice(0, 4000) } } });
@@ -660,7 +702,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         for (const q of res.questions) u.notices.push({ t, text: q });
         return true;
       }
-      const r = await command({ command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: written ? action.call : calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
+      const r = await begin(u, { command: "act", participant: u.participant, ...asField, blocks: res.blocks, provenance: { via: "call", call: written ? action.call : calls.programText(program), resolver: RESOLVER }, ...(action.reasoning && keepReasoning(u) ? { reasoning: action.reasoning } : {}) });
       if (r === null) await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { rejected_action: JSON.stringify(res.blocks).slice(0, 4000), call: calls.programText(program) } } });
       return true;
     }
@@ -707,7 +749,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     return true;
   };
 
-  const maxActions: number = cfg.orchestration.max_actions_per_wake;
+  // Deciding takes world time if the world says so (docs/design/rebuild.md 6.4): a model by its tokens, code a fixed time.
+  const thinkingCosts = cfg.orchestration.thinking_time === "costs_world_time";
+  const rates = cfg.orchestration.thinking ?? {};
   let momentAt = -1, cohortsNow = 0; // how many cohorts have woken at this moment (MAX_COHORTS_PER_MOMENT)
   let stopped: string | undefined; // why the run stopped early, if it did (a spending limit)
   try {
@@ -727,13 +771,16 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // the run starts at 0) is due now.
       const cohort: Unit[] = [];
       for (let u = units.next(); u && u.nextWake <= t; u = units.next()) {
-        // Guard against two code units waking each other forever within one tick.
-        if (u.wakeTick === t && u.wakesThisTick >= 3) {
-          [u.nextWake, u.wakeFor] = [t + tick, "cadence"];
-          continue;
+        // Guard against units waking each other forever (letters back and forth): at most three news wakes a tick.
+        const tickNow = Math.floor(t / tick);
+        if (u.wakeFor === "news") {
+          if (u.wakeTick === tickNow && u.wakesThisTick >= 3) {
+            [u.nextWake, u.wakeFor] = [(tickNow + 1) * tick, "cadence"];
+            continue;
+          }
+          u.wakesThisTick = u.wakeTick === tickNow ? u.wakesThisTick + 1 : 1;
+          u.wakeTick = tickNow;
         }
-        u.wakesThisTick = u.wakeTick === t ? u.wakesThisTick + 1 : 1;
-        u.wakeTick = t;
         wakes++;
         // Why it woke, and how long since the last time (contracts 0.7: flows are computed from `since`).
         u.wokeFor = u.wakeFor;
@@ -746,7 +793,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       // they decided is carried out in key order, never in the order decisions came back. Those whose wakes go on
       // look again in the next round, and see the round before.
       let awake = cohort.map((u) => ({ u, n: 0 }));
+      let rounds = 0;
       while (awake.length) {
+        // Acting always moves time on, so rounds at one moment are only looking, drafting and asking: many means a loop.
+        if (++rounds > MAX_COHORTS_PER_MOMENT)
+          throw new RunStuck(`participants went on without acting at t=${t} (${MAX_COHORTS_PER_MOMENT} rounds in one moment): ${awake[0]!.u.key} among them`);
         const looking: { u: Unit; n: number; obs: Observation }[] = [];
         // Everyone's looks are sent together: nothing acts in between, so it's the same as one by one, without waiting.
         const live = awake.filter((a) => units.get(a.u.key) === a.u);
@@ -796,17 +847,20 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           // A code citizen's decisions on the way to this action (docs/design/ai-citizens.md 7): training data, in full logs.
           const decisions = (r.value as any)?.[DECISIONS] as DecisionRecord[] | undefined;
           if (decisions?.length && !lean) for (const d of decisions) await k.request({ op: "annotate", annotation: { annotation: "decision", subject: x.u.participant, data: d } });
-          const goesOn = await apply(x.u, r.value);
-          if (goesOn && x.n + 1 < maxActions && units.get(x.u.key) === x.u) next.push({ u: x.u, n: x.n + 1 });
-          else if (goesOn && x.n + 1 >= maxActions) {
-            // Out of actions with more to do: it carries on shortly (the next tick), as someone with a queue keeps
-            // working through the day, rather than at its usual time (a shop's orders a day late, a bank's payments).
-            // Often, it's falling behind (health).
-            if (units.get(x.u.key) === x.u && t + tick < x.u.nextWake) [x.u.nextWake, x.u.wakeFor] = [t + tick, "done"];
-            const h = (cutShort[x.u.module.name] ??= { wakes: 0, participants: new Set() });
-            h.wakes++;
-            h.participants.add(x.u.participant);
+          if (thinkingCosts) {
+            // Its thinking: a model's by the tokens it just used (logged, so a replay is exact), code's a fixed time.
+            const used = (notes.get(x.u.participant) ?? []).filter((a: any) => a.annotation === "usage" && a.purpose === "participant") as any[];
+            x.u.thinking = x.u.llm
+              ? used.reduce((s, a) => s + (a.output_tokens ?? 0) * (rates.model_seconds_per_output_token ?? 0) + (a.input_tokens ?? 0) * (rates.model_seconds_per_input_token ?? 0), 0)
+              : (rates.code_seconds ?? 0);
           }
+          x.u.doneAt = undefined;
+          const goesOn = await apply(x.u, r.value);
+          if (units.get(x.u.key) !== x.u) continue;
+          // It began an act: its wake goes on when the act is done. Otherwise, if it goes on (it looked, drafted), it
+          // does so in the next round, at this moment.
+          if (x.u.doneAt !== undefined) [x.u.nextWake, x.u.wakeFor] = [x.u.doneAt, "done"];
+          else if (goesOn) next.push({ u: x.u, n: x.n + 1 });
         }
         awake = next;
       }
@@ -838,7 +892,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   return { runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
-    health: { cut_short: Object.fromEntries(Object.entries(cutShort).map(([k, v]) => [k, { wakes: v.wakes, participants: v.participants.size }])), refused: { ...refusedBy } },
+    health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) },
     ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}) };
 }

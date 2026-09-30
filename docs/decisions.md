@@ -992,6 +992,25 @@ See the design note, §16.
   - **Why:** the terms reader counts a notice only under the giver's own clause. With no clause for members, a member couldn't leave, and a member leaving town left the union holding a ghost (found by the first truth audit).
   - **Revisit if:** the `law` reader can supply terms implied by law (a statutory right to resign that a membership doesn't write down).
 
+- **Acting costs time, in the engine** (docs/design/rebuild.md 6; R2's first step). A `time` crate says how long an act takes (the world's `act_time` by block and actor kind; one second where it says nothing) and places it on its actor's timeline: one per person (by body, shared by every capacity), `lanes` per system. The kernel holds an act in progress in its schedule and applies it when done. The orchestrator's wake for that unit pauses until then. `max_actions_per_wake` and the "cut short" signal are gone; the health report has a backlog instead (how long acts waited for their actor).
+  - **Engineering calls:**
+    - **A program of several steps takes effect whole,** when all its steps are done, not step by step as the design sketched. Steps refer to each other (a payment to the account a step before opened), and applying them apart would break that.
+    - **Acts done at the same second apply in the order they were begun,** not strictly by actor key. It's still deterministic, and never the order decisions came back in.
+    - **A unit busy with an act isn't woken by news** until it's done. It sees the news then, with its act's outcome, as someone in the middle of something would.
+    - **Thinking time** is passed with the act (`thinking`, logged), so a replay is exact: a model's from the tokens it used, code's a fixed figure. A human's (wall-clock) waits for a human seat.
+    - **Runaway guard:** 1,000 rounds at one moment stops the run. Acting always moves time on, so only looking and drafting can loop.
+  - **Contract changes (within B5 and B7, signed):** `action_started` event; `thinking` on the act command; `max_actions_per_wake` removed; `act_time` absent means a second an act (description). **To confirm with Naz.**
+  - **Revisit if:** a program's steps need to land apart (a long program whose early steps others should see), or lanes need a system to decide again before its acts are done.
+  - **What it found in the modules, the first day** (the action budget had hidden each):
+    - **Retries paced by wakes:** a citizen whose new home wasn't free yet tried to move in every time it woke. Once a refused act woke it a second later, it tried 2 million times in a month. It now tries again the next day, by time.
+    - **Planning per moment:** modules planned whenever the clock had moved on. Every step now lands at a moment of its own, so they planned again mid-plan (a landlord listed one house 16 times). **The rule:** a plan is made when a wake begins; woken because its act is done (`woke_for: "done"`), a module carries on with the plan it has.
+    - **A builder signing what it can't do:** it now declines a contract for a lot already built on, in writing (docs/behaviour/building.md).
+  - **A new expected race:** `no_time_left` when a new employer names someone on their first day who has already worked a full day at the job they just left. It's a same-day handover the new employer couldn't see (D58's kind).
+    - **A guard that compared exact times:** units writing to each other were held to three news wakes a moment. Now no two moments are equal, so a mayor and its finance office wrote back and forth every second. It's now three news wakes a *tick*. A unit's own acts finishing don't count.
+    - **A price that changed a second after it was quoted:** a builder declined a landlord's offer at the builder's own published price, raised a second later. A price it published in the last 30 days is now honoured (a placeholder: a common term for a quote).
+  - **The health report watches for loops:** the same act by the same unit more than 24 times in a day is flagged ("a retry loop?").
+
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

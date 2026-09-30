@@ -142,12 +142,19 @@ test("with confirmation set to never, drafts take effect without waiting, and sa
 
 test("offices answer the mayor's letters with their reports, in figures", async () => {
   let calls = 0;
+  let again = false;
   const seen: string[] = [];
   const tool = (name: string, input: object) => [{ type: "tool_use" as const, id: `t${++calls}`, name, input }];
   const adapter = new MockAdapter("mock", {
     participant: (req: LlmRequest) => {
       seen.push(JSON.stringify(req.messages.at(-1)!.content));
       if (calls === 0) return tool("write", { to: ["finance", "council-clerk", "planning", "bank"], text: "Please send me the town's figures.", as: "mayor" });
+      // Again a week on: what's been published since (the builder's prices) is in the answer.
+      const day = Number(/It is year 1, day (\d+)/.exec(JSON.stringify(req.messages.at(-1)!.content))?.[1] ?? 0);
+      if (!again && day >= 8) {
+        again = true;
+        return tool("write", { to: ["finance"], text: "Please send me the town's figures again.", as: "mayor" });
+      }
       return tool("done_for_now", { days: 7 });
     },
     translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],

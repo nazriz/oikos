@@ -301,6 +301,7 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
                 controller: tpl.controller.clone(),
                 framing: tpl.framing.clone(),
                 on_opt_out: tpl.on_opt_out.clone(),
+                lanes: None,
             }),
             traits: traits.clone(),
             status: ParticipantStatus::Active,
@@ -448,6 +449,8 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             vec![Timed::new(t, EventBody::ConditionEnded { person, condition })]
         }
         Sched::Death { person, cause } => die(s, st, &person, cause),
+        // (Acts in progress are the kernel's to apply: Kernel::advance.)
+        Sched::Act { .. } => vec![],
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
             if !b.alive {

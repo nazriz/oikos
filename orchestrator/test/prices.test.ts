@@ -86,7 +86,10 @@ test("world prices move month to month, and scripted shocks change a price and t
   const first = offers.find((o) => o.at < 60 * DAY)!;
   const later = offers.find((o) => o.at >= 60 * DAY)!;
   for (const [f, q] of Object.entries(first.data.quantities as { [f: string]: number })) expect(Math.abs(later.data.quantities[f] - Math.floor(q / 2))).toBeLessThanOrEqual(1);
-  // Factories buy their inputs at the price the world market asks now.
+  // Factories buy their inputs at the price the world market asks now: the list in force when the order was placed, or
+  // the one just before it (an order decided just before a new list landed was rightly at the old price; acts take
+  // time). Prices move month to month, so not against the first list after the shock.
   const inputOrders = recs.filter((r) => r.kind === "order" && r.speaks_for.startsWith("factory-") && r.data.kind === "inputs" && r.at >= 90 * DAY);
-  for (const o of inputOrders) expect(o.data.unit_price).toBeGreaterThanOrEqual(after);
+  expect(inputOrders.length).toBeGreaterThan(0);
+  for (const o of inputOrders) expect(o.data.unit_price).toBeGreaterThanOrEqual(Math.min(...lists.filter((l) => l.t <= o.at && l.t >= o.at - 31 * DAY).map((l) => l.goods.inputs)));
 }, 600_000);

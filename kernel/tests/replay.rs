@@ -109,7 +109,7 @@ fn riverbend_replays_and_observations_are_reproducible() {
         Command::Observe { participant: "mayor-system".into(), only: None },
         Command::Observe { participant: "developer-system".into(), only: None },
     ] {
-        if let Some(o) = run.command(&cmd).unwrap().observation {
+        if let Some(o) = run.done(&cmd).unwrap().observation {
             observations.push(terrarium_kernel::canon::canonical(&o).unwrap());
         }
     }
@@ -126,7 +126,7 @@ fn riverbend_replays_and_observations_are_reproducible() {
         Command::Observe { participant: "mayor-system".into(), only: None },
         Command::Observe { participant: "developer-system".into(), only: None },
     ] {
-        if let Some(o) = run2.command(&cmd).unwrap().observation {
+        if let Some(o) = run2.done(&cmd).unwrap().observation {
             again.push(terrarium_kernel::canon::canonical(&o).unwrap());
         }
     }

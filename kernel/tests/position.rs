@@ -69,13 +69,13 @@ fn street() -> Run<Vec<u8>> {
         ],
         "positions": [{"id": "registry-office", "entity": "registry", "channels": office_channels, "holder": "registry-system"}],
         "caps": {"max_created_entities": 1},
-        "orchestration": {"thinking_time": "free", "max_actions_per_wake": 5}
+        "orchestration": {"thinking_time": "free"}
     });
     Run::start(config, "position", Vec::new(), None).unwrap()
 }
 
 fn act(run: &mut Run<Vec<u8>>, participant: &str, blocks: Value) -> Result<Option<String>, RefusalCode> {
-    let r = run.command(&rb_act(participant, blocks)).unwrap();
+    let r = run.done(&rb_act(participant, blocks)).unwrap();
     match &r.events[0].body {
         EventBody::ActionApplied { created, .. } => Ok(created.as_ref().and_then(|c| c.values().next().cloned())),
         EventBody::ActionRefused { code, .. } => Err(*code),

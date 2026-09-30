@@ -133,7 +133,6 @@
     "max_created_entities": 50
   },
   "orchestration": {
-    "thinking_time": "free",
-    "max_actions_per_wake": 5
+    "thinking_time": "free"
   }
 }

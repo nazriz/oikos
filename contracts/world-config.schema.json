@@ -316,12 +316,6 @@
           "minimum": 1,
           "maximum": 1000000
         },
-        "max_actions_per_wake": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000,
-          "description": "Superseded by act_time (docs/design/rebuild.md 6.3): kept only until acting time is in the engine, then removed."
-        },
         "confirm": {
           "description": "When a language-model participant sees and confirms what its plain-language request will do before it takes effect (docs/design/translator-and-resolver.md §10). Default 'always'. 'consequential': everything except plain messages. 'never': immersion, audited offline.",
           "enum": [
@@ -331,7 +325,7 @@
           ]
         },
         "act_time": {
-          "description": "How long each kind of act takes its actor, in world seconds (docs/design/rebuild.md 6.3), by actor kind; an act takes effect when done. Each figure sourced or a placeholder (sources).",
+          "description": "How long each kind of act takes its actor, in world seconds (docs/design/rebuild.md 6.3), by actor kind; an act takes effect when done. Keyed by block name (transfer, message, publish...); `default` for any kind a table doesn't name. Absent (or no figure for a kind, and no default): one second. Each figure sourced or a placeholder (sources).",
           "type": "object",
           "additionalProperties": false,
           "properties": {

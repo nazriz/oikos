@@ -537,7 +537,7 @@ export const migration: BehaviourModule = {
             data: { leaseholder: lh, members, couples: h.couples.map(([a, b]) => [h.persons![a], h.persons![b]]) },
           })));
         }
-        if (looked !== obs.t && todo.length === 0 && !expecting) {
+        if (looked !== obs.t && obs.woke_for !== "done" && todo.length === 0 && !expecting) {
           looked = obs.t;
           return { type: "look", looks: [{ channel: "jobs", query: { standing: true, limit: p.search_limit } }] };
         }

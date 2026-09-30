@@ -113,6 +113,16 @@ pub struct Event {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum EventBody {
+    /// An act begun (docs/design/rebuild.md 6.3): its actor is busy with it from `starts` (after any thinking) and it
+    /// takes effect at `done`, when it's applied or refused.
+    ActionStarted {
+        action: Id,
+        participant: Id,
+        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
+        position: Option<Id>,
+        starts: i64,
+        done: i64,
+    },
     ActionApplied {
         action: Id,
         participant: Id,
@@ -322,6 +332,7 @@ pub enum EventBody {
 impl EventBody {
     pub fn name(&self) -> &'static str {
         match self {
+            EventBody::ActionStarted { .. } => "action_started",
             EventBody::ActionApplied { .. } => "action_applied",
             EventBody::ActionRefused { .. } => "action_refused",
             EventBody::Transfer { .. } => "transfer",

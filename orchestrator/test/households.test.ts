@@ -62,7 +62,7 @@ test("households live, move and pay together", async () => {
   // Nobody was refused anything, but for same-moment races (D58): someone who had just left or moved, named for work by
   // a firm acting on what it saw at the moment's start; and a household moving into a home its last tenants are still
   // leaving (refused, and tried again: docs/behaviour/citizen.md).
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code))).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
 }, 300_000);
 
 test("a child born here is brought home by the parent who bore them and added to the household's record", async () => {
@@ -88,6 +88,7 @@ test("a child born here is brought home by the parent who bore them and added to
     const home = ev.find((e) => e.event === "occupied" && e.occupant === b.person);
     if (home) expect(home.by).toBe(`${b.parents[0]}-self`);
   }
-  // Nothing refused but same-moment races (D58) and moving into a home still being left, as above.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code))).toEqual([]);
+  // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
+  // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own) and moving into a home still being left, as above.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
 }, 300_000);

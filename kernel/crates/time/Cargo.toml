@@ -1,0 +1,10 @@
+[package]
+name = "terrarium-time"
+version = "0.7.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "World time's semantics: how long each act takes its actor, and when it's done on the actor's timeline."
+rust-version = "1.85"
+
+[dependencies]
+serde_json = { workspace = true }

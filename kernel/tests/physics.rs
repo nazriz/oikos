@@ -21,7 +21,7 @@ fn town() -> Run<Vec<u8>> {
 
 /// Act as a Riverbend actor: an organisation's position (held by its system), or a person.
 fn act(run: &mut Run<Vec<u8>>, participant: &str, blocks: Value) -> Response {
-    run.command(&rb_act(participant, blocks)).unwrap()
+    run.done(&rb_act(participant, blocks)).unwrap()
 }
 
 fn refusal(r: &Response) -> Option<RefusalCode> {
@@ -173,7 +173,9 @@ fn building_needs_space_materials_and_time() {
     let house = created(&r, "x");
     let home = format!("{house}/dwelling.1");
     assert_eq!(refusal(&act(&mut run, "alice-self", json!([{"block": "occupy", "space": home}]))), Some(RefusalCode::StructureIncomplete));
-    run.command(&Command::Advance { to: 90 * DAY }).unwrap();
+    // (Its building began a few seconds in, when the builder was done with the acts before: it's finished a few
+    // seconds after its 90 days.)
+    run.command(&Command::Advance { to: 90 * DAY + TICK }).unwrap();
     assert_eq!(refusal(&act(&mut run, "carol-self", json!([{"block": "occupy", "space": home}]))), None);
     assert_eq!(refusal(&act(&mut run, "carol-self", json!([{"block": "occupy", "space": home}]))), Some(RefusalCode::AlreadyPresent));
     assert_eq!(refusal(&act(&mut run, "bob-self", json!([{"block": "occupy", "space": home}]))), Some(RefusalCode::CapacityExceeded));

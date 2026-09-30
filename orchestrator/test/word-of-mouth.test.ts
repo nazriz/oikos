@@ -19,7 +19,7 @@ test("people ask the people they know, and are told only what those people could
   const out = join(root, "runs", "test-word-of-mouth");
   rmSync(out, { recursive: true, force: true });
   // What each citizen could see around them, at each look.
-  const seen = new Map<string, { t: number; structures: Set<string>; people: Set<string> }[]>();
+  const seen = new Map<string, { t: number; structures: Set<string>; people: Set<string>; carryingOn: boolean }[]>();
   const s = await runWorld({
     config: generate({ ...spec, citizens: 120 }), runId: "word-of-mouth", outDir: out, until: 240 * DAY,
     inspect: async (participant, obs) => {
@@ -27,7 +27,7 @@ test("people ask the people they know, and are told only what those people could
       if (street?.kind !== "sites") return;
       const buildings = street.cells.flatMap((c) => (c.structure ? [c.structure] : []));
       const people = new Set<string>(buildings.flatMap((x) => x.spaces.flatMap((sp) => sp.occupants ?? [])));
-      seen.set(participant, [...(seen.get(participant) ?? []), { t: obs.t, structures: new Set(buildings.map((x) => x.structure)), people }]);
+      seen.set(participant, [...(seen.get(participant) ?? []), { t: obs.t, structures: new Set(buildings.map((x) => x.structure)), people, carryingOn: obs.woke_for === "done" }]);
     },
   });
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
@@ -38,12 +38,14 @@ test("people ask the people they know, and are told only what those people could
   expect(asks.length).toBeGreaterThan(5);
   expect(tips.length).toBeGreaterThan(5);
 
-  // What a participant could see when it decided: every look at that moment (it may move later in the same wake), and the one before.
+  // What a participant could see when it decided: every look of the wake it decided in (its plan is made when the wake
+  // begins, and carried on as its acts are done: acts take time), and the one before.
   const couldSee = (participant: string, t: number) => {
-    const looks = seen.get(participant) ?? [];
-    const now = looks.filter((x) => x.t === t);
-    const before = looks.filter((x) => x.t < t).at(-1);
-    return new Set([...now, ...(before ? [before] : [])].flatMap((x) => [...x.structures]));
+    const looks = (seen.get(participant) ?? []).filter((x) => x.t <= t);
+    let from = looks.length - 1;
+    while (from > 0 && looks[from]!.carryingOn) from--;
+    while (from > 0 && looks[from - 1]!.t === looks[from]!.t) from--;
+    return new Set(looks.slice(Math.max(0, from - 1)).flatMap((x) => [...x.structures]));
   };
   // Those asked are people the asker has shared a home or workplace with.
   const everSeen = (participant: string, t: number) => new Set((seen.get(participant) ?? []).filter((x) => x.t <= t).flatMap((x) => [...x.people]));

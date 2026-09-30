@@ -37,6 +37,9 @@ pub enum Command {
         provenance: Value,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reasoning: Option<String>,
+        /// World seconds spent deciding, before the act starts (the world's `thinking_time`; docs/design/rebuild.md 6.4).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thinking: Option<i64>,
     },
     Advance {
         to: i64,
@@ -142,6 +145,7 @@ impl Kernel {
             boundary_accounts,
             currency: currency.clone(),
             tick: c.clock.tick_seconds,
+            act_times: terrarium_time::ActTimes::from_orchestration(&c.orchestration),
             randomness: Randomness::new(c.seed),
             config: c.clone(),
         };
@@ -208,6 +212,7 @@ impl Kernel {
                                 controller: p.controller.clone(),
                                 framing: p.framing.clone(),
                                 on_opt_out: p.on_opt_out.clone(),
+                                lanes: p.lanes,
                             }),
                             traits: p.traits.clone(),
                             status: ParticipantStatus::Active,
@@ -238,6 +243,7 @@ impl Kernel {
                 })
                 .collect(),
             schedule: Default::default(),
+            timelines: Default::default(),
         };
         for x in &w.structures {
             let f = s.types[&x.structure_type].footprint;
@@ -413,10 +419,13 @@ impl Kernel {
         crate::contracts::check(&crate::contracts::contracts().command, &body).map_err(|e| ProtocolError(format!("command {e}")))?;
         let exists = |p: &str| if self.state.participants.contains_key(p) { Ok(()) } else { perr(format!("unknown participant {p}")) };
         match cmd {
-            Command::Act { participant, position, .. } => {
+            Command::Act { participant, position, thinking, .. } => {
                 exists(participant)?;
                 if position.is_none() && self.state.participants[participant].kind == ParticipantKind::System {
                     return perr(format!("{participant} is a system: it acts only in a position"));
+                }
+                if thinking.is_some_and(|x| x < 0) {
+                    return perr("thinking time can't be negative");
                 }
             }
             Command::Observe { participant, only } => {
@@ -455,9 +464,6 @@ impl Kernel {
                 if *to < self.state.t {
                     return perr(format!("cannot advance to {to}: the clock is at {}", self.state.t));
                 }
-                if to % self.s.tick != 0 {
-                    return perr(format!("{to} is not a multiple of tick_seconds ({})", self.s.tick));
-                }
                 if *to > self.s.run_end() {
                     return perr(format!("{to} is beyond the end of the run ({})", self.s.run_end()));
                 }
@@ -475,7 +481,7 @@ impl Kernel {
     pub fn apply(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         self.precheck(cmd)?;
         Ok(match cmd {
-            Command::Act { participant, position, blocks, .. } => self.act(participant, position.as_deref(), blocks),
+            Command::Act { participant, position, blocks, thinking, .. } => self.begin(participant, position.as_deref(), blocks, thinking.unwrap_or(0)),
             Command::Advance { to } => self.advance(*to),
             Command::Observe { participant, only } => self.observe(participant, only.as_deref(), &[]),
             Command::Look { participant, only, looks } => self.observe(participant, only.as_deref(), looks),
@@ -519,8 +525,27 @@ impl Kernel {
         })
     }
 
-    fn act(&mut self, participant: &str, position: Option<&str>, blocks: &[Block]) -> Output {
+    /// An act begun: its actor is busy with it for the time it takes (the world's `act_time`), after any thinking, and
+    /// it takes effect when done (docs/design/rebuild.md 6.2, 6.3).
+    fn begin(&mut self, participant: &str, position: Option<&str>, blocks: &[Block], thinking: i64) -> Output {
         let action = self.state.mint("act");
+        let t = self.state.t;
+        let p = &self.state.participants[participant];
+        let (actor, key, lanes) = match p.kind {
+            ParticipantKind::Person => (terrarium_time::Actor::Person, p.person.clone().unwrap_or_else(|| participant.into()), 1),
+            ParticipantKind::System => (terrarium_time::Actor::System, participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
+        };
+        let seconds = self.s.act_times.program(actor, blocks.iter().map(Block::name));
+        let mut timeline = self.state.timelines.get(&key).cloned().unwrap_or_default();
+        let (starts, done) = terrarium_time::place(&mut timeline, lanes, t + thinking, seconds);
+        self.state.timelines.insert(key, timeline);
+        let pos = position.map(String::from);
+        self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec() });
+        Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos, starts, done })], observation: None }
+    }
+
+    /// An act done: applied now, as a whole (or refused), and its outcome delivered at the actor's next observation.
+    fn act(&mut self, action: Id, participant: &str, position: Option<&str>, blocks: &[Block]) -> Output {
         let t = self.state.t;
         let result = if !can_act(&self.state.participants[participant]) {
             Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")))
@@ -555,7 +580,10 @@ impl Kernel {
         while self.state.schedule.first().is_some_and(|x| x.at <= to) {
             let item = self.state.schedule.pop_first().unwrap();
             self.state.t = item.at;
-            events.extend(scheduled(&self.s, &mut self.state, item));
+            match item.what {
+                crate::state::Sched::Act { action, participant, position, blocks } => events.extend(self.act(action, &participant, position.as_deref(), &blocks).events),
+                _ => events.extend(scheduled(&self.s, &mut self.state, item)),
+            }
         }
         self.state.t = to;
         Output { events, observation: None }

@@ -31,8 +31,9 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const share = trader.buys.goods.from as { [f: string]: number };
   const task = config.catalogue.tasks.find((t: any) => t.id === "make");
   const { ev, recs } = await run("town", config, 200 * DAY);
-  // Nothing refused but same-moment races (D58), and households moving into homes still being left.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code))).toEqual([]);
+  // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
+  // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own), and households moving into homes still being left.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
   // Making: at the works, by the factory's own employees, never more than a working day each.
   const employees = new Map<string, Set<string>>();
   for (const a of [...config.world.records, ...recs].filter((r: any) => r.record === "agreement" && r.terms.template === "employment")) {

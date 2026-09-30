@@ -230,6 +230,7 @@ export const citizen: BehaviourModule = {
     let searchingWork = false; // this month's look for a better-paid job while employed
     let nextJobSearch = ctx.rng("job-search-day").below(30) * DAY;
     const applied = new Set<string>();
+    let nextMoveTry = 0; // when we next try moving into a home we hold a lease on
     // Attention: the market is looked at only when hunting, as a search (what's on offer now).
     let lookedAt = -1;
     const found: { homes: StatementRecord[]; jobs: StatementRecord[]; petitions: StatementRecord[] } = { homes: [], jobs: [], petitions: [] };
@@ -937,7 +938,9 @@ export const citizen: BehaviourModule = {
         for (const k of children(t)) steps.push(because("Taking the children out of our old home.", moveOut(livingAt, k.person)));
         livingAt = null;
       }
-      if (home && !home.movedIn) {
+      // (Tried and not yet in, because the last tenants are still there: again the next day, whenever we look again.)
+      if (home && !home.movedIn && t >= nextMoveTry) {
+        nextMoveTry = t + DAY;
         moveStep = because(`Moving into ${home.space}, which we hold a lease on${children(t).length ? ", with the children" : ""}.`, moveIn(home.space), ...children(t).map((k) => C.call("occupancy", { in: home!.space, who: k.person })));
         steps.push(moveStep);
         moving = true;
@@ -1559,7 +1562,8 @@ export const citizen: BehaviourModule = {
           }
           return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY));
         }
-        if (plannedAt !== obs.t) {
+        // (Planned when a wake begins; woken because an act of ours is done, we carry on with the plan: the stepper.)
+        if (plannedAt !== obs.t && obs.woke_for !== "done") {
           const acc = ownBanked(obs, me);
           const usual = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
           if (cheaperThan && (home || obs.t >= cheaperThan.until)) cheaperThan = null;

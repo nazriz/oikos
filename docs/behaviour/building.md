@@ -39,6 +39,11 @@ The town's wages are lower than Australia's (the generator's pay scale is a plac
 
 The builder buys materials for the jobs it has signed and not yet begun, oldest first, as far as it can pay for them now: a job whose materials it can't yet afford waits, and so do the jobs after it. It pays with the order, so what it can buy is what's in its account. (Before C4a it ordered for every waiting job at once or not at all, so several contracts signed together, more than its balance, stalled every one of them.)
 
+**Taking on a contract.** The builder knows a construction contract by its terms, whatever it's called: it builds or demolishes something, and the client pays (pilot 9, G4). It decides once it knows its own price for the job, and signs what it can do. It declines in writing, saying why:
+- **below its price:** it says what it charges. A price it published in the last 30 days (`quote_valid_days`, a placeholder: a common term for a builder's quote) is honoured, so a client who offers at a list the builder has since raised gets the price it was quoted;
+- **a lot already built on:** a lot whose every cell it has seen built on, or one with a job of its own there, queued or under way (2026-09-30: a town commissioned a second park where the builder was already building one, and the builder signed a contract it couldn't carry out).
+Whether a building fits a lot's open ground exactly is the resolver's to judge when it builds.
+
 ## Leaves out
 
 - **One kind of material**, instead of concrete, timber, steel and fittings.

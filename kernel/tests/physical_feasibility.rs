@@ -401,7 +401,8 @@ fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
 
         // 2. A refused action changes nothing (beyond minting its action id and queuing its outcome).
         if let Some(EventBody::ActionRefused { code, .. }) = resp.events.first().map(|e| &e.body) {
-            prop_assert_eq!(resp.events.len(), 1);
+            // (Besides its start: acts take effect when done.)
+            prop_assert_eq!(resp.events.iter().filter(|e| !matches!(e.body, EventBody::ActionStarted { .. })).count(), 1);
             prop_assert_eq!(&before.accounts, &after.accounts);
             prop_assert_eq!(&before.structures, &after.structures);
             prop_assert_eq!(&before.occupancy, &after.occupancy);
@@ -412,7 +413,8 @@ fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
             if let Some(p) = &prediction {
                 prop_assert_eq!(p, &Err(*code), "oracle disagreed on {:?}", cmd);
             }
-        } else if let (Some(p), Command::Act { .. }) = (&prediction, &cmd) {
+        } else if let (Some(p), Command::Act { .. }, Some(EventBody::ActionApplied { .. })) = (&prediction, &cmd, resp.events.first().map(|e| &e.body)) {
+            // (An act that couldn't be done before the run's end never took effect: nothing to judge.)
             prop_assert_eq!(p, &Ok(()), "oracle expected a refusal for {:?}", cmd);
         }
     }
@@ -458,6 +460,7 @@ fn the_oracle_is_exercised() {
         blocks: vec![serde_json::from_value(b).unwrap()],
         provenance: json!({"via": "direct"}),
         reasoning: None,
+        thinking: None,
     };
     let bld = |b: serde_json::Value| act("builder-system", Some("builder"), b);
     let cases = [
@@ -487,7 +490,7 @@ fn the_oracle_is_exercised() {
     for (cmd, expected) in cases {
         let Command::Act { participant, position, blocks, .. } = &cmd else { unreachable!() };
         assert_eq!(predict(&run, participant, position.as_deref(), &blocks[0]), Some(expected), "oracle on {cmd:?}");
-        let resp = run.command(&cmd).unwrap();
+        let resp = run.done(&cmd).unwrap();
         let got = match &resp.events[0].body {
             EventBody::ActionRefused { code, .. } => Err(*code),
             _ => Ok(()),

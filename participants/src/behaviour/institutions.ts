@@ -181,7 +181,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.7.0",
+  version: "0.9.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -196,6 +196,7 @@ export const builder: BehaviourModule = {
         working_day: 8 * 3600, // seconds a worker works in a day
         work_days: 5, // of every 7
         build_markup_bps: 2000,
+        quote_valid_days: 30, // a published price is honoured this long (placeholder: a common term for a builder's quote)
         workplace: "", // the space in the yard its crew works in
         max_crew: 12,
         min_crew: 2, // a core crew, kept through quiet times
@@ -215,6 +216,8 @@ export const builder: BehaviourModule = {
     const deliveries = new Deliveries();
     const handled = new Set<string>(); // contracts taken on
     const waiting: { agreement: string; client: string; type?: string; on?: string; remove?: string; price?: string }[] = []; // signed, not yet begun
+    const builtCell = new Map<string, boolean>(); // what stands on each cell, as we last saw it
+    const ourLots = new Set<string>(); // lots with a building job of ours on them, queued or begun
     const projects: { structure: string; task: "build" | "demolish"; left: number }[] = [];
     const typeOf = new Map<string, string>(); // structure -> its kind of building: what we've built, and what we've seen
     const onOrder = new Map<string, number>(); // kind -> ordered, not yet delivered
@@ -245,7 +248,10 @@ export const builder: BehaviourModule = {
         const steps: Step[] = [];
         if (!acc) return steps;
         steps.push(...dues.payDebts(book, acc.account, acc.balance, staffing.workers(book, t).length * wage));
-        for (const c of channels.cells(obs)) if (c.structure) typeOf.set(c.structure.structure, c.structure.type);
+        for (const c of channels.cells(obs)) {
+          if (c.structure) typeOf.set(c.structure.structure, c.structure.type);
+          builtCell.set(c.cell, !!c.structure);
+        }
         const supply = goodsPrices(book, p.supplier);
         const materialsCost = (m: { [kind: string]: number }) => Object.entries(m).reduce((x, [k, q]) => x + (supply.prices[k] === undefined ? Infinity : q * supply.prices[k]!), 0);
         const withMargin = (x: number) => Math.floor((x * (10_000 + p.build_markup_bps)) / 10_000);
@@ -282,13 +288,25 @@ export const builder: BehaviourModule = {
           const ours = job?.type ? prices[job.type] : undefined;
           if (job?.type && ours === undefined) continue;
           handled.add(r.id);
-          // Offered less than our price: declined, saying what we charge (a firm answers an offer it won't take).
-          if (agreed !== undefined && ours !== undefined && cents(agreed) < ours) {
+          // A lot already built on, or with a job of ours on it: declined, saying so (we can't do what we'd sign to).
+          const lotCells: string[] = (job?.type && job.on ? (book.records.get(job.on) as any)?.data?.cells : undefined) ?? [];
+          if (job?.type && job.on && (ourLots.has(job.on) || (lotCells.length && lotCells.every((c) => builtCell.get(c))))) {
+            steps.push(because(`${client} asks us to build a ${job.type} on ${job.on}, which is already built on${ourLots.has(job.on) ? " (our own job there)" : ""}: declining, and saying so.`,
+              say("offer_declined", `We can't build a ${job.type} on ${job.on}: it's already built on${ourLots.has(job.on) ? ", with our own job there" : ""}.`, { to: [client], visible: [me, client], basis: r.id, data: { agreement: r.id, reason: "site_taken" } })));
+            continue;
+          }
+          // Offered less than our price: declined, saying what we charge (a firm answers an offer it won't take). A price
+          // we've published in the last `quote_valid_days` is honoured: a client who offers at a list we've since raised
+          // gets the price it was quoted.
+          const type = job?.type;
+          const quoted = type ? book.all("price_list").filter((l) => l.speaks_for === me && typeof l.data?.prices?.[type] === "number" && obs.t - l.at <= p.quote_valid_days * DAY).map((l) => l.data!.prices[type] as number) : [];
+          if (agreed !== undefined && ours !== undefined && cents(agreed) < Math.min(ours, ...quoted)) {
             steps.push(because(`${client} offers ${usd(cents(agreed))} to build a ${job!.type}; our price is ${usd(ours)}: declining, and saying so.`,
               say("offer_declined", `We can't build a ${job!.type} on ${job!.on} for ${usd(cents(agreed))}: our price is ${usd(ours)}. Offer us a construction agreement at that price and we'll take it on.`, { to: [client], visible: [me, client], basis: r.id, data: { agreement: r.id, price: String(ours) } })));
             continue;
           }
           waiting.push({ agreement: r.id, client, type: job?.type, on: job?.on, remove: job?.remove, price: agreed === undefined ? undefined : amount(cents(agreed)) });
+          if (job?.type && job.on) ourLots.add(job.on);
           if (!book.signedBy(r.id, me)) steps.push(because("A client has signed a construction contract: taking it on.", sign(r.id)));
         }
 

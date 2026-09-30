@@ -18,6 +18,8 @@ pub struct Statics {
     /// The world's default currency (its first): materials and newcomers' money are in it.
     pub currency: String,
     pub tick: i64,
+    /// How long each act takes its actor (the world's `orchestration.act_time`).
+    pub act_times: terrarium_time::ActTimes,
     /// The detailed places' areas: where cells exist (D58).
     pub detailed: Vec<crate::config::PlaceRect>,
     pub randomness: Randomness,

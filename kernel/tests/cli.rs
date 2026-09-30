@@ -44,7 +44,10 @@ fn serve_then_verify_then_replay() {
     assert_eq!(replies.len(), requests.len());
     assert!(replies[1]["observation"]["participant"] == "mayor-system");
     assert_eq!(replies[2]["check"]["ok"], true);
-    assert_eq!(replies[3]["events"][0]["event"], "action_applied");
+    // An act begins now and takes effect when done (a second, in a world without act times), here during the advance.
+    assert_eq!(replies[3]["events"][0]["event"], "action_started");
+    assert_eq!(replies[3]["events"][0]["done"], 1);
+    assert!(replies[6]["events"].as_array().unwrap().iter().any(|e| e["event"] == "action_applied"), "{}", replies[6]);
     // An off-contract command is rejected and never logged.
     assert_eq!(replies[4]["ok"], false, "{}", replies[4]);
     assert!(replies[4]["error"].as_str().unwrap().contains("contract"));

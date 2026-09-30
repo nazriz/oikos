@@ -184,6 +184,12 @@
             "reasoning": {
               "description": "The participant's own stated reasoning, if it gave any. Logged, never interpreted.",
               "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Text"
+            },
+            "thinking": {
+              "description": "World seconds spent deciding before the act starts (the world's thinking_time, docs/design/rebuild.md 6.4): the act begins after it. Absent: none.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 31536000
             }
           }
         },
@@ -371,6 +377,43 @@
     "Event": {
       "description": "Every change to the world emits at least one event, each pointing at the command that caused it. There are no events for law: laws are records (the 'recorded' event) and nothing happens because of them unless someone acts.",
       "oneOf": [
+        {
+          "description": "A participant's act begun (docs/design/rebuild.md 6.3): its actor is busy with it from `starts` (after any thinking) and it takes effect at `done`, when it's applied (action_applied) or refused (action_refused), under the same action id.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "action",
+            "participant",
+            "starts",
+            "done"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "action_started"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "action": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/KernelId"
+            },
+            "participant": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            },
+            "as": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            },
+            "starts": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
+            },
+            "done": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
+            }
+          }
+        },
         {
           "description": "A participant's action took effect.",
           "type": "object",
@@ -1396,6 +1439,7 @@
     },
     "EventName": {
       "enum": [
+        "action_started",
         "action_applied",
         "action_refused",
         "transfer",

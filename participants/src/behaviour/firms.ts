@@ -42,7 +42,9 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
       if (sent?.then && o) follow.push(...(sent.then(o) ?? []));
       sent = undefined;
       absorb(obs);
-      if (plannedAt !== obs.t) {
+      // A plan is made when a wake begins; woken because an act of ours is done, we carry on with it (acts take time:
+      // docs/design/rebuild.md 6.3), never planning again what's still to do.
+      if (plannedAt !== obs.t && obs.woke_for !== "done") {
         // What a wake didn't get to (it allows only so many actions) is done first at the next: a module's state already
         // counts on it (a price it holds as published, a payment as made), so it's never dropped, but for a day's work
         // once the day's over.

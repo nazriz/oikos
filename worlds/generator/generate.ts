@@ -811,6 +811,6 @@ export function generate(spec: TownSpec): any {
     templates,
     ...(spec.life === false ? {} : { life }),
     caps: { max_created_entities: 50 },
-    orchestration: { thinking_time: "free", max_actions_per_wake: 12 },
+    orchestration: { thinking_time: "free" },
   };
 }

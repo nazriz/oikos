@@ -467,6 +467,11 @@ Proposed together, for one sign-off:
   - the engine answers `agreements` (read-only, never logged) from an index of each party's agreements, and the orchestrator compares them when a wake ends (`audit: true`, tests and calibration). A divergence is recorded only if it's still there at the unit's next audit: another's act in the same moment isn't staleness;
   - **the first run found a real mole:** a citizen leaving town gave notice on the job and the lease but not on the union membership, so the union kept a member who'd gone. Also, memberships gave members no right to resign at all, so no notice of theirs would have counted. Fixed: memberships state the member's notice (the profile's, with its source), and leaving town ends every agreement the citizen can end;
   - **the gate:** a 300-person town over 180 days has no belief wrong for more than a week (the rest are members telling the union of a job's end a few days late), and a planted false belief is caught.
+- **R2, acting time** (2026-09-30):
+  - the `time` crate (act times by block and actor kind; timelines, one per person and lanes per system); the kernel holds acts in progress and applies them when done, and `advance` goes to any second; `thinking` is logged with the act; `max_actions_per_wake` is gone, with a backlog and a repeated-act count in the health report in its place;
+  - modules plan when a wake begins and carry on through its acts (`woke_for: "done"`); retries are paced by time;
+  - **first parity step** (every act a second): a 30-day, 80-person town is within noise of `main`: 266 payments against 275, 345 work events against 344, citizens' acts 745 against 712, no refusals in either;
+  - **Gate:** kernel 94 (3 new time tests), participants 39, orchestrator by file (below).
 - **Next:**
   1. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
   2. R4 and R5.

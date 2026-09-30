@@ -404,6 +404,9 @@ pub struct ParticipantCfg {
     /// Its own parameters (a person's disposition), used by the role modules it runs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub traits: Option<Value>,
+    /// A system's: how many acts it carries out at once (docs/design/rebuild.md 6.3). A person has one timeline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lanes: Option<u32>,
 }
 
 /// A role through which a participant acts for an organisation.

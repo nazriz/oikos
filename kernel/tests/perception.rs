@@ -135,7 +135,7 @@ fn many_looks_over_a_long_run() {
 fn a_closed_account_leaves_the_view() {
     let mut run = Run::start(riverbend(), "perception-close", Vec::new(), None).unwrap();
     let act = |run: &mut Run<Vec<u8>>, blocks: serde_json::Value| {
-        run.command(&rb_act("bank-payments", blocks)).unwrap()
+        run.done(&rb_act("bank-payments", blocks)).unwrap()
     };
     let r = act(&mut run, serde_json::json!([{"block": "open_account", "holder": "alice", "ref": "a"}]));
     let acc = match &r.events[0].body {

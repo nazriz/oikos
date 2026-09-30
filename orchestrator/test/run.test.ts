@@ -27,10 +27,11 @@ test("the bank carries out standing orders on schedule; the run replays byte-ide
 
   const transfers = events(s.logPath).filter((e) => e.event === "transfer");
   const rent = transfers.filter((e) => e.from === "acc-bob");
-  expect(rent.map((e) => e.t / DAY)).toEqual([30, 60, 90]);
+  // On the day due (a payment lands when the bank's done with it: a second in, in a world without act times).
+  expect(rent.map((e) => Math.floor(e.t / DAY))).toEqual([30, 60, 90]);
   expect(rent.every((e) => e.to === "acc-devco" && e.amount === "180000" && e.by === "bank-payments-system" && e.per_instruction === "so-bob-rent")).toBe(true);
   const wages = transfers.filter((e) => e.to === "acc-carol");
-  expect(wages.map((e) => e.t / DAY)).toEqual([14, 28, 42, 56, 70, 84, 98]);
+  expect(wages.map((e) => Math.floor(e.t / DAY))).toEqual([14, 28, 42, 56, 70, 84, 98]);
 
   // Bob runs out of money eventually: $8,000, $1,800 a month. Not in 100 days, though.
   expect(transfers.length).toBe(10);

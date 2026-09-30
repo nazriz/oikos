@@ -16,7 +16,7 @@ const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const tight = { ...base, citizens: 120, apartment_blocks: 2, houses: 16, landlord_capital: 300_000_000, landlord_compliance_bps: 10_000 };
 
 /** Refusals from same-moment races (D58): someone who'd just left, named for work by a firm acting on what it saw. */
-const RACES = ["not_present", "not_at_work", "capacity_exceeded"]; // and moving into a home still being left
+const RACES = ["not_present", "not_at_work", "capacity_exceeded", "no_time_left"]; // and moving into a home still being left; a new job's first day after a full one at the old
 
 async function run(name: string, config: any, until: number) {
   const out = join(root, "runs", `test-building-${name}`);
@@ -130,4 +130,9 @@ test("a construction contract is known by its terms, not its name; one offered b
   const no = recs.find((r) => r.kind === "offer_declined" && r.data?.agreement === "town-park-cheap");
   expect(no?.addressed_to).toEqual(["city"]);
   expect(no.text).toMatch(/our price is \$[\d,]+\.\d\d/);
+  // Never two building jobs taken on for one lot: one for a lot already built on is declined, saying so (the town's own
+  // mayor commissions a park here too, not knowing of this one).
+  const signed = new Set(recs.filter((r) => r.record === "signature" && r.as === "builder").map((r) => r.agreement));
+  const lots = recs.filter((r) => r.record === "agreement" && signed.has(r.id)).flatMap((r) => r.terms.commitments.filter((c: any) => c.who === "builder" && c.does?.outcome?.structure?.type).map((c: any) => c.does.outcome.structure.on));
+  expect(new Set(lots).size).toBe(lots.length);
 }, 300_000);
