@@ -493,9 +493,10 @@ Proposed together, for one sign-off:
   - `terrarium-perception` builds observations, read-only (no `&mut State`);
   - the root crate is the engine: the kernel interface, the log, the protocol and the schedule.
   Observing is now perception building, then the world delivering (marking what was seen, handing over outcomes and messages). Public paths are unchanged (`terrarium_kernel::{state, observe, ...}`). The same final state over 60 days.
+- **R4, the diff** (2026-09-30): `terrarium diff <baseline> <change> [QUERY...]` compares every measure of two batches of the same world. With several seeds a side, a difference is judged against seed-to-seed spread and flagged beyond three standard errors; with one, the relative change is flagged beyond a tenth. On the parity batches (10 seeds each) it finds the known gatherings difference by itself (attendance z 4.7). It also finds first-quarter religious affiliation 1.4 points lower on the rebuild (z -4.2), part of the same difference.
 - **Next:**
-  1. R3's `law` crate: formal conditions read in Rust, for institutions and a draft's warnings. Then the draft preview moves too, and the TypeScript resolver and knowledge can go.
-  2. R4: module manifests checked at load; the health report and diff; compact logs; checkpoints and resuming from one.
+  1. R4: module manifests checked at load; the health report (the diff is done); compact logs; checkpoints and resuming from one.
+  2. (R3's `law` stays in TypeScript for now: docs/decisions.md.)
   3. R5: clean-up.
 
 **After the rebuild,** on the new platform:

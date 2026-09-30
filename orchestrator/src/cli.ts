@@ -11,6 +11,7 @@
 //     With --model, --translator-model runs the translator on its own model (e.g. a smaller one); without, it only
 //     prices the cost projection.
 //   terrarium measure <DIR> [QUERY...] [--sql "select ..."] [--list]
+//   terrarium diff <BASELINE> <CHANGE> [QUERY...]: every measure of two batches compared (beyond seed noise: flagged)
 //   terrarium cost <DIR> [--translator-model provider/model]
 //   terrarium run ... [--no-compress]: logs are compressed once measured (<run>.jsonl.zst, about a seventh the size,
 //     checked to read back whole before the plain log goes); --no-compress keeps them plain.
@@ -72,7 +73,7 @@ async function measureDir(dir: string): Promise<string> {
   return m;
 }
 
-const usage = "usage: terrarium run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl> | story <log.jsonl> [participant]";
+const usage = "usage: terrarium run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -110,6 +111,11 @@ try {
       const names = positional().slice(1);
       for (const name of names.length ? names : ["overview"]) console.log(`## ${name}\n${table(await runQuery(dir, name))}\n`);
     }
+  } else if (cmd === "diff" && positional()[1]) {
+    // Before and after (docs/design/rebuild.md 8.4): every measure of two batches of the same world, compared.
+    const { diff, diffText } = await import("@terrarium/measure");
+    const [a, b] = [await measureDir(positional()[0]!), await measureDir(positional()[1]!)];
+    console.log(diffText(await diff(a, b, positional().slice(2).length ? positional().slice(2) : undefined)));
   } else if (cmd === "consult-audit" && positional()[0]) {
     // The sparse mind's robustness audit (docs/design/ai-citizens.md 4), on the world's own questions and people.
     const { consultAudit, auditText } = await import("./audit");

@@ -250,3 +250,5 @@ export function table(rows: Record<string, unknown>[]): string {
   const line = (vals: string[]) => vals.map((v, i) => (v.length > w[i]! ? `${v.slice(0, w[i]! - 1)}…` : v.padEnd(w[i]!))).join("  ").trimEnd();
   return [line(cols), line(w.map((n) => "-".repeat(n))), ...rows.map((r) => line(cols.map((k) => cell(r[k]))))].join("\n");
 }
+
+export { diff, diffText, DIFF_QUERIES, type DiffRow } from "./diff";
