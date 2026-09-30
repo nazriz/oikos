@@ -132,7 +132,7 @@ One Cargo workspace. Crates depend downwards only, and the boundaries enforce th
 | `time` | The clock, simultaneity, wakes, acting time and thinking time, invariance perturbations | `contracts`, `core` | Knowing what seats do |
 | `engine` | A run: loads config, drives the loop, orders annotations, replays and resumes, serves hosts | all of the above | |
 | `engine-napi` | The engine inside the Bun process (N-API) | `engine` | |
-| `core-wasm` | `core`, `terms`, `law` and log reading for the browser and TypeScript tools | `core`, `terms`, `law` | |
+| `core-wasm` | `core`, `terms`, `law` and log reading for the browser and TypeScript tools (`law` builds to WebAssembly itself for now: kernel/crates/law) | `core`, `terms`, `law` | |
 | later: `engine-py` | Python seats (the Gymnasium/PettingZoo shape) | `engine` | |
 
 **Read-only is a type, not a promise.** The kernel exposes a `WorldView` (immutable borrows of state and records). Only `kernel` holds `&mut World`. `terms`, `law`, `perception` and `resolver` receive a `WorldView`, so they can't write even by mistake.
@@ -484,7 +484,7 @@ Proposed together, for one sign-off:
   - **Gate:** kernel 97, TypeScript 281.
 - **R2, the resolver in the engine** (2026-09-30): `kernel/crates/resolver`, which holds the call language, what each seat knows, and the resolver. It's a port of `translator/src/{resolver,knowledge}.ts` and `participants/src/calls.ts`. The engine keeps each seat's knowledge from the observations it delivers, and resolves calls itself (the protocol's `resolve`): every code module's act, and a model seat's drafts.
   - **Checked:** shadow mode (`TERRARIUM_RESOLVER=shadow`) resolves every call both ways. There were no differences in 26,920 calls over 60 days of the 1,000-person town, and none across the whole test suite, where a difference fails the test. The same final state.
-  - **Still in TypeScript:** a model seat's draft preview and law warnings (they read the seat's knowledge there too). They move with the `law` crate.
+  - **Still in TypeScript:** a model seat's draft preview and law warnings (they read the seat's knowledge there too). Their law warnings read with the Rust `law` reader now; what they read of the seat's knowledge is still TypeScript's.
 - **R2, invariance** (2026-09-30): the engine's scheduler can perturb a run for tests (`perturb`: seeded extra wakes, recorded in the log; never a research run). `orchestrator/test/invariance.test.ts` runs a 200-person town for 120 days as it is, and again with about 12% more wakes. Goods bought, orders, payments, factory output, shop service and waste collected must each stay within 10%. They do. The builder's building work moved about 20% on one seed, through different hires, and is left out as too lumpy to judge on one seed.
   - Not done from 6.6: shuffling acts done at the same second, splitting payments, and scaling act times. The last needs no mode: a world's `act_time` table is the knob.
 - **R2, parity step 2: configured act times** (2026-09-30). Generated worlds carry an `act_time` table (placeholders: minutes for people, a second for systems). A year of the 1,000-person town is within the rebuild's own spread on every town measure, with no warnings. Two module fixes came out of it: time-bound steps first, and planning again once a plan is done (docs/decisions.md).
@@ -504,7 +504,8 @@ Proposed together, for one sign-off:
   - **Not yet:** `perceives` (what each module relies on perceiving) is empty, and `state` is "none" (no module saves its state yet: checkpoints).
 - **R4, the health report** (2026-09-30): `terrarium health <DIR>` sets a batch's measures against its profile's calibration targets, each within a stated tolerance. Breaches come first, then demand that went unmet. Targets not yet measured are listed as such. The rebuild's 10-seed batch breaches on unemployment (1.5% against 4.6%), saving (-10% against 6.5%), group participation (60% against 50%) and unmet demand (8%). These are the calibration work queued for after the rebuild (the labour market; goods under shortage).
 - **R5** (2026-09-30): the docs match the platform (VISION §4 and §8, reliability, measurement, the behaviour modules' rules). What stays in TypeScript is kept for a stated reason (docs/decisions.md).
-- **Deferred, with reasons and when to revisit** (docs/decisions.md): the `law` reader in Rust; checkpoints (resume by replay stays); compact logs (B13) and generated types (B1), both to confirm with Naz; the rest of the loop in the engine (the rounds of look, decide, act).
+- **The `law` reader is Rust** (kernel/crates/law), built to WebAssembly for the TypeScript modules and checked against `@bufbuild/cel` in shadow (docs/decisions.md). It was deferred at first; Naz asked for it.
+- **Deferred, with reasons and when to revisit** (docs/decisions.md): checkpoints (resume by replay stays); compact logs (B13) and generated types (B1), both to confirm with Naz; the rest of the loop in the engine (the rounds of look, decide, act).
 - **Next:** merge `rebuild` into `main` (Naz's call), then calibration on the new platform: the labour market and goods under shortage, with `terrarium health` and `diff` watching.
 
 **After the rebuild,** on the new platform:

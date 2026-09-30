@@ -1,0 +1,15 @@
+[package]
+name = "terrarium-law"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The law reader: a statement's formal condition (CEL, integers only, allowlisted functions) evaluated against an act (D27). Built natively and to WebAssembly for the TypeScript modules."
+rust-version = "1.85"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+cel-parser = "0.10"
+serde = { workspace = true }
+serde_json = { workspace = true }

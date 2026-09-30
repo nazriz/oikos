@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "test": "bun test",
-    "kernel": "cargo build --release --manifest-path kernel/Cargo.toml --workspace",
+    "kernel": "cargo build --release --manifest-path kernel/Cargo.toml --workspace && cargo build --release --manifest-path kernel/Cargo.toml --target wasm32-unknown-unknown -p terrarium-law",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "engines": {

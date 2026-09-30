@@ -20,3 +20,11 @@ test("decimals, time and regex are rejected", () => {
   expect(violations("timestamp('2026-01-01T00:00:00Z') < now").length).toBeGreaterThan(0);
   expect(violations(PLANNING)).toEqual([]);
 });
+
+test("a condition that can't be parsed is an error verdict, not a crash", () => {
+  const r = evaluate("block.block ==", { block: {}, actor: "a", now: 0 }, []);
+  expect("error" in r && r.error.startsWith("parse")).toBe(true);
+  expect(violations("(((")[0]).toStartWith("parse");
+  // (And the reader goes on reading after it.)
+  expect(evaluate(PLANNING, { block: { block: "construct", lot: "l" }, actor: "a", now: 0 }, [])).toEqual({ value: true });
+});

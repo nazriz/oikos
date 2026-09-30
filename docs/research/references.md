@@ -87,3 +87,11 @@ sources); this list is for the architecture and design ideas.
 | Pointing at the input instead of generating: outputs that are positions in the input | Vinyals, O., Fortunato, M. & Jaitly, N. (2015), "Pointer Networks", NeurIPS 2015 **(to confirm)**; copying in sequence-to-sequence models: See, A., Liu, P. J. & Manning, C. D. (2017), "Get To The Point", ACL 2017 **(to confirm)** | Copy-only ids and text in the target build |
 | Proper scoring rules: log loss rewards honest probabilities | Gneiting, T. & Raftery, A. E. (2007), "Strictly Proper Scoring Rules, Prediction, and Estimation", *Journal of the American Statistical Association* 102(477), 359–378 **(to confirm)** | The training objective, and why no reinforcement learning is needed |
 | Modern networks are overconfident; temperature scaling and expected calibration error | Guo, C., Pleiss, G., Sun, Y. & Weinberger, K. Q. (2017), "On Calibration of Modern Neural Networks", ICML 2017 **(to confirm)** | Calibrating the translation's confidence; the calibration measure |
+
+## Laws and claims (D19, D27; kernel/crates/law)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A statement's grammar: attributes, deontic, aim, conditions, or else | Crawford, S. E. S. & Ostrom, E. (1995), "A Grammar of Institutions", *American Political Science Review* 89(3), 582–600 | Laws' and procedures' `adico` part |
+| Positions a claim can hold (a liberty, a right, and their correlatives) | Hohfeld, W. N. (1913), "Some Fundamental Legal Conceptions as Applied in Judicial Reasoning", *Yale Law Journal* 23(1), 16–59 | Claim records' `position`; the law reader's `holds_liberty` and `holds_right` |
+| A small, total, side-effect-free expression language, with errors that `&&` and `\|\|` absorb when the other side decides | Google, *Common Expression Language* specification, [github.com/google/cel-spec](https://github.com/google/cel-spec); the parser we use is `cel-parser` from [cel-rust](https://github.com/cel-rust/cel-rust) | Statements' `formal` conditions (a subset: integers only, allowlisted functions); the evaluator is ours |
