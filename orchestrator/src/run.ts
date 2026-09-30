@@ -28,6 +28,7 @@ import { calls, DECISIONS, modules as builtin, Randomness, slice, View, type Beh
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft } from "@terrarium/translator";
 import { Kernel } from "./kernel";
+import { divergences } from "./truth";
 import type { Watchdog } from "./watchdog";
 
 export const ORCHESTRATOR_VERSION = "0.8.0";
@@ -68,6 +69,9 @@ export interface RunOptions {
   consult?: boolean;
   /** Kinds (and things) the sparse mind leaves out: an audit's `avoid` (consult-audit). */
   consultAvoid?: string[];
+  /** Truth audits (docs/design/rebuild.md 8.2): each code module's beliefs, when a wake is done, checked against the
+   * terms' readings; divergences recorded as `audit` annotations. For tests and calibration runs. */
+  audit?: boolean;
 }
 
 /** More than this many cohorts at one simulated moment means participants are waking each other without end: the run
@@ -151,6 +155,8 @@ interface Unit {
   llm?: { controller: LlmController; config: any; drafts: { draft: Draft; hash: string; reasoning?: string }[]; drafted: number };
   ctx: ParticipantContext;
   nextWake: number;
+  /** Truth audits: the divergences found at its last audit, by belief, and when each was first found. */
+  diverged?: Map<string, number>;
   /** Why its next wake is due (contracts 0.7: woke_for), and why the current one happened; when it last woke. */
   wakeFor: NonNullable<Observation["woke_for"]>;
   wokeFor: NonNullable<Observation["woke_for"]>;
@@ -584,6 +590,18 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const apply = async (u: Unit, action: ParticipantAction): Promise<boolean> => {
     const L = u.llm;
     if (action.type === "wait") {
+      if (o.audit && u.controller.beliefs) {
+        // Stale is still wrong after a wake to see the change: a divergence is recorded when it's found again at the
+        // unit's next audit (one arising from another's act in the same moment is not), with when it was first found.
+        const was = u.diverged ?? new Map<string, number>();
+        u.diverged = new Map();
+        for (const d of await divergences(k, u.controller.beliefs())) {
+          const key = JSON.stringify(d.belief.of === "held" ? [d.belief.party, d.belief.template] : d.belief);
+          const since = was.get(key);
+          u.diverged.set(key, since ?? t);
+          if (since !== undefined) await k.request({ op: "annotate", annotation: { annotation: "audit", subject: u.participant, data: { t, unit: u.key, ...d, since } } });
+        }
+      }
       if (action.until !== undefined) [u.nextWake, u.wakeFor] = [Math.max(t + tick, ceilTo(action.until, tick)), "asked"];
       return false;
     }

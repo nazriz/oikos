@@ -462,10 +462,14 @@ Proposed together, for one sign-off:
   - **A guard on the engine:** the binary and the native module carry a fingerprint of the sources they were built from (kernel/build.rs), and the host refuses a module that doesn't match the binary beside it. A `cargo test` rebuilds only the binary, and the stale module had written logs the binary couldn't replay.
   - **Gate:** kernel 88, participants 39, orchestrator 73.
   - **Modules read ends from readings:** the landlord's leases in force, `Staffing`'s contract ends, and the citizen's job and home. They no longer work ends out themselves. That arithmetic had hard-coded notice periods (30 and 14 days, and a month when a clause was missing), each a place where code could drift from the terms. A job the citizen walks out of (wages unpaid) is the one end that isn't the terms'. A 90-day town's events are identical before and after (437,836 lines).
+- **R3, truth audits** (2026-09-30):
+  - modules declare what they believe about agreements (`beliefs()` on a controller: an agreement in force, one between two parties, or all of a kind a party holds). The citizen's job and home, the union's register, every employer's staff and every landlord's leases are covered;
+  - the engine answers `agreements` (read-only, never logged) from an index of each party's agreements, and the orchestrator compares them when a wake ends (`audit: true`, tests and calibration). A divergence is recorded only if it's still there at the unit's next audit: another's act in the same moment isn't staleness;
+  - **the first run found a real mole:** a citizen leaving town gave notice on the job and the lease but not on the union membership, so the union kept a member who'd gone. Also, memberships gave members no right to resign at all, so no notice of theirs would have counted. Fixed: memberships state the member's notice (the profile's, with its source), and leaving town ends every agreement the citizen can end;
+  - **the gate:** a 300-person town over 180 days has no belief wrong for more than a week (the rest are members telling the union of a job's end a few days late), and a planted false belief is caught.
 - **Next:**
-  1. The rest of R3: truth audits.
-  2. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
-  3. R4 and R5.
+  1. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
+  2. R4 and R5.
 
 **After the rebuild,** on the new platform:
 1. The labour market (search frictions) and goods prices under shortage, calibrated with the health report watching every other measure.

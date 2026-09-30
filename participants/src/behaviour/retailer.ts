@@ -5,7 +5,7 @@ import * as C from "../calls";
 import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
-import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
+import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw } from "./common";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
@@ -160,7 +160,7 @@ export const retailer: BehaviourModule = {
       return steps;
     }
 
-    return stepper(
+    return Object.assign(stepper(
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
@@ -390,6 +390,6 @@ export const retailer: BehaviourModule = {
           return s;
         }
       },
-    );
+    ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };

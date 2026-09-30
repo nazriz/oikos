@@ -51,6 +51,10 @@ pub struct State {
     /// state and its hash are unchanged), for reading agreements by their terms without scanning every record.
     #[serde(skip)]
     pub marks: Map<Id, AgreementMarks>,
+    /// Each party's agreements, in the order they were made: derived like `marks`, for answering what's in force with
+    /// someone (the truth audits, docs/design/rebuild.md 8.2).
+    #[serde(skip)]
+    pub agreements_of: Map<Id, imbl::Vector<Id>>,
     /// Record ids in the order they were made (record i has seq i+1).
     pub record_order: imbl::Vector<Id>,
     pub participants: Map<Id, Arc<Participant>>,
@@ -529,6 +533,11 @@ impl State {
     /// Store a record, giving it the next sequence number.
     pub fn store(&mut self, record: Record) {
         match &record.body {
+            crate::blocks::RecordBody::Agreement { terms } => {
+                for p in &terms.parties {
+                    self.agreements_of.entry(p.clone()).or_default().push_back(record.id.clone());
+                }
+            }
             crate::blocks::RecordBody::Signature { agreement, party } => {
                 let m = self.marks.entry(agreement.clone()).or_default();
                 m.signatures.push(terrarium_terms::Mark { party: party.clone(), at: record.at });

@@ -27,7 +27,7 @@
 import { cents } from "../money";
 import type { Eligibility, LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { DECISIONS, params, wait, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
+import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
 import { because, Book, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.18.0",
+  version: "0.19.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -1517,6 +1517,14 @@ export const citizen: BehaviourModule = {
       }
       if (share?.order) s.push(withdraw(share.order, "Leaving town."));
       if (job) s.push(notice(job.agreement, "Leaving town."));
+      // Everything else of ours that we can end by notice under its terms (memberships): ended, and what we pay under
+      // it stopped.
+      for (const r of book.ofType("agreement")) {
+        if (r.record !== "agreement" || r.id === home?.agreement || r.id === job?.agreement || !r.terms.parties.includes(me) || !book.inForce(r.id)) continue;
+        if (!r.terms.termination?.some((x) => x.party === me)) continue;
+        for (const o of book.all("request")) if (o.record === "statement" && o.basis === r.id && o.speaks_for === me && !book.withdrawn.has(o.id)) s.push(withdraw(o.id, "Leaving town."));
+        s.push(notice(r.id, "Leaving town."));
+      }
       s.push(say("departure", `${me} has left town.`));
       if (acc && acc.balance > 0 && p.outside_account) s.push(pay(p.outside_account, acc.balance, { from: acc.account, for: "Moving away: send all my savings with me." }));
       // Leaving takes a body out of every space it's in. The children go first, each on its own (one may not be here).
@@ -1527,6 +1535,11 @@ export const citizen: BehaviourModule = {
     let childrenNow: Member[] = [];
 
     return {
+      /** Our job and home, as we have them (truth audits). */
+      beliefs: (): Belief[] => departed ? [] : [
+        ...(job ? [{ of: "agreement" as const, agreement: job.agreement, in_force: true }] : []),
+        ...(home ? [{ of: "agreement" as const, agreement: home.agreement, in_force: true }] : []),
+      ],
       step(obs): ParticipantAction | Promise<ParticipantAction> {
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);

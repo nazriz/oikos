@@ -9,7 +9,7 @@
 
 import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
-import { params, type BehaviourModule, type ParticipantContext } from "../module";
+import { params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, breaches, DAY, MONTH, offer, pay, say, type Step } from "./common";
 import { stepper } from "./firms";
 
@@ -29,7 +29,7 @@ interface Dispute {
 
 export const organiser: BehaviourModule = {
   name: "union.organiser",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -53,6 +53,7 @@ export const organiser: BehaviourModule = {
         between_days: 7, // after a stoppage, an improved offer awaited this long before the next
         price_kind: "goods", // prices tracked for the claim (shops' price lists)
         dues: 0, // cents a month (the world's profile)
+        resignation_notice_days: 0, // a member's notice of resigning, written into each membership (the world's profile; 0: none written)
         dues_account: "",
       },
       ctx.params,
@@ -66,7 +67,13 @@ export const organiser: BehaviourModule = {
     const handled = new Set<string>();
     const stagger = new Map(p.employers.map((e, i) => [e, Math.floor(((i + 1) * p.first_claim_days * DAY) / Math.max(1, p.employers.length))]));
     let offered = false;
-    return stepper(
+    // Where our members work, as we have it (truth audits): each a job in force with that employer.
+    const beliefs = (): Belief[] => {
+      const members = new Set(book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties[0] === me && book.inForce(r.id)).map((r: any) => r.terms.parties[1] as string));
+      const closed = new Set(book.open("closure").map((r) => (typeof r.data?.firm === "string" ? r.data.firm : r.speaks_for!)));
+      return [...employerOf].filter(([m, e]) => e && members.has(m) && !closed.has(e)).sort().map(([m, e]): Belief => ({ of: "between", template: "employment", parties: [e, m], in_force: true }));
+    };
+    return Object.assign(stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
         const t = obs.t;
@@ -81,7 +88,7 @@ export const organiser: BehaviourModule = {
                 offer: { by: me, take_up: "join", terms: { template: "membership", commitments: [
                   { who: me, does: { text: "Represents the member at work, and bargains for them." } },
                   { who: "taker", does: { outcome: { money: { to: p.dues_account, amount: String(p.dues), for: "Union dues." } } }, every: MONTH },
-                ] } } })));
+                ], termination: [{ party: me, notice: MONTH }, ...(p.resignation_notice_days > 0 ? [{ party: "taker" as const, notice: p.resignation_notice_days * DAY }] : [])] } } })));
           }
         }
         // Members: the register at the start, and those who've joined since (membership agreements in force).
@@ -95,7 +102,7 @@ export const organiser: BehaviourModule = {
           if (typeof a.data?.employer === "string") employerOf.set(who, a.data.employer);
           if (inForce.has(who)) continue;
           steps.push(because(`${who} asks to join: offering membership, ${p.dues} cents a month in dues.`,
-            offer(who, { template: "membership", ourNotice: MONTH, we: C.text(`${me} represents ${who} at work, and bargains for them.`) as any,
+            offer(who, { template: "membership", ourNotice: MONTH, ...(p.resignation_notice_days > 0 ? { theirNotice: p.resignation_notice_days * DAY } : {}), we: C.text(`${me} represents ${who} at work, and bargains for them.`) as any,
               they: pay(p.dues_account, p.dues, { every: MONTH, for: "Union dues." }), text: `${who} is a member of ${me}, paying dues of ${p.dues} cents a month.`, basis: a.id })));
         }
         // Members who've told us where they now work (or that they're out of work: no employer).
@@ -237,6 +244,6 @@ export const organiser: BehaviourModule = {
         }
         return steps;
       },
-    );
+    ), { beliefs });
   },
 };

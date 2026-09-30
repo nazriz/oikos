@@ -16,7 +16,7 @@ import { cents } from "../money";
 import * as C from "../calls";
 import type { Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { params, wait, type BehaviourModule, type ParticipantContext } from "../module";
+import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
 import { because, between, Book, breaches, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
@@ -139,7 +139,10 @@ export const landlord: BehaviourModule = {
         income += amount;
       }
     };
-    return stepper(absorb, (obs) => {
+    // The leases we hold in force, as we have them (truth audits).
+    const leasesHeld = (): Belief[] => [{ of: "held", party: me, template: "lease",
+      agreements: book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.inForce(r.id)).map((r) => r.id) }];
+    return Object.assign(stepper(absorb, (obs) => {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
@@ -430,7 +433,7 @@ export const landlord: BehaviourModule = {
         }
       }
       return steps;
-    });
+    }), { beliefs: (): Belief[] => leasesHeld() });
   },
 };
 
@@ -490,6 +493,10 @@ export class Staffing {
   /** Employment agreements in force and not yet ended, oldest first. */
   staff(book: Book, t: number): any[] {
     return this.contracts(book).filter((a) => book.inForce(a.id) && t < this.endOf(book, a)).sort((x, y) => book.signedAt(x.id)! - book.signedAt(y.id)!);
+  }
+  /** Our staff, as we have them (truth audits). */
+  beliefs(book: Book): Belief[] {
+    return [{ of: "held", party: this.me, template: "employment", agreements: this.staff(book, book.now).map((a) => a.id) }];
   }
   /** Offers we've made in the last month that the worker hasn't signed yet. */
   offered(book: Book, t: number): any[] {
@@ -1054,7 +1061,7 @@ export const employer: BehaviourModule = {
       const acc = ownAccount(obs);
       if (acc) for (const [, amount] of receipts(obs, acc.account)) revenue += amount;
     };
-    return stepper(absorb, (obs) => {
+    return Object.assign(stepper(absorb, (obs) => {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
@@ -1077,6 +1084,6 @@ export const employer: BehaviourModule = {
         if (due > 0 && p.outside_account) steps.push(because(`Monthly: paying suppliers ${p.supplier_share_bps / 100}% of revenue.`, pay(p.outside_account, due, { from: acc.account, for: "Suppliers." })));
       }
       return steps;
-    });
+    }), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };

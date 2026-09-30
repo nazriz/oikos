@@ -985,6 +985,13 @@ See the design note, §16.
 - **The engine's binary and native module must come from the same sources:** a fingerprint in each (kernel/build.rs), checked when the host loads the module. It's a loud stop, not a fallback to stdio: a quiet mismatch writes logs that don't replay.
   - **Revisit if:** the stdio binary is retired, and the module is the only engine.
 
+- **Truth audits record only divergences that last** (docs/design/rebuild.md 8.2). A divergence counts when it's still there at the unit's next audit, with when it was first found (`since`, added to the `audit` annotation's data; the log contract's description now says so).
+  - **Why:** a unit can't know what another did in the same moment. Counting that would bury real staleness in noise: the first run gave two such cases against 68 real ones.
+  - **Revisit if:** R2's acting time changes what "the same moment" means (acts take effect when done), or a lag that is real shows up only once.
+- **Memberships state the member's right to resign, and leaving town ends everything the citizen can end.** The union's figure is the Registered Organisations Act's two weeks (s 174, to confirm). A club's or congregation's is a placeholder of at once. Both are in the profile.
+  - **Why:** the terms reader counts a notice only under the giver's own clause. With no clause for members, a member couldn't leave, and a member leaving town left the union holding a ghost (found by the first truth audit).
+  - **Revisit if:** the `law` reader can supply terms implied by law (a statutory right to resign that a membership doesn't write down).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.

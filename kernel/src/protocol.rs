@@ -117,6 +117,28 @@ fn handle(run: &mut Option<Run<BufWriter<File>>>, req: &Value) -> Result<Value, 
             let obs = r.full_view(str_field("participant")?).ok_or("unknown participant")?;
             Ok(json!({ "ok": true, "observation": obs }))
         }
+        "agreements" => {
+            // Agreements read by their terms now (the truth audits, docs/design/rebuild.md 8.2): those named, and every
+            // one a party is in. Not logged; changes nothing.
+            let st = r.kernel().state();
+            let mut ids: Vec<String> = req
+                .get("ids")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                .unwrap_or_default();
+            if let Some(p) = req.get("party").and_then(Value::as_str) {
+                ids.extend(st.agreements_of.get(p).into_iter().flat_map(|v| v.iter().cloned()));
+            }
+            let agreements: Vec<Value> = ids
+                .iter()
+                .filter_map(|id| {
+                    let stored = st.records.get(id)?;
+                    let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
+                    Some(json!({ "id": id, "template": terms.template, "parties": terms.parties, "reading": st.reading(id)? }))
+                })
+                .collect();
+            Ok(json!({ "ok": true, "agreements": agreements }))
+        }
         "state" => {
             let hash = r.kernel().state_hash().map_err(|e| e.to_string())?;
             Ok(json!({ "ok": true, "t": r.kernel().t(), "state_hash": hash, "head": r.head() }))

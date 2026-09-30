@@ -10,7 +10,7 @@ import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
-import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
+import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, prohibitions, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
@@ -226,7 +226,7 @@ export const builder: BehaviourModule = {
     let wage: number = p.wage; // (an enterprise agreement raises it)
     const bargaining = new Bargaining(ctx.entity);
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
-    return stepper(
+    return Object.assign(stepper(
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
@@ -412,7 +412,7 @@ export const builder: BehaviourModule = {
           "A letter asking about work: answering with our prices and how we take on a job."));
         return steps;
       },
-    );
+    ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };
 

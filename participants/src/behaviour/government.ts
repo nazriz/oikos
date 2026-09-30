@@ -9,7 +9,7 @@ import { cents } from "../money";
 import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
+import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, cellsOf, DAY, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote } from "./common";
 import { Staffing, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
@@ -257,7 +257,7 @@ export const financeOfficer: BehaviourModule = {
     const letters = new Letters();
     // The town account's money in and out, as the office sees it (for its reports).
     const flows: { t: number; amount: number; party: string }[] = [];
-    return stepper(
+    return Object.assign(stepper(
       (obs) => {
         book.absorb(obs);
         payroll.absorb(obs);
@@ -334,7 +334,7 @@ export const financeOfficer: BehaviourModule = {
         }));
         return steps;
       },
-    );
+    ), { beliefs: (): Belief[] => payroll.beliefs(book) });
   },
 };
 
@@ -534,7 +534,7 @@ export const works: BehaviourModule = {
     let month = -1;
     let collectedKg = 0;
     const annual = Math.floor((p.wage * 365 * DAY) / p.period);
-    return stepper(
+    return Object.assign(stepper(
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
@@ -658,7 +658,7 @@ export const works: BehaviourModule = {
         }));
         return steps;
       },
-    );
+    ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };
 

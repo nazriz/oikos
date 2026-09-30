@@ -20,7 +20,7 @@ const WORKING_DAY = 8 * HOUR;
 /** The builder's crew: its yard's places, and the crew it starts with (sized to its usual work, not its room). */
 const CREW = { capacity: 12, start: 4 };
 
-export const GENERATOR_VERSION = "0.15.0";
+export const GENERATOR_VERSION = "0.16.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -341,7 +341,7 @@ export function generate(spec: TownSpec): any {
         template: "membership", parties: ["union", c.id],
         commitments: [{ who: "union", does: { text: `The union represents ${c.id} at work, and bargains for them.` } },
           { who: c.id, does: { outcome: { money: { to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } } }, every: MONTH }],
-        termination: [{ party: "union", notice: MONTH }] } });
+        termination: [{ party: "union", notice: MONTH }, { party: c.id, notice: Math.max(1, U.resignation_notice_days * DAY) }] } });
       for (const party of ["union", c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: ["union", c.id], speaks_for: party, agreement: mem, as: party });
       records.push({ id: `${mem}-dues`, record: "statement", author: "genesis", at: 0, visible_to: [c.id, "bank"], speaks_for: c.id, kind: "request", addressed_to: ["bank"], basis: mem,
         text: "Please pay my union dues monthly.", data: { outcome: { money: { from: `acc-${c.id}`, to: "acc-union", amount: String(U.dues_per_month), for: "Union dues." } }, every: MONTH, first: (1 + unionPick.below(30)) * DAY } });
@@ -390,7 +390,8 @@ export function generate(spec: TownSpec): any {
       const mem = `${g.id}-member-${c.id}`;
       records.push({ id: mem, record: "agreement", author: "genesis", at: 0, visible_to: [g.id, c.id], terms: {
         template: "membership", parties: [g.id, c.id],
-        commitments: [{ who: g.id, does: { text: `The ${g.name} counts ${c.id} among its members.` } }, { who: c.id, does: { outcome: { attend: { practice: g.gathering } } } }] } });
+        commitments: [{ who: g.id, does: { text: `The ${g.name} counts ${c.id} among its members.` } }, { who: c.id, does: { outcome: { attend: { practice: g.gathering } } } }],
+        termination: [{ party: c.id, notice: Math.max(1, G.leave_notice_days * DAY) }] } });
       for (const party of [g.id, c.id]) records.push({ id: `${mem}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: [g.id, c.id], speaks_for: party, agreement: mem, as: party });
       if (g.teaching) believe(c.id, g.teaching, 8_000); // a member holds it strongly
     }
@@ -648,7 +649,7 @@ export function generate(spec: TownSpec): any {
   // and the shops' prices (what its claims follow).
   office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }, lawBook,
     { id: "closures", kind: "records", match: { statement_kinds: ["closure"] } }],
-    code("union.organiser", { employers: [...factories, ...shops, "builder"], claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, dues_account: "acc-union" }));
+    code("union.organiser", { employers: [...factories, ...shops, "builder"], claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, resignation_notice_days: V.unions.resignation_notice_days, dues_account: "acc-union" }));
   office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"] } }],
     code("world.disposal", { kind: "waste", price_per_tonne: SV.landfill_levy_per_tonne, account: "acc-outside" }));
   // Rates (docs/behaviour/public-finance.md): the rates officer levies them on the valuer's valuations, under the rating law.

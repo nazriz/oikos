@@ -61,7 +61,21 @@ export interface ParticipantContext {
 export interface Controller {
   /** Called repeatedly while the participant is awake; return {type: "wait"} to sleep. Code modules answer synchronously; model-backed participants return a promise. */
   step(obs: Observation, ctx: ParticipantContext): ParticipantAction | Promise<ParticipantAction>;
+  /** What it believes about the world when a wake is done, typed, for truth audits (docs/design/rebuild.md 8.2): test
+   * and calibration runs check each against the terms' readings. Never used to decide anything. */
+  beliefs?(): Belief[];
 }
+
+/**
+ * A belief a module holds about the world, in a form the platform can check (docs/design/rebuild.md 8.2):
+ * - `agreement`: this agreement is (or isn't) in force;
+ * - `between`: an agreement of this kind is (or isn't) in force between these two parties;
+ * - `held`: these are all the agreements of this kind in force with this party.
+ */
+export type Belief =
+  | { of: "agreement"; agreement: string; in_force: boolean }
+  | { of: "between"; template: string; parties: [string, string]; in_force: boolean }
+  | { of: "held"; party: string; template: string; agreements: string[] };
 
 export interface BehaviourModule {
   /** The name worlds use in controller.impl, e.g. "bank.payment_system". */
