@@ -20,7 +20,26 @@ const WORKING_DAY = 8 * HOUR;
 /** The builder's crew: its yard's places, and the crew it starts with (sized to its usual work, not its room). */
 const CREW = { capacity: 12, start: 4 };
 
-export const GENERATOR_VERSION = "0.16.0";
+/**
+ * How long each act takes whoever does it (docs/design/rebuild.md 6.3): a person's acts take minutes (writing, filling
+ * in, going somewhere), a system's a second. Placeholders, not a place's figures: sourced per place, they'd move to
+ * profiles. Block names as the kernel knows them; a person's `occupy` is going there (travel).
+ */
+const ACT_TIME = {
+  person: {
+    message: 300, publish: 900, withdraw: 300, propose_agreement: 1800, sign_agreement: 600, give_notice: 600, vote: 600,
+    transfer: 300, open_account: 900, close_account: 900, occupy: 900, vacate: 300, leave: 3600, arrive: 3600,
+    work: 300, move_goods: 600, construct: 900, demolish: 900, record_claim: 900, transfer_claim: 900, release_claim: 900,
+    birth: 3600, harm: 300, create_entity: 1800, create_position: 900, appoint: 600, deploy: 1800, retire: 600,
+  },
+  default: 1,
+  sources: {
+    person: "Placeholder: minutes for a person's act (5 for a message, 15 to fill in or go somewhere, 30 to draft an agreement, an hour to leave or arrive), to be sourced (time-use surveys, the Terrarium time model: docs/design/rebuild.md 6.3).",
+    default: "Placeholder: a second for a system's act (software).",
+  },
+};
+
+export const GENERATOR_VERSION = "0.17.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -811,6 +830,6 @@ export function generate(spec: TownSpec): any {
     templates,
     ...(spec.life === false ? {} : { life }),
     caps: { max_created_entities: 50 },
-    orchestration: { thinking_time: "free" },
+    orchestration: { thinking_time: "free", act_time: ACT_TIME },
   };
 }

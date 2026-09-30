@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.19.0",
+  version: "0.20.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -1001,7 +1001,8 @@ export const citizen: BehaviourModule = {
           mind.learn("practice", attending.practice, got ? Math.min(10_000, Math.round(Math.log1p(others.length) * 2_500) + meaning) : 0);
           if (got) strengthen(attending.host, Math.round((p.belief.display_bps * Math.min(20, others.length)) / 20));
           if (got) {
-            steps.push(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
+            // (Before anything else: it's over now. Acts take time, so a plan's order is the order things get done.)
+            steps.unshift(because(`${attending.host}'s gathering is over (${others.length} others were there): going home.`, moveOut(attending.space, me)));
             companyAt.set(attending.practice, others.length);
             for (const o of others) {
               talked.set(o, t);
@@ -1031,7 +1032,7 @@ export const citizen: BehaviourModule = {
             if (going.get(r.id) === start && !attending) {
               going.delete(r.id);
               attending = { practice: r.id, host, space: pr.at, until: start + lasts };
-              if (!inside(pr.at)) steps.push(because(`Going to ${host}'s gathering.`, moveIn(pr.at)));
+              if (!inside(pr.at)) steps.unshift(because(`Going to ${host}'s gathering.`, moveIn(pr.at))); // (first: it's on now)
             }
           } else if (start - t <= 7 * DAY && decidedFor.get(r.id) !== start) {
             // The first time: our routine, as it stands. We go if a membership of ours says we take part (and know it for
@@ -1562,8 +1563,9 @@ export const citizen: BehaviourModule = {
           }
           return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY));
         }
-        // (Planned when a wake begins; woken because an act of ours is done, we carry on with the plan: the stepper.)
-        if (plannedAt !== obs.t && obs.woke_for !== "done") {
+        // (Planned when a wake begins; woken because an act of ours is done, we carry on with the plan, and plan afresh
+        // only once it's done: the stepper.)
+        if (plannedAt !== obs.t && (obs.woke_for !== "done" || todo.length === 0)) {
           const acc = ownBanked(obs, me);
           const usual = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
           if (cheaperThan && (home || obs.t >= cheaperThan.until)) cheaperThan = null;
