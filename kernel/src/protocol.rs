@@ -155,6 +155,13 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             sched.as_mut().ok_or("no run started")?.to_cadence(str_field("participant")?, t);
             Ok(json!({ "ok": true }))
         }
+        // Invariance tests only (never a research run): extra wakes, seeded.
+        "perturb" => {
+            let p = crate::schedule::Perturb { extra_wakes_bps: req["extra_wakes_bps"].as_u64().unwrap_or(0) as u32, seed: req["seed"].as_u64().unwrap_or(0) };
+            sched.as_mut().ok_or("no run started")?.perturb(p);
+            r.annotate(json!({ "annotation": "note", "subject": "orchestrator", "data": { "perturbed": { "extra_wakes_bps": p.extra_wakes_bps, "seed": p.seed } } })).map_err(|e| e.to_string())?;
+            Ok(json!({ "ok": true }))
+        }
         "finished" => {
             let t = r.kernel().t();
             sched.as_mut().ok_or("no run started")?.finished(str_field("key")?, req["until"].as_i64(), t);

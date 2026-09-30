@@ -38,9 +38,19 @@ struct Unit {
     done_at: Option<i64>,
 }
 
+/// A perturbation for invariance tests (docs/design/rebuild.md 6.6, 8.1), never for research runs: each wake, with
+/// this chance, the unit's next wake comes early (somewhere before its cadence, on a tick), as if something woke it.
+/// Nothing a module computes per period should move when it's woken more often.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Perturb {
+    pub extra_wakes_bps: u32,
+    pub seed: u64,
+}
+
 #[derive(Debug, Default)]
 pub struct Scheduler {
     tick: i64,
+    perturb: Option<Perturb>,
     units: BTreeMap<String, Unit>,
     /// (next wake, key): the queue.
     queue: BTreeSet<(i64, String)>,
@@ -61,6 +71,23 @@ pub enum Next {
 impl Scheduler {
     pub fn new(tick: i64) -> Self {
         Self { tick, moment_at: -1, ..Default::default() }
+    }
+
+    pub fn perturb(&mut self, p: Perturb) {
+        self.perturb = (p.extra_wakes_bps > 0).then_some(p);
+    }
+
+    /// A deterministic draw in [0, n) for a unit at a time (splitmix64 over the seed, the key and the time).
+    fn draw(seed: u64, key: &str, t: i64, n: u64) -> u64 {
+        let mut x = seed ^ (t as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        for b in key.bytes() {
+            x = (x ^ b as u64).wrapping_mul(0x0100_0000_01B3);
+        }
+        x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = x;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        (z ^ (z >> 31)) % n.max(1)
     }
 
     fn ceil(&self, t: i64) -> i64 {
@@ -176,6 +203,13 @@ impl Scheduler {
             // (Its cadence, if it waits without a time.)
             u.next_wake = t + (u.cadence.div_euclid(self.tick) * self.tick + if u.cadence.rem_euclid(self.tick) == 0 { 0 } else { self.tick });
             u.wake_for = "cadence";
+            if let Some(p) = self.perturb {
+                // (Test mode: sometimes sooner, on a tick before its cadence is up.)
+                let ticks = (u.cadence / self.tick).max(1) as u64;
+                if Self::draw(p.seed, &key, t, 10_000) < p.extra_wakes_bps as u64 && ticks > 1 {
+                    u.next_wake = (t.div_euclid(self.tick) + 1 + Self::draw(p.seed ^ 1, &key, t, ticks - 1) as i64) * self.tick;
+                }
+            }
             self.queue.insert((u.next_wake, key.clone()));
             cohort.push((key, u.woke_for, u.since));
         }

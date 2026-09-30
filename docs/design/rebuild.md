@@ -485,6 +485,8 @@ Proposed together, for one sign-off:
 - **R2, the resolver in the engine** (2026-09-30): `kernel/crates/resolver`, which holds the call language, what each seat knows, and the resolver. It's a port of `translator/src/{resolver,knowledge}.ts` and `participants/src/calls.ts`. The engine keeps each seat's knowledge from the observations it delivers, and resolves calls itself (the protocol's `resolve`): every code module's act, and a model seat's drafts.
   - **Checked:** shadow mode (`TERRARIUM_RESOLVER=shadow`) resolves every call both ways. There were no differences in 26,920 calls over 60 days of the 1,000-person town, and none across the whole test suite, where a difference fails the test. The same final state.
   - **Still in TypeScript:** a model seat's draft preview and law warnings (they read the seat's knowledge there too). They move with the `law` crate.
+- **R2, invariance** (2026-09-30): the engine's scheduler can perturb a run for tests (`perturb`: seeded extra wakes, recorded in the log; never a research run). `orchestrator/test/invariance.test.ts` runs a 200-person town for 120 days as it is, and again with about 12% more wakes. Goods bought, orders, payments, factory output, shop service and waste collected must each stay within 10%. They do. The builder's building work moved about 20% on one seed, through different hires, and is left out as too lumpy to judge on one seed.
+  - Not done from 6.6: shuffling acts done at the same second, splitting payments, and scaling act times. The last needs no mode: a world's `act_time` table is the knob.
 - **Next:**
   1. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
   2. R4 and R5.

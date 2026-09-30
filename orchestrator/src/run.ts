@@ -69,6 +69,9 @@ export interface RunOptions {
   consult?: boolean;
   /** Kinds (and things) the sparse mind leaves out: an audit's `avoid` (consult-audit). */
   consultAvoid?: string[];
+  /** Invariance tests only (docs/design/rebuild.md 8.1): extra wakes, seeded (basis points of wakes followed by an early
+   * one). Never a research run; the log says so. */
+  perturb?: { extraWakesBps: number; seed: number };
   /** Truth audits (docs/design/rebuild.md 8.2): each code module's beliefs, when a wake is done, checked against the
    * terms' readings; divergences recorded as `audit` annotations. For tests and calibration runs. */
   audit?: boolean;
@@ -264,6 +267,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   } } : a);
 
   await k.request({ op: "start", config: cfg, run_id: o.runId, log_path: logPath, anchors_path: anchorsPath });
+  if (o.perturb) await k.request({ op: "perturb", extra_wakes_bps: o.perturb.extraWakesBps, seed: o.perturb.seed });
 
   // Every model call (participants, translator, debriefs) is recorded as it happens.
   const brains = new Map<string, MockBrain>(); // filled below, as mock participants are created
