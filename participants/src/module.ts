@@ -97,7 +97,12 @@ export interface BehaviourModule {
  * annotations, for full logs.
  */
 export const DECISIONS = Symbol.for("terrarium.decisions");
-export interface DecisionRecord { t: number; domain: string; strategy: string; choice?: string; options: { key: string; score: number }[] }
+/** `state`: the mind's state behind it (contracts-0.7 A2): needs, satisfaction and certainty, and the strongest feeling,
+ * beliefs held and goal pursued when there are any. */
+export interface DecisionRecord {
+  t: number; domain: string; strategy: string; choice?: string; options: { key: string; score: number }[];
+  state?: { mind: string; needs: { [need: string]: number }; satisfaction: number; certainty: number; emotion?: { kind: string; about: string; bps: number }; beliefs?: { [assertion: string]: number }; goal?: { goal: string; method: string } };
+}
 
 export const wait = (until?: number): ParticipantAction => (until === undefined ? { type: "wait" } : { type: "wait", until });
 export const act = (blocks: Block[], reasoning?: string): ParticipantAction => (reasoning ? { type: "act", blocks, reasoning } : { type: "act", blocks });

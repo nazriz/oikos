@@ -881,9 +881,7 @@ See the design note, §16.
   - **Starting beliefs are per-person participant parameters,** from the census share and memberships: the mind's state, not the world's.
   - **Measured as stated,** since belief is internal: `town/beliefs` reads what people say, as a survey would.
   - **Why no decision-record change:** recording belief strengths would change the `CitizenDecision` contract, which needs sign-off.
-  - **Proposed for sign-off (not done):**
-    - a structured `claim` on statements, for things put forward to be believed, so code needn't recognise the kind `teaching`;
-    - belief strengths in `CitizenDecision`, for training data.
+  - **Since done** (2026-10-01): beliefs attach to statements carrying an `assertion` (contracts 0.7 A1), not to the kind `teaching`; decisions carry the mind's `state`, beliefs included (A2).
   - **Revisit if:** a practising-share or stated-affiliation target is sourced; belief needs to attach to any statement (rumour, news, a mayor's promise), which is the `claim` field; or conversion rates need calibrating.
 
 - **AI citizens, step 6: feelings and ties** (docs/design/ai-citizens.md "Progress"; docs/behaviour/citizen.md "Feelings and ties").
@@ -903,7 +901,7 @@ See the design note, §16.
 - **AI citizens, step 8: the sparse mind, plumbed and off by default** (docs/design/ai-citizens.md section 4 and "Progress"; participants/src/llm/consult.ts).
   - **The plumbing:** code participants get a `consult` on their context when a run turns it on (`--consult`; recorded in a note; resume reads it back). It asks through the run's model I/O, so calls are logged, priced, budgeted and replayed like any other. Answers are remembered by kind of person and thing, for the run only. A citizen returns its pending question with its action, so the orchestrator waits for it inside the cohort and the log's order doesn't depend on which call came back first.
   - **Used for** joining the union and starting a business: the answer shifts the cited rate.
-  - **Why purpose `participant`:** it is the participant's own call, and a new purpose would change the log contract. **Proposed for sign-off:** a `consult` purpose in the usage annotation.
+  - **Why purpose `participant`:** it is the participant's own call, and a new purpose would change the log contract. (Since contracts 0.7: its own `consult` purpose.)
   - **Before any real-model run:** the design's robustness audit and fidelity check; and Naz's go-ahead for paid calls (mock-first rule; Codex pilots are approved).
   - **Revisit if:** the kinds are too fine (every person asks) or too coarse (everyone alike); or answers swing with wording.
 
@@ -1072,6 +1070,13 @@ See the design note, §16.
 
 - **A wake asked for between ticks takes the next tick, not a whole tick on** (2026-09-30; kernel `schedule.rs` `finished`). A unit woken by news between ticks, asking to wake again at a gathering's end ten minutes later, was put a whole tick (an hour) on: people stayed at the hall an hour past its end. Now the soonest is the next tick boundary after now; for a wake on a tick (the usual), that's the same as before.
   - **Revisit if:** a finer clock is wanted for news (then wakes on exact times, which the tick exists to batch).
+
+- **Contract revision, 2026-10-01** (Naz: "yes to all"; docs/design/world-expansion.md §1; contracts/README.md "Changes from v0.7").
+  - **Periodic tenancies:** `then: "periodic"` on an agreement's terms. Leases where the world's tenancy law says so (the profile's `tenancy.after_fixed_term`) run on past their term until notice. Landlords renew only leases that would end. A test runs 13 months and finds no tenancy ended without notice.
+  - **Ratified as built:** `log.detail`, the run dataset format, `notices`, `framing.debrief_text`.
+  - **Already in 0.7, now used:** beliefs attach to `assertion`s (so news, promises and rumours can be believed); decisions carry the mind's `state`; the `consult` purpose.
+  - **Deferred still:** B13 (compact logs), B1 (generated types). Construction payments fold into materials from suppliers (world-expansion §6.1).
+  - **Revisit if:** a place's law lets a landlord end a periodic tenancy only for reasons: then the reasons are the landlord's to give, and a tribunal's to judge (§5).
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 

@@ -487,6 +487,9 @@ class Resolver {
     const theirs = this.outcome(this.raw(c, "they_do"), other);
     const commitments = [...(ours ? [{ who: me, ...ours }] : []), ...(theirs ? [{ who: other, ...theirs }] : [])];
     const term = this.seconds(c, "term");
+    // After the term: it may continue, periodically, until ended by notice.
+    const then = this.str(c, "then") || undefined;
+    if (then !== undefined && then !== "periodic") throw new Ask(`After its term, an agreement can only continue periodically (then=periodic), not "${then}".`);
     const termination = [
       ...(this.has(c, "our_notice") ? [{ party: me, notice: this.seconds(c, "our_notice")! }] : []),
       ...(this.has(c, "their_notice") ? [{ party: other, notice: this.seconds(c, "their_notice")! }] : []),
@@ -497,7 +500,7 @@ class Resolver {
       {
         block: "propose_agreement", ref, speaks_for: me, ...(this.id(c, "basis") ? { basis: this.id(c, "basis") } : {}),
         ...(this.visible(c) ? { visible_to: this.visible(c) } : {}),
-        terms: { ...(this.str(c, "template") ? { template: this.str(c, "template") } : {}), parties: [me, other], commitments, ...(term ? { term } : {}), ...(termination.length ? { termination } : {}), ...(text ? { text } : {}) },
+        terms: { ...(this.str(c, "template") ? { template: this.str(c, "template") } : {}), parties: [me, other], commitments, ...(term ? { term } : {}), ...(then ? { then } : {}), ...(termination.length ? { termination } : {}), ...(text ? { text } : {}) },
       },
       { block: "sign_agreement", agreement: `$${ref}`, as: me },
     ];

@@ -10,7 +10,7 @@ use serde::Serialize;
 use terrarium_contracts::blocks::AgreementTerms;
 
 /// This reader's version, stated on every reading.
-pub const READER: &str = "terms-0.1.0";
+pub const READER: &str = "terms-0.2.0";
 
 /// A mark made on an agreement: who (the party signed or gave notice as), and when.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,7 +34,8 @@ pub struct Reading {
 /// Reads an agreement at `now`, from its terms and the signatures and notices made on it.
 ///
 /// - **Offered** until every party has signed.
-/// - **In force** from the last party's signature: until its term runs out, if it has one (`ends_at`).
+/// - **In force** from the last party's signature: until its term runs out, if it has one (`ends_at`). An agreement
+///   whose terms say it continues after its term (`then: periodic`) isn't ended by it: it runs on until ended by notice.
 /// - **Ending** once a party has given notice under a termination clause of its own: it ends when that notice
 ///   period runs out (`ends_at`). A notice from a party the terms give no clause to ends nothing, by the terms.
 /// - **Ended** once the earliest of those has come: by the term, or by notice.
@@ -51,7 +52,7 @@ pub fn read(terms: &AgreementTerms, signatures: &[Mark], notices: &[Mark], now: 
     let Some(from) = signed_at.filter(|_| !terms.parties.is_empty()) else {
         return reading("offered", None, None);
     };
-    let by_term = terms.term.map(|d| from.saturating_add(d));
+    let by_term = if terms.then.as_deref() == Some("periodic") { None } else { terms.term.map(|d| from.saturating_add(d)) };
     // The earliest notice to run out, under the notice-giver's own clause (a notice before the agreement was in
     // force counts from when it came into force).
     let by_notice = notices
@@ -125,6 +126,19 @@ mod tests {
         let t = terms(None, &[("union", 30 * DAY)]);
         let r = read(&t, &[m("union", 0), m("c1", 0)], &[m("c1", 10 * DAY)], 400 * DAY);
         assert_eq!(r.status, "in_force");
+    }
+
+    #[test]
+    fn a_periodic_agreement_runs_on_after_its_term_until_notice() {
+        let mut t = terms(Some(365 * DAY), &[("union", 60 * DAY)]);
+        t.then = Some("periodic".into());
+        let s = [m("union", 0), m("c1", 0)];
+        let r = read(&t, &s, &[], 400 * DAY);
+        assert_eq!((r.status, r.ends_at, r.ended_by), ("in_force", None, None));
+        let r = read(&t, &s, &[m("union", 500 * DAY)], 520 * DAY);
+        assert_eq!((r.status, r.ends_at, r.ended_by), ("ending", Some(560 * DAY), Some("notice")));
+        let r = read(&t, &s, &[m("union", 500 * DAY)], 560 * DAY);
+        assert_eq!((r.status, r.ended_by), ("ended", Some("notice")));
     }
 
     #[test]

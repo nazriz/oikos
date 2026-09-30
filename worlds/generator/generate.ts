@@ -39,7 +39,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.19.0";
+export const GENERATOR_VERSION = "0.20.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -388,7 +388,7 @@ export function generate(spec: TownSpec): any {
   const beliefs = new Map<string, { [teaching: string]: number }>();
   const believe = (who: string, teaching: string, bps: number) => beliefs.set(who, { ...(beliefs.get(who) ?? {}), [teaching]: Math.max(bps, beliefs.get(who)?.[teaching] ?? 0) });
   if (U.teaching) {
-    records.push({ id: "union-teaching", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "union", kind: "teaching", text: U.teaching });
+    records.push({ id: "union-teaching", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "union", kind: "teaching", text: U.teaching, assertion: { that: U.teaching } });
     for (const m of unionMembers) believe(m.member, "union-teaching", 7_000);
   }
   const G = V.groups;
@@ -401,7 +401,7 @@ export function generate(spec: TownSpec): any {
       const name = per > 1 ? `${spec.name} ${g.name} ${i}` : `${spec.name} ${g.name}`;
       entities.push({ id, kind: "group", name });
       groups.push({ id, name, gathering: `${id}-gathering`, teaching: g.teaching ? `${id}-teaching` : undefined, held: g.held_at_start_bps });
-      if (g.teaching) records.push({ id: `${id}-teaching`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: id, kind: "teaching", text: g.teaching });
+      if (g.teaching) records.push({ id: `${id}-teaching`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: id, kind: "teaching", text: g.teaching, assertion: { that: g.teaching } });
       records.push({ id: `${id}-gathering`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: id, kind: "notice",
         text: `The ${g.name} meets at the town hall every ${g.every_days} days, 7pm, for ${g.lasts_minutes} minutes. All welcome.`,
         practice: { at: hall, every: g.every_days * DAY, first: evening(n++), lasts: g.lasts_minutes * 60, roles: [{ role: "member", open: true }] } });
@@ -473,6 +473,7 @@ export function generate(spec: TownSpec): any {
         { who: lh, does: { outcome: { money: { from: `acc-${lh}`, to: `acc-${home.landlord}`, amount: String(home.rent), for: "rent" } } }, every: MONTH },
       ],
       term: Math.max(MONTH, term - elapsed),
+      ...(V.tenancy.after_fixed_term ? { then: V.tenancy.after_fixed_term } : {}),
       termination: [{ party: home.landlord, notice: 60 * DAY }, { party: lh, notice: 30 * DAY }],
       text: `${lh} rents home ${home.space} from ${home.landlord}${others.length ? `, to live there with their household: ${others.map((m) => m.id).join(", ")}` : ""}.` } });
     for (const party of visible) records.push({ id: `${ag}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: visible, speaks_for: party, agreement: ag, as: party });
@@ -719,7 +720,7 @@ export function generate(spec: TownSpec): any {
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
         city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000,
         // Their practice: reviewing rents as often as the law allows here, with the notice it asks (the law itself is a record).
-        rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days }));
+        rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days, ...(V.tenancy.after_fixed_term ? { after_term: V.tenancy.after_fixed_term } : {}) }));
   }
   // What the town's firms sell and buy: their price lists, and the world market's buying offers.
   const market = { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"] } };
@@ -751,7 +752,7 @@ export function generate(spec: TownSpec): any {
     // Enterprise agreements (a rise at work).
     { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] } },
     // Gatherings: whatever holds one, in whatever words (a statement having a practice); and what groups teach.
-    { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { statement_kinds: ["teaching"] } }];
+    { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { has: ["assertion"] } }];
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {

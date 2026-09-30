@@ -411,6 +411,9 @@ pub struct AgreementTerms {
     pub commitments: Vec<Commitment>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub term: Option<i64>,
+    /// After the term: `periodic`, it continues until ended by notice (absent: it ends with its term).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub then: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub termination: Option<Vec<Termination>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -30,7 +30,7 @@ export interface Profile {
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number };
     retirement_age: number;
     labour_force_participation_bps: number;
-    tenancy: { rent_review_months: number; rent_increase_notice_days: number };
+    tenancy: { rent_review_months: number; rent_increase_notice_days: number; after_fixed_term?: "periodic" };
     values: { [value: string]: { mean_bps: number; sd_bps: number } };
     industrial_action: { ballot_turnout_bps: number; ballot_pass_bps: number; notice_days: number; paid_during_action: boolean };
     world_price_process: { [kind: string]: { sd_bps: number; persistence_bps: number } };

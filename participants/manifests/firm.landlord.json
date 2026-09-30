@@ -1,8 +1,13 @@
 {
   "name": "firm.landlord",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "doc": "docs/behaviour/firms.md",
   "params": {
+    "after_term": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "arrears_months_before_notice": {
       "schema": {
         "type": "integer"

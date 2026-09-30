@@ -35,7 +35,7 @@ import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Hea
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
-import { factsOf, Feelings, Mind, MIND_DEFAULTS, Pursuit, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
+import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
 /** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
  * certainty a gathering takes it (with 20 or more others there), and being told; how strongly it's held to say so, and
@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.22.0",
+  version: "0.23.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -296,7 +296,13 @@ export const citizen: BehaviourModule = {
     const MONEY_MATTERS = new Set(["shop", "job", "home"]);
     const decide = (domain: string, t: number, rng: Rng, o: Parameters<Mind["decide"]>[2]) => {
       const d = mind.decide(domain, rng, { doubt: MONEY_MATTERS.has(domain) ? Math.round(feelings.level("fear", "money", t) / 2) : 0, ...o });
-      decided.push({ t, domain, strategy: d.strategy, ...(d.key !== undefined ? { choice: d.key } : {}), options: d.scores.length ? d.scores : o.options.map((x) => ({ key: x.key, score: 0 })) });
+      // (With the mind's state behind it: training data for citizen models, contracts-0.7 A2.)
+      const emotion = feelings.strongest(t);
+      const held = Object.fromEntries([...beliefs].filter(([, b]) => b > 0).sort(([a], [b]) => (a < b ? -1 : 1)));
+      const goal = [...pursuits.values()].find((x) => x.method !== undefined);
+      decided.push({ t, domain, strategy: d.strategy, ...(d.key !== undefined ? { choice: d.key } : {}), options: d.scores.length ? d.scores : o.options.map((x) => ({ key: x.key, score: 0 })),
+        state: { mind: MIND_VERSION, needs: { ...levelsNow }, satisfaction: d.satisfaction ?? 0, certainty: d.certainty ?? 0,
+          ...(emotion ? { emotion } : {}), ...(Object.keys(held).length ? { beliefs: held } : {}), ...(goal ? { goal: { goal: goal.goal, method: goal.method! } } : {}) } });
       return d;
     };
     let levelsNow: NeedLevels = { subsistence: 10_000, shelter: 10_000, security: 10_000, social: 10_000, status: 10_000 }; // as last judged
@@ -344,7 +350,7 @@ export const citizen: BehaviourModule = {
     // Belief: each teaching we know of -> how strongly we hold it (basis points); when it last faded.
     const beliefs = new Map<string, number>(Object.entries(p.beliefs as { [k: string]: number }));
     let fadedAt: number | null = null;
-    const teachingsOf = (host: string) => book.open("teaching").filter((r) => (r.speaks_for ?? r.author) === host);
+    const teachingsOf = (host: string) => book.assertions().filter((r) => (r.speaks_for ?? r.author) === host);
     /** How strongly we hold what someone teaches (the most of their teachings). */
     const holdTo = (host: string) => Math.max(0, ...teachingsOf(host).map((r) => beliefs.get(r.id) ?? 0));
     /** Nearer certainty, by a share of the way (basis points of it). */
@@ -1409,9 +1415,9 @@ export const citizen: BehaviourModule = {
       job ? CATCHING_UP.work(job.employer, !job.claimed) : "",
       job && p.union ? CATCHING_UP.union(isMember()) : "",
       ...[...wentLast].sort().map((id) => book.records.get(id)).flatMap((r) => (r?.record === "statement" && r.speaks_for ? [CATCHING_UP.goes(r.speaks_for)] : [])),
-      ...[...new Set(book.open("teaching").filter((r) => (beliefs.get(r.id) ?? 0) >= p.belief.tell_at_bps).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.holds),
+      ...[...new Set(book.assertions().filter((r) => (beliefs.get(r.id) ?? 0) >= p.belief.tell_at_bps).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.holds),
       // (Held less firmly, but still one's own, as someone would answer a census: said, without urging it on anyone.)
-      ...[...new Set(book.open("teaching").filter((r) => { const b = beliefs.get(r.id) ?? 0; return b >= p.belief.affiliate_bps && b < p.belief.tell_at_bps; }).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.leans),
+      ...[...new Set(book.assertions().filter((r) => { const b = beliefs.get(r.id) ?? 0; return b >= p.belief.affiliate_bps && b < p.belief.tell_at_bps; }).map((r) => r.speaks_for ?? r.author))].sort().map(CATCHING_UP.leans),
     ].filter(Boolean).join(" ") || CATCHING_UP.nothing;
     const wordOfMouth = (obs: Observation, t: number, steps: Step[]) => {
       // The buildings around us; in our own we see who's there (they're the people we know).

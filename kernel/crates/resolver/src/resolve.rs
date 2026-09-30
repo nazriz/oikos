@@ -728,6 +728,12 @@ impl Resolver<'_> {
             }
         }
         let term = Self::seconds(c, "term")?.filter(|t| *t != 0);
+        // After the term: it may continue, periodically, until ended by notice.
+        let then = match Self::str_(c, "then")?.filter(|t| !t.is_empty()) {
+            None => None,
+            Some(t) if t == "periodic" => Some(t),
+            Some(t) => return ask(format!("After its term, an agreement can only continue periodically (then=periodic), not \"{t}\".")),
+        };
         let mut termination = vec![];
         if Self::has(c, "our_notice") {
             termination.push(json!({ "party": me, "notice": Self::seconds(c, "our_notice")? }));
@@ -749,6 +755,7 @@ impl Resolver<'_> {
             ("parties", some(json!([me, other]))),
             ("commitments", some(json!(commitments))),
             ("term", term.map(Json::from)),
+            ("then", then.map(Json::from)),
             ("termination", (!termination.is_empty()).then(|| json!(termination))),
             ("text", text.map(Json::from)),
         ]);

@@ -263,7 +263,11 @@ export interface Circumstances { monthly_income: number; savings: number; homele
  * means to them beyond the facts (from what they believe; basis points). */
 export interface Choice { key: string; facts?: Facts; others?: number; meaning?: number }
 
-export interface Decision { key?: string; strategy: Strategy; scores: { key: string; score: number }[] }
+/** The mind that decides, as decision records name it (contracts-0.7 A2: `state.mind`). */
+export const MIND_VERSION = "mind-0.2.0";
+
+/** `satisfaction` and `certainty`: as they stood when it decided (basis points). */
+export interface Decision { key?: string; strategy: Strategy; scores: { key: string; score: number }[]; satisfaction?: number; certainty?: number }
 
 export interface MindParams {
   /** Satisfaction below which a person looks to change (CONSUMAT's aspiration; placeholder). */
@@ -312,6 +316,11 @@ export class Mind {
     // Satisfaction: life as a whole, and, where the caller knows it, how this area has gone (the lower counts).
     const sat = Math.min(satisfaction(this.person, o.levels), o.satisfied_here ?? 10_000);
     const s = strategy(sat, certainty, this.p);
+    const d = this.decideAs(s, rng, options, learned, o);
+    return { ...d, satisfaction: sat, certainty };
+  }
+
+  private decideAs(s: Strategy, rng: Rng, options: Choice[], learned: ReturnType<Mind["learned"]>, o: { current?: string; circ: Circumstances }): Decision {
     const has = (k?: string) => k !== undefined && options.some((x) => x.key === k);
     const scored = (value: (x: Choice) => number) => options.map((x) => ({ key: x.key, score: Math.round(learned.get(x.key) + value(x)) }));
     if (!options.length) return { strategy: s, scores: [] };
@@ -366,6 +375,17 @@ export class Feelings {
   /** Felt at least this strongly now (a stronger feeling isn't lessened by a milder cause). */
   feel(e: Emotion, about: string, bps: number, t: number): void {
     this.felt.set(`${e}:${about}`, { bps: Math.min(10_000, Math.max(this.level(e, about, t), Math.round(bps))), t });
+  }
+
+  /** The strongest feeling now, if any: what it is, about whom, how strong. */
+  strongest(t: number): { kind: string; about: string; bps: number } | undefined {
+    let best: { kind: string; about: string; bps: number } | undefined;
+    for (const k of [...this.felt.keys()].sort()) {
+      const [kind, about] = [k.slice(0, k.indexOf(":")), k.slice(k.indexOf(":") + 1)];
+      const bps = this.level(kind as Emotion, about, t);
+      if (bps > 0 && (!best || bps > best.bps)) best = { kind, about, bps };
+    }
+    return best;
   }
 
   /** Felt more: a share of the way to its strongest. */

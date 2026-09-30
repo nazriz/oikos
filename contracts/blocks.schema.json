@@ -750,6 +750,10 @@
         "term": {
           "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Duration"
         },
+        "then": {
+          "description": "What happens when the term runs out: absent, the agreement ends; \"periodic\", it continues, from one period to the next, until a party ends it by notice under its termination clauses (a fixed-term lease becoming a periodic tenancy, as tenancy law commonly provides).",
+          "const": "periodic"
+        },
         "termination": {
           "type": "array",
           "items": {
@@ -1397,6 +1401,10 @@
             },
             "term": {
               "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Duration"
+            },
+            "then": {
+              "description": "As an agreement's terms: \"periodic\", it continues after its term until ended by notice.",
+              "const": "periodic"
             },
             "termination": {
               "type": "array",

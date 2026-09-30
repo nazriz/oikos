@@ -25,10 +25,11 @@ changes (§9) need sign-off before each part is built. Scope: all three tiers fr
    choice, not a workaround.
 2. **Ratified as they are:** `log.detail`, the run dataset format, `notices` on the observation, and
    `framing.debrief_text`.
-3. **`claim` on statements:** a structured `claim: { text, about? }` for things put forward to be believed (a
-   teaching, a news report, a promise, a rumour). Belief attaches to claims, not to the statement kind `teaching`.
-4. **Belief strengths in `CitizenDecision`** (training data).
-5. **A `consult` purpose** in the usage annotation for the sparse mind's calls.
+3. **Things put forward to be believed:** already in 0.7 as `assertion` (`claim` is a legal position here). Beliefs
+   now attach to it, not to the statement kind `teaching`, so news, promises and rumours can be believed too.
+4. **Belief strengths in decisions:** already in 0.7 as the decision's mind `state`; now filled in (needs,
+   satisfaction, certainty, the strongest feeling, beliefs, goal).
+5. **A `consult` purpose:** already in 0.7, and used.
 6. B13 (compact logs) and B1 (generated types) stay deferred. Construction payments are folded into §6.1 (materials
    from suppliers).
 
@@ -83,6 +84,81 @@ species listed under the state's Flora and Fauna Guarantee Act, with densities a
 statements (to source). Proportional fidelity: a few species, chosen for what they're sensitive to (a wetland frog to
 water quality, a woodland glider to fragmentation, a common grassland bird as a control), not an ecosystem.
 
+### 2.4 The contract, exactly (for sign-off)
+
+**Catalogue** (world config), all optional: a world without them has no nature, as now.
+
+```yaml
+land_covers:                      # what unbuilt ground is; a cell's `terrain` names one
+  - id: woodland
+  - id: cleared                   # what's left when a building comes down
+    succeeds_to: { cover: scrub, after_days: 1825 }
+  - id: scrub
+    succeeds_to: { cover: woodland, after_days: 7300 }
+  - id: water                     # the river: its cells carry the flow layer
+fields:                           # integer quantities on cells
+  - id: pollution
+    min: 0
+    max: 1000000
+    baseline: 0
+    decay_bps_per_day: 200        # toward the baseline
+    diffusion_bps_per_day: 500    # to the four neighbours
+    flows: true                   # carried downstream along the flow layer
+    from_structures: { factory-works: 50 }   # per structure of the type, per day
+    from_covers: { farmland: 1 }
+species:
+  - id: wetland-frog
+    capacity: { wetland: 60, water: 10 }     # a cell's carrying capacity, by cover
+    growth_bps_per_year: 9000                # r, the intrinsic rate (logistic)
+    dispersal_bps_per_year: 2000             # the share that leaves for a neighbour cell
+    barriers: [built]                        # covers it can't cross
+    min_viable: 4                            # below this in a cell, it fails there
+    tolerance: { pollution: { above: 500, mortality_bps_per_day: 50 } }
+    detection_bps: 6000                      # a survey's chance of finding each one there
+    conspicuous: false                       # whether passers-by notice it
+tasks:
+  - id: survey                    # measurement is work
+    labour: 3600                  # per cell surveyed
+    surveys: true
+```
+
+- **Structure types** gain an optional `cover` (a park is `grassland`); built cells are otherwise the reserved cover
+  `built`.
+- **World:**
+  - `populations: [{ species, cell, count }]` at the start;
+  - `fields: [{ field, cell, value }]`, sparse;
+  - `flows: [{ from, to }]`, cell to downstream cell, the river's course.
+
+**Physics** (the kernel, daily, at the day's start; keyed randomness per species, cell and day):
+
+1. Covers succeed after their unbuilt days.
+2. Fields: sources, then decay, then diffusion, then flow.
+3. Populations:
+   - growth, logistic toward capacity, stochastically rounded (so small populations can fail);
+   - deaths from fields past tolerance;
+   - dispersal to neighbours that aren't barriers;
+   - a cell below `min_viable` fails.
+4. A species at zero everywhere is **extinct**: recorded once, permanent. Nothing can add it back.
+
+**Blocks and outcomes:**
+- `work` with a `surveys` task takes `survey: { of, cells }`: the species or field, and the cells.
+- Performers' time is charged per cell.
+- The outcome, seen only by the actor, carries estimates:
+  - for a species, each individual found with `detection_bps`;
+  - for a field, the value with an error of ±`detection_bps` of it.
+- What the actor then publishes, honestly or not, is theirs.
+
+**Events:**
+- `species_extinct`.
+- A monthly `nature_census` of the truth (species totals and cover areas by place), for measurement. No participant
+  perceives it.
+
+**Observation:** cells in `sites` views show their cover. A `conspicuous` species shows as `seen: true` where any are
+present, never as a count.
+
+**Why daily, not lazily** like structure variables: diffusion and dispersal couple neighbouring cells, so each day
+must be stepped. At 4,800 cells, three fields and three species, that's small next to a day of acts.
+
 ## 3. Elections and information (tier 1)
 
 - **Elections** (modules and records; the kernel already has ballots, votes and appointments):
@@ -90,17 +166,17 @@ water quality, a woodland glider to fragmentation, a common grassland bird as a 
     council elections: preferential or proportional voting, compulsory for residents.
   - An electoral office runs nominations, the roll (adult residents), the ballot and the count, and appoints the
     winner.
-  - Candidates: the incumbent seat (model or code), and code challengers with platforms (statements with claims).
+  - Candidates: the incumbent seat (model or code), and code challengers with platforms (statements with assertions).
   - **How citizens vote** (the citizen's mind): retrospective and economic voting (Fiorina 1981; Lewis-Beck and
     Stegmaier 2000). They weigh their own fortunes, the town's that they've heard about, their anger at the town,
     their values against the platforms, and turnout's cost (zero where voting is compulsory).
 - **The information environment:**
   - A **local newspaper** (a firm and a position) reads the public records (budgets, laws, ballot results, petitions,
-    the environment report, court rulings) and publishes reports. Each is a statement with a `claim`, chosen by
+    the environment report, court rulings) and publishes reports. Each is a statement with an `assertion`, chosen by
     newsworthiness and its own leaning (a parameter).
   - Citizens read it, some regularly and some not (a profile rate), and it feeds their beliefs about the town and the
     mayor, with word of mouth as now.
-  - Promises and rumours are claims too, so they can be believed, checked and broken.
+  - Promises and rumours are assertions too, so they can be believed, checked and broken.
 
 ## 4. Public services (tier 1)
 
@@ -152,6 +228,9 @@ water quality, a woodland glider to fragmentation, a common grassland bird as a 
   uses the person's timeline, as acts do now.
 - **Roads are structures** the town builds and maintains (wear, as now). Commuting time counts against a job's
   appeal (the mind's appraisal).
+- **A daily round:** today a worker occupies their workplace from hire to leaving, and never goes home. So a housemate
+  doesn't see a death at home for weeks (found 2026-10-01), and nobody is home at night. With travel time, people go
+  to work and come home each working day, and see what's there.
 - Proportional fidelity: no traffic or congestion, no vehicles as things, and no public transport at first.
 
 ## 7. Tier 3
@@ -180,7 +259,7 @@ water quality, a woodland glider to fragmentation, a common grassland bird as a 
 
 | # | Part | Rust | TypeScript | Done when |
 |---|---|---|---|---|
-| 1 | Contract revision (§1) | `terms` (periodic) | landlord, citizen, belief via `claim` | Suite passes; soak clean |
+| 1 | Contract revision (§1) | `terms` (periodic) | landlord, citizen, belief via `assertion` | Suite passes; soak clean |
 | 2 | Nature (§2) | `terrarium-nature`: covers, fields, populations, surveys, extinction | environment officer, planning, generator's landscape | A 5-year run where building on habitat measurably shrinks a species, and a survey sees it |
 | 3 | Elections and information (§3) | (none needed) | electoral office, newspaper, voting mind, candidates | A mayor voted out in some seeds, for reasons the logs show |
 | 4 | Services (§4) | body variables, `treat` and `teach` on bodies, fields in life physics | clinic, school, budget lines | Treatment shortens illness; schooling raises skill and pay |

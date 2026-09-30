@@ -52,7 +52,7 @@ export interface Offer {
   by?: Id;
   to?: Eligibility;
   take_up: "sign" | "apply" | "order" | "join" | "attend";
-  terms?: { commitments: { who: Id | "taker"; does: Does; every?: number; per?: "unit" }[]; term?: number; termination?: { party: Id | "taker"; notice: number }[]; template?: string };
+  terms?: { commitments: { who: Id | "taker"; does: Does; every?: number; per?: "unit" }[]; term?: number; then?: "periodic"; termination?: { party: Id | "taker"; notice: number }[]; template?: string };
   available?: number;
   until?: number;
   practice?: Id;
@@ -79,6 +79,8 @@ export interface AgreementTerms {
   /** (`does` is typed in the contract, `Does`; read loosely here, and checked by the kernel.) */
   commitments: { who: Id; does: Json; every?: number }[];
   term?: number;
+  /** After the term: "periodic", it continues until ended by notice. */
+  then?: "periodic";
   termination?: { party: Id; notice: number }[];
   text?: string;
   attrs?: Json;

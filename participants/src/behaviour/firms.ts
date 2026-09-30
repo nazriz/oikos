@@ -79,7 +79,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.10.1",
+  version: "0.11.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -111,8 +111,11 @@ export const landlord: BehaviourModule = {
       // there is one, bounds it: no more often than the law allows, and at least the notice it requires.
       rent_review_months: null as number | null,
       rent_increase_notice_days: 0,
-      // Offering the sitting tenant a new lease as one runs out (placeholder: landlords mostly do; to calibrate against
-      // how long renters stay).
+      // What our leases say happens after the fixed term: "periodic", they run on until ended by notice (as the world's
+      // tenancy law commonly provides; the world gives it); none, they end with it.
+      after_term: null as "periodic" | null,
+      // Offering the sitting tenant a new lease as one that ends with its term runs out (placeholder: landlords mostly
+      // do). A lease that runs on after its term needs none.
       renew: true,
     },
     ctx.params,
@@ -214,7 +217,7 @@ export const landlord: BehaviourModule = {
         const months = between(p.min_term_months, p.max_term_months, ctx.rng(`term-${listingId}`).below(1_000_000) / 1_000_000);
         steps.push(because(`Letting ${listing.data.space}: an applicant picked at random among the ${eligible.length} it fits (at most ${p.max_people_per_bedroom || "any number of"} people per bedroom), for ${months} months.`,
           ["lease", offer(tenant, {
-            template: "lease", term: months * MONTH, ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
+            template: "lease", term: months * MONTH, ...(p.after_term ? { then: p.after_term } : {}), ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
             we: C.call("occupancy", { who: tenant, in: listing.data.space }),
             they: pay(acc.account, listing.data.rent, { every: MONTH, for: "rent" }),
             text: `${tenant} rents home ${listing.data.space} from ${me} for ${listing.data.rent} cents a month, for ${months} months${household.length ? `, to live there with their household: ${household.join(", ")}` : ""}.`,
@@ -230,7 +233,7 @@ export const landlord: BehaviourModule = {
       // agents do as a lease runs out; letting it run out and relisting the home costs a vacancy and a search).
       if (p.renew) for (const a of active) {
         const ends = book.endsAt(a.id);
-        if (ends === undefined || renewed.has(a.id) || noticeGiven.has(a.id) || ends - t > p.landlord_notice_days * DAY) continue;
+        if (a.terms.then === "periodic" || ends === undefined || renewed.has(a.id) || noticeGiven.has(a.id) || ends - t > p.landlord_notice_days * DAY) continue;
         const tenant = tenantOf(a);
         const lt = leaseTerms(a, tenant);
         if (!lt.space || !owned.some((o) => o.space === lt.space)) continue;
@@ -240,7 +243,7 @@ export const landlord: BehaviourModule = {
         const household = (a.terms.text as string | undefined)?.match(/household: (.*)\.$/)?.[1];
         steps.push(because(`The tenancy of ${lt.space} ends on day ${Math.floor(ends / DAY)}: offering ${tenant} a new lease at ${usd(rent)} a month, for ${months} months from then.`,
           ["lease", offer(tenant, {
-            template: "lease", term: ends - t + months * MONTH, ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
+            template: "lease", term: ends - t + months * MONTH, ...(p.after_term ? { then: p.after_term } : {}), ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
             we: C.call("occupancy", { who: tenant, in: lt.space }),
             they: pay(acc.account, rent, { every: MONTH, for: "rent" }),
             text: `${tenant} rents home ${lt.space} from ${me} for ${rent} cents a month, renewing their lease (${a.id}) for ${months} months from day ${Math.floor(ends / DAY)}${household ? `, to live there with their household: ${household}` : ""}.`,
@@ -253,7 +256,7 @@ export const landlord: BehaviourModule = {
       const listing = (o: (typeof owned)[number], rent: number) =>
         say("rental_listing", `Home to let: ${o.space}${o.bedrooms ? `, ${o.bedrooms} bedrooms` : ""}, ${rent} cents a month.`, { data: { structure: o.structure, space: o.space, type: o.type, ...(o.bedrooms ? { bedrooms: o.bedrooms } : {}), rent },
           // The lease it's for (2a): the home to occupy, the rent monthly.
-          offer: { by: me, take_up: "apply", available: 1, terms: { template: "lease", commitments: [
+          offer: { by: me, take_up: "apply", available: 1, terms: { template: "lease", ...(p.after_term ? { then: p.after_term } : {}), commitments: [
             { who: me, does: { outcome: { occupancy: { in: o.space } } } },
             { who: "taker", does: { outcome: { money: { to: acc.account, amount: String(rent), for: "rent" } } }, every: MONTH },
           ] } } });

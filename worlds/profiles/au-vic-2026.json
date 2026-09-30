@@ -549,7 +549,8 @@
     "labour_force_participation_bps": 8000,
     "tenancy": {
       "rent_review_months": 12,
-      "rent_increase_notice_days": 60
+      "rent_increase_notice_days": 60,
+      "after_fixed_term": "periodic"
     },
     "values": {
       "benevolence": { "mean_bps": 7000, "sd_bps": 1500 },
@@ -693,7 +694,7 @@
     "ordinary_hours_per_week": "Maximum ordinary hours for a full-time employee, 38 a week (Fair Work Act 2009, s 62, the National Employment Standards).",
     "fertility_per_10000": "ABS, Births, Australia 2024: births per 10,000 women (the published rates per 1,000, times 10: configs are integers) a year, by age.",
     "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80%; to confirm against ABS, Labour Force, Australia, Table 16 (15-64 year olds). Those outside it (studying, caring, other reasons) don't look for work.",
-    "tenancy": "Residential Tenancies Act 1997 (Vic), s 44: a residential rent may be increased no more than once every 12 months, with at least 60 days' written notice.",
+    "tenancy": "Residential Tenancies Act 1997 (Vic), s 44: a residential rent may be increased no more than once every 12 months, with at least 60 days' written notice. After a fixed term, a tenancy continues as a periodic (month-to-month) one unless it's ended by notice or a new agreement (the Act; Consumer Affairs Victoria's guidance on fixed-term agreements, to confirm the section).",
     "values": "Placeholder: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power: 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500. To source for this place: the World Values Survey's Schwartz items for Australia (wave 6), rescaled.",
     "industrial_action": "Fair Work Act 2009 (Cth), Part 3-3: a protected action ballot needs at least 50% of the members on the roll voting (s 459(1)(b)) and more than 50% of the votes approving (s 459(1)(c)); at least 3 working days' written notice of action (s 414(2)(a), taken as 3 days); an employer must not pay employees for a period of protected action (s 470).",
     "world_price_process": "Placeholder: world prices move each month by a mean-reverting random process (sd of the monthly move, in basis points of the base price; the share of a gap from the base kept each month). To estimate from ABS, International Trade Price Indexes (import and export price indexes by commodity).",

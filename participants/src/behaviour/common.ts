@@ -23,6 +23,7 @@ export class Book {
   private readonly standing = new Map<string, Map<string, StatementRecord>>(); // statement kind -> those not withdrawn, in the order seen
   private readonly byRecord = new Map<string, Record[]>(); // record type (agreement, claim...) -> records, in the order seen
   private readonly withPractice = new Map<string, StatementRecord>(); // statements carrying a practice, not withdrawn
+  private readonly withAssertion = new Map<string, StatementRecord>(); // statements put forward to be believed, not withdrawn
   /** participant -> the person it acts as (from a directory). */
   readonly participantPerson = new Map<string, string>();
   /** position -> its organisation, role and holder (from a directory). */
@@ -50,6 +51,7 @@ export class Book {
         const w = this.records.get(r.withdraws);
         if (w?.record === "statement") this.standing.get(w.kind)?.delete(w.id);
         this.withPractice.delete(r.withdraws);
+        this.withAssertion.delete(r.withdraws);
       }
       if (r.record === "signature") {
         const s = this.signatures.get(r.agreement) ?? new Set();
@@ -66,6 +68,7 @@ export class Book {
           if (open) open.set(r.id, r);
           else this.standing.set(r.kind, new Map([[r.id, r]]));
           if (r.practice) this.withPractice.set(r.id, r);
+          if (r.assertion) this.withAssertion.set(r.id, r);
         }
       }
       if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
@@ -96,6 +99,11 @@ export class Book {
   /** Statements carrying a practice (a gathering: docs/design/ai-citizens.md 2b), still standing, in the order seen. */
   practices(): StatementRecord[] {
     return [...this.withPractice.values()];
+  }
+
+  /** Statements put forward to be believed (an `assertion`: a teaching, a report, a promise), not withdrawn. */
+  assertions(): StatementRecord[] {
+    return [...this.withAssertion.values()];
   }
 
   /** Records of a type (agreement, claim, notice...), in the order seen: rather than every record ever seen. */
@@ -297,9 +305,9 @@ export const record = (position: "right" | "liberty", holder: string, about: unk
   C.call("claim", { position, holder, about: C.json(about), against: o.against, basis: o.basis });
 
 /** Offer an agreement (signed on our side). `we` and `they` are the outcomes each side commits to. */
-export function offer(withWhom: string, o: { template: string; we?: C.Call; they?: C.Call; term?: number; ourNotice?: number; theirNotice?: number; text?: string; basis?: string }): C.Call {
+export function offer(withWhom: string, o: { template: string; we?: C.Call; they?: C.Call; term?: number; then?: "periodic"; ourNotice?: number; theirNotice?: number; text?: string; basis?: string }): C.Call {
   return C.call("agreement", {
-    with: withWhom, template: o.template, we_do: o.we, they_do: o.they, term: o.term ? C.secs(o.term) : undefined,
+    with: withWhom, template: o.template, we_do: o.we, they_do: o.they, term: o.term ? C.secs(o.term) : undefined, then: o.then,
     our_notice: o.ourNotice ? C.secs(o.ourNotice) : undefined, their_notice: o.theirNotice ? C.secs(o.theirNotice) : undefined,
     terms: o.text ? C.text(o.text) : undefined, basis: o.basis,
   });

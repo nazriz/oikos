@@ -331,7 +331,6 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - **Not yet:**
     - the audit on a real model (gpt-6-luna, when Naz says);
     - gatherings and teachings as things to ask about;
-    - a dedicated `consult` purpose in the log contract (proposed).
 - **Five years with the whole AI citizen** (2026-09-29, `runs/c7-run5`, 3 seeds; against `runs/c6-run5`, the mind's first wiring):
 
   | Measure | Before | Now | Target |

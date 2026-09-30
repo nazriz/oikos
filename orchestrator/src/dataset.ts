@@ -123,7 +123,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         const dec = openDecision.get(b.participant);
         if (dec && !dec.drafts.includes(b.draft)) dec.drafts.push(b.draft);
       } else if (a === "decision") {
-        citizenDecisions.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, domain: b.data?.domain, strategy: b.data?.strategy, ...(b.data?.choice !== undefined ? { choice: b.data.choice } : {}), options: b.data?.options ?? [] });
+        citizenDecisions.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, domain: b.data?.domain, strategy: b.data?.strategy, ...(b.data?.choice !== undefined ? { choice: b.data.choice } : {}), options: b.data?.options ?? [], ...(b.data?.state ? { state: b.data.state } : {}) });
       } else if (a === "observation") {
         observations.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, ...(b.data?.as ? { as: b.data.as } : {}), observation: b.data?.observation });
       }

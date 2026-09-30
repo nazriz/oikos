@@ -180,7 +180,14 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 7. **A seat acts as exactly one entity.** *(Superseded in v0.4: a participant acts as itself, or for an organisation in a position it holds.)*
 8. **`sites` channels have a refresh interval** (since v0.3, any channel's `every`), so detection can be delayed and partial. Coverage and frequency are experimental variables.
 
-## Changes from v0.4 (in progress)
+## Changes from v0.7 (in progress, becoming 0.8; docs/design/world-expansion.md)
+
+- **Periodic agreements** (signed 2026-10-01): an agreement's terms may say `then: "periodic"`: once its term runs out it continues until ended by notice under its termination clauses, as tenancy law commonly provides for a fixed-term lease. `terms` reads it (reader `terms-0.2.0`), offers may carry it, and the call language's `agreement` takes `then=periodic`.
+- **Ratified as built** (signed 2026-10-01): `log.detail`; the run dataset format and the log's `observation` annotation; `notices` on the observation; `framing.debrief_text`.
+- **Already in 0.7, now used:** `assertion` on statements (beliefs attach to what's asserted, not to the kind `teaching`); a decision's mind `state` (needs, satisfaction, certainty, the strongest feeling, beliefs, goal); the `consult` purpose.
+- The `$id`s stay `…:0.7:…` until 0.8 closes, with nature's changes (world-expansion §9).
+
+## Changes from v0.4
 
 - **Money** (done): amounts and balances are decimal-string integers, 38 digits at most (`common#/$defs/Amount`, `Cents`); `world.currencies`; accounts, observed accounts, transactions and the `transfer` and `account_opened` events carry a `currency`; `open_account` takes an optional `currency`; refusal codes `currency_mismatch` and `unknown_currency`. Outcomes' money amounts (the platform standard, outcomes.schema.json) are decimal strings too. Code does its arithmetic in ordinary numbers and converts at the edge, throwing beyond 2^53 rather than rounding (`participants/src/money.ts`); display is exact at any size.
 - **Several edges** (done): `world.boundaries` (at least one; the first is the default) replaces `world.boundary`. Each edge holds an account in its own custody in every currency, and may go negative; conservation covers the world and all its edges. An arrival comes by the edge whose position acts (`person_arrived.via`); `leave` may name the edge it leaves by (`to`, default the first; `not_a_boundary` otherwise), recorded as `person_left.to`. Construction materials and demolition are paid into the default edge (until phase B).
