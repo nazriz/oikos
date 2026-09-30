@@ -11,15 +11,15 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
-pub mod exec;
-pub mod geo;
 pub mod kernel;
 pub mod log;
-pub mod observe;
 pub mod protocol;
 pub mod run;
-pub mod state;
-pub mod statics;
+
+// The world (its state, physics and records: the only writer) and perception (read-only), as crates of their own,
+// where the kernel has always had them.
+pub use terrarium_perception as observe;
+pub use terrarium_world::{exec, geo, state, statics};
 
 pub use kernel::{Command, Kernel, ProtocolError};
 pub use run::{replay, Run};

@@ -488,9 +488,15 @@ Proposed together, for one sign-off:
 - **R2, invariance** (2026-09-30): the engine's scheduler can perturb a run for tests (`perturb`: seeded extra wakes, recorded in the log; never a research run). `orchestrator/test/invariance.test.ts` runs a 200-person town for 120 days as it is, and again with about 12% more wakes. Goods bought, orders, payments, factory output, shop service and waste collected must each stay within 10%. They do. The builder's building work moved about 20% on one seed, through different hires, and is left out as too lumpy to judge on one seed.
   - Not done from 6.6: shuffling acts done at the same second, splitting payments, and scaling act times. The last needs no mode: a world's `act_time` table is the knob.
 - **R2, parity step 2: configured act times** (2026-09-30). Generated worlds carry an `act_time` table (placeholders: minutes for people, a second for systems). A year of the 1,000-person town is within the rebuild's own spread on every town measure, with no warnings. Two module fixes came out of it: time-bound steps first, and planning again once a plan is done (docs/decisions.md).
+- **R2, the crates** (2026-09-30):
+  - `terrarium-world` holds the state, physics and records: the only writer;
+  - `terrarium-perception` builds observations, read-only (no `&mut State`);
+  - the root crate is the engine: the kernel interface, the log, the protocol and the schedule.
+  Observing is now perception building, then the world delivering (marking what was seen, handing over outcomes and messages). Public paths are unchanged (`terrarium_kernel::{state, observe, ...}`). The same final state over 60 days.
 - **Next:**
-  1. R2: `time` (acting and thinking time, replacing the action budget), `perception` and `resolver` in the engine. The largest phase.
-  2. R4 and R5.
+  1. R3's `law` crate: formal conditions read in Rust, for institutions and a draft's warnings. Then the draft preview moves too, and the TypeScript resolver and knowledge can go.
+  2. R4: module manifests checked at load; the health report and diff; compact logs; checkpoints and resuming from one.
+  3. R5: clean-up.
 
 **After the rebuild,** on the new platform:
 1. The labour market (search frictions) and goods prices under shortage, calibrated with the health report watching every other measure.

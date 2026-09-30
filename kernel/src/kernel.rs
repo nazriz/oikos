@@ -1,86 +1,16 @@
-//! The kernel (v0.5): the only writer of world state, and physics only.
-//!
-//! It takes commands (the only inputs; see the Command definition in
-//! contracts/log.schema.json) and returns the events they caused. An act
-//! either takes effect, or is refused because it is physically impossible.
-//! There are no mandates, approvals or laws in here (D18-D20): authority and
-//! law are records, and they matter only through what participants choose to do.
-//!
-//! It never reads wall-clock time, never iterates a hash map, never touches a
-//! float, and draws randomness only from `Statics::randomness`.
+//! The engine's kernel (docs/design/rebuild.md section 4): the world (`terrarium-world`, the only writer) and what its
+//! participants perceive of it (`terrarium-perception`, read-only), together behind one command interface. An
+//! observation is built by perception from the world as it is, then delivered by the world (what was looked through
+//! is marked seen; outcomes and messages are handed over), and its hash goes in the log.
 
-use crate::blocks::{Block, Id};
 use crate::canon;
-use crate::config::{cell_id, terrain_at, LoadedConfig, ParticipantKind, SELF};
-use crate::events::{EventBody, RefusalCode, Timed};
-use crate::exec::{can_act, exec_action, refuse, schedule_birthday, scheduled, Refusal};
-use crate::observe::{self, Observation};
-use crate::rng::Randomness;
-use crate::state::{Account, Body, Cell, Counters, Entity, Outcome, OutcomeStatus, Participant, ParticipantDef, ParticipantStatus, Position, RefusalInfo, State, Structure};
+use crate::config::LookRequest;
+use crate::events::{EventBody, Timed};
+use crate::observe::{self, Observation, RecordIndex};
+use crate::state::State;
 use crate::statics::Statics;
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
-pub enum Command {
-    Act {
-        participant: Id,
-        /// The position it acts in; absent: as itself (a person's only).
-        #[serde(default, rename = "as", skip_serializing_if = "Option::is_none")]
-        position: Option<Id>,
-        blocks: Vec<Block>,
-        /// Logged, never interpreted.
-        provenance: Value,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        reasoning: Option<String>,
-        /// World seconds spent deciding, before the act starts (the world's `thinking_time`; docs/design/rebuild.md 6.4).
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        thinking: Option<i64>,
-    },
-    Advance {
-        to: i64,
-    },
-    Observe {
-        participant: Id,
-        /// Only this capacity ("self", or a position it holds); absent: all of them.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        only: Option<Id>,
-    },
-    /// An observation that also looks through the named channels now (attention): on-request
-    /// channels are perceived only this way, and a look through a records channel can be a search.
-    Look {
-        participant: Id,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        only: Option<Id>,
-        looks: Vec<crate::config::LookRequest>,
-    },
-    OptOut {
-        participant: Id,
-        statement: String,
-    },
-}
-
-/// A command the kernel will not accept at all. Unlike a refusal (a finding,
-/// logged and returned to the participant), a protocol error means the orchestrator
-/// sent something off-contract; it is never logged.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProtocolError(pub String);
-
-impl fmt::Display for ProtocolError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for ProtocolError {}
-
-fn perr<T>(msg: impl Into<String>) -> Result<T, ProtocolError> {
-    Err(ProtocolError(msg.into()))
-}
+pub use terrarium_world::kernel::{Check, Command, ProtocolError};
 
 #[derive(Debug, Clone, Default)]
 pub struct Output {
@@ -88,519 +18,74 @@ pub struct Output {
     pub observation: Option<Observation>,
 }
 
-/// Result of a dry run: would physics allow this right now?
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Check {
-    pub ok: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub refusal: Option<RefusalInfo>,
-}
-
 pub struct Kernel {
-    s: Statics,
-    state: State,
-    /// Derived lookups for observations; not part of the state.
-    index: observe::RecordIndex,
-    /// Canonical bytes already made for the state hash (not part of the state): see `write_state`.
-    canon_cache: std::cell::RefCell<CanonCache>,
-}
-
-/// Records never change once made, and the order they were made in only grows, so their canonical bytes are kept
-/// between checkpoints: a checkpoint encodes only what's new, not the whole history. The same bytes, so the same hash.
-#[derive(Default)]
-struct CanonCache {
-    /// record id -> the record it was made from (to be sure it's the same one), and its canonical bytes
-    records: BTreeMap<Id, (Arc<crate::blocks::Record>, u64, Arc<[u8]>)>,
-    /// `record_order`'s elements so far, canonical and comma-separated; how many; the last one
-    order: Vec<u8>,
-    order_n: usize,
-    order_last: Option<Id>,
-}
-
-fn refusal_info(r: &Refusal) -> RefusalInfo {
-    RefusalInfo { code: r.code, block: r.block, detail: r.detail.clone() }
+    world: terrarium_world::World,
+    /// Perception's derived lookups; not part of the state.
+    index: RecordIndex,
 }
 
 impl Kernel {
-    pub fn new(loaded: &LoadedConfig) -> Result<Kernel, String> {
-        let c = loaded.config.clone();
-        let w = &c.world;
-        let currency = w.currencies[0].code.clone();
-        let cur_of = |a: &crate::config::AccountCfg| a.currency.clone().unwrap_or_else(|| currency.clone());
-        let mut boundary_accounts = BTreeMap::new();
-        for a in w.accounts.iter().filter(|a| w.boundaries.contains(&a.holder) && a.custodian == a.holder) {
-            boundary_accounts.entry((a.holder.clone(), cur_of(a))).or_insert_with(|| a.id.clone());
-        }
-        let s = Statics {
-            types: c.catalogue.structure_types.iter().map(|t| (t.id.clone(), t.clone())).collect(),
-            spaces: c
-                .catalogue
-                .structure_types
-                .iter()
-                .map(|t| (t.id.clone(), crate::config::spaces_of(t).into_iter().map(|(l, sp)| (l, sp.clone())).collect()))
-                .collect(),
-            templates: c.templates.iter().map(|t| (t.id.clone(), t.clone())).collect(),
-            boundaries: w.boundaries.clone(),
-            detailed: crate::config::detailed_rects(&w.places),
-            boundary_accounts,
-            currency: currency.clone(),
-            tick: c.clock.tick_seconds,
-            act_times: terrarium_time::ActTimes::from_orchestration(&c.orchestration),
-            randomness: Randomness::new(c.seed),
-            config: c.clone(),
-        };
-        let person_of: BTreeMap<&str, &str> = c.participants.iter().filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
-        let mut cells = crate::state::Map::new();
-        // Cells exist only where a place is detailed (D58); nested detailed places share theirs.
-        for r in crate::config::detailed_rects(&w.places) {
-            for y in r.y..r.y + r.h {
-                for x in r.x..r.x + r.w {
-                    cells.insert(cell_id(x, y), Cell { x, y, terrain: terrain_at(&w.ground, x, y).map(String::from), structure: None, changed: 0 });
-                }
-            }
-        }
-        let mut st = State {
-            t: 0,
-            counters: Counters::default(),
-            entities: w
-                .entities
-                .iter()
-                .map(|e| {
-                    let body = (e.kind == crate::config::PERSON).then(|| Body {
-                        born_at: e.born_at.unwrap_or(0),
-                        sex: e.sex,
-                        children: w.entities.iter().filter(|c| c.parents.as_ref().is_some_and(|ps| ps.contains(&e.id))).map(|c| c.id.clone()).collect(),
-                        present: e.present.unwrap_or(true),
-                        alive: true,
-                        parents: e.parents.clone().unwrap_or_default(),
-                        conditions: vec![],
-                        participant: person_of.get(e.id.as_str()).map(|p| p.to_string()),
-                    });
-                    (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0, body })
-                })
-                .collect(),
-            accounts: w.accounts.iter().map(|a| (a.id.clone(), Arc::new(Account { holder: a.holder.clone(), custodian: a.custodian.clone(), currency: cur_of(a), balance: a.balance, changed: 0 }))).collect(),
-            labour_used: crate::state::Map::new(),
-            holdings: w
-                .holdings
-                .iter()
-                .map(|x| (crate::state::holding_key(&x.holder, &x.at, &x.kind), crate::state::Holding { kind: x.kind.clone(), holder: x.holder.clone(), at: x.at.clone(), quantity: x.quantity, changed: 0 }))
-                .collect(),
-            closed_accounts: crate::state::Map::new(),
-            cells,
-            structures: crate::state::Map::new(),
-            occupancy: crate::state::Map::new(),
-            departures: crate::state::Map::new(),
-            records: crate::state::Map::new(),
-            marks: Default::default(),
-            agreements_of: Default::default(),
-            record_order: imbl::Vector::new(),
-            participants: c
-                .participants
-                .iter()
-                .map(|p| {
-                    (
-                        p.id.clone(),
-                        Arc::new(Participant {
-                            kind: p.kind,
-                            person: p.person.clone(),
-                            owner: p.owner.clone(),
-                            template: None,
-                            def: Arc::new(ParticipantDef {
-                                title: p.title.clone(),
-                                channels: p.channels.clone(),
-                                controller: p.controller.clone(),
-                                framing: p.framing.clone(),
-                                on_opt_out: p.on_opt_out.clone(),
-                                lanes: p.lanes,
-                            }),
-                            traits: p.traits.clone(),
-                            status: ParticipantStatus::Active,
-                            status_changed: 0,
-                            pending: BTreeMap::new(),
-                            new_transactions: BTreeMap::new(),
-                            looks: BTreeMap::new(),
-                        }),
-                    )
-                })
-                .collect(),
-            positions: c
-                .positions
-                .iter()
-                .map(|p| {
-                    (
-                        p.id.clone(),
-                        Position {
-                            entity: p.entity.clone(),
-                            title: p.title.clone(),
-                            role: p.role.clone(),
-                            channels: Arc::new(p.channels.clone()),
-                            role_module: p.role_module.clone(),
-                            holder: p.holder.clone(),
-                            changed: 0,
-                        },
-                    )
-                })
-                .collect(),
-            schedule: Default::default(),
-            timelines: Default::default(),
-        };
-        for x in &w.structures {
-            let f = s.types[&x.structure_type].footprint;
-            let cells = crate::config::footprint_cells(&crate::config::detailed_rects(&w.places), &x.at, f).expect("validated");
-            for cell in &cells {
-                st.cells.get_mut(cell).unwrap().structure = Some(x.id.clone());
-            }
-            st.structures.insert(x.id.clone(), Structure {
-                    at: x.at.clone(),
-                    cells,
-                    structure_type: x.structure_type.clone(),
-                    built_by: x.built_by.clone(),
-                    complete: true,
-                    completes_at: None,
-                    labour_done: 0,
-                    demolition: None,
-                    variables: crate::exec::init_variables(&s, &x.structure_type, 0),
-                });
-        }
-        for o in &w.occupancy {
-            let (sid, _) = crate::config::split_space(&o.space).expect("validated");
-            st.occupancy.entry(sid.to_string()).or_default().entry(o.space.clone()).or_default().insert(o.occupant.clone());
-        }
-        for r in &w.records {
-            st.store(r.clone());
-        }
-        // Bodies age from the start.
-        let people: Vec<(Id, i64)> = st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (id.clone(), b.born_at))).collect();
-        for (id, born) in people {
-            schedule_birthday(&s, &mut st, &id, born);
-        }
-        let k = Kernel { s, state: st, index: Default::default(), canon_cache: Default::default() };
-        k.state_hash().map_err(|e| format!("initial state is not canonical: {e}"))?;
-        Ok(k)
+    pub fn new(loaded: &crate::config::LoadedConfig) -> Result<Kernel, String> {
+        Ok(Kernel { world: terrarium_world::World::new(loaded)?, index: Default::default() })
     }
 
     pub fn state(&self) -> &State {
-        &self.state
+        self.world.state()
     }
 
     pub fn statics(&self) -> &Statics {
-        &self.s
+        self.world.statics()
     }
 
     pub fn t(&self) -> i64 {
-        self.state.t
+        self.world.t()
     }
 
-    /// Canonical JSON of the full world state. Byte-identical replay means this is byte-identical.
     pub fn canonical_state(&self) -> Result<Vec<u8>, canon::CanonError> {
-        let mut out = Vec::new();
-        self.write_state(&mut |b| out.extend_from_slice(b))?;
-        Ok(out)
+        self.world.canonical_state()
     }
 
     pub fn state_hash(&self) -> Result<String, canon::CanonError> {
-        use sha2::{Digest, Sha256};
-        let mut h = Sha256::new();
-        h.update(canon::DOMAIN_STATE.as_bytes());
-        self.write_state(&mut |b| h.update(b))?;
-        Ok(canon::to_hex(&h.finalize()))
+        self.world.state_hash()
     }
 
-    /// The state's canonical bytes (exactly `canon::canonical(&self.state)`), streamed: the records and their order
-    /// from the cache, encoding only those made since the last time; the rest (small by comparison) encoded afresh.
-    fn write_state(&self, sink: &mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> {
-        let mut rest = self.state.clone(); // (a persistent copy: cheap)
-        rest.records = crate::state::Map::new();
-        rest.record_order = imbl::Vector::new();
-        let v = serde_json::to_value(&rest).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
-        canon::check_integers(&v)?;
-        let Value::Object(m) = &v else { return Err(canon::CanonError::Serialize("the state is not an object".into())) };
-        let mut keys: Vec<&String> = m.keys().collect();
-        keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
-        let mut cache = self.canon_cache.borrow_mut();
-        let cache = &mut *cache;
-        sink(b"{");
-        for (i, k) in keys.into_iter().enumerate() {
-            let mut buf = Vec::new();
-            if i > 0 {
-                buf.push(b',');
-            }
-            canon::write_string(k, &mut buf);
-            buf.push(b':');
-            match k.as_str() {
-                "records" => {
-                    sink(&buf);
-                    self.write_records(cache, sink)?;
-                }
-                "record_order" => {
-                    sink(&buf);
-                    self.write_order(cache, sink);
-                }
-                _ => {
-                    canon::write_value(&m[k], &mut buf);
-                    sink(&buf);
-                }
-            }
-        }
-        sink(b"}");
-        Ok(())
-    }
-
-    fn write_records(&self, cache: &mut CanonCache, sink: &mut dyn FnMut(&[u8])) -> Result<(), canon::CanonError> {
-        let records = &self.state.records;
-        // Canonical key order is by UTF-16 code units; for ASCII ids (every id so far) that's the map's own order.
-        let mut ids: Vec<&Id> = records.keys().collect();
-        if !ids.iter().all(|k| k.is_ascii()) {
-            ids.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
-        }
-        let mut buf = Vec::new();
-        sink(b"{");
-        for (i, id) in ids.into_iter().enumerate() {
-            let stored = &records[id];
-            buf.clear();
-            if i > 0 {
-                buf.push(b',');
-            }
-            canon::write_string(id, &mut buf);
-            buf.push(b':');
-            sink(&buf);
-            let fresh = match cache.records.get(id) {
-                Some((r, seq, _)) => !(Arc::ptr_eq(r, &stored.record) && *seq == stored.seq),
-                None => true,
-            };
-            if fresh {
-                let bytes: Arc<[u8]> = canon::canonical(stored)?.into();
-                cache.records.insert(id.clone(), (stored.record.clone(), stored.seq, bytes));
-            }
-            sink(&cache.records[id].2);
-        }
-        sink(b"}");
-        Ok(())
-    }
-
-    fn write_order(&self, cache: &mut CanonCache, sink: &mut dyn FnMut(&[u8])) {
-        let order = &self.state.record_order;
-        // Only ever appended to; if it isn't what was cached (it always should be), start again.
-        let same = cache.order_n <= order.len() && (cache.order_n == 0 || order.get(cache.order_n - 1) == cache.order_last.as_ref());
-        if !same {
-            cache.order.clear();
-            cache.order_n = 0;
-        }
-        for id in order.iter().skip(cache.order_n) {
-            if cache.order_n > 0 {
-                cache.order.push(b',');
-            }
-            canon::write_string(id, &mut cache.order);
-            cache.order_n += 1;
-        }
-        cache.order_last = order.last().cloned();
-        sink(b"[");
-        sink(&cache.order);
-        sink(b"]");
-    }
-
-    fn check_only(&self, participant: &str, only: &Option<Id>) -> Result<(), ProtocolError> {
-        if let Some(o) = only {
-            let p = &self.state.participants[participant];
-            let ok = if o == SELF { p.kind == ParticipantKind::Person } else { self.state.positions.contains_key(o) };
-            if !ok {
-                return perr(format!("{participant} has no capacity {o}"));
-            }
-        }
-        Ok(())
-    }
-
-    /// Validate a command without applying it. A command that fails here is
-    /// rejected before it reaches the log.
+    /// Validate a command without applying it.
     pub fn precheck(&self, cmd: &Command) -> Result<(), ProtocolError> {
-        let body = serde_json::to_value(cmd).map_err(|e| ProtocolError(e.to_string()))?;
-        canon::check_integers(&body).map_err(|e| ProtocolError(e.to_string()))?;
-        crate::contracts::check(&crate::contracts::contracts().command, &body).map_err(|e| ProtocolError(format!("command {e}")))?;
-        let exists = |p: &str| if self.state.participants.contains_key(p) { Ok(()) } else { perr(format!("unknown participant {p}")) };
-        match cmd {
-            Command::Act { participant, position, thinking, .. } => {
-                exists(participant)?;
-                if position.is_none() && self.state.participants[participant].kind == ParticipantKind::System {
-                    return perr(format!("{participant} is a system: it acts only in a position"));
-                }
-                if thinking.is_some_and(|x| x < 0) {
-                    return perr("thinking time can't be negative");
-                }
-            }
-            Command::Observe { participant, only } => {
-                exists(participant)?;
-                self.check_only(participant, only)?;
-            }
-            Command::Look { participant, only, looks } => {
-                exists(participant)?;
-                self.check_only(participant, only)?;
-                if looks.is_empty() || looks.len() > 16 {
-                    return perr("a look names 1..=16 channels");
-                }
-                for l in looks {
-                    // A channel of a position it no longer holds is simply not there to look through.
-                    let ch = match l.channel.split_once('/') {
-                        None => self.state.participants[participant].def.channels.iter().find(|c| c.id == l.channel),
-                        Some((pos, id)) => self.state.positions.get(pos).and_then(|x| x.channels.iter().find(|c| c.id == id)),
-                    };
-                    let Some(ch) = ch else { return perr(format!("{participant} has no channel {}", l.channel)) };
-                    if let Some(q) = &l.query {
-                        if !matches!(ch.kind, crate::config::ChannelKind::Records { .. }) {
-                            return perr(format!("channel {} isn't a records channel, so it can't be searched", l.channel));
-                        }
-                        if q.limit.is_some_and(|n| n == 0 || n > 200) {
-                            return perr("a search's limit is 1..=200");
-                        }
-                        for f in q.conditions.iter().flatten().map(|c| &c.field).chain(q.order.iter().map(|o| &o.field)) {
-                            if !observe::known_field(f) {
-                                return perr(format!("{f} isn't a field a search can use"));
-                            }
-                        }
-                    }
-                }
-            }
-            Command::Advance { to } => {
-                if *to < self.state.t {
-                    return perr(format!("cannot advance to {to}: the clock is at {}", self.state.t));
-                }
-                if *to > self.s.run_end() {
-                    return perr(format!("{to} is beyond the end of the run ({})", self.s.run_end()));
-                }
-            }
-            Command::OptOut { participant, .. } => {
-                exists(participant)?;
-                if self.state.participants[participant].status != ParticipantStatus::Active {
-                    return perr(format!("{participant} has already left or ended"));
-                }
-            }
-        }
-        Ok(())
+        self.world.precheck(cmd)
     }
 
     pub fn apply(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
-        self.precheck(cmd)?;
-        Ok(match cmd {
-            Command::Act { participant, position, blocks, thinking, .. } => self.begin(participant, position.as_deref(), blocks, thinking.unwrap_or(0)),
-            Command::Advance { to } => self.advance(*to),
-            Command::Observe { participant, only } => self.observe(participant, only.as_deref(), &[]),
-            Command::Look { participant, only, looks } => self.observe(participant, only.as_deref(), looks),
-            Command::OptOut { participant, statement } => {
-                let t = self.state.t;
-                let c = self.state.stamp();
-                let p = Arc::make_mut(self.state.participants.get_mut(participant).unwrap());
-                p.status = ParticipantStatus::OptedOut;
-                p.status_changed = c;
-                let vacant = p.def.vacant_after_opt_out();
-                let mut events = vec![Timed::new(t, EventBody::ParticipantOptedOut { participant: participant.clone(), statement: statement.clone() })];
-                // Without a stand-in, nobody is there to act in its positions any more.
-                if vacant {
-                    let held: Vec<Id> = self.state.positions.iter().filter(|(_, x)| x.holder.as_deref() == Some(participant.as_str())).map(|(id, _)| id.clone()).collect();
-                    for id in held {
-                        let c = self.state.stamp();
-                        let x = self.state.positions.get_mut(&id).unwrap();
-                        x.holder = None;
-                        x.changed = c;
-                        events.push(Timed::new(t, EventBody::Appointed { position: id, holder: None, by: None }));
-                    }
-                }
-                Output { events, observation: None }
+        match cmd {
+            Command::Observe { participant, only } => {
+                self.world.precheck(cmd)?;
+                Ok(self.observe(participant, only.as_deref(), &[]))
             }
-        })
-    }
-
-    /// Dry run: would physics allow this action right now?
-    pub fn check(&self, participant: &str, position: Option<&str>, blocks: &[Block]) -> Result<Check, ProtocolError> {
-        if !self.state.participants.contains_key(participant) {
-            return perr(format!("unknown participant {participant}"));
-        }
-        if blocks.is_empty() || blocks.len() > 32 {
-            return perr("an action has 1..=32 blocks");
-        }
-        let mut scratch = self.state.clone();
-        let action = scratch.mint("act");
-        Ok(match exec_action(&self.s, &mut scratch, participant, position, &action, blocks) {
-            Ok(_) => Check { ok: true, refusal: None },
-            Err(r) => Check { ok: false, refusal: Some(refusal_info(&r)) },
-        })
-    }
-
-    /// An act begun: its actor is busy with it for the time it takes (the world's `act_time`), after any thinking, and
-    /// it takes effect when done (docs/design/rebuild.md 6.2, 6.3).
-    fn begin(&mut self, participant: &str, position: Option<&str>, blocks: &[Block], thinking: i64) -> Output {
-        let action = self.state.mint("act");
-        let t = self.state.t;
-        let p = &self.state.participants[participant];
-        let (actor, key, lanes) = match p.kind {
-            ParticipantKind::Person => (terrarium_time::Actor::Person, p.person.clone().unwrap_or_else(|| participant.into()), 1),
-            ParticipantKind::System => (terrarium_time::Actor::System, participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
-        };
-        let seconds = self.s.act_times.program(actor, blocks.iter().map(Block::name));
-        let mut timeline = self.state.timelines.get(&key).cloned().unwrap_or_default();
-        let (starts, done) = terrarium_time::place(&mut timeline, lanes, t + thinking, seconds);
-        self.state.timelines.insert(key, timeline);
-        let pos = position.map(String::from);
-        self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec() });
-        Output { events: vec![Timed::new(t, EventBody::ActionStarted { action, participant: participant.into(), position: pos, starts, done })], observation: None }
-    }
-
-    /// An act done: applied now, as a whole (or refused), and its outcome delivered at the actor's next observation.
-    fn act(&mut self, action: Id, participant: &str, position: Option<&str>, blocks: &[Block]) -> Output {
-        let t = self.state.t;
-        let result = if !can_act(&self.state.participants[participant]) {
-            Err(refuse(RefusalCode::ParticipantInactive, format!("{participant} no longer acts")))
-        } else {
-            let mut scratch = self.state.clone();
-            exec_action(&self.s, &mut scratch, participant, position, &action, blocks).map(|res| (scratch, res))
-        };
-        let pos = position.map(String::from);
-        let (events, outcome) = match result {
-            Ok((scratch, res)) => {
-                self.state = scratch;
-                let created = (!res.created.is_empty()).then_some(res.created);
-                let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), created: created.clone() })];
-                events.extend(res.events);
-                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None })
+            Command::Look { participant, only, looks } => {
+                self.world.precheck(cmd)?;
+                Ok(self.observe(participant, only.as_deref(), looks))
             }
-            Err(r) => (
-                vec![Timed::new(
-                    t,
-                    EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: r.block, code: r.code, detail: r.detail.clone() },
-                )],
-                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)) },
-            ),
-        };
-        let key = pos.unwrap_or_else(|| SELF.into());
-        Arc::make_mut(self.state.participants.get_mut(participant).unwrap()).pending.entry(key).or_default().outcomes.push(outcome);
-        Output { events, observation: None }
+            _ => Ok(Output { events: self.world.apply(cmd)?.events, observation: None }),
+        }
     }
 
-    fn advance(&mut self, to: i64) -> Output {
-        let mut events = vec![];
-        while self.state.schedule.first().is_some_and(|x| x.at <= to) {
-            let item = self.state.schedule.pop_first().unwrap();
-            self.state.t = item.at;
-            match item.what {
-                crate::state::Sched::Act { action, participant, position, blocks } => events.extend(self.act(action, &participant, position.as_deref(), &blocks).events),
-                _ => events.extend(scheduled(&self.s, &mut self.state, item)),
-            }
-        }
-        self.state.t = to;
-        Output { events, observation: None }
+    pub fn check(&self, participant: &str, position: Option<&str>, blocks: &[crate::blocks::Block]) -> Result<Check, ProtocolError> {
+        self.world.check(participant, position, blocks)
     }
 
     /// The full picture a participant's channels cover right now; changes nothing.
-    pub fn full_view(&mut self, participant: &str) -> Option<observe::Observation> {
-        self.state.participants.contains_key(participant).then(|| observe::full_view(&self.s, &self.state, &mut self.index, participant))
+    pub fn full_view(&mut self, participant: &str) -> Option<Observation> {
+        self.world.state().participants.contains_key(participant).then(|| observe::full_view(self.world.statics(), self.world.state(), &mut self.index, participant))
     }
 
-    fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[crate::config::LookRequest]) -> Output {
-        let obs = observe::observe(&self.s, &mut self.state, &mut self.index, participant, only, looks);
+    fn observe(&mut self, participant: &str, only: Option<&str>, looks: &[LookRequest]) -> Output {
+        let (obs, seen, drained) = observe::observe(self.world.statics(), self.world.state(), &mut self.index, participant, only, looks);
+        let (outcomes, inbox) = self.world.deliver(participant, only, seen, drained);
+        let obs = Observation { outcomes, inbox, ..obs };
         // A lean log keeps no observation hashes (the log's `detail`): hashing a whole observation is much of the cost.
-        if self.s.config.log.detail.as_deref() == Some("lean") {
+        if self.world.statics().config.log.detail.as_deref() == Some("lean") {
             return Output { events: vec![], observation: Some(obs) };
         }
         let hash = canon::hash_value(canon::DOMAIN_OBSERVATION, &obs).expect("observations are canonical");
-        Output { events: vec![Timed::new(self.state.t, EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs) }
+        Output { events: vec![Timed::new(self.world.t(), EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs) }
     }
 }

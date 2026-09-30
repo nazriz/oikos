@@ -503,10 +503,7 @@ impl RecordIndex {
 }
 
 /// A field a search can use. Purely mechanical: names a place in a record, and never says what it means.
-pub fn known_field(f: &str) -> bool {
-    matches!(f, "record" | "kind" | "at" | "author" | "speaks_for" | "basis")
-        || f.strip_prefix("data.").or_else(|| f.strip_prefix("about.")).is_some_and(|p| !p.is_empty() && p.split('.').all(|x| !x.is_empty()))
-}
+pub use terrarium_world::kernel::known_field;
 
 fn field(r: &Record, f: &str) -> Option<Value> {
     let path = |v: &Value, p: &str| p.split('.').try_fold(v, |v, k| v.get(k)).cloned();
@@ -654,29 +651,11 @@ fn capacities<'a>(st: &'a State, participant: &str) -> Vec<Capacity<'a>> {
     v
 }
 
-/// Build a participant's observation, consuming its "new since last time" state. `only`: one
-/// capacity ("self" or a position it holds); None: all of them.
-pub fn observe(s: &Statics, st: &mut State, index: &mut RecordIndex, participant: &str, only: Option<&str>, requested: &[LookRequest]) -> Observation {
-    let (obs, looks, drained) = build(s, st, index, participant, Mode::Look, only, requested);
-    let p = std::sync::Arc::make_mut(st.participants.get_mut(participant).unwrap());
-    for (id, look) in looks {
-        p.looks.insert(id, look);
-    }
-    for e in drained {
-        p.new_transactions.remove(&e);
-    }
-    let mut outcomes = vec![];
-    let mut inbox = vec![];
-    let keys: Vec<Id> = p.pending.keys().filter(|k| only.is_none_or(|o| o == k.as_str())).cloned().collect();
-    for k in keys {
-        if let Some(mut x) = p.pending.remove(&k) {
-            outcomes.append(&mut x.outcomes);
-            inbox.append(&mut x.inbox);
-        }
-    }
-    outcomes.sort_by(|a, b| (a.t, &a.action).cmp(&(b.t, &b.action)));
-    inbox.sort_by(|a, b| (a.t, &a.id).cmp(&(b.t, &b.id)));
-    Observation { outcomes, inbox, ..obs }
+/// Build a participant's observation (read-only): what it perceives now, what it looked through (for the world to mark
+/// seen), and the transactions it was shown (for the world to drain). `only`: one capacity ("self" or a position it
+/// holds); None: all of them. The world then delivers it (World::deliver), with the outcomes and messages waiting.
+pub fn observe(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, only: Option<&str>, requested: &[LookRequest]) -> (Observation, Vec<(Id, Look)>, Vec<Id>) {
+    build(s, st, index, participant, Mode::Look, only, requested)
 }
 
 /// The full picture a participant's channels cover right now (Mode::Full), changing nothing.

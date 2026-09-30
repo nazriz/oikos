@@ -1,0 +1,13 @@
+[package]
+name = "terrarium-perception"
+version = "0.7.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Perception: what a participant perceives of the world through its channels, read-only (docs/design/rebuild.md section 4)."
+rust-version = "1.85"
+
+[dependencies]
+terrarium-world = { path = "../world" }
+terrarium-terms = { path = "../terms" }
+serde = { workspace = true }
+serde_json = { workspace = true }

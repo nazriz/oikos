@@ -1,0 +1,17 @@
+[package]
+name = "terrarium-world"
+version = "0.7.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The world: its state, physics and records. The only writer (docs/design/rebuild.md section 4)."
+rust-version = "1.85"
+
+[dependencies]
+terrarium-core = { path = "../core" }
+terrarium-contracts = { path = "../contracts" }
+terrarium-terms = { path = "../terms" }
+terrarium-time = { path = "../time" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+imbl = { version = "7.0.2", features = ["serde"] }

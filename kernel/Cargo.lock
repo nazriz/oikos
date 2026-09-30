@@ -1205,9 +1205,11 @@ dependencies = [
  "sha2",
  "terrarium-contracts",
  "terrarium-core",
+ "terrarium-perception",
  "terrarium-resolver",
  "terrarium-terms",
  "terrarium-time",
+ "terrarium-world",
 ]
 
 [[package]]
@@ -1219,6 +1221,16 @@ dependencies = [
  "napi-build",
  "napi-derive",
  "terrarium-kernel",
+]
+
+[[package]]
+name = "terrarium-perception"
+version = "0.7.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "terrarium-terms",
+ "terrarium-world",
 ]
 
 [[package]]
@@ -1242,6 +1254,20 @@ name = "terrarium-time"
 version = "0.7.0"
 dependencies = [
  "serde_json",
+]
+
+[[package]]
+name = "terrarium-world"
+version = "0.7.0"
+dependencies = [
+ "imbl",
+ "serde",
+ "serde_json",
+ "sha2",
+ "terrarium-contracts",
+ "terrarium-core",
+ "terrarium-terms",
+ "terrarium-time",
 ]
 
 [[package]]
