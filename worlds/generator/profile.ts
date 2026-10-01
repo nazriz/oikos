@@ -87,6 +87,11 @@ export interface Profile {
       water: { litres_per_person_per_day: number; price_per_kl: number; service_per_quarter: number; river_inflow_kl_per_cell_per_day: number; river_decay_bps_per_day: number; river_flow_bps_per_day: number };
       energy: { kwh_per_household_per_day: number; price_per_kwh: number; supply_per_day: number; grid_price_per_kwh: number; grid_emissions_g_per_kwh: number };
     };
+    /** Floods (world-expansion 7.3): the river's banks and spill, how deep before a building floods, wetland's soaking. */
+    hazards?: { river_bank_kl: number; spill_bps_per_day: number; flood_above_kl: number; wetland_soak_kl_per_day: number };
+    /** Crime and policing (world-expansion 7.2): how rarely people in need take from work, the police's establishment, and
+     * how often an investigation finds who. */
+    crime?: { take_bps_per_month_in_need: number; caught_bps_reckoned: number; take_quantity: number; detection_bps: number; investigation_hours: number; police_per_1000: number; officer_wage_per_fortnight: number };
     /** Justice (world-expansion 5): the tribunal's times, and how often people take a case to it. */
     justice?: { hearing_after_days: number; pay_within_days: number; challenge_bps: number; apply_bps: number; apply_after_days: number };
     /** Elections and the local paper (docs/design/world-expansion.md 3). */

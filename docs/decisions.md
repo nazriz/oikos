@@ -1177,6 +1177,19 @@ See the design note, §16.
   - **What changes:** about the same work done; people home in the evenings see more (waste complaints up, deaths at home seen); wakes up about 3.7 times, the suite about twice as long.
   - **Revisit if:** speed matters more (commute wakes could be batched by the engine); a study needs roads, traffic or rosters.
 
+- **Floods and crime, built** (2026-10-02; contract signed; docs/behaviour/floods.md, crime.md).
+  - **In Rust:** fields spill over a level, scale by day, and can be soaked up; buildings flood (occupants out, no entry, wear) and recede; taking goods without consent; investigation as work that finds the taker with a chance.
+  - **In TypeScript:**
+    - the generated river spills under heavy rain and buildings beside it flood; people go to the relief centre;
+    - people in need take from work, rarely; shops find it short at a monthly stocktake and report it;
+    - the police investigate and charge; the tribunal orders restitution; people pay orders against them.
+  - **Found:**
+    - draining wetland changes nothing, because the river spills alike into any land: wetland's mitigation needs a bank by cover;
+    - a flooded workplace sent its workers into a loop of retries (the relief rule now applies to home only);
+    - a building put up on the river stays under water, a fair consequence.
+  - **Liberties:** no factory stocktakes (taking there goes unnoticed); no fraud; restitution only.
+  - **Revisit if:** a study needs wetland mitigation, flood warnings, burglary, policing that prevents, or deterrence learned from others.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

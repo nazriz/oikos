@@ -19,7 +19,7 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
     text: "A residential rent may not be increased by more than 4% at a time. Or else: the increase is invalid.",
     adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent by more than 4%", or_else: "the increase is invalid" },
     formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase' && block.data.rent * 100 > block.data.was * 104" } });
-  const challenging = (c: any) => c?.params?.tribunal && (c.params = { ...c.params, tribunal: { ...c.params.tribunal, challenge_bps: 10_000 } });
+  const challenging = (c: any) => c?.impl === "citizen.default" && c.params?.tribunal && (c.params = { ...c.params, tribunal: { ...c.params.tribunal, challenge_bps: 10_000 } });
   for (const x of config.participants) {
     if (x.controller?.impl === "firm.landlord") x.controller.params.rent_review_months = 6; // (their practice: reviews within the run)
     challenging(x.controller);

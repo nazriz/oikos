@@ -72,6 +72,21 @@ pub struct State {
     /// The world's totals (catalogue `counters`: greenhouse gas), as work adds to them.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub totals: BTreeMap<Id, i64>,
+    /// Buildings under water now (world-expansion 7.3).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub flooded: BTreeSet<Id>,
+    /// Goods taken without consent (world-expansion 7.3): the truth, which investigation can find.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub takings: Vec<Taking>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Taking {
+    pub t: i64,
+    pub by: Id,
+    pub from: Id,
+    pub kind: Id,
+    pub at: Id,
 }
 
 /// Future physical effects in (at, seq) order: a persistent map, so the state's copy for each action is cheap (a
@@ -461,6 +476,9 @@ pub struct Outcome {
     pub created: Option<BTreeMap<String, Id>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub refusal: Option<RefusalInfo>,
+    /// What an investigation found, seen only by the one who investigated: `{from, at, kind, taker}` (taker null: not found).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub investigated: Option<serde_json::Value>,
     /// A survey's estimates (nature), seen only by the one who surveyed: `{of, cells: {cell: estimate}}`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub surveyed: Option<serde_json::Value>,

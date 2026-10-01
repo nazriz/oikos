@@ -52,12 +52,14 @@ pub struct Exec<'a> {
     pub events: Vec<Timed>,
     /// A survey's estimates, for the actor alone (nature).
     pub surveyed: Option<Value>,
+    pub investigated: Option<Value>,
 }
 
 pub struct ExecResult {
     pub events: Vec<Timed>,
     pub created: BTreeMap<String, Id>,
     pub surveyed: Option<Value>,
+    pub investigated: Option<Value>,
 }
 
 /// Can this participant act now? (Active, or opted out with a stand-in carrying on.)
@@ -86,14 +88,14 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![], surveyed: None };
+    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
             r
         })?;
     }
-    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed })
+    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated })
 }
 
 // ---------------- life: shared by acts and scheduled effects ----------------
@@ -431,7 +433,54 @@ fn nature_day(s: &Statics, st: &mut State, day: i64) -> Vec<Timed> {
         }));
     }
     st.nature = Some(Arc::new(n));
+    events.extend(floods(s, st, t));
     st.schedule(t + 86_400, Sched::NatureDay { day: day + 1 });
+    events
+}
+
+/// Floods (world-expansion 7.3): a building whose type floods, with its field above the level on any of its cells, is
+/// under water: its occupants are moved out, and its wear rises each day; below again, it's receded.
+fn floods(s: &Statics, st: &mut State, t: i64) -> Vec<Timed> {
+    let mut events = vec![];
+    let ids: Vec<Id> = st.structures.keys().cloned().collect();
+    for sid in ids {
+        let x = &st.structures[&sid];
+        let Some(fl) = s.types.get(&x.structure_type).and_then(|ty| ty.floods.clone()) else { continue };
+        let base = s.config.catalogue.fields.iter().find(|f| f.id == fl.field).map_or(0, |f| f.baseline);
+        let level = x.cells.iter().map(|c| st.nature.as_deref().and_then(|n| n.fields.get(&fl.field)).and_then(|m| m.get(c)).copied().unwrap_or(base)).max().unwrap_or(base);
+        let was = st.flooded.contains(&sid);
+        if level > fl.above {
+            if !was {
+                st.flooded.insert(sid.clone());
+                events.push(Timed::new(t, EventBody::Flooded { structure: sid.clone(), level }));
+                settle(s, st, &sid);
+                if let Some(m) = st.occupancy.remove(&sid) {
+                    for (space, bodies) in m {
+                        for b in bodies {
+                            st.record_departure(&space, &b, VacateReason::Flooded);
+                            st.moved(&b);
+                            events.push(Timed::new(t, EventBody::Vacated { occupant: b, space: space.clone(), by: None, reason: VacateReason::Flooded }));
+                        }
+                    }
+                }
+                st.touch_structure(&sid);
+            }
+            if fl.wear_per_day != 0 {
+                settle(s, st, &sid);
+                let vars: Vec<crate::config::VariableCfg> = vars_for(s, &st.structures[&sid].structure_type).cloned().collect();
+                if let (Some(cfg), Some(x)) = (vars.iter().find(|v| v.id == "wear"), st.structures.get_mut(&sid)) {
+                    if let Some(cur) = x.variables.get("wear").copied() {
+                        x.variables.insert("wear".into(), (cur.0.saturating_add(fl.wear_per_day).clamp(cfg.min, cfg.max), cur.1));
+                    }
+                }
+                st.touch_structure(&sid);
+            }
+        } else if was {
+            st.flooded.remove(&sid);
+            st.touch_structure(&sid);
+            events.push(Timed::new(t, EventBody::FloodReceded { structure: sid }));
+        }
+    }
     events
 }
 
@@ -702,7 +751,8 @@ impl<'a> Exec<'a> {
     /// Work (phase B): performers at a structure spend their time on units of a task. The kernel checks only physics:
     /// that they're there, alive, and have time left today; that the inputs are held there; that what's worked on can
     /// be. Who works for whom is content (D20).
-    fn work(&mut self, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>, survey: Option<&crate::blocks::Survey>) -> R<()> {
+    #[allow(clippy::too_many_arguments)]
+    fn work(&mut self, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>, survey: Option<&crate::blocks::Survey>, investigate: Option<&crate::blocks::Investigate>) -> R<()> {
         use crate::config::{TASK_BUILD, TASK_DEMOLISH};
         let (at, on) = (self.r(at)?, self.ro(on)?);
         let builtin = task == TASK_BUILD || task == TASK_DEMOLISH;
@@ -729,6 +779,11 @@ impl<'a> Exec<'a> {
                 }
             }
             (false, None) => {}
+        }
+        // An investigation (crime): of goods taken from someone, at a structure.
+        let investigates = spec.as_ref().is_some_and(|x| x.investigates);
+        if investigates != investigate.is_some() {
+            return Err(refuse(RefusalCode::BadInvestigation, if investigates { format!("{task} is an investigation: say of what taken from whom, and where") } else { format!("{task} isn't an investigation") }));
         }
         let per_unit = spec.as_ref().map_or(1, |x| x.labour);
         let mut total = per_unit.checked_mul(units as i64).ok_or_else(|| refuse(RefusalCode::Overflow, "too much work"))?;
@@ -913,6 +968,15 @@ impl<'a> Exec<'a> {
         }
         if let Some(sv) = survey {
             self.surveyed = Some(self.survey_estimates(sv));
+        }
+        // What it finds: the latest such taking, and who did it, with the task's chance (to the actor only).
+        if let Some(iv) = investigate {
+            let (from, at) = (self.r(&iv.from)?, self.r(&iv.at)?);
+            let found = self.st.takings.iter().rev().find(|x| x.from == from && x.at == at && x.kind == iv.kind).cloned();
+            let chance = spec.as_ref().map_or(0, |x| x.detection_bps);
+            let mut rng = self.s.randomness.stream(&["investigate", self.action]);
+            let taker = found.as_ref().filter(|_| rng.below(10_000) < chance as u64).map(|x| x.by.clone());
+            self.investigated = Some(serde_json::json!({ "from": from, "at": at, "kind": iv.kind, "taken": found.is_some(), "taker": taker }));
         }
         if task == TASK_BUILD {
             let needed = self.s.types[&self.st.structures[&target].structure_type].build_labour;
@@ -1262,6 +1326,29 @@ impl<'a> Exec<'a> {
                 self.move_money(&from, &to, *amount, TransferReason::Payment, settles, per_instruction, memo.clone())
             }
 
+            // Taking (world-expansion 7.3): goods another holds where the taker is, moved to the taker there; no consent.
+            Block::Take { kind, quantity, from, at } => {
+                let (from, at) = (self.r(from)?, self.r(at)?);
+                let me = self.acting_person()?;
+                self.living_present(&me)?;
+                if !(1..=MAX_MONEY).contains(quantity) {
+                    return Err(refuse(RefusalCode::Overflow, "quantity out of range"));
+                }
+                if !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(&me))) {
+                    return Err(refuse(RefusalCode::NotPresent, format!("{me} isn't at {at}")));
+                }
+                let have = self.st.holding(&from, &at, kind);
+                if have < *quantity {
+                    return Err(refuse(RefusalCode::InsufficientQuantity, format!("{from} has {have} {kind} at {at}")));
+                }
+                let c = self.st.stamp();
+                self.add_holding(&from, &at, kind, -*quantity, c);
+                self.add_holding(&me, &at, kind, *quantity, c);
+                let t = self.now();
+                self.st.takings.push(crate::state::Taking { t, by: me.clone(), from: from.clone(), kind: kind.clone(), at: at.clone() });
+                self.emit(EventBody::Taken { by: me, from, kind: kind.clone(), quantity: *quantity, at });
+                Ok(())
+            }
             Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
                 let (from_at, to, to_at) = (self.r(from_at)?, self.r(to)?, self.r(to_at)?);
                 if !self.s.config.catalogue.resources.iter().any(|r| &r.id == kind) {
@@ -1437,7 +1524,7 @@ impl<'a> Exec<'a> {
                 Ok(())
             }
 
-            Block::Work { task, units, at, performers, on, survey } => self.work(task, *units, at, performers, on, survey.as_ref()),
+            Block::Work { task, units, at, performers, on, survey, investigate } => self.work(task, *units, at, performers, on, survey.as_ref(), investigate.as_ref()),
 
             Block::Occupy { space, who } => {
                 let space = self.r(space)?;
@@ -1462,6 +1549,9 @@ impl<'a> Exec<'a> {
                 }
                 if x.demolition.is_some() {
                     return Err(refuse(RefusalCode::ComingDown, format!("{sid} is being demolished")));
+                }
+                if self.st.flooded.contains(sid) {
+                    return Err(refuse(RefusalCode::Flooded, format!("{sid} is under water")));
                 }
                 let sid = sid.to_string();
                 // A body is in one place at a time: coming here, it leaves wherever else it was.

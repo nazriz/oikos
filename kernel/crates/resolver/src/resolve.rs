@@ -269,6 +269,7 @@ impl Resolver<'_> {
         match c.fn_.as_str() {
             "money" => self.money(c, bind),
             "goods" => self.goods(c),
+            "take" => self.take(c),
             "work" => self.work(c),
             "account" => self.account(c, bind),
             "structure" => self.structure(c, bind),
@@ -358,7 +359,25 @@ impl Resolver<'_> {
         };
         let on = self.id(c, "on")?;
         let survey = survey.zip(cells).map(|(of, cells)| json!({ "of": of, "cells": cells }));
-        Ok(vec![obj(vec![("block", some("work")), ("task", some(task)), ("units", some(units.parse::<i64>().unwrap_or(0))), ("at", some(at)), ("performers", some(json!(by))), ("on", on.map(Json::from)), ("survey", survey)])])
+        // An investigation (crime): of goods of a kind taken from someone, at a structure.
+        let investigate = match self.id(c, "investigate")? {
+            None => None,
+            Some(from) => {
+                let Some(taken_at) = self.id(c, "taken_at")? else { return ask("Taken from where?") };
+                let kind = self.need(c, "kind", "Taken: what?")?;
+                Some(json!({ "from": self.k.entity_of(&from), "at": taken_at, "kind": kind }))
+            }
+        };
+        Ok(vec![obj(vec![("block", some("work")), ("task", some(task)), ("units", some(units.parse::<i64>().unwrap_or(0))), ("at", some(at)), ("performers", some(json!(by))), ("on", on.map(Json::from)), ("survey", survey), ("investigate", investigate)])])
+    }
+
+    /// Taking goods another holds, where we are (crime: world-expansion 7.3).
+    fn take(&self, c: &Call) -> R<Vec<Json>> {
+        let kind = self.need(c, "kind", "Take what?")?;
+        let Some(quantity) = Self::quantity(c, "quantity")?.filter(|q| q != "0") else { return ask("How much?") };
+        let from = self.k.entity_of(&self.need(c, "from", "Whose?")?);
+        let at = self.need(c, "at", "Where?")?;
+        Ok(vec![json!({ "block": "take", "kind": kind, "quantity": quantity, "from": from, "at": at })])
     }
 
     /// The money outcome of a call, for requests and commitments.

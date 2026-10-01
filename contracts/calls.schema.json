@@ -161,7 +161,8 @@
             "birth",
             "harm",
             "position",
-            "system"
+            "system",
+            "take"
           ]
         },
         "args": {
@@ -258,7 +259,10 @@
                     "on",
                     "for",
                     "survey",
-                    "cells"
+                    "cells",
+                    "investigate",
+                    "taken_at",
+                    "kind"
                   ]
                 }
               }
@@ -670,6 +674,36 @@
                     "template",
                     "title",
                     "retire"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "fn": {
+                "const": "take"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "args": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "quantity",
+                  "from",
+                  "at"
+                ],
+                "propertyNames": {
+                  "enum": [
+                    "kind",
+                    "quantity",
+                    "from",
+                    "at"
                   ]
                 }
               }

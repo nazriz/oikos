@@ -31,6 +31,7 @@ import { principal } from "./behaviour/school";
 import { practice } from "./behaviour/health";
 import { member, registrar } from "./behaviour/tribunal";
 import { energy, water } from "./behaviour/utilities";
+import { station } from "./behaviour/police";
 
 /** Every behaviour module available to worlds, by the name used in controller.impl. */
 export const modules: { [name: string]: BehaviourModule & { source: string } } = Object.fromEntries(
@@ -74,6 +75,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [registrar, "behaviour/tribunal.ts"],
       [water, "behaviour/utilities.ts"],
       [energy, "behaviour/utilities.ts"],
+      [station, "behaviour/police.ts"],
     ] as const
   ).map(([m, src]) => [m.name, { ...m, source: new URL(`./${src}`, import.meta.url).pathname }]),
 );

@@ -10,11 +10,11 @@ import { because, Book, breaches, DAY, say, type Step, usd } from "./common";
 import { stepper } from "./firms";
 
 /** The kinds of application a tribunal hears here: a notice of rent increase said to breach the law; a debt unpaid. */
-export const APPLICATION_KINDS = ["rent_increase", "debt"] as const;
+export const APPLICATION_KINDS = ["rent_increase", "debt", "charge"] as const;
 
 export const member: BehaviourModule = {
   name: "tribunal.member",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -72,6 +72,18 @@ export const member: BehaviourModule = {
             if (broken.length) order("invalid", `the notice of rent increase ${n.id} breaches ${broken.map((l) => l.id).join(", ")} and is invalid; the rent stays as it was.`, { notice: n.id, laws: broken.map((l) => l.id) },
               `The notice breaches ${broken.map((l) => l.id).join(", ")}${answer ? " (whatever the respondent says)" : " (the respondent didn't answer)"}: the increase is invalid.`);
             else order("valid", `the notice of rent increase ${n.id} is valid; the application is dismissed.`, { notice: n.id }, "The notice breaches no law in force when it was given: dismissed.");
+          } else if (kind === "charge") {
+            // A charge (crime): the police's evidence that the respondent took goods; proven, the taker makes good what they
+            // were worth to whom they were taken from.
+            const ev = a.data.evidence ?? {};
+            if (ev.found !== against || !a.data.account) {
+              order("dismissed", "dismissed: the evidence doesn't show the respondent took them.", {}, "The evidence doesn't name the respondent: dismissed.");
+              continue;
+            }
+            const amount = cents(a.data.amount ?? 0);
+            order("pay", `proven: the respondent took ${ev.goods ?? "goods"} from ${a.data.victim} at ${ev.at}, and is to pay them ${usd(amount)} by day ${Math.floor((t + p.pay_within_days * DAY) / DAY)}.`,
+              { victim: a.data.victim, amount, to: a.data.account, due: t + p.pay_within_days * DAY, report: a.data.report },
+              `The police's investigation found ${against} took them${answer ? " (whatever they say)" : " (they didn't answer)"}: proven; ordering them to make good the ${usd(amount)}.`);
           } else if (kind === "debt") {
             // A debt on the record (the applicant's, against the respondent), less what the respondent says it has paid.
             const c = (book.records.get(String(a.data.claim)) ?? (a.data.evidence?.id === a.data.claim ? a.data.evidence : undefined)) as any;

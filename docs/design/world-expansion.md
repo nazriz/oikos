@@ -361,6 +361,8 @@ rebuild. I'd do it on its own branch, with the invariance and reliability tests 
 
 ### 7.1 Hazards
 
+*Floods built 2026-10-02: docs/behaviour/floods.md. Wetland's mitigation isn't captured (needs a bank by cover).*
+
 - **Floods:** the boundary sets the river's inflow, and when a cell's `water_level` passes a structure type's
   threshold, the structure takes damage (its wear variable) and its occupants are displaced (the kernel moves bodies
   out, as it does on demolition). Wetland cover holds water (a field sink), so draining it raises flood risk
@@ -368,6 +370,8 @@ rebuild. I'd do it on its own branch, with the invariance and reliability tests 
 - **Heat:** later.
 
 ### 7.2 Crime and policing
+
+*Built 2026-10-02 (theft from work, shops' stocktakes, police, charges): docs/behaviour/crime.md. Fraud not yet.*
 
 - **The physics of taking** (Rust): a person can take goods from a holding where they are, without the holder's
   consent. Money moves only through banks, so theft of money is fraud: a transfer on a forged instruction, which the
@@ -379,7 +383,7 @@ rebuild. I'd do it on its own branch, with the invariance and reliability tests 
 - **Care, given the stakes:** crime is where a simulation most easily encodes prejudice. No offending rate is tied to
   any group, only to circumstances, and the doc says so.
 
-### 7.3 The contract, exactly (proposed, for sign-off)
+### 7.3 The contract, exactly (signed 2026-10-02: Naz, "yes signed off")
 
 **Floods (7.1):**
 

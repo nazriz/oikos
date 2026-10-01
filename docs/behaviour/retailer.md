@@ -39,6 +39,7 @@ Lengnick (2013) is the model: its firms sell to households who visit them, and i
 ## Parameters
 
 - `premises`, `workplace`, `max_staff` and `min_staff`.
+- `police` and `stocktake_days`: the monthly stocktake. What's there against the books (last count, deliveries in, goods served out); short, a report to the police with its value (docs/behaviour/crime.md).
 - `serve_task` and `serve_labour`: the time a sale takes, as the shop plans with it at first. Where workers differ in skill, it learns each worker's pace (`Pace`, common.ts), a crew's being its members' mean (what a unit takes is linear in a crew's mean skill). Refused for lack of time, each in that crew is as much slower as the world's figure says. After work done, each a little quicker (2%) once a week, until a plan doesn't fit. So a slow crew is learned at once and a quick one over weeks, at about one refusal a crew a week (2026-10-01: without it, a slower crew's plan was refused again and again, and a quicker one did less than it could).
 - `suppliers`.
 - `wage` and `period`; `working_day` and `work_days` (6).

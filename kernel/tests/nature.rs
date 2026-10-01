@@ -202,3 +202,30 @@ fn work_draws_from_and_emits_to_fields_and_counters() {
     assert_eq!(census.len(), 1);
     assert_eq!(census[0]["ghg"], 15);
 }
+
+/// Floods (world-expansion 7.3): a building whose type floods, above its level, is under water: its occupants moved out,
+/// no one let in, its wear rising; the water down, it's receded. Sources scale by day; a field spills over a level.
+#[test]
+fn a_building_floods_above_its_level_and_recedes() {
+    let mut w = nature_world();
+    // The shop's own pollution stands in for water: it floods above 100, and from day 6 the source stops.
+    w["catalogue"]["fields"][0]["source_by_day"] = json!([{"from_day": 6, "bps": 0}]);
+    w["catalogue"]["fields"][0]["decay_bps_per_day"] = json!(5000);
+    w["catalogue"]["fields"][0]["spills_above"] = json!(1000);
+    w["catalogue"]["fields"][0]["spill_bps_per_day"] = json!(5000);
+    for t in w["catalogue"]["structure_types"].as_array_mut().unwrap() {
+        if t["id"] == "shop" {
+            t["floods"] = json!({"field": "pollution", "above": 30, "wear_per_day": 100});
+        }
+    }
+    let mut run = start(&w);
+    let ev = advance(&mut run, 5 * DAY);
+    assert!(ev.iter().any(|e| matches!(e, EventBody::Flooded { structure, .. } if structure == "s-shop")));
+    assert!(ev.iter().any(|e| matches!(e, EventBody::Vacated { occupant, reason, .. } if occupant == "carol" && format!("{reason:?}") == "Flooded")));
+    assert!(run.kernel().state().structures_of("carol").is_empty());
+    assert_eq!(act(&mut run, "carol-self", None, json!([{"block": "occupy", "space": "s-shop/workplace.1"}])), Err(RefusalCode::Flooded));
+    // The source stopped, it decays: receded, and carol can go back.
+    let ev = advance(&mut run, 20 * DAY);
+    assert!(ev.iter().any(|e| matches!(e, EventBody::FloodReceded { structure } if structure == "s-shop")));
+    act(&mut run, "carol-self", None, json!([{"block": "occupy", "space": "s-shop/workplace.1"}])).unwrap();
+}

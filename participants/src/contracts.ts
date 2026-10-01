@@ -121,6 +121,8 @@ export interface Outcome {
   refusal?: { code: string; block?: number; detail?: string };
   /** A survey's estimates (nature), for the one who surveyed only. */
   surveyed?: { of: Id; cells: { [cell: string]: number } };
+  /** What an investigation found (crime), for the one who investigated only: whether goods were taken as said, and who. */
+  investigated?: { from: Id; at: Id; kind: Id; taken: boolean; taker: Id | null };
 }
 
 /** A message: `from` the participant, `as` the position it wrote in, `from_entity` who acted (the person, or the
@@ -132,7 +134,7 @@ export interface Transaction { t: number; from: Id; to: Id; amount: string; curr
 
 /** A space in a building: its kind and attributes (the world's vocabulary), how many bodies it holds at most, how many
  * are in it, and who (in the capacity's own buildings, or where its channel shows names). */
-export interface Departure { occupant: Id; reason: "left" | "removed" | "demolition" | "departed" | "died"; at: number }
+export interface Departure { occupant: Id; reason: "left" | "removed" | "demolition" | "departed" | "died" | "flooded"; at: number }
 export interface SiteSpace { space: Id; kind: string; capacity: number; attrs?: Json; count: number; occupants?: Id[]; left?: Departure[] }
 /** A state variable as perceived (phase B): its value on a day, its change each whole day since, and its bounds. */
 export interface VariableView { value: number; as_of_day: number; per_day: number; min: number; max: number }

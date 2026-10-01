@@ -17,6 +17,7 @@ records.
 | **Listing** | Listed for a hearing `hearing_after_days` (21) on, and both sides told (`hearing_notice`). The respondent may answer (`tribunal_response`) before then. | Placeholder (VCAT's times to finalise, to source) |
 | **A rent increase** | On the day: the notice (the original if the tribunal can see it, else the copy), tested against the laws in force when it was given, as the landlord gave it (`breaches`, the law reader). Breaching: **invalid**, the rent stays as it was. Not: **valid**, dismissed. Not the respondent's notice to the applicant: dismissed. | The tenancy law's own words: "Or else: the increase is invalid" |
 | **A debt** | The debt on the record (the applicant's, against the respondent), less what the respondent says it has paid: an order to **pay** it within `pay_within_days` (28), into the applicant's account. Nothing owed: dismissed. | Placeholder |
+| **A charge** (0.2.0) | From the police, with what their investigation found. If it names the respondent: proven, and an order to make good the goods' value to the one they were taken from. | docs/behaviour/crime.md |
 | **Enforcement** | A creditor whose order to pay is due and unpaid asks the registrar (`enforcement_request`). The registrar orders the debtor's banks (a `garnishee_order`) to pay what's unpaid from what they hold for the debtor. | Garnishee orders (Judgment Debt Recovery Act 1984 (Vic), to confirm) |
 
 ## The parties

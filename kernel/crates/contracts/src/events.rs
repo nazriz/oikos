@@ -73,6 +73,10 @@ pub enum RefusalCode {
     NoBodyEffect,
     /// Work that draws from a field where there isn't enough of it (water from a river run low).
     FieldExhausted,
+    /// Into a building under water.
+    Flooded,
+    /// An investigation that doesn't say what of, or work that says so for a task that doesn't investigate.
+    BadInvestigation,
     /// Building work on something that isn't being built.
     NotBeingBuilt,
     /// Demolition work on something that isn't being demolished.
@@ -98,6 +102,8 @@ pub enum VacateReason {
     /// The body crossed out of the world.
     Departed,
     Died,
+    /// Its building flooded (world-expansion 7.3).
+    Flooded,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -289,6 +295,24 @@ pub enum EventBody {
         until: i64,
         death_called_off: bool,
     },
+    /// Goods taken without the holder's consent (world-expansion 7.3): the truth, for measurement. Nobody is told who.
+    Taken {
+        by: Id,
+        from: Id,
+        kind: Id,
+        #[serde(with = "terrarium_core::money::amount")]
+        quantity: terrarium_core::money::Money,
+        at: Id,
+    },
+    /// A building flooded (a field passed its level): its occupants moved out.
+    Flooded {
+        structure: Id,
+        level: i64,
+    },
+    /// The water's gone down below its level.
+    FloodReceded {
+        structure: Id,
+    },
     /// The world's totals (tier 2: greenhouse gas), monthly, for measurement.
     CounterCensus {
         counters: BTreeMap<Id, i64>,
@@ -393,6 +417,9 @@ impl EventBody {
             EventBody::ConditionTreated { .. } => "condition_treated",
             EventBody::BodyChanged { .. } => "body_changed",
             EventBody::CounterCensus { .. } => "counter_census",
+            EventBody::Flooded { .. } => "flooded",
+            EventBody::Taken { .. } => "taken",
+            EventBody::FloodReceded { .. } => "flood_receded",
             EventBody::Harmed { .. } => "harmed",
             EventBody::ParticipantCreated { .. } => "participant_created",
             EventBody::ParticipantEnded { .. } => "participant_ended",

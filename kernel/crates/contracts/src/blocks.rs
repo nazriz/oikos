@@ -43,6 +43,14 @@ pub enum Block {
         /// Where they go (a structure, or for an edge, itself).
         to_at: IdOrRef,
     },
+    /// Taking goods another holds at a structure where the taker is, without their consent (world-expansion 7.3).
+    Take {
+        kind: Id,
+        #[serde(with = "terrarium_core::money::amount")]
+        quantity: terrarium_core::money::Money,
+        from: IdOrRef,
+        at: IdOrRef,
+    },
     OpenAccount {
         holder: IdOrRef,
         /// The account's currency; absent: the world's first (its default).
@@ -85,6 +93,9 @@ pub enum Block {
         /// A survey (a task that `surveys`): of a species or a field, in these cells (one unit each).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         survey: Option<Survey>,
+        /// An investigation (a task that `investigates`): of goods taken from someone, at a structure.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        investigate: Option<Investigate>,
     },
     /// A body goes into a space: the acting person, or someone they bring (`who`).
     Occupy {
@@ -320,6 +331,7 @@ impl Block {
         match self {
             Block::Transfer { .. } => "transfer",
             Block::MoveGoods { .. } => "move_goods",
+            Block::Take { .. } => "take",
             Block::Work { .. } => "work",
             Block::OpenAccount { .. } => "open_account",
             Block::CloseAccount { .. } => "close_account",
@@ -409,6 +421,15 @@ pub struct NewPosition {
 }
 
 /// A survey (nature): what's counted or measured, and where.
+/// What an investigation is of: the latest taking of goods of a kind from someone at a structure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Investigate {
+    pub from: IdOrRef,
+    pub at: IdOrRef,
+    pub kind: Id,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Survey {

@@ -1,4 +1,4 @@
-# `citizen.default` (v0.30.0): the AI citizen in code
+# `citizen.default` (v0.31.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -58,6 +58,8 @@ It wakes weekly, whenever something names it (an offer, a notice, a message), an
 | **School** | A child of school age (the world's `school.ages`) not at school asks the school for a place (once a month) and goes when offered. At the end of school they leave. | docs/behaviour/education.md |
 | **Too ill to work** | With a condition of a band nobody works with (the world's `care.off_work`: hospital-level), out of the workplace until better, then back. | Placeholder (docs/behaviour/health.md) |
 | **Care** | (A child too: their parents would take them.) With a condition of a kind the clinic sees, not yet treated: to the clinic with the chance `care.seek_bps`, waiting there and asking to be seen; home once seen (felt), better, or after `wait_days`. | Placeholder (docs/behaviour/health.md) |
+| **Floods** | Flooded out of home (or finding it under water): to the relief centre (`relief`), home again tried a day on. | docs/behaviour/floods.md |
+| **Taking** | In need and at work where the employer keeps goods: rarely, some taken and brought home (`crime`). A tribunal's order to pay: paid when we can. | docs/behaviour/crime.md |
 | **The daily round** | At each wake: where we belong now (work in working hours, school in school hours, the clinic while waiting, a gathering while it lasts, else home), and there if we're not; awake again when that changes. Such wakes only move us; the full plan is weekly, on news, and at a gathering. Off sick: a notice to our employer, and we don't go in. A move the world refuses isn't tried again before things change (a home pulled down: never). | docs/behaviour/daily-round.md |
 | **A home of our own** | A lot whose title is ours, with a dwelling we live in on it: no rent and no hunting for a rental; the mortgage repayment counts as housing; rates (and penalty interest, fines) paid when they come, keeping a month's essentials; no tenant's grievances; we don't leave town for want of work. | docs/behaviour/ownership.md |
 | **Utilities** | Holding a home and living there: signs up with the energy retailer. Bills addressed to us paid when they come, if we can, before anything else; what they come to a month counts with the rent in outgoings. | docs/behaviour/utilities.md |
@@ -112,6 +114,7 @@ Saving is off: it's negative in the first year, and 22–25% over five (target 6
 - **Leaving:** `leave_after_homeless_days` 90, `leave_after_jobless_days` 180
 - **Voice:** `petition_start_bps` 300, `petition_willing_bps` 4400, `petition_days` 180, `threshold_mean_bps` 2500, `threshold_sd_bps` 1000, `rent_burden_grievance_bps` 4000, `aggrieved_bps` 2000
 - **Elections:** `electoral_town` (the world's), `civic`: `turnout_bps` 9000, `stand_bps` 30, `reads_news_bps` 5000, `approval_memory_weeks` 26, `news_weight_bps` 1500, `platform_weight_bps` 2500 (the profile sets turnout, standing and readers)
+- **Floods and crime:** `relief` (a space), `crime` (`take_bps`, `caught_bps`, `quantity`): the world's
 - **The daily round:** `round` (`work_start`, `work_end`, `work_days`, `school_start`, `school_end`): the world's
 - **Utilities:** `utilities` (`energy`): the world's
 - **The tribunal:** `tribunal` (`entity`, `challenge_bps`, `apply_bps`, `apply_after_days`): the world's

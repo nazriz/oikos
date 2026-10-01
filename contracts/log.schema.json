@@ -954,7 +954,8 @@
                 "removed",
                 "demolition",
                 "departed",
-                "died"
+                "died",
+                "flooded"
               ]
             }
           }
@@ -1601,6 +1602,94 @@
               }
             }
           }
+        },
+        {
+          "description": "Goods taken without the holder's consent: the truth, for measurement. Nobody in the world is told who.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "by",
+            "from",
+            "kind",
+            "quantity",
+            "at"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "taken"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "by": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            },
+            "from": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            },
+            "kind": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+            },
+            "quantity": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Quantity"
+            },
+            "at": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            }
+          }
+        },
+        {
+          "description": "A building flooded: its field passed its level; its occupants were moved out.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "structure",
+            "level"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "flooded"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "structure": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            },
+            "level": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {
+          "description": "The water's gone down below the building's level.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "structure"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "flood_receded"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "structure": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            }
+          }
         }
       ]
     },
@@ -1638,7 +1727,10 @@
         "participant_ended",
         "position_created",
         "appointed",
-        "counter_census"
+        "counter_census",
+        "taken",
+        "flooded",
+        "flood_receded"
       ]
     },
     "RefusalCode": {
@@ -1691,6 +1783,8 @@
         "bad_survey",
         "no_body_effect",
         "field_exhausted",
+        "flooded",
+        "bad_investigation",
         "not_being_built",
         "not_coming_down",
         "coming_down"

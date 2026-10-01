@@ -182,6 +182,34 @@ pub struct FieldCfg {
     pub from_structures: BTreeMap<Id, i64>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub from_covers: BTreeMap<Id, i64>,
+    /// What's above this level on a cell spreads to the four around it, `spill_bps_per_day` of it a day (a river over its
+    /// banks: world-expansion 7.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spills_above: Option<i64>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub spill_bps_per_day: i64,
+    /// The sources scaled from a day on (rain, a wet season, a drought): `[{from_day, bps}]`; before the first, all.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_by_day: Vec<DayStep>,
+}
+
+/// From a day of the run on (days since its start), a share in basis points.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DayStep {
+    pub from_day: i64,
+    pub bps: i64,
+}
+
+/// A structure type that floods: when a field (water) passes `above` on any of its cells, its occupants are moved out,
+/// no one can come in while it lasts, and its `wear` rises by `wear_per_day`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FloodsCfg {
+    pub field: Id,
+    pub above: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub wear_per_day: i64,
 }
 
 /// A species: its carrying capacity by cover (individuals per 1,000 cells, so a sparse animal can have a fraction of
@@ -254,6 +282,11 @@ pub struct TaskCfg {
     /// an estimate.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub surveys: bool,
+    /// Investigation (world-expansion 7.3): work with `investigate` finds who took the goods, with this chance.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub investigates: bool,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub detection_bps: u32,
     /// What a unit does to the bodies worked on (`work`'s `on` naming a person, or a space: everyone in it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_body: Option<OnBody>,
@@ -333,6 +366,10 @@ pub struct VariableCfg {
     pub types: Option<Vec<Id>>,
 }
 
+fn is_zero_u32(x: &u32) -> bool {
+    *x == 0
+}
+
 fn is_zero(x: &i64) -> bool {
     *x == 0
 }
@@ -385,6 +422,9 @@ pub struct StructureType {
     /// Nature: the land cover its cells count as while it stands (a park is grassland); absent, `built`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<Id>,
+    /// Floods (world-expansion 7.3): above what level of which field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub floods: Option<FloodsCfg>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.30.0",
+  version: "0.31.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -192,6 +192,11 @@ export const citizen: BehaviourModule = {
       // The daily round (world-expansion 6.3): when work and school are (times of day, seconds; working days of each
       // week). With it, we go to work and school and come home; without it, a body stays where it went.
       round: null as { work_start: number; work_end: number; work_days: number; school_start: number; school_end: number } | null,
+      // Where we go when our home is under water (the town's relief centre: a space), if the world has one.
+      relief: null as string | null,
+      // Crime (docs/behaviour/crime.md): in need and at work where our employer keeps goods, the month's chance we take
+      // some (`take_bps`), less as the chance of being caught we reckon (`caught_bps`) is higher. Circumstances only.
+      crime: null as { take_bps: number; caught_bps: number; quantity: number } | null,
       civic: { turnout_bps: 9000, stand_bps: 30, reads_news_bps: 5000, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 },
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
@@ -580,6 +585,8 @@ export const citizen: BehaviourModule = {
       // Did the move-in we just attempted work?
       if (moving && lastWasMove && obs.outcomes.length) {
         if (obs.outcomes.at(-1)!.status === "applied" && home) home.movedIn = true;
+        // (Under water: not a home anyone can live in. We end the lease, as a tenant of uninhabitable premises may.)
+        if (obs.outcomes.at(-1)!.refusal?.code === "flooded" && home && !home.owned) uninhabitable = home.agreement;
         moving = false;
       }
       // The id of a rent-share standing order we just set up.
@@ -1047,6 +1054,13 @@ export const citizen: BehaviourModule = {
         for (const k of children(t)) steps.push(because("Taking the children out of our old home.", moveOut(livingAt, k.person)));
         livingAt = null;
       }
+      if (uninhabitable && home?.agreement === uninhabitable) {
+        steps.push(because("The home we lease is under water: ending the lease, as one may for premises no one can live in.", notice(home.agreement, "The premises are uninhabitable (flooded)."),
+          ...(home.order ? [withdraw(home.order, "Lease ended: the premises are flooded.")] : [])));
+        home = null;
+        homelessSince = t;
+      }
+      uninhabitable = null;
       // (Already there, the round having brought us: in.)
       if (home && !home.movedIn && obs.body?.in === home.space) home.movedIn = true;
       // (Tried and not yet in, because the last tenants are still there: again the next day, whenever we look again.)
@@ -1336,6 +1350,28 @@ export const citizen: BehaviourModule = {
       if (p.utilities && home?.movedIn && isLeaseholder() && energyFor !== home.agreement) {
         energyFor = home.agreement;
         steps.push(because("A home of ours: signing up for its energy supply.", say("supply_request", `Supply request: energy for ${home.space}.`, { to: [p.utilities.energy], visible: [me, p.utilities.energy], data: { account: acc.account, home: home.space } })));
+      }
+      // A tribunal's order that we pay (a debt, or making good what we took): paid when we can, keeping a month's essentials.
+      for (const o of book.open("tribunal_order").filter((x) => x.data?.against === me && x.data?.finding === "pay" && !billsPaid.has(x.id))) {
+        const amount = cents(o.data?.amount ?? 0);
+        const to = o.data?.to;
+        if (!to || amount <= 0 || acc.balance < amount + p.essentials) continue;
+        billsPaid.add(o.id);
+        acc.balance -= amount;
+        steps.push(because(`The tribunal ordered us to pay ${usd(amount)}: paying it.`, pay(String(to), amount, { from: acc.account, for: `Paying under order ${o.id}.`, settles: String(o.data?.claim ?? o.id) })));
+      }
+      // Taking (crime): in need (less than a month's essentials), at work where our employer keeps goods, rarely, the more
+      // rarely the likelier we'd be caught; and home with them.
+      if (p.crime && job?.workplace && obs.body?.in === job.workplace && acc.balance < p.essentials && t >= nextTakeChance) {
+        nextTakeChance = t + MONTH;
+        const chance = Math.round((p.crime.take_bps * (10_000 - p.crime.caught_bps)) / 10_000);
+        const homeAt = home?.movedIn ? structureOf(home.space) : livingAt ? structureOf(livingAt) : undefined;
+        if (homeAt && ctx.rng(`take-${t}`).below(10_000) < chance) {
+          const at = structureOf(job.workplace);
+          steps.push(because(`We can't make ends meet (${usd(acc.balance)}, less than a month's essentials): taking ${p.crime.quantity} ${p.goods} from ${job.employer}'s stock at work, and home with them.`,
+            C.call("take", { kind: p.goods, quantity: C.text(String(p.crime.quantity)), from: job.employer, at }),
+            C.call("goods", { kind: p.goods, quantity: C.text(String(p.crime.quantity)), to: me, at: homeAt, from_at: at })));
+        }
       }
       // What's recorded against us to pay (rates on a home we own, a fine): paid when we can, keeping a month's essentials.
       for (const c of book.ofType("claim") as any[]) {
@@ -1664,7 +1700,9 @@ export const citizen: BehaviourModule = {
       const street = obs.channels.street;
       const here = obs.body.in;
       if (here && street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === here && sp.kind === "dwelling"))) lastDwelling = here;
-      const home_ = home?.movedIn ? home.space : livingAt ?? lastDwelling;
+      let home_ = home?.movedIn ? home.space : livingAt ?? lastDwelling;
+      // (Our home under water: the relief centre, until a day on, when we try home again.)
+      if (floodedOut && t < floodedOut.until && home_ === floodedOut.home && p.relief) home_ = p.relief;
       if (atClinic && p.care) return p.care.waiting;
       if (attending && !attending.gone && t < attending.until) return here;
       const age = Math.floor((t - obs.body.born_at) / year);
@@ -1696,6 +1734,9 @@ export const citizen: BehaviourModule = {
     };
     /** The round move we sent last, and how it went (the outcome comes with our next look). */
     let pendingGo: string | null = null;
+    let floodedOut: { home: string; until: number } | null = null;
+    let nextTakeChance = 0;
+    let uninhabitable: string | null = null; // a lease on a home we found under water
     const heardGo = (obs: Observation) => {
       if (!pendingGo) return;
       const out = obs.outcomes.at(-1);
@@ -1703,6 +1744,12 @@ export const citizen: BehaviourModule = {
       pendingGo = null;
       if (!out || out.status === "applied") return;
       refusedGo = { to, until: nextChange(obs.t) };
+      // (Our home under water: to the relief centre at once. Work or school under water: not before things change.)
+      const homeNow = home?.movedIn ? home.space : livingAt ?? lastDwelling;
+      if (out.refusal?.code === "flooded" && to === homeNow && p.relief) {
+        floodedOut = { home: to, until: obs.t + DAY };
+        refusedGo = null;
+      }
       // (A place pulled down, or coming down: not again.)
       if (["unknown_structure", "unknown_space", "coming_down"].includes(out.refusal?.code ?? "")) {
         refusedGo = { to, until: Infinity };
@@ -1943,6 +1990,7 @@ export const citizen: BehaviourModule = {
         // (Taken out of the world with our household, or gone from it: nothing more here.)
         if (obs.body && !obs.body.present) return wait(ctx.world.runEnd + DAY);
         heardGo(obs);
+
         // A child does nothing on their own (their parents house them) until they're 18, except ask for help if no
         // adult of the household is left: all of them seen to die (in our home), or gone from it.
         if (obs.body && obs.t - obs.body.born_at < ADULT_YEARS * year) {

@@ -304,6 +304,15 @@
                   "maximum": 9007199254740991
                 },
                 "maxProperties": 20
+              },
+              "investigates": {
+                "description": "Investigation (crime): work with `investigate` finds who took the goods, with detection_bps, and tells only the actor.",
+                "type": "boolean"
+              },
+              "detection_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
               }
             }
           }
@@ -480,6 +489,42 @@
                   "maximum": 9007199254740991
                 },
                 "maxProperties": 1000
+              },
+              "spills_above": {
+                "description": "What's above this level on a cell spreads to the four around it, spill_bps_per_day of it a day (a river over its banks).",
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "spill_bps_per_day": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "source_by_day": {
+                "description": "The sources scaled from a day of the run on (rain, a wet season, a drought); before the first step, all of them.",
+                "type": "array",
+                "maxItems": 1000,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "from_day",
+                    "bps"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "from_day": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "bps": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000
+                    }
+                  }
+                }
               }
             }
           }
@@ -927,6 +972,30 @@
         "cover": {
           "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId",
           "description": "Nature: the land cover its cells count as while it stands (a park is grassland); absent, the reserved cover `built`."
+        },
+        "floods": {
+          "description": "Floods (world-expansion 7.3): when this field passes `above` on any of its cells, its occupants are moved out, no one can come in while it lasts, and its wear rises by wear_per_day.",
+          "type": "object",
+          "required": [
+            "field",
+            "above"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+            },
+            "above": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "wear_per_day": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
         }
       }
     },

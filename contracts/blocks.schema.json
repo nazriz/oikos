@@ -106,6 +106,9 @@
         },
         {
           "$ref": "#/$defs/retire"
+        },
+        {
+          "$ref": "#/$defs/take"
         }
       ]
     },
@@ -1163,6 +1166,27 @@
               "uniqueItems": true
             }
           }
+        },
+        "investigate": {
+          "description": "An investigation (a task that investigates): of goods of a kind taken from someone, at a structure.",
+          "type": "object",
+          "required": [
+            "from",
+            "at",
+            "kind"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/IdOrRef"
+            },
+            "at": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/IdOrRef"
+            },
+            "kind": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+            }
+          }
         }
       }
     },
@@ -1597,6 +1621,35 @@
           },
           "maxItems": 32,
           "uniqueItems": true
+        }
+      }
+    },
+    "take": {
+      "description": "Taking goods another holds at a structure where the taker is, without their consent (world-expansion 7.3). Recorded as it happened (taken); the holder sees their holding fall; nobody is told who.",
+      "type": "object",
+      "required": [
+        "block",
+        "kind",
+        "quantity",
+        "from",
+        "at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "block": {
+          "const": "take"
+        },
+        "kind": {
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+        },
+        "quantity": {
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Quantity"
+        },
+        "from": {
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/IdOrRef"
+        },
+        "at": {
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/IdOrRef"
         }
       }
     }

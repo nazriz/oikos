@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -102,13 +102,19 @@
       "source": "placeholder"
     },
     "look_at": {
-      "schema": {},
-      "source": "the world gives it (no default)"
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
     },
     "look_days": {
-      "schema": {},
+      "schema": {
+        "type": "integer"
+      },
       "unit": "days",
-      "source": "the world gives it (no default)"
+      "default": 5,
+      "source": "placeholder"
     },
     "max_staff": {
       "schema": {
@@ -153,6 +159,14 @@
       },
       "unit": "bps",
       "default": 2500,
+      "source": "placeholder"
+    },
+    "police": {
+      "schema": {
+        "type": "string",
+        "description": "whom it reports goods missing to, at its monthly stocktake (\"\": no stocktake)"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "premises": {
@@ -252,6 +266,15 @@
       "default": 60,
       "source": "placeholder"
     },
+    "stocktake_days": {
+      "schema": {
+        "type": "integer",
+        "description": "when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
     "suppliers": {
       "schema": {
         "type": "array",
@@ -311,7 +334,7 @@
     "work_days": {
       "schema": {
         "type": "integer",
-        "description": "of every 7: shops open on Saturdays look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
+        "description": "of every 7: shops open on Saturdays"
       },
       "unit": "days",
       "default": 6,

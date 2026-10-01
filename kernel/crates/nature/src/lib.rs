@@ -159,7 +159,7 @@ pub fn step_day(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSt
     succession(cat, ground, land, st, day, &mut out);
     let mut values: BTreeMap<Id, Vec<i64>> = BTreeMap::new();
     for f in &cat.fields {
-        let v = step_field(f, ground, land, st.fields.get(&f.id));
+        let v = step_field(f, ground, land, st.fields.get(&f.id), day);
         st.fields.insert(f.id.clone(), sparse(&v, ground, f.baseline));
         if st.fields.get(&f.id).is_some_and(|m| m.is_empty()) {
             st.fields.remove(&f.id);
@@ -211,18 +211,20 @@ fn succession(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureStat
     }
 }
 
-fn step_field(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&BTreeMap<Id, i64>>) -> Vec<i64> {
-    step_field_dense(f, ground, land, dense(now, ground, f.baseline))
+fn step_field(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&BTreeMap<Id, i64>>, day: i64) -> Vec<i64> {
+    step_field_dense(f, ground, land, dense(now, ground, f.baseline), day)
 }
 
-fn step_field_dense(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: &Land, mut v: Vec<i64>) -> Vec<i64> {
+fn step_field_dense(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: &Land, mut v: Vec<i64>, day: i64) -> Vec<i64> {
     let n = ground.cells.len();
-    // Sources.
+    // Sources (a cover's may be negative: soaking it up), scaled for the day (rain, drought).
+    let scale = f.source_by_day.iter().rev().find(|s| s.from_day <= day).map_or(BPS, |s| s.bps);
     for i in 0..n {
-        v[i] += f.from_covers.get(&land.cover[i]).copied().unwrap_or(0);
+        let mut add = f.from_covers.get(&land.cover[i]).copied().unwrap_or(0);
         for ty in &land.anchored[i] {
-            v[i] += f.from_structures.get(ty).copied().unwrap_or(0);
+            add += f.from_structures.get(ty).copied().unwrap_or(0);
         }
+        v[i] += if add > 0 { add.saturating_mul(scale) / BPS } else { add };
     }
     // Decay toward the baseline (at least one step while it's away from it).
     if f.decay_bps_per_day > 0 {
@@ -264,6 +266,26 @@ fn step_field_dense(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, 
             let moved = excess * f.flow_bps_per_day / BPS;
             next[i] -= moved;
             next[j] += moved;
+        }
+        v = next;
+    }
+    // Spilling: what's above the level on a cell spreads to its neighbours (a river over its banks).
+    if let (Some(level), true) = (f.spills_above, f.spill_bps_per_day > 0) {
+        let mut next = v.clone();
+        for i in 0..n {
+            let nb = &ground.neighbours[i];
+            let excess = v[i] - level;
+            if nb.is_empty() || excess <= 0 {
+                continue;
+            }
+            let each = excess * f.spill_bps_per_day / BPS / nb.len() as i64;
+            if each == 0 {
+                continue;
+            }
+            next[i] -= each * nb.len() as i64;
+            for &j in nb {
+                next[j] += each;
+            }
         }
         v = next;
     }
@@ -423,7 +445,7 @@ pub fn spin_up(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSta
     let caps: Vec<Capacity> = cat.species.iter().map(|sp| capacity(sp, ground, land)).collect();
     for day in first_day..first_day + days {
         for (k, f) in cat.fields.iter().enumerate() {
-            fields[k] = step_field_dense(f, ground, land, std::mem::take(&mut fields[k]));
+            fields[k] = step_field_dense(f, ground, land, std::mem::take(&mut fields[k]), day);
         }
         let values: BTreeMap<Id, Vec<i64>> = cat.fields.iter().zip(&fields).map(|(f, v)| (f.id.clone(), v.clone())).collect();
         for (k, sp) in cat.species.iter().enumerate() {

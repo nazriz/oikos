@@ -250,6 +250,8 @@ impl World {
             timelines: Default::default(),
             nature: None,
             totals: c.catalogue.counters.iter().map(|x| (x.id.clone(), 0)).collect(),
+            flooded: Default::default(),
+            takings: vec![],
         };
         for x in &w.structures {
             let f = s.types[&x.structure_type].footprint;
@@ -604,14 +606,14 @@ impl World {
                 let created = (!res.created.is_empty()).then_some(res.created);
                 let mut events = vec![Timed::new(t, EventBody::ActionApplied { action: action.clone(), participant: participant.into(), position: pos.clone(), created: created.clone() })];
                 events.extend(res.events);
-                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed })
+                (events, Outcome { action, t, status: OutcomeStatus::Applied, created, refusal: None, surveyed: res.surveyed, investigated: res.investigated })
             }
             Err(r) => (
                 vec![Timed::new(
                     t,
                     EventBody::ActionRefused { action: action.clone(), participant: participant.into(), position: pos.clone(), block: r.block, code: r.code, detail: r.detail.clone() },
                 )],
-                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None },
+                Outcome { action, t, status: OutcomeStatus::Refused, created: None, refusal: Some(refusal_info(&r)), surveyed: None, investigated: None },
             ),
         };
         let key = pos.unwrap_or_else(|| SELF.into());

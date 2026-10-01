@@ -188,3 +188,32 @@ fn a_body_is_in_one_place_and_going_somewhere_takes_the_trip() {
     assert_eq!(st.structures_of("alice"), vec!["s-shop".to_string()]);
     assert_eq!(body_view(&mut run, "alice-self")["in"], json!("s-shop/dwelling.1"));
 }
+
+#[test]
+fn goods_are_taken_and_investigation_finds_the_taker_with_its_chance() {
+    let mut w = services_world();
+    w["catalogue"]["tasks"].as_array_mut().unwrap().push(json!({"id": "investigate", "labour": 600, "in": "workplace", "investigates": true, "detection_bps": 10000}));
+    w["catalogue"]["tasks"].as_array_mut().unwrap().push(json!({"id": "look_around", "labour": 600, "in": "workplace", "investigates": true, "detection_bps": 0}));
+    let mut run = start(&w);
+    // Not there: refused. There (bob comes in): taken, and the holding moved.
+    assert_eq!(act(&mut run, "bob-self", None, json!([{"block": "take", "kind": "goods", "quantity": "3", "from": "alice", "at": "s-house"}])), Err(RefusalCode::NotPresent));
+    act(&mut run, "bob-self", None, json!([{"block": "occupy", "space": "s-house/dwelling.1"}])).unwrap();
+    let ev = act(&mut run, "bob-self", None, json!([{"block": "take", "kind": "goods", "quantity": "3", "from": "alice", "at": "s-house"}])).unwrap();
+    assert!(ev.iter().any(|e| matches!(e, EventBody::Taken { by, from, .. } if by == "bob" && from == "alice")));
+    let st = run.kernel().state();
+    assert_eq!(st.holding("alice", "s-house", "goods"), 7);
+    assert_eq!(st.holding("bob", "s-house", "goods"), 3);
+    assert_eq!(act(&mut run, "bob-self", None, json!([{"block": "take", "kind": "goods", "quantity": "30", "from": "alice", "at": "s-house"}])), Err(RefusalCode::InsufficientQuantity));
+    // Investigation: work that finds the taker (here, surely), told to the investigator only.
+    let found = |run: &mut Run<Vec<u8>>, task: &str| {
+        let cmd = direct("carol-self", None, serde_json::from_value(json!([{"block": "work", "task": task, "units": 1, "at": "s-shop", "performers": ["carol"], "investigate": {"from": "alice", "at": "s-house", "kind": "goods"}}])).unwrap()).unwrap();
+        step(run, &cmd).unwrap();
+        let o = run.command(&Command::Observe { participant: "carol-self".into(), only: None }).unwrap().observation.unwrap();
+        serde_json::to_value(&o).unwrap()["outcomes"].as_array().unwrap().last().unwrap()["investigated"].clone()
+    };
+    assert_eq!(found(&mut run, "investigate")["taker"], json!("bob"));
+    assert_eq!(found(&mut run, "look_around")["taker"], json!(null));
+    assert_eq!(found(&mut run, "look_around")["taken"], json!(true));
+    // Not an investigation: refused.
+    assert_eq!(act(&mut run, "carol-self", None, json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "performers": ["carol"], "investigate": {"from": "alice", "at": "s-house", "kind": "goods"}}])), Err(RefusalCode::BadInvestigation));
+}

@@ -75,6 +75,10 @@ export interface TownSpec {
   utilities?: boolean;
   /** Owner-occupiers, where the profile describes ownership (world-expansion 6.2). Default: yes; false: every home let. */
   ownership?: boolean;
+  /** Crime and policing, where the profile describes them and there's a tribunal (world-expansion 7.2). Default: yes. */
+  crime?: boolean;
+  /** Rain and drought (world-expansion 7.3): the river's inflow from a day of the run on, as a share (10,000 = usual). */
+  weather?: { from_day: number; bps: number }[];
   /** The daily round, where the profile describes it (world-expansion 6.3): people go to work and school and come home;
    * moving takes time. Default: yes; false: a body stays where it went, and moving takes none. */
   round?: boolean;
@@ -248,6 +252,8 @@ export function generate(spec: TownSpec): any {
   const UT = V.utilities && spec.utilities !== false ? V.utilities : undefined;
   const OW = V.ownership && spec.ownership !== false ? V.ownership : undefined;
   const RD = V.round && spec.round !== false ? V.round : undefined;
+  const HZ = V.hazards && UT ? V.hazards : undefined; // (floods: where the river carries water)
+  const CR = V.crime && JU && spec.crime !== false ? V.crime : undefined;
   // (With the round, employers look at the day's work an hour after it starts, when their staff are in.)
   const look = RD ? { look_at: (RD.work_start_hour + 1) * HOUR, look_days: RD.work_days } : {};
   const SHOP_DAYS = RD ? RD.work_days : 6; // (a shop opens when its staff are in)
@@ -313,6 +319,13 @@ export function generate(spec: TownSpec): any {
     text: `The planning office may not grant a permit for building on the river lots (${riverList[0]} to ${riverList.at(-1)}), which flood.`,
     adico: { attribute: "the planning office", deontic: "must_not", aim: "grant a building permit", condition: "for a river lot" },
     formal: { language: "cel", condition: `block.block == 'grant_permit' && block.lot in [${riverList.map((x) => `'${x}'`).join(",")}]` } });
+  // The police station's lot (world-expansion 7.2), the police's.
+  if (CR) {
+    const stationLot = site();
+    structures.push({ id: "police-station", at: cellOf.get(stationLot), type: "station", built_by: "builder" });
+    own(stationLot, "police");
+    entities.push({ id: "police", kind: "police", name: "Police" });
+  }
   // The clinic's and the school's lots (world-expansion 4), each the organisation's own.
   if (HE) {
     const clinicLot = site(), schoolLot = site();
@@ -715,6 +728,8 @@ export function generate(spec: TownSpec): any {
     // (A civic building has a hall, where groups and meetings gather: docs/design/ai-citizens.md 2b.)
     { id: "civic", category: "civic", materials: { materials: kg(330) }, build_labour: 10_000 * HOUR, demolition_labour: 800 * HOUR, build_time: 120 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }, { kind: "hall", count: 1, capacity: spec.hall_capacity ?? 200 }] },
     { id: "park", category: "green", materials: { materials: kg(20) }, build_labour: 1_500 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [] },
+    ...(CR ? [{ id: "station", category: "civic", materials: { materials: kg(300) }, build_labour: 8_000 * HOUR, demolition_labour: 600 * HOUR, build_time: 120 * DAY, footprint: { w: 1, h: 1 },
+      spaces: [{ kind: "workplace", count: 1, capacity: Math.max(1, Math.ceil((CR.police_per_1000 * everyone.length) / 1000)) + 2 }] }] : []),
     // (The utilities': a water works and a substation, run without staff here: placeholders.)
     ...(UT ? [
       { id: "works", category: "utility", materials: { materials: kg(500) }, build_labour: 12_000 * HOUR, demolition_labour: 800 * HOUR, build_time: 180 * DAY, footprint: { w: 1, h: 1 }, spaces: [] },
@@ -919,6 +934,18 @@ export function generate(spec: TownSpec): any {
       { id: "departures", kind: "records", match: { statement_kinds: ["departure"] } }],
       code("utility.energy", { depot: "substation", grid: "outside", units_per_customer_per_day: UT.energy.kwh_per_household_per_day, price_per_unit: UT.energy.price_per_kwh, supply_per_day: UT.energy.supply_per_day }));
   }
+  // The police (world-expansion 7.2): the state's, paid by a grant from outside; they investigate what's reported, and
+  // charge whom they find before the tribunal.
+  if (CR) {
+    const officers = Math.max(1, Math.ceil((CR.police_per_1000 * everyone.length) / 1000));
+    const stationCell = structures.find((x) => x.id === "police-station")!.at;
+    accounts.push({ id: "acc-police", holder: "police", custodian: "bank", balance: 6 * CR.officer_wage_per_fortnight * officers });
+    office("police-oic", "police", "Officer in charge", "officer_in_charge", [{ id: "books", kind: "accounts" }, mine("police-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [stationCell], occupants: "names" }],
+      code("police.station", { building: "police-station", workplace: "police-station/workplace.1", account: "acc-police", officers, wage: CR.officer_wage_per_fortnight, period: 14 * DAY,
+        working_day: WORKING_DAY, task_seconds: CR.investigation_hours * HOUR, tribunal: "tribunal", ...look }));
+    office("outside-police-funding", "outside", "Police funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
+      code("world.grants", { account: "acc-outside", to: "police", to_account: "acc-police", per_resident_per_year: Math.ceil(((CR.officer_wage_per_fortnight * officers * 365) / 14) / Math.max(1, homes.length)) }));
+  }
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
   office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }, lawBook,
@@ -989,7 +1016,7 @@ export function generate(spec: TownSpec): any {
     const price = RETAIL_PRICE;
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
-        suppliers: [...factories, "outside"], price, demand: SHOP.demand, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) }));
+        suppliers: [...factories, "outside"], price, demand: SHOP.demand, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}) }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = { id: "petitions", kind: "records", match: { statement_kinds: ["petition"] }, on_request: true };
@@ -1027,6 +1054,8 @@ export function generate(spec: TownSpec): any {
     ...(HE && ED ? { school: { entity: "school", building: "school-building", ages: ED.school_ages },
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),
+    ...(HZ ? { relief: "town-hall/hall.1" } : {}),
+    ...(CR ? { crime: { take_bps: CR.take_bps_per_month_in_need, caught_bps: CR.caught_bps_reckoned, quantity: CR.take_quantity } } : {}),
     ...(RD ? { round: { work_start: RD.work_start_hour * HOUR, work_end: RD.work_end_hour * HOUR, work_days: RD.work_days, school_start: RD.school_start_hour * HOUR, school_end: RD.school_end_hour * HOUR } } : {}),
     ...(JU ? { tribunal: { entity: "tribunal", challenge_bps: JU.challenge_bps, apply_bps: JU.apply_bps, apply_after_days: JU.apply_after_days } } : {}),
     ...(E ? { electoral_town: "city", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 } } : {}),
@@ -1073,6 +1102,8 @@ export function generate(spec: TownSpec): any {
     catalogue: {
       // (With nature: every cell has a cover, so each type says which it can stand on; a park is grassland.)
       structure_types: structureTypes.map((t) => ({ ...t, materials: Object.fromEntries(Object.entries(t.materials).map(([k, q]) => [k, String(q)])),
+        // (Every building floods with water above the profile's depth on its cells.)
+        ...(HZ && L ? { floods: { field: "water", above: HZ.flood_above_kl } } : {}),
         ...(L ? { terrains: L.buildable, ...(t.id === "park" ? { cover: L.default_cover } : {}) } : {}) })),
       resources: [{ id: "goods", unit: "item" }, { id: "inputs", unit: "kg" }, { id: "materials", unit: "kg" }, { id: "waste", unit: "kg" }, ...(UT ? [{ id: "energy", unit: "kWh" }] : [])],
       // What builds up and wears out (docs/behaviour/services.md): waste in homes (grams), by the people living there;
@@ -1102,6 +1133,8 @@ export function generate(spec: TownSpec): any {
         ] : []),
         // Utilities (world-expansion 6.1): a kilolitre drawn from the river (where there's a river); a kWh supplied from
         // what was bought, emitting what the grid's generation does (grams of CO2e).
+        // Investigation (crime): an officer's hours that find who took what was reported, with the profile's chance.
+        ...(CR ? [{ id: "investigate", labour: CR.investigation_hours * HOUR, in: "workplace", investigates: true, detection_bps: CR.detection_bps }] : []),
         ...(UT ? [
           { id: "draw_water", labour: 0, ...(L ? { draws: { field: "water", per_unit: 1 } } : {}) },
           { id: "supply_energy", labour: 0, consumes: { energy: "1" }, emits: { greenhouse_gas: UT.energy.grid_emissions_g_per_kwh } },
@@ -1114,7 +1147,10 @@ export function generate(spec: TownSpec): any {
       // (The river carries water where there are utilities: fed along its course, flowing downstream, lost along the way.)
       ...(L ? { land_covers: L.land_covers, default_cover: L.default_cover, cleared_cover: L.cleared_cover, species: L.species,
         fields: [...L.fields, ...(UT ? [{ id: "water", min: 0, max: 1_000_000_000_000, decay_bps_per_day: UT.water.river_decay_bps_per_day, flow_bps_per_day: UT.water.river_flow_bps_per_day,
-          from_covers: { [V.nature!.river_cover]: UT.water.river_inflow_kl_per_cell_per_day } }] : [])] } : {}),
+          from_covers: { [V.nature!.river_cover]: UT.water.river_inflow_kl_per_cell_per_day, ...(HZ ? { wetland: -HZ.wetland_soak_kl_per_day } : {}) },
+          // (Floods: over its banks it spills onto the land around; rain and drought scale what comes down.)
+          ...(HZ ? { spills_above: HZ.river_bank_kl, spill_bps_per_day: HZ.spill_bps_per_day } : {}),
+          ...(spec.weather?.length ? { source_by_day: spec.weather } : {}) }] : [])] } : {}),
     },
     world: { boundaries: ["outside"], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
       // The places (D58): the town, detailed, covering its ground; with nature, within its district, the landscape.

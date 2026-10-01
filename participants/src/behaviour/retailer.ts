@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.5.0",
+  version: "0.6.0",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -43,7 +43,9 @@ export const retailer: BehaviourModule = {
         period: 14 * DAY,
         notice_days: 14,
         working_day: 8 * 3600,
-        work_days: 6, // of every 7: shops open on Saturdays look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)
+        work_days: 6, // of every 7: shops open on Saturdays
+        police: "", // whom it reports goods missing to, at its monthly stocktake ("": no stocktake)
+        stocktake_days: 30, look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)
         price: 9000, // its opening retail price, cents each
         demand: 250, // what it expects to sell in a month, before it knows
         unpaid_days: 7,
@@ -106,6 +108,7 @@ export const retailer: BehaviourModule = {
     let headcountWhy = "";
     let monthStart = -1;
     let nextRestock = 0;
+    const books = { last: null as number | null, in: 0, out: 0, next: 0 }; // the stocktake's books
     // Setting up (a shop just founded): our account asked for, the capital called, the premises bought.
     const setup = { accountAsked: false, capitalCalled: false, founderAccount: undefined as string | undefined, registered: false, purchased: false, ready: !p.founder };
     const workDay = (t: number) => Math.floor(t / DAY) % 7 < p.work_days;
@@ -176,6 +179,7 @@ export const retailer: BehaviourModule = {
           ours.delete(d.order);
           onOrder = Math.max(0, onOrder - o.quantity);
           if (d.delivered < o.quantity) shortAt.set(o.seller, obs.t);
+          books.in += d.delivered;
         }
       },
       (obs) => {
@@ -196,6 +200,18 @@ export const retailer: BehaviourModule = {
         if (headcount < 0) headcount = Math.max(workers.length, p.min_staff); // (a new shop starts by hiring its minimum)
         if (monthStart < 0) monthStart = acc.balance;
         const stock = held(obs, p.premises, p.kind);
+        // The stocktake (crime: docs/behaviour/crime.md), monthly: what's here against our books (last count, what came,
+        // what we served). Short: reported to the police, with what it was worth at our price.
+        if (p.police && t >= books.next) {
+          books.next = t + p.stocktake_days * DAY;
+          const expected = books.last === null ? null : books.last + books.in - books.out;
+          books.last = stock;
+          books.in = 0;
+          books.out = 0;
+          if (expected !== null && expected > stock && acc) steps.push(because(`The stocktake: ${stock} ${p.kind} here, where our books say ${expected}. ${expected - stock} missing: reporting it to the police.`,
+            say("crime_report", `Report: ${expected - stock} ${p.kind} missing from ${p.premises}, found at our stocktake.`, { to: [p.police], visible: [me, p.police],
+              data: { kind: p.kind, quantity: expected - stock, at: p.premises, value: (expected - stock) * price, account: acc.account } })));
+        }
         // Our suppliers' prices, cheapest first (and those that came up short in the last week, last).
         const offers = p.suppliers.map((s) => ({ seller: s, ...goodsPrices(book, s) })).filter((x) => x.prices[p.kind] !== undefined && x.account)
           .map((x) => ({ seller: x.seller, account: x.account!, unit: x.prices[p.kind]!, min: x.min_order ?? 1 }))
@@ -359,7 +375,10 @@ export const retailer: BehaviourModule = {
             : `We couldn't serve all of an order within ${within} days: served ${x.served} of the ${x.o.quantity}; refunding the rest.`;
           const st = fillWith(x.o, q, finished ? x.served : -1, q ? crew : [], why);
           st.then = (res) => {
-            if (res.status === "applied") return void (q && pace.done(crew, Math.floor(t / DAY)));
+            if (res.status === "applied") {
+              books.out += q;
+              return void (q && pace.done(crew, Math.floor(t / DAY)));
+            }
             if (q) pace.refused(res, q, crew);
             for (const w of crew) if (share) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
             // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.

@@ -98,6 +98,7 @@ test("a child born here is brought home by the parent who bore them and added to
   }
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own) and moving into a home still being left, as above;
-  // and, with the daily round, a partner gone to work while a conception was under way, or someone who died mid-trip.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "too_far", "participant_inactive"].includes(e.code))).toEqual([]);
+  // and, with the daily round, a partner gone to work while a conception was under way, or someone who died mid-trip;
+  // and a house a landlord put up on the river, found under water (its lease then ended).
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "too_far", "participant_inactive", "flooded"].includes(e.code))).toEqual([]);
 }, 300_000);

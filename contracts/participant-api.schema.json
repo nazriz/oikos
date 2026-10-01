@@ -376,6 +376,10 @@
               }
             }
           }
+        },
+        "investigated": {
+          "description": "What an investigation found, for the one who investigated only: whether goods were taken as said, and the taker if found (null: not found).",
+          "type": "object"
         }
       }
     },

@@ -127,3 +127,10 @@ sources); this list is for the architecture and design ideas.
 | Human capital: schooling raises productivity, and earnings rise log-linearly with years of it | Mincer, J. (1974), *Schooling, Experience, and Earnings*, NBER **(to confirm)** | Skill speeds work (`labour_by`), steeply enough to give the profile's return a year |
 | The return to a year of schooling in Australia | Leigh, A. (2008), "Returns to education in Australia", *Economic Papers* 27(3), 233–249 **(to confirm)** | The profile's `return_per_year_bps` (10%) |
 | Credentials as a signal employers screen on | Spence, M. (1973), "Job market signaling", *Quarterly Journal of Economics* 87(3), 355–374 | Not yet used: certificates exist, employers don't read them (leaves out) |
+
+## Crime (docs/behaviour/crime.md; docs/design/world-expansion.md §7.2)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Offending as a choice weighed against the chance and cost of being caught | Becker, G. S. (1968), "Crime and punishment: an economic approach", *Journal of Political Economy* 76(2), 169–217 | The chance of taking falls with the chance of being caught one reckons |
+| Routine activity: crime needs a motivated offender, a suitable target, and no capable guardian | Cohen, L. E. & Felson, M. (1979), "Social change and crime rate trends: a routine activity approach", *American Sociological Review* 44(4), 588–608 | Taking only where one is, from goods there (work), in need |

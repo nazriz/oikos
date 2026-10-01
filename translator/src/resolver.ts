@@ -190,6 +190,7 @@ class Resolver {
     switch (c.fn) {
       case "money": return this.money(c, bind);
       case "goods": return this.goods(c);
+      case "take": return this.take(c);
       case "work": return this.work(c);
       case "account": return this.account(c, bind);
       case "structure": return this.structure(c, bind);
@@ -248,7 +249,23 @@ class Resolver {
     const at = this.need(c, "at", "Where?");
     const by = this.has(c, "by") ? (this.ids(c, "by") ?? [this.id(c, "by")!]).map((p) => this.k.entityOf(p)) : [];
     const on = this.id(c, "on");
-    return [{ block: "work", task, units: Number(units), at, performers: by, ...(on ? { on } : {}), ...(survey && cells ? { survey: { of: survey, cells } } : {}) }];
+    // An investigation (crime): of goods of a kind taken from someone, at a structure.
+    const from = this.id(c, "investigate");
+    let investigate: object | undefined;
+    if (from) {
+      const takenAt = this.id(c, "taken_at");
+      if (!takenAt) throw new Ask("Taken from where?");
+      investigate = { from: this.k.entityOf(from), at: takenAt, kind: this.need(c, "kind", "Taken: what?") };
+    }
+    return [{ block: "work", task, units: Number(units), at, performers: by, ...(on ? { on } : {}), ...(survey && cells ? { survey: { of: survey, cells } } : {}), ...(investigate ? { investigate } : {}) }];
+  }
+
+  /** Taking goods another holds, where we are (crime: world-expansion 7.3). */
+  private take(c: Call): Block[] {
+    const kind = this.need(c, "kind", "Take what?");
+    const quantity = this.quantity(c, "quantity");
+    if (!quantity || quantity === "0") throw new Ask("How much?");
+    return [{ block: "take", kind, quantity, from: this.k.entityOf(this.need(c, "from", "Whose?")), at: this.need(c, "at", "Where?") }];
   }
 
   /** The money outcome of a call, for requests and commitments. */

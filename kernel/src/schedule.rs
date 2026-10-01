@@ -250,6 +250,12 @@ impl Scheduler {
                     }
                 }
                 // Something happening to one's own body (falling ill, getting better, being treated) is felt at once.
+                // (Flooded out of where one was is felt at once too.)
+                Some("vacated") if e["reason"].as_str() == Some("flooded") => {
+                    let (Some(st), Some(person)) = (st, e["occupant"].as_str()) else { continue };
+                    let keys = self.acting_for(st, person, "", t);
+                    self.wake_now(keys, t);
+                }
                 Some("condition_began" | "condition_ended" | "condition_treated") => {
                     let (Some(st), Some(person)) = (st, e["person"].as_str()) else { continue };
                     let keys = self.acting_for(st, person, "", t);

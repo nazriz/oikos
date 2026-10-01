@@ -5,7 +5,7 @@ use serde_json::Value as Json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
-pub const FUNCTIONS: [&str; 18] = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system"];
+pub const FUNCTIONS: [&str; 19] = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take"];
 pub const LABELS: [&str; 5] = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form"];
 
 #[derive(Debug, Clone, PartialEq)]

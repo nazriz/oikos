@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -182,6 +182,11 @@
       "source": "placeholder"
     },
     "complain_to": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "crime": {
       "schema": {},
       "default": null,
       "source": "placeholder"
@@ -368,6 +373,11 @@
     "registry": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "relief": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     },
     "rent_bearable_share_bps": {
       "schema": {
