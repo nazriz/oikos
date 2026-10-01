@@ -71,6 +71,8 @@ pub enum RefusalCode {
     BadSurvey,
     /// Work on a person or a space with a task that does nothing to bodies, or work on a structure with one that does.
     NoBodyEffect,
+    /// Work that draws from a field where there isn't enough of it (water from a river run low).
+    FieldExhausted,
     /// Building work on something that isn't being built.
     NotBeingBuilt,
     /// Demolition work on something that isn't being demolished.
@@ -287,6 +289,10 @@ pub enum EventBody {
         until: i64,
         death_called_off: bool,
     },
+    /// The world's totals (tier 2: greenhouse gas), monthly, for measurement.
+    CounterCensus {
+        counters: BTreeMap<Id, i64>,
+    },
     /// Work changed a body variable (services: teaching raises skill): its value now.
     BodyChanged {
         person: Id,
@@ -386,6 +392,7 @@ impl EventBody {
             EventBody::ConditionEnded { .. } => "condition_ended",
             EventBody::ConditionTreated { .. } => "condition_treated",
             EventBody::BodyChanged { .. } => "body_changed",
+            EventBody::CounterCensus { .. } => "counter_census",
             EventBody::Harmed { .. } => "harmed",
             EventBody::ParticipantCreated { .. } => "participant_created",
             EventBody::ParticipantEnded { .. } => "participant_ended",

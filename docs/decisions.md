@@ -1137,6 +1137,13 @@ See the design note, §16.
   - **Liberties:** the tribunal believes what the parties say they paid; no appeals or costs; the profile's rates of taking a case are placeholders.
   - **Revisit if:** tenants are given a reason to stay on past a notice (then possession orders and a sheriff: the kernel already allows a removal); a study needs bargaining arbitration, bonds and repairs, or challenges to the town's decisions.
 
+- **Water and energy, built** (2026-10-01; contract signed; docs/behaviour/utilities.md).
+  - **In Rust:** tasks draw from fields and emit to fields and world counters; counters are censused monthly.
+  - **In TypeScript:** a water corporation draws the town's use from the river (restrictions when it can't) and bills owners quarterly; an energy retailer buys from the grid, supplies its customers (each kWh's emissions counted) and bills them monthly; households pay bills before shopping.
+  - **What it shows:** about 2% fewer goods sold in the first 120 days, as bills come out of what households spend; a river with no inflow runs dry within weeks.
+  - **Liberties:** use is a fixed rate (no meters, no response to price); no disconnection, local generation or gas; drought is config.
+  - **Revisit if:** a study needs water saving under restrictions or prices (use as a choice: the goods model), a changing season, or local generation and its pollution.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

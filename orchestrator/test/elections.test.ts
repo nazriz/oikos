@@ -77,7 +77,7 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   expect(Math.floor(alone.result.at / DAY)).toBe(POLL - 30);
   expect(alone.recs.some((r) => r.kind === "ballot" && r.data?.electorate === "roll")).toBe(false);
 
-  const voted = await town("voted-out", true, POLL + 40);
+  const voted = await town("voted-out", true, POLL + 40, 1000);
   expect(voted.result.data.winner).not.toBe(voted.incumbent);
   const mayor = voted.appointed[0]?.holder;
   expect(mayor).toBe(voted.result.data.winner);

@@ -1571,6 +1571,36 @@
               "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
             }
           }
+        },
+        {
+          "description": "The world's totals (tier 2: greenhouse gas), monthly, for measurement.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "counters"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "counter_census"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "counters": {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            }
+          }
         }
       ]
     },
@@ -1607,7 +1637,8 @@
         "participant_created",
         "participant_ended",
         "position_created",
-        "appointed"
+        "appointed",
+        "counter_census"
       ]
     },
     "RefusalCode": {
@@ -1659,6 +1690,7 @@
         "no_time_left",
         "bad_survey",
         "no_body_effect",
+        "field_exhausted",
         "not_being_built",
         "not_coming_down",
         "coming_down"

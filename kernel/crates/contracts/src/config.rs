@@ -111,6 +111,9 @@ pub struct Catalogue {
     /// exactly and attaches no meaning to them; work changes them (a task's `on_body`), and they drift by `per_day`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_variables: Vec<BodyVariableCfg>,
+    /// World totals the kernel keeps (tier 2: greenhouse gas).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub counters: Vec<CounterCfg>,
 }
 
 /// A body variable: its bounds, its value for a body born here (or given none), and its drift a day.
@@ -245,6 +248,27 @@ pub struct TaskCfg {
     /// variable's minimum to `at_max_bps` of it at its maximum.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub labour_by: Option<LabourBy>,
+    /// Per unit: taken from a field, at the cell (the structure's, or the four around them) that has the most of it
+    /// (water from the river).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub draws: Option<Draws>,
+    /// Per unit: added to a field at the structure's corner cell (pollution), or to a world counter (greenhouse gas).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub emits: BTreeMap<Id, i64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Draws {
+    pub field: Id,
+    pub per_unit: i64,
+}
+
+/// A world total the kernel keeps (greenhouse gas): added to by work, censused monthly, with no effect on anything.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CounterCfg {
+    pub id: Id,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1043,6 +1067,24 @@ fn check_bodies(c: &Config) -> Result<(), String> {
                 return Err(format!("task {}: labour_by names no body variable {}", t.id, lb.variable));
             }
             bps(lb.at_max_bps, &format!("task {}: labour_by.at_max_bps", t.id))?;
+        }
+    }
+    let mut counters: BTreeSet<&str> = BTreeSet::new();
+    for x in &cat.counters {
+        if !counters.insert(&x.id) || cat.fields.iter().any(|f| f.id == x.id) {
+            return Err(format!("counter {}: its id must be unique among counters and fields", x.id));
+        }
+    }
+    for t in &cat.tasks {
+        if let Some(d) = &t.draws {
+            if !cat.fields.iter().any(|f| f.id == d.field) || d.per_unit < 0 {
+                return Err(format!("task {}: draws from no field {} (or a negative amount)", t.id, d.field));
+            }
+        }
+        for k in t.emits.keys() {
+            if !counters.contains(k.as_str()) && !cat.fields.iter().any(|f| &f.id == k) {
+                return Err(format!("task {}: emits to no field or counter {k}", t.id));
+            }
         }
     }
     for e in &c.world.entities {

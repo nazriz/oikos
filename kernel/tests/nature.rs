@@ -171,3 +171,34 @@ fn nature_replays_exactly() {
     let run = start(&world(&default_params()));
     assert!(run.kernel().state().nature.is_none());
 }
+
+/// Tier 2 (world-expansion 6.4): work draws from a field where there's enough of it, emits to a field and to a world
+/// counter, and the counters are censused monthly.
+#[test]
+fn work_draws_from_and_emits_to_fields_and_counters() {
+    let mut w = nature_world();
+    let cat = w["catalogue"].as_object_mut().unwrap();
+    cat.insert("counters".into(), json!([{"id": "ghg"}]));
+    cat["tasks"].as_array_mut().unwrap().push(json!({"id": "clean", "labour": 1, "in": "workplace", "draws": {"field": "pollution", "per_unit": 10}}));
+    cat["tasks"].as_array_mut().unwrap().push(json!({"id": "burn", "labour": 60, "in": "workplace", "emits": {"ghg": 5, "pollution": 1000}}));
+    let mut run = start(&w);
+    advance(&mut run, 10 * DAY);
+    let field = |run: &Run<Vec<u8>>, cell: &str| run.kernel().state().nature.as_ref().unwrap().fields.get("pollution").and_then(|m| m.get(cell)).copied().unwrap_or(0);
+    // The shop pollutes its own cell (cell.0.2) most: that's where a draw takes from.
+    let before = field(&run, "cell.0.2");
+    assert!(before > 20, "{before}");
+    act(&mut run, "carol-self", None, json!([{"block": "work", "task": "clean", "units": 2, "at": "s-shop", "performers": ["carol"]}])).unwrap();
+    assert_eq!(field(&run, "cell.0.2"), before - 20);
+    // More than there is: refused, and nothing taken.
+    assert_eq!(act(&mut run, "carol-self", None, json!([{"block": "work", "task": "clean", "units": 1000, "at": "s-shop", "performers": ["carol"]}])), Err(RefusalCode::FieldExhausted));
+    assert_eq!(field(&run, "cell.0.2"), before - 20);
+    // Emitting: to the counter, and to the field at the shop's corner cell.
+    act(&mut run, "carol-self", None, json!([{"block": "work", "task": "burn", "units": 3, "at": "s-shop", "performers": ["carol"]}])).unwrap();
+    assert_eq!(run.kernel().state().totals["ghg"], 15);
+    assert_eq!(field(&run, "cell.0.2"), before - 20 + 3000);
+    // The census, monthly.
+    let ev = advance(&mut run, 31 * DAY);
+    let census: Vec<_> = ev.iter().filter_map(|e| match e { EventBody::CounterCensus { counters } => Some(counters.clone()), _ => None }).collect();
+    assert_eq!(census.len(), 1);
+    assert_eq!(census[0]["ghg"], 15);
+}

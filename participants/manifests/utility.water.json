@@ -1,0 +1,72 @@
+{
+  "name": "utility.water",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/utilities.md",
+  "params": {
+    "bill_every_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 91,
+      "source": "placeholder"
+    },
+    "channel": {
+      "schema": {
+        "type": "string",
+        "description": "its view of the town's homes (who lives in each, how many)"
+      },
+      "default": "town",
+      "source": "placeholder"
+    },
+    "dwelling": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "dwelling",
+      "source": "placeholder"
+    },
+    "litres_per_person_per_day": {
+      "schema": {
+        "type": "integer",
+        "description": "what a person uses (the world's figure)"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "price_per_kl": {
+      "schema": {
+        "type": "integer",
+        "description": "the tariff (cents)"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "service_per_quarter": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "task": {
+      "schema": {
+        "type": "string",
+        "description": "the work that draws a kilolitre"
+      },
+      "default": "draw_water",
+      "source": "placeholder"
+    },
+    "works": {
+      "schema": {
+        "type": "string",
+        "description": "the water works (the world must say): where it draws from the river"
+      },
+      "default": "",
+      "required": true,
+      "source": "the water works (the world must say): where it draws from the river"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

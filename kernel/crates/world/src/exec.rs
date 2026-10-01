@@ -440,6 +440,10 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
     let t = item.at;
     match item.what {
         Sched::NatureDay { day } => nature_day(s, st, day),
+        Sched::CounterCensus => {
+            st.schedule(t + 30 * 86_400, Sched::CounterCensus);
+            vec![Timed::new(t, EventBody::CounterCensus { counters: st.totals.clone() })]
+        }
         Sched::StructureComplete { structure } => match st.structures.get_mut(&structure) {
             Some(x) if !x.complete && x.completes_at == Some(item.at) => {
                 // Its time is up; it's complete if its building work is done too (phase B), or else as soon as it is.
@@ -793,6 +797,35 @@ impl<'a> Exec<'a> {
                 need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
             }
         }
+        // What's drawn from a field (water from the river): from the cell, of the structure's or the four around them, with
+        // the most of it, if it has enough.
+        let drawn: Option<(Id, Id, i64)> = match spec.as_ref().and_then(|x| x.draws.clone()) {
+            None => None,
+            Some(d) => {
+                let need = d.per_unit.checked_mul(units as i64).ok_or_else(|| refuse(RefusalCode::Overflow, "too much to draw"))?;
+                let nature = self.st.nature.as_deref().ok_or_else(|| refuse(RefusalCode::NotModelled, "this world has no fields to draw from"))?;
+                let base = self.s.config.catalogue.fields.iter().find(|f| f.id == d.field).map_or(0, |f| f.baseline);
+                let min = self.s.config.catalogue.fields.iter().find(|f| f.id == d.field).map_or(0, |f| f.min);
+                let mut cells: BTreeSet<Id> = BTreeSet::new();
+                for c in &self.st.structures[&at].cells {
+                    cells.insert(c.clone());
+                    if let Some((x, y)) = crate::config::cell_xy(c) {
+                        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                            let n = crate::config::cell_id(x + dx, y + dy);
+                            if self.st.cells.contains_key(&n) {
+                                cells.insert(n);
+                            }
+                        }
+                    }
+                }
+                let value = |c: &Id| nature.fields.get(&d.field).and_then(|m| m.get(c)).copied().unwrap_or(base);
+                let best = cells.iter().max_by(|a, b| value(a).cmp(&value(b)).then(b.cmp(a))).cloned().unwrap_or_default();
+                if value(&best) - need < min {
+                    return Err(refuse(RefusalCode::FieldExhausted, format!("not enough {} near {at}: {} there, {need} needed", d.field, value(&best))));
+                }
+                Some((d.field.clone(), best.clone(), value(&best) - need))
+            }
+        };
         // What's worked on: bodies (a person there, or everyone in a space of the place), or a structure.
         let bodies: Option<Vec<Id>> = match &on {
             Some(o) if self.st.body(o).is_some() => {
@@ -851,6 +884,25 @@ impl<'a> Exec<'a> {
                     }
                 }
                 self.st.touch_structure(&target);
+            }
+        }
+        // Drawn from the field; emitted to fields (at the corner cell) and counters.
+        if let Some((field, cell, left)) = drawn {
+            let n = Arc::make_mut(self.st.nature.as_mut().unwrap());
+            n.fields.entry(field).or_default().insert(cell, left);
+        }
+        if let Some(x) = spec.as_ref().filter(|x| !x.emits.is_empty()) {
+            let corner = self.st.structures[&at].at.clone();
+            for (k, per) in &x.emits {
+                let by = per.saturating_mul(units.min(i64::MAX as u64) as i64);
+                if let Some(v) = self.st.totals.get_mut(k) {
+                    *v = v.saturating_add(by);
+                } else if let Some(f) = self.s.config.catalogue.fields.iter().find(|f| &f.id == k) {
+                    if let Some(n) = self.st.nature.as_mut().map(Arc::make_mut) {
+                        let cur = n.fields.get(k).and_then(|m| m.get(&corner)).copied().unwrap_or(f.baseline);
+                        n.fields.entry(k.clone()).or_default().insert(corner.clone(), cur.saturating_add(by).clamp(f.min, f.max));
+                    }
+                }
             }
         }
         self.emit(EventBody::Worked { task: task.into(), units, at: at.clone(), on: on.clone(), performers: who, labour: total, by: self.participant.into() });

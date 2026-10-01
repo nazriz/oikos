@@ -249,6 +249,7 @@ impl World {
             schedule: Default::default(),
             timelines: Default::default(),
             nature: None,
+            totals: c.catalogue.counters.iter().map(|x| (x.id.clone(), 0)).collect(),
         };
         for x in &w.structures {
             let f = s.types[&x.structure_type].footprint;
@@ -293,6 +294,10 @@ impl World {
             }
             st.nature = Some(Arc::new(n));
             st.schedule(86_400, crate::state::Sched::NatureDay { day: 1 });
+        }
+        // The world's totals, censused monthly.
+        if !c.catalogue.counters.is_empty() {
+            st.schedule(30 * 86_400, crate::state::Sched::CounterCensus);
         }
         // Bodies age from the start.
         let people: Vec<(Id, i64)> = st.entities.iter().filter_map(|(id, e)| e.body.as_ref().map(|b| (id.clone(), b.born_at))).collect();

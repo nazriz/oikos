@@ -272,6 +272,38 @@
                     "maximum": 10000
                   }
                 }
+              },
+              "draws": {
+                "description": "Per unit: taken from a field, at the cell (of the structure's, or the four around them) with the most of it; refused (field_exhausted) where there isn't enough (water from a river run low).",
+                "type": "object",
+                "required": [
+                  "field",
+                  "per_unit"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+                  },
+                  "per_unit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
+              },
+              "emits": {
+                "description": "Per unit: added to a field at the structure's corner cell (pollution), or to a world counter (greenhouse gas).",
+                "type": "object",
+                "propertyNames": {
+                  "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+                },
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "maxProperties": 20
               }
             }
           }
@@ -600,6 +632,23 @@
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
+              }
+            }
+          }
+        },
+        "counters": {
+          "description": "World totals the kernel keeps (greenhouse gas): added to by work (a task's emits), censused monthly (counter_census), with no effect on anything.",
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
               }
             }
           }

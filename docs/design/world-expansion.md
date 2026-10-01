@@ -292,6 +292,8 @@ consultation (a payment from outside on the practice's claim).
 
 ### 6.1 Water and energy
 
+*Built 2026-10-01: docs/behaviour/utilities.md. As built: no local generation or gas; use is a fixed rate (no meters, no response to price or restrictions); drought is config, not a season.*
+
 - **Water:** the river's `water_level` and `pollution` fields. A water works (building and position) draws water (a
   task: water from a river cell into a `water` resource) and treats it. Households use it (consumption, as goods now,
   with a price or rates). Drought is the boundary lowering inflow.

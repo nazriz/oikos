@@ -634,7 +634,7 @@
       "rates_due_days": 30,
       "rates_penalty_interest_bps": 1000,
       "median_house_price": 57200000,
-      "rates_exempt_kinds": ["health_service", "school"]
+      "rates_exempt_kinds": ["health_service", "school", "utility"]
     },
     "services": {
       "waste_per_person_per_day_g": 1403,
@@ -690,6 +690,10 @@
         { "kind": "injury", "severity": "serious", "consults": 2, "days_kept_bps": 8000, "fatal_kept_bps": 5000 }
       ],
       "off_work_severities": ["serious", "severe"]
+    },
+    "utilities": {
+      "water": { "litres_per_person_per_day": 160, "price_per_kl": 300, "service_per_quarter": 9000, "river_inflow_kl_per_cell_per_day": 1000, "river_decay_bps_per_day": 1000, "river_flow_bps_per_day": 5000 },
+      "energy": { "kwh_per_household_per_day": 11, "price_per_kwh": 30, "supply_per_day": 110, "grid_price_per_kwh": 18, "grid_emissions_g_per_kwh": 780 }
     },
     "justice": {
       "hearing_after_days": 21,
@@ -754,6 +758,7 @@
   "sources": {
     "currency": "Australian dollars, in cents.",
     "health": "The clinic stands for the town's health system (general practice and the hospital it refers to; a liberty: a town of 200 has neither). doctors_per_1000: about 120 full-time-equivalent GPs per 100,000 people (Department of Health and Aged Care, GP workforce statistics, 2023; to confirm). doctor_wage_per_fortnight: a salaried GP in community health, about $180,000 a year (placeholder, to source from the Victorian public sector's agreements). consult_minutes: a long consultation (MBS item 36 is 20-40 minutes; placeholder for care of a hospital-level condition). seek_care_bps, treats and off_work_severities: placeholders (the conditions here are hospital-level, so nearly everyone with one is treated; care shortens them by a fifth; fatal_kept_bps has no effect while conditions don't kill: docs/behaviour/life.md). Nobody works with a serious or severe condition (a hospital stay): placeholder.",
+    "utilities": "Water: residential use about 160 litres a person a day in regional Victoria (Essential Services Commission, water performance reports; to confirm); a regional water corporation's tariff, about $3 a kilolitre and $90 a quarter in service charges (to confirm against a corporation's price determination); bills go to owners. The river's inflow, flow and losses are placeholders, sized so a small town's draw is a small share of a modest river's water. Energy (electricity): an average Victorian household uses about 4,000 kWh a year, 11 a day (Australian Energy Regulator / ESC; to confirm); the Victorian Default Offer for 2025-26 is about 30 cents a kWh and $1.10 a day in supply charges (ESC; to confirm); what the retailer pays the grid (wholesale and network), placeholder; grid emissions about 0.78 kg CO2e a kWh (National Greenhouse Accounts Factors 2024, Victoria, scope 2; to confirm).",
     "justice": "The tribunal is a civil and administrative tribunal of the state (VCAT is the model: residential tenancies and civil claims lists). hearing_after_days: about three weeks from application to hearing (placeholder; VCAT's annual report gives times to finalise by list, to source). pay_within_days: placeholder. challenge_bps: the share of tenants given an unlawful notice of rent increase who apply to the tribunal, and apply_bps: the share of workers owed wages who pursue a claim (placeholders: few do; to source, e.g. from Consumer Affairs Victoria and Fair Work Ombudsman reports). apply_after_days: a month's wait for payment first (placeholder). Enforcement of an unpaid money order by an order to the debtor's bank (a garnishee order, Judgment Debt Recovery Act 1984 (Vic), to confirm).",
     "education": "school_ages: Victorian children start school (Prep) in the year they turn 5 and must attend until 17 (Education and Training Reform Act 2006 (Vic); to confirm the section). students_per_teacher: about 13.5 full-time-equivalent students per teacher in Victoria (ABS, Schools, 2024; to confirm). school_days_per_year: about 200 (four terms of about ten weeks). hours_per_day: about 6 (placeholder). teacher_wage_per_fortnight: about $110,000 a year, near the top of the classroom teacher range in the Victorian Government Schools Agreement 2022 (to confirm). attainment: the highest level of education of Australians aged 25-64 (ABS, Education and Work, May 2024; shares rounded, to confirm), as years of schooling (Year 11 or below as 10: placeholder). return_per_year_bps: the wage return to a year of schooling, about 10% (Leigh 2008, 'Returns to education in Australia', Economic Papers 27(3); estimates run 8-15%; to confirm), taken as productivity (human capital: Mincer 1974) and applied linearly in the time a task takes (docs/behaviour/education.md). max_years: the skill scale's top (placeholder).",
     "elections": "Local Government Act 2020 (Vic): councils are elected every four years (general elections, the last in October 2024), voting is compulsory for those enrolled, and single-councillor wards vote by preference. This town elects its mayor directly (most Victorian mayors are chosen by the councillors: a liberty). Turnout, about 83% (the VEC's reported participation at the 2024 local elections, to confirm). stand_bps (the chance an adult stands when an election is called, before their drive: 2%, a placeholder to calibrate against candidates per vacancy, the VEC's) and news_readers_bps (the share who read the local paper each week) are placeholders: the University of Canberra's Digital News Report: Australia gives local news use, to source.",
@@ -800,7 +805,7 @@
     "public_finance.rates_instalments": "Local Government Act 1989 (Vic), s 167: rates are payable in four instalments (or as a lump sum).",
     "public_finance.rates_due_days": "Placeholder: an instalment falls due 30 days after its notice.",
     "public_finance.rates_penalty_interest_bps": "Local Government Act 1989 (Vic), s 172: interest on unpaid rates at the rate fixed under the Penalty Interest Rates Act 1983, 10% a year (to confirm the current rate).",
-    "public_finance.rates_exempt_kinds": "Land used exclusively for charitable, educational or public health purposes is not rateable (Local Government Act 1989 (Vic), s 154; to confirm): here, the clinic's and the school's.",
+    "public_finance.rates_exempt_kinds": "Land used exclusively for charitable, educational or public health purposes is not rateable (Local Government Act 1989 (Vic), s 154; to confirm): here, the clinic's, the school's and the utilities' (land used for water supply is exempt; the energy retailer's substation is treated alike, a liberty).",
     "public_finance.median_house_price": "Valuer-General Victoria, A Guide to Property Values 2024 (released July 2025): country Victoria's median house price, $572,000. The land value of a lot is derived from it: this less what the builder charges to build a house.",
     "services.waste_per_person_per_day_g": "Derived: 512 kg of municipal solid waste per person a year, 2022-23 (DCCEEW, National Waste and Resource Recovery Report 2024), a day's worth in grams.",
     "services.landfill_levy_per_tonne": "EPA Victoria, waste levy 2025-26: municipal waste in rural areas, $84.78 a tonne. What the landfill charges on top (its gate fee) is left out.",

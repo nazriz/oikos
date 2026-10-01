@@ -77,6 +77,12 @@ export interface Profile {
      * the return to a year of it. */
     education?: { school_ages: [number, number]; students_per_teacher: number; school_days_per_year: number; hours_per_day: number; teacher_wage_per_fortnight: number;
       attainment: { label: string; share_bps: number; years: number }[]; return_per_year_bps: number; max_years: number };
+    /** Utilities (world-expansion 6.1): water drawn from the river and billed to owners; energy bought from the grid and
+     * billed to households. */
+    utilities?: {
+      water: { litres_per_person_per_day: number; price_per_kl: number; service_per_quarter: number; river_inflow_kl_per_cell_per_day: number; river_decay_bps_per_day: number; river_flow_bps_per_day: number };
+      energy: { kwh_per_household_per_day: number; price_per_kwh: number; supply_per_day: number; grid_price_per_kwh: number; grid_emissions_g_per_kwh: number };
+    };
     /** Justice (world-expansion 5): the tribunal's times, and how often people take a case to it. */
     justice?: { hearing_after_days: number; pay_within_days: number; challenge_bps: number; apply_bps: number; apply_after_days: number };
     /** Elections and the local paper (docs/design/world-expansion.md 3). */

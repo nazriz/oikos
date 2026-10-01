@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.27.0",
+  version: "0.28.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -184,6 +184,8 @@ export const citizen: BehaviourModule = {
       // `challenge_bps`) or a debt owed us unpaid after `apply_after_days` (with `apply_bps`), and where we ask for an
       // unpaid order to be enforced (the world says; none: no tribunal).
       tribunal: null as { entity: string; challenge_bps: number; apply_bps: number; apply_after_days: number } | null,
+      // Utilities (docs/behaviour/utilities.md): the energy retailer we sign up with once we hold a home (the world says).
+      utilities: null as { energy: string } | null,
       civic: { turnout_bps: 9000, stand_bps: 30, reads_news_bps: 5000, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 },
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
@@ -1298,6 +1300,21 @@ export const citizen: BehaviourModule = {
       // Borrowing (docs/behaviour/credit.md): short of next month's housing and essentials, with income coming in, we
       // ask our bank for a loan to tide us over (three months' worth, less what we have); we take what's offered.
       steps.push(...borrowing.steps(book, t, acc.account));
+      // Utilities: signed up for energy once we hold a home and live there; bills paid when they come, if we can (before
+      // anything else we spend on), and counted with the rent in the month's outgoings.
+      if (p.utilities && home?.movedIn && isLeaseholder() && energyFor !== home.agreement) {
+        energyFor = home.agreement;
+        steps.push(because("A home of ours: signing up for its energy supply.", say("supply_request", `Supply request: energy for ${home.space}.`, { to: [p.utilities.energy], visible: [me, p.utilities.energy], data: { account: acc.account, home: home.space } })));
+      }
+      for (const inv of book.open("invoice").filter((r) => (r.addressed_to ?? []).includes(me) && r.data?.service && !billsPaid.has(r.id))) {
+        const m = inv.data?.outcome?.money;
+        const amount = cents(m?.amount ?? 0);
+        if (!m?.to || amount <= 0 || acc.balance < amount) continue;
+        billsPaid.add(inv.id);
+        bills.push({ at: t, amount });
+        acc.balance -= amount;
+        steps.push(because(`Paying our ${inv.data?.service} bill.`, pay(m.to, amount, { from: acc.account, for: `${inv.data?.service} bill.`, settles: inv.id })));
+      }
       {
         const housing = home?.rent ?? share?.cents ?? 0;
         if (housing > 0 && monthlyIncome() > 0 && acc.balance < housing + p.essentials && borrowing.canApply(t)) {
@@ -1314,7 +1331,7 @@ export const citizen: BehaviourModule = {
       /** What we save of income: the household's usual share, or more while we're spending less (a goal's method). */
       const saving = () => (pursuing("spend less") ? Math.max(p.saving_bps, p.goals.spend_less_saving_bps) : p.saving_bps);
       const monthly = () => {
-        const housing = home?.rent ?? share?.cents ?? 0;
+        const housing = (home?.rent ?? share?.cents ?? 0) + billsMonthly(t);
         const seen = t >= p.income_window_days * DAY;
         const income = seen ? Math.floor((inflows.reduce((x, f) => x + f.amount, 0) * MONTH) / (p.income_window_days * DAY)) : monthlyIncome();
         const fromIncome = Math.max(p.essentials, Math.floor((income * (10_000 - saving())) / 10_000) - housing);
@@ -1589,6 +1606,18 @@ export const citizen: BehaviourModule = {
     const stoodFor = new Set<string>();
     const readsNews = ctx.rng("reads-news").below(10_000) < p.civic.reads_news_bps;
     const readItems = new Set<string>();
+    // ---- utilities ----
+    let energyFor: string | undefined; // the lease we've signed up for energy on
+    const billsPaid = new Set<string>();
+    const bills: { at: number; amount: number }[] = [];
+    /** What our bills come to a month: what we've paid over the last 90 days (from when we first paid one). */
+    const billsMonthly = (t: number) => {
+      while (bills.length && t - bills[0]!.at > 90 * DAY) bills.shift();
+      if (!bills.length) return 0;
+      const span = Math.max(30 * DAY, Math.min(90 * DAY, t - bills[0]!.at + 30 * DAY));
+      return Math.floor((bills.reduce((a, b) => a + b.amount, 0) * MONTH) / span);
+    };
+
     // ---- the tribunal ----
     /** A copy of a record we rely on, for the tribunal (which can't see what was between us and the other side). */
     const evidence = (r: any) => JSON.parse(JSON.stringify(r));
