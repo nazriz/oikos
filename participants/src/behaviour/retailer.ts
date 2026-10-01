@@ -6,7 +6,7 @@ import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.3.2",
+  version: "0.4.0",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -91,6 +91,7 @@ export const retailer: BehaviourModule = {
     const shortAt = new Map<string, number>(); // supplier -> when it last came up short
     let unitCost = 0; // what we last paid a supplier for an item
     const used = new Map<string, number>(); // worker -> seconds worked today
+    const pace = new Pace(p.serve_labour); // how long a unit takes, as we learn it (our figure at first)
     let usedDay = -1;
     let wage = p.wage;
     let price = p.price;
@@ -340,12 +341,12 @@ export const retailer: BehaviourModule = {
         for (const x of [...queue]) {
           const want = x.o.quantity - x.served;
           const minRoom = crew.length ? Math.min(...crew.map(room)) : 0;
-          const q = Math.min(want, left, Math.floor((minRoom * crew.length) / p.serve_labour));
+          const q = Math.min(want, left, Math.floor((minRoom * crew.length) / pace.perUnit(crew)));
           // (An order for a fortnight's shopping is served over the fortnight: it's what the household uses until then.)
           const within = x.o.forDays ?? p.serve_within_days;
           const out = left === 0 || (q === want) ? "done" : t - x.since >= within * DAY ? "late" : "wait";
           if (q === 0 && out === "wait") break; // no hands left today: the rest wait their turn
-          const share = q ? Math.ceil((q * p.serve_labour) / crew.length) : 0;
+          const share = q ? Math.ceil((q * pace.perUnit(crew)) / crew.length) : 0;
           left -= q;
           for (const w of crew) if (share) used.set(w, (used.get(w) ?? 0) + share);
           const before = x.served;
@@ -358,7 +359,8 @@ export const retailer: BehaviourModule = {
             : `We couldn't serve all of an order within ${within} days: served ${x.served} of the ${x.o.quantity}; refunding the rest.`;
           const st = fillWith(x.o, q, finished ? x.served : -1, q ? crew : [], why);
           st.then = (res) => {
-            if (res.status === "applied") return;
+            if (res.status === "applied") return void (q && pace.done(crew, Math.floor(t / DAY)));
+            if (q) pace.refused(res, q, crew);
             for (const w of crew) if (share) used.set(w, Math.max(0, (used.get(w) ?? 0) - share));
             // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
             const short = outOfTime(res);

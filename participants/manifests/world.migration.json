@@ -1,6 +1,6 @@
 {
   "name": "world.migration",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "households": {
@@ -68,6 +68,11 @@
         1,
         3
       ],
+      "source": "placeholder"
+    },
+    "schooling": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "search_limit": {

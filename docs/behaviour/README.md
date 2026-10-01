@@ -45,6 +45,8 @@ Rules every module follows (so re-runs are reproducible):
 | (bargaining) | an employer's side: offers by capacity to pay, enterprise agreements and rises, no pay for time on strike, concessions after stoppages; in factories', shops' and the builder's modules | [unions.md](unions.md) |
 | `city.works` | the town's works office: hires the crew the budget's staff line pays for; collects waste from homes and keeps the town's assets up, from the depot; takes waste to the landfill | [services.md](services.md) |
 | `city.environment` | the town's environment office: hires the scientists the budget's environment line pays for; surveys the district's species each quarter; reports, and keeps a habitat register for planning | [environment.md](environment.md); the physics: [nature.md](nature.md) |
+| `school.principal` | a school: keeps its teachers, gives places to children of school age, teaches each classroom on school days (raising pupils' skill), certifies those who finish | [education.md](education.md) |
+| `clinic.practice` | a clinic: keeps its doctors, sees patients who come in and ask, in turn, as their hours allow (care shortens a condition) | [health.md](health.md) |
 | `city.electoral_office` | the town's elections: keeps the roll, gives notice, takes nominations, publishes the ballot, counts by instant runoff, and appoints the winner | [elections.md](elections.md) |
 | `firm.newspaper` | the local paper's editor: runs the week's most newsworthy public records, with a tone toward the town's government and a leaning | [news.md](news.md) |
 | `world.disposal` | the outside world's landfill: invoices monthly for what's delivered, at a price a tonne | [services.md](services.md) |

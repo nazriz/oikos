@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@terrarium/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { skillClock } from "./skill";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -42,10 +43,14 @@ test("goods are made from inputs by workers' hours, exported within each factory
   }
   const made = ev.filter((e) => e.event === "worked" && e.task === "make");
   expect(made.length).toBeGreaterThan(50);
+  // The time it took: the task's, scaled by the crew's mean schooling where skill speeds work (labour_by), exactly as the
+  // engine reckons it.
+  const labourOf = skillClock(config, ev);
   for (const w of made) {
     const firm = w.at.replace("-works", "");
     expect(w.performers.every((p: string) => employees.get(firm)?.has(p))).toBe(true);
-    expect(w.labour).toBe(w.units * task.labour);
+    const want = labourOf(w, task);
+    if (want !== undefined) expect(w.labour).toBe(want);
   }
   const perDay = new Map<string, number>();
   for (const w of made) for (const p of w.performers) {
@@ -106,7 +111,9 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   // ... or let go because the money for the next pay period isn't there (slack demand runs a factory's cash down).
   const cashLetGo = c1.filter((c) => c.participant?.startsWith("factory-") && /Can't cover the next pay period/.test(c.reasoning ?? ""));
   expect(letGo.length).toBeGreaterThanOrEqual(1);
-  expect(letGo.length + cashLetGo.length + quit.length).toBeGreaterThanOrEqual(4);
+  // (At least two of its staff go. Four, before the clinic and the school took four of the town's 120 people's jobs
+  // from the factory: generator 0.22.0.)
+  expect(letGo.length + cashLetGo.length + quit.length).toBeGreaterThanOrEqual(2);
   expect(e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && e.record.text?.startsWith("Redundancy: we're making more")).length).toBe(letGo.length);
   // Beyond the top of Lengnick's band (last month's demand: the shops' orders, and its share of the world market's
   // offer) a factory makes nothing, though its staff could make far more: a day's making never takes its stock past

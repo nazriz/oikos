@@ -69,6 +69,8 @@ pub enum RefusalCode {
     NoTimeLeft,
     /// A survey that doesn't say what of or where, of something the world has, or work that says so for a task that isn't one.
     BadSurvey,
+    /// Work on a person or a space with a task that does nothing to bodies, or work on a structure with one that does.
+    NoBodyEffect,
     /// Building work on something that isn't being built.
     NotBeingBuilt,
     /// Demolition work on something that isn't being demolished.
@@ -276,6 +278,21 @@ pub enum EventBody {
         person: Id,
         condition: Id,
     },
+    /// Care given (services): the condition now lasts until `until`, and a death due from it was called off, or not.
+    /// The truth, for measurement: nobody in the world is told whether a death was called off.
+    ConditionTreated {
+        person: Id,
+        condition: Id,
+        by: Id,
+        until: i64,
+        death_called_off: bool,
+    },
+    /// Work changed a body variable (services: teaching raises skill): its value now.
+    BodyChanged {
+        person: Id,
+        variable: Id,
+        value: i64,
+    },
     Harmed {
         person: Id,
         by: Id,
@@ -367,6 +384,8 @@ impl EventBody {
             EventBody::BirthStarted { .. } => "birth_started",
             EventBody::ConditionBegan { .. } => "condition_began",
             EventBody::ConditionEnded { .. } => "condition_ended",
+            EventBody::ConditionTreated { .. } => "condition_treated",
+            EventBody::BodyChanged { .. } => "body_changed",
             EventBody::Harmed { .. } => "harmed",
             EventBody::ParticipantCreated { .. } => "participant_created",
             EventBody::ParticipantEnded { .. } => "participant_ended",
@@ -403,6 +422,8 @@ impl EventBody {
                 | EventBody::BirthStarted { .. }
                 | EventBody::ConditionBegan { .. }
                 | EventBody::ConditionEnded { .. }
+                | EventBody::ConditionTreated { .. }
+                | EventBody::BodyChanged { .. }
                 | EventBody::Harmed { .. }
         )
     }

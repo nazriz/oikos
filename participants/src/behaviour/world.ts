@@ -11,6 +11,7 @@ import { ownerOf } from "./institutions";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
 import { drawHousehold, type HouseholdSpec } from "./household";
+import { yearsOfSchooling, type SchoolingSpec } from "./school";
 
 export const exportDemand: BehaviourModule = {
   name: "world.export_demand",
@@ -477,7 +478,7 @@ export const idle: BehaviourModule = {
  */
 export const migration: BehaviourModule = {
   name: "world.migration",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => 30 * DAY,
   firstWake: () => 30 * DAY,
@@ -495,6 +496,9 @@ export const migration: BehaviourModule = {
         jobseekers_payment: "", // the support payment whose published recipients count as jobseekers ("": none published)
         participation_bps: 10_000, // of adults other than the one who came for the job, those looking for work
         template_outside_lf: "", // the template for those who aren't ("": everyone takes `template`)
+        // Where bodies have a skill (schooling): the years each newcomer has had, as the world's people have, and how much
+        // of the variable a year is (null: newcomers start at the variable's initial).
+        schooling: null as (SchoolingSpec & { variable: string; per_year: number }) | null,
       },
       ctx.params,
     );
@@ -562,6 +566,7 @@ export const migration: BehaviourModule = {
             const blocks = d.members.map((m, j) => C.call("presence", {
               name: C.text(`m${++arrivals}`), age: C.text(`${m.age * 365 + m.day} days`), sex: m.sex, template: templateOf(j),
               ...(m.age >= 18 ? { carrying: C.dollars(Math.floor(((p.savings_months[0] + r.below(p.savings_months[1] - p.savings_months[0] + 1)) * p.outside_monthly_income))) } : {}),
+              ...(p.schooling ? { variables: C.json({ [p.schooling.variable]: yearsOfSchooling(m.age, p.schooling, (n) => r.below(n)) * p.schooling.per_year }) } : {}),
             }));
             todo.push(because(`A household moves here: the town's expected wage (${usd(Math.floor(mean))} a month x a ${Math.round(chance * 100)}% chance of a job) beats ${usd(p.outside_monthly_income)} elsewhere.`, ...blocks.map((b, j) => [refs[j]!, b] as [string, C.Call])));
             brought.push({ t: obs.t, adults: d.members.filter((m) => m.age >= 18).length });

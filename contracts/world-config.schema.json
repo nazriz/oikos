@@ -194,6 +194,84 @@
               "surveys": {
                 "description": "Measurement (nature): a unit surveys one cell for a species or a field (the work block's `survey`), and only the actor learns the estimate.",
                 "type": "boolean"
+              },
+              "on_body": {
+                "description": "What a unit does to the bodies worked on (the work block's `on` naming a person at the place, or a space of it: everyone in it). changes: added to each body's variables per unit, within their bounds. treats: once a work act gives a condition of this kind (and band, if given) at least `units`, its remaining days are cut to days_kept_bps of them, and a death due from it still happens only with the chance fatal_kept_bps (at the same share of the time left). A condition is treated once.",
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "changes": {
+                    "type": "object",
+                    "propertyNames": {
+                      "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+                    },
+                    "additionalProperties": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "maxProperties": 100
+                  },
+                  "treats": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "units",
+                        "days_kept_bps",
+                        "fatal_kept_bps"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "illness",
+                            "injury"
+                          ]
+                        },
+                        "severity": {
+                          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Label"
+                        },
+                        "units": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "days_kept_bps": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000
+                        },
+                        "fatal_kept_bps": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 10000
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "labour_by": {
+                "description": "Skill at work: the labour per unit scales with the performers' mean of a body variable, from all of it at the variable's minimum to at_max_bps of it at its maximum.",
+                "type": "object",
+                "required": [
+                  "variable",
+                  "at_max_bps"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "variable": {
+                    "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+                  },
+                  "at_max_bps": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 10000
+                  }
+                }
               }
             }
           }
@@ -482,6 +560,46 @@
               },
               "conspicuous": {
                 "type": "boolean"
+              }
+            }
+          }
+        },
+        "body_variables": {
+          "description": "Named integers on every body (services: skill, say), kept exactly with no meaning attached. Work changes them (a task's on_body); they drift by per_day, a whole day at a time. A body born here, or given none, starts at initial.",
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "min",
+              "max",
+              "initial"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "min": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "max": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "initial": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "per_day": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
               }
             }
           }
@@ -1170,6 +1288,19 @@
             "female",
             "male"
           ]
+        },
+        "variables": {
+          "description": "Persons only: the body's starting variables (the catalogue's body_variables; others start at initial).",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxProperties": 100
         }
       }
     },
@@ -1845,6 +1976,29 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 10000
+                  }
+                }
+              }
+            },
+            "fields": {
+              "description": "The yearly chance rises by bps_per_unit for each unit of a field in the cell where the body is (the corner cell of a structure it's in; none outside one).",
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "required": [
+                  "field",
+                  "bps_per_unit"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "field": {
+                    "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+                  },
+                  "bps_per_unit": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   }
                 }
               }

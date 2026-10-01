@@ -246,6 +246,8 @@ people's fortunes), and kept in others.
 - **The budget gains real lines:** the clinic's and school's staff and running costs, so the mayor's trade-offs are
   among services, nature and taxes.
 
+*Built 2026-10-01: docs/behaviour/health.md and education.md, citizen.md. As built: the clinic is paid by a grant (not per consultation: routine visits aren't modelled, so fees would be almost nothing); care shortens conditions but can't yet save lives (fatality by age is proposed); pollution's effect on illness is in the physics but not in the generated town (no sourced figure).*
+
 ### 4.1 Who runs them (the real world, by profile)
 
 In Victoria neither is the council's: state schools are the state's (the Department of Education employs the
@@ -255,7 +257,7 @@ support payments are), and the school is the state's (its teachers paid from out
 on the town's budget (where municipalities run schools); the generator reads who runs each from the profile. The
 council's own part in Victoria is maternal and child health and kindergartens: later, if a study needs them.
 
-### 4.2 The contract, exactly (proposed, for sign-off)
+### 4.2 The contract, exactly (signed 2026-10-01: Naz, "yes signed off, include skill at work")
 
 | Where | Change |
 |---|---|
@@ -263,7 +265,7 @@ council's own part in Victoria is maternal and child health and kindergartens: l
 | **World config** | A person entity may give its body's starting `variables` (the generator draws adults' `skill` from the profile's attainment). The `arrive` block may too (a newcomer's). Born here: `initial`. |
 | **Tasks** | `on_body` (optional): what a unit does to a body worked on.<br>• `changes: {variable: per_unit}`: adds to body variables, within their bounds;<br>• `treats: [{kind, severity?, units, days_kept_bps, fatal_kept_bps}]`: once a work act gives a condition of that kind (and band) at least `units`, its remaining days are cut to `days_kept_bps` of them, and if a death is due from it, it's called off with the chance 1 − `fatal_kept_bps`. A condition is treated once (`treated`); more care does nothing more. |
 | **The `work` block** | `on` may name a **person** (their body must be in a space of the structure at `at`) or a **space** of it (every body in that space: a class). `on_body` applies to each. A structure, as now, otherwise. |
-| **Skill at work** (optional, say if you want it) | A task's `labour_by`: `{variable, at_max_bps}`: its labour per unit scales with the performers' mean of that body variable, from 100% at 0 to `at_max_bps` at the maximum. The physical reason employers pay for skill (Mincer 1974). Without it, a school certificate is a pure signal (Spence 1973). |
+| **Skill at work** (signed: included) | A task's `labour_by`: `{variable, at_max_bps}`: its labour per unit scales with the performers' mean of that body variable, from 100% at 0 to `at_max_bps` at the maximum. The physical reason employers pay for skill (Mincer 1974). Without it, a school certificate is a pure signal (Spence 1973). |
 | **Life physics** | `illness.fields`: `[{field, bps_per_unit}]`: the yearly illness chance rises by that much per unit of the field in the cell where the body is (its structure's corner cell), drawn by thinning, as places' injury risk is now. |
 | **State** | A condition keeps when its death is due (`death_at`, hidden from views) and whether it's been `treated`. A death due from a condition happens only if the condition still says so. |
 | **Log** | `condition_treated {person, condition, by, until, death_called_off}`: the truth, for measurement. Nobody in the world is told a death was called off. `body_changed {person, variable, value}` when work changes one (batched per work act). |

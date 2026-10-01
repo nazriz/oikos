@@ -1,0 +1,151 @@
+{
+  "name": "school.principal",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/education.md",
+  "params": {
+    "account": {
+      "schema": {
+        "type": "string",
+        "description": "what it pays its staff from (its funding comes in there)"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    },
+    "building": {
+      "schema": {
+        "type": "string",
+        "description": "the school, and where its teachers work (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "the school, and where its teachers work (the world must say)"
+    },
+    "channel": {
+      "schema": {
+        "type": "string",
+        "description": "its view of the building, who is where in it"
+      },
+      "default": "premises",
+      "source": "placeholder"
+    },
+    "classrooms": {
+      "schema": {
+        "type": "array",
+        "description": "its classrooms (spaces of the building)"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "industry": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "education",
+      "source": "placeholder"
+    },
+    "lesson_seconds": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "seconds",
+      "default": 21600,
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "role": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "teacher",
+      "source": "placeholder"
+    },
+    "school_ages": {
+      "schema": {
+        "type": "array",
+        "description": "from the year one turns the first, to the end of the year one is the second"
+      },
+      "default": [
+        5,
+        17
+      ],
+      "source": "placeholder"
+    },
+    "starts": {
+      "schema": {
+        "type": "integer",
+        "description": "when the school day starts (placeholder)"
+      },
+      "default": 30600,
+      "source": "when the school day starts (placeholder)"
+    },
+    "teach_task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "teach",
+      "source": "placeholder"
+    },
+    "teachers": {
+      "schema": {
+        "type": "integer",
+        "description": "the establishment: how many teachers it keeps (its funder's)"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "term_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 70,
+      "source": "placeholder"
+    },
+    "wage": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "working_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 28800,
+      "source": "placeholder"
+    },
+    "workplace": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    },
+    "year": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 31536000,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

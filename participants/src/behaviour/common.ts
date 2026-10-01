@@ -234,6 +234,41 @@ export function outOfTime(res: { refusal?: { code?: string; detail?: string } })
   return m ? { who: m[1]!, left: Number(m[2]) } : { left: 0 };
 }
 
+/**
+ * How long a unit of work takes, as a manager learns it, worker by worker: the figure it plans with at first; once the
+ * world has said a crew hasn't the time ("this needs N" each), each of them as slow as that crew turned out to be, next to
+ * what we thought; and after work that went through, each a little quicker (2%) once a week, asking a little more of them,
+ * until it doesn't fit. A crew takes its members' mean (what a unit takes is linear in a crew's mean skill, the
+ * world's physics). Where workers differ (skill), a plan on the figure alone asks a slow crew for more than its day
+ * holds, again and again, and a quick one for less than it could do.
+ */
+export class Pace {
+  private readonly known = new Map<string, number>(); // worker -> seconds a unit
+  private readonly asked = new Map<string, number>(); // worker -> the week we last asked more of them
+  constructor(private readonly nominal: number) {}
+  private of(w: string) {
+    return this.known.get(w) ?? this.nominal;
+  }
+  perUnit(crew: string[]): number {
+    return crew.length ? Math.max(1, Math.ceil(crew.reduce((a, w) => a + this.of(w), 0) / crew.length)) : Math.ceil(this.nominal);
+  }
+  /** Refused for time: `units` of work shared by `crew`, each needing what the refusal says. */
+  refused(res: { refusal?: { code?: string; detail?: string } }, units: number, crew: string[]) {
+    const m = res.refusal?.code === "no_time_left" ? /this needs (\d+)/.exec(res.refusal.detail ?? "") : null;
+    if (!m || units <= 0 || !crew.length) return;
+    const ratio = (Number(m[1]) * crew.length) / units / (crew.reduce((a, w) => a + this.of(w), 0) / crew.length);
+    if (ratio > 1) for (const w of crew) this.known.set(w, this.of(w) * ratio);
+  }
+  /** Done in the time we gave it (on day `day`): perhaps they're quicker than we think. Once a week each. */
+  done(crew: string[], day: number) {
+    const week = Math.floor(day / 7);
+    for (const w of crew) if (this.asked.get(w) !== week) {
+      this.asked.set(w, week);
+      this.known.set(w, this.of(w) * 0.98);
+    }
+  }
+}
+
 /** A step with its reason: `because("Rent is due", pay(...))`. */
 export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): Step => Object.assign(lines, { why });
 

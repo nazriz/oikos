@@ -107,6 +107,22 @@ pub struct Catalogue {
     /// Living populations on cells: growth, mortality, dispersal, tolerances. An extinct species never returns.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub species: Vec<SpeciesCfg>,
+    /// Named integers on every body (services, docs/design/world-expansion.md 4.2): skill, say. The kernel keeps them
+    /// exactly and attaches no meaning to them; work changes them (a task's `on_body`), and they drift by `per_day`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub body_variables: Vec<BodyVariableCfg>,
+}
+
+/// A body variable: its bounds, its value for a body born here (or given none), and its drift a day.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BodyVariableCfg {
+    pub id: Id,
+    pub min: i64,
+    pub max: i64,
+    pub initial: i64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub per_day: i64,
 }
 
 /// The reserved cover of a cell with a building whose type names none.
@@ -222,6 +238,45 @@ pub struct TaskCfg {
     /// an estimate.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub surveys: bool,
+    /// What a unit does to the bodies worked on (`work`'s `on` naming a person, or a space: everyone in it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_body: Option<OnBody>,
+    /// Skill at work: the labour per unit scales with the performers' mean of a body variable, from all of it at the
+    /// variable's minimum to `at_max_bps` of it at its maximum.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labour_by: Option<LabourBy>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OnBody {
+    /// Per unit: added to each body's variables, within their bounds.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub changes: BTreeMap<Id, i64>,
+    /// Care: what a work act of at least `units` does to a condition of this kind (and band, if given), once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub treats: Vec<Treats>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Treats {
+    pub kind: crate::vocab::ConditionKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
+    /// The least units of one work act that treat it.
+    pub units: u64,
+    /// The share of its remaining days it lasts once treated.
+    pub days_kept_bps: u32,
+    /// The chance a death due from it still happens once treated.
+    pub fatal_kept_bps: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LabourBy {
+    pub variable: Id,
+    pub at_max_bps: u32,
 }
 
 /// A state variable of structures, with its dynamics: it changes by `per_day`, and `per_occupant_per_day` for each
@@ -455,6 +510,9 @@ pub struct EntityCfg {
     /// Persons only: biological sex, where the world models it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sex: Option<crate::vocab::Sex>,
+    /// Persons only: the body's starting variables (the catalogue's `body_variables`; others take `initial`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variables: Option<BTreeMap<Id, i64>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -636,6 +694,17 @@ impl ByAge {
 pub struct Hazard {
     pub by_age: Vec<AgeStep>,
     pub severity: Vec<Severity>,
+    /// The yearly chance rises by `bps_per_unit` for each unit of a field in the cell where the body is (its
+    /// structure's corner cell).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<FieldEffect>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FieldEffect {
+    pub field: Id,
+    pub bps_per_unit: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -937,6 +1006,59 @@ pub fn check_traits(owner: &str, traits: &Option<Value>) -> Result<(), String> {
     Ok(())
 }
 
+/// Bodies' variables, care and skill at work (docs/design/world-expansion.md 4.2): what they name exists, in range.
+fn check_bodies(c: &Config) -> Result<(), String> {
+    let cat = &c.catalogue;
+    let bps = |v: u32, what: &str| if v <= 10_000 { Ok(()) } else { Err(format!("{what} must be 0..=10000 basis points")) };
+    let mut vars: BTreeMap<&str, &BodyVariableCfg> = BTreeMap::new();
+    for v in &cat.body_variables {
+        if v.min > v.max || v.initial < v.min || v.initial > v.max {
+            return Err(format!("body variable {}: min <= initial <= max", v.id));
+        }
+        if vars.insert(&v.id, v).is_some() {
+            return Err(format!("duplicate body variable {}", v.id));
+        }
+    }
+    for t in &cat.tasks {
+        if let Some(ob) = &t.on_body {
+            for k in ob.changes.keys() {
+                if !vars.contains_key(k.as_str()) {
+                    return Err(format!("task {}: no body variable {k}", t.id));
+                }
+            }
+            for tr in &ob.treats {
+                bps(tr.days_kept_bps, &format!("task {}: days_kept_bps", t.id))?;
+                bps(tr.fatal_kept_bps, &format!("task {}: fatal_kept_bps", t.id))?;
+                if tr.units == 0 {
+                    return Err(format!("task {}: a treatment takes at least one unit", t.id));
+                }
+            }
+        }
+        if let Some(lb) = &t.labour_by {
+            if !vars.contains_key(lb.variable.as_str()) {
+                return Err(format!("task {}: labour_by names no body variable {}", t.id, lb.variable));
+            }
+            bps(lb.at_max_bps, &format!("task {}: labour_by.at_max_bps", t.id))?;
+        }
+    }
+    for e in &c.world.entities {
+        for (k, v) in e.variables.iter().flatten() {
+            let cfg = vars.get(k.as_str()).ok_or_else(|| format!("entity {}: no body variable {k}", e.id))?;
+            if *v < cfg.min || *v > cfg.max {
+                return Err(format!("entity {}: {k} out of its bounds", e.id));
+            }
+        }
+    }
+    if let Some(ill) = c.life.as_ref().and_then(|l| l.illness.as_ref()) {
+        for f in &ill.fields {
+            if !cat.fields.iter().any(|x| x.id == f.field) {
+                return Err(format!("illness: no field {}", f.field));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Semantic validation beyond the JSON Schema.
 /// Nature's config (docs/design/world-expansion.md 2.4): everything it names exists, and its figures are in range.
 fn check_nature(c: &Config) -> Result<(), String> {
@@ -1070,6 +1192,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     }
     check_places(w)?;
     check_nature(c)?;
+    check_bodies(c)?;
 
     // Ids are unique across every kind.
     let mut ids: BTreeSet<String> = BTreeSet::new();

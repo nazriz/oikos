@@ -116,20 +116,23 @@ fn draw_severity(s: &Statics, bands: &[Severity], key: &[&str]) -> (String, i64,
     (band.label.clone(), duration, death)
 }
 
+fn death_cause(kind: ConditionKind) -> DeathCause {
+    match kind {
+        ConditionKind::Illness => DeathCause::Illness,
+        ConditionKind::Injury => DeathCause::Injury,
+    }
+}
+
 /// A condition begins now (and may end in death within it).
 fn begin_condition(s: &Statics, st: &mut State, person: &str, kind: ConditionKind, severity: String, until: i64, death_at: Option<i64>) -> (Id, Vec<Timed>) {
     let t = st.t;
     let id = st.mint("cnd");
     if let Some(b) = st.entities.get_mut(person).and_then(|e| e.body.as_mut()) {
-        b.conditions.push(Condition { id: id.clone(), kind, severity: severity.clone(), since: t, until });
+        b.conditions.push(Condition { id: id.clone(), kind, severity: severity.clone(), since: t, until, death_at: death_at.map(|d| d.max(t)), treated: false });
     }
     st.schedule(until.max(t + s.tick), Sched::ConditionEnds { person: person.into(), condition: id.clone() });
     if let Some(d) = death_at {
-        let cause = match kind {
-            ConditionKind::Illness => DeathCause::Illness,
-            ConditionKind::Injury => DeathCause::Injury,
-        };
-        st.schedule(d.max(t), Sched::Death { person: person.into(), cause });
+        st.schedule(d.max(t), Sched::Death { person: person.into(), cause: death_cause(kind), condition: Some(id.clone()) });
     }
     (id.clone(), vec![Timed::new(t, EventBody::ConditionBegan { person: person.into(), condition: id, kind, severity, until })])
 }
@@ -320,7 +323,8 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
 
 /// A new body, with its participant from a template.
 #[allow(clippy::too_many_arguments)]
-fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, sex: Option<Sex>, parents: Vec<Id>, present: bool, template: &str) -> (Id, Vec<Timed>) {
+#[allow(clippy::too_many_arguments)]
+fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, sex: Option<Sex>, parents: Vec<Id>, present: bool, template: &str, variables: Option<&BTreeMap<Id, i64>>) -> (Id, Vec<Timed>) {
     let t = st.t;
     let id = st.mint("ent");
     let c = st.stamp();
@@ -331,7 +335,7 @@ fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, sex: Opt
             name: name.into(),
             changed: c,
             moved: 0,
-            body: Some(Body { born_at, sex, present, alive: true, parents: parents.clone(), conditions: vec![], participant: None, children: vec![] }),
+            body: Some(Body { born_at, sex, present, alive: true, parents: parents.clone(), conditions: vec![], participant: None, children: vec![], variables: crate::state::body_variables(&s.config.catalogue, variables, t) }),
         },
     );
     // The parents' bodies record the child.
@@ -462,10 +466,20 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             if let Some(oc) = &life.other_causes {
                 if uniform(s, &["life", &person, &a, "other"], 10_000) < oc.at(age) as i64 {
                     let at = t + uniform(s, &["life", &person, &a, "other-when"], year);
-                    st.schedule(at, Sched::Death { person: person.clone(), cause: DeathCause::Other });
+                    st.schedule(at, Sched::Death { person: person.clone(), cause: DeathCause::Other, condition: None });
                 }
             }
-            if let Some(ill) = &life.illness {
+            if let Some(ill) = life.illness.as_ref().filter(|ill| !ill.fields.is_empty()) {
+                // Illness that fields raise (pollution where the body is): a candidate drawn at the highest the fields
+                // could make it, kept, when it comes, at the rate where the body is then (thinning, as injuries).
+                let p = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age) as i64;
+                let most: i64 = ill.fields.iter().map(|f| f.bps_per_unit.max(0).saturating_mul(s.config.catalogue.fields.iter().find(|x| x.id == f.field).map_or(0, |x| x.max.max(0)))).fold(0i64, |a, b| a.saturating_add(b));
+                let max_bps = p.saturating_add(most).clamp(0, 10_000) as u32;
+                if max_bps > 0 && uniform(s, &["life", &person, &a, "ill"], 10_000) < max_bps as i64 {
+                    let at = t + uniform(s, &["life", &person, &a, "ill-when"], year);
+                    st.schedule(at, Sched::IllnessExposure { person: person.clone(), max_bps, age });
+                }
+            } else if let Some(ill) = &life.illness {
                 let p = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age);
                 if uniform(s, &["life", &person, &a, "ill"], 10_000) < p as i64 {
                     let onset = t + uniform(s, &["life", &person, &a, "ill-when"], year);
@@ -503,6 +517,33 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             let (severity, duration, death) = draw_severity(s, &inj.severity, &["life", &person, &tk, "injury-how"]);
             begin_condition(s, st, &person, ConditionKind::Injury, severity, t + duration, death.map(|d| t + d)).1
         }
+        Sched::IllnessExposure { person, max_bps, age } => {
+            let (Some(life), Some(b)) = (s.life(), st.body(&person)) else { return vec![] };
+            let Some(ill) = &life.illness else { return vec![] };
+            if !b.alive || !b.present {
+                return vec![];
+            }
+            let base = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age) as i64;
+            // The fields in the cell where the body is (the corner cell of a structure it's in); none outside one.
+            let cell = st.structures_of(&person).first().map(|sid| st.structures[sid].at.clone());
+            let extra: i64 = cell.map_or(0, |c| {
+                ill.fields
+                    .iter()
+                    .map(|f| {
+                        let v = st.nature.as_deref().and_then(|n| n.fields.get(&f.field)).and_then(|m| m.get(&c)).copied();
+                        let v = v.unwrap_or_else(|| s.config.catalogue.fields.iter().find(|x| x.id == f.field).map_or(0, |x| x.baseline));
+                        f.bps_per_unit.saturating_mul(v)
+                    })
+                    .fold(0i64, |a, b| a.saturating_add(b))
+            });
+            let rate = base.saturating_add(extra).clamp(0, max_bps as i64);
+            let tk = t.to_string();
+            if uniform(s, &["life", &person, &tk, "ill-kept"], max_bps as i64) >= rate {
+                return vec![];
+            }
+            let (severity, duration, death) = draw_severity(s, &ill.severity, &["life", &person, &tk, "ill-how"]);
+            begin_condition(s, st, &person, ConditionKind::Illness, severity, t + duration, death.map(|d| t + d)).1
+        }
         Sched::ConditionBegins { person, kind, severity, until, death_at } => {
             if !st.body(&person).is_some_and(|b| b.alive) {
                 return vec![];
@@ -518,7 +559,16 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             }
             vec![Timed::new(t, EventBody::ConditionEnded { person, condition })]
         }
-        Sched::Death { person, cause } => die(s, st, &person, cause),
+        // A death from a condition happens only if the condition still says it's due (care may have called it off).
+        Sched::Death { person, cause, condition } => {
+            if let Some(c) = &condition {
+                let due = st.body(&person).and_then(|b| b.conditions.iter().find(|x| &x.id == c)).and_then(|x| x.death_at);
+                if !due.is_some_and(|d| d <= t) {
+                    return vec![];
+                }
+            }
+            die(s, st, &person, cause)
+        }
         // (Acts in progress are the kernel's to apply: Kernel::advance.)
         Sched::Act { .. } => vec![],
         Sched::BirthDue { parents, name, template } => {
@@ -532,7 +582,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             let sex = s.life().and_then(|l| l.birth.as_ref()).and_then(|bp| bp.female_bps).map(|f| {
                 if uniform(s, &["birth", &next_id, "sex"], 10_000) < f as i64 { Sex::Female } else { Sex::Male }
             });
-            create_person(s, st, &name, t, sex, parents, present, &template).1
+            create_person(s, st, &name, t, sex, parents, present, &template, None).1
         }
     }
 }
@@ -674,7 +724,7 @@ impl<'a> Exec<'a> {
             (false, None) => {}
         }
         let per_unit = spec.as_ref().map_or(1, |x| x.labour);
-        let total = per_unit.checked_mul(units as i64).ok_or_else(|| refuse(RefusalCode::Overflow, "too much work"))?;
+        let mut total = per_unit.checked_mul(units as i64).ok_or_else(|| refuse(RefusalCode::Overflow, "too much work"))?;
         // Where: a standing structure (the workplace, depot or home).
         let place = self.st.structures.get(&at).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {at}")))?;
         if !place.complete {
@@ -700,6 +750,18 @@ impl<'a> Exec<'a> {
             });
             if !there {
                 return Err(refuse(RefusalCode::NotAtWork, format!("{p} isn't at {at}{}", kind.as_ref().map_or(String::new(), |k| format!(" (in a {k})")))));
+            }
+        }
+        // Skill at work: the labour scales with the performers' mean of a body variable (all of it at the minimum, the
+        // task's share at the maximum).
+        if let Some(lb) = spec.as_ref().and_then(|x| x.labour_by.as_ref()).filter(|_| !who.is_empty() && total > 0) {
+            if let Some(cfg) = self.s.config.catalogue.body_variables.iter().find(|v| v.id == lb.variable).filter(|c| c.max > c.min) {
+                let now = self.now();
+                let sum: i128 = who.iter().map(|p| self.st.body(p).and_then(|b| b.variables.get(&cfg.id)).map_or(cfg.initial, |x| crate::state::body_variable_at(cfg, *x, now).0) as i128).sum();
+                let mean = sum / who.len() as i128;
+                let off = (10_000 - lb.at_max_bps.min(10_000) as i128) * (mean - cfg.min as i128) / (cfg.max - cfg.min) as i128;
+                let factor = 10_000 - off;
+                total = ((total as i128 * factor + 9_999) / 10_000).max(1) as i64;
             }
         }
         let today = day_of(self.now());
@@ -728,9 +790,32 @@ impl<'a> Exec<'a> {
                 need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
             }
         }
-        // What's worked on.
+        // What's worked on: bodies (a person there, or everyone in a space of the place), or a structure.
+        let bodies: Option<Vec<Id>> = match &on {
+            Some(o) if self.st.body(o).is_some() => {
+                self.living_present(o)?;
+                if !self.st.occupancy.get(&at).is_some_and(|m| m.values().any(|b| b.contains(o))) {
+                    return Err(refuse(RefusalCode::NotPresent, format!("{o} isn't at {at}")));
+                }
+                Some(vec![o.clone()])
+            }
+            Some(o) if split_space(o).is_some_and(|(sid, _)| sid == at) => {
+                let (_, local) = split_space(o).unwrap();
+                if self.s.space(&self.st.structures[&at].structure_type, local).is_none() {
+                    return Err(refuse(RefusalCode::UnknownSpace, format!("{at} has no space {local}")));
+                }
+                Some(self.st.occupancy.get(&at).and_then(|m| m.get(o)).map_or(vec![], |b| b.iter().filter(|x| !who.contains(x)).cloned().collect()))
+            }
+            _ => None,
+        };
+        let on_body = spec.as_ref().and_then(|x| x.on_body.clone());
+        match (&bodies, &on_body) {
+            (Some(_), None) => return Err(refuse(RefusalCode::NoBodyEffect, format!("{task} does nothing to a body"))),
+            (None, Some(_)) => return Err(refuse(RefusalCode::NoBodyEffect, format!("{task} is work on bodies: say on whom (a person there, or a space of {at})"))),
+            _ => {}
+        }
         let target = on.clone().unwrap_or_else(|| at.clone());
-        if builtin || spec.as_ref().is_some_and(|x| !x.changes.is_empty()) {
+        if bodies.is_none() && (builtin || spec.as_ref().is_some_and(|x| !x.changes.is_empty())) {
             let t = self.st.structures.get(&target).ok_or_else(|| refuse(RefusalCode::UnknownStructure, format!("no structure {target}")))?;
             if task == TASK_BUILD && (t.complete || t.demolition.is_some()) {
                 return Err(refuse(RefusalCode::NotBeingBuilt, format!("{target} isn't being built")));
@@ -752,7 +837,7 @@ impl<'a> Exec<'a> {
             for (k, per) in &x.produces {
                 self.add_holding(&me, &at, k, per * units as i128, c);
             }
-            if !x.changes.is_empty() {
+            if !x.changes.is_empty() && bodies.is_none() {
                 settle(self.s, self.st, &target);
                 let ty = self.st.structures[&target].structure_type.clone();
                 let vars: Vec<crate::config::VariableCfg> = vars_for(self.s, &ty).cloned().collect();
@@ -766,6 +851,11 @@ impl<'a> Exec<'a> {
             }
         }
         self.emit(EventBody::Worked { task: task.into(), units, at: at.clone(), on: on.clone(), performers: who, labour: total, by: self.participant.into() });
+        if let (Some(bodies), Some(ob)) = (&bodies, &on_body) {
+            for b in bodies {
+                self.on_body(b, ob, units);
+            }
+        }
         if let Some(sv) = survey {
             self.surveyed = Some(self.survey_estimates(sv));
         }
@@ -793,6 +883,50 @@ impl<'a> Exec<'a> {
             }
         }
         Ok(())
+    }
+
+    /// Work done to a body (services): its variables changed, and care given for its conditions (each once).
+    fn on_body(&mut self, person: &str, ob: &crate::config::OnBody, units: u64) {
+        let now = self.now();
+        let tick = self.s.tick;
+        let cat = &self.s.config.catalogue;
+        let mut events = vec![];
+        let mut schedule = vec![];
+        let Some(b) = self.st.entities.get_mut(person).and_then(|e| e.body.as_mut()) else { return };
+        for (v, per) in &ob.changes {
+            let Some(cfg) = cat.body_variables.iter().find(|c| &c.id == v) else { continue };
+            let cur = b.variables.get(v).copied().unwrap_or((cfg.initial, now));
+            let (val, at) = crate::state::body_variable_at(cfg, cur, now);
+            let new = val.saturating_add(per.saturating_mul(units.min(i64::MAX as u64) as i64)).clamp(cfg.min, cfg.max);
+            b.variables.insert(v.clone(), (new, at));
+            events.push(EventBody::BodyChanged { person: person.into(), variable: v.clone(), value: new });
+        }
+        for c in b.conditions.iter_mut().filter(|c| !c.treated && c.until > now) {
+            let Some(tr) = ob.treats.iter().find(|tr| tr.kind == c.kind && tr.severity.as_ref().is_none_or(|x| x == &c.severity) && units >= tr.units) else { continue };
+            let keep = |d: i64| now + ((d - now).max(0) as i128 * tr.days_kept_bps as i128 / 10_000) as i64;
+            c.until = keep(c.until).max(now + tick);
+            schedule.push((c.until, Sched::ConditionEnds { person: person.into(), condition: c.id.clone() }));
+            let mut called_off = false;
+            if let Some(d) = c.death_at.filter(|d| *d >= now) {
+                let mut rng = self.s.randomness.stream(&["care", self.action, person, &c.id]);
+                if rng.below(10_000) < tr.fatal_kept_bps as u64 {
+                    let nd = keep(d).min(c.until - 1).max(now);
+                    c.death_at = Some(nd);
+                    schedule.push((nd, Sched::Death { person: person.into(), cause: death_cause(c.kind), condition: Some(c.id.clone()) }));
+                } else {
+                    c.death_at = None;
+                    called_off = true;
+                }
+            }
+            c.treated = true;
+            events.push(EventBody::ConditionTreated { person: person.into(), condition: c.id.clone(), by: self.participant.into(), until: c.until, death_called_off: called_off });
+        }
+        for (t, what) in schedule {
+            self.st.schedule(t, what);
+        }
+        for e in events {
+            self.emit(e);
+        }
     }
 
     /// What a survey finds: for a species, each one in the cell found with its detection chance; for a field, the value
@@ -1314,7 +1448,7 @@ impl<'a> Exec<'a> {
             }
 
             // ---------------- bodies ----------------
-            Block::Arrive { person, name, born_at, template, carrying, sex, bind } => {
+            Block::Arrive { person, name, born_at, template, carrying, sex, variables, bind } => {
                 if !self.s.is_boundary(&self.entity) || self.position.is_none() {
                     return Err(refuse(RefusalCode::NotTheirs, "people cross into the world only through the outside world"));
                 }
@@ -1341,7 +1475,7 @@ impl<'a> Exec<'a> {
                         if *born_at > self.now() {
                             return Err(refuse(RefusalCode::Overflow, "born in the future"));
                         }
-                        let (id, events) = create_person(self.s, self.st, name, *born_at, *sex, vec![], true, template);
+                        let (id, events) = create_person(self.s, self.st, name, *born_at, *sex, vec![], true, template, variables.as_ref());
                         self.emit_all(events);
                         id
                     }

@@ -8,6 +8,7 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@terrarium/worlds/generator/generate";
 import { runWorld } from "../src/run";
+import { skillClock } from "./skill";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
@@ -20,8 +21,13 @@ async function run(name: string, config: any, until: number) {
   const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
   expect(log.filter((e) => e.kind === "annotation" && (e.body.data?.call_unresolved || e.body.data?.call_unreadable)).map((e) => e.body.data)).toEqual([]);
   const ev = log.filter((e) => e.kind === "event").map((e) => ({ t: e.t, ...e.body }));
-  // Nothing refused but same-moment races (D58): someone who'd just left, named for work.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded"].includes(e.code))).toEqual([]);
+  // Nothing refused but same-moment races (D58): someone who'd just left, named for work; and, where workers differ in
+  // skill, a crew's first day short of time (a shop learns how long a crew takes from being told: Pace). Once per crew,
+  // or near it: not the same plan again and again.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
+  const short = ev.filter((e) => e.event === "action_refused" && e.code === "no_time_left");
+  const acts = ev.filter((e) => e.event === "action_applied").length;
+  expect(short.length * 50).toBeLessThan(acts);
   return { ev, recs: ev.filter((e) => e.event === "recorded").map((e) => e.record) };
 }
 
@@ -37,9 +43,11 @@ test("households buy from shops and use their goods up; shops serve with their s
   // Serving: at the shop, by its own staff, an item's hours each.
   const served = ev.filter((e) => e.event === "worked" && e.task === "serve");
   expect(served.length).toBeGreaterThan(100);
+  const labourOf = skillClock(config, ev);
   for (const w of served) {
     expect(w.performers.every((p: string) => employees.get(w.at.replace("-premises", ""))?.has(p))).toBe(true);
-    expect(w.labour).toBe(w.units * serve.labour);
+    const want = labourOf(w, serve);
+    if (want !== undefined) expect(w.labour).toBe(want);
   }
   // Every household order is answered: what came, and a refund of the rest at the price paid.
   const orders = new Map(recs.filter((r) => r.kind === "order" && /^c\d+$/.test(r.speaks_for)).map((r) => [r.id, r]));

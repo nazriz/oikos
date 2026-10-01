@@ -420,9 +420,11 @@ class Resolver {
     const age = this.seconds(c, "age");
     if (age === undefined) throw new Ask(`How old is ${name}?`);
     const carrying = this.amount(c, "carrying");
+    // (A newcomer's body variables: a JSON object, as given.)
+    const variables = this.json(c, "variables");
     const sex = this.str(c, "sex");
     if (sex !== undefined && sex !== "female" && sex !== "male") throw new Ask("sex should be female or male.");
-    return [{ block: "arrive", name, template, born_at: this.k.t - age, ...(sex ? { sex } : {}), ...(carrying ? { carrying } : {}), ...(bind ? { ref: bind } : {}) }];
+    return [{ block: "arrive", name, template, born_at: this.k.t - age, ...(sex ? { sex } : {}), ...(carrying ? { carrying } : {}), ...(variables !== undefined ? { variables } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   /** An organisation's positions: create one, appoint someone to one, or leave one empty. */

@@ -1335,6 +1335,76 @@
           }
         },
         {
+          "description": "Care given (services): the condition now lasts until `until`; a death due from it was called off, or not. The truth, for measurement: nobody in the world is told whether a death was called off.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "person",
+            "condition",
+            "by",
+            "until",
+            "death_called_off"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "condition_treated"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "person": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            },
+            "condition": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/KernelId"
+            },
+            "by": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            },
+            "until": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
+            },
+            "death_called_off": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "description": "Work changed a body variable (services: teaching raises skill): its value now.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "person",
+            "variable",
+            "value"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "body_changed"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Count"
+            },
+            "person": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
+            },
+            "variable": {
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {
           "description": "Someone was harmed by another participant's body.",
           "type": "object",
           "required": [
@@ -1531,6 +1601,8 @@
         "birth_started",
         "condition_began",
         "condition_ended",
+        "condition_treated",
+        "body_changed",
         "harmed",
         "participant_created",
         "participant_ended",
@@ -1586,6 +1658,7 @@
         "not_at_work",
         "no_time_left",
         "bad_survey",
+        "no_body_effect",
         "not_being_built",
         "not_coming_down",
         "coming_down"

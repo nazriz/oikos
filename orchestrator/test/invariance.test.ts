@@ -21,7 +21,7 @@ async function measure(name: string, perturb?: { extraWakesBps: number; seed: nu
   const units = (task: string) => ev.filter((e) => e.event === "worked" && e.task === task).reduce((a, e) => a + e.units, 0);
   return {
     perturbed: log.some((e) => e.kind === "annotation" && e.body.data?.perturbed),
-    wakes: s.wakes,
+    wakes: s.wakesBy.cadence ?? 0, // (the wakes the perturbation adds to: those on a unit's cadence)
     measures: {
       goods_to_households: ev.filter((e) => e.event === "goods_moved" && /^c\d+$/.test(e.to)).reduce((a, e) => a + Number(e.quantity), 0),
       orders: ev.filter((e) => e.event === "recorded" && e.record.kind === "order" && /^c\d+$/.test(e.record.speaks_for)).length,
@@ -41,7 +41,8 @@ test("woken more often, the town does the same over time: nothing counts per wak
     measures: Object.fromEntries(Object.keys(base.measures).map((k) => [k, runs.reduce((a, r) => a + (r.measures as any)[k], 0) / runs.length])) };
   expect(base.perturbed).toBe(false);
   expect(more.perturbed).toBe(true);
-  expect(more.wakes).toBeGreaterThan(base.wakes * 1.05);
+  // (Woken on their cadence more often by far; acts finishing and news, most of all wakes, it doesn't touch.)
+  expect(more.wakes).toBeGreaterThan(base.wakes * 1.2);
   // Each measure within 10% (what different draws alone move it by, at this size), or it's listed here.
   const off = Object.entries(base.measures).map(([k, v]) => ({ measure: k, base: v, more_wakes: (more.measures as any)[k] as number }))
     .filter((x) => Math.abs(x.more_wakes - x.base) > 0.1 * Math.max(1, x.base));

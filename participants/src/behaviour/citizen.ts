@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.24.0",
+  version: "0.25.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -175,6 +175,11 @@ export const citizen: BehaviourModule = {
       // Civic life (docs/behaviour/citizen.md "Elections and news"): enrolling, judging the town's government, standing
       // and voting; reading the local paper. Placeholders, but the turnout and readership the world gives (its profile).
       electoral_town: null as string | null, // where we enrol and vote (the world says; none: no elections)
+      // School (docs/behaviour/education.md): the school children of its ages go to (the world says; none: no school).
+      school: null as { entity: string; building: string; ages: [number, number] } | null,
+      // Health (docs/behaviour/health.md): the clinic and its waiting room; the share who go when something's wrong of a
+      // kind it sees; and the conditions nobody works with (the world says; none: no clinic).
+      care: null as { entity: string; waiting: string; seek_bps: number; severities: string[]; off_work: string[]; wait_days: number } | null,
       civic: { turnout_bps: 9000, stand_bps: 30, reads_news_bps: 5000, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 },
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
@@ -1038,6 +1043,7 @@ export const citizen: BehaviourModule = {
 
       wordOfMouth(obs, t, steps);
       civic(obs, t, steps);
+      bodily(obs, t, steps, inside);
 
       // Taking part (docs/design/ai-citizens.md 2b): gatherings the world holds (practices), where we may come. Going is
       // physics: being in the space for its time. Whether to go is the mind's: the company it brings against the time it
@@ -1563,6 +1569,70 @@ export const citizen: BehaviourModule = {
     const stoodFor = new Set<string>();
     const readsNews = ctx.rng("reads-news").below(10_000) < p.civic.reads_news_bps;
     const readItems = new Set<string>();
+    // ---- school (a child's) ----
+    let askedSchool = -1;
+    const triedPlace = new Set<string>();
+    const classroomOf = (obs: Observation): string | undefined => {
+      const street = obs.channels.street;
+      if (!p.school || street?.kind !== "sites") return undefined;
+      return street.cells.flatMap((c) => c.structure?.structure === p.school!.building ? c.structure.spaces : []).find((sp) => sp.kind === "classroom" && sp.occupants?.includes(me))?.space;
+    };
+    /** A child of school age who isn't at school: to the place offered, or asking for one (once a month). */
+    const schooling = (obs: Observation): Step | undefined => {
+      if (!p.school || !obs.body) return undefined;
+      const t = obs.t;
+      const age = Math.floor((t - obs.body.born_at) / year);
+      if (age < p.school.ages[0] || age > p.school.ages[1] || classroomOf(obs)) return undefined;
+      const place = book.open("school_place").filter((r) => (r.addressed_to ?? []).includes(me) && !triedPlace.has(r.id)).sort((a, b) => b.at - a.at)[0];
+      if (place?.data?.classroom) {
+        triedPlace.add(place.id);
+        return because("A place at school: going.", moveIn(String(place.data.classroom)));
+      }
+      if (askedSchool >= 0 && t - askedSchool < MONTH) return undefined;
+      askedSchool = t;
+      return because(`Of school age (${age}) and not at school: asking the school for a place.`, say("school_enrolment", `Enrolment at school: ${me}.`, { to: [p.school.entity], visible: [me, p.school.entity], data: { born_at: obs.body.born_at, years_before: 0 } }));
+    };
+
+    // ---- the body: off work while too ill to work, care at the clinic, and leaving school at its end ----
+    let offSick: string | null = null; // the workplace we're off from
+    let atClinic: { condition: string; since: number } | null = null;
+    const soughtCare = new Set<string>();
+    const bodily = (obs: Observation, t: number, steps: Step[], inside: (space: string) => boolean) => {
+      if (!obs.body) return;
+      // School's over at its end: out of the classroom.
+      const room = classroomOf(obs);
+      if (room && p.school && Math.floor((t - obs.body.born_at) / year) > p.school.ages[1]) steps.push(because("School's over: leaving it.", moveOut(room, me)));
+      const c = p.care;
+      if (!c) return;
+      const now = (obs.body.conditions ?? []).filter((x) => x.until > t);
+      // Too ill or hurt to work (a hospital-level condition): out of the workplace until better.
+      const tooIll = now.some((x) => c.off_work.includes(x.severity));
+      if (tooIll && job?.workplace && !offSick && inside(job.workplace)) {
+        offSick = job.workplace;
+        steps.push(because("Too ill to work: staying away until we're better.", moveOut(job.workplace, me)));
+      } else if (!tooIll && offSick) {
+        if (job?.workplace === offSick) steps.push(because("Better: back to work.", moveIn(offSick)));
+        offSick = null;
+      }
+      // At the clinic: home once seen (we feel it), better, or after waiting long enough.
+      if (atClinic) {
+        const x = now.find((y) => y.id === atClinic!.condition);
+        if (!x || x.treated || t - atClinic.since >= c.wait_days * DAY) {
+          if (inside(c.waiting)) steps.push(because(x?.treated ? "Seen at the clinic: going home." : "Done at the clinic: going home.", moveOut(c.waiting, me)));
+          atClinic = null;
+        }
+        return;
+      }
+      // Something wrong of a kind the clinic sees, not yet seen to: to the clinic (most do), asking for care.
+      const ill = now.find((x) => !x.treated && c.severities.includes(x.severity) && !soughtCare.has(x.id));
+      if (!ill) return;
+      soughtCare.add(ill.id);
+      if (ctx.rng(`care-${ill.id}`).below(10_000) >= c.seek_bps) return;
+      atClinic = { condition: ill.id, since: t };
+      steps.push(because(`A ${ill.severity} ${ill.kind}: going to the clinic.`, moveIn(c.waiting),
+        say("care_request", `Asking to be seen: a ${ill.severity} ${ill.kind}.`, { to: [c.entity], visible: [me, c.entity], data: { condition: ill.id, kind: ill.kind, severity: ill.severity } })));
+    };
+
     const civic = (obs: Observation, t: number, steps: Step[]) => {
       if (!p.electoral_town || !obs.body || t - obs.body.born_at < ADULT_YEARS * year) return;
       const town = p.electoral_town;
@@ -1679,6 +1749,8 @@ export const citizen: BehaviourModule = {
               return callAction(because("No adult of our household is left: asking for help.", say("care_request", "We have no adult at home any more.", { to: [p.child_protection], data: { children: kids } })));
             }
           }
+          const learn = schooling(obs);
+          if (learn) return callAction(learn);
           return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY));
         }
         // (Planned when a wake begins; woken because an act of ours is done, we carry on with the plan, and plan afresh

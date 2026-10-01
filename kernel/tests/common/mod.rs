@@ -474,7 +474,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                 // The outside world brings someone in: a newcomer (carrying money), or someone returning.
                 let outside: Vec<String> = persons.iter().filter(|p| st.entities[*p].body.as_ref().is_some_and(|b| b.alive && !b.present)).cloned().collect();
                 let block = match (flag, pick(&outside, *a)) {
-                    (true, Some(p)) => Block::Arrive { person: Some(p), name: None, born_at: None, template: None, carrying: None, sex: None, bind: None },
+                    (true, Some(p)) => Block::Arrive { person: Some(p), name: None, born_at: None, template: None, carrying: None, sex: None, variables: None, bind: None },
                     _ => Block::Arrive {
                         person: None,
                         name: Some(format!("newcomer {a}")),
@@ -482,6 +482,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         template: Some("newcomer".into()),
                         carrying: Some(1 + *b as i128 * 5000),
                         sex: None,
+                        variables: None,
                         bind: None,
                     },
                 };
@@ -708,6 +709,7 @@ pub fn concretize<W: std::io::Write>(run: &Run<W>, op: &Op) -> Option<Command> {
                         template: person.is_none().then(|| "newcomer".into()),
                         carrying: carrying.then_some(10_000),
                         sex: None,
+                        variables: None,
                         bind: None,
                     },
                     B::Leave { person } => Block::Leave { person: person.map(|i| pick(&persons, i).unwrap()), to: None },

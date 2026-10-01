@@ -55,7 +55,7 @@ Lengnick, M. (2013), *Agent-based macroeconomics: a baseline model*, **Journal o
 ## Parameters
 
 - `works`, `workplace` and `max_staff`: its works, the space its workers are in, and the room there.
-- `per_unit`, `labour_per_unit`, `task` and `output`: what a unit takes, and what it makes.
+- `per_unit`, `labour_per_unit`, `task` and `output`: what a unit takes, and what it makes. `labour_per_unit` is what it plans with at first; where workers differ in skill, it learns how long a unit takes this crew (`Pace`, as the shop does: docs/behaviour/retailer.md).
 - `supplier` and `market`: whom it buys inputs from, and whose buying offer it exports under.
 - `wage` and `period`: the wage offered, per pay period. `price`: its opening wholesale price.
 - `working_day` and `work_days`.

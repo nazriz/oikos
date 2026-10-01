@@ -1,0 +1,156 @@
+{
+  "name": "clinic.practice",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/health.md",
+  "params": {
+    "account": {
+      "schema": {
+        "type": "string",
+        "description": "what it pays its staff from (its funding comes in there)"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    },
+    "building": {
+      "schema": {
+        "type": "string",
+        "description": "the clinic, where its doctors work, and its waiting room (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "the clinic, where its doctors work, and its waiting room (the world must say)"
+    },
+    "channel": {
+      "schema": {
+        "type": "string",
+        "description": "its view of the building, who is where in it"
+      },
+      "default": "premises",
+      "source": "placeholder"
+    },
+    "closes": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 64800,
+      "source": "placeholder"
+    },
+    "consult_seconds": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "seconds",
+      "default": 1800,
+      "source": "placeholder"
+    },
+    "consults": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "doctors": {
+      "schema": {
+        "type": "integer",
+        "description": "the establishment (its funder's)"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "give_up_days": {
+      "schema": {
+        "type": "integer",
+        "description": "a patient who asked and isn't here after this long is dropped from the list"
+      },
+      "unit": "days",
+      "default": 3,
+      "source": "placeholder"
+    },
+    "industry": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "health_care",
+      "source": "placeholder"
+    },
+    "notice_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    },
+    "opens": {
+      "schema": {
+        "type": "integer",
+        "description": "the hours it sees patients (placeholder)"
+      },
+      "default": 28800,
+      "source": "the hours it sees patients (placeholder)"
+    },
+    "period": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 1209600,
+      "source": "placeholder"
+    },
+    "role": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "doctor",
+      "source": "placeholder"
+    },
+    "treat_task": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "treat",
+      "source": "placeholder"
+    },
+    "wage": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "waiting": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    },
+    "work_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 5,
+      "source": "placeholder"
+    },
+    "working_day": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 28800,
+      "source": "placeholder"
+    },
+    "workplace": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "required": true,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

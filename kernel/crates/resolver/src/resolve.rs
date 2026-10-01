@@ -608,6 +608,8 @@ impl Resolver<'_> {
         };
         let Some(age) = Self::seconds(c, "age")? else { return ask(format!("How old is {name}?")) };
         let carrying = Self::amount(c, "carrying")?;
+        // (A newcomer's body variables: a JSON object, as given.)
+        let variables = Self::json_(c, "variables")?;
         let sex = Self::str_(c, "sex")?.filter(|x| !x.is_empty());
         if sex.as_deref().is_some_and(|s| s != "female" && s != "male") {
             return ask("sex should be female or male.");
@@ -619,6 +621,7 @@ impl Resolver<'_> {
             ("born_at", some(self.k.t - age)),
             ("sex", sex.map(Json::from)),
             ("carrying", carrying.filter(|c| !c.is_empty()).map(Json::from)),
+            ("variables", variables),
             ("ref", bind.map(Json::from)),
         ])])
     }

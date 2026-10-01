@@ -12,6 +12,7 @@ export { drawPerson, NEEDS, VALUES, type PopulationValues } from "./behaviour/mi
 export { repayment } from "./behaviour/credit";
 export { annualTax, withholding, type IncomeTaxLaw } from "./behaviour/tax";
 export { adultAgeBands, drawHousehold, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
+export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
 import { disposal, exportDemand, funding, grants, idle, migration, trade, transfers, valuer } from "./behaviour/world";
@@ -26,6 +27,8 @@ import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxC
 import { environment } from "./behaviour/environment";
 import { electoralOffice } from "./behaviour/elections";
 import { newspaper } from "./behaviour/news";
+import { principal } from "./behaviour/school";
+import { practice } from "./behaviour/health";
 
 /** Every behaviour module available to worlds, by the name used in controller.impl. */
 export const modules: { [name: string]: BehaviourModule & { source: string } } = Object.fromEntries(
@@ -63,6 +66,8 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [environment, "behaviour/environment.ts"],
       [electoralOffice, "behaviour/elections.ts"],
       [newspaper, "behaviour/news.ts"],
+      [principal, "behaviour/school.ts"],
+      [practice, "behaviour/health.ts"],
     ] as const
   ).map(([m, src]) => [m.name, { ...m, source: new URL(`./${src}`, import.meta.url).pathname }]),
 );

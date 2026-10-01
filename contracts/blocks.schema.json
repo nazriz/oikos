@@ -899,6 +899,19 @@
             "female",
             "male"
           ]
+        },
+        "variables": {
+          "description": "A newcomer's body variables (others start at the catalogue's initial).",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "maxProperties": 100
         }
       }
     },
@@ -1125,7 +1138,8 @@
           "maxItems": 1000
         },
         "on": {
-          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/IdOrRef"
+          "$ref": "urn:terrarium:contracts:0.7:common#/$defs/IdOrRef",
+          "description": "Or a person at the place, or a space of it (everyone in it): the task's on_body applies to each body."
         },
         "survey": {
           "description": "A survey (a task that `surveys`): of a species or a field, in these cells, one unit each. Only the actor learns the estimates (the outcome's `surveyed`).",

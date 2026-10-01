@@ -77,13 +77,14 @@ const TABLES: { [name: string]: string } = {
     union all
     select $run, seq, t, json_extract_string(body, '$.position'), json_extract_string(body, '$.holder'), json_extract_string(body, '$.by')
     from raw where kind = 'event' and json_extract_string(body, '$.event') = 'appointed'`,
-  // Bodies: coming and going, births, illness, injury, harm and death. detail: the cause of death, or a condition's kind.
+  // Bodies: coming and going, births, illness, injury, harm, care and death. detail: the cause of death, a condition's kind, or
+  // (care) whether a death due from it was called off.
   life: `
     select $run as run_id, seq, t, json_extract_string(body, '$.event') as event, json_extract_string(body, '$.person') as person, json_extract_string(body, '$.by') as "by",
-      coalesce(json_extract_string(body, '$.died_of'), json_extract_string(body, '$.kind')) as detail, json_extract_string(body, '$.severity') as severity,
+      coalesce(json_extract_string(body, '$.died_of'), json_extract_string(body, '$.kind'), case json_extract_string(body, '$.death_called_off') when 'true' then 'death_called_off' when 'false' then 'treated' end) as detail, json_extract_string(body, '$.severity') as severity,
       json_extract_string(body, '$.condition') as condition, (json_extract_string(body, '$.until'))::BIGINT as until, from_json(json_extract(body, '$.parents'), '["VARCHAR"]') as parents
     from raw where kind = 'event' and json_extract_string(body, '$.event') in
-      ('person_created', 'person_arrived', 'person_left', 'person_died', 'birth_started', 'condition_began', 'condition_ended', 'harmed')`,
+      ('person_created', 'person_arrived', 'person_left', 'person_died', 'birth_started', 'condition_began', 'condition_ended', 'condition_treated', 'harmed')`,
   events: `
     select $run as run_id, seq, t, json_extract_string(body, '$.event') as event, (json_extract_string(body, '$.cause'))::UBIGINT as cause, body
     from raw where kind = 'event'`,
@@ -154,9 +155,14 @@ const TABLES: { [name: string]: string } = {
   acts: `
     select $run as run_id, c.seq, c.t, json_extract_string(c.body, '$.participant') as participant, json_extract_string(c.body, '$.as') as "as", json_extract_string(c.body, '$.provenance.via') as via,
       json_array_length(json_extract(c.body, '$.blocks')) as blocks, json_extract_string(c.body, '$.reasoning') as reasoning,
-      json_extract_string(o.body, '$.event') = 'action_applied' as applied, json_extract_string(o.body, '$.action') as action,
-      json_extract_string(o.body, '$.code') as refusal, (json_extract_string(o.body, '$.block'))::INTEGER as refused_block, json_extract_string(o.body, '$.detail') as detail, json_extract(c.body, '$.blocks') as blocks_json
-    from raw c left join raw o on o.kind = 'event' and (json_extract_string(o.body, '$.cause'))::UBIGINT = c.seq and json_extract_string(o.body, '$.event') in ('action_applied', 'action_refused')
+      json_extract_string(coalesce(o.body, d.body), '$.event') = 'action_applied' as applied, json_extract_string(coalesce(o.body, d.body), '$.action') as action,
+      json_extract_string(coalesce(o.body, d.body), '$.code') as refusal, (json_extract_string(coalesce(o.body, d.body), '$.block'))::INTEGER as refused_block, json_extract_string(coalesce(o.body, d.body), '$.detail') as detail, json_extract(c.body, '$.blocks') as blocks_json
+    -- An act's outcome: at once (refused as submitted, caused by the act), or when its time is up (an act that takes time
+    -- starts, and is applied or refused later, caused by the advance: matched by the act's id).
+    from raw c
+      left join raw o on o.kind = 'event' and (json_extract_string(o.body, '$.cause'))::UBIGINT = c.seq and json_extract_string(o.body, '$.event') in ('action_applied', 'action_refused')
+      left join raw s on s.kind = 'event' and (json_extract_string(s.body, '$.cause'))::UBIGINT = c.seq and json_extract_string(s.body, '$.event') = 'action_started'
+      left join raw d on d.kind = 'event' and json_extract_string(d.body, '$.event') in ('action_applied', 'action_refused') and json_extract_string(d.body, '$.action') = json_extract_string(s.body, '$.action')
     where c.kind = 'command' and json_extract_string(c.body, '$.command') = 'act'`,
   messages: `
     select $run as run_id, seq, t, participant, "as", from_json(json_extract(b, '$.to'), '["VARCHAR"]') as "to", json_extract_string(b, '$.text') as text, json_extract_string(b, '$.re') as re

@@ -75,7 +75,8 @@ test("wages are paid net of the tax withheld, which is paid over; rates are levi
   const paid = claims.filter((c) => ev.some((e) => e.event === "transfer" && e.settles === c.id && e.to === "acc-city"));
   expect(paid.length).toBeGreaterThan(claims.length / 2);
   // Grants: from outside, to the town, at the rate per resident for a quarter.
-  const grants = recs.filter((r) => r.kind === "grant_payment");
+  // (The town's: the clinic and the school have their own funders' grants.)
+  const grants = recs.filter((r) => r.kind === "grant_payment" && (r.addressed_to ?? []).includes("city"));
   expect(grants.length).toBeGreaterThanOrEqual(1);
   for (const g of grants) {
     expect(g.data.residents).toBeGreaterThan(40);

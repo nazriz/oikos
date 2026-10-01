@@ -13,7 +13,7 @@
 use crate::blocks::{Id, Record};
 use crate::config::{cell_id, Area, Channel, ChannelKind, CmpOp, LookRequest, Occupants, ParticipantKind, Query, RecordFilter, SELF};
 use crate::geo::{within, Rect};
-use crate::state::{Condition, Look, Message, Outcome, ParticipantStatus, State, Transaction};
+use crate::state::{Look, Message, Outcome, ParticipantStatus, State, Transaction};
 use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -43,6 +43,19 @@ pub struct Observation {
     pub readings: BTreeMap<Id, terrarium_terms::Reading>,
 }
 
+/// A condition as its body knows it: what, how bad, since and until when, and whether it's been treated. Never
+/// whether, or when, it will kill.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConditionView {
+    pub id: Id,
+    pub kind: crate::state::ConditionKind,
+    pub severity: String,
+    pub since: i64,
+    pub until: i64,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub treated: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BodyView {
     pub born_at: i64,
@@ -53,7 +66,10 @@ pub struct BodyView {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub parents: Vec<Id>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub conditions: Vec<Condition>,
+    pub conditions: Vec<ConditionView>,
+    /// Its variables (the world's `body_variables`), as they are now.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub variables: BTreeMap<Id, i64>,
     /// Its children, as a parent knows them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<ChildView>,
@@ -830,7 +846,14 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
         present: b.present,
         alive: b.alive,
         parents: b.parents.clone(),
-        conditions: b.conditions.clone(),
+        conditions: b.conditions.iter().map(|c| ConditionView { id: c.id.clone(), kind: c.kind, severity: c.severity.clone(), since: c.since, until: c.until, treated: c.treated }).collect(),
+        variables: s
+            .config
+            .catalogue
+            .body_variables
+            .iter()
+            .filter_map(|cfg| b.variables.get(&cfg.id).map(|x| (cfg.id.clone(), crate::state::body_variable_at(cfg, *x, st.t).0)))
+            .collect(),
     });
     let positions = st
         .positions

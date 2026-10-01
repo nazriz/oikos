@@ -178,6 +178,7 @@ impl World {
                         parents: e.parents.clone().unwrap_or_default(),
                         conditions: vec![],
                         participant: person_of.get(e.id.as_str()).map(|p| p.to_string()),
+                        variables: crate::state::body_variables(&c.catalogue, e.variables.as_ref(), 0),
                     });
                     (e.id.clone(), Entity { kind: e.kind.clone(), name: e.name.clone(), changed: 0, moved: 0, body })
                 })

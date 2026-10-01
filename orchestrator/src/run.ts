@@ -102,6 +102,8 @@ export interface RunSummary {
   commands: number;
   refused: number;
   wakes: number;
+  /** Wakes by why (cadence, news, asked, done, start). */
+  wakesBy: { [why: string]: number };
   t: number;
   /** Wall-clock milliseconds spent waiting on the kernel and in behaviour modules (profiling only; never logged). */
   kernelMs: number;
@@ -236,6 +238,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const anchorsPath = join(o.outDir, `${o.runId}.anchors.jsonl`);
   let t = 0;
   let commands = 0, refused = 0, wakes = 0, kernelMs = 0, moduleMs = 0, platformMs = 0;
+  const wakesBy: { [why: string]: number } = {};
   const profModules: { [m: string]: { ms: number; steps: number } } = {};
   const backlog: { [m: string]: { acts: number; waited: number; longest: number } } = {};
   const repeats: { [m: string]: { times: number; unit: string; act: string } } = {};
@@ -803,6 +806,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         const u = units.get(c.key);
         if (!u) continue;
         wakes++;
+        wakesBy[c.woke_for] = (wakesBy[c.woke_for] ?? 0) + 1;
         u.wokeFor = c.woke_for;
         u.since = c.since;
         cohort.push(u);
@@ -911,7 +915,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   if (resolverDiffCount) await Bun.write(join(o.outDir, `${o.runId}.resolver-diffs.json`), JSON.stringify(resolverDiffs, null, 1));
-  return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
+  return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
     health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) },
     ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}) };

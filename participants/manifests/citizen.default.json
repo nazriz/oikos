@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -111,6 +111,11 @@
       },
       "unit": "months",
       "default": 3,
+      "source": "placeholder"
+    },
+    "care": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "catch_up_days": {
@@ -410,6 +415,11 @@
       },
       "unit": "months",
       "default": 6,
+      "source": "placeholder"
+    },
+    "school": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "search_limit": {

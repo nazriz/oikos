@@ -10,7 +10,8 @@
 //! - **News:** a message wakes everyone it's delivered to; a record naming an entity wakes the code units acting for
 //!   it (a person's own unit; the units holding an organisation's positions), never its author, and never a
 //!   language-model participant (it reads what's come in on its own cadence, and letters wake it). A unit busy with an
-//!   act isn't woken: it sees the news when its act is done.
+//!   act isn't woken: it sees the news when its act is done. A change in one's own body (a condition begun, ended or
+//!   treated) wakes that person's own code unit.
 //! - **Guards:** at most three news wakes a unit a tick (then the next tick); more than `MAX_COHORTS_PER_MOMENT`
 //!   cohorts at one moment stops the run.
 
@@ -247,6 +248,12 @@ impl Scheduler {
                         let keys = self.units.iter().filter(|(_, u)| u.participant == to && u.next_wake > t && !Self::busy(u, t)).map(|(k, _)| k.clone()).collect();
                         self.wake_now(keys, t);
                     }
+                }
+                // Something happening to one's own body (falling ill, getting better, being treated) is felt at once.
+                Some("condition_began" | "condition_ended" | "condition_treated") => {
+                    let (Some(st), Some(person)) = (st, e["person"].as_str()) else { continue };
+                    let keys = self.acting_for(st, person, "", t);
+                    self.wake_now(keys, t);
                 }
                 Some("recorded") => {
                     let Some(st) = st else { continue };

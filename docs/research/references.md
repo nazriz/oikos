@@ -119,3 +119,11 @@ sources); this list is for the architecture and design ideas.
 | Instant-runoff (preferential) counting | The single transferable vote in single-member form (Hare); Victoria's preferential voting, *Local Government Act 2020* (Vic) **(to confirm the section)** | The electoral office's count |
 | News values: what makes an event news | Galtung, J. & Ruge, M. H. (1965), "The structure of foreign news", *Journal of Peace Research* 2, 64–91 **(to confirm)** | The paper's weights by kind of record (placeholders) |
 | Media slant: what a paper runs, and how, leans | Gentzkow, M. & Shapiro, J. M. (2010), "What drives media slant? Evidence from U.S. daily newspapers", *Econometrica* 78, 35–71 **(to confirm)** | The paper's `leaning_bps` |
+
+## Public services (docs/behaviour/health.md, education.md; docs/design/world-expansion.md §4)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Human capital: schooling raises productivity, and earnings rise log-linearly with years of it | Mincer, J. (1974), *Schooling, Experience, and Earnings*, NBER **(to confirm)** | Skill speeds work (`labour_by`), steeply enough to give the profile's return a year |
+| The return to a year of schooling in Australia | Leigh, A. (2008), "Returns to education in Australia", *Economic Papers* 27(3), 233–249 **(to confirm)** | The profile's `return_per_year_bps` (10%) |
+| Credentials as a signal employers screen on | Spence, M. (1973), "Job market signaling", *Quarterly Journal of Economics* 87(3), 355–374 | Not yet used: certificates exist, employers don't read them (leaves out) |

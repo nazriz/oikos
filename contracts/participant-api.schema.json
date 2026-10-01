@@ -132,6 +132,10 @@
                   },
                   "until": {
                     "$ref": "urn:terrarium:contracts:0.7:common#/$defs/SimTime"
+                  },
+                  "treated": {
+                    "description": "Care has been given for it.",
+                    "type": "boolean"
                   }
                 }
               }
@@ -176,6 +180,19 @@
                   }
                 }
               }
+            },
+            "variables": {
+              "description": "Its variables (the world's body_variables), as they are now.",
+              "type": "object",
+              "propertyNames": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "maxProperties": 100
             }
           }
         },

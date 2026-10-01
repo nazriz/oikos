@@ -72,7 +72,8 @@ pub enum Block {
     },
     /// Work (phase B): `units` of a task, at a structure, by performers who are there (in a space of the task's
     /// kind). Their time comes from each one's working day; the task's inputs from the actor's holding there; its
-    /// outputs go to that holding; its changes to a structure's variables (`on`, or `at`). The built-in tasks `build`
+    /// outputs go to that holding; its changes to a structure's variables (`on`, or `at`). `on` may instead name a
+    /// person there, or a space of `at` (everyone in it): the task's `on_body` applies to each body. The built-in tasks `build`
     /// and `demolish` work `on` a structure begun or coming down.
     Work {
         task: Id,
@@ -113,6 +114,9 @@ pub enum Block {
         /// A newcomer's biological sex, where the world models it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sex: Option<crate::vocab::Sex>,
+        /// A newcomer's body variables (others take the catalogue's `initial`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        variables: Option<std::collections::BTreeMap<Id, i64>>,
         #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
         bind: Option<String>,
     },

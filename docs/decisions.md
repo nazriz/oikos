@@ -1100,11 +1100,36 @@ See the design note, §16.
   - **Liberties:** the town elects its mayor directly (Victoria's councillors choose most mayors); councillors are fixed; there are no campaigns, postal votes or fines for not voting; a platform is a candidate's top two values. Voting and standing weights are placeholders.
   - **Revisit if:** a study needs councillors elected (wards, proportional counting), campaigning, or citizens telling each other what they think of the mayor (word of mouth carries no politics yet); or candidate numbers per vacancy and local news readership are sourced (the profile's placeholders).
 
+- **Services: contract signed, built** (Naz, 2026-10-01: "yes signed off, include skill at work"; docs/design/world-expansion.md §4; docs/behaviour/health.md, education.md).
+  - **In Rust:** body variables (skill), work done to bodies (a person there, or everyone in a room), care (`treats`: a condition shortened, a death due from it called off with a chance, once, and nobody told which), skill at work (`labour_by`), illness rising with a field where the body is, and a change in one's own body waking that person.
+  - **In TypeScript:**
+    - the school (`school.principal`): teachers by establishment, places for children of school age, a lesson a school day to each classroom, certificates;
+    - the clinic (`clinic.practice`): doctors by establishment, a walk-in queue seen in turn as hours allow;
+    - citizens go to school, stay off work while seriously ill, and go to the clinic;
+    - the generator's adults and newcomers bring schooling drawn from the profile's attainment;
+    - both services are paid by grants from outside and exempt from rates.
+  - **Who runs them is the real world's:** in Victoria neither is the council's (state schools; general practice), so the mayor's budget doesn't gain these lines. A profile can put them on a town's budget.
+  - **Skill at work, calibrated to stay calibrated:** tasks' labour is scaled so the mean adult's schooling takes the profile's time. A less-schooled crew is slower. Six years' more schooling around the mean is worth the profile's return per year, compounded (a linear approximation of Mincer's log-linear).
+  - **Found by running it:**
+    - shops and factories retried a plan the world had refused for lack of time, forever (a run 40 times slower). Managers now learn how long work takes from what the world tells them (`Pace`);
+    - the clinic and the school were taken for shops by the generator's loop over workplaces;
+    - the school offered places to pupils already seated;
+    - a citizen only noticed falling ill at their weekly wake, so a short illness never kept anyone off work (now a condition wakes its body's person).
+    - managers who learned only "slower" left quick crews doing less than they could (the factories made too little to pay dividends): `Pace` learns each worker's pace, quicker by asking a little more once a week;
+    - the clinic's daily wake drifted to whenever news last woke it (10pm, closed): a module run by the shared stepper can now ask when to wake (the clinic, at opening; the school, each morning);
+    - **a measurement bug, hidden until now:** the `acts` table matched an act to its outcome only when it came at once, so every act that takes time (nearly all) had no outcome, and refusals counted 0. It now matches by the act's id (measure/src/index.ts);
+    - the invariance test measured all wakes, most of which (acts finishing, news) the perturbation doesn't touch: it now measures wakes on cadence (the run summary counts wakes by why: `wakesBy`).
+  - **The trade-off it shows:** the doctor and teachers come out of the town's workforce, five fewer factory workers in the small town, and 7-8% fewer goods in the first 120 days (two seeds). That's a real cost of public services, not a bug.
+  - **Liberties:** the clinic stands for the whole health system; anyone may teach or doctor; care can't save lives yet (conditions don't kill in the generated town: fatality by age is proposed); pollution's effect on illness isn't used (no sourced figure).
+  - **Revisit if:** fatality by age is signed (then a share of each age's deaths comes through conditions, care cutting it); a study needs employers to screen on certificates (Spence), teachers' qualifications, or routine care.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).
 
 - **Construction payments must be fleshed out. Accepted only to unblock us** *(Naz, 2026-09-25: "not happy with this, but will accept it for now")*. In v0.2, `construct` and `demolish` pay materials and demolition costs straight from the builder's own account to the boundary. That skips the builder's bank (contrary to D26: money moves only when a custodian's seat moves it) and doesn't model suppliers at all. To return to it: have builders buy materials from supplier entities (possibly outside-world suppliers via the boundary) through ordinary bank-executed transfers, with materials as a physical stock that construction consumes, or through the work/process model (D24), where building is a task with inputs. Until then it's a documented liberty; see contracts/blocks.schema.json (`construct`, `demolish`). Known quirk: since materials are paid to the outside world, the outside world's own seat builds for free (it pays itself). Only a researcher-configured boundary module can do this; it disappears once construction payments are fleshed out.
+
+- **Fatality by age on a condition's band (a contract addition, proposed 2026-10-01).** A band has one `fatal_bps` for all ages, but real case fatality rises steeply with age, so no single figure can carry a share of the life table's deaths without killing far more children than die. Proposal: an optional `fatal_by_age: [{from, bps}]` on a severity band, read like `other_causes`. The generator would then move each age's "treatable" deaths from `other_causes` into conditions, set so that with care as usual the life table holds, and without care more die. Until signed, care shortens illness but saves no one.
 
 - **Contract additions proposed by M2** (docs/design/m2-llm-participants.md, "Open"): `notices` on the Observation (translation failures and similar orchestrator-to-seat notes), and `framing.debrief_text`.
 - ~~Directory refresh interval (D33)~~: superseded by D42 (perception is changes).

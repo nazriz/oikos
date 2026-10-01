@@ -51,6 +51,8 @@ export interface Profile {
       rates_instalments: number;
       rates_due_days: number;
       rates_penalty_interest_bps: number;
+      /** Kinds of organisation whose land isn't rateable (schools, public health), besides the outside world's. */
+      rates_exempt_kinds?: string[];
       median_house_price: number;
     };
     services: {
@@ -65,6 +67,14 @@ export interface Profile {
     unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; resignation_notice_days: number; claim_margin_bps: number; meeting_every_days?: number; teaching?: string };
     /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */
     groups?: { kinds: { kind: string; name: string; every_days: number; lasts_minutes: number; teaching?: string; held_at_start_bps?: number }[]; per_kind_per_1000_people: number; taking_part_bps: number; leave_notice_days: number };
+    /** Health (docs/design/world-expansion.md 4): the clinic's doctors, their care for conditions (as consultations), and who
+     * seeks it; the conditions that keep someone off work. */
+    health?: { doctors_per_1000: number; doctor_wage_per_fortnight: number; consult_minutes: number; seek_care_bps: number;
+      treats: { kind: "illness" | "injury"; severity?: string; consults: number; days_kept_bps: number; fatal_kept_bps: number }[]; off_work_severities: string[] };
+    /** Education (world-expansion 4): school ages, staffing, the school year, adults' attainment (as years of schooling), and
+     * the return to a year of it. */
+    education?: { school_ages: [number, number]; students_per_teacher: number; school_days_per_year: number; hours_per_day: number; teacher_wage_per_fortnight: number;
+      attainment: { label: string; share_bps: number; years: number }[]; return_per_year_bps: number; max_years: number };
     /** Elections and the local paper (docs/design/world-expansion.md 3). */
     elections?: { term_years: number; method: "preferential" | "plurality"; turnout_bps: number; stand_bps: number; news_readers_bps: number };
     /** Nature (docs/design/world-expansion.md 2): the landscape around the town, its covers, pollution, and species in

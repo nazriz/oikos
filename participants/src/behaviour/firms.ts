@@ -28,7 +28,8 @@ import { because, between, Book, breaches, callAction, usd, cellsOf, commitmentO
  * id, whether a day's work was done): what it returns is done next. A step refused because the world changed in the
  * same moment (D58) is undone by its own `then`; the rest of the plan goes on, each step tried as it comes.
  */
-export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observation) => Step[]) {
+/** `until`: when to wake next with nothing left to do (the time it asks for), if not on its cadence. */
+export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observation) => Step[], until?: (obs: Observation) => number | undefined) {
   let todo: Step[] = [];
   let plannedAt = -1;
   /** A day's work (a step with a `work` call) left undone when the day's over is dropped, not carried: it spent that day's
@@ -61,7 +62,7 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
       }
       todo.unshift(...follow.filter((s) => s.length));
       let next = todo.shift();
-      if (!next) return wait();
+      if (!next) return wait(until?.(obs));
       // Done later than planned: a step that counts from when it's done is made again for now (a notice's date).
       if (next.redo && next.planned !== undefined && next.planned !== obs.t) next = next.redo(obs.t);
       sent = next;

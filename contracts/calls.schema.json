@@ -567,6 +567,7 @@
                     "sex",
                     "template",
                     "carrying",
+                    "variables",
                     "leave"
                   ]
                 }

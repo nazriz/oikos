@@ -169,6 +169,24 @@ pub struct Body {
     /// Its biological children, in order of birth (the other side of `parents`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<Id>,
+    /// Its variables (the catalogue's `body_variables`): each value, as of a time (drift settles from then).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub variables: BTreeMap<Id, (i64, i64)>,
+}
+
+/// A body's variables as they start: what's given (clamped to the bounds), else each one's `initial`, as of `t`.
+pub fn body_variables(cat: &crate::config::Catalogue, given: Option<&BTreeMap<Id, i64>>, t: i64) -> BTreeMap<Id, (i64, i64)> {
+    cat.body_variables.iter().map(|v| (v.id.clone(), (given.and_then(|g| g.get(&v.id)).copied().unwrap_or(v.initial).clamp(v.min, v.max), t))).collect()
+}
+
+/// A body variable's value at `t`, settled: its drift a whole day at a time since it was last set; and the time it's
+/// settled to (whole days on, so no part of a day's drift is lost when it's written back).
+pub fn body_variable_at(cfg: &crate::config::BodyVariableCfg, (v, at): (i64, i64), t: i64) -> (i64, i64) {
+    if cfg.per_day == 0 || t <= at {
+        return (v, at);
+    }
+    let days = (t - at) / 86_400;
+    (v.saturating_add(cfg.per_day.saturating_mul(days)).clamp(cfg.min, cfg.max), at + days * 86_400)
 }
 
 /// Someone leaving a space: who, why (they left, were removed, died, ...), and when.
@@ -204,6 +222,12 @@ pub struct Condition {
     pub severity: String,
     pub since: i64,
     pub until: i64,
+    /// When a death from it is due (the kernel's; never in a view).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub death_at: Option<i64>,
+    /// Care has been given for it (once is all that counts).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub treated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -492,7 +516,10 @@ pub enum Sched {
     Exposure { person: Id, max_bps: u32 },
     ConditionBegins { person: Id, kind: ConditionKind, severity: String, until: i64, #[serde(default, skip_serializing_if = "Option::is_none")] death_at: Option<i64> },
     ConditionEnds { person: Id, condition: Id },
-    Death { person: Id, cause: DeathCause },
+    /// A death, from a condition (it happens only if the condition still says it's due now) or not.
+    Death { person: Id, cause: DeathCause, #[serde(default, skip_serializing_if = "Option::is_none")] condition: Option<Id> },
+    /// A chance of illness (thinning, as `Exposure`): drawn at `max_bps`, kept at the rate where the body is now.
+    IllnessExposure { person: Id, max_bps: u32, age: i64 },
     BirthDue { parents: Vec<Id>, name: String, template: Id },
     /// An act in progress: it takes effect when its actor is done with it (docs/design/rebuild.md 6.2).
     Act {
