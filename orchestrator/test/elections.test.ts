@@ -15,9 +15,11 @@ const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 const POLL = 200;
 
-async function town(name: string, negligent: boolean, days: number) {
+async function town(name: string, negligent: boolean, days: number, standBps?: number) {
   const config = generate({ ...spec, years: 1, first_election_days: POLL });
   if (negligent) for (const x of config.participants) if (x.controller?.impl === "city.mayor_code") x.controller.params.staff_budget = 0;
+  // (How readily people stand, where the test needs a contest, or none.)
+  if (standBps !== undefined) for (const c of [...config.participants.map((x: any) => x.controller), ...config.templates.map((x: any) => x.controller)]) if (c?.params?.civic) c.params = { ...c.params, civic: { ...c.params.civic, stand_bps: standBps } };
   const out = join(root, "runs", `test-elections-${name}`);
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config, runId: name, outDir: out, until: days * DAY });
@@ -38,7 +40,7 @@ test("instant runoff: the last is out until someone has a majority", () => {
 });
 
 test("an election in a town run well, and in a town whose mayor funds no works crew", async () => {
-  const kept = await town("kept", false, POLL + 5);
+  const kept = await town("kept", false, POLL + 5, 1000);
   // The office's records, in order: a notice, nominations (the incumbent among them), the roll and the ballot, then
   // the result on polling day, and the winner appointed.
   const kinds = ["election_notice", "electoral_roll", "ballot_result"].map((k) => kept.recs.find((r) => r.kind === k && r.author === "electoral-system")?.at ?? -1);
@@ -68,6 +70,12 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   expect(news.every((r) => r.assertion?.about?.includes("city"))).toBe(true);
   for (const e of editions) expect(news.filter((r) => r.data.edition === e).length).toBeLessThanOrEqual(5);
   expect(news.some((r) => r.data.kind === "election_notice" || r.data.kind === "nomination")).toBe(true);
+
+  // Nobody stands against the incumbent: elected unopposed when nominations close, with no ballot.
+  const alone = await town("unopposed", false, POLL - 25, 0);
+  expect(alone.result.data).toMatchObject({ winner: alone.incumbent, unopposed: true });
+  expect(Math.floor(alone.result.at / DAY)).toBe(POLL - 30);
+  expect(alone.recs.some((r) => r.kind === "ballot" && r.data?.electorate === "roll")).toBe(false);
 
   const voted = await town("voted-out", true, POLL + 40);
   expect(voted.result.data.winner).not.toBe(voted.incumbent);

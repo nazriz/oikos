@@ -36,7 +36,7 @@ export function instantRunoff(candidates: string[], rankings: string[][]): { win
 
 export const electoralOffice: BehaviourModule = {
   name: "city.electoral_office",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/elections.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -83,6 +83,17 @@ export const electoralOffice: BehaviourModule = {
           const noms = book.open("nomination").filter((n) => n.at >= since && n.data?.office === p.office && (n.addressed_to ?? []).includes(p.town));
           const candidates = [...new Map(noms.map((n) => [n.author as string, n])).values()].sort((a, b) => (a.author < b.author ? -1 : 1));
           const names = candidates.map((n) => ({ candidate: n.author as string, for: n.speaks_for as string, name: (n.data?.name as string) ?? (n.speaks_for as string), nomination: n.id }));
+          // One candidate: elected unopposed, with no ballot. None: no one elected (the office stays as it is).
+          if (names.length <= 1) {
+            const who = names[0];
+            steps.push(because(who ? `Nominations closed: one candidate, ${who.name}, elected unopposed.` : "Nominations closed: no candidates; no one is elected.",
+              say("ballot_result", `Election result, ${p.office_title || p.office}: ${who ? `${who.name} elected unopposed` : "no one nominated; no one elected"}.`,
+                { visible: "public", data: { office: p.office, winner: who?.candidate, unopposed: !!who, candidates: names.length } }),
+              ...(who ? [C.call("position", { appoint: p.office, to: who.candidate })] : [])));
+            stage = "waiting";
+            poll += p.term_days * DAY;
+            return steps;
+          }
           stage = "voting";
           const r = roll();
           const st = because(`Nominations closed: ${names.length} candidates. Publishing the roll (${r.length}) and the ballot.`,

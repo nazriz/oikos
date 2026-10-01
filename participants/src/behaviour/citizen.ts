@@ -25,12 +25,12 @@
 // asking the bank to pay. Nothing happens to them automatically.
 
 import { cents } from "../money";
-import type { Eligibility, LookRequest, Observation, ParticipantAction, SiteStructure, StatementRecord } from "../contracts";
+import type { Eligibility, LookRequest, Observation, ParticipantAction, Record, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { because, Book, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { because, Book, breaches, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.25.0",
+  version: "0.26.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -180,6 +180,10 @@ export const citizen: BehaviourModule = {
       // Health (docs/behaviour/health.md): the clinic and its waiting room; the share who go when something's wrong of a
       // kind it sees; and the conditions nobody works with (the world says; none: no clinic).
       care: null as { entity: string; waiting: string; seek_bps: number; severities: string[]; off_work: string[]; wait_days: number } | null,
+      // The tribunal (docs/behaviour/justice.md): where we take a rent increase that breaks the law (with the chance
+      // `challenge_bps`) or a debt owed us unpaid after `apply_after_days` (with `apply_bps`), and where we ask for an
+      // unpaid order to be enforced (the world says; none: no tribunal).
+      tribunal: null as { entity: string; challenge_bps: number; apply_bps: number; apply_after_days: number } | null,
       civic: { turnout_bps: 9000, stand_bps: 30, reads_news_bps: 5000, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 },
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
@@ -441,6 +445,8 @@ export const citizen: BehaviourModule = {
     const absorb = (obs: Observation) => {
       const news = book.absorb(obs);
       fresh.push(...news);
+      // What's paid to us against a debt owed us (by the debtor, or its bank under a garnishee order).
+      for (const tx of channels.transactions(obs)) if (tx.settles && tx.from !== tx.to && ownBanked(obs, me)?.account === tx.to) settledToUs.set(tx.settles, (settledToUs.get(tx.settles) ?? 0) + cents(tx.amount));
       // At work (docs/behaviour/unions.md), taken in as it's seen, before the money that comes with it: a rise in an
       // enterprise agreement (paid from the next pay day), a stoppage called, and the return to work (our pay restarts).
       for (const r of news) {
@@ -953,9 +959,22 @@ export const citizen: BehaviourModule = {
 
       // A rent increase on our home (the landlord's notice, as the tenancy law allows): if we can still afford it, we pay
       // the new rent from when it starts; if not, we give notice and look for somewhere else.
-      if (home && isLeaseholder()) for (const r of fresh) {
+      // (A notice we challenged, upheld by the tribunal: it applies after all.)
+      const upheldNow = upheld.splice(0).map((id) => book.records.get(id)).filter((r): r is Record => !!r);
+      if (home && isLeaseholder()) for (const r of [...fresh, ...upheldNow]) {
         if (r.record !== "statement" || r.kind !== "rent_increase" || r.data?.lease !== home.agreement || !(r.addressed_to ?? []).includes(me)) continue;
         const rent = cents(r.data.rent);
+        // A notice that breaks the tenancy law (as we read the law): some of us take it to the tribunal, and pay the rent
+        // as it was meanwhile; an invalid notice changes nothing.
+        if (p.tribunal && !challenged.has(r.id) && r.speaks_for && breaches(book, { block: "publish", kind: "rent_increase", data: r.data }, r.speaks_for, r.at).length) {
+          challenged.add(r.id);
+          if (ctx.rng(`challenge-${r.id}`).below(10_000) < p.tribunal.challenge_bps) {
+            feelings.feel("anger", home.landlord, 4_000, t);
+            steps.push(because(`A notice of rent increase that breaks the law: taking it to the tribunal, and paying the rent as it was meanwhile.`,
+              say("tribunal_application", `Application: the notice of rent increase ${r.id} from ${r.speaks_for} breaks the law; we ask that it be found invalid.`, { to: [p.tribunal.entity], visible: [me, p.tribunal.entity, r.speaks_for], basis: r.id, data: { kind: "rent_increase", against: r.speaks_for, notice: r.id, evidence: evidence(r) } })));
+            continue;
+          }
+        }
         // Angry with the landlord, the more so the more of our income it takes (a placeholder scale).
         const riseShare = householdIncome() > 0 ? ((rent - home.rent) * 10_000) / householdIncome() : 10_000;
         if (rent > home.rent) feelings.feel("anger", home.landlord, 2_000 + 20 * riseShare, t);
@@ -1044,6 +1063,7 @@ export const citizen: BehaviourModule = {
       wordOfMouth(obs, t, steps);
       civic(obs, t, steps);
       bodily(obs, t, steps, inside);
+      justice(obs, t, steps);
 
       // Taking part (docs/design/ai-citizens.md 2b): gatherings the world holds (practices), where we may come. Going is
       // physics: being in the space for its time. Whether to go is the mind's: the company it brings against the time it
@@ -1569,6 +1589,42 @@ export const citizen: BehaviourModule = {
     const stoodFor = new Set<string>();
     const readsNews = ctx.rng("reads-news").below(10_000) < p.civic.reads_news_bps;
     const readItems = new Set<string>();
+    // ---- the tribunal ----
+    /** A copy of a record we rely on, for the tribunal (which can't see what was between us and the other side). */
+    const evidence = (r: any) => JSON.parse(JSON.stringify(r));
+    const challenged = new Set<string>(); // notices of rent increase we've weighed taking to the tribunal
+    const upheld: string[] = []; // notices we challenged that the tribunal upheld: they apply after all
+    const pursued = new Set<string>(); // debts owed us we've weighed applying over
+    const enforcing = new Set<string>(); // orders we've asked to be enforced
+    const settledToUs = new Map<string, number>(); // a debt owed us -> what's been paid against it
+    /** What the tribunal decided on our applications; debts owed us left unpaid, applied over; unpaid orders enforced. */
+    const justice = (obs: Observation, t: number, steps: Step[]) => {
+      const tr = p.tribunal;
+      if (!tr) return;
+      for (const o of book.open("tribunal_order").filter((x) => (x.addressed_to ?? []).includes(me) && x.data?.applicant === me && !enforcing.has(x.id))) {
+        if (o.data?.kind === "rent_increase") {
+          enforcing.add(o.id);
+          if (o.data.finding === "valid") upheld.push(String(o.data.notice));
+          continue;
+        }
+        if (o.data?.kind !== "debt" || o.data.finding !== "pay" || t < Number(o.data.due) + DAY) continue;
+        enforcing.add(o.id);
+        const claim = book.records.get(String(o.data.claim)) as any;
+        const unpaid = Math.min(cents(o.data.amount), cents(claim?.about?.amount ?? o.data.amount) - (settledToUs.get(String(o.data.claim)) ?? 0));
+        if (unpaid > 0) steps.push(because(`The tribunal ordered ${o.data.against} to pay us ${usd(cents(o.data.amount))} by day ${Math.floor(Number(o.data.due) / DAY)}, and ${usd(unpaid)} is still unpaid: asking for the order to be enforced.`,
+          say("enforcement_request", `Request to enforce order ${o.id}: ${usd(unpaid)} unpaid.`, { to: [tr.entity], visible: [me, tr.entity], basis: o.id, data: { order: o.id, unpaid } })));
+      }
+      const acc = ownBanked(obs, me);
+      for (const c of book.ofType("claim") as any[]) {
+        if (c.holder !== me || c.about?.kind !== "debt" || !c.counterparty || pursued.has(c.id) || t - c.at < tr.apply_after_days * DAY) continue;
+        pursued.add(c.id);
+        const owed = cents(c.about.amount) - (settledToUs.get(c.id) ?? 0);
+        if (owed <= 0 || !acc || ctx.rng(`apply-${c.id}`).below(10_000) >= tr.apply_bps) continue;
+        steps.push(because(`${c.counterparty} still owes us ${usd(owed)} (${c.about.for ?? "a debt"}), ${Math.floor((t - c.at) / DAY)} days on: applying to the tribunal.`,
+          say("tribunal_application", `Application: ${c.counterparty} owes us ${usd(owed)} (${c.about.for ?? "a debt"}, recorded as ${c.id}).`, { to: [tr.entity], visible: [me, tr.entity, c.counterparty], basis: c.id, data: { kind: "debt", against: c.counterparty, claim: c.id, amount: owed, account: acc.account, evidence: evidence(c) } })));
+      }
+    };
+
     // ---- school (a child's) ----
     let askedSchool = -1;
     const triedPlace = new Set<string>();

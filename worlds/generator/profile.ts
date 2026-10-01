@@ -75,6 +75,8 @@ export interface Profile {
      * the return to a year of it. */
     education?: { school_ages: [number, number]; students_per_teacher: number; school_days_per_year: number; hours_per_day: number; teacher_wage_per_fortnight: number;
       attainment: { label: string; share_bps: number; years: number }[]; return_per_year_bps: number; max_years: number };
+    /** Justice (world-expansion 5): the tribunal's times, and how often people take a case to it. */
+    justice?: { hearing_after_days: number; pay_within_days: number; challenge_bps: number; apply_bps: number; apply_after_days: number };
     /** Elections and the local paper (docs/design/world-expansion.md 3). */
     elections?: { term_years: number; method: "preferential" | "plurality"; turnout_bps: number; stand_bps: number; news_readers_bps: number };
     /** Nature (docs/design/world-expansion.md 2): the landscape around the town, its covers, pollution, and species in

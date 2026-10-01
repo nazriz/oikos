@@ -1,0 +1,27 @@
+{
+  "name": "tribunal.member",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/justice.md",
+  "params": {
+    "hearing_after_days": {
+      "schema": {
+        "type": "integer",
+        "description": "listed for a hearing this long after it's made (the respondent's time to answer)"
+      },
+      "unit": "days",
+      "default": 21,
+      "source": "placeholder"
+    },
+    "pay_within_days": {
+      "schema": {
+        "type": "integer",
+        "description": "an order to pay: within this long"
+      },
+      "unit": "days",
+      "default": 28,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

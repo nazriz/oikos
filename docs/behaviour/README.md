@@ -47,6 +47,8 @@ Rules every module follows (so re-runs are reproducible):
 | `city.environment` | the town's environment office: hires the scientists the budget's environment line pays for; surveys the district's species each quarter; reports, and keeps a habitat register for planning | [environment.md](environment.md); the physics: [nature.md](nature.md) |
 | `school.principal` | a school: keeps its teachers, gives places to children of school age, teaches each classroom on school days (raising pupils' skill), certifies those who finish | [education.md](education.md) |
 | `clinic.practice` | a clinic: keeps its doctors, sees patients who come in and ask, in turn, as their hours allow (care shortens a condition) | [health.md](health.md) |
+| `tribunal.member` | a tribunal's member: lists applications, tells both sides, and on the day decides on the record under the laws in force (a rent increase invalid or valid; a debt ordered paid) | [justice.md](justice.md) |
+| `tribunal.registrar` | a tribunal's registrar: enforces an unpaid order to pay by a garnishee order to the debtor's bank | [justice.md](justice.md) |
 | `city.electoral_office` | the town's elections: keeps the roll, gives notice, takes nominations, publishes the ballot, counts by instant runoff, and appoints the winner | [elections.md](elections.md) |
 | `firm.newspaper` | the local paper's editor: runs the week's most newsworthy public records, with a tone toward the town's government and a leaning | [news.md](news.md) |
 | `world.disposal` | the outside world's landfill: invoices monthly for what's delivered, at a price a tonne | [services.md](services.md) |

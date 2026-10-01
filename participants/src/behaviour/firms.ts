@@ -80,7 +80,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.11.0",
+  version: "0.12.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -467,6 +467,17 @@ export const landlord: BehaviourModule = {
           answered.add(r.id);
           if (obeys(`order-${r.id}`)) steps.push(because("Obeying a demolition order: commissioning the builder to demolish it.", C.call("structure", { remove: r.data?.structure, by: p.builder, price: C.dollars(price), from: acc.account, basis: r.id })));
         }
+      }
+      // A tribunal's order that a notice of rent increase of ours is invalid (docs/behaviour/justice.md): obeying it (as
+      // often as we obey the law), we withdraw the notice and the rent stays as it was.
+      for (const o of book.open("tribunal_order")) {
+        if (answered.has(o.id) || !(o.addressed_to ?? []).includes(me) || o.data?.against !== me || o.data?.kind !== "rent_increase" || o.data?.finding !== "invalid") continue;
+        answered.add(o.id);
+        const n = book.records.get(String(o.data.notice)) as any;
+        if (!n || !obeys(`tribunal-${o.id}`)) continue;
+        const changes = rentChanges.get(n.data?.lease) ?? [];
+        rentChanges.set(n.data?.lease, changes.filter((c) => !(c.from === Number(n.data?.from) && c.rent === cents(n.data?.rent))));
+        steps.push(because(`The tribunal has found our notice of rent increase ${n.id} invalid: withdrawing it; the rent stays as it was.`, withdraw(n.id, `Withdrawn: found invalid by the tribunal (${o.id}).`)));
       }
       return steps;
     }), { beliefs: (): Belief[] => leasesHeld() });
@@ -993,6 +1004,8 @@ export class WindingUp {
 
   /** Every observation (not only when planning): money paid to us once we've closed, by paying account (a buyer's). */
   absorb(obs: Observation, account: string | undefined) {
+    // A debt settled from our account (by us, or by our bank under a garnishee order) is paid.
+    if (account) for (const tx of channels.transactions(obs)) if (tx.from === account && tx.settles) this.paid.add(tx.settles);
     if (this.state !== "closed" || !account) return;
     for (const tx of channels.transactions(obs)) if (tx.to === account && tx.from !== account) this.credit.set(tx.from, (this.credit.get(tx.from) ?? 0) + cents(tx.amount));
   }

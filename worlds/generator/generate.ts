@@ -69,6 +69,8 @@ export interface TownSpec {
   /** The clinic and the school, where the profile describes health and education (world-expansion 4). Default: yes;
    * false: neither (and bodies have no skill). */
   services?: boolean;
+  /** The tribunal, where the profile describes justice (world-expansion 5). Default: yes; false: none. */
+  justice?: boolean;
   /** Superseded by apartment_units and house_types (generator 0.10). */
   rents?: { apartment: number; house: number };
   /** The profile the town's place-specific figures come from (worlds/profiles/<id>.json). Default: au-vic-2026. */
@@ -218,6 +220,7 @@ export function generate(spec: TownSpec): any {
   // ---- public services (world-expansion 4): health and education, where the profile describes both ----
   const HE = V.health && V.education && spec.services !== false ? V.health : undefined;
   const ED = HE ? V.education : undefined;
+  const JU = V.justice && spec.justice !== false ? V.justice : undefined;
   // Skill is schooling: a year of it is 10,000 (so a school day is a 200th of that). It speeds work (labour_by): the
   // time a task takes falls linearly with the performers' mean skill, steeply enough that six years more around the
   // mean adult's take the profile's return to a year's schooling, compounded (Mincer 1974; a linear approximation of the
@@ -732,7 +735,7 @@ export function generate(spec: TownSpec): any {
     code("bank.lending", { rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
       default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: 10_000_000, funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
   office("outside-funding", "outside", "Wholesale funding", undefined, [{ id: "ledger", kind: "accounts" }, mine("draws")], code("world.funding", { account: "acc-outside" }));
-  office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city" }));
+  office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city", ...(JU ? { courts: ["tribunal"] } : {}) }));
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
   office("outside-trade", "outside", "The world market", undefined, [{ id: "ledger", kind: "accounts" }, mine("orders"), { id: "stock", kind: "holdings" }],
     code("world.trade", { account: "acc-outside", sells: { materials: MATERIALS_PRICE, inputs: WORLD.inputs, goods: WORLD.goods_import },
@@ -808,6 +811,13 @@ export function generate(spec: TownSpec): any {
       code("world.grants", { account: "acc-outside", to: "clinic", to_account: "acc-clinic", per_resident_per_year: Math.ceil(yearly(HE.doctor_wage_per_fortnight, doctors) / residentsAtStart) }));
     office("outside-school-funding", "outside", "School funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
       code("world.grants", { account: "acc-outside", to: "school", to_account: "acc-school", per_resident_per_year: Math.ceil(yearly(ED.teacher_wage_per_fortnight, teachers) / residentsAtStart) }));
+  }
+  // The tribunal (world-expansion 5), the state's: its member hears applications and makes orders, under the laws in
+  // force; its registrar enforces unpaid orders to pay, by an order to the debtor's bank.
+  if (JU) {
+    entities.push({ id: "tribunal", kind: "tribunal", name: "Civil and Administrative Tribunal" });
+    office("tribunal-member", "tribunal", "Tribunal member", "member", [mine("tribunal-business"), lawBook], code("tribunal.member", { hearing_after_days: JU.hearing_after_days, pay_within_days: JU.pay_within_days }));
+    office("tribunal-registrar", "tribunal", "Principal registrar", "registrar", [mine("tribunal-business")], code("tribunal.registrar", { banks: ["bank"] }));
   }
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
@@ -910,6 +920,7 @@ export function generate(spec: TownSpec): any {
     complain_to: "city", complain_bps: V.services.complain_bps,
     ...(HE && ED ? { school: { entity: "school", building: "school-building", ages: ED.school_ages },
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
+    ...(JU ? { tribunal: { entity: "tribunal", challenge_bps: JU.challenge_bps, apply_bps: JU.apply_bps, apply_after_days: JU.apply_after_days } } : {}),
     ...(E ? { electoral_town: "city", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 } } : {}),
     union: "union", union_join_bps: V.unions.membership_bps,
     participation_bps: V.labour_force_participation_bps, child_template_outside_lf: "child-outside-lf",

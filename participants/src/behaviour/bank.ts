@@ -20,7 +20,7 @@ interface Payment { instruction: string; from: string; to: string; amount: numbe
 
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
-  version: "0.9.1",
+  version: "0.10.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -29,7 +29,8 @@ export const bankPaymentSystem: BehaviourModule = {
     const maxBatch = Math.min(32, ctx.params.max_batch ?? 32);
     const done = new Set<string>(); // one-off instructions handled
     const settled = new Map<string, string[]>(); // death registration -> the heirs' accounts its estate goes to
-    const p = { town: (ctx.params.town as string | undefined) ?? "" }; // an estate with no heirs goes to the town, if the world names one
+    const p = { town: (ctx.params.town as string | undefined) ?? "", // an estate with no heirs goes to the town, if the world names one
+      courts: (ctx.params.courts as string[] | undefined) ?? [] }; // whose garnishee orders it carries out (the world's tribunals and courts)
     const nextDue = new Map<string, number>(); // standing order -> next due time
     // Instructions, read once as they arrive: a one-off is dealt with then; a standing order is kept until it's withdrawn
     // (so a plan never rescans every instruction ever made).
@@ -146,6 +147,21 @@ export const bankPaymentSystem: BehaviourModule = {
             const amount = i === 0 ? acc.balance - each * (to.length - 1) : each;
             if (amount > 0) out.push({ instruction: r.id, from: acc.account, to: account, amount, due: obs.t });
           });
+        }
+      }
+      // Garnishee orders (docs/behaviour/justice.md): a court's or tribunal's order to pay a debt from what we hold for the
+      // debtor, carried out as the law requires: what the debtor's accounts here hold, up to the amount, to the creditor,
+      // settling the debt. Once each.
+      for (const g of book.open("garnishee_order").filter((r) => (r.addressed_to ?? []).includes(me) && !done.has(r.id) && p.courts.includes(r.speaks_for ?? ""))) {
+        done.add(g.id);
+        let left = cents(g.data?.amount ?? 0);
+        const to = g.data?.to;
+        if (typeof to !== "string" || left <= 0) continue;
+        for (const acc of [...custody.values()].filter((a) => a.holder === g.data?.debtor && a.balance > 0).sort((a, b) => (a.account < b.account ? -1 : 1))) {
+          const amount = Math.min(left, acc.balance);
+          left -= amount;
+          out.push({ instruction: g.id, from: acc.account, to, amount, due: obs.t, ...(typeof g.data?.claim === "string" ? { settles: g.data.claim } : {}) });
+          if (left <= 0) break;
         }
       }
       out.sort((a, b) => a.due - b.due || (a.instruction < b.instruction ? -1 : 1));

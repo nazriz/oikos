@@ -1,4 +1,4 @@
-# `citizen.default` (v0.25.0): the AI citizen in code
+# `citizen.default` (v0.26.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -58,6 +58,7 @@ It wakes weekly, whenever something names it (an offer, a notice, a message), an
 | **School** | A child of school age (the world's `school.ages`) not at school asks the school for a place (once a month) and goes when offered. At the end of school they leave. | docs/behaviour/education.md |
 | **Too ill to work** | With a condition of a band nobody works with (the world's `care.off_work`: hospital-level), out of the workplace until better, then back. | Placeholder (docs/behaviour/health.md) |
 | **Care** | With a condition of a kind the clinic sees, not yet treated: to the clinic with the chance `care.seek_bps`, waiting there and asking to be seen; home once seen (felt), better, or after `wait_days`. | Placeholder (docs/behaviour/health.md) |
+| **The tribunal** | A notice of rent increase that breaks the law (as we read it): to the tribunal with the chance `tribunal.challenge_bps`, paying the old rent meanwhile, and the new one only if it's found valid. A debt owed us still unpaid after `apply_after_days`: an application, with the chance `apply_bps`; an order to pay that's unpaid a day past its date, a request to enforce it. | docs/behaviour/justice.md (placeholders) |
 | **Leaving town** | After 90 days without a home, or 180 days with nobody in the household earning and less money than a month's rent or essentials: give notice, take all savings out of town, and leave with the household. The thresholds stretch with tradition and security, from half to one and a half times. | Hirschman (1970): exit. Thresholds are placeholders to calibrate |
 
 The rates the person's values shift (`sway`) move symmetrically about the town's mean, so the town's rates stay as calibrated while people differ.
@@ -108,6 +109,7 @@ Saving is off: it's negative in the first year, and 22–25% over five (target 6
 - **Leaving:** `leave_after_homeless_days` 90, `leave_after_jobless_days` 180
 - **Voice:** `petition_start_bps` 300, `petition_willing_bps` 4400, `petition_days` 180, `threshold_mean_bps` 2500, `threshold_sd_bps` 1000, `rent_burden_grievance_bps` 4000, `aggrieved_bps` 2000
 - **Elections:** `electoral_town` (the world's), `civic`: `turnout_bps` 9000, `stand_bps` 30, `reads_news_bps` 5000, `approval_memory_weeks` 26, `news_weight_bps` 1500, `platform_weight_bps` 2500 (the profile sets turnout, standing and readers)
+- **The tribunal:** `tribunal` (`entity`, `challenge_bps`, `apply_bps`, `apply_after_days`): the world's
 - **School and care:** `school` (`entity`, `building`, `ages`), `care` (`entity`, `waiting`, `seek_bps`, `severities`, `off_work`, `wait_days`): the world's
 - **Complaints:** `complain_to`, `complain_about` "waste", `complain_after_days` 14, `complain_bps` 3000
 - **Word of mouth:** `ask_home_bps` 3700, `ask_work_bps` 6900, `ask_again_days` 60, `max_contacts` 15, `pass_on_bps` 10000, `catch_up_days` 14, `news_days` 90

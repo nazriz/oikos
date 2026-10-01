@@ -278,6 +278,8 @@ consultation (a payment from outside on the practice's claim).
 
 ## 5. Justice (tier 1)
 
+*Built 2026-10-01 (no contract change): docs/behaviour/justice.md. As built: rent-increase disputes and debts, with enforcement by garnishee order through the bank; possession orders and the bailiff wait for tenants who stay on past a notice (behaviour to source); the bargaining tribunal isn't built.*
+
 - **A tribunal** (a position; Victoria's VCAT is the model): it takes applications (tenancy disputes, unpaid wages, a
   breach of a law, a challenge to a decision of the town), hears both sides (records, with time to respond), and
   rules. Orders are records.
@@ -315,6 +317,39 @@ consultation (a payment from outside on the practice's claim).
   doesn't see a death at home for weeks (found 2026-10-01), and nobody is home at night. With travel time, people go
   to work and come home each working day, and see what's there.
 - Proportional fidelity: no traffic or congestion, no vehicles as things, and no public transport at first.
+
+### 6.4 The contract, exactly (proposed, for sign-off)
+
+**Water and energy (6.1):**
+
+| Where | Change |
+|---|---|
+| **Tasks** | `draws` (optional): `{field, per_unit}`: a unit takes that much of a field from the cell (of the structure's, or the four around them) that has the most of it. It's refused (`field_exhausted`) if there isn't enough there. The water works draws `water` from the river this way, and `produces` a `water` resource. |
+| **Tasks** | `emits` (optional): `{field_or_counter: per_unit}`: a unit adds to a field at the structure's corner cell (pollution from a generator), or to a world counter. |
+| **Catalogue** | `counters`: `[{id}]`: world totals the kernel keeps and censuses monthly (`counter_census`), with no effect on anything (greenhouse gas: it matters, but not here). |
+| **State, log** | Counters' values, and the census event. |
+
+Everything else is records and existing physics:
+- metering is a structure variable `per_occupant_per_day` (it exists);
+- bills, supply contracts and disconnection notices are records;
+- the grid and the gas network are the boundary selling `energy` (world.trade);
+- drought is the boundary's inflow (the river's source) falling.
+
+**Roads and commuting (6.3):**
+
+| Where | Change |
+|---|---|
+| **Bodies are in one place at a time** | Occupying a space in another structure moves the body there: out of every space it was in elsewhere (it still holds a lease, a job; that's the record). Today a body can be at home and at work at once, which is why nobody is ever home. |
+| **Travel takes time** | Catalogue `travel: {seconds_per_cell, by_cover: {cover: seconds_per_cell}}` (roads quicker). Moving from one structure to another takes the time of the quickest path over the cells between, by cover. The act is under way that long (acts take time already), and arrives then. From outside the world, or into a first space, no travel. |
+| **Roads** | A cover (`road`) and a structure type the town builds on its lots. Wear on it as now. |
+| **Observation** | Where one is: the space (or none: in transit). |
+
+Behaviour (TypeScript): the daily round, which is citizens going to work on working days and home after; employers
+seeing who's in. Each module that reads who's where is reviewed (deaths seen at home, the waste per occupant, a
+shop's staff present, a school's pupils).
+
+**Note on cost:** a body in one place at a time changes what every module sees. It's the biggest change since the
+rebuild. I'd do it on its own branch, with the invariance and reliability tests as the gate.
 
 ## 7. Tier 3
 
@@ -364,8 +399,8 @@ shows its mechanism, a soak run, and a line in docs/decisions.md.
 | 3 | None, as built: a ballot's electorate is in its data, read by whoever counts. |
 | 4 | §4.2: body variables; tasks' `on_body` (changes, treats) on a person or a space; optional skill at work; illness reading fields; treated conditions; two log events; one's own body variables in view. |
 | 5 | None: applications, rulings and orders are records. |
-| 6 | Tasks may draw a resource from a cell's field (water); a greenhouse counter. |
+| 6 | §6.4: tasks' `draws` (from a field) and `emits` (to a field or a counter); world `counters`. |
 | 7 | None beyond records (sales and mortgages exist). |
-| 8 | Catalogue: travel cost by cover; the timeline charges travel. |
+| 8 | §6.4: a body in one place at a time; travel time by cover on moving between structures; where one is in the observation. |
 | 9 | Structure types' flood threshold; the kernel displaces occupants. |
 | 10 | Block: `take` (goods from a holding where one is, without consent); the bank's instruction check may be fooled (a forged instruction). |

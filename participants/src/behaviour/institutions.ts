@@ -239,6 +239,7 @@ export const builder: BehaviourModule = {
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
+        dues.absorb(obs, ownAccount(obs)?.account);
         letters.take(obs, book);
         for (const d of deliveries.take(book, obs.entity)) {
           const o = orderQty.get(d.order);

@@ -40,3 +40,7 @@ Real retail banking: payments are made on the account holder's instruction; stan
 - Fraud detection beyond author verification.
 - Court orders (a later version).
 - Payment timing within a day.
+
+## Garnishee orders (v0.10.0; docs/behaviour/justice.md)
+
+A court's or tribunal's order to pay a debt from what the bank holds for the debtor (`garnishee_order`, from an entity in the world's `courts`): carried out once, from the debtor's accounts here in id order, up to the amount, to the creditor's account, settling the debt (the transfer names it). What the accounts don't hold isn't paid; the order isn't kept open.

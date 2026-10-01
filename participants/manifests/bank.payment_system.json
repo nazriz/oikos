@@ -1,10 +1,16 @@
 {
   "name": "bank.payment_system",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "doc": "docs/behaviour/bank-payment-system.md",
   "params": {
     "amount": {
       "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "courts": {
+      "schema": {
+        "description": "whose garnishee orders it carries out (the world's tribunals and courts)"
+      },
       "source": "the world gives it (no default)"
     },
     "from": {
@@ -31,8 +37,11 @@
       "source": "the world gives it (no default)"
     },
     "town": {
-      "schema": {},
-      "source": "the world gives it (no default)"
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
     },
     "verify_author": {
       "schema": {

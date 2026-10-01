@@ -1,0 +1,17 @@
+{
+  "name": "tribunal.registrar",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/justice.md",
+  "params": {
+    "banks": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "required": true,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

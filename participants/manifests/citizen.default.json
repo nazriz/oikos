@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.25.0",
+  "version": "0.26.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -504,6 +504,11 @@
       "unit": "bps",
       "default": 1000,
       "source": "roughly normal with this mean and spread (Granovetter 1978)"
+    },
+    "tribunal": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     },
     "union": {
       "schema": {},

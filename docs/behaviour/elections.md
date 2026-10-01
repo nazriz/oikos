@@ -1,4 +1,4 @@
-# `city.electoral_office` (v0.1.0): the town's elections
+# `city.electoral_office` (v0.2.0): the town's elections
 
 **Source:** `participants/src/behaviour/elections.ts`. A position of the town's (`entity: city`), run by code here; a
 person or a model could hold it. Design: docs/design/world-expansion.md §3.1. The voters are citizens
@@ -16,6 +16,7 @@ preferential vote is a ranking (`a>b>c`).
 | **The roll** | Everyone who has enrolled with the town (genesis enrolments for the adults at the start; citizens enrol when they come of age or arrive), less those whose deaths are registered and those who've left. | — |
 | **Notice** | `nominations_open_days` (60) before polling day: a public `election_notice` giving polling day, the close of nominations and the method. | Placeholder timetable |
 | **Nominations** | `nomination` statements to the town for this office, made since the notice, one per candidate (the last counts). They close `nominations_close_days` (30) before polling day. | — |
+| **Unopposed** | One candidate at the close: elected unopposed, with no ballot (a `ballot_result` saying so, and the appointment). None: no one is elected, and the office stays as it is. | Local Government Act 2020 (Vic): an unopposed candidate is declared elected (to confirm the section) |
 | **The roll and the ballot** | At the close: the `electoral_roll` (who may vote) and a `ballot` for `electorate: "roll"`, listing the candidates, open for `voting_days` (14) up to polling day. | — |
 | **The count** | On polling day: each elector's last formal vote (a ranking of at least one candidate; others are informal), counted by instant runoff (the last-placed candidate is out, their ballots go to the next preference still standing, until one has a majority). Under `plurality`, only first preferences count, for one round. | Instant runoff, as in Victoria's single-member elections |
 | **The result** | A public `ballot_result` with the winner, the rounds, formal votes, electors and turnout. The winner is appointed to the office. The next election is a term later. | — |
@@ -34,6 +35,7 @@ preferential vote is a ranking (`a>b>c`).
   built (the builder signed), and re-tabled an adopted budget. The mayor module kept what it had done in memory, which
   a successor doesn't have. Now it reads the office's record: what the office has acted on, whoever held it.
 - **The incumbent's successor nominated itself after nominations had closed.** It now stands only while they're open.
+- **A town run well sometimes has no challenger** (people stand less when they approve of the town): the ballot then had one name. Now the sole candidate is elected unopposed, as the law says.
 
 ## Leaves out (for now)
 
