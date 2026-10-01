@@ -318,7 +318,7 @@ consultation (a payment from outside on the practice's claim).
   to work and come home each working day, and see what's there.
 - Proportional fidelity: no traffic or congestion, no vehicles as things, and no public transport at first.
 
-### 6.4 The contract, exactly (proposed, for sign-off)
+### 6.4 The contract, exactly (signed 2026-10-01: Naz, "yes to both, signed off")
 
 **Water and energy (6.1):**
 

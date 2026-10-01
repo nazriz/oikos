@@ -43,13 +43,13 @@ from rates.
 - **Going to the clinic:** with a condition of a kind the clinic sees, not yet treated, 90% go (`seek_care_bps`). They
   wait in the waiting room, asking to be seen, and go home once seen (they feel it), better, or after 2 days.
 
-## What it can't do yet: save lives
+## Saving lives (fatality by age, signed 2026-10-01)
 
-In the generated town every death comes from the life table, and conditions never kill, so no death is counted twice
-(docs/behaviour/life.md). So care shortens illness (fewer days off work) but saves no one. For care to save lives, a
-share of each age's deaths would come from conditions, with the treated rate matching the life table. Real case
-fatality rises steeply with age, which one figure per band can't follow. That needs a small contract addition: a
-band's fatality by age. **Proposed, awaiting sign-off.**
+With the clinic in the world, the profile's treatable deaths (about 15% of deaths under 75) come through the severe
+illness band instead of the life table's other causes. The band's fatality at each age (`fatal_by_age`) is set so that,
+with care as usual (90% treated, and treatment halving a death: placeholders), each age dies at the life table's rate.
+Without care, deaths at 30 to 74 are about 12% higher; with better care, lower. From 75 the life table carries every
+death (treatable mortality is counted under 75). docs/behaviour/life.md.
 
 ## Leaves out (for now)
 

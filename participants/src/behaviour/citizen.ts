@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.26.0",
+  version: "0.27.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -1670,7 +1670,14 @@ export const citizen: BehaviourModule = {
         if (job?.workplace === offSick) steps.push(because("Better: back to work.", moveIn(offSick)));
         offSick = null;
       }
-      // At the clinic: home once seen (we feel it), better, or after waiting long enough.
+      seekCare(obs, t, steps, inside);
+    };
+    /** At the clinic, home once seen (felt), better, or after waiting long enough; else, with something wrong of a kind it
+     * sees, to the clinic (most do), asking for care. A child too (their parents would take them). */
+    const seekCare = (obs: Observation, t: number, steps: Step[], inside: (space: string) => boolean) => {
+      const c = p.care;
+      if (!c || !obs.body) return;
+      const now = (obs.body.conditions ?? []).filter((x) => x.until > t);
       if (atClinic) {
         const x = now.find((y) => y.id === atClinic!.condition);
         if (!x || x.treated || t - atClinic.since >= c.wait_days * DAY) {
@@ -1805,6 +1812,10 @@ export const citizen: BehaviourModule = {
               return callAction(because("No adult of our household is left: asking for help.", say("care_request", "We have no adult at home any more.", { to: [p.child_protection], data: { children: kids } })));
             }
           }
+          const cared: Step[] = [];
+          const sees = obs.channels.street;
+          seekCare(obs, obs.t, cared, (space) => sees?.kind !== "sites" || sees.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === space && sp.occupants?.includes(me))));
+          if (cared.length) return callAction(cared[0]!);
           const learn = schooling(obs);
           if (learn) return callAction(learn);
           return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY));

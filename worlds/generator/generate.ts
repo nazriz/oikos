@@ -106,16 +106,33 @@ export interface TownSpec {
 }
 
 /** The town's life physics (docs/behaviour/life.md), from the profile: deaths by age (the mean of the sexes' life
- * tables: the world's bodies die at the same rates), illness, injury and birth. */
-export function townLife(P: Profile) {
+ * tables: the world's bodies die at the same rates), illness, injury and birth. With care in the world (`care`: the share
+ * of the ill who are treated, and what treating does to a death), the profile's treatable deaths come through illness
+ * instead: its severe band kills at each age so that, with care as usual, each age dies at the life table's rate. */
+export function townLife(P: Profile, care?: { treated_bps: number; fatal_kept_bps: number }) {
   const L = P.values.life;
-  // Mean of the sexes, in basis points (1e-4), rounded half up; at least 1 where it's above 0.
-  const byAge = L.qx_per_100000.male.map((m, age) => ({ from: age, bps: Math.max(1, Math.floor((m + L.qx_per_100000.female[age]!) / 20 + 0.5)) }));
+  // Mean of the sexes, in (fractional) basis points.
+  const qx = L.qx_per_100000.male.map((m, age) => (m + L.qx_per_100000.female[age]!) / 20);
+  const T = care ? L.treatable : undefined;
+  const ill = L.illness as { by_age: { from: number; bps: number }[]; severity: { label: string; share_bps: number; days: [number, number]; fatal_bps: number; fatal_by_age?: { from: number; bps: number }[] }[] };
+  const band = T ? ill.severity.find((b) => b.label === T.band) : undefined;
+  const at = (steps: { from: number; bps: number }[], age: number) => [...steps].reverse().find((s) => s.from <= age)?.bps ?? 0;
+  // Each age's treatable deaths, the band's fatality that gives them with care as usual, and the rest of the deaths.
+  const treatable = qx.map((q, age) => (T && band ? (q * at(T.share_bps_by_age, age)) / 10_000 : 0));
+  const fatal = treatable.map((d, age) => {
+    if (!T || !band || !care || d <= 0) return 0;
+    const incidence = (at(ill.by_age, age) * band.share_bps) / 10_000; // basis points of people a year
+    const mix = (care.treated_bps * care.fatal_kept_bps) / 10_000 + (10_000 - care.treated_bps); // basis points
+    return incidence > 0 ? Math.min(10_000, Math.round((d * 10_000 * 10_000) / (incidence * mix))) : 0;
+  });
+  // Rounded half up; at least 1 where it's above 0.
+  const byAge = qx.map((q, age) => ({ from: age, bps: Math.max(1, Math.floor(q - treatable[age]! + 0.5)) }));
   return {
     year: 365 * DAY,
-    // All deaths come from the life table, which covers every cause: illness and injury are set not to kill, so no death is counted twice.
+    // Deaths come from the life table, which covers every cause: but for the treatable share, which comes through the
+    // severe illness band when there's care, illness and injury are set not to kill, so no death is counted twice.
     other_causes: { by_age: byAge },
-    illness: L.illness,
+    illness: band ? { ...ill, severity: ill.severity.map((b) => (b === band ? { ...b, fatal_by_age: fatal.map((bps, age) => ({ from: age, bps })) } : b)) } : L.illness,
     injury: L.injury,
     birth: { ages: L.birth.ages, gestation: L.birth.gestation_days * DAY, reach: 0, female_bps: L.birth.female_bps },
   };
@@ -915,7 +932,9 @@ export function generate(spec: TownSpec): any {
       serve_labour: SHOP.serve, suppliers: [...factories, "outside"], price: RETAIL_PRICE, demand: SHOP.demand, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank" } },
   };
   // "population" is who could sign a petition: the adults.
-  const life = townLife(P);
+  // (With the clinic: treatable deaths come through illness, and care cuts them; docs/behaviour/life.md.)
+  const severeKept = HE?.treats.find((x) => x.kind === "illness" && x.severity === V.life.treatable?.band)?.fatal_kept_bps;
+  const life = townLife(P, HE && severeKept !== undefined ? { treated_bps: HE.seek_care_bps, fatal_kept_bps: severeKept } : undefined);
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps,
     ...(HE && ED ? { school: { entity: "school", building: "school-building", ages: ED.school_ages },

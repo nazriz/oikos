@@ -149,3 +149,17 @@ fn illness_rises_with_a_field_where_the_body_is() {
     assert!(ill.contains(&"carol"), "{ill:?}");
     assert!(!ill.contains(&"alice"), "{ill:?}");
 }
+
+#[test]
+fn a_condition_kills_by_the_bodys_age() {
+    // Alice is 30. A grave harm that kills from 30 on kills her; one that kills only from 31, doesn't.
+    for (from, dies) in [(30, true), (31, false)] {
+        let mut w = services_world();
+        w["life"]["harm"]["severity"] = json!([{"label": "grave", "share_bps": 10000, "days": [20, 20], "fatal_bps": 0,
+            "fatal_by_age": [{"from": 0, "bps": 0}, {"from": from, "bps": 10000}]}]);
+        let mut run = start(&w);
+        act(&mut run, "bob-self", None, json!([{"block": "harm", "person": "alice"}])).unwrap();
+        let ev = advance(&mut run, 25 * DAY);
+        assert_eq!(ev.iter().any(|e| matches!(e, EventBody::PersonDied { person, .. } if person == "alice")), dies, "fatal from {from}");
+    }
+}

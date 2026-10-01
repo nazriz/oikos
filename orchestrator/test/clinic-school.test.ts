@@ -76,6 +76,24 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code)).map((e) => e.code)).toEqual([]);
 }, 900_000);
 
+test("with care in the world, treatable deaths come through severe illness, and with care as usual each age dies at the life table's rate", () => {
+  const withCare = generate({ ...spec, years: 1 }).life, without = generate({ ...spec, years: 1, services: false }).life;
+  const severe = withCare.illness.severity.find((b: any) => b.label === "severe");
+  expect(severe.fatal_by_age.length).toBeGreaterThan(70);
+  expect(without.illness.severity.every((b: any) => !b.fatal_by_age)).toBe(true);
+  const at = (steps: any[], age: number) => [...steps].reverse().find((x) => x.from <= age)?.bps ?? 0;
+  for (const age of [30, 50, 65, 74]) {
+    const table = at(without.other_causes.by_age, age);
+    expect(at(withCare.other_causes.by_age, age)).toBeLessThan(table);
+    // Expected deaths, with 90% treated and care halving a death: within a basis point of the table.
+    const incidence = (at(withCare.illness.by_age, age) * severe.share_bps) / 10_000;
+    const expected = at(withCare.other_causes.by_age, age) + (incidence * at(severe.fatal_by_age, age) * (0.9 * 0.5 + 0.1)) / 10_000;
+    expect(Math.abs(expected - table)).toBeLessThan(1);
+  }
+  // From 75 the life table carries every death (treatable mortality is counted under 75).
+  expect(at(withCare.other_causes.by_age, 80)).toBe(at(without.other_causes.by_age, 80));
+});
+
 test("a town without them: no skill, no clinic, no school", () => {
   const config = generate({ ...spec, years: 1, services: false });
   expect(config.catalogue.body_variables).toBeUndefined();

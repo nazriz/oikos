@@ -731,6 +731,10 @@ pub struct Severity {
     pub share_bps: u32,
     pub days: [u32; 2],
     pub fatal_bps: u32,
+    /// The chance of death by the body's age (as `other_causes`), in place of `fatal_bps` where given: case fatality
+    /// rises steeply with age.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fatal_by_age: Option<Vec<AgeStep>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1046,6 +1050,14 @@ fn check_bodies(c: &Config) -> Result<(), String> {
             let cfg = vars.get(k.as_str()).ok_or_else(|| format!("entity {}: no body variable {k}", e.id))?;
             if *v < cfg.min || *v > cfg.max {
                 return Err(format!("entity {}: {k} out of its bounds", e.id));
+            }
+        }
+    }
+    if let Some(l) = c.life.as_ref() {
+        let bands = l.illness.iter().flat_map(|x| x.severity.iter()).chain(l.injury.iter().flat_map(|x| x.severity.iter())).chain(l.harm.iter().flat_map(|x| x.severity.iter()));
+        for b in bands {
+            if b.fatal_bps > 10_000 || b.fatal_by_age.iter().flatten().any(|x| x.bps > 10_000) {
+                return Err(format!("severity {}: fatality must be 0..=10000 basis points", b.label));
             }
         }
     }

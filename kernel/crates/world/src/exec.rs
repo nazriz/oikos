@@ -98,7 +98,8 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
 
 // ---------------- life: shared by acts and scheduled effects ----------------
 
-fn draw_severity(s: &Statics, bands: &[Severity], key: &[&str]) -> (String, i64, Option<i64>) {
+/// A condition's band, how long it lasts, and when (if) it kills: by the band's fatality at the body's age.
+fn draw_severity(s: &Statics, bands: &[Severity], age: i64, key: &[&str]) -> (String, i64, Option<i64>) {
     let mut rng = s.randomness.stream(key);
     let mut x = rng.below(10_000) as u32;
     let band = bands.iter().find(|b| {
@@ -112,7 +113,8 @@ fn draw_severity(s: &Statics, bands: &[Severity], key: &[&str]) -> (String, i64,
     let band = band.unwrap_or(&bands[bands.len() - 1]);
     let days = band.days[0] as i64 + rng.below((band.days[1] - band.days[0] + 1) as u64) as i64;
     let duration = days * 86_400;
-    let death = (rng.below(10_000) < band.fatal_bps as u64).then(|| rng.below(duration as u64) as i64);
+    let fatal = band.fatal_by_age.as_ref().map_or(band.fatal_bps, |steps| crate::config::ByAge { by_age: steps.clone() }.at(age));
+    let death = (rng.below(10_000) < fatal as u64).then(|| rng.below(duration as u64) as i64);
     (band.label.clone(), duration, death)
 }
 
@@ -483,7 +485,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
                 let p = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age);
                 if uniform(s, &["life", &person, &a, "ill"], 10_000) < p as i64 {
                     let onset = t + uniform(s, &["life", &person, &a, "ill-when"], year);
-                    let (severity, duration, death) = draw_severity(s, &ill.severity, &["life", &person, &a, "ill-how"]);
+                    let (severity, duration, death) = draw_severity(s, &ill.severity, age, &["life", &person, &a, "ill-how"]);
                     st.schedule(onset, Sched::ConditionBegins {
                         person: person.clone(), kind: ConditionKind::Illness, severity, until: onset + duration, death_at: death.map(|d| onset + d),
                     });
@@ -514,7 +516,8 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             if uniform(s, &["life", &person, &tk, "injured"], max_bps as i64) >= rate as i64 {
                 return vec![];
             }
-            let (severity, duration, death) = draw_severity(s, &inj.severity, &["life", &person, &tk, "injury-how"]);
+            let age = (t - b.born_at).div_euclid(life.year);
+            let (severity, duration, death) = draw_severity(s, &inj.severity, age, &["life", &person, &tk, "injury-how"]);
             begin_condition(s, st, &person, ConditionKind::Injury, severity, t + duration, death.map(|d| t + d)).1
         }
         Sched::IllnessExposure { person, max_bps, age } => {
@@ -541,7 +544,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             if uniform(s, &["life", &person, &tk, "ill-kept"], max_bps as i64) >= rate {
                 return vec![];
             }
-            let (severity, duration, death) = draw_severity(s, &ill.severity, &["life", &person, &tk, "ill-how"]);
+            let (severity, duration, death) = draw_severity(s, &ill.severity, age, &["life", &person, &tk, "ill-how"]);
             begin_condition(s, st, &person, ConditionKind::Illness, severity, t + duration, death.map(|d| t + d)).1
         }
         Sched::ConditionBegins { person, kind, severity, until, death_at } => {
@@ -1561,7 +1564,8 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::TooFar, format!("{victim} isn't near {me}")));
                 }
                 let idx = index.to_string();
-                let (severity, duration, death) = draw_severity(self.s, &harm.severity, &["harm", self.action, &idx, &victim]);
+                let age = self.st.body(&victim).map_or(0, |b| (self.now() - b.born_at).div_euclid(self.s.life().map_or(365 * 86_400, |l| l.year)));
+                let (severity, duration, death) = draw_severity(self.s, &harm.severity, age, &["harm", self.action, &idx, &victim]);
                 let t = self.now();
                 let (cid, events) = begin_condition(self.s, self.st, &victim, ConditionKind::Injury, severity, t + duration, death.map(|d| t + d));
                 self.emit(EventBody::Harmed { person: victim, by: self.participant.into(), condition: cid });
