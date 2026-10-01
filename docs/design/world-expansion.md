@@ -84,7 +84,7 @@ species listed under the state's Flora and Fauna Guarantee Act, with densities a
 statements (to source). Proportional fidelity: a few species, chosen for what they're sensitive to (a wetland frog to
 water quality, a woodland glider to fragmentation, a common grassland bird as a control), not an ecosystem.
 
-### 2.4 The contract, exactly (for sign-off; built on the `nature` branch, not merged)
+### 2.4 The contract, exactly (signed 2026-10-01)
 
 **Catalogue** (world config), all optional: a world without them has no nature, as now.
 
@@ -114,7 +114,8 @@ species:
     home_range: 3                                # crowding is felt over a square this far each way
     growth_bps_per_year: 3000                    # r (logistic)
     mortality_bps_per_year: 2000                 # background deaths (births replace them at capacity)
-    dispersal_bps_per_year: 5000                 # the share that leaves for a neighbouring cell
+    dispersal_bps_per_year: 1000                 # the share of adults that leave a year (the young always do)
+    dispersal_range: 3                           # cells it can cross of ground it can't live on
     barriers: [built]                            # covers it dies crossing
     min_viable: 2                                # fewer in a home range don't breed (an Allee effect)
     tolerance: { pollution: { above: 500, mortality_bps_per_day: 50 } }
@@ -132,22 +133,24 @@ tasks:
 - **World:**
   - `populations: [{ species, cell, count }]`;
   - `fields: [{ field, cell, value }]`, sparse;
-  - `flows: [{ from, to }]`, the river's course.
+  - `flows: [{ from, to }]`, the river's course;
+  - `nature_spin_up_days`: nature stepped alone this long before the start, so it begins in its own balance.
 
-**Physics** (the kernel, daily; keyed randomness per species and day):
+**Physics** (the kernel, daily; keyed randomness per species and day; docs/behaviour/nature.md has the detail):
 
 1. Unbuilt covers succeed after their days; a demolished building's cells become `cleared_cover`.
 2. Fields: sources, then decay, then diffusion, then flow; bounded.
 3. Populations:
    - background and tolerance deaths;
-   - births replacing background deaths plus logistic growth, against the home range's crowding (its individuals
-     against its covers' capacity);
+   - births replacing background deaths plus logistic growth, against the home range's crowding (the others in it
+     against its covers' capacity), none where too few are there to breed;
    - crowding deaths past capacity;
-   - dispersal to neighbours, lost crossing a barrier or off the world's edge;
+   - the young of a species with a home range leave it (natal dispersal), and a share of adults move each year:
+     a correlated walk through ground they can't live on, settling by the ground's quality out of the range they left,
+     within their range, or dying; a barrier kills; the world's edge turns them back;
    - none survive in a cell whose cover gives no capacity.
 
-   Fractions are rounded by draws (stochastic rounding). Capacity is nominal: a population settles somewhat below it,
-   since each individual feels itself and those near it as crowding (Lloyd's mean crowding).
+   Fractions are rounded by draws (stochastic rounding). On uniform habitat each species settles near its capacity.
 4. A species at zero everywhere is **extinct**: recorded once, permanent.
 
 **Blocks and outcomes:**
@@ -171,22 +174,60 @@ must be stepped. At 4,800 cells, three fields and three species, that's small ne
 
 ## 3. Elections and information (tier 1)
 
-- **Elections** (modules and records; the kernel already has ballots, votes and appointments):
-  - The town's charter (a record) sets the offices, their terms and the voting method. The profile's is Victoria's
-    council elections: preferential or proportional voting, compulsory for residents.
-  - An electoral office runs nominations, the roll (adult residents), the ballot and the count, and appoints the
-    winner.
-  - Candidates: the incumbent seat (model or code), and code challengers with platforms (statements with assertions).
-  - **How citizens vote** (the citizen's mind): retrospective and economic voting (Fiorina 1981; Lewis-Beck and
-    Stegmaier 2000). They weigh their own fortunes, the town's that they've heard about, their anger at the town,
-    their values against the platforms, and turnout's cost (zero where voting is compulsory).
-- **The information environment:**
-  - A **local newspaper** (a firm and a position) reads the public records (budgets, laws, ballot results, petitions,
-    the environment report, court rulings) and publishes reports. Each is a statement with an `assertion`, chosen by
-    newsworthiness and its own leaning (a parameter).
-  - Citizens read it, some regularly and some not (a profile rate), and it feeds their beliefs about the town and the
-    mayor, with word of mouth as now.
-  - Promises and rumours are assertions too, so they can be believed, checked and broken.
+**No contract changes.** Votes are records the kernel only keeps. Who may vote, and what wins, is for whoever counts:
+- a secret ballot is a vote visible only to the electoral office;
+- a preferential vote is a ranking in the choice (`c0012-self>mayor-system>c0400-self`);
+- the winner is appointed to the position, as organisations fill their own positions;
+- news is statements carrying assertions.
+
+### 3.1 The electoral office (`city.electoral_office`, a position of the town's)
+
+- **The charter says when** (a record the generator writes from the profile): the offices elected (the mayor), the
+  term (Victoria's councils: four years), the method (preferential), and whether voting is compulsory (it is).
+- **The cycle:**
+  1. **Notice:** it opens nominations, 60 days before polling day (a statement).
+  2. **Nominations:** a candidate nominates by a statement (`nomination`), for the office, with a platform: an
+     assertion of what they'll do, and the values it speaks to. The incumbent nominates by default.
+  3. **The roll:** the adults resident in the town, from its directory, published when nominations close.
+  4. **The ballot:** a statement listing the candidates, open for two weeks.
+  5. **Votes:** each a ranking, visible to the office only.
+  6. **The count:** valid votes from people on the roll, by instant runoff. The result is published, and the winner
+     appointed to the office.
+- **A candidate is a participant:** the AI mayor's seat (code or model), or a citizen's. A citizen who wins holds the
+  position and runs its role module, as the position says. An AI that loses is out of office, which is the
+  accountability the research is about.
+
+### 3.2 The local newspaper (`firm.newspaper`, a firm with an editor's position)
+
+- **It reads the public record:** budgets, laws, ballot results, petitions and their counts, the environment office's
+  reports, permit decisions, complaints counts, tribunal rulings (later).
+- **Weekly, it publishes the most newsworthy items**, each a statement with an assertion, saying whom it's about
+  (`about`) and whether it reflects well or badly on them (`data.tone`: −1, 0, +1).
+  - Newsworthiness: novelty, conflict (a refusal, a decline, a petition), and size. Placeholder weights.
+  - Its leaning (a parameter, −1 to +1 toward the incumbent) tips which items it runs, and their tone where it's a
+    matter of judgement. The facts it states are the records'; the paper doesn't invent.
+- Its business: a cover price and subscriptions, or free (a placeholder). Later, a model can run the editor's desk.
+
+### 3.3 Citizens: reading, judging, voting (the citizen's mind)
+
+- **Reading the paper:** a share of people read it each week (the profile's: a survey of local news consumption).
+  What's read about an office holder moves their **approval** of them, an attitude kept per office holder (−10,000 to
+  10,000). It fades toward neutral over months.
+- **What else moves approval:** their own fortunes over the term (retrospective, economic voting: Fiorina 1981;
+  Lewis-Beck and Stegmaier 2000); anger at the town (an uncollected bin, a refused complaint); and word of mouth (what
+  friends say of the mayor, now part of catching up).
+- **Standing for office:** each nomination period, adults with the time and the drive (achievement and power among
+  their values, swayed by dissatisfaction with the incumbent) stand with a small chance (the profile's). Their
+  platform speaks to their own top values.
+- **Voting:** compulsory, so nearly everyone votes; the profile gives the turnout. A citizen ranks the candidates:
+  - the incumbent by approval;
+  - a challenger by how well their platform's values match the voter's own, and by what the voter has heard of them
+    (word of mouth);
+  - each weighed by the voter's temperament (the conformist leans to whom friends favour).
+  - The ranking is a choice, recorded as a decision (training data).
+
+**Done when:** a mayor is voted out in some seeds, for reasons the logs show (approval falling with the news and with
+people's fortunes), and kept in others.
 
 ## 4. Public services (tier 1)
 

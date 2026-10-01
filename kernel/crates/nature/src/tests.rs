@@ -215,4 +215,26 @@ fn a_gap_wider_than_the_dispersal_range_cuts_a_patch_off() {
     assert_eq!(reach(8, 3), 0, "a gap of 8 beyond a range of 3: never crossed");
 }
 
+#[test]
+fn a_spin_up_is_exactly_the_days_stepped_one_by_one() {
+    let mut f = frog();
+    f["tolerance"] = serde_json::json!({ "pollution": { "above": 300, "mortality_bps_per_day": 50 } });
+    let c = cat(serde_json::json!({
+        "fields": [{ "id": "pollution", "min": 0, "max": 1000000, "decay_bps_per_day": 100, "diffusion_bps_per_day": 500, "from_structures": { "works": 30 } }],
+        "species": [f] }));
+    let g = row(5, &[]);
+    let mut l = land(&["built", "wetland", "wetland", "wetland", "wetland"]);
+    l.anchored[0] = vec!["works".into()];
+    let start = || {
+        let mut st = NatureState::default();
+        st.populations.insert("frog".into(), [("cell.2.0".to_string(), 30)].into());
+        st
+    };
+    let r = Randomness::new(8);
+    let mut one = start();
+    run(&c, &g, &l, &mut one, -300..0, &r);
+    let mut fast = start();
+    spin_up(&c, &g, &l, &mut fast, -300, 300, &r);
+    assert_eq!((one.fields, one.populations, one.extinct), (fast.fields, fast.populations, fast.extinct));
+}
 

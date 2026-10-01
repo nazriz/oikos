@@ -74,3 +74,24 @@ Where a run's time goes: each run's `<run>.summary.json` has a `profile`: each b
 - **Compressed by default** (`--no-compress` to keep plain; before, `--compress` asked for it): each log is compressed once the batch is measured (`<run>.jsonl.zst`, zstd): about a seventh the size, checked to read back whole before the plain log goes. Measurement, `dataset`, `corpus`, `story` and `replay` all read compressed logs. **Needs Bun 1.4 or later:** Bun 1.3's zstd stream stalled after 64 MB, so reading back a 5-year run's log (2.3 GB, 326 MB compressed) hung at 0% CPU, and so would any reader of it; 1.4.2 reads it back in about 4 seconds. A test reads back a compressed log over 100 MB line by line.
 - **`--keep measures`** (for test runs): once measured, a run keeps its measurement tables, its summary and a recipe (`<run>.recipe.json`: the `run-one` command, the commit, the kernel's version, the final state hash), not its log. Running the command at the commit regenerates the log exactly, and the hash says so. About 150 MB for three 5-year runs' tables together, against 1 GB of compressed logs. Refused (the log is kept, and it says why) for a run with a language-model participant (a model's answers can't be regenerated, and they're training data), with uncommitted changes, or with modules from outside the repository.
 - **A more compact log** (dropping what replay regenerates) is proposed in docs/design/compact-logs.md: it changes the log contract.
+
+## Soak runs (2026-10-01)
+
+A soak is a batch run to find trouble: many seeds over several years, read for the signs above (`terrarium run ...`
+prints them per run).
+
+**The first soak** was 10 seeds of the 1,000-person town over three years each (commit fb0f115), five at a time on a
+busy machine:
+- every run finished, at about 2,700–3,800 seconds for three years;
+- refusals 15–179 a run, all of the expected kinds;
+- one warning: a factory posting a job 27 times in a day. Not a loop. It had lost all 40 of its staff by day 66 and
+  was rehiring, at about one hire per posting. The repeat heuristic (24 a day) can't tell a hiring burst from a retry
+  loop.
+
+Losing a whole workforce in a day is an outcome worth a look in calibration, not a reliability fault.
+
+**Next:** soaks as a regular check, after any change to physics or to a module many seats run.
+
+**Invariance, a residual (2026-10-01).** Woken 50% more often, the small town delivers about 3% fewer goods to
+households over 90 days, with or without nature, across three perturbation seeds (one alone moved it 10%, on its draws).
+That's inside the test's 10%, but it's consistent, so something still counts a little per wake: to look at.

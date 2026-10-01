@@ -177,7 +177,7 @@ test("offices answer the mayor's letters with their reports, in figures", async 
   expect(read.match(/Report from bank: your accounts with us/g)?.length).toBeGreaterThanOrEqual(2);
   expect(read).toContain("council proposal form");
   // The budget brief: what the budget can pay for; what a park costs is the builder's published price, not something finance was told.
-  expect(read).toContain("The budget's lines: parks, for building a park");
+  expect(read).toContain("The budget's lines: "); expect(read).toContain("parks, for building a park");
   // The payroll, itemised (pilots 8 and 9: the mayor chased a recurring payment it couldn't place): who, how often,
   // gross, what reaches them after tax, into which account, under which agreement.
   expect(read).toMatch(/The town's payroll \(\d+, recurring payments from acc-city\): c\d+, every 14 days, \$[\d,.]+ gross, \$[\d,.]+ paid to acc-\S+ after tax withheld \(agreement /);

@@ -30,7 +30,8 @@ test("a crew the budget pays for collects the waste, takes it to the landfill, a
   const all = [...config.world.records, ...recs];
   const jobs = all.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "city");
   expect(jobs.length).toBeGreaterThanOrEqual(1);
-  expect(recs.filter((r) => jobs.includes(r)).every((j) => j.in_position === "works")).toBe(true);
+  // (Hired by the works office, or, in a world with nature, the environment office.)
+  expect(recs.filter((r) => jobs.includes(r)).every((j) => ["works", "environment"].includes(j.in_position))).toBe(true);
   const wages = all.filter((r: any) => r.kind === "request" && r.speaks_for === "city" && jobs.some((j: any) => j.id === r.basis) && r.data?.every);
   expect(wages.length).toBeGreaterThanOrEqual(1);
   expect(wages.every((w: any) => w.in_position === "finance")).toBe(true);

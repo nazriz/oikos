@@ -35,7 +35,10 @@ async function measure(name: string, perturb?: { extraWakesBps: number; seed: nu
 
 test("woken more often, the town does the same over time: nothing counts per wake", async () => {
   const base = await measure("base");
-  const more = await measure("more-wakes", { extraWakesBps: 5000, seed: 7 });
+  // (Three perturbations, their mean: one alone can move a measure by 10% on its draws, at this size.)
+  const runs = await Promise.all([7, 8, 9].map((seed) => measure(`more-wakes-${seed}`, { extraWakesBps: 5000, seed })));
+  const more = { perturbed: runs.every((r) => r.perturbed), wakes: Math.min(...runs.map((r) => r.wakes)),
+    measures: Object.fromEntries(Object.keys(base.measures).map((k) => [k, runs.reduce((a, r) => a + (r.measures as any)[k], 0) / runs.length])) };
   expect(base.perturbed).toBe(false);
   expect(more.perturbed).toBe(true);
   expect(more.wakes).toBeGreaterThan(base.wakes * 1.05);

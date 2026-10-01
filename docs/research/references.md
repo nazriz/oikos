@@ -95,3 +95,17 @@ sources); this list is for the architecture and design ideas.
 | A statement's grammar: attributes, deontic, aim, conditions, or else | Crawford, S. E. S. & Ostrom, E. (1995), "A Grammar of Institutions", *American Political Science Review* 89(3), 582–600 | Laws' and procedures' `adico` part |
 | Positions a claim can hold (a liberty, a right, and their correlatives) | Hohfeld, W. N. (1913), "Some Fundamental Legal Conceptions as Applied in Judicial Reasoning", *Yale Law Journal* 23(1), 16–59 | Claim records' `position`; the law reader's `holds_liberty` and `holds_right` |
 | A small, total, side-effect-free expression language, with errors that `&&` and `\|\|` absorb when the other side decides | Google, *Common Expression Language* specification, [github.com/google/cel-spec](https://github.com/google/cel-spec); the parser we use is `cel-parser` from [cel-rust](https://github.com/cel-rust/cel-rust) | Statements' `formal` conditions (a subset: integers only, allowlisted functions); the evaluator is ours |
+
+## Nature (docs/behaviour/nature.md; kernel/crates/nature)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Logistic growth toward a carrying capacity | Verhulst, P.-F. (1838), "Notice sur la loi que la population suit dans son accroissement", *Correspondance mathématique et physique* 10, 113–121 | Births and crowding deaths |
+| Fewer breed when too few are near (an Allee effect) | Allee, W. C. (1931), *Animal Aggregations*, University of Chicago Press | `min_viable` |
+| Populations in patches, going extinct and recolonised (metapopulations) | Levins, R. (1969), "Some demographic and genetic consequences of environmental heterogeneity for biological control", *Bulletin of the Entomological Society of America* 15, 237–240; Hanski, I. (1998), "Metapopulation dynamics", *Nature* 396, 41–49 | Fragmentation: barriers and dispersal ranges |
+| Mean crowding: an individual's experience of density exceeds the mean density | Lloyd, M. (1967), "Mean crowding", *Journal of Animal Ecology* 36, 1–30 | Crowding counts the others, not oneself |
+| Natal dispersal: the young leave where they were born | Greenwood, P. J. (1980), "Mating systems, philopatry and dispersal in birds and mammals", *Animal Behaviour* 28, 1140–1162 **(to confirm)** | Newborns disperse out of the home range |
+| Dispersal as a correlated random walk | Kareiva, P. M. & Shigesada, N. (1983), "Analyzing insect movement as a correlated random walk", *Oecologia* 56, 234–238 **(to confirm)** | The dispersal walk |
+| Spinning a model up to its own equilibrium before the experiment | Common practice in climate and ecosystem models (e.g. ocean and land-carbon spin-up) **(a citation to find)** | `nature_spin_up_days` |
+| Imperfect detection in wildlife surveys | MacKenzie, D. I. and others (2002), "Estimating site occupancy rates when detection probabilities are less than one", *Ecology* 83, 2248–2255 **(to confirm)** | Surveys find each animal with a detection chance |
+

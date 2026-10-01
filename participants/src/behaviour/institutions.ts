@@ -187,7 +187,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.9.1",
+  version: "0.9.2",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -258,6 +258,12 @@ export const builder: BehaviourModule = {
           if (c.structure) typeOf.set(c.structure.structure, c.structure.type);
           builtCell.set(c.cell, !!c.structure);
         }
+        // Where on a lot a building goes: a lot of one cell, there; a bigger one (a block of the landscape), the first of
+        // its cells we've seen free (the foreman's walk of the ground).
+        const siteOn = (lot: string) => {
+          const cells = cellsOf(book, lot);
+          return cells.length <= 1 ? lot : (cells.find((c) => builtCell.get(c) === false) ?? lot);
+        };
         const supply = goodsPrices(book, p.supplier);
         const materialsCost = (m: { [kind: string]: number }) => Object.entries(m).reduce((x, [k, q]) => x + (supply.prices[k] === undefined ? Infinity : q * supply.prices[k]!), 0);
         const withMargin = (x: number) => Math.floor((x * (10_000 + p.build_markup_bps)) / 10_000);
@@ -369,7 +375,7 @@ export const builder: BehaviourModule = {
           for (const [k, q] of Object.entries(x.materials)) inYard.set(k, stock(k) - q);
           waiting.splice(waiting.indexOf(w), 1);
           const s = because(`The materials for a ${w.type} on ${w.on} are in the yard: starting it, and invoicing the agreed price.`,
-            ["site", C.call("structure", { type: w.type, on: w.on, by: me, materials_at: p.yard })], ...invoice);
+            ["site", C.call("structure", { type: w.type, on: siteOn(w.on), by: me, materials_at: p.yard })], ...invoice);
           s.then = (out) => {
             const sid = out.created?.site;
             if (sid) typeOf.set(sid, w.type!);

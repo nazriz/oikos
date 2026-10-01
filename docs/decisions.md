@@ -1078,6 +1078,20 @@ See the design note, §16.
   - **Deferred still:** B13 (compact logs), B1 (generated types). Construction payments fold into materials from suppliers (world-expansion §6.1).
   - **Revisit if:** a place's law lets a landlord end a periodic tenancy only for reasons: then the reasons are the landlord's to give, and a tribunal's to judge (§5).
 
+- **Nature: contract signed** (Naz, 2026-10-01: "nature's contract is signed off"; built on the `nature` branch, merged once the suite passes; docs/design/world-expansion.md §2; docs/behaviour/nature.md and environment.md).
+  - **In Rust:** the physics, in `terrarium-nature` (covers and their succession; fields that spread, decay and flow; populations; extinction; survey estimates). The world steps it daily, censuses it monthly, clears land on demolition, delivers surveys to the surveyor only, and shows conspicuous species to passers-by.
+  - **In TypeScript:** the town's environment office (`city.environment`); planning applying a habitat law through the office's register; the generator's district around the town, from the profile's `nature`. The profile's species are the squirrel glider, the growling grass frog and the superb fairy-wren, with their densities and ranges sourced and their rates placeholders.
+  - **Found by running it.** Each was a gap between the physics and how real populations behave, and is fixed in the physics, not tuned:
+    - per-cell capacity can't hold a sparse animal, so crowding is felt over a home range, per 1,000 cells;
+    - counting oneself as crowding halves a sparse species, so crowding counts the others;
+    - dying on the first unsuitable step, and settling on the first poor cell, drained the fairy-wrens, so dispersers walk within a range and choose habitat by quality;
+    - young born in place, and random walks that go nowhere, halved them again, so the young leave the home range on a correlated walk;
+    - losses off the world's edge were an artefact, so the edge reflects;
+    - the generator's opening densities aren't nature's own balance, so the world spins nature up before the start (10 years: the slowest species settle within it; a dense spin-up loads the small town's district in 1.5 seconds).
+  - **The result:** five years of the small town's district after spin-up, three seeds: frogs 3,300–4,600, gliders 45–63, fairy-wrens 480–570, no extinctions. Draining the wetlands leaves frogs a third or fewer, in the census and in the office's surveys (a test).
+  - **Also fixed on the way:** two offices of one organisation each took the other's staff and postings (an office's staff are now its role's); a job offer naming an empty paying account was refused (it now names none, and the payroll pays).
+  - **Revisit if:** the species' rates are sourced (survival and fecundity, to replace the placeholders); food webs are wanted (predators and prey); or a study needs habitat quality within a cover.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

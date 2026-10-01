@@ -23,7 +23,8 @@ const dir = (name: string) => {
 };
 /** A small town with one citizen's controller swapped for a faulty module. */
 function faulty(impl: string, params: object, over: object = {}) {
-  const c = generate({ ...spec, citizens: 40, ...over });
+  // (No nature: these test a module's faults, and a 2-second stall limit, not the world's load.)
+  const c = generate({ ...spec, citizens: 40, nature: false, ...over });
   const p = c.participants.find((x: any) => x.kind === "person");
   p.controller = { type: "code", impl, params };
   return { config: c, unit: `${p.id}|self` };

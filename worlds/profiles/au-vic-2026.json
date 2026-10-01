@@ -703,7 +703,7 @@
       ],
       "survey_hours_per_ha": 1,
       "survey_staff": 1,
-      "spin_up_years": 20
+      "spin_up_years": 10
     }
   },
   "sources": {

@@ -541,6 +541,8 @@ export class Staffing {
   }
   /** Our staff, as we have them (truth audits). */
   beliefs(book: Book): Belief[] {
+    // (An office that keeps only its own role's staff doesn't hold its organisation's whole list: it says nothing of it.)
+    if (this.o.own) return [];
     return [{ of: "held", party: this.me, template: "employment", agreements: this.staff(book, book.now).map((a) => a.id) }];
   }
   /** Offers we've made in the last month that the worker hasn't signed yet. */

@@ -46,6 +46,7 @@ const REFUSAL: Record<string, string> = {
   unknown_task: "that isn't a kind of work anyone knows how to do here",
   not_at_work: "the people named aren't there to do it",
   no_time_left: "there aren't enough working hours left today for that",
+  bad_survey: "a survey has to say what it's counting and in which places, one unit of work for each place",
   not_being_built: "that isn't being built",
   not_coming_down: "that isn't being demolished",
   coming_down: "it's being demolished",

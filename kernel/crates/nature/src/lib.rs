@@ -212,8 +212,11 @@ fn succession(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureStat
 }
 
 fn step_field(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&BTreeMap<Id, i64>>) -> Vec<i64> {
+    step_field_dense(f, ground, land, dense(now, ground, f.baseline))
+}
+
+fn step_field_dense(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: &Land, mut v: Vec<i64>) -> Vec<i64> {
     let n = ground.cells.len();
-    let mut v = dense(now, ground, f.baseline);
     // Sources.
     for i in 0..n {
         v[i] += f.from_covers.get(&land.cover[i]).copied().unwrap_or(0);
@@ -308,14 +311,31 @@ fn sround_wide(num: i128, den: i128, rng: &mut Rng) -> i64 {
     i64::try_from(q + i128::from(extra)).unwrap_or(i64::MAX)
 }
 
+/// A species' capacity per 1,000 cells, cell by cell, and over each cell's home range: what the land gives it (the same
+/// while the land is).
+struct Capacity {
+    cap: Vec<i64>,
+    room: Vec<i64>,
+}
+
+fn capacity(sp: &SpeciesCfg, ground: &Ground, land: &Land) -> Capacity {
+    let cap: Vec<i64> = land.cover.iter().map(|c| sp.capacity_per_1000_cells.get(c).copied().unwrap_or(0)).collect();
+    let room = home_range_sums(ground, &cap, sp.home_range);
+    Capacity { cap, room }
+}
+
 fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields: &BTreeMap<Id, Vec<i64>>, rng: &mut Rng) -> Vec<i64> {
+    step_species_with(sp, ground, land, &capacity(sp, ground, land), n, fields, rng)
+}
+
+fn step_species_with(sp: &SpeciesCfg, ground: &Ground, land: &Land, capacity: &Capacity, n: &[i64], fields: &BTreeMap<Id, Vec<i64>>, rng: &mut Rng) -> Vec<i64> {
     let cells = ground.cells.len();
     let barriers: BTreeSet<&str> = sp.barriers.iter().map(String::as_str).collect();
     let year = BPS * DAYS_A_YEAR;
-    // Capacity per 1,000 cells, cell by cell; and the individuals and capacity over each cell's home range.
-    let cap: Vec<i64> = land.cover.iter().map(|c| sp.capacity_per_1000_cells.get(c).copied().unwrap_or(0)).collect();
+    // The individuals over each cell's home range, against its capacity.
+    let (cap, room) = (&capacity.cap, &capacity.room);
     let best = sp.capacity_per_1000_cells.values().copied().max().unwrap_or(1).max(1);
-    let (crowd, room) = (home_range_sums(ground, n, sp.home_range), home_range_sums(ground, &cap, sp.home_range));
+    let crowd = home_range_sums(ground, n, sp.home_range);
     let mut next = vec![0i64; cells];
     let mut arriving = vec![0i64; cells];
     for i in 0..cells {
@@ -391,6 +411,43 @@ fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields
         next[i] += arriving[i];
     }
     next
+}
+
+/// Nature's spin-up: `days` stepped before the run, over the land as it is, with no succession (as `step_day` with no
+/// covers' succession would, day by day, exactly), but kept dense throughout. Returns the species that went extinct.
+pub fn spin_up(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureState, first_day: i64, days: i64, randomness: &Randomness) -> Vec<Id> {
+    let mut fields: Vec<Vec<i64>> = cat.fields.iter().map(|f| dense(st.fields.get(&f.id), ground, f.baseline)).collect();
+    let mut pops: Vec<Vec<i64>> = cat.species.iter().map(|sp| dense(st.populations.get(&sp.id), ground, 0)).collect();
+    let mut gone = vec![];
+    // (The land doesn't change in a spin-up: each species' capacity, once.)
+    let caps: Vec<Capacity> = cat.species.iter().map(|sp| capacity(sp, ground, land)).collect();
+    for day in first_day..first_day + days {
+        for (k, f) in cat.fields.iter().enumerate() {
+            fields[k] = step_field_dense(f, ground, land, std::mem::take(&mut fields[k]));
+        }
+        let values: BTreeMap<Id, Vec<i64>> = cat.fields.iter().zip(&fields).map(|(f, v)| (f.id.clone(), v.clone())).collect();
+        for (k, sp) in cat.species.iter().enumerate() {
+            if st.extinct.contains_key(&sp.id) {
+                continue;
+            }
+            let mut rng = randomness.stream(&["nature", &sp.id, &day.to_string()]);
+            let next = step_species_with(sp, ground, land, &caps[k], &pops[k], &values, &mut rng);
+            if next.iter().all(|x| *x == 0) && pops[k].iter().any(|x| *x > 0) {
+                st.extinct.insert(sp.id.clone(), day);
+                gone.push(sp.id.clone());
+            }
+            pops[k] = next;
+        }
+    }
+    for (f, v) in cat.fields.iter().zip(&fields) {
+        let m = sparse(v, ground, f.baseline);
+        if m.is_empty() { st.fields.remove(&f.id); } else { st.fields.insert(f.id.clone(), m); }
+    }
+    for (sp, v) in cat.species.iter().zip(&pops) {
+        let m = sparse(v, ground, 0);
+        if m.is_empty() { st.populations.remove(&sp.id); } else { st.populations.insert(sp.id.clone(), m); }
+    }
+    gone
 }
 
 /// A survey's estimate of a species in a cell: each one there found with the species' detection chance.
