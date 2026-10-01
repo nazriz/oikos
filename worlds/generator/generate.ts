@@ -834,7 +834,7 @@ export function generate(spec: TownSpec): any {
   const Cr = V.credit;
   office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), { id: "who", kind: "directory" }],
     code("bank.lending", { rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
-      default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: 10_000_000, funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
+      default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: 10_000_000, ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
   office("outside-funding", "outside", "Wholesale funding", undefined, [{ id: "ledger", kind: "accounts" }, mine("draws")], code("world.funding", { account: "acc-outside" }));
   office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city", ...(JU ? { courts: ["tribunal"] } : {}) }));
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
@@ -1055,6 +1055,8 @@ export function generate(spec: TownSpec): any {
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),
     ...(HZ ? { relief: "town-hall/hall.1" } : {}),
+    ...(OW?.market ? { market: { buy_bps: OW.market.buy_bps_per_month, deposit_bps: OW.market.deposit_bps, costs_bps: OW.market.costs_bps, mortgage_months: OW.market.mortgage_months, relist_days: OW.market.relist_days, cut_bps: OW.market.cut_bps, floor_bps: OW.market.floor_bps,
+      bedrooms_by_type: Object.fromEntries(houseTypes.map((h) => [h.id, h.bedrooms])) } } : {}),
     ...(CR ? { crime: { take_bps: CR.take_bps_per_month_in_need, caught_bps: CR.caught_bps_reckoned, quantity: CR.take_quantity } } : {}),
     ...(RD ? { round: { work_start: RD.work_start_hour * HOUR, work_end: RD.work_end_hour * HOUR, work_days: RD.work_days, school_start: RD.school_start_hour * HOUR, school_end: RD.school_end_hour * HOUR } } : {}),
     ...(JU ? { tribunal: { entity: "tribunal", challenge_bps: JU.challenge_bps, apply_bps: JU.apply_bps, apply_after_days: JU.apply_after_days } } : {}),

@@ -1,6 +1,6 @@
 {
   "name": "bank.lending",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "doc": "docs/behaviour/credit.md",
   "params": {
     "arrears_days": {
@@ -46,6 +46,14 @@
       "default": 500,
       "source": "placeholder"
     },
+    "max_lvr_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 8000,
+      "source": "placeholder"
+    },
     "max_months": {
       "schema": {
         "type": "integer"
@@ -64,6 +72,22 @@
         "person": 3000,
         "organisation": 2000
       },
+      "source": "placeholder"
+    },
+    "mortgage_max_months": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "months",
+      "default": 360,
+      "source": "placeholder"
+    },
+    "mortgage_rate_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 0,
       "source": "placeholder"
     },
     "rate_bps": {

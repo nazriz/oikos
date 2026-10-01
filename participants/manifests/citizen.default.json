@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -290,6 +290,11 @@
       },
       "unit": "days",
       "default": 180,
+      "source": "placeholder"
+    },
+    "market": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "max_contacts": {

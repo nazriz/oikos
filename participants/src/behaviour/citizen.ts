@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.31.0",
+  version: "0.32.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -197,6 +197,10 @@ export const citizen: BehaviourModule = {
       // Crime (docs/behaviour/crime.md): in need and at work where our employer keeps goods, the month's chance we take
       // some (`take_bps`), less as the chance of being caught we reckon (`caught_bps`) is higher. Circumstances only.
       crime: null as { take_bps: number; caught_bps: number; quantity: number } | null,
+      // Homes for sale (docs/behaviour/ownership.md): the month's chance a renting household that can afford a home that
+      // suits it buys one (`buy_bps`), with the deposit and costs it takes, on a mortgage from our bank. A home of ours
+      // unsold after `relist_days` is listed again for `cut_bps` less, down to `floor_bps` of what we first asked.
+      market: null as { buy_bps: number; deposit_bps: number; costs_bps: number; mortgage_months: number; bedrooms_by_type: { [type: string]: number }; relist_days: number; cut_bps: number; floor_bps: number } | null,
       civic: { turnout_bps: 9000, stand_bps: 30, reads_news_bps: 5000, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 },
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
@@ -521,6 +525,19 @@ export const citizen: BehaviourModule = {
       // Money that came in from others, for what our income is (refunds, which delivery notes tell us of, come off it).
       const mine = new Set(channels.accounts(obs).filter((a) => a.holder === me).map((a) => a.account));
       for (const tx of channels.transactions(obs)) if (mine.has(tx.to) && !mine.has(tx.from)) {
+        // (A home's price, paid us for one we're selling, and a mortgage's principal aren't income: they're the home's.)
+        if (selling?.listing === "pending") selling.listing = book.open("property_for_sale").find((r) => r.speaks_for === me && r.data?.lot === selling!.lot)?.id ?? "pending";
+        const sale = selling?.listing ? book.open("property_purchase").find((r) => r.basis === selling!.listing && r.data?.account === tx.from) : undefined;
+        if (sale && selling) {
+          selling.buyer ??= sale.speaks_for;
+          selling.buyerAccount ??= tx.from;
+          if (selling.buyerAccount === tx.from) selling.received += cents(tx.amount);
+          continue;
+        }
+        if (buying && tx.settles && String((book.records.get(tx.settles) as any)?.terms?.text ?? "").includes(`their home, ${buying.space}`)) {
+          buying.funded = true;
+          continue;
+        }
         inflows.push({ t: tx.t, amount: cents(tx.amount) });
         // Our wages, as agreed: the wage, less the income tax the law says our employer withholds.
         if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period))) {
@@ -1095,9 +1112,12 @@ export const citizen: BehaviourModule = {
       const patience = Math.max(0.5, Math.min(1.5, 1 + p.sway.patience_tradition * zValue("tradition") + p.sway.patience_security * zValue("security")));
       const homelessDays = Math.round(p.leave_after_homeless_days * patience);
       const joblessDays = Math.round(p.leave_after_jobless_days * patience);
-      const leave = isLeaseholder() && !home?.owned && (
+      const wouldLeave = isLeaseholder() && (
         (homelessSince !== null && t - homelessSince >= homelessDays * DAY) ||
         (joblessSince !== null && t - joblessSince >= joblessDays * DAY && earnedIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0) === 0 && broke));
+      // (An owner who'd leave sells first, and goes once it's sold: docs/behaviour/ownership.md.)
+      if (wouldLeave && home?.owned && p.market && !selling) { const lot = lotOf(obs, home.structure); if (lot) sell(obs, lot, true); }
+      const leave = wouldLeave && !home?.owned && !selling;
       if (leave) {
         const why = homelessSince !== null && t - homelessSince >= homelessDays * DAY
           ? `Leaving town: ${Math.floor((t - homelessSince) / DAY)} days without a home (we leave after ${homelessDays}).`
@@ -1111,6 +1131,11 @@ export const citizen: BehaviourModule = {
       civic(obs, t, steps);
       bodily(obs, t, steps, inside);
       justice(obs, t, steps);
+      market(obs, t, steps);
+      if (soldAndGoing !== null && t > soldAndGoing) {
+        soldAndGoing = null;
+        return [...steps, ...departure(ownBanked(obs, me), "Our home sold: leaving town, as we meant to.")];
+      }
 
       // Taking part (docs/design/ai-citizens.md 2b): gatherings the world holds (practices), where we may come. Going is
       // physics: being in the space for its time. Whether to go is the mind's: the company it brings against the time it
@@ -1774,6 +1799,130 @@ export const citizen: BehaviourModule = {
       return Math.floor((bills.reduce((a, b) => a + b.amount, 0) * MONTH) / span);
     };
 
+    // ---- homes for sale (docs/behaviour/ownership.md) ----
+    type Selling = { lot: string; space?: string; structure: string; bedrooms?: number; price: number; asked: number; leaveAfter: boolean; listing?: string; buyer?: string; buyerAccount?: string; received: number; sold?: boolean; loan?: string };
+    let selling: Selling | null = null;
+    let buying: { listing: string; seller: string; account: string; price: number; lot: string; space: string; structure: string; stage: "applied" | "paid"; since: number; funded?: boolean } | null = null;
+    let nextBuyChance = ctx.rng("buy-day").below(30) * DAY;
+    let soldAndGoing: number | null = null; // when we'd sold up to leave (we go at a later wake, with what's left)
+    const soldLots = new Set<string>();
+    const titleOf = (lot: string) => book.ofType("claim").find((c: any) => c.about?.kind === "ownership" && c.about?.object === lot) as any;
+    const valuationOf = (lot: string) => book.open("valuation").filter((v) => v.data?.lot === lot).sort((a, b) => b.at - a.at)[0]?.data?.value as number | undefined;
+    const mortgageFor = (space: string) => book.ofType("agreement").find((r: any) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(me) && book.inForce(r.id) && String(r.terms.text ?? "").includes(space)) as any;
+    /** The house on a lot (from the street), and its dwelling. */
+    const houseOn = (obs: Observation, lot: string) => {
+      const cells = new Set((book.records.get(lot) as any)?.data?.cells ?? []);
+      const st = channels.cells(obs).find((c) => cells.has(c.cell) && c.structure)?.structure;
+      return st ? { structure: st.structure, type: st.type, space: st.spaces.find((sp) => sp.kind === "dwelling")?.space } : undefined;
+    };
+    const lotOf = (obs: Observation, structure: string) => {
+      const cell = channels.cells(obs).find((c) => c.structure?.structure === structure)?.cell;
+      return cell ? book.open("lot").find((l) => ((l.data?.cells as string[]) ?? []).includes(cell))?.id : undefined;
+    };
+    /** Put a lot of ours with a house on it up for sale, at its valuation. */
+    const sell = (obs: Observation, lot: string, leaveAfter: boolean): boolean => {
+      const h = houseOn(obs, lot);
+      const price = valuationOf(lot);
+      if (!h?.space || !price) return false;
+      selling = { lot, space: h.space, structure: h.structure, bedrooms: p.market?.bedrooms_by_type[h.type], price, asked: price, leaveAfter, received: 0, loan: mortgageFor(h.space)?.id };
+      return true;
+    };
+    const market = (obs: Observation, t: number, steps: Step[]) => {
+      const m = p.market;
+      const acc = ownBanked(obs, me);
+      if (!m || !acc || !isLeaseholder()) return;
+      // Inherited land with a house we don't live in: sold.
+      if (!selling) for (const r of book.ofType("claim_transfer")) {
+        const lot = r.to === me ? (book.records.get(r.claim) as any)?.about?.object as string | undefined : undefined;
+        if (!lot || soldLots.has(lot) || ownerOf(book, lot) !== me || home?.owned && titleOf(lot)?.id === home.agreement) continue;
+        if (sell(obs, lot, false)) break; // (Not until it's valued in our name.)
+      }
+      // ---- selling: listed at the valuation; once paid in full, the title passed and the mortgage paid off ----
+      const s = selling as Selling | null;
+      if (s?.listing === "pending") s.listing = book.open("property_for_sale").find((r) => r.speaks_for === me && r.data?.lot === s.lot)?.id ?? "pending";
+      if (s && !s.listing) {
+        s.listing = "pending";
+        const st = because(`Selling ${s.structure} at its valuation, ${usd(s.price)}${s.leaveAfter ? ", to leave town once it's sold" : ""}.`,
+          say("property_for_sale", `For sale: ${s.structure}, a home${s.bedrooms ? ` with ${s.bedrooms} bedrooms` : ""}, ${usd(s.price)}. To buy it, send a purchase naming this listing, and pay.`, { visible: "public",
+            data: { structure: s.structure, lot: s.lot, space: s.space, type: "home", price: s.price, account: acc.account, ...(s.bedrooms ? { bedrooms: s.bedrooms } : {}) } }));
+        steps.push(st);
+      } else if (s?.listing && s.listing !== "pending" && !s.sold && !s.buyer && t - (book.records.get(s.listing)?.at ?? t) >= m.relist_days * DAY
+        && s.price > Math.floor((s.asked * m.floor_bps) / 10_000)) {
+        const was = s.price;
+        s.price = Math.max(Math.floor((s.asked * m.floor_bps) / 10_000), s.price - Math.floor((s.price * m.cut_bps) / 10_000));
+        steps.push(because(`${s.structure} hasn't sold in ${m.relist_days} days at ${usd(was)}: taking it off, to list it for ${usd(s.price)}.`, withdraw(s.listing, "Relisting for less.")));
+        s.listing = undefined;
+      } else if (s?.listing && s.listing !== "pending" && !s.sold) {
+        const buy = s.buyer ? undefined : book.open("property_purchase").filter((r) => r.basis === s.listing && (r.addressed_to ?? []).includes(me)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))[0];
+        if (buy) {
+          s.buyer = buy.speaks_for;
+          s.buyerAccount = String(buy.data?.account);
+        }
+        if (s.buyer && s.received >= s.price) {
+          s.sold = true;
+          soldLots.add(s.lot);
+          const title = titleOf(s.lot);
+          steps.push(because(`${s.buyer} has paid ${usd(s.received)} for ${s.structure}: passing them the title.`,
+            ...(title ? [C.call("claim", { transfer: title.id, to: s.buyer })] : []), withdraw(s.listing, "Sold."),
+            say("property_sold", `Sold: ${s.structure} to ${s.buyer} for ${usd(s.price)}.`, { visible: "public", basis: s.listing, data: { structure: s.structure, lot: s.lot, buyer: s.buyer, price: s.price } })));
+          if (s.loan) steps.push(because("Sold: asking the bank what paying our mortgage off takes.",
+            say("loan_payout_request", `What does paying off ${s.loan} take?`, { to: [p.bank], visible: [me, p.bank], data: { loan: s.loan } })));
+          // (Leaving: we stay in it until we go, a day or so. Not leaving: it wasn't our home.)
+          if (!s.loan) {
+            if (s.leaveAfter) soldAndGoing = t;
+            selling = null;
+          }
+        }
+      } else if (s?.sold && s.loan) {
+        const fig = book.open("loan_payout").find((r) => r.data?.loan === s.loan && (r.addressed_to ?? []).includes(me));
+        if (fig) {
+          const amount = cents(fig.data?.amount ?? 0);
+          const order = book.all("request").find((r) => r.record === "statement" && r.kind === "request" && r.basis === s.loan && r.speaks_for === me && !book.withdrawn.has(r.id));
+          steps.push(because(`Paying our mortgage off (${usd(amount)}), and stopping its repayments.`,
+            pay(String(fig.data?.account), amount, { from: acc.account, for: `Paying off ${s.loan}.`, settles: s.loan }), ...(order ? [withdraw(order.id, "Mortgage paid off.")] : [])));
+          if (s.leaveAfter) soldAndGoing = t;
+          selling = null;
+        }
+      }
+      // ---- buying: a renting household with income that can afford a home that suits it, now and then ----
+      const b = buying as typeof buying;
+      if (b?.stage === "applied") {
+        const declined = book.all("loan_decision").some((r) => r.at >= b.since && (r.addressed_to ?? []).includes(me) && r.data?.approved === false);
+        if (declined || !book.open("property_for_sale").some((r) => r.id === b.listing) || t - b.since > 60 * DAY) buying = null;
+        else if (b.funded && acc.balance >= b.price) {
+          b.stage = "paid";
+          steps.push(because(`Our mortgage is through: buying ${b.structure} for ${usd(b.price)}.`,
+            say("property_purchase", `Purchase of ${b.structure}, as listed.`, { to: [b.seller], visible: [me, b.seller], basis: b.listing, data: { listing: b.listing, account: acc.account } }),
+            pay(b.account, b.price, { from: acc.account, for: `Buying ${b.structure}.` })));
+        }
+      } else if (b?.stage === "paid" && ownerOf(book, b.lot) === me) {
+        // Ours: notice on the home we rented, and in once the seller's out (the round takes us there).
+        const old = home;
+        if (old && !old.owned) steps.push(because(`${b.structure} is ours: giving notice on the home we rented.`,
+          notice(old.agreement, "We've bought a home."), ...(old.order ? [withdraw(old.order, "Moving to a home we've bought.")] : [])));
+        const loan = mortgageFor(b.space);
+        home = { agreement: titleOf(b.lot)?.id ?? b.lot, space: b.space, structure: b.structure, landlord: me, movedIn: false, owned: true,
+          rent: loan ? cents(commitmentOf(loan, me).outcome?.money?.amount ?? "0") : 0 };
+        buying = null;
+      }
+      if (!buying && !selling && home && !home.owned && householdIncome() > 0 && t >= nextBuyChance) {
+        nextBuyChance = t + MONTH;
+        if (ctx.rng(`buy-${t}`).below(10_000) < m.buy_bps && borrowing.canApply(t)) {
+          const rooms = minBedrooms(t);
+          const l = book.open("property_for_sale")
+            .filter((r) => r.data?.type === "home" && r.speaks_for !== me && Number(r.data?.bedrooms ?? rooms) >= rooms && acc.balance * 10_000 >= Number(r.data?.price) * (m.deposit_bps + m.costs_bps))
+            .sort((a, b) => Number(a.data?.price) - Number(b.data?.price) || (a.id < b.id ? -1 : 1))[0];
+          if (l) {
+            const price = Number(l.data!.price);
+            const loan = price - Math.floor((price * m.deposit_bps) / 10_000);
+            buying = { listing: l.id, seller: l.speaks_for!, account: String(l.data!.account), price, lot: String(l.data!.lot), space: String(l.data!.space), structure: String(l.data!.structure), stage: "applied", since: t };
+            steps.push(borrowing.apply(t, acc.account, loan, m.mortgage_months, "a home",
+              `${l.data!.structure} is for sale at ${usd(price)}, and we have the deposit and costs: asking the bank for a mortgage of ${usd(loan)}.`, { price, home: l.data!.space }));
+          }
+        }
+      }
+    };
+
     // ---- the tribunal ----
     /** A copy of a record we rely on, for the tribunal (which can't see what was between us and the other side). */
     const evidence = (r: any) => JSON.parse(JSON.stringify(r));
@@ -1953,7 +2102,7 @@ export const citizen: BehaviourModule = {
     let leaving = false;
     const departure = (acc: { account: string; balance: number } | undefined, why: string): Step[] => {
       const s: Step = because(why);
-      if (home) {
+      if (home && !home.owned) {
         if (home.order) s.push(withdraw(home.order));
         for (const x of home.retiring ?? []) s.push(withdraw(x.order));
         home.retiring = [];

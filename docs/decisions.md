@@ -1190,6 +1190,15 @@ See the design note, §16.
   - **Liberties:** no factory stocktakes (taking there goes unnoticed); no fraud; restitution only.
   - **Revisit if:** a study needs wetland mitigation, flood warnings, burglary, policing that prevents, or deterrence learned from others.
 
+- **Buying and selling homes, built** (2026-10-02; no contract change; docs/behaviour/ownership.md, credit.md).
+  - **What:** owners who'd leave, and heirs of a house they don't live in, list it at its valuation, cutting the price monthly to a floor; renters with a deposit buy on a mortgage (80% at most, within the bank's rule on income); the title passes on full payment; a seller's mortgage is paid off at the bank's payout figure; the buyer gives notice on the lease and moves in.
+  - **Found:**
+    - a home's price, and a mortgage's principal, were counted as income: a seller spent $89,000 at the shops;
+    - the seller, with no home on the books after selling, rented a flat before leaving, and its first rent made "send all my savings" fail: a leaving seller now lives in the sold house until they go, and goes a wake later;
+    - citizens don't run a step's `then`: a listing's id is read from the record book.
+  - **Outcome, not tuned:** in the generated town nobody has a deposit (savings are a few months' pay), so listings sit unsold and the sellers fall behind on their mortgages.
+  - **Revisit if:** savings follow a real wealth distribution; a study needs auctions, investors, owners moving house, or mortgagee sales.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

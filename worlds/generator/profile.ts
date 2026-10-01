@@ -80,7 +80,9 @@ export interface Profile {
     /** The daily round (world-expansion 6.3): working and school hours, and what crossing a cell takes (seconds). */
     round?: { work_start_hour: number; work_end_hour: number; work_days: number; school_start_hour: number; school_end_hour: number; travel_seconds_per_cell: number; travel_by_cover: { [cover: string]: number } };
     /** Home ownership (world-expansion 6.2): which houses their households own, with a mortgage or outright. */
-    ownership?: { house_owner_bps: number; mortgage_bps_by_age: { from: number; bps: number }[]; mortgage_payment_per_month: number; mortgage_rate_bps: number; mortgage_years_left: [number, number] };
+    ownership?: { house_owner_bps: number; mortgage_bps_by_age: { from: number; bps: number }[]; mortgage_payment_per_month: number; mortgage_rate_bps: number; mortgage_years_left: [number, number];
+      /** Buying and selling homes: a renting household's chance a month, the deposit and costs (of the price), the mortgage term; a seller's price cut when unsold. */
+      market?: { buy_bps_per_month: number; deposit_bps: number; costs_bps: number; mortgage_months: number; relist_days: number; cut_bps: number; floor_bps: number } };
     /** Utilities (world-expansion 6.1): water drawn from the river and billed to owners; energy bought from the grid and
      * billed to households. */
     utilities?: {

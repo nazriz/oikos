@@ -17,6 +17,13 @@ It answers every application (`loan_decision`, with the reason if it's declined)
 
 **Loans already in force** (0.2.0): taken on when it first looks (the world's mortgages: docs/behaviour/ownership.md), followed like any other.
 
+**Mortgages** (0.3.0): an application for "a home" is lent at `mortgage_rate_bps` over up to `mortgage_max_months`, at
+most `max_lvr_bps` of the price it gives, within the usual rule on income; the agreement's text names the home.
+
+**Paying off** (0.3.0): asked (`loan_payout_request`), the bank says what paying a loan off takes (`loan_payout`): its
+remaining repayments' present value at the loan's rate (a world mortgage's rate read from its text). A payment settling
+the loan marks it repaid in full.
+
 **Following repayments:**
 - repayments arrive by the borrower's standing order and are set against their loans, oldest first;
 - a month behind is **arrears** (a `loan_arrears` notice);

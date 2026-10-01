@@ -128,6 +128,13 @@ sources); this list is for the architecture and design ideas.
 | The return to a year of schooling in Australia | Leigh, A. (2008), "Returns to education in Australia", *Economic Papers* 27(3), 233–249 **(to confirm)** | The profile's `return_per_year_bps` (10%) |
 | Credentials as a signal employers screen on | Spence, M. (1973), "Job market signaling", *Quarterly Journal of Economics* 87(3), 355–374 | Not yet used: certificates exist, employers don't read them (leaves out) |
 
+## Homes for sale (docs/behaviour/ownership.md)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Sellers cut their asking price the longer a home is on the market | Merlo, A. & Ortalo-Magné, F. (2004), "Bargaining over residential real estate: evidence from England", *Journal of Urban Economics* 56(2), 192–216 **(to confirm)** | A home unsold after a month is relisted for less, down to a floor |
+| Lending above 80% of a home's value as higher risk (a 20% deposit, or mortgage insurance) | APRA, *Prudential Practice Guide APG 223: Residential Mortgage Lending* **(to confirm)** | The bank's `max_lvr_bps`; buyers' `deposit_bps` |
+
 ## Crime (docs/behaviour/crime.md; docs/design/world-expansion.md §7.2)
 
 | Idea | Citation | Used in |

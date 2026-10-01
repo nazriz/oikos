@@ -46,10 +46,10 @@ export class Borrowing {
   }
 
   /** Applying: how much, over how long, from and to which account, and why (the lender reads the account itself). */
-  apply(t: number, account: string, amount: number, months: number, purpose: string, why: string): Step {
+  apply(t: number, account: string, amount: number, months: number, purpose: string, why: string, extra: object = {}): Step {
     this.applied = t;
     return because(why, say("loan_application", `Application for a loan of ${usd(amount)} over ${months} months, for ${purpose}.`, {
-      to: [this.lender], visible: [this.me, this.lender], data: { amount, months, account, purpose },
+      to: [this.lender], visible: [this.me, this.lender], data: { amount, months, account, purpose, ...extra },
     }));
   }
 
@@ -81,7 +81,15 @@ export class Borrowing {
 }
 
 /** What a lender remembers of a loan it has made. */
-interface Loan { agreement: string; borrower: string; account: string; principal: number; payment: number; months: number; start?: number; arrearsNoticeAt?: number; defaulted?: boolean }
+interface Loan { agreement: string; borrower: string; account: string; principal: number; payment: number; months: number; start?: number; arrearsNoticeAt?: number; defaulted?: boolean; rate_bps?: number }
+
+/** What's left on a loan: its remaining repayments' present value at its rate (what paying it off now takes). */
+export function payout(payment: number, annualBps: number, monthsLeft: number): number {
+  if (monthsLeft <= 0) return 0;
+  const r = annualBps / 12 / 10_000;
+  if (r === 0) return payment * monthsLeft;
+  return Math.ceil((payment * (1 - (1 + r) ** -monthsLeft)) / r);
+}
 
 /**
  * bank.lending: a bank's lending office. It decides applications by the bank's rules: repayments, at the loan's rate
@@ -94,7 +102,7 @@ interface Loan { agreement: string; borrower: string; account: string; principal
  */
 export const lending: BehaviourModule = {
   name: "bank.lending",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -106,6 +114,9 @@ export const lending: BehaviourModule = {
         buffer_bps: 300, // assessed at the rate plus this (serviceability)
         max_share_bps: { person: 3000, organisation: 2000 } as { [kind: string]: number }, // of monthly income, for repayments
         max_months: 60,
+        // Mortgages (docs/behaviour/ownership.md): a loan for a home, at its own rate, over longer, for at most a share of
+        // the price (the loan-to-value ratio). 0: none.
+        mortgage_rate_bps: 0, mortgage_max_months: 360, max_lvr_bps: 8000,
         default_days: 90, // this far behind: default
         arrears_days: 30, // this far behind: arrears (a notice)
         reserve: 5_000_000, // kept in the bank's own account, cents
@@ -140,6 +151,12 @@ export const lending: BehaviourModule = {
           while (list.length && list[0]!.t < obs.t - 90 * DAY) list.shift();
           inflows.set(tx.to, list);
           // Repayments: from a borrower's account into ours, set against their loans, oldest first.
+          // A payout (paying a loan off: docs/behaviour/ownership.md): the loan it names is repaid.
+          const payoff = own && tx.to === own && tx.settles ? loans.get(tx.settles) : undefined;
+          if (payoff) {
+            repaid.set(payoff.agreement, payoff.payment * payoff.months);
+            continue;
+          }
           if (own && tx.to === own) {
             let x = cents(tx.amount);
             for (const l of [...loans.values()].filter((l) => l.account === tx.from && l.start !== undefined).sort((a, b) => a.start! - b.start!)) {
@@ -172,7 +189,8 @@ export const lending: BehaviourModule = {
             const repay = r.terms.commitments.find((c: any) => c.who === who)?.does?.outcome?.money;
             if (!repay?.from) continue;
             const payment = cents(repay.amount), months = Math.max(1, Math.round((r.terms.term ?? 0) / MONTH));
-            loans.set(r.id, { agreement: r.id, borrower: who, account: repay.from, principal: payment * months, payment, months, start: t });
+            const rateOf = /\(([\d.]+)% a year\)/.exec(String(r.terms.text ?? ""));
+            loans.set(r.id, { agreement: r.id, borrower: who, account: repay.from, principal: payment * months, payment, months, start: t, ...(rateOf ? { rate_bps: Math.round(Number(rateOf[1]) * 100) } : {}) });
           }
         }
         // What borrowing from us is, for anyone who might (docs/design/ai-citizens.md 2a): published once.
@@ -208,9 +226,11 @@ export const lending: BehaviourModule = {
           const who = a.speaks_for!;
           const account = String(a.data?.account);
           const amount = Math.floor(Number(a.data?.amount) || 0);
-          const months = Math.min(p.max_months, Math.max(1, Math.floor(Number(a.data?.months) || 12)));
+          const mortgage = a.data?.purpose === "a home" && p.mortgage_rate_bps > 0;
+          const price = Math.floor(Number(a.data?.price) || 0);
+          const months = Math.min(mortgage ? p.mortgage_max_months : p.max_months, Math.max(1, Math.floor(Number(a.data?.months) || 12)));
           const kind = kindOf(who);
-          const rate = p.rate_bps[kind] ?? p.rate_bps.organisation!;
+          const rate = mortgage ? p.mortgage_rate_bps : p.rate_bps[kind] ?? p.rate_bps.organisation!;
           const income = incomeOf(account);
           const already = current(who).reduce((x, l) => x + l.payment, 0);
           const assessed = repayment(amount, rate + p.buffer_bps, months) + already;
@@ -218,6 +238,7 @@ export const lending: BehaviourModule = {
           const holderOk = accounts.get(account)?.holder === who && accounts.get(account)?.custodian === me;
           const refuse = !holderOk ? "we don't keep that account for you" : amount <= 0 ? "it doesn't say how much" : defaulted.has(who) ? "you're in default on a loan with us"
             : behind(who) ? "you're behind on a loan with us"
+            : mortgage && amount * 10_000 > price * p.max_lvr_bps ? `it's more than ${p.max_lvr_bps / 100}% of the home's price (${usd(price)})`
             : assessed > cap ? `the repayments${already ? ` (with the ${usd(already)} a month you already repay us)` : ""}, ${usd(assessed)} a month at ${(rate + p.buffer_bps) / 100}% (our rate and the buffer we assess at), are more than ${(p.max_share_bps[kind] ?? 2000) / 100}% of your regular income (${usd(income)}, the least that came into your account in any of the last three months)` : "";
           if (refuse) {
             steps.push(because(`A loan application we can't approve: ${refuse}.`, say("loan_decision", `Loan application ${a.id} declined: ${refuse}.`, { to: [who], visible: [who, me], basis: a.id, data: { application: a.id, approved: false, reason: refuse } })));
@@ -229,14 +250,24 @@ export const lending: BehaviourModule = {
               template: "loan", term: months * MONTH,
               we: pay(account, amount, { for: "Loan principal." }),
               they: pay(acc.account, monthly, { from: account, every: MONTH, for: "Loan repayment." }),
-              text: `${me} lends ${who} ${usd(amount)}, paid into ${account}; ${who} repays ${usd(monthly)} a month for ${months} months (${rate / 100}% a year).`,
+              text: `${me} lends ${who} ${usd(amount)}${mortgage && a.data?.home ? ` for their home, ${a.data.home}` : ""}, paid into ${account}; ${who} repays ${usd(monthly)} a month for ${months} months (${rate / 100}% a year).`,
               basis: a.id,
             })],
             say("loan_decision", `Loan application ${a.id} approved: offered.`, { to: [who], visible: [who, me], basis: a.id, data: { application: a.id, approved: true, amount, months, rate_bps: rate, payment: monthly } }));
-          st.then = (out) => { if (out.created?.loan) loans.set(out.created.loan, { agreement: out.created.loan, borrower: who, account, principal: amount, payment: monthly, months }); };
+          st.then = (out) => { if (out.created?.loan) loans.set(out.created.loan, { agreement: out.created.loan, borrower: who, account, principal: amount, payment: monthly, months, rate_bps: rate }); };
           steps.push(st);
         }
 
+        // Asked what paying a loan off takes: its remaining repayments' present value at its rate (a payout figure).
+        for (const r of book.open("loan_payout_request").filter((x) => (x.addressed_to ?? []).includes(me) && !decided.has(x.id))) {
+          decided.add(r.id);
+          const l = loans.get(String(r.data?.loan));
+          if (!l || l.borrower !== r.speaks_for) continue;
+          const left = Math.max(0, l.months - Math.floor((repaid.get(l.agreement) ?? 0) / Math.max(1, l.payment)));
+          const amount = payout(l.payment, l.rate_bps ?? p.rate_bps.person!, left);
+          steps.push(because(`A payout figure for loan ${l.agreement}: ${left} repayments left, worth ${usd(amount)} now.`,
+            say("loan_payout", `To pay off loan ${l.agreement}: ${usd(amount)}, to ${acc.account}, naming the loan.`, { to: [l.borrower], visible: [l.borrower, me], basis: r.id, data: { loan: l.agreement, amount, account: acc.account } })));
+        }
         // Signed: pay the principal out (drawing funding first if we're short).
         const toPay = [...loans.values()].filter((l) => l.start === undefined && book.signedBy(l.agreement, l.borrower));
         const needed = toPay.reduce((x, l) => x + l.principal, 0);
