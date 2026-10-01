@@ -1,0 +1,82 @@
+{
+  "name": "city.electoral_office",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/elections.md",
+  "params": {
+    "first_poll_day": {
+      "schema": {
+        "type": "integer",
+        "description": "the first polling day (the world gives it)"
+      },
+      "default": 365,
+      "source": "the first polling day (the world gives it)"
+    },
+    "method": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "preferential",
+      "source": "placeholder"
+    },
+    "nominations_close_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "nominations_open_days": {
+      "schema": {
+        "type": "integer",
+        "description": "before polling day"
+      },
+      "unit": "days",
+      "default": 60,
+      "source": "placeholder"
+    },
+    "office": {
+      "schema": {
+        "type": "string",
+        "description": "the position elected (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "the position elected (the world must say)"
+    },
+    "office_title": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "term_days": {
+      "schema": {
+        "type": "integer",
+        "description": "the charter's term (the world gives it)"
+      },
+      "unit": "days",
+      "default": 1460,
+      "source": "the charter's term (the world gives it)"
+    },
+    "town": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "e",
+      "source": "placeholder"
+    },
+    "voting_days": {
+      "schema": {
+        "type": "integer",
+        "description": "the ballot is open this long, ending on polling day"
+      },
+      "unit": "days",
+      "default": 14,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

@@ -669,6 +669,13 @@
       "taking_part_bps": 4000,
       "leave_notice_days": 0
     },
+    "elections": {
+      "term_years": 4,
+      "method": "preferential",
+      "turnout_bps": 8300,
+      "stand_bps": 200,
+      "news_readers_bps": 4000
+    },
     "nature": {
       "cell_m": 25,
       "landscape": {
@@ -708,6 +715,7 @@
   },
   "sources": {
     "currency": "Australian dollars, in cents.",
+    "elections": "Local Government Act 2020 (Vic): councils are elected every four years (general elections, the last in October 2024), voting is compulsory for those enrolled, and single-councillor wards vote by preference. This town elects its mayor directly (most Victorian mayors are chosen by the councillors: a liberty). Turnout, about 83% (the VEC's reported participation at the 2024 local elections, to confirm). stand_bps (the chance an adult stands when an election is called, before their drive: 2%, a placeholder to calibrate against candidates per vacancy, the VEC's) and news_readers_bps (the share who read the local paper each week) are placeholders: the University of Canberra's Digital News Report: Australia gives local news use, to source.",
     "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a cell is a 25 m lot (a town of 1,000 at about 13 people a hectare). The landscape around the town (margin_cells, block_cells, shares_bps, woodland_patches), the covers' succession (cleared land to grassland in a year; scrub to woodland in about 40), the pollution figures, survey_hours_per_ha and survey_staff (the town's environment office: one scientist) are placeholders. spin_up_years: nature is run alone this long before the start, so it begins in its own balance (as ecological and climate models spin up).",
     "nature.species": "Placeholders for growth, mortality, dispersal, min_viable and detection. Gliders and fairy-wrens live in family groups sharing a home range, which isn't modelled, so their breeding threshold is one; frogs breed where at least four share a pond (a home range of half a hectare). How far each crosses ground it can\u2019t live on (dispersal_m): frogs up to 200 m from water (the frog\u2019s guidelines above); gliders glide gaps of tens of metres (75 m, a placeholder); fairy-wrens, placeholder. The young always leave their parents' home range (natal dispersal, in the physics); the share of adults moving a year is a placeholder. Densities and ranges: squirrel glider (listed under Victoria's Flora and Fauna Guarantee Act 1988), 0.38 a hectare in Victoria and a home range of 3-5 ha (van der Ree and others, from the studies summarised in 'Large area used by squirrel gliders in an urban area', PMC8216951; to confirm against the originals), crossing cleared gaps badly; growling grass frog (listed; nationally vulnerable), about 68 adults at a Melbourne wetland (45 males and 23 females, Heard and others; to confirm), moving 15-200 m between waterbodies and living as a metapopulation, sensitive to water quality ('Guidelines for managing the endangered Growling Grass Frog in urbanising landscapes'; the EPBC species profile); superb fairy-wren, a common and conspicuous control, territories of 1-2 ha held by a pair and helpers (Museums Victoria), densities by cover a placeholder.",
     "households": "ABS, Census of Population and Housing 2021 (QuickStats, Australia): lone person 25.6%, group 3.9%, family 70.5% of households; of families, couple without children 38.8%, with children 43.7%, one parent 15.9%, other 1.6% (counted with groups). Children per family: AIFS, from the 2021 Census (3+ taken as 3). Same-sex couples 1.4% (Census 2021); one in five lone parents male (Census 2021); 105.8 boys per 100 girls (ABS, Births, Australia 2024). Placeholders: adult_female_bps (about half), group_size, mother_age_at_first_birth (around the median age of mothers, 32.1, ABS Births 2024), adult_ages (18 to 99: the bounds; adults' ages are drawn from the census bands, households.age_bands_bps).",

@@ -1,6 +1,6 @@
 {
   "name": "firm.employer",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "buffer_periods": {

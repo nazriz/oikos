@@ -1,4 +1,4 @@
-# The town's government (code mayor v0.3.0; the rest v0.2.0)
+# The town's government (code mayor v0.7.0, clerk v0.5.2)
 
 **Source:** `participants/src/behaviour/government.ts`. These are code seats of the town (`entity: city`), plus the mayor's code stand-in. None of this is kernel mechanics (D19, D20). A law exists because a clerk published it after counting a ballot. Money leaves the town's account because the finance officer instructed the bank, and the bank checked its list of signatories. Every step is a person following, or not following, a procedure written as a record.
 
@@ -21,9 +21,11 @@ The genesis records that set this up are world content, made by the generator:
 ## `city.mayor_code`: the all-code control
 
 A rule-following mayor. In AI experiments an LLM takes this seat instead (M2), and this module is the baseline it's compared against.
-- **Budget:** each year it proposes a budget (`data.enact` = a `budget` statement with `lines`: `parks`, and since C4b `staff`, the works crew's wages, and `services`, the landfill's charges; [services.md](services.md)). If the council hasn't adopted one within 45 days, it tables it again.
+- **Budget:** each year without an adopted budget (at the year's start, or on taking office), it proposes one (`data.enact` = a `budget` statement with `lines`: `parks`, and since C4b `staff`, the works crew's wages, and `services`, the landfill's charges; [services.md](services.md)). If the council hasn't adopted one within 45 days, it tables it again.
 - **A park a year:** when the current year's adopted budget can pay for one and the town owns a free parcel, it applies for planning permission. Once that is granted, it proposes and signs a construction agreement with the builder at 1.2× materials cost.
 - **Approvals:** it writes an `approval` for each invoice for work it commissioned. The payments procedure needs one over $50,000.
+- **Elections** (docs/behaviour/elections.md): given notice of an election for its office, while nominations are open, it stands as the incumbent, on its record.
+- **The office's record:** what it has acted on (a permit decision, an invoice, a petition) and when it last applied for a park, it reads from the office's records, whoever made them. So whoever takes the office, elected or appointed, carries on from where the office left off. (Until 2026-10-01 it kept these in memory: a newly elected mayor commissioned again a park already built.)
 - **Petitions:** once a petition's organiser's published count (`petition_count`) reaches `petition_threshold_bps` of the population, it turns the petition into a proposal carrying the petition's demand, with probability `responsiveness_bps`.
 
 Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 200, `park_budget` $80,000, `builder`, `park_type`.
@@ -33,6 +35,7 @@ Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 2
 ## `city.council_clerk`
 
 It wakes daily.
+- It counts only the council's ballots (`electorate: "council"`), not the town's elections.
 - It puts each proposal addressed to the town to a council ballot, open for `vote_days` (14).
 - At close, it counts the latest vote of each **councillor seat**, checked against the directory's roles, so votes from anyone else don't count.
 - A proposal passes with more yes than no *and* a majority of all councillors (so abstentions count against).
@@ -97,7 +100,7 @@ It works only from what is reported, so under-reporting is invisible to it. Audi
 
 ## Leaves out
 
-- Elections (councillors and the mayor are fixed).
+- Electing councillors (they're fixed; the mayor is elected: elections.md).
 - Committees.
 - Amendments.
 - Courts and appeals.

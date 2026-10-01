@@ -24,6 +24,8 @@ import { retailer } from "./behaviour/retailer";
 import { builder, childProtection, inspector, planningOfficer, registry } from "./behaviour/institutions";
 import { councilClerk, councillor, financeOfficer, mayorCode, ratesOfficer, taxClerk, works } from "./behaviour/government";
 import { environment } from "./behaviour/environment";
+import { electoralOffice } from "./behaviour/elections";
+import { newspaper } from "./behaviour/news";
 
 /** Every behaviour module available to worlds, by the name used in controller.impl. */
 export const modules: { [name: string]: BehaviourModule & { source: string } } = Object.fromEntries(
@@ -59,6 +61,8 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [ratesOfficer, "behaviour/government.ts"],
       [works, "behaviour/government.ts"],
       [environment, "behaviour/environment.ts"],
+      [electoralOffice, "behaviour/elections.ts"],
+      [newspaper, "behaviour/news.ts"],
     ] as const
   ).map(([m, src]) => [m.name, { ...m, source: new URL(`./${src}`, import.meta.url).pathname }]),
 );

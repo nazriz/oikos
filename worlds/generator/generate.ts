@@ -40,7 +40,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.20.0";
+export const GENERATOR_VERSION = "0.21.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -62,6 +62,10 @@ export interface TownSpec {
   /** Nature around the town (the profile's `nature`: docs/design/world-expansion.md 2). Default: where the profile
    * describes it; false: none. */
   nature?: boolean;
+  /** When the first election falls (days from the start; the profile's term after it). Default: a year in. */
+  first_election_days?: number;
+  /** Elections and the local paper, where the profile describes them (world-expansion 3). Default: yes; false: none. */
+  elections?: boolean;
   /** Superseded by apartment_units and house_types (generator 0.10). */
   rents?: { apartment: number; house: number };
   /** The profile the town's place-specific figures come from (worlds/profiles/<id>.json). Default: au-vic-2026. */
@@ -256,6 +260,13 @@ export function generate(spec: TownSpec): any {
     adico: { attribute: "the planning office", deontic: "must_not", aim: "grant a building permit", condition: "for a river lot" },
     formal: { language: "cel", condition: `block.block == 'grant_permit' && block.lot in [${riverList.map((x) => `'${x}'`).join(",")}]` } });
   for (const p of parcels) if (!records.some((r) => r.id === `title-${p.id}`)) own(p.id, "city");
+  // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----
+  const E = V.elections && spec.elections !== false ? V.elections : undefined;
+  if (E) {
+    records.push({ id: "law-elections", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
+      text: `The town's electors elect the mayor every ${E.term_years} years, by ${E.method === "preferential" ? "preferential" : "first-past-the-post"} vote, run by the electoral office. Every adult resident must enrol and vote.`,
+      adico: { attribute: "the town's adult residents", deontic: "must", aim: "enrol and vote", condition: `at each election of the mayor, every ${E.term_years} years` } });
+  }
   // ---- nature: the landscape around the town, where the profile describes one (docs/design/world-expansion.md 2) ----
   const L = V.nature && spec.nature !== false ? landscape(V.nature, spec.grid, spec.name, rng, "factory") : undefined;
   if (L) {
@@ -626,6 +637,8 @@ export function generate(spec: TownSpec): any {
     positions.push({ id, entity, title, ...(role ? { role } : {}), channels, ...(job ? { role_module: job } : {}), holder });
   };
   const adultCount = everyone.filter((m) => m.adult).length;
+  // (Elections: the adults on the roll at the start, each enrolled.)
+  if (E) for (const c of everyone.filter((m) => m.adult)) records.push({ id: `enrol-${c.id}`, record: "statement", author: "genesis", at: 0, visible_to: [c.id, "city"], speaks_for: c.id, kind: "enrolment", addressed_to: ["city"], text: `Enrolment: ${c.id}.`, data: { born_at: c.born_at } });
   // The code mayor's yearly budget for parks (placeholder: a park a year at about what the builder charges).
   // ---- the town's services (docs/behaviour/services.md) ----
   const SV = V.services;
@@ -643,7 +656,8 @@ export function generate(spec: TownSpec): any {
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
     [{ id: "budget", title: "The town's accounts", kind: "accounts" }, { id: "laws", title: "Laws, the charter and procedures", kind: "records", match: { statement_kinds: ["charter", "law", "procedure"] } },
       { ...mine("city-business"), title: "Correspondence and filings concerning the town" }, { id: "files", title: "The town's files: every record the town can see, looked up on request (look, with what to find)", kind: "records", match: {}, on_request: true }, { ...forms, title: "Forms on file" }, { ...priceLists, title: "Price lists" }, { id: "who", title: "Who's who", kind: "directory" },
-      { id: "civic", title: "Petitions, budgets, invoices, council results and complaints", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "invoice", "ballot_result", "complaint"] } }, { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
+      { id: "civic", title: "Petitions, budgets, invoices, council results and complaints", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "invoice", "ballot_result", "complaint"] } },
+      ...(E ? [{ id: "elections", title: "Elections, and the local paper", kind: "records", match: { statement_kinds: ["election_notice", "nomination", "ballot", "electoral_roll", "news"] } }] : []), { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
     spec.mayor === "code" ? mayorCode : { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       // Until a real model is used, the mock runs the office with the code mayor as its brain (docs/design/m2-llm-participants.md).
       params: { cadence_days: 7, standing: ["laws", "forms", "prices"], mock: { brain: "city.mayor_code", params: mayorParams } } },
@@ -697,6 +711,16 @@ export function generate(spec: TownSpec): any {
     code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
       collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
       maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste" }));
+  // The electoral office (elections): keeps the roll, takes nominations, runs the ballot, counts it, and appoints the
+  // winner. And the local paper, which reports the public record.
+  if (E) {
+    office("electoral", "city", "Electoral commissioner", "electoral_officer", [civic("roll", ["enrolment", "death_registration", "departure", "nomination", "ballot", "electoral_roll", "election_notice"]),
+      { id: "votes", kind: "records", match: { records: ["vote"] } }],
+      code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: E.term_years * 365, first_poll_day: spec.first_election_days ?? 365, method: E.method, town: "city" }));
+    entities.push({ id: "paper", kind: "firm", name: `The ${spec.name} Times` });
+    office("editor", "paper", "Editor", undefined, [civic("record", ["petition", "complaint", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision"])],
+      code("firm.newspaper", { town: "city" }));
+  }
   // The environment office (nature): surveys the district's wildlife with the scientists its budget line pays for, and
   // reports; tells planning where it found listed species.
   if (L) office("environment", "city", "Environment officer", "environment_officer", [mine("environment-business"), civic("budgets", ["budget"]),
@@ -784,7 +808,9 @@ export function generate(spec: TownSpec): any {
     // Enterprise agreements (a rise at work).
     { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] } },
     // Gatherings: whatever holds one, in whatever words (a statement having a practice); and what groups teach.
-    { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { has: ["assertion"] } }];
+    { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { has: ["assertion"] } },
+    // Elections and the local paper (world-expansion 3).
+    ...(E ? [{ id: "elections", kind: "records", match: { statement_kinds: ["election_notice", "ballot", "electoral_roll", "ballot_result", "nomination", "news"] } }] : [])];
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {
@@ -800,6 +826,7 @@ export function generate(spec: TownSpec): any {
   const life = townLife(P);
   const citizenController = code("citizen.default", { outside_account: "acc-outside", bank: "bank", registry: "city", child_protection: "city", population: adultCount,
     complain_to: "city", complain_bps: V.services.complain_bps,
+    ...(E ? { electoral_town: "city", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 } } : {}),
     union: "union", union_join_bps: V.unions.membership_bps,
     participation_bps: V.labour_force_participation_bps, child_template_outside_lf: "child-outside-lf",
     values: { values: V.values }, // (people's values, for their minds: docs/design/ai-citizens.md 3a)

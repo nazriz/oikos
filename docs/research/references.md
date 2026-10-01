@@ -109,3 +109,13 @@ sources); this list is for the architecture and design ideas.
 | Spinning a model up to its own equilibrium before the experiment | Common practice in climate and ecosystem models (e.g. ocean and land-carbon spin-up) **(a citation to find)** | `nature_spin_up_days` |
 | Imperfect detection in wildlife surveys | MacKenzie, D. I. and others (2002), "Estimating site occupancy rates when detection probabilities are less than one", *Ecology* 83, 2248–2255 **(to confirm)** | Surveys find each animal with a detection chance |
 
+
+## Elections and information (docs/behaviour/elections.md, news.md; docs/design/world-expansion.md §3)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Retrospective voting: voters judge the incumbent on how things have gone for them | Fiorina, M. P. (1981), *Retrospective Voting in American National Elections*, Yale University Press **(to confirm)** | A citizen's approval of the town's government follows its own satisfaction and anger at the town |
+| Economic voting | Lewis-Beck, M. S. & Stegmaier, M. (2000), "Economic determinants of electoral outcomes", *Annual Review of Political Science* 3, 183–219 **(to confirm)** | As above: fortunes over the term move approval |
+| Instant-runoff (preferential) counting | The single transferable vote in single-member form (Hare); Victoria's preferential voting, *Local Government Act 2020* (Vic) **(to confirm the section)** | The electoral office's count |
+| News values: what makes an event news | Galtung, J. & Ruge, M. H. (1965), "The structure of foreign news", *Journal of Peace Research* 2, 64–91 **(to confirm)** | The paper's weights by kind of record (placeholders) |
+| Media slant: what a paper runs, and how, leans | Gentzkow, M. & Shapiro, J. M. (2010), "What drives media slant? Evidence from U.S. daily newspapers", *Econometrica* 78, 35–71 **(to confirm)** | The paper's `leaning_bps` |

@@ -115,7 +115,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.23.0",
+  version: "0.24.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -172,6 +172,10 @@ export const citizen: BehaviourModule = {
       goods: "goods",
       leave_after_homeless_days: 90,
       leave_after_jobless_days: 180,
+      // Civic life (docs/behaviour/citizen.md "Elections and news"): enrolling, judging the town's government, standing
+      // and voting; reading the local paper. Placeholders, but the turnout and readership the world gives (its profile).
+      electoral_town: null as string | null, // where we enrol and vote (the world says; none: no elections)
+      civic: { turnout_bps: 9000, stand_bps: 30, reads_news_bps: 5000, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 },
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
       petition_willing_bps: 4400, // share of people who sign petitions at all (AES 2016: 44% had signed a written petition in the last five years)
@@ -1033,6 +1037,7 @@ export const citizen: BehaviourModule = {
       }
 
       wordOfMouth(obs, t, steps);
+      civic(obs, t, steps);
 
       // Taking part (docs/design/ai-citizens.md 2b): gatherings the world holds (practices), where we may come. Going is
       // physics: being in the space for its time. Whether to go is the mind's: the company it brings against the time it
@@ -1550,6 +1555,69 @@ export const citizen: BehaviourModule = {
     };
 
     /** Grown up with no account of our own (children have none): ask the bank for one, once. */
+    // ---- civic life: the roll, approval of the town's government, standing and voting, the paper ----
+    let enrolled: boolean | null = null; // (on the roll at the start, if the world enrolled us)
+    let approval = 0; // of the town's government (its office holders), -10,000 to 10,000
+    let approvedAt = -1;
+    const voted = new Set<string>();
+    const stoodFor = new Set<string>();
+    const readsNews = ctx.rng("reads-news").below(10_000) < p.civic.reads_news_bps;
+    const readItems = new Set<string>();
+    const civic = (obs: Observation, t: number, steps: Step[]) => {
+      if (!p.electoral_town || !obs.body || t - obs.body.born_at < ADULT_YEARS * year) return;
+      const town = p.electoral_town;
+      // On the roll: enrolled at the start, or now (of age, or new to town), once.
+      if (enrolled === null) enrolled = book.all("enrolment").some((r) => r.speaks_for === me);
+      if (!enrolled) {
+        enrolled = true;
+        steps.push(because("Of voting age (or new to town) and not on the roll: enrolling, as the law requires.", say("enrolment", `Enrolment: ${me}.`, { to: [town], visible: [me, town], data: { born_at: obs.body.born_at } })));
+      }
+      // Approval of the town's government, weekly: our own fortunes (retrospective, economic voting) and our anger at the
+      // town, remembered over about half a year; and what we read of it in the paper.
+      if (approvedAt < 0 || t - approvedAt >= 7 * DAY) {
+        approvedAt = t;
+        const signal = Math.max(-10_000, Math.min(10_000, 2 * (satisfaction(mind.person, levelsNow) - 5_000) - feelings.level("anger", town, t)));
+        approval = Math.round(approval + (signal - approval) / Math.max(1, p.civic.approval_memory_weeks));
+      }
+      if (readsNews) for (const r of book.open("news")) {
+        if (readItems.has(r.id) || r.data?.about_office !== true) continue;
+        readItems.add(r.id);
+        approval = Math.max(-10_000, Math.min(10_000, approval + Math.round(Number(r.data?.tone ?? 0) * p.civic.news_weight_bps)));
+      }
+      // An election called: standing, with a small chance, swayed by drive (achievement, power) and by how badly we think
+      // the town is run; our platform speaks to what we value most.
+      for (const n of book.open("election_notice")) {
+        if (stoodFor.has(n.id) || t >= Number(n.data?.nominations_close_at ?? 0)) continue;
+        stoodFor.add(n.id);
+        const drive = 1 + 0.5 * zValue("achievement") + 0.5 * zValue("power") + (approval < 0 ? -approval / 5_000 : 0);
+        if (ctx.rng(`stand-${n.id}`).below(10_000) >= shifted(p.civic.stand_bps, drive - 1)) continue;
+        const top = (Object.keys(mind.person.values) as Value[]).sort((a, b) => zValue(b) - zValue(a) || (a < b ? -1 : 1)).slice(0, 2);
+        const platform = `Standing for ${n.data?.office}: for ${top.join(" and ")}.`;
+        steps.push(because(`An election: standing for office (drive ${drive.toFixed(2)}; we think the town is run ${approval >= 0 ? "well enough" : "badly"}).`,
+          say("nomination", platform, { to: [town], visible: "public", data: { office: n.data?.office, name: me, values: top }, assertion: { that: platform } })));
+      }
+      // Voting: on a ballot open to the roll, if we're on it, once; nearly everyone, where voting is compulsory. A ranking:
+      // the incumbent by our approval, a challenger by how well their platform speaks to our values.
+      const roll = new Set((book.open("electoral_roll").sort((a, b) => b.at - a.at)[0]?.data?.electors as string[] | undefined) ?? []);
+      for (const b of book.open("ballot")) {
+        if (voted.has(b.id) || b.data?.electorate !== "roll" || !roll.has(me) || t < Number(b.data?.opens_at ?? 0) || t >= Number(b.data?.closes_at ?? 0)) continue;
+        voted.add(b.id);
+        if (ctx.rng(`turnout-${b.id}`).below(10_000) >= p.civic.turnout_bps) continue;
+        const candidates = (b.data?.candidates ?? []) as { candidate: string; nomination: string }[];
+        const scores = candidates.map((c) => {
+          const nom = book.records.get(c.nomination) as any;
+          const incumbent = !!nom?.data?.incumbent;
+          const values = ((nom?.data?.values ?? []) as Value[]).filter((v) => v in mind.person.values);
+          const fit = values.length ? values.reduce((a, v) => a + zValue(v), 0) / values.length : 0;
+          const score = Math.round(incumbent ? approval : fit * p.civic.platform_weight_bps) + (c.candidate === ctx.participant ? 100_000 : 0);
+          return { key: c.candidate, score };
+        }).sort((x, y) => y.score - x.score || (x.key < y.key ? -1 : 1));
+        if (!scores.length) continue;
+        decided.push({ t, domain: "vote", strategy: "deliberate", choice: scores[0]!.key, options: scores });
+        steps.push(because(`Voting: ranking the ${scores.length} candidates (our approval of the town's government: ${approval}).`, vote(b.id, scores.map((x) => x.key).join(">"), [town])));
+      }
+    };
+
     let accountAsked = false;
     const withoutAccount = (steps: Step[]): Step[] => {
       if (!accountAsked && p.bank) {

@@ -1,4 +1,4 @@
-# `citizen.default` (v0.21.0): the AI citizen in code
+# `citizen.default` (v0.24.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -51,6 +51,10 @@ It wakes weekly, whenever something names it (an offer, a notice, a message), an
 | **Voice: starting a petition** | A tenant is *aggrieved* while angry with their landlord (at or above `aggrieved_bps`: a notice to go lasts about 95 days, a rent rise the longer the more it takes), or while rent is ≥ 40% of income. If no tenant-protection petition is open, an aggrieved tenant starts one with probability 3% per wake. It demands a law (90 days' notice; rent rises capped at 5% a year), with its Institutional Grammar breakdown, tagged `tenant_protection`, and closed after 180 days. | Hirschman (1970): voice |
 | **Voice: who signs at all** | Each person signs petitions at all with probability 44%, drawn once; only they sign or start petitions. | Australian Election Study 2016: 44% had signed a written petition in five years (to confirm against the tables) |
 | **Voice: signing** | A tenant signs when aggrieved, or once the share of the town that has signed (the organiser's latest published count, at most every 3 days) reaches their own threshold. Thresholds are roughly normal (mean 25%, sd 10%), half the person's conformity and half their own draw: the conformist waits for others. | Granovetter (1978) |
+| **Elections: the roll** | Of voting age (or new to town) and not enrolled: enrols with the town, once, as the law requires (`electoral_town`). | Compulsory enrolment (Victoria) |
+| **Elections: approval** | Weekly, its approval of the town's government (−10,000 to 10,000) moves toward its own fortunes (satisfaction) less its anger at the town (a waste complaint's, say), remembered over about half a year (`approval_memory_weeks` 26). A reader of the paper (`reads_news_bps`, drawn once) moves it by each item about the government's tone (`news_weight_bps`). | Retrospective voting (Fiorina 1981); economic voting (Lewis-Beck and Stegmaier 2000). The weights are placeholders |
+| **Elections: standing** | Given notice of an election, while nominations are open, it stands with a small chance (`stand_bps`), more with drive (achievement, power) and the worse it thinks the town is run. Its platform is its two strongest values. | Placeholder, to calibrate against candidates per vacancy |
+| **Elections: voting** | On the roll, with the ballot open: it votes with the chance `turnout_bps` (voting is compulsory; some don't), once, in secret (visible only to the town). It ranks every candidate: itself first if it stands; the incumbent by its approval; a challenger by how well their platform's values are its own (`platform_weight_bps`). | Preferential voting; retrospective and values-based choice (placeholders) |
 | **Leaving town** | After 90 days without a home, or 180 days with nobody in the household earning and less money than a month's rent or essentials: give notice, take all savings out of town, and leave with the household. The thresholds stretch with tradition and security, from half to one and a half times. | Hirschman (1970): exit. Thresholds are placeholders to calibrate |
 
 The rates the person's values shift (`sway`) move symmetrically about the town's mean, so the town's rates stay as calibrated while people differ.
@@ -100,6 +104,7 @@ Saving is off: it's negative in the first year, and 22–25% over five (target 6
 - **Union:** `union`, `union_join_bps` (the world's), `ballot_turnout_bps` 7000, `strike_vote_yes_bps` 8500
 - **Leaving:** `leave_after_homeless_days` 90, `leave_after_jobless_days` 180
 - **Voice:** `petition_start_bps` 300, `petition_willing_bps` 4400, `petition_days` 180, `threshold_mean_bps` 2500, `threshold_sd_bps` 1000, `rent_burden_grievance_bps` 4000, `aggrieved_bps` 2000
+- **Elections:** `electoral_town` (the world's), `civic`: `turnout_bps` 9000, `stand_bps` 30, `reads_news_bps` 5000, `approval_memory_weeks` 26, `news_weight_bps` 1500, `platform_weight_bps` 2500 (the profile sets turnout, standing and readers)
 - **Complaints:** `complain_to`, `complain_about` "waste", `complain_after_days` 14, `complain_bps` 3000
 - **Word of mouth:** `ask_home_bps` 3700, `ask_work_bps` 6900, `ask_again_days` 60, `max_contacts` 15, `pass_on_bps` 10000, `catch_up_days` 14, `news_days` 90
 - **The mind:** `values` (the world's), `mind` (aspiration 6000, certainty 5000; EWA φ 0.9, ρ 0.9, δ 0.5, λ 4)
@@ -120,7 +125,7 @@ Unless a source is named above, a figure is a placeholder, to calibrate.
 
 ## Leaves out (for now)
 
-- Voice beyond petitions and complaints: voting in elections, protest, contacting councillors.
+- Voice beyond petitions, complaints and elections: protest, contacting councillors, campaigning for a candidate.
 - Knowing which laws already exist (a citizen may petition for a law already passed).
 - Buying homes; commuting; housing quality beyond price and bedrooms; renegotiating rent.
 - Moving house while housed: looking for somewhere cheaper or better while keeping the home, and giving notice once a new lease is signed. A household hunts only once it's without a home, so a rent it can't bear means notice first, then the hunt (the realistic order is the other way round).

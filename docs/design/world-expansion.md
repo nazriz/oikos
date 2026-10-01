@@ -174,6 +174,8 @@ must be stepped. At 4,800 cells, three fields and three species, that's small ne
 
 ## 3. Elections and information (tier 1)
 
+*Built 2026-10-01: docs/behaviour/elections.md and news.md, citizen.md "Elections". As built: the roll is from enrolments (not the directory); the code mayor stands as the incumbent; the paper has no business yet (unpaid editor); word of mouth carries no politics yet.*
+
 **No contract changes.** Votes are records the kernel only keeps. Who may vote, and what wins, is for whoever counts:
 - a secret ballot is a vote visible only to the electoral office;
 - a preferential vote is a ranking in the choice (`c0012-self>mayor-system>c0400-self`);
@@ -243,6 +245,34 @@ people's fortunes), and kept in others.
   posting may ask for it.
 - **The budget gains real lines:** the clinic's and school's staff and running costs, so the mayor's trade-offs are
   among services, nature and taxes.
+
+### 4.1 Who runs them (the real world, by profile)
+
+In Victoria neither is the council's: state schools are the state's (the Department of Education employs the
+teachers), and general practice is private, mostly bulk-billed to Medicare (the Commonwealth pays per consultation).
+So in the au-vic profile the clinic is a practice (a firm) paid per consultation from outside (the boundary, as
+support payments are), and the school is the state's (its teachers paid from outside). A profile can instead put them
+on the town's budget (where municipalities run schools); the generator reads who runs each from the profile. The
+council's own part in Victoria is maternal and child health and kindergartens: later, if a study needs them.
+
+### 4.2 The contract, exactly (proposed, for sign-off)
+
+| Where | Change |
+|---|---|
+| **Catalogue** | `body_variables`: `[{id, min, max, initial, per_day?}]`, named integers on every body (e.g. `skill`, 0 to 10,000), as structures' `variables`. `per_day` drifts it (forgetting, if a world wants it). |
+| **World config** | A person entity may give its body's starting `variables` (the generator draws adults' `skill` from the profile's attainment). The `arrive` block may too (a newcomer's). Born here: `initial`. |
+| **Tasks** | `on_body` (optional): what a unit does to a body worked on.<br>• `changes: {variable: per_unit}`: adds to body variables, within their bounds;<br>• `treats: [{kind, severity?, units, days_kept_bps, fatal_kept_bps}]`: once a work act gives a condition of that kind (and band) at least `units`, its remaining days are cut to `days_kept_bps` of them, and if a death is due from it, it's called off with the chance 1 − `fatal_kept_bps`. A condition is treated once (`treated`); more care does nothing more. |
+| **The `work` block** | `on` may name a **person** (their body must be in a space of the structure at `at`) or a **space** of it (every body in that space: a class). `on_body` applies to each. A structure, as now, otherwise. |
+| **Skill at work** (optional, say if you want it) | A task's `labour_by`: `{variable, at_max_bps}`: its labour per unit scales with the performers' mean of that body variable, from 100% at 0 to `at_max_bps` at the maximum. The physical reason employers pay for skill (Mincer 1974). Without it, a school certificate is a pure signal (Spence 1973). |
+| **Life physics** | `illness.fields`: `[{field, bps_per_unit}]`: the yearly illness chance rises by that much per unit of the field in the cell where the body is (its structure's corner cell), drawn by thinning, as places' injury risk is now. |
+| **State** | A condition keeps when its death is due (`death_at`, hidden from views) and whether it's been `treated`. A death due from a condition happens only if the condition still says so. |
+| **Log** | `condition_treated {person, condition, by, until, death_called_off}`: the truth, for measurement. Nobody in the world is told a death was called off. `body_changed {person, variable, value}` when work changes one (batched per work act). |
+| **Observation** | One's own body: its `variables`, and `treated` on its conditions. Never `death_at`. Others' bodies: nothing new (a school learns a pupil's skill only by testing: a task, later, or the records it keeps). |
+| **Refusals** | `not_there` (the person isn't at the structure; exists), `no_body_effect` (the task has no `on_body` but `on` names a person or space). |
+
+Everything else is records and people: enrolment at a school, a doctor's appointment, a waiting list (the clinic's
+staff hours), a certificate (a statement a school makes), a posting asking for one, Medicare's payment per
+consultation (a payment from outside on the practice's claim).
 
 ## 5. Justice (tier 1)
 
@@ -329,8 +359,8 @@ shows its mechanism, a soak run, and a line in docs/decisions.md.
 | Part | Change |
 |---|---|
 | 2 | Catalogue: `land_covers`, `fields`, `species` (with growth, capacities by cover, tolerances, dispersal, detection); structure types' `cover` and field sources; a `flow` layer on places. State and log: fields and populations on cells; `species_extinct` and `survey_recorded` events. Task: `survey`. Observation: cover in the street view, conspicuous species seen. |
-| 3 | Ballots' `electorate` may name a roll (a record) as well as a body of office holders. Nothing else: charters, candidates and news are records. |
-| 4 | Catalogue: body `variables`; tasks' `on_body` changes; life physics may read a field at the home cell. Observation: one's own body variables. |
+| 3 | None, as built: a ballot's electorate is in its data, read by whoever counts. |
+| 4 | §4.2: body variables; tasks' `on_body` (changes, treats) on a person or a space; optional skill at work; illness reading fields; treated conditions; two log events; one's own body variables in view. |
 | 5 | None: applications, rulings and orders are records. |
 | 6 | Tasks may draw a resource from a cell's field (water); a greenhouse counter. |
 | 7 | None beyond records (sales and mortgages exist). |

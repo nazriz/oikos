@@ -1,6 +1,6 @@
 {
   "name": "city.finance_officer",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "doc": "docs/behaviour/government.md",
   "params": {
     "approval_over": {

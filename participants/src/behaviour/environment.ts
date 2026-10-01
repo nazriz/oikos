@@ -17,7 +17,7 @@ const YEAR = 365 * DAY;
 
 export const environment: BehaviourModule = {
   name: "city.environment",
-  version: "0.1.0",
+  version: "0.1.1",
   doc: "docs/behaviour/environment.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(3600),
@@ -166,11 +166,10 @@ export const environment: BehaviourModule = {
       const lots = [...recorded].sort();
       steps.push(because(`The lots where we've recorded a listed species, this round or before: telling planning (${lots.length} lots).`,
         ...(register ? [withdraw(register, "Superseded by this round's register.")] : []),
-        say("habitat_register", `Habitat register, round ${round}: listed species recorded on ${lots.length} lots${lots.length ? ` (${lots.slice(0, 20).join(", ")}${lots.length > 20 ? ", ..." : ""})` : ""}.`,
-          { to: [p.planning], visible: "public", data: { round: round, lots } })));
+        ["register", say("habitat_register", `Habitat register, round ${round}: listed species recorded on ${lots.length} lots${lots.length ? ` (${lots.slice(0, 20).join(", ")}${lots.length > 20 ? ", ..." : ""})` : ""}.`,
+          { to: [p.planning], visible: "public", data: { round: round, lots } })]));
       steps.at(-1)!.then = (out) => {
-        const id = Object.values(out.created ?? {})[0];
-        if (id) register = id;
+        if (out.created?.register) register = out.created.register;
       };
       return steps;
     }

@@ -29,7 +29,7 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.6.0",
+  version: "0.7.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -38,24 +38,42 @@ export const mayorCode: BehaviourModule = {
       staff_budget: 0, services_budget: 0, environment_budget: 0 }, ctx.params);
     need(p, ["builder"], "city.mayor_code");
     const book = new Book();
-    let nextBudget = 0;
+    let tabledYear = 0; // the year we last tabled a budget for
     let lastTabled = 0;
     let parkYear = -1;
     const handled = new Set<string>();
     // The office's own records: made in this position (whoever held it then), or by this participant as itself.
     const ours = (r: { author: string; in_position?: string }) => (ctx.position ? r.in_position === ctx.position : r.author === ctx.participant);
+    // What the office has already acted on (the bases of its records), and the last year it applied for a park: read
+    // from the record, not kept in memory, so whoever takes office carries on where the office left off.
+    const acted = new Set<string>();
     return stepper(
-      (obs) => void book.absorb(obs),
+      (obs) => {
+        for (const r of book.absorb(obs)) {
+          if (!ours(r)) continue;
+          if (r.basis) acted.add(r.basis);
+          if (r.record === "statement" && r.kind === "permit_application") parkYear = Math.max(parkYear, Math.floor(r.at / YEAR));
+        }
+      },
       (obs) => {
         const me = obs.entity;
         const t = obs.t;
         const steps: Step[] = [];
-        // The annual budget; tabled again every 45 days until the council adopts one for the year.
+        // An election for our office: standing again (once each notice, while nominations are open), on what we've done.
+        for (const n of book.open("election_notice")) {
+          if (handled.has(n.id) || !ctx.position || n.data?.office !== ctx.position || t >= (n.data?.nominations_close_at ?? Infinity)) continue;
+          handled.add(n.id);
+          const platform = "Standing again: keeping the town's services running, its parks built and its budget balanced.";
+          steps.push(because("An election for this office: nominating, as the incumbent.",
+            say("nomination", `Nomination for ${ctx.position}: the incumbent. ${platform}`, { to: [me], visible: "public", data: { office: ctx.position, name: "the incumbent mayor", incumbent: true, values: ["security", "benevolence"] }, assertion: { that: platform } })));
+        }
+        // The annual budget, for each year that has none adopted: tabled at the year's start (or on taking office), and
+        // again every 45 days until the council adopts one.
         const thisYear = Math.floor(t / YEAR) + 1;
         const adopted = book.open("budget").some((b) => b.data?.year === thisYear);
-        if (t >= nextBudget || (!adopted && t >= lastTabled + 45 * DAY)) {
-          const newYear = t >= nextBudget;
-          if (newYear) nextBudget = t + YEAR;
+        if (!adopted && (tabledYear !== thisYear || t >= lastTabled + 45 * DAY)) {
+          const newYear = tabledYear !== thisYear;
+          tabledYear = thisYear;
           lastTabled = t;
           const lines = { parks: p.park_budget, ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
           steps.push(because(newYear ? "A new year: tabling the town's budget." : "No budget adopted for this year yet: tabling it again.", say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: ${Object.entries(lines).map(([k, v]) => `${k} ${v} cents`).join(", ")}.`, { to: [me],
@@ -80,7 +98,7 @@ export const mayorCode: BehaviourModule = {
           }
         }
         for (const d of book.open("permit_decision")) {
-          if (handled.has(d.id) || !(d.addressed_to ?? []).includes(me)) continue;
+          if (handled.has(d.id) || acted.has(d.id) || !(d.addressed_to ?? []).includes(me)) continue;
           const app = book.records.get(d.data?.application);
           if (app?.record !== "statement" || !ours(app)) continue;
           handled.add(d.id);
@@ -91,7 +109,7 @@ export const mayorCode: BehaviourModule = {
         }
         // Approve invoices for work we commissioned (the payments procedure requires it over $50k).
         for (const inv of book.open("invoice")) {
-          if (handled.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
+          if (handled.has(inv.id) || acted.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           handled.add(inv.id);
           const ag = book.records.get(inv.basis ?? "");
           if (ag?.record === "agreement" && ours(ag)) {
@@ -100,7 +118,7 @@ export const mayorCode: BehaviourModule = {
         }
         // Petitions with enough signatures become proposals (sometimes).
         for (const pet of book.open("petition")) {
-          if (handled.has(pet.id)) continue;
+          if (handled.has(pet.id) || acted.has(pet.id)) continue;
           if (publishedCount(book, pet) * 10_000 < p.petition_threshold_bps * p.population) continue;
           handled.add(pet.id);
           if (ctx.rng(`respond-${pet.id}`).below(10_000) >= p.responsiveness_bps) continue;
@@ -124,7 +142,7 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.5.1",
+  version: "0.5.2",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -150,7 +168,8 @@ export const councilClerk: BehaviourModule = {
           steps.push(because("A proposal addressed to the council: opening a ballot.", say("ballot", `Council ballot: ${prop.text}`, { basis: prop.id, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? formTags(prop) } })));
         }
         for (const ballot of book.open("ballot")) {
-          if (closed.has(ballot.id) || ballot.speaks_for !== me || t < (ballot.data?.closes_at ?? Infinity)) continue;
+          // (Our council's ballots only: an election's ballot speaks for the town too, and is the electoral office's.)
+          if (closed.has(ballot.id) || ballot.speaks_for !== me || ballot.data?.electorate !== "council" || t < (ballot.data?.closes_at ?? Infinity)) continue;
           closed.add(ballot.id);
           const latest = new Map<string, string>();
           for (const r of book.ofType("vote")) if (r.ballot === ballot.id && r.in_position && councillors.has(r.in_position)) latest.set(r.in_position, r.choice);
@@ -165,7 +184,7 @@ export const councilClerk: BehaviourModule = {
         }
         steps.push(...letters.answer(() => {
           const waiting = book.open("proposal").filter((x) => (x.addressed_to ?? []).includes(me) && !balloted.has(x.id));
-          const open = book.open("ballot").filter((b) => b.speaks_for === me && !closed.has(b.id));
+          const open = book.open("ballot").filter((b) => b.speaks_for === me && b.data?.electorate === "council" && !closed.has(b.id));
           const results = book.open("ballot_result").slice(-3);
           const year = Math.floor(t / YEAR) + 1;
           const budget = book.open("budget").find((b) => b.data?.year === year);
@@ -241,7 +260,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.8.1",
+  version: "0.8.2",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -502,7 +521,7 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
-  version: "0.1.2",
+  version: "0.1.3",
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),

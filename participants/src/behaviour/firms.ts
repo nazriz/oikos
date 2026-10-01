@@ -597,7 +597,8 @@ export class Staffing {
     // withhold.
     const law = incomeTaxLaw(book);
     for (const a of doesPay ? staff : []) {
-      if (this.orders.has(a.id) || this.stopped.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
+      // (Not a job we've given notice on: a worker who died has their order withdrawn, and isn't a new hire.)
+      if (this.orders.has(a.id) || this.stopped.has(a.id) || this.noticed.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
       const worker = a.terms.parties[1];
       const pays = { ...jobTerms(a, worker) };
       pays.wage = this.gross.get(a.id) ?? pays.wage;
@@ -1081,7 +1082,7 @@ function creditorAccount(book: Book, holder: string): string | undefined {
 
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.6.0",
+  version: "0.6.1",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,

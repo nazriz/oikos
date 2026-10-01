@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -139,6 +139,20 @@
       "default": "",
       "source": "placeholder"
     },
+    "civic": {
+      "schema": {
+        "type": "object"
+      },
+      "default": {
+        "turnout_bps": 9000,
+        "stand_bps": 30,
+        "reads_news_bps": 5000,
+        "approval_memory_weeks": 26,
+        "news_weight_bps": 1500,
+        "platform_weight_bps": 2500
+      },
+      "source": "placeholder"
+    },
     "complain_about": {
       "schema": {
         "type": "string"
@@ -164,6 +178,13 @@
     },
     "complain_to": {
       "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "electoral_town": {
+      "schema": {
+        "description": "where we enrol and vote (the world says; none: no elections)"
+      },
       "default": null,
       "source": "placeholder"
     },

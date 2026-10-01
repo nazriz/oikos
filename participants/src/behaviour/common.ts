@@ -300,7 +300,8 @@ export const message = (to: string[], text: string, re?: string): C.Call => C.ca
 export const moveIn = (space: string): C.Call => C.call("occupancy", { in: space });
 /** Come out of a space, or a whole building. */
 export const moveOut = (from: string, who: string): C.Call => C.call("occupancy", { in: from, who, leave: "yes" });
-export const vote = (ballot: string, choice: string, visible?: "public"): C.Call => C.call("vote", { ballot, choice, visible });
+/** `visible`: public, or only to these (a secret ballot: the electoral office). */
+export const vote = (ballot: string, choice: string, visible?: "public" | string[]): C.Call => C.call("vote", { ballot, choice, visible: Array.isArray(visible) ? C.json(visible) : visible });
 export const record = (position: "right" | "liberty", holder: string, about: unknown, o: { against?: string; basis?: string } = {}): C.Call =>
   C.call("claim", { position, holder, about: C.json(about), against: o.against, basis: o.basis });
 

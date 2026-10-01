@@ -1,6 +1,6 @@
 {
   "name": "city.environment",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "doc": "docs/behaviour/environment.md",
   "params": {
     "decline_flag_bps": {

@@ -1,6 +1,6 @@
 {
   "name": "city.council_clerk",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "doc": "docs/behaviour/government.md",
   "params": {
     "vote_days": {

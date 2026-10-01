@@ -65,6 +65,8 @@ export interface Profile {
     unions: { membership_bps: { [kind: string]: number }; dues_per_month: number; resignation_notice_days: number; claim_margin_bps: number; meeting_every_days?: number; teaching?: string };
     /** Social groups that meet (clubs, congregations): their kinds, how often and how long they meet, how many. */
     groups?: { kinds: { kind: string; name: string; every_days: number; lasts_minutes: number; teaching?: string; held_at_start_bps?: number }[]; per_kind_per_1000_people: number; taking_part_bps: number; leave_notice_days: number };
+    /** Elections and the local paper (docs/design/world-expansion.md 3). */
+    elections?: { term_years: number; method: "preferential" | "plurality"; turnout_bps: number; stand_bps: number; news_readers_bps: number };
     /** Nature (docs/design/world-expansion.md 2): the landscape around the town, its covers, pollution, and species in
      * real units (per hectare, hectares), converted to cells by the generator with `cell_m`. */
     nature?: {
