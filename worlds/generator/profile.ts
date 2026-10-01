@@ -77,6 +77,8 @@ export interface Profile {
      * the return to a year of it. */
     education?: { school_ages: [number, number]; students_per_teacher: number; school_days_per_year: number; hours_per_day: number; teacher_wage_per_fortnight: number;
       attainment: { label: string; share_bps: number; years: number }[]; return_per_year_bps: number; max_years: number };
+    /** Home ownership (world-expansion 6.2): which houses their households own, with a mortgage or outright. */
+    ownership?: { house_owner_bps: number; mortgage_bps_by_age: { from: number; bps: number }[]; mortgage_payment_per_month: number; mortgage_rate_bps: number; mortgage_years_left: [number, number] };
     /** Utilities (world-expansion 6.1): water drawn from the river and billed to owners; energy bought from the grid and
      * billed to households. */
     utilities?: {

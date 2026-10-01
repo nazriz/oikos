@@ -18,7 +18,8 @@ const tight = { ...base, citizens: 120, apartment_blocks: 2, houses: 16, landlor
 async function run(compliance: number, name: string) {
   const out = join(root, "runs", `test-river-${name}`);
   rmSync(out, { recursive: true, force: true });
-  const config = generate({ ...tight, landlord_compliance_bps: compliance });
+  // (Every home let: this is about landlords building.)
+  const config = generate({ ...tight, ownership: false, landlord_compliance_bps: compliance });
   // A lot of landlord-1's with nothing on it (lots are registry records over cells).
   const cellsOf = (lot: string): string[] => config.world.records.find((r: any) => r.id === lot)?.data?.cells ?? [];
   const riverSite = config.world.records.find((r: any) => r.record === "claim" && r.holder === "landlord-1" && !config.world.structures.some((s: any) => cellsOf(r.about.object).includes(s.at))).about.object;

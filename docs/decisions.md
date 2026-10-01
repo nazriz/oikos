@@ -1144,6 +1144,21 @@ See the design note, §16.
   - **Liberties:** use is a fixed rate (no meters, no response to price); no disconnection, local generation or gas; drought is config.
   - **Revisit if:** a study needs water saving under restrictions or prices (use as a choice: the goods model), a changing season, or local generation and its pollution.
 
+- **Home ownership, the first part** (2026-10-01; no contract change; docs/behaviour/ownership.md).
+  - **Built:**
+    - owner-occupied houses at the profile's share, with mortgages by the head's age, sized within the bank's rule;
+    - the bank takes on loans in force at the start;
+    - owners pay no rent, count the mortgage as housing, pay rates, and don't act as tenants;
+    - the land registry passes a dead owner's land to their heir;
+    - `ownerOf` believes a title's transfer only from its holder or its issuer.
+  - **Found:** mortgages at the median for every owner put households with no pay into default within months. Capped by the bank's own rule, none default.
+  - **Also found:**
+    - with 18 candidates, a ranking of their ids ran past a vote's 200-character limit and every vote was rejected. Ballots now number the candidates and votes rank the numbers, as on a real ballot paper (city.electoral_office 0.3.0);
+    - a newcomer enrolling at school counted no years of schooling elsewhere: now their years since school age;
+    - the building tests run with every home let (they're about landlords' houses).
+  - **Liberties:** flats all rented (no strata); owners don't leave town; no market for homes yet.
+  - **Revisit when:** homes come up for sale (owners leaving, estates sold, new builds) and renters buy (the BoE model's buy/rent decision, mortgages for buyers).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

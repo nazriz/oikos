@@ -15,6 +15,8 @@ It answers every application (`loan_decision`, with the reason if it's declined)
 
 **Paying out.** Once the borrower signs, the bank pays the principal (settling the agreement). If that would take it below its reserve, it first draws funding from outside (`funding_draw`; `world.funding` pays it, docs/behaviour/boundary.md). It pays interest on its funding monthly, and repays funding when it has more than it needs.
 
+**Loans already in force** (0.2.0): taken on when it first looks (the world's mortgages: docs/behaviour/ownership.md), followed like any other.
+
 **Following repayments:**
 - repayments arrive by the borrower's standing order and are set against their loans, oldest first;
 - a month behind is **arrears** (a `loan_arrears` notice);

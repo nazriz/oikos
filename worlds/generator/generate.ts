@@ -73,6 +73,8 @@ export interface TownSpec {
   justice?: boolean;
   /** Water and energy utilities, where the profile describes them (world-expansion 6.1). Default: yes; false: none. */
   utilities?: boolean;
+  /** Owner-occupiers, where the profile describes ownership (world-expansion 6.2). Default: yes; false: every home let. */
+  ownership?: boolean;
   /** Superseded by apartment_units and house_types (generator 0.10). */
   rents?: { apartment: number; house: number };
   /** The profile the town's place-specific figures come from (worlds/profiles/<id>.json). Default: au-vic-2026. */
@@ -241,6 +243,8 @@ export function generate(spec: TownSpec): any {
   const ED = HE ? V.education : undefined;
   const JU = V.justice && spec.justice !== false ? V.justice : undefined;
   const UT = V.utilities && spec.utilities !== false ? V.utilities : undefined;
+  const OW = V.ownership && spec.ownership !== false ? V.ownership : undefined;
+  const ownPick = rng("ownership");
   // Skill is schooling: a year of it is 10,000 (so a school day is a 200th of that). It speeds work (labour_by): the
   // time a task takes falls linearly with the performers' mean skill, steeply enough that six years more around the
   // mean adult's take the profile's return to a year's schooling, compounded (Mincer 1974; a linear approximation of the
@@ -577,6 +581,41 @@ export function generate(spec: TownSpec): any {
       data: { leaseholder: lh, members: h.members.map((m) => ({ person: m.id, participant: `${m.id}-self`, born_at: m.born_at, sex: m.sex, ...(m.parents ? { parents: m.parents } : {}) })), couples: h.couples } });
     const home = homeOf.get(h);
     if (!home) continue;
+    // Owner-occupiers (world-expansion 6.2): a house its household owns (its lot's title theirs), outright or with a
+    // mortgage still being repaid to the bank (by the household head's age).
+    if (OW && houseTypes.some((x) => x.id === home.type) && ownPick.below(10_000) < OW.house_owner_bps) {
+      const lot = parcels.find((q) => q.cell === structures.find((x) => x.id === home.structure)!.at)!.id;
+      const title = records.find((r) => r.id === `title-${lot}`)!;
+      title.holder = lh;
+      const head = h.members.find((m) => m.id === lh)!;
+      const age = Math.floor(-head.born_at / YEAR);
+      const mortgageBps = [...OW.mortgage_bps_by_age].reverse().find((x) => x.from <= age)?.bps ?? 0;
+      // (A mortgage the bank would have lent: repayments within its share of the household's income, at most the
+      // median; none for a household with no income.)
+      const income = h.members.reduce((a, m) => a + (monthlyPay.get(m.id) ?? 0), 0);
+      const affordable = Math.min(OW.mortgage_payment_per_month, Math.floor((income * V.credit.max_repayment_share_bps.person) / 10_000));
+      if (ownPick.below(10_000) < mortgageBps && affordable > 0) {
+        const [lo, hi] = OW.mortgage_years_left;
+        const months = 12 * (lo + ownPick.below(hi - lo + 1));
+        const payment = affordable;
+        const i = OW.mortgage_rate_bps / 10_000 / 12;
+        const principal = Math.round((payment * (1 - (1 + i) ** -months)) / i);
+        const loan = `mortgage-${lh}`;
+        const parties = ["bank", lh];
+        records.push({ id: loan, record: "agreement", author: "genesis", at: 0, visible_to: parties, terms: {
+          template: "loan", parties, term: months * MONTH,
+          commitments: [
+            { who: "bank", does: { outcome: { money: { to: `acc-${lh}`, amount: String(principal), for: "Loan principal." } } } },
+            { who: lh, does: { outcome: { money: { from: `acc-${lh}`, to: "acc-bank", amount: String(payment), for: "Loan repayment." } } }, every: MONTH },
+          ],
+          text: `bank lent ${lh} ${principal / 100} for their home, ${home.space}; ${lh} repays ${payment / 100} a month for ${months} more months (${OW.mortgage_rate_bps / 100}% a year).` } });
+        for (const party of parties) records.push({ id: `${loan}-sig-${party}`, record: "signature", author: "genesis", at: 0, visible_to: parties, speaks_for: party, agreement: loan, as: party });
+        records.push({ id: `${loan}-repay`, record: "statement", author: "genesis", at: 0, visible_to: [lh, "bank"], speaks_for: lh, kind: "request", addressed_to: ["bank"], basis: loan,
+          text: "Please pay my mortgage repayments monthly.", data: { outcome: { money: { from: `acc-${lh}`, to: "acc-bank", amount: String(payment), for: "Loan repayment." } }, every: MONTH, first: (2 + ownPick.below(29)) * DAY } });
+      }
+      for (const m of h.members) occupancy.push({ occupant: m.id, space: home.space });
+      continue;
+    }
     const ag = `lease-${lh}`;
     const term = (12 + pick.below(13)) * MONTH;
     const elapsed = pick.below(term / DAY) * DAY; // tenancies already part-way through
@@ -883,7 +922,9 @@ export function generate(spec: TownSpec): any {
     { id: "survey", kind: "sites", area: "all", every: 30 * DAY }, priceLists], code("world.valuer", { land_value: landValue, builder: "builder", rating: "city", exempt: rateExempt }));
   office("outside-grants", "outside", "Grants to local government", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
     code("world.grants", { account: "acc-outside", to: "city", to_account: "acc-city", per_resident_per_year: V.public_finance.grants_per_resident_per_year }));
-  office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [civic("notifications", ["death_notification"]), deaths], code("city.registry"));
+  office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [civic("notifications", ["death_notification"]), deaths,
+    // (And of land: to pass a deceased's titles to their heirs, as the succession law says.)
+    { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "titles", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }], code("city.registry"));
   office("child-protection", "city", "Child protection officer", "child_protection", [deaths, civic("requests", ["care_request"])], code("city.child_protection"));
   office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["proposal", "ballot", "ballot_result", "budget", "law"]), votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
   [-80, -40, 0, 40, 80].forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
@@ -952,7 +993,9 @@ export function generate(spec: TownSpec): any {
     // Gatherings: whatever holds one, in whatever words (a statement having a practice); and what groups teach.
     { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { has: ["assertion"] } },
     // Elections and the local paper (world-expansion 3).
-    ...(E ? [{ id: "elections", kind: "records", match: { statement_kinds: ["election_notice", "ballot", "electoral_roll", "ballot_result", "nomination", "news"] } }] : [])];
+    ...(E ? [{ id: "elections", kind: "records", match: { statement_kinds: ["election_notice", "ballot", "electoral_roll", "ballot_result", "nomination", "news"] } }] : []),
+    // The land register (world-expansion 6.2): the lots, and who holds them (a home of one's own).
+    ...(OW ? [{ id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "titles", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release"] } }] : [])];
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {

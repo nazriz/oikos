@@ -94,7 +94,7 @@ interface Loan { agreement: string; borrower: string; account: string; principal
  */
 export const lending: BehaviourModule = {
   name: "bank.lending",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -128,6 +128,7 @@ export const lending: BehaviourModule = {
     let nextInterest = MONTH;
     let own: string | undefined;
     let termsOffered = false;
+    let adopted = false; // loans in force when we first looked (the world's: mortgages already being repaid), taken on
 
     return stepper(
       (obs: Observation) => {
@@ -162,6 +163,18 @@ export const lending: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
+        // Loans in force when we first look: their repayments as their terms say, from when we first see them.
+        if (!adopted) {
+          adopted = true;
+          for (const r of book.ofType("agreement")) {
+            if (r.record !== "agreement" || r.terms.template !== "loan" || r.terms.parties[0] !== me || loans.has(r.id) || !book.inForce(r.id)) continue;
+            const who = r.terms.parties[1]!;
+            const repay = r.terms.commitments.find((c: any) => c.who === who)?.does?.outcome?.money;
+            if (!repay?.from) continue;
+            const payment = cents(repay.amount), months = Math.max(1, Math.round((r.terms.term ?? 0) / MONTH));
+            loans.set(r.id, { agreement: r.id, borrower: who, account: repay.from, principal: payment * months, payment, months, start: t });
+          }
+        }
         // What borrowing from us is, for anyone who might (docs/design/ai-citizens.md 2a): published once.
         if (!termsOffered) {
           termsOffered = book.open("loan_terms").some((r) => r.speaks_for === me);

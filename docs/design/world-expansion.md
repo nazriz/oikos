@@ -304,6 +304,8 @@ consultation (a payment from outside on the practice's claim).
 
 ### 6.2 Home ownership
 
+*Built 2026-10-01 (no contract change): docs/behaviour/ownership.md. As built: tenure and mortgages at the start, owners' costs and conduct, inheritance through the land registry. Buying and selling homes is next.*
+
 - Homes for sale (property sales exist for premises; the same for dwellings), mortgages from the bank (credit exists),
   owner-occupiers who pay rates and upkeep, not rent. The profile's tenure split (ABS census: owners outright, with a
   mortgage, renters) sets the start.

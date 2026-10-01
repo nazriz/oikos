@@ -1,4 +1,4 @@
-# `citizen.default` (v0.28.0): the AI citizen in code
+# `citizen.default` (v0.29.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -58,6 +58,7 @@ It wakes weekly, whenever something names it (an offer, a notice, a message), an
 | **School** | A child of school age (the world's `school.ages`) not at school asks the school for a place (once a month) and goes when offered. At the end of school they leave. | docs/behaviour/education.md |
 | **Too ill to work** | With a condition of a band nobody works with (the world's `care.off_work`: hospital-level), out of the workplace until better, then back. | Placeholder (docs/behaviour/health.md) |
 | **Care** | (A child too: their parents would take them.) With a condition of a kind the clinic sees, not yet treated: to the clinic with the chance `care.seek_bps`, waiting there and asking to be seen; home once seen (felt), better, or after `wait_days`. | Placeholder (docs/behaviour/health.md) |
+| **A home of our own** | A lot whose title is ours, with a dwelling we live in on it: no rent and no hunting for a rental; the mortgage repayment counts as housing; rates (and penalty interest, fines) paid when they come, keeping a month's essentials; no tenant's grievances; we don't leave town for want of work. | docs/behaviour/ownership.md |
 | **Utilities** | Holding a home and living there: signs up with the energy retailer. Bills addressed to us paid when they come, if we can, before anything else; what they come to a month counts with the rent in outgoings. | docs/behaviour/utilities.md |
 | **The tribunal** | A notice of rent increase that breaks the law (as we read it): to the tribunal with the chance `tribunal.challenge_bps`, paying the old rent meanwhile, and the new one only if it's found valid. A debt owed us still unpaid after `apply_after_days`: an application, with the chance `apply_bps`; an order to pay that's unpaid a day past its date, a request to enforce it. | docs/behaviour/justice.md (placeholders) |
 | **Leaving town** | After 90 days without a home, or 180 days with nobody in the household earning and less money than a month's rent or essentials: give notice, take all savings out of town, and leave with the household. The thresholds stretch with tradition and security, from half to one and a half times. | Hirschman (1970): exit. Thresholds are placeholders to calibrate |

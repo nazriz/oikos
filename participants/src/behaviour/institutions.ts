@@ -20,7 +20,11 @@ export function ownerOf(book: Book, lot: string): string | undefined {
   let holder: string | undefined;
   const titles = standingClaims([...book.ofType("claim"), ...book.ofType("claim_release"), ...book.ofType("withdrawal")]).filter((c) => c.about?.kind === "ownership" && c.about?.object === lot);
   for (const c of titles) holder = c.holder;
-  for (const r of book.ofType("claim_transfer")) if (titles.some((c) => c.id === r.claim)) holder = r.to;
+  // A transfer counts if the holder made it, or whoever issued the title (the land registry: a death's transmission, say).
+  for (const r of book.ofType("claim_transfer")) {
+    const c = titles.find((x) => x.id === r.claim);
+    if (c && (r.speaks_for === holder || r.speaks_for === c.speaks_for)) holder = r.to;
+  }
   return holder;
 }
 
@@ -463,7 +467,7 @@ export const builder: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
-  version: "0.3.1",
+  version: "0.4.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(_ctx: ParticipantContext) {
@@ -488,6 +492,15 @@ export const registry: BehaviourModule = {
             basis: n.id, visible: "public",
             data: { deceased: who, reported_by: n.speaks_for, ...(d.partner ? { partner: d.partner } : {}), children: d.children ?? [], without_adult: d.without_adult ?? [] },
           })));
+          // The land the deceased held passes to their heir, as the succession law says (the partner; else the eldest adult
+          // child; else the town), recorded by us as the land registry (a transmission).
+          const heir = (d.partner as string | undefined) ?? ((d.adult_children ?? []) as string[])[0] ?? me;
+          for (const lot of book.open("lot")) {
+            const owner = ownerOf(book, lot.id);
+            if (owner !== who) continue;
+            const title = standingClaims(book.ofType("claim")).find((c) => c.about?.kind === "ownership" && c.about?.object === lot.id);
+            if (title) steps.push(because(`${who} held ${lot.id}: passing it to their heir, ${heir}, as the law of succession says.`, C.call("claim", { transfer: title.id, to: heir, basis: n.id })));
+          }
         }
         steps.push(...letters.answer(() => `Report from the registrar: ${registered.size} deaths registered${registered.size ? ` (${[...registered].sort().join(", ")})` : ""}.`));
         return steps;

@@ -13,7 +13,8 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const base = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 // Tight housing and rich landlords, so they build.
-const tight = { ...base, citizens: 120, apartment_blocks: 2, houses: 16, landlord_capital: 300_000_000, landlord_compliance_bps: 10_000 };
+// (Every home let: these are landlords' buildings. Owner-occupiers would take some of their houses.)
+const tight = { ...base, ownership: false, citizens: 120, apartment_blocks: 2, houses: 16, landlord_capital: 300_000_000, landlord_compliance_bps: 10_000 };
 
 /** Refusals from same-moment races (D58): someone who'd just left, named for work by a firm acting on what it saw. */
 const RACES = ["not_present", "not_at_work", "capacity_exceeded", "no_time_left"]; // and moving into a home still being left; a new job's first day after a full one at the old

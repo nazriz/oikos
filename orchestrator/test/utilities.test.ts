@@ -45,7 +45,9 @@ test("water is drawn from the river and energy bought from the grid, as the town
   expect(bills.some((b) => b.data.service === "water")).toBe(true);
   expect(bills.filter((b) => b.data.service === "energy").length).toBeGreaterThan(customers * 2);
   const paid = new Set(ev.filter((e) => e.event === "transfer" && e.settles).map((e) => e.settles));
-  expect(bills.filter((b) => b.at < 110 * DAY).every((b) => paid.has(b.id))).toBe(true);
+  // (Nearly all by now: a household short of money pays when it can.)
+  const due = bills.filter((b) => b.at < 110 * DAY);
+  expect(due.filter((b) => paid.has(b.id)).length).toBeGreaterThan(due.length * 0.9);
   expect(recs.some((r) => r.kind === "water_restrictions")).toBe(false);
 }, 900_000);
 

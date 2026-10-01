@@ -33,6 +33,7 @@ import * as C from "../calls";
 import { because, Book, breaches, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
+import { ownerOf } from "./institutions";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
@@ -108,6 +109,8 @@ export function heardNews(text: string): News | undefined {
 /** A home is a unit (a space) in a building. */
 interface Home {
   agreement: string; space: string; structure: string; landlord: string; rent: number; order?: string; movedIn: boolean;
+  /** Ours (`agreement` is the title; `rent`, the mortgage repayment, if any): docs/behaviour/ownership.md. */
+  owned?: boolean;
   /** Rent orders replaced by a new rent's, to stop once their last payment is made (when). */
   retiring?: { order: string; at: number }[];
 }
@@ -115,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.28.0",
+  version: "0.29.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -419,6 +422,28 @@ export const citizen: BehaviourModule = {
     let nextFertility = ctx.rng("fertility-day").below(30) * DAY;
     const householdIncome = () => monthlyIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0);
 
+    /** A home we own (world-expansion 6.2): a lot whose title is ours (the world's, bought, or inherited), with a dwelling
+     * we live in on it. What we pay on a loan for it (its text names the home) is what it costs us a month. */
+    const findOwnHome = (obs: Observation) => {
+      const street = obs.channels.street;
+      if (!isLeaseholder() || street?.kind !== "sites") return;
+      const titles = new Set([...book.ofType("claim").filter((c: any) => c.about?.kind === "ownership" && c.holder === me).map((c: any) => c.about.object),
+        ...book.ofType("claim_transfer").filter((r: any) => r.to === me).map((r: any) => (book.records.get(r.claim) as any)?.about?.object).filter(Boolean)]);
+      for (const lot of titles) {
+        if (ownerOf(book, lot) !== me) continue;
+        const cells = new Set((book.records.get(lot) as any)?.data?.cells ?? []);
+        const st = street.cells.find((c) => cells.has(c.cell) && c.structure)?.structure;
+        const space = st?.spaces.find((sp) => sp.kind === "dwelling" && sp.occupants?.includes(me))?.space;
+        if (!st || !space) continue;
+        const title = book.ofType("claim").find((c: any) => c.about?.kind === "ownership" && c.about?.object === lot) as any;
+        const loan = book.ofType("agreement").find((r: any) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(me) && book.inForce(r.id) && String(r.terms.text ?? "").includes(space)) as any;
+        const repay = loan ? cents(loan.terms.commitments.find((c: any) => c.who === me)?.does?.outcome?.money?.amount ?? 0) : 0;
+        home = { agreement: title?.id ?? lot, space, structure: st.structure, landlord: me, rent: repay, movedIn: true, owned: true };
+        livingAt = null;
+        return;
+      }
+    };
+
     const learnFromInitialRecords = (obs: Observation) => {
       // Agreements already in force when we first look (the world's genesis records).
       for (const r of book.ofType("agreement")) {
@@ -571,6 +596,7 @@ export const citizen: BehaviourModule = {
 
     const plan = (obs: Observation): Step[] => {
       if (plannedAt === -1) learnFromInitialRecords(obs);
+      if (!home) findOwnHome(obs);
       const t = obs.t;
       // Our account at a bank (standing orders need one). Money brought from elsewhere is in our own keeping until we deposit it.
       const ours = channels.accounts(obs).filter((a) => a.holder === me).map((a) => ({ ...a, balance: cents(a.balance) }));
@@ -1050,7 +1076,7 @@ export const citizen: BehaviourModule = {
       const patience = Math.max(0.5, Math.min(1.5, 1 + p.sway.patience_tradition * zValue("tradition") + p.sway.patience_security * zValue("security")));
       const homelessDays = Math.round(p.leave_after_homeless_days * patience);
       const joblessDays = Math.round(p.leave_after_jobless_days * patience);
-      const leave = isLeaseholder() && (
+      const leave = isLeaseholder() && !home?.owned && (
         (homelessSince !== null && t - homelessSince >= homelessDays * DAY) ||
         (joblessSince !== null && t - joblessSince >= joblessDays * DAY && earnedIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0) === 0 && broke));
       if (leave) {
@@ -1306,6 +1332,17 @@ export const citizen: BehaviourModule = {
         energyFor = home.agreement;
         steps.push(because("A home of ours: signing up for its energy supply.", say("supply_request", `Supply request: energy for ${home.space}.`, { to: [p.utilities.energy], visible: [me, p.utilities.energy], data: { account: acc.account, home: home.space } })));
       }
+      // What's recorded against us to pay (rates on a home we own, a fine): paid when we can, keeping a month's essentials.
+      for (const c of book.ofType("claim") as any[]) {
+        if (c.counterparty !== me || c.position !== "right" || !["rates", "rates_interest", "fine"].includes(c.about?.kind) || billsPaid.has(c.id)) continue;
+        const amount = cents(c.about.amount ?? 0);
+        const to = c.about.account;
+        if (!to || amount <= 0 || acc.balance < amount + p.essentials) continue;
+        billsPaid.add(c.id);
+        bills.push({ at: t, amount });
+        acc.balance -= amount;
+        steps.push(because(`Paying the ${c.about.kind} recorded against us (${c.about.for ?? c.id}).`, pay(to, amount, { from: acc.account, for: `Paying ${c.about.kind} ${c.id}.`, settles: c.id })));
+      }
       for (const inv of book.open("invoice").filter((r) => (r.addressed_to ?? []).includes(me) && r.data?.service && !billsPaid.has(r.id))) {
         const m = inv.data?.outcome?.money;
         const amount = cents(m?.amount ?? 0);
@@ -1535,12 +1572,14 @@ export const citizen: BehaviourModule = {
     const willing = ctx.rng("petition-willing").below(10_000) < p.petition_willing_bps;
     const countsPublished = new Map<string, { n: number; at: number }>();
     const voice = (t: number, steps: Step[]) => {
-      const burden = home && householdIncome() > 0 ? (home.rent * 10_000) / householdIncome() : 0;
+      // (Tenants only: an owner has no landlord, and no tenancy to protect.)
+      const tenancy = home && !home.owned ? home : null;
+      const burden = tenancy && householdIncome() > 0 ? (tenancy.rent * 10_000) / householdIncome() : 0;
       const noticed = [...book.notices.entries()].some(([ag, ns]) => ag === home?.agreement && ns.some((n) => n.as !== me));
       // Aggrieved: angry with our landlord (given notice to go, or a rent rise), while it lasts; or while the rent
       // takes too much of our income.
-      if (home && noticed) feelings.feel("anger", home.landlord, 6_000, t);
-      const aggrieved = !!home && (burden >= p.rent_burden_grievance_bps || feelings.level("anger", home.landlord, t) >= p.aggrieved_bps);
+      if (tenancy && noticed) feelings.feel("anger", tenancy.landlord, 6_000, t);
+      const aggrieved = !!tenancy && (burden >= p.rent_burden_grievance_bps || feelings.level("anger", tenancy.landlord, t) >= p.aggrieved_bps);
       const open = found.petitions.filter((x) => (x.data?.demand?.tags ?? []).includes("tenant_protection"));
       // An organiser closes their petition after `petition_days`; a new one can then start.
       for (const pet of open) if (pet.speaks_for === me && t - pet.at >= p.petition_days * DAY && !signed.has(`closed-${pet.id}`)) {
@@ -1675,7 +1714,7 @@ export const citizen: BehaviourModule = {
       }
       if (askedSchool >= 0 && t - askedSchool < MONTH) return undefined;
       askedSchool = t;
-      return because(`Of school age (${age}) and not at school: asking the school for a place.`, say("school_enrolment", `Enrolment at school: ${me}.`, { to: [p.school.entity], visible: [me, p.school.entity], data: { born_at: obs.body.born_at, years_before: 0 } }));
+      return because(`Of school age (${age}) and not at school: asking the school for a place.`, say("school_enrolment", `Enrolment at school: ${me}.`, { to: [p.school.entity], visible: [me, p.school.entity], data: { born_at: obs.body.born_at, years_before: Math.max(0, age - p.school.ages[0]) } })); // (years at school elsewhere: a newcomer's)
     };
 
     // ---- the body: off work while too ill to work, care at the clinic, and leaving school at its end ----
@@ -1765,18 +1804,18 @@ export const citizen: BehaviourModule = {
         if (voted.has(b.id) || b.data?.electorate !== "roll" || !roll.has(me) || t < Number(b.data?.opens_at ?? 0) || t >= Number(b.data?.closes_at ?? 0)) continue;
         voted.add(b.id);
         if (ctx.rng(`turnout-${b.id}`).below(10_000) >= p.civic.turnout_bps) continue;
-        const candidates = (b.data?.candidates ?? []) as { candidate: string; nomination: string }[];
+        const candidates = (b.data?.candidates ?? []) as { candidate: string; number?: string; nomination: string }[];
         const scores = candidates.map((c) => {
           const nom = book.records.get(c.nomination) as any;
           const incumbent = !!nom?.data?.incumbent;
           const values = ((nom?.data?.values ?? []) as Value[]).filter((v) => v in mind.person.values);
           const fit = values.length ? values.reduce((a, v) => a + zValue(v), 0) / values.length : 0;
           const score = Math.round(incumbent ? approval : fit * p.civic.platform_weight_bps) + (c.candidate === ctx.participant ? 100_000 : 0);
-          return { key: c.candidate, score };
+          return { key: c.candidate, number: c.number ?? c.candidate, score };
         }).sort((x, y) => y.score - x.score || (x.key < y.key ? -1 : 1));
         if (!scores.length) continue;
         decided.push({ t, domain: "vote", strategy: "deliberate", choice: scores[0]!.key, options: scores });
-        steps.push(because(`Voting: ranking the ${scores.length} candidates (our approval of the town's government: ${approval}).`, vote(b.id, scores.map((x) => x.key).join(">"), [town])));
+        steps.push(because(`Voting: ranking the ${scores.length} candidates (our approval of the town's government: ${approval}).`, vote(b.id, scores.map((x) => x.number).join(">"), [town])));
       }
     };
 
@@ -1822,7 +1861,7 @@ export const citizen: BehaviourModule = {
       /** Our job and home, as we have them (truth audits). */
       beliefs: (): Belief[] => departed ? [] : [
         ...(job ? [{ of: "agreement" as const, agreement: job.agreement, in_force: true }] : []),
-        ...(home ? [{ of: "agreement" as const, agreement: home.agreement, in_force: true }] : []),
+        ...(home && !home.owned ? [{ of: "agreement" as const, agreement: home.agreement, in_force: true }] : []),
       ],
       step(obs): ParticipantAction | Promise<ParticipantAction> {
         if (departed) return wait(ctx.world.runEnd + DAY);

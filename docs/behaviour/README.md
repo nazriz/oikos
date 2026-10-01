@@ -47,6 +47,7 @@ Rules every module follows (so re-runs are reproducible):
 | `city.environment` | the town's environment office: hires the scientists the budget's environment line pays for; surveys the district's species each quarter; reports, and keeps a habitat register for planning | [environment.md](environment.md); the physics: [nature.md](nature.md) |
 | `school.principal` | a school: keeps its teachers, gives places to children of school age, teaches each classroom on school days (raising pupils' skill), certifies those who finish | [education.md](education.md) |
 | `clinic.practice` | a clinic: keeps its doctors, sees patients who come in and ask, in turn, as their hours allow (care shortens a condition) | [health.md](health.md) |
+| (home ownership) | owner-occupiers at the start, mortgages the bank takes on, owners' rates, titles passed to heirs | [ownership.md](ownership.md) |
 | `utility.water` | a water corporation: draws the town's use from the river each day (restrictions when it can't), bills owners quarterly | [utilities.md](utilities.md) |
 | `utility.energy` | an energy retailer: buys from the grid, supplies its customers (emitting the grid's greenhouse gas), bills them monthly | [utilities.md](utilities.md) |
 | `tribunal.member` | a tribunal's member: lists applications, tells both sides, and on the day decides on the record under the laws in force (a rent increase invalid or valid; a debt ordered paid) | [justice.md](justice.md) |

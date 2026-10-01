@@ -36,7 +36,7 @@ export function instantRunoff(candidates: string[], rankings: string[][]): { win
 
 export const electoralOffice: BehaviourModule = {
   name: "city.electoral_office",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/elections.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -82,7 +82,8 @@ export const electoralOffice: BehaviourModule = {
           const since = notice ? book.records.get(notice)?.at ?? 0 : 0;
           const noms = book.open("nomination").filter((n) => n.at >= since && n.data?.office === p.office && (n.addressed_to ?? []).includes(p.town));
           const candidates = [...new Map(noms.map((n) => [n.author as string, n])).values()].sort((a, b) => (a.author < b.author ? -1 : 1));
-          const names = candidates.map((n) => ({ candidate: n.author as string, for: n.speaks_for as string, name: (n.data?.name as string) ?? (n.speaks_for as string), nomination: n.id }));
+          // (Each candidate's number on the ballot paper, in order: a vote ranks the numbers, as on a real ballot.)
+          const names = candidates.map((n, i) => ({ candidate: n.author as string, number: String(i + 1), for: n.speaks_for as string, name: (n.data?.name as string) ?? (n.speaks_for as string), nomination: n.id }));
           // One candidate: elected unopposed, with no ballot. None: no one elected (the office stays as it is).
           if (names.length <= 1) {
             const who = names[0];
@@ -98,14 +99,15 @@ export const electoralOffice: BehaviourModule = {
           const r = roll();
           const st = because(`Nominations closed: ${names.length} candidates. Publishing the roll (${r.length}) and the ballot.`,
             say("electoral_roll", `The electoral roll for the election on day ${Math.floor(poll / DAY)}: ${r.length} electors.`, { visible: "public", data: { electors: r, poll_at: poll } }),
-            ["ballot", say("ballot", `Ballot: ${p.office_title || p.office}. Candidates: ${names.map((x) => x.name).join(", ")}. ${p.method === "preferential" ? "Rank them, first to last, as the choice: their ids, in order, joined by >." : "Choose one."} Voting closes on day ${Math.floor(poll / DAY)}.`,
-              { visible: "public", data: { office: p.office, electorate: "roll", candidates: names, method: p.method, opens_at: poll - p.voting_days * DAY, closes_at: poll, options: names.map((x) => x.candidate) } })]);
+            ["ballot", say("ballot", `Ballot: ${p.office_title || p.office}. Candidates: ${names.map((x) => `${x.number}. ${x.name}`).join(", ")}. ${p.method === "preferential" ? "Rank them, first to last, as the choice: their numbers, in order, joined by > (2>1>3)." : "Choose one, by number."} Voting closes on day ${Math.floor(poll / DAY)}.`,
+              { visible: "public", data: { office: p.office, electorate: "roll", candidates: names, method: p.method, opens_at: poll - p.voting_days * DAY, closes_at: poll, options: names.map((x) => x.number) } })]);
           st.then = (out) => { ballot = out.created?.ballot; };
           steps.push(st);
         }
         if (stage === "voting" && ballot && t >= poll) {
           const b = book.records.get(ballot) as any;
-          const candidates: string[] = b?.data?.options ?? [];
+          const candidates: string[] = b?.data?.options ?? []; // (their numbers on the ballot)
+          const byNumber = new Map(((b?.data?.candidates ?? []) as { candidate: string; number?: string }[]).map((c) => [c.number ?? c.candidate, c.candidate]));
           const electors = new Set((book.open("electoral_roll").sort((a, x) => x.at - a.at)[0]?.data?.electors as string[] | undefined) ?? []);
           // Each elector's last vote on this ballot, if it ranks the candidates (others are informal).
           const last = new Map<string, string[]>();
@@ -114,7 +116,9 @@ export const electoralOffice: BehaviourModule = {
             const ranking = String(v.choice).split(">").map((x) => x.trim()).filter((x) => candidates.includes(x));
             if (ranking.length) last.set(v.speaks_for, p.method === "plurality" ? ranking.slice(0, 1) : ranking);
           }
-          const { winner, rounds } = instantRunoff(candidates, [...last.values()]);
+          const counted = instantRunoff(candidates, [...last.values()]);
+          const winner = counted.winner ? byNumber.get(counted.winner) : undefined;
+          const rounds = counted.rounds.map((r) => Object.fromEntries(Object.entries(r).map(([n, v]) => [byNumber.get(n) ?? n, v])));
           const who = (b?.data?.candidates ?? []).find((c: any) => c.candidate === winner);
           const turnout = electors.size ? Math.round((last.size * 10_000) / electors.size) : 0;
           steps.push(because(`Polling day: counting ${last.size} formal votes of ${electors.size} electors${winner ? `; ${who?.name ?? winner} is elected` : ": nobody is elected"}.`,
