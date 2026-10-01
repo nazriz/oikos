@@ -6,7 +6,7 @@ import { cents } from "../money";
 import type { Observation } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
@@ -22,7 +22,7 @@ import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from
  */
 export const producer: BehaviourModule = {
   name: "firm.producer",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -44,7 +44,7 @@ export const producer: BehaviourModule = {
         period: 14 * DAY,
         notice_days: 14,
         working_day: 8 * 3600,
-        work_days: 5, // of every 7
+        work_days: 5, // of every 7 look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)
         price: 6000, // its wholesale price, cents each
         min_order: 50, // the least it sells in one order (it sells wholesale)
         lender: "", // whom it borrows from (none: it doesn't)
@@ -98,10 +98,10 @@ export const producer: BehaviourModule = {
     let nextShipment = 0;
     const workDay = (t: number) => Math.floor(t / DAY) % 7 < p.work_days;
     const monthlyUnits = (workers: number) => Math.floor((workers * p.working_day * p.work_days * 30) / 7 / p.labour_per_unit);
-    /** Room in our workplace now: its capacity less the bodies in it. */
-    const roomAtWork = (obs: Observation) => {
+    /** Room in our workplace: its capacity less our staff, or the bodies in it now if more (staff come and go each day). */
+    const roomAtWork = (obs: Observation, staff: number) => {
       const sp = channels.cells(obs).find((c) => c.structure?.structure === p.works)?.structure?.spaces.find((x) => x.kind === "workplace");
-      return sp ? sp.capacity - sp.count : p.max_staff;
+      return sp ? sp.capacity - Math.max(sp.count, staff) : p.max_staff;
     };
     const hourly = () => Math.ceil((wage * 3600) / ((p.period / DAY) * (p.work_days / 7) * p.working_day));
 
@@ -195,7 +195,7 @@ export const producer: BehaviourModule = {
         steps.push(...bargaining.steps(book, t, staffing, acc.account, acc.balance, (rise) => { wage = Math.floor((wage * (10_000 + rise)) / 10_000); }));
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
-          target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs) > 0,
+          target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
           why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} a fortnight.`,
         }));
         // Can't cover the next pay period: let the most recent hire go.
@@ -332,6 +332,7 @@ export const producer: BehaviourModule = {
         }
         return steps;
       },
+      p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
     ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };

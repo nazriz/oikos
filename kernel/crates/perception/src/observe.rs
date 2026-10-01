@@ -70,6 +70,9 @@ pub struct BodyView {
     /// Its variables (the world's `body_variables`), as they are now.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub variables: BTreeMap<Id, i64>,
+    /// The space it's in (one at a time), if any (world-expansion 6.4).
+    #[serde(default, rename = "in", skip_serializing_if = "Option::is_none")]
+    pub in_space: Option<Id>,
     /// Its children, as a parent knows them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<ChildView>,
@@ -835,7 +838,7 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
             channels.insert(path, data);
         }
     }
-    let body = p.person.as_ref().and_then(|person| st.body(person)).map(|b| BodyView {
+    let body = p.person.as_ref().and_then(|person| st.body(person).map(|b| (person, b))).map(|(person, b)| BodyView {
         born_at: b.born_at,
         sex: b.sex,
         children: b
@@ -854,6 +857,7 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
             .iter()
             .filter_map(|cfg| b.variables.get(&cfg.id).map(|x| (cfg.id.clone(), crate::state::body_variable_at(cfg, *x, st.t).0)))
             .collect(),
+        in_space: st.structures_of(person).into_iter().find_map(|sid| st.occupancy.get(&sid)?.iter().find(|(_, bodies)| bodies.contains(person)).map(|(sp, _)| sp.clone())),
     });
     let positions = st
         .positions

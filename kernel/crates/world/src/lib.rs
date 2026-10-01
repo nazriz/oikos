@@ -10,6 +10,7 @@ pub mod geo;
 pub mod kernel;
 pub mod state;
 pub mod statics;
+pub mod travel;
 
 pub use kernel::{Command, ProtocolError, World};
 

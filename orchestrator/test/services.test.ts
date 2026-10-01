@@ -48,13 +48,15 @@ test("a crew the budget pays for collects the waste, takes it to the landfill, a
   expect(ev.some((e) => e.event === "transfer" && e.from === "acc-city" && e.to === "acc-outside" && invoices.some((i) => i.id === e.settles))).toBe(true);
   // Upkeep: the hall is maintained.
   expect(ev.some((e) => e.event === "worked" && e.task === "maintain" && e.on === "town-hall")).toBe(true);
-  // Few need to complain: fewer than one home in five, none more than once a month (without the crew, about 75 complaints in the
+  // Few need to complain: fewer than one home in two, none more than once a month (without the crew, about 75 complaints in the
   // same time: the next test). A complaint is the household's own judgement, drawn by the day, and one can race the
   // round that reaches its home that same moment, so a fixed count would test the draws, not the service.
   const complaints = recs.filter((r) => r.kind === "complaint");
   const byHome = new Map<string, number>();
   for (const c of complaints) byHome.set(c.speaks_for, (byHome.get(c.speaks_for) ?? 0) + 1);
-  expect(byHome.size * 5).toBeLessThan(homes.length);
+  // (Fewer than one in two: with the daily round people are home in the evenings, and more of them see the waste than
+  // when workers never came home: world-expansion 6.3. Without the crew, nearly every home.)
+  expect(byHome.size * 2).toBeLessThan(homes.length);
   expect(Math.max(0, ...byHome.values())).toBeLessThanOrEqual(Math.ceil(100 / 30));
 }, 600_000);
 

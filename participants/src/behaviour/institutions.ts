@@ -11,7 +11,7 @@ import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { evaluate, standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, prohibitions, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { nextLook, because, Book, prohibitions, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 
@@ -191,7 +191,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.9.3",
+  version: "0.10.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -204,7 +204,7 @@ export const builder: BehaviourModule = {
         wage: 150_000, // the crew's pay, cents per period
         period: 14 * DAY,
         working_day: 8 * 3600, // seconds a worker works in a day
-        work_days: 5, // of every 7
+        work_days: 5, // of every 7 look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)
         build_markup_bps: 2000,
         quote_valid_days: 30, // a published price is honoured this long (placeholder: a common term for a builder's quote)
         workplace: "", // the space in the yard its crew works in
@@ -454,6 +454,7 @@ export const builder: BehaviourModule = {
           "A letter asking about work: answering with our prices and how we take on a job."));
         return steps;
       },
+      p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
     ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };

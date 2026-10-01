@@ -652,6 +652,33 @@
               }
             }
           }
+        },
+        "travel": {
+          "description": "Travel (world-expansion 6.3): a body moving from one structure to another takes the time of the quickest path over the cells between, each cell costing what its cover says (by_cover: a road quicker, water slower) or seconds_per_cell. The act of moving takes that much longer. Absent: moving takes no time. Either way a body is in one space at a time.",
+          "type": "object",
+          "required": [
+            "seconds_per_cell"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "seconds_per_cell": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400
+            },
+            "by_cover": {
+              "type": "object",
+              "propertyNames": {
+                "$ref": "urn:terrarium:contracts:0.7:common#/$defs/ConfigId"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 86400
+              },
+              "maxProperties": 50
+            }
+          }
         }
       }
     },

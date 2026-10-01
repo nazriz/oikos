@@ -29,7 +29,8 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
 
   // ---- school ----
   // Everyone of school age at the start is in a classroom; teaching happens on about the school days there are.
-  const pupils = config.world.occupancy.filter((o: any) => o.space.includes("/classroom."));
+  // (At home at the start, each with a place: they go in school hours.)
+  const pupils = config.world.records.filter((r: any) => r.kind === "school_place").map((r: any) => ({ occupant: r.addressed_to[0], space: r.data.classroom }));
   const ageAt0 = (p: string) => Math.floor(-born.get(p)! / YEAR);
   expect(pupils.length).toBe([...born.keys()].filter((p) => ageAt0(p) >= 5 && ageAt0(p) <= 17).length);
   const lessons = ev.filter((e) => e.event === "worked" && e.task === "teach");
@@ -67,13 +68,14 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
     expect(x.until).toBeLessThan(b.until);
   }
   // Too ill to work: workers out of their workplace while it lasts, and back after.
-  const offSick = log.filter((e) => e.kind === "command" && /Too ill to work/.test(JSON.stringify(e.body))).length;
-  const back = log.filter((e) => e.kind === "command" && /Better: back to work/.test(JSON.stringify(e.body))).length;
-  expect(offSick).toBeGreaterThan(0);
-  expect(back).toBeGreaterThan(0);
+  // (Each tells their employer; once better, they're back at work.)
+  const sick = recs.filter((r) => r.kind === "sick_leave");
+  expect(sick.length).toBeGreaterThan(0);
+  const back = sick.filter((r) => ev.some((e) => e.event === "occupied" && e.occupant === r.speaks_for && e.space.includes("/workplace.") && e.t > r.at));
+  expect(back.length).toBeGreaterThan(0);
 
   // Nothing refused but the usual races (and a patient who'd gone home before being seen).
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code)).map((e) => e.code)).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "participant_inactive"].includes(e.code)).map((e) => e.code)).toEqual([]);
 }, 900_000);
 
 test("with care in the world, treatable deaths come through severe illness, and with care as usual each age dies at the life table's rate", () => {

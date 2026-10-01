@@ -1159,6 +1159,24 @@ See the design note, §16.
   - **Liberties:** flats all rented (no strata); owners don't leave town; no market for homes yet.
   - **Revisit when:** homes come up for sale (owners leaving, estates sold, new builds) and renters buy (the BoE model's buy/rent decision, mortgages for buyers).
 
+- **The daily round, built** (2026-10-01; contract signed; docs/behaviour/daily-round.md).
+  - **In Rust:** a body in one place at a time; moving between buildings takes the quickest path's time by cover; one's own body says where it is.
+  - **In TypeScript:**
+    - citizens go to work and school and come home, waking when that changes (commute wakes only move them);
+    - employers look at the day's work an hour after it starts;
+    - the school's roll is its places;
+    - the grants office and water corporation count residents at night, as a census does;
+    - workers call in sick;
+    - a birth's chance waits until partners are together.
+  - **Found by running it:**
+    - **a measurement bug:** employment was counted as bodies in workplaces at the run's end, which a run ending at midnight with everyone home reads as none employed. Jobs are now employment agreements in force, and "move-ins" and "hires" are first arrivals, not each day's commute (economy/summary, economy/monthly, town/economy, town/word-of-mouth);
+    - hiring room counted bodies present (at night, everyone's place free): now staff on contract;
+    - children taken out of town kept going to school;
+    - a tenant whose home was pulled down tried to go home again and again;
+    - the round brought a new leaseholder home before their own moving-in step, which then failed forever.
+  - **What changes:** about the same work done; people home in the evenings see more (waste complaints up, deaths at home seen); wakes up about 3.7 times, the suite about twice as long.
+  - **Revisit if:** speed matters more (commute wakes could be batched by the engine); a study needs roads, traffic or rosters.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

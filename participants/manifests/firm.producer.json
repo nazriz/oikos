@@ -1,6 +1,6 @@
 {
   "name": "firm.producer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "doc": "docs/behaviour/producer.md",
   "params": {
     "builder": {
@@ -67,6 +67,15 @@
       },
       "default": "",
       "source": "placeholder"
+    },
+    "look_at": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "look_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
     },
     "market": {
       "schema": {
@@ -257,7 +266,7 @@
     "work_days": {
       "schema": {
         "type": "integer",
-        "description": "of every 7"
+        "description": "of every 7 look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
       },
       "unit": "days",
       "default": 5,

@@ -145,7 +145,7 @@ export interface Condition { id: Id; kind: "illness" | "injury"; severity: strin
 export type Sex = "female" | "male";
 /** A child, as their parent knows them. */
 export interface ChildView { person: Id; born_at: number; sex?: Sex; alive: boolean }
-export interface Body { born_at: number; sex?: Sex; present: boolean; alive: boolean; parents?: Id[]; conditions?: Condition[]; children?: ChildView[]; /** Its variables (skill...), as they are now. */ variables?: { [variable: string]: number } }
+export interface Body { born_at: number; sex?: Sex; present: boolean; alive: boolean; parents?: Id[]; conditions?: Condition[]; children?: ChildView[]; /** Its variables (skill...), as they are now. */ variables?: { [variable: string]: number }; /** The space it's in (one at a time). */ in?: string }
 
 /** What an entity holds, and where (phase B): a quantity (a decimal-string integer) of a resource kind at a place. */
 export interface HoldingItem { kind: Id; at: Id; quantity: string }

@@ -80,7 +80,10 @@ test("a demolition order is carried out by the builder's crew, commissioned by t
   config.world.records.push({ id: "order-1", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "demolition_order", addressed_to: ["landlord-1"],
     text: `Order: demolish ${house.id}.`, data: { structure: house.id, lot: lotOf(house.at) } });
   const { ev, recs } = await run("demolition", config, 60 * DAY);
-  expect(ev.filter((e) => e.event === "action_refused" && !RACES.includes(e.code))).toEqual([]);
+  // (Its tenants, out at work when it came down, try going home once each: they couldn't see it from there.)
+  const gone = ev.filter((e) => e.event === "action_refused" && ["coming_down", "unknown_structure"].includes(e.code));
+  expect(new Set(gone.map((e) => e.participant)).size).toBe(gone.length);
+  expect(ev.filter((e) => e.event === "action_refused" && !RACES.includes(e.code) && !["coming_down", "unknown_structure"].includes(e.code))).toEqual([]);
   // The landlord commissions the builder at its published demolition price; the builder starts, and invoices.
   const contract = recs.find((r) => r.record === "agreement" && r.terms.template === "construction" && r.basis === "order-1");
   expect(contract.terms.commitments[0].does.outcome.structure).toEqual({ remove: house.id });

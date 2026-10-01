@@ -380,12 +380,14 @@ export const valuer: BehaviourModule = {
  */
 export const grants: BehaviourModule = {
   name: "world.grants",
-  version: "0.1.0",
+  version: "0.2.0",
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
-  firstWake: () => 0,
+  firstWake: () => 3 * 3600,
   create(ctx) {
-    const p = need(params({ account: "", to: "", to_account: "", per_resident_per_year: 0, every_days: 91, first_day: 30, dwelling: "dwelling" }, ctx.params), ["account", "to", "to_account"], "world.grants");
+    const p = need(params({ account: "", to: "", to_account: "", per_resident_per_year: 0, every_days: 91, first_day: 30, dwelling: "dwelling",
+      count_at: 3 * 3600, // when it looks (a time of night: residents are counted where they sleep, as a census counts them)
+    }, ctx.params), ["account", "to", "to_account"], "world.grants");
     const me = ctx.entity;
     const seen = new Map<string, SiteStructure | undefined>(); // what we last saw on each cell (perception is changes)
     let next = p.first_day * DAY;
@@ -405,6 +407,8 @@ export const grants: BehaviourModule = {
           say("grant_payment", `A grant of ${usd(amount)} for the quarter (${residents} residents).`, { to: [p.to], visible: [me, p.to], data: { amount, residents, per_resident_per_year: p.per_resident_per_year } }),
           pay(p.to_account, amount, { from: p.account, for: "Grant." }))];
       },
+      // (It looks at night, when residents are home: not wherever the day has taken them.)
+      (obs) => (Math.floor(obs.t / DAY) + 1) * DAY + p.count_at,
     );
   },
 };

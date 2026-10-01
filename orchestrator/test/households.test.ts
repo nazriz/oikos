@@ -49,10 +49,14 @@ test("households live, move and pay together", async () => {
   }
   expect(split).toBeLessThanOrEqual(1);
 
-  // Children are brought by a parent (the leaseholder), never move themselves.
+  // Children are brought into a new home by a parent (the leaseholder); after, they come home from school themselves.
   const childMoves = ev.filter((e) => e.event === "occupied" && e.space.includes("/dwelling.") && known(e.occupant) && !adult(e.occupant, e.t));
   expect(childMoves.length).toBeGreaterThan(0);
-  for (const e of childMoves) expect(e.by).toBe(`${householdOf.get(e.occupant).leaseholder}-self`);
+  const firstInto = new Map<string, any>();
+  for (const e of childMoves) if (!firstInto.has(`${e.occupant}|${e.space}`)) firstInto.set(`${e.occupant}|${e.space}`, e);
+  const brought = [...firstInto.values()].filter((e) => !config.world.occupancy.some((o: any) => o.occupant === e.occupant && o.space === e.space));
+  for (const e of brought) expect([`${householdOf.get(e.occupant).leaseholder}-self`, `${e.occupant}-self`]).toContain(e.by);
+  expect(brought.some((e) => e.by === `${householdOf.get(e.occupant).leaseholder}-self`)).toBe(true);
   // Other adults move themselves.
   const adultMoves = ev.filter((e) => e.event === "occupied" && e.space.includes("/dwelling.") && known(e.occupant) && adult(e.occupant, e.t) && householdOf.get(e.occupant).leaseholder !== e.occupant);
   expect(adultMoves.length).toBeGreaterThan(0);
@@ -93,6 +97,7 @@ test("a child born here is brought home by the parent who bore them and added to
     if (home) expect(home.by).toBe(`${b.parents[0]}-self`);
   }
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
-  // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own) and moving into a home still being left, as above.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
+  // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own) and moving into a home still being left, as above;
+  // and, with the daily round, a partner gone to work while a conception was under way, or someone who died mid-trip.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "too_far", "participant_inactive"].includes(e.code))).toEqual([]);
 }, 300_000);

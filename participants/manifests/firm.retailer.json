@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -100,6 +100,15 @@
       "schema": {},
       "default": null,
       "source": "placeholder"
+    },
+    "look_at": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "look_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
     },
     "max_staff": {
       "schema": {
@@ -302,7 +311,7 @@
     "work_days": {
       "schema": {
         "type": "integer",
-        "description": "of every 7: shops open on Saturdays"
+        "description": "of every 7: shops open on Saturdays look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
       },
       "unit": "days",
       "default": 6,

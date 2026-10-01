@@ -10,7 +10,14 @@ at_end as (select r.run_id,
     count(*) filter (where p.born_at + 18 * 365 * 86400 <= r.end_t and (ret.age is null or p.born_at + ret.age * 365 * 86400 > r.end_t)) as working_age,
     count(*) filter (where p.born_at + 18 * 365 * 86400 <= r.end_t and (ret.age is null or p.born_at + ret.age * 365 * 86400 > r.end_t) and not p.outside_lf) as labour_force
   from r join people p on p.run_id = r.run_id and p.created_t <= r.end_t and (p.gone_t is null or p.gone_t > r.end_t) left join ret on ret.run_id = r.run_id group by all),
-jobs as (select o.run_id, sum(case when o.event = 'occupied' then 1 else -1 end) as employed from occupancy o join r on r.run_id = o.run_id where o.t <= r.end_t and o.space_kind = 'workplace' group by all),
+-- (Jobs are employment agreements the worker signed, with no notice on them yet: being at work is only part of a day.)
+emp as (select a.run_id, a.id, json_extract_string(a.body, '$.terms.parties[0]') as employer, json_extract_string(a.body, '$.terms.parties[1]') as worker,
+    (select min(s.t) from records s where s.run_id = a.run_id and s.record = 'signature' and json_extract_string(s.body, '$.agreement') = a.id and s.speaks_for = json_extract_string(a.body, '$.terms.parties[1]')) as signed_t,
+    (select min(n.t) from records n where n.run_id = a.run_id and n.record = 'notice' and json_extract_string(n.body, '$.agreement') = a.id) as notice_t
+  from records a where a.record = 'agreement' and a.template = 'employment'),
+jobs as (select e.run_id, count(distinct e.worker) as employed from emp e join r on r.run_id = e.run_id
+    left join people p on p.run_id = e.run_id and p.entity = e.worker
+  where e.signed_t <= r.end_t and (e.notice_t is null or e.notice_t > r.end_t) and (p.gone_t is null or p.gone_t > r.end_t) group by all),
 person_accounts as (select distinct a.run_id, a.account, a.holder, l.t as left_t, ar.t as arrived_t from accounts a join entities e on e.run_id = a.run_id and e.entity = a.holder and e.kind = 'person'
   left join (select run_id, person, min(t) as t from life where event = 'person_left' group by all) l on l.run_id = a.run_id and l.person = a.holder
   left join (select run_id, person, max(t) as t from life where event = 'person_arrived' group by all) ar on ar.run_id = a.run_id and ar.person = a.holder),

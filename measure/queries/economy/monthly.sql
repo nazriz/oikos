@@ -16,11 +16,16 @@ notes as (select n.run_id, json_extract_string(n.body, '$.data.order') as order_
 hh as (select h.run_id, h.m, sum(h.q) filter (where h.retry_of is null) as wanted, sum(n.delivered) as got,
     round(sum(h.q * h.price) / 100.0 / nullif(sum(h.q), 0), 2) as price_paid
   from hh_orders h left join notes n on n.run_id = h.run_id and n.order_id = h.id group by all),
+-- (Jobs are employment agreements the worker signed, with no notice on them yet: being at work is only part of a day.)
+emp as (select a.run_id, a.id, json_extract_string(a.body, '$.terms.parties[0]') as employer, json_extract_string(a.body, '$.terms.parties[1]') as worker,
+    (select min(s.t) from records s where s.run_id = a.run_id and s.record = 'signature' and json_extract_string(s.body, '$.agreement') = a.id and s.speaks_for = json_extract_string(a.body, '$.terms.parties[1]')) as signed_t,
+    (select min(n.t) from records n where n.run_id = a.run_id and n.record = 'notice' and json_extract_string(n.body, '$.agreement') = a.id) as notice_t
+  from records a where a.record = 'agreement' and a.template = 'employment'),
 jobs as (select m.run_id, m.m,
-    sum(case when o.event = 'occupied' then 1 else -1 end) filter (where o.structure like 'factory-%') as factory_jobs,
-    sum(case when o.event = 'occupied' then 1 else -1 end) filter (where o.structure like 'shop-%') as shop_jobs,
-    sum(case when o.event = 'occupied' then 1 else -1 end) filter (where o.structure like 'builder-%') as builder_jobs
-  from m join occupancy o on o.run_id = m.run_id and o.t < (m.m + 1) * 2592000 and o.space_kind = 'workplace' group by all),
+    count(distinct e.worker) filter (where e.employer like 'factory-%') as factory_jobs,
+    count(distinct e.worker) filter (where e.employer like 'shop-%') as shop_jobs,
+    count(distinct e.worker) filter (where e.employer like 'builder%') as builder_jobs
+  from m join emp e on e.run_id = m.run_id and e.signed_t < (m.m + 1) * 2592000 and (e.notice_t is null or e.notice_t >= (m.m + 1) * 2592000) group by all),
 gone as (select run_id, person, min(t) as t from life where event in ('person_left', 'person_died') group by all),
 adults as (select m.run_id, m.m, count(*) as adults from m join entities e on e.run_id = m.run_id and e.kind = 'person'
     left join gone g on g.run_id = e.run_id and g.person = e.entity

@@ -1,6 +1,6 @@
 {
   "name": "city.works",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "doc": "docs/behaviour/services.md",
   "params": {
     "collect_every_days": {
@@ -78,6 +78,21 @@
       },
       "default": "",
       "required": true,
+      "source": "placeholder"
+    },
+    "look_at": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "look_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 5,
       "source": "placeholder"
     },
     "maintain_labour": {
@@ -170,7 +185,8 @@
     },
     "working_day": {
       "schema": {
-        "type": "integer"
+        "type": "integer",
+        "description": "when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
       },
       "default": 28800,
       "source": "placeholder"

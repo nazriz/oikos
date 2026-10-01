@@ -564,7 +564,22 @@ impl World {
             ParticipantKind::Person => (terrarium_time::Actor::Person, p.person.clone().unwrap_or_else(|| participant.into()), 1),
             ParticipantKind::System => (terrarium_time::Actor::System, participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
         };
-        let seconds = self.s.act_times.program(actor, blocks.iter().map(Block::name));
+        // (Going somewhere takes the trip: the longest of the act's moves, from where each body is to the building it's
+        // going to. Literal ids only: a body or space made in the act itself is going nowhere yet.)
+        let trip = blocks
+            .iter()
+            .filter_map(|b| match b {
+                Block::Occupy { space, who } if !space.starts_with('$') && !who.as_deref().is_some_and(|w| w.starts_with('$')) => {
+                    let body = who.clone().or_else(|| p.person.clone())?;
+                    let (to, _) = crate::config::split_space(space)?;
+                    let from = self.state.structures_of(&body).into_iter().next()?;
+                    Some(crate::travel::seconds(&self.s, &self.state, &from, to))
+                }
+                _ => None,
+            })
+            .max()
+            .unwrap_or(0);
+        let seconds = self.s.act_times.program(actor, blocks.iter().map(Block::name)) + trip;
         let mut timeline = self.state.timelines.get(&key).cloned().unwrap_or_default();
         let (starts, done) = terrarium_time::place(&mut timeline, lanes, t + thinking, seconds);
         self.state.timelines.insert(key, timeline);

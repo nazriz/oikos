@@ -14,7 +14,7 @@ import { goodsPrices, held as heldAt, order } from "./trade";
 
 export const water: BehaviourModule = {
   name: "utility.water",
-  version: "0.1.0",
+  version: "0.1.1",
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -96,6 +96,8 @@ export const water: BehaviourModule = {
         }
         return steps;
       },
+      // (Its daily look in the early morning, when residents are home: not wherever the day has taken them.)
+      (obs) => (Math.floor(obs.t / DAY) + 1) * DAY + 6 * 3600,
     );
   },
 };

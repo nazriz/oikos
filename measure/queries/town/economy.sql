@@ -2,8 +2,11 @@
 select r.run_id, r.seed,
   (select count(*) from records x where x.run_id = r.run_id and x.t > 0 and x.record = 'agreement' and x.template = 'lease') as leases,
   (select count(*) from records x where x.run_id = r.run_id and x.t > 0 and x.record = 'agreement' and x.template = 'employment') as jobs,
-  (select count(*) from occupancy o where o.run_id = r.run_id and o.t > 0 and o.event = 'occupied' and o.space_kind = 'dwelling') as move_ins,
-  (select count(*) from occupancy o where o.run_id = r.run_id and o.t > 0 and o.event = 'occupied' and o.space_kind = 'workplace') as hires,
+  -- (The first time someone came into a home, or a workplace: not each day's coming home and going to work.)
+  (select count(*) from (select occupant, space, min(t) as first from occupancy o where o.run_id = r.run_id and o.event = 'occupied' and o.space_kind = 'dwelling' group by all) where first > 0) as move_ins,
+  -- (Not the world's own workforce coming in on its first working day: their jobs were agreed before the start.)
+  (select count(*) from (select occupant, space, min(t) as first from occupancy o where o.run_id = r.run_id and o.event = 'occupied' and o.space_kind = 'workplace' group by all) x
+    where first > 0 and not exists (select 1 from (select json_extract_string(a.body, '$.terms.parties[1]') as worker, regexp_extract(a.body::VARCHAR, '"in":"([^"]+)"', 1) as space from records a where a.run_id = r.run_id and a.record = 'agreement' and a.template = 'employment' and a.t = 0) g where g.worker = x.occupant and g.space = x.space)) as hires,
   (select count(*) from records x where x.run_id = r.run_id and x.t > 0 and x.kind = 'departure') as departures,
   (select count(*) from records x where x.run_id = r.run_id and x.t > 0 and x.kind = 'petition') as petitions,
   (select count(*) from records x where x.run_id = r.run_id and x.t > 0 and x.kind = 'law') as laws,

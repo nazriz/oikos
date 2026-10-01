@@ -10,7 +10,7 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, cellsOf, DAY, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote, outOfTime, team } from "./common";
+import { nextLook, because, Book, cellsOf, DAY, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote, outOfTime, team } from "./common";
 import { Staffing, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownerOf } from "./institutions";
@@ -521,7 +521,7 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
-  version: "0.1.3",
+  version: "0.2.0",
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -530,7 +530,7 @@ export const works: BehaviourModule = {
       depot: "", workplace: "", // its depot, and the space the crew works in there (the world must say)
       role: "works crew", wage: 0, period: 14 * DAY, notice_days: 14,
       industry: "", // what the work is (its postings say)
-      working_day: 8 * 3600, work_days: 5,
+      working_day: 8 * 3600, work_days: 5, look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)
       waste: "waste", collect_task: "collect", collect_labour: 0, collect_per_unit: 0, collect_every_days: 7, // per unit: seconds of work, and waste taken
       wear: "wear", maintain_task: "maintain", maintain_labour: 0, maintain_per_unit: 0, maintain_over: 0, // wear worth a crew's time above this
       staff_line: "staff", landfill: "", kind: "waste", dispose_every_days: 7,
@@ -683,6 +683,7 @@ export const works: BehaviourModule = {
         }));
         return steps;
       },
+      p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
     ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };

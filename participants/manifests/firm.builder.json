@@ -1,6 +1,6 @@
 {
   "name": "firm.builder",
-  "version": "0.9.3",
+  "version": "0.10.0",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "build_markup_bps": {
@@ -36,6 +36,15 @@
       "unit": "days",
       "default": 7,
       "source": "placeholder"
+    },
+    "look_at": {
+      "schema": {},
+      "source": "the world gives it (no default)"
+    },
+    "look_days": {
+      "schema": {},
+      "unit": "days",
+      "source": "the world gives it (no default)"
     },
     "max_crew": {
       "schema": {
@@ -103,7 +112,7 @@
     "work_days": {
       "schema": {
         "type": "integer",
-        "description": "of every 7"
+        "description": "of every 7 look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)"
       },
       "unit": "days",
       "default": 5,

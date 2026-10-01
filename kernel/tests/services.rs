@@ -163,3 +163,28 @@ fn a_condition_kills_by_the_bodys_age() {
         assert_eq!(ev.iter().any(|e| matches!(e, EventBody::PersonDied { person, .. } if person == "alice")), dies, "fatal from {from}");
     }
 }
+
+#[test]
+fn a_body_is_in_one_place_and_going_somewhere_takes_the_trip() {
+    // A minute a cell; water ten.
+    let mut w = services_world();
+    w["catalogue"]["travel"] = json!({"seconds_per_cell": 60, "by_cover": {"water": 600}});
+    let mut run = start(&w);
+    let now = run.kernel().state().t;
+    // Alice at home (cell.1.1) goes to the shop (cell.0.2): two cells, two minutes on top of the act itself.
+    let cmd = direct("alice-self", None, serde_json::from_value(json!([{"block": "occupy", "space": "s-shop/dwelling.1"}])).unwrap()).unwrap();
+    let r = step(&mut run, &cmd).unwrap();
+    let (starts, done) = r.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some((*starts, *done)), _ => None }).unwrap();
+    let mut still = start(&services_world());
+    let r0 = step(&mut still, &cmd).unwrap();
+    let base = r0.events.iter().find_map(|e| match &e.body { EventBody::ActionStarted { starts, done, .. } => Some(done - starts), _ => None }).unwrap();
+    assert_eq!(done - starts, base + 120);
+    assert!(starts >= now);
+    // Arrived: in the shop, and no longer at home.
+    // (The helper carries the act through to when it's done.)
+    advance(&mut run, done + 1);
+    assert!(r.events.iter().map(|e| &e.body).any(|e| matches!(e, EventBody::Vacated { occupant, space, .. } if occupant == "alice" && space == "s-house/dwelling.1")));
+    let st = run.kernel().state();
+    assert_eq!(st.structures_of("alice"), vec!["s-shop".to_string()]);
+    assert_eq!(body_view(&mut run, "alice-self")["in"], json!("s-shop/dwelling.1"));
+}

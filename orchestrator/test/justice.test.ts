@@ -1,5 +1,5 @@
 // The tribunal in a town (docs/behaviour/justice.md; docs/design/world-expansion.md 5): a law caps rent increases at
-// 5%; landlords who don't comply raise rents anyway; their tenants (here, all of them) take the notices to the tribunal,
+// 4% (landlords raise to similar homes' rents plus 5%); landlords who don't comply raise rents anyway; their tenants (here, all of them) take the notices to the tribunal,
 // which finds each invalid under the law in force; the landlords obey or not, as often as they obey the law. Nothing in
 // the engine stops a notice: a law is enforced only because someone applies, and someone decides, and someone obeys.
 
@@ -16,9 +16,9 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 test("unlawful rent increases are taken to the tribunal, found invalid, and withdrawn by the landlords who comply", async () => {
   const config = generate({ ...spec, years: 1 });
   config.world.records.push({ id: "law-rent-cap", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
-    text: "A residential rent may not be increased by more than 5% at a time. Or else: the increase is invalid.",
-    adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent by more than 5%", or_else: "the increase is invalid" },
-    formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase' && block.data.rent * 100 > block.data.was * 105" } });
+    text: "A residential rent may not be increased by more than 4% at a time. Or else: the increase is invalid.",
+    adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent by more than 4%", or_else: "the increase is invalid" },
+    formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase' && block.data.rent * 100 > block.data.was * 104" } });
   const challenging = (c: any) => c?.params?.tribunal && (c.params = { ...c.params, tribunal: { ...c.params.tribunal, challenge_bps: 10_000 } });
   for (const x of config.participants) {
     if (x.controller?.impl === "firm.landlord") x.controller.params.rent_review_months = 6; // (their practice: reviews within the run)
@@ -33,7 +33,7 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   const kind = (k: string) => recs.filter((r) => r.kind === k);
   // The notices that break the cap (as the law reads them), and only those, are taken to the tribunal.
-  const unlawful = kind("rent_increase").filter((n) => n.data.rent * 100 > n.data.was * 105);
+  const unlawful = kind("rent_increase").filter((n) => n.data.rent * 100 > n.data.was * 104);
   expect(unlawful.length).toBeGreaterThan(3);
   const applications = kind("tribunal_application");
   expect(applications.map((a) => a.data.notice).sort()).toEqual(unlawful.map((n) => n.id).sort());

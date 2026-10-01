@@ -269,6 +269,12 @@ export class Pace {
   }
 }
 
+/** The next time of day `at` (seconds) on a working day (the first `days` of each week), after `t`: when an employer whose
+ * staff come in for the working day looks at the day's work (world-expansion 6.3). */
+export function nextLook(t: number, at: number, days: number): number {
+  for (let d = Math.floor(t / DAY); ; d++) if (d % 7 < days && d * DAY + at > t) return d * DAY + at;
+}
+
 /** A step with its reason: `because("Rent is due", pay(...))`. */
 export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): Step => Object.assign(lines, { why });
 

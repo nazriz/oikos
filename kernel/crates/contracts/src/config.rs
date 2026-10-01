@@ -114,6 +114,19 @@ pub struct Catalogue {
     /// World totals the kernel keeps (tier 2: greenhouse gas).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub counters: Vec<CounterCfg>,
+    /// Travel (world-expansion 6.3): moving between structures takes the time of the quickest path over the cells
+    /// between, by each cell's cover. Absent: moving takes no time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub travel: Option<TravelCfg>,
+}
+
+/// What crossing a cell takes (seconds), by its cover (a road, quicker; water, slower), else `seconds_per_cell`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TravelCfg {
+    pub seconds_per_cell: i64,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub by_cover: BTreeMap<Id, i64>,
 }
 
 /// A body variable: its bounds, its value for a body born here (or given none), and its drift a day.
@@ -1376,6 +1389,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     // Occupancy: persons, present, in spaces that exist, within capacity.
     let mut used: BTreeMap<&str, u64> = BTreeMap::new();
     let mut seen = BTreeSet::new();
+    let mut placed: BTreeSet<&str> = BTreeSet::new();
     for o in &w.occupancy {
         let e = entity(&o.occupant)?;
         if e.kind != PERSON || e.present == Some(false) {
@@ -1386,6 +1400,10 @@ pub fn validate(c: &Config) -> Result<(), String> {
         let spec = space_spec(ty, local).ok_or_else(|| format!("structure {sid} has no space {local}"))?;
         if !seen.insert((o.occupant.as_str(), o.space.as_str())) {
             return Err(format!("{} occupies {} twice", o.occupant, o.space));
+        }
+        // A body is in one place at a time (world-expansion 6.4).
+        if !placed.insert(o.occupant.as_str()) {
+            return Err(format!("{} is in more than one space: a body is in one place at a time", o.occupant));
         }
         let u = used.entry(o.space.as_str()).or_default();
         *u += 1;

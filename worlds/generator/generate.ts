@@ -75,6 +75,9 @@ export interface TownSpec {
   utilities?: boolean;
   /** Owner-occupiers, where the profile describes ownership (world-expansion 6.2). Default: yes; false: every home let. */
   ownership?: boolean;
+  /** The daily round, where the profile describes it (world-expansion 6.3): people go to work and school and come home;
+   * moving takes time. Default: yes; false: a body stays where it went, and moving takes none. */
+  round?: boolean;
   /** Superseded by apartment_units and house_types (generator 0.10). */
   rents?: { apartment: number; house: number };
   /** The profile the town's place-specific figures come from (worlds/profiles/<id>.json). Default: au-vic-2026. */
@@ -244,6 +247,10 @@ export function generate(spec: TownSpec): any {
   const JU = V.justice && spec.justice !== false ? V.justice : undefined;
   const UT = V.utilities && spec.utilities !== false ? V.utilities : undefined;
   const OW = V.ownership && spec.ownership !== false ? V.ownership : undefined;
+  const RD = V.round && spec.round !== false ? V.round : undefined;
+  // (With the round, employers look at the day's work an hour after it starts, when their staff are in.)
+  const look = RD ? { look_at: (RD.work_start_hour + 1) * HOUR, look_days: RD.work_days } : {};
+  const SHOP_DAYS = RD ? RD.work_days : 6; // (a shop opens when its staff are in)
   const ownPick = rng("ownership");
   // Skill is schooling: a year of it is 10,000 (so a school day is a 200th of that). It speeds work (labour_by): the
   // time a task takes falls linearly with the performers' mean skill, steeply enough that six years more around the
@@ -402,7 +409,11 @@ export function generate(spec: TownSpec): any {
       { employer: "school", structure: "school-building", space: "school-building/workplace.1", wage: ED.teacher_wage_per_fortnight, capacity: teachers + 2, start: teachers, industry: "education" });
     // The pupils the world starts with: enrolled, each in a classroom (the classes as even as they come).
     pupilsAtStart.forEach((c, i) => {
-      occupancy.push({ occupant: c.id, space: `school-building/classroom.${1 + (i % teachers)}` });
+      const room = `school-building/classroom.${1 + (i % teachers)}`;
+      // (With the round, at home at the start, with a place: they go in school hours.)
+      if (RD) records.push({ id: `school-place-${c.id}`, record: "statement", author: "genesis", at: 0, visible_to: [c.id, "school"], speaks_for: "school", kind: "school_place", addressed_to: [c.id], basis: `school-enrol-${c.id}`,
+        text: `A place at the school, in ${room}.`, data: { classroom: room, building: "school-building" } });
+      else occupancy.push({ occupant: c.id, space: room });
       records.push({ id: `school-enrol-${c.id}`, record: "statement", author: "genesis", at: 0, visible_to: [c.id, "school"], speaks_for: c.id, kind: "school_enrolment", addressed_to: ["school"],
         text: `Enrolment at school: ${c.id}.`, data: { born_at: c.born_at, years_before: Math.max(0, ageNow(c) - ED.school_ages[0]) } });
     });
@@ -426,7 +437,7 @@ export function generate(spec: TownSpec): any {
     const meanRent = [...units.map((u) => u.rent), ...houseTypes.map((h) => h.rent)].reduce((a, b) => a + b, 0) / (units.length + houseTypes.length);
     const spend = Math.max(0, (income * (10_000 - V.spending.saving_bps)) / 10_000 - Math.floor((households.length * spec.housed_bps) / 10_000) * meanRent);
     SHOP.demand = Math.max(20, Math.floor(spend / RETAIL_PRICE / Math.max(1, shops.length)));
-    const hoursPerWorkerMonth = ((WORKING_DAY * 6) / 7) * 30; // a shop opens 6 days of 7
+    const hoursPerWorkerMonth = ((WORKING_DAY * SHOP_DAYS) / 7) * 30; // a shop opens 6 days of 7 (with the round, its staff's 5)
     // (At the shops' planned utilisation of their staff's hours: docs/behaviour/retailer.md.)
     for (const w of workplaces) if (w.employer.startsWith("shop-")) w.start = Math.min(w.capacity, Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / (hoursPerWorkerMonth * SHOP_UTILISATION_BPS))));
     // A shop's opening money: its working capital, as a shop founded in the run is given (the venture's rule, below): a
@@ -476,7 +487,7 @@ export function generate(spec: TownSpec): any {
     // (The town's wages are instructed by its finance officer, the signatory the bank knows.)
     records.push({ id: `${ag}-wages`, record: "statement", author: "genesis", at: 0, visible_to: [w.employer, "bank"], speaks_for: w.employer, ...(w.employer === "city" ? { in_position: "finance" } : {}), kind: "request", addressed_to: ["bank"], basis: ag,
       text: `Please pay ${c.id}'s wages every 14 days.`, data: { outcome: { money: { from: `acc-${w.employer}`, to: `acc-${c.id}`, amount: String(w.wage - withholding(taxLaw, w.wage, 14 * DAY)), for: "wages" } }, every: 14 * DAY, first: (1 + pick.below(14)) * DAY } });
-    occupancy.push({ occupant: c.id, space: w.space });
+    if (!RD) occupancy.push({ occupant: c.id, space: w.space }); // (with the round, at home at the start: they go to work at its hour)
     // Union members at the start: the profile's membership rate for the work's industry, dues by standing order.
     if (unionPick.below(10_000) < (U.membership_bps[w.industry] ?? U.membership_bps.other ?? 0)) {
       const mem = `member-${c.id}`;
@@ -823,7 +834,7 @@ export function generate(spec: TownSpec): any {
   office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, priceLists, lawBook, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } },
     { id: "ground", kind: "sites", area: "all", every: 7 * DAY }, { id: "yard", kind: "sites", area: [cellOf.get(yardLot)], occupants: "names" }],
     code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", industry: "construction", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS,
-      workplace: "builder-yard/workplace.1", max_crew: CREW.capacity }));
+      workplace: "builder-yard/workplace.1", max_crew: CREW.capacity, ...look }));
   const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
   office("planning", "city", "Planning officer", "planning_officer",
     [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
@@ -849,7 +860,7 @@ export function generate(spec: TownSpec): any {
     { id: "town", kind: "sites", area: { place: "town" } }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" }],
     code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
       collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
-      maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste" }));
+      maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste", ...look }));
   // The electoral office (elections): keeps the roll, takes nominations, runs the ballot, counts it, and appoints the
   // winner. And the local paper, which reports the public record.
   if (E) {
@@ -866,7 +877,7 @@ export function generate(spec: TownSpec): any {
     { id: "land", kind: "sites", area: { place: "district" }, every: 30 * DAY }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" },
     { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }],
     code("city.environment", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
-      survey_labour: L.survey_labour, species: V.nature!.species.map((s) => ({ id: s.id, name: s.name, covers: Object.keys(s.density_per_ha), ...(s.listed ? { listed: true } : {}) })), planning: "city" }));
+      survey_labour: L.survey_labour, species: V.nature!.species.map((s) => ({ id: s.id, name: s.name, covers: Object.keys(s.density_per_ha), ...(s.listed ? { listed: true } : {}) })), planning: "city", ...look }));
   // The clinic and the school (world-expansion 4): each keeps the staff its establishment says and is paid for by a
   // grant from outside (the funder's, by the residents it serves), and does its work: seeing patients who come in,
   // teaching each classroom on school days.
@@ -876,11 +887,11 @@ export function generate(spec: TownSpec): any {
     const residentsAtStart = Math.max(1, homes.length);
     office("clinic-manager", "clinic", "Practice manager", "practice_manager", [{ id: "books", kind: "accounts" }, mine("clinic-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [clinicCell], occupants: "names" }],
       code("clinic.practice", { building: "clinic-centre", workplace: "clinic-centre/workplace.1", waiting: "clinic-centre/waiting.1", account: "acc-clinic", doctors, wage: HE.doctor_wage_per_fortnight,
-        period: 14 * DAY, working_day: WORKING_DAY, consult_seconds: HE.consult_minutes * 60, consults: HE.treats.map((x) => ({ kind: x.kind, ...(x.severity ? { severity: x.severity } : {}), consults: x.consults })) }));
+        period: 14 * DAY, working_day: WORKING_DAY, consult_seconds: HE.consult_minutes * 60, ...(RD ? { opens: (RD.work_start_hour + 0.5) * HOUR, closes: RD.work_end_hour * HOUR } : {}), consults: HE.treats.map((x) => ({ kind: x.kind, ...(x.severity ? { severity: x.severity } : {}), consults: x.consults })) }));
     office("principal", "school", "Principal", "principal", [{ id: "books", kind: "accounts" }, mine("school-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [schoolCell], occupants: "names" }],
       code("school.principal", { building: "school-building", workplace: "school-building/workplace.1", classrooms: Array.from({ length: teachers }, (_, i) => `school-building/classroom.${i + 1}`),
         account: "acc-school", teachers, wage: ED.teacher_wage_per_fortnight, period: 14 * DAY, working_day: WORKING_DAY, lesson_seconds: ED.hours_per_day * HOUR,
-        term_days: Math.round((ED.school_days_per_year / 4) * (7 / 5)), school_ages: ED.school_ages }));
+        term_days: Math.round((ED.school_days_per_year / 4) * (7 / 5)), school_ages: ED.school_ages, ...(RD ? { starts: (RD.school_start_hour + 0.5) * HOUR } : {}) }));
     // Their funding: the staff's wages a year, per home seen (what world.grants counts), paid quarterly.
     office("outside-health-funding", "outside", "Health funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
       code("world.grants", { account: "acc-outside", to: "clinic", to_account: "acc-clinic", per_resident_per_year: Math.ceil(yearly(HE.doctor_wage_per_fortnight, doctors) / residentsAtStart) }));
@@ -970,7 +981,7 @@ export function generate(spec: TownSpec): any {
       const cell = structures.find((x) => x.id === w.structure)!.at;
       office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, lawBook, { id: "stock", kind: "holdings" }, { id: "works", kind: "sites", area: [cell], occupants: "names" }],
         code("firm.producer", { works: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, industry: w.industry, lender: "bank", builder: "builder",
-          per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside" }));
+          per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside", ...look }));
       continue;
     }
     // A shop: it buys from the factories or the world market, whichever is cheaper, and serves whoever orders.
@@ -978,7 +989,7 @@ export function generate(spec: TownSpec): any {
     const price = RETAIL_PRICE;
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
-        suppliers: [...factories, "outside"], price, demand: SHOP.demand }));
+        suppliers: [...factories, "outside"], price, demand: SHOP.demand, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = { id: "petitions", kind: "records", match: { statement_kinds: ["petition"] }, on_request: true };
@@ -1001,11 +1012,11 @@ export function generate(spec: TownSpec): any {
   const shopVenture = {
     // Beyond the premises: a month's stock at the wholesale price, and three months' wages for a shop's opening staff
     // (until customers find it: they change shops only now and then). Derived from the town's own figures.
-    kind: "shop", name: "Shop", capital: SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / (14 * DAY)) * Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / ((((WORKING_DAY * 6) / 7) * 30) * SHOP_UTILISATION_BPS))),
+    kind: "shop", name: "Shop", capital: SHOP.demand * WORLD.goods_export + 3 * Math.floor((wages.shop * MONTH) / (14 * DAY)) * Math.max(1, Math.ceil((SHOP.demand * SERVE * 10_000) / ((((WORKING_DAY * SHOP_DAYS) / 7) * 30) * SHOP_UTILISATION_BPS))),
     channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer", "property_for_sale", "property_sold"] } },
       { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: ["{cell}"], occupants: "names" }],
     role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", industry: "retail", lender: "bank", builder: "builder", max_staff: 6, wage: wages.shop, period: 14 * DAY, working_day: WORKING_DAY,
-      serve_labour: SHOP.serve, suppliers: [...factories, "outside"], price: RETAIL_PRICE, demand: SHOP.demand, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank" } },
+      serve_labour: SHOP.serve, suppliers: [...factories, "outside"], price: RETAIL_PRICE, demand: SHOP.demand, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } },
   };
   // "population" is who could sign a petition: the adults.
   // (With the clinic: treatable deaths come through illness, and care cuts them; docs/behaviour/life.md.)
@@ -1016,6 +1027,7 @@ export function generate(spec: TownSpec): any {
     ...(HE && ED ? { school: { entity: "school", building: "school-building", ages: ED.school_ages },
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),
+    ...(RD ? { round: { work_start: RD.work_start_hour * HOUR, work_end: RD.work_end_hour * HOUR, work_days: RD.work_days, school_start: RD.school_start_hour * HOUR, school_end: RD.school_end_hour * HOUR } } : {}),
     ...(JU ? { tribunal: { entity: "tribunal", challenge_bps: JU.challenge_bps, apply_bps: JU.apply_bps, apply_after_days: JU.apply_after_days } } : {}),
     ...(E ? { electoral_town: "city", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 } } : {}),
     union: "union", union_join_bps: V.unions.membership_bps,
@@ -1096,6 +1108,7 @@ export function generate(spec: TownSpec): any {
         ] : []),
       ],
       ...(UT ? { counters: [{ id: "greenhouse_gas" }] } : {}),
+      ...(RD ? { travel: { seconds_per_cell: RD.travel_seconds_per_cell, by_cover: RD.travel_by_cover } } : {}),
       ...(HE && ED ? { body_variables: [{ id: "skill", min: 0, max: ED.max_years * SKILL_PER_YEAR, initial: 0 }] } : {}),
       working_day: WORKING_DAY,
       // (The river carries water where there are utilities: fed along its course, flowing downstream, lost along the way.)

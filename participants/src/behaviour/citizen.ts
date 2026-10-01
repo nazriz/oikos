@@ -30,7 +30,7 @@ import { channels } from "../contracts";
 import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { because, Book, breaches, callAction, commitmentOf, DAY, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { because, Book, breaches, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
 import { ownerOf } from "./institutions";
@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.29.0",
+  version: "0.30.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -189,6 +189,9 @@ export const citizen: BehaviourModule = {
       tribunal: null as { entity: string; challenge_bps: number; apply_bps: number; apply_after_days: number } | null,
       // Utilities (docs/behaviour/utilities.md): the energy retailer we sign up with once we hold a home (the world says).
       utilities: null as { energy: string } | null,
+      // The daily round (world-expansion 6.3): when work and school are (times of day, seconds; working days of each
+      // week). With it, we go to work and school and come home; without it, a body stays where it went.
+      round: null as { work_start: number; work_end: number; work_days: number; school_start: number; school_end: number } | null,
       civic: { turnout_bps: 9000, stand_bps: 30, reads_news_bps: 5000, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 },
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
@@ -724,15 +727,15 @@ export const citizen: BehaviourModule = {
         }
         // Having a child: a woman of an age to, not already expecting, once a month, at the rate for her age.
         const age = Math.floor((t - body.born_at) / year);
-        if (body.sex === "female" && p.births && body.present && t >= nextFertility && t >= expectingUntil) {
+        const partner = household?.couples.find((c) => c.includes(me))?.find((x) => x !== me);
+        const man = partner ? household!.members.find((m) => m.person === partner && m.sex === "male") : undefined;
+        // With a partner, only when they're here with us (we see who's in our own home): the month's chance waits for it.
+        const together = !man || (street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.occupants?.includes(me) && sp.occupants?.includes(man.person))));
+        if (body.sex === "female" && p.births && body.present && t >= nextFertility && t >= expectingUntil && together) {
           nextFertility = t + MONTH;
           const rate = [...(p.fertility_per_10000 as { from: number; rate: number }[])].reverse().find((r) => age >= r.from)?.rate ?? 0;
           if (rate > 0 && ctx.rng(`conceive-${t}`).below(120_000) < rate) {
-            const partner = household?.couples.find((c) => c.includes(me))?.find((x) => x !== me);
-            const man = partner && household!.members.find((m) => m.person === partner && m.sex === "male");
-            // With a partner, only when they're here with us (we see who's in our own home).
-            const together = !man || (street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.occupants?.includes(me) && sp.occupants?.includes(man.person))));
-            if (together) expectingUntil = t + p.gestation + MONTH;
+            expectingUntil = t + p.gestation + MONTH;
             if (together) steps.push(because(`Having a child: at ${age}, the chance this month is ${rate} in 120,000 (${rate} births per 10,000 women a year at this age).`,
               C.call("birth", { name: C.text(`baby of ${me}`), template: childTemplate(), ...(man ? { with: man.person } : {}) })));
           }
@@ -788,7 +791,7 @@ export const citizen: BehaviourModule = {
         if (r?.record === "agreement" && !book.signedBy(r.id, me) && !retired) {
           const terms = jobTerms(r, me);
           const s: Step = because(`Our notice is worked out: starting the job we took (${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days).`, sign(r.id));
-          if (terms.workplace) s.push(moveIn(terms.workplace));
+          if (terms.workplace && !p.round) s.push(moveIn(terms.workplace)); // (with the round, we go when work starts)
           steps.push(s);
           job = { agreement: r.id, employer: r.terms.parties.find((x) => x !== me)!, ...terms, since: t };
           joblessSince = null;
@@ -898,7 +901,7 @@ export const citizen: BehaviourModule = {
         } else if (r.terms.template === "employment" && !job) {
           const terms = jobTerms(r, me);
           const s: Step = because(`Taking the job offered: ${usd(terms.wage)} every ${Math.round(terms.period / DAY)} days${thank(terms.workplace ? structureOf(terms.workplace) : undefined, t)}.`, sign(r.id));
-          if (terms.workplace) s.push(moveIn(terms.workplace));
+          if (terms.workplace && !p.round) s.push(moveIn(terms.workplace)); // (with the round, we go when work starts)
           steps.push(s);
           job = { agreement: r.id, employer: other, ...terms, since: t };
           joblessSince = null;
@@ -981,7 +984,7 @@ export const citizen: BehaviourModule = {
       }
       if (backTo) {
         // (Only if we still work there: a job may have ended, or another begun, in the meantime.)
-        if (job?.employer === backTo.employer && job.workplace === backTo.space) steps.push(because("The stoppage is over: back to work.", moveIn(backTo.space)));
+        if (job?.employer === backTo.employer && job.workplace === backTo.space && !p.round) steps.push(because("The stoppage is over: back to work.", moveIn(backTo.space)));
         backTo = null;
       }
 
@@ -1044,6 +1047,8 @@ export const citizen: BehaviourModule = {
         for (const k of children(t)) steps.push(because("Taking the children out of our old home.", moveOut(livingAt, k.person)));
         livingAt = null;
       }
+      // (Already there, the round having brought us: in.)
+      if (home && !home.movedIn && obs.body?.in === home.space) home.movedIn = true;
       // (Tried and not yet in, because the last tenants are still there: again the next day, whenever we look again.)
       if (home && !home.movedIn && t >= nextMoveTry) {
         nextMoveTry = t + DAY;
@@ -1645,6 +1650,71 @@ export const citizen: BehaviourModule = {
     const stoodFor = new Set<string>();
     const readsNews = ctx.rng("reads-news").below(10_000) < p.civic.reads_news_bps;
     const readItems = new Set<string>();
+    // ---- the daily round (world-expansion 6.3) ----
+    let lastDwelling: string | undefined; // the home we were last in (a dwelling): where we go back to
+    let nextPlanAt = 0; // when our next full plan is due (a week on from the last): other wakes only take us where we belong
+    const tod = (t: number) => t - Math.floor(t / DAY) * DAY;
+    const workday = (t: number, days: number) => Math.floor(t / DAY) % 7 < days;
+    /** Where we belong now: school or work in their hours (not while too ill, on strike, or gone from the job), the clinic
+     * while waiting there, a gathering while it lasts; otherwise home. Undefined: anywhere will do (no round, no home). */
+    const belong = (obs: Observation): string | undefined => {
+      const r = p.round;
+      if (!r || !obs.body) return undefined;
+      const t = obs.t;
+      const street = obs.channels.street;
+      const here = obs.body.in;
+      if (here && street?.kind === "sites" && street.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === here && sp.kind === "dwelling"))) lastDwelling = here;
+      const home_ = home?.movedIn ? home.space : livingAt ?? lastDwelling;
+      if (atClinic && p.care) return p.care.waiting;
+      if (attending && !attending.gone && t < attending.until) return here;
+      const age = Math.floor((t - obs.body.born_at) / year);
+      if (age < ADULT_YEARS) {
+        const place = p.school && age >= p.school.ages[0] && age <= p.school.ages[1] ? book.open("school_place").filter((x) => (x.addressed_to ?? []).includes(me)).sort((a, b) => b.at - a.at)[0] : undefined;
+        if (place?.data?.classroom && workday(t, r.work_days) && tod(t) >= r.school_start && tod(t) < r.school_end) return String(place.data.classroom);
+        return home_;
+      }
+      if (job?.workplace && !offSick && !striking?.out && t < jobEnds(job) && workday(t, r.work_days) && tod(t) >= r.work_start && tod(t) < r.work_end) return job.workplace;
+      return home_;
+    };
+    /** The next time where we belong may change: work and school starting or ending, on working days. */
+    const nextChange = (t: number): number => {
+      const r = p.round!;
+      let best = Infinity;
+      for (const at of [r.work_start, r.work_end, r.school_start, r.school_end]) best = Math.min(best, nextLook(t, at, r.work_days));
+      return best;
+    };
+    /** Going where we belong, if we're not there (not again before things change, if the world refused it: a home pulled
+     * down, a workplace full). */
+    let refusedGo: { to: string; until: number } | null = null;
+    const goWhereWeBelong = (obs: Observation): Step | undefined => {
+      const to = belong(obs);
+      if (!to || obs.body?.in === to) return undefined;
+      if (refusedGo && refusedGo.to === to && obs.t < refusedGo.until) return undefined;
+      const st: Step = because(to === obs.body?.in ? "" : `${job?.workplace === to ? "Off to work" : home?.space === to || livingAt === to || lastDwelling === to ? "Home" : "Going"}: ${to}.`, moveIn(to));
+      (st as any).goTo = to;
+      return st;
+    };
+    /** The round move we sent last, and how it went (the outcome comes with our next look). */
+    let pendingGo: string | null = null;
+    const heardGo = (obs: Observation) => {
+      if (!pendingGo) return;
+      const out = obs.outcomes.at(-1);
+      const to = pendingGo;
+      pendingGo = null;
+      if (!out || out.status === "applied") return;
+      refusedGo = { to, until: nextChange(obs.t) };
+      // (A place pulled down, or coming down: not again.)
+      if (["unknown_structure", "unknown_space", "coming_down"].includes(out.refusal?.code ?? "")) {
+        refusedGo = { to, until: Infinity };
+        if (lastDwelling === to) lastDwelling = undefined;
+        if (livingAt === to) livingAt = null;
+      }
+    };
+    const sendGo = (st: Step) => {
+      pendingGo = (st as any).goTo ?? null;
+      return callAction(st);
+    };
+
     // ---- utilities ----
     let energyFor: string | undefined; // the lease we've signed up for energy on
     const billsPaid = new Set<string>();
@@ -1707,8 +1777,10 @@ export const citizen: BehaviourModule = {
       const t = obs.t;
       const age = Math.floor((t - obs.body.born_at) / year);
       if (age < p.school.ages[0] || age > p.school.ages[1] || classroomOf(obs)) return undefined;
-      const place = book.open("school_place").filter((r) => (r.addressed_to ?? []).includes(me) && !triedPlace.has(r.id)).sort((a, b) => b.at - a.at)[0];
-      if (place?.data?.classroom) {
+      const place = book.open("school_place").filter((r) => (r.addressed_to ?? []).includes(me)).sort((a, b) => b.at - a.at)[0];
+      // (With the round, a place is ours to go to in school hours; without it, we go now and stay.)
+      if (p.round && place?.data?.classroom) return undefined;
+      if (place?.data?.classroom && !triedPlace.has(place.id)) {
         triedPlace.add(place.id);
         return because("A place at school: going.", moveIn(String(place.data.classroom)));
       }
@@ -1725,17 +1797,19 @@ export const citizen: BehaviourModule = {
       if (!obs.body) return;
       // School's over at its end: out of the classroom.
       const room = classroomOf(obs);
-      if (room && p.school && Math.floor((t - obs.body.born_at) / year) > p.school.ages[1]) steps.push(because("School's over: leaving it.", moveOut(room, me)));
+      if (room && p.school && !p.round && Math.floor((t - obs.body.born_at) / year) > p.school.ages[1]) steps.push(because("School's over: leaving it.", moveOut(room, me)));
       const c = p.care;
       if (!c) return;
       const now = (obs.body.conditions ?? []).filter((x) => x.until > t);
       // Too ill or hurt to work (a hospital-level condition): out of the workplace until better.
       const tooIll = now.some((x) => c.off_work.includes(x.severity));
-      if (tooIll && job?.workplace && !offSick && inside(job.workplace)) {
+      if (tooIll && job?.workplace && !offSick && (p.round || inside(job.workplace))) {
         offSick = job.workplace;
-        steps.push(because("Too ill to work: staying away until we're better.", moveOut(job.workplace, me)));
+        // (Telling our employer, as a worker on personal leave does; with the round, we just don't go in.)
+        steps.push(because("Too ill to work: staying away until we're better.", say("sick_leave", `Off sick from ${Math.floor(t / DAY)} (day): too ill to work.`, { to: [job.employer], visible: [me, job.employer], data: { from: t } }),
+          ...(p.round ? [] : [moveOut(job.workplace, me)])));
       } else if (!tooIll && offSick) {
-        if (job?.workplace === offSick) steps.push(because("Better: back to work.", moveIn(offSick)));
+        if (job?.workplace === offSick) steps.push(because("Better: back to work.", ...(p.round ? [] : [moveIn(offSick)])));
         offSick = null;
       }
       seekCare(obs, t, steps, inside);
@@ -1866,6 +1940,9 @@ export const citizen: BehaviourModule = {
       step(obs): ParticipantAction | Promise<ParticipantAction> {
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
+        // (Taken out of the world with our household, or gone from it: nothing more here.)
+        if (obs.body && !obs.body.present) return wait(ctx.world.runEnd + DAY);
+        heardGo(obs);
         // A child does nothing on their own (their parents house them) until they're 18, except ask for help if no
         // adult of the household is left: all of them seen to die (in our home), or gone from it.
         if (obs.body && obs.t - obs.body.born_at < ADULT_YEARS * year) {
@@ -1886,7 +1963,16 @@ export const citizen: BehaviourModule = {
           if (cared.length) return callAction(cared[0]!);
           const learn = schooling(obs);
           if (learn) return callAction(learn);
-          return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY));
+          const go = goWhereWeBelong(obs);
+          if (go) return sendGo(go);
+          return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY, p.round ? nextChange(obs.t) : Infinity));
+        }
+        // The daily round: a wake that's only for going somewhere (one we asked for, our cadence, or a move done), with
+        // nothing left to do and no full plan due, just takes us where we belong.
+        if (p.round && obs.t < nextPlanAt && todo.length === 0 && obs.woke_for !== "news" && obs.woke_for !== "start" && !(practiceWake !== null && obs.t >= practiceWake)) {
+          const go = goWhereWeBelong(obs);
+          if (go) return sendGo(go);
+          return wait(Math.min(nextChange(obs.t), nextPlanAt, practiceWake ?? Infinity));
         }
         // (Planned when a wake begins; woken because an act of ours is done, we carry on with the plan, and plan afresh
         // only once it's done: the stepper.)
@@ -1938,6 +2024,13 @@ export const citizen: BehaviourModule = {
           // (What the last wake didn't get to comes first: our state already counts on it.)
           todo = [...todo, ...plan(obs).filter((s) => s.length)]; // (a step with nothing to do isn't sent: as the stepper)
           plannedAt = obs.t;
+          if (p.round) {
+            nextPlanAt = obs.t + 7 * DAY;
+            // (Unless a step of the plan already takes us there: going to the clinic, say.)
+            const go = goWhereWeBelong(obs);
+            const goingThere = (to: string) => todo.some((st) => st.some((l) => { const c = Array.isArray(l) ? l[1] : l; return c.fn === "occupancy" && JSON.stringify(c.args.in ?? "").includes(to) && !c.args.leave; }));
+            if (go && !goingThere(String(belong(obs)))) todo.push(go);
+          }
           leadFound.homes = [];
           leadFound.jobs = [];
         }
@@ -1956,7 +2049,10 @@ export const citizen: BehaviourModule = {
         lastWasMove = !!next && next === moveStep;
         if (leaving && todo.length === 0) departed = true; // the last of leaving is under way
         // (A gathering to go to, or come back from, before the week is out: awake then.)
-        const action = next ? callAction(next) : wait(practiceWake !== null ? Math.min(practiceWake, obs.t + 7 * DAY) : undefined);
+        if (next && (next as any).goTo) pendingGo = (next as any).goTo;
+        const action = next ? callAction(next)
+          : p.round ? wait(Math.min(practiceWake ?? Infinity, nextPlanAt, nextChange(obs.t)))
+          : wait(practiceWake !== null ? Math.min(practiceWake, obs.t + 7 * DAY) : undefined);
         if (decided.length) Object.defineProperty(action, DECISIONS, { value: decided.splice(0), enumerable: false });
         // Questions to the sparse mind out this wake: the action, once they're answered (and if waiting, awake again by
         // the next hour, to decide with the answer).

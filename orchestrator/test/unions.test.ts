@@ -90,7 +90,9 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   const back = recs.find((r) => r.kind === "return_to_work" && r.at > first.at);
   expect(back).toBeDefined();
   const strikers = first.data.members as string[];
-  expect(ev.filter((e) => e.event === "vacated" && strikers.includes(e.occupant) && e.space === "factory-1-works/workplace.1" && e.t >= first.at && e.t < back.at).length).toBeGreaterThan(strikers.length / 2);
+  // (They don't go in while it lasts: out of the works, or never come in.)
+  const inDuring = new Set(ev.filter((e) => e.event === "occupied" && strikers.includes(e.occupant) && e.space === "factory-1-works/workplace.1" && e.t > first.at + DAY && e.t < back.at).map((e) => e.occupant));
+  expect(strikers.length - inDuring.size).toBeGreaterThan(strikers.length / 2);
   // (Pay stops while they're out: in a stoppage, once the employer next sees to its payroll. A one-day stoppage may end
   // at that moment, so any stoppage will do.)
   const returns = recs.filter((r) => r.kind === "return_to_work");

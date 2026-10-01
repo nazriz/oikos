@@ -313,6 +313,8 @@ consultation (a payment from outside on the practice's claim).
 
 ### 6.3 Roads and commuting
 
+*Built 2026-10-01 (the daily round and travel; roads as structures not yet): docs/behaviour/daily-round.md.*
+
 - **Travel takes time** (Rust): moving between spaces costs time by distance, less along road cells (a cover). It
   uses the person's timeline, as acts do now.
 - **Roads are structures** the town builds and maintains (wear, as now). Commuting time counts against a job's
@@ -377,6 +379,32 @@ rebuild. I'd do it on its own branch, with the invariance and reliability tests 
 - **Care, given the stakes:** crime is where a simulation most easily encodes prejudice. No offending rate is tied to
   any group, only to circumstances, and the doc says so.
 
+### 7.3 The contract, exactly (proposed, for sign-off)
+
+**Floods (7.1):**
+
+| Where | Change |
+|---|---|
+| **Fields** | `spills_above` and `spill_bps_per_day` (optional): what's above that level on a cell spreads to the four around it each day (a river over its banks). `from_covers` may be negative: a cover that soaks a field up (wetland holding water), down to the field's minimum. |
+| **Fields** | `source_by_day` (optional): `[{from_day, bps}]`, the field's sources scaled from a day on (rain, a wet season, a drought). Exogenous, as weather is: a scenario's to set. |
+| **Structure types** | `floods_above` (optional): a level of a field (`water`) on any of its cells that floods it. Flooded: its occupants are moved out (`vacated`, reason `flooded`); it can't be occupied while it lasts (refusal `flooded`); its `wear` rises by `flood_wear_per_day`. |
+| **Log** | `flooded {structure, level}`, `flood_receded {structure}`. |
+
+**Crime (7.2):**
+
+| Where | Change |
+|---|---|
+| **A block, `take`** | `{kind, quantity, from, at}`: a person takes goods another holds at a structure where the taker is, without their consent. Refused if the taker isn't there (`not_present`) or there isn't that much (`insufficient_quantity`). The holder sees their holding fall (holdings views); nobody is told who took it. |
+| **Log** | `taken {by, from, kind, quantity, at}`: the truth, for measurement. |
+| **Investigation is work** | A task that `investigates`: work with `investigate: <a taking's event seq or the holding it was from>` returns, to the actor only, the taker with the task's `detection_bps` (else nothing). Like a survey: evidence found by work, with a chance. |
+
+Not proposed yet: fraud (money taken by a forged instruction). It needs records to carry a claimed signer apart from the
+true author, a change to the records model. I'd rather do theft first and see.
+
+Behaviour (TypeScript): offending is rare and driven only by circumstances (need, opportunity, the chance of being
+caught: Becker 1968; Cohen and Felson 1979), never by any group. Police take reports, investigate, and charge; the
+tribunal decides.
+
 ## 8. Order and milestones
 
 | # | Part | Rust | TypeScript | Done when |
@@ -406,5 +434,5 @@ shows its mechanism, a soak run, and a line in docs/decisions.md.
 | 6 | §6.4: tasks' `draws` (from a field) and `emits` (to a field or a counter); world `counters`. |
 | 7 | None beyond records (sales and mortgages exist). |
 | 8 | §6.4: a body in one place at a time; travel time by cover on moving between structures; where one is in the observation. |
-| 9 | Structure types' flood threshold; the kernel displaces occupants. |
-| 10 | Block: `take` (goods from a holding where one is, without consent); the bank's instruction check may be fooled (a forged instruction). |
+| 9 | §7.3: fields spill over a level and can be soaked up; a field's sources by day; structure types flood above a level (occupants moved out, no entry, wear). |
+| 10 | §7.3: block `take` (goods from a holding where one is, without consent); `taken` in the log; tasks that `investigate` (the taker found with a chance). Fraud later. |

@@ -10,14 +10,14 @@ import { cents } from "../money";
 import type { SiteStructure } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, lotOf, MONTH, say, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { nextLook, because, Book, DAY, lotOf, MONTH, say, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Staffing, stepper } from "./firms";
 
 const YEAR = 365 * DAY;
 
 export const environment: BehaviourModule = {
   name: "city.environment",
-  version: "0.1.1",
+  version: "0.2.0",
   doc: "docs/behaviour/environment.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(3600),
@@ -26,7 +26,7 @@ export const environment: BehaviourModule = {
       depot: "", workplace: "", // where the office's staff work (the world must say)
       role: "environmental scientist", wage: 0, period: 14 * DAY, notice_days: 14,
       industry: "", // what the work is (its postings say)
-      working_day: 8 * 3600, work_days: 5,
+      working_day: 8 * 3600, work_days: 5, look_at: 0, look_days: 5, // when its staff are in (a time of day on working days: the world's; 0, whenever it wakes)
       staff_line: "environment", // the adopted budget's line that pays the staff
       survey_task: "survey", survey_labour: 0, // seconds of fieldwork a cell (the world's task)
       // The species it surveys, where each lives (its covers), and whether it's listed as threatened (the world gives).
@@ -136,6 +136,7 @@ export const environment: BehaviourModule = {
         }
         return steps;
       },
+      p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
     );
 
     function nameOf(species: string): string {

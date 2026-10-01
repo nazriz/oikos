@@ -1464,6 +1464,27 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::ComingDown, format!("{sid} is being demolished")));
                 }
                 let sid = sid.to_string();
+                // A body is in one place at a time: coming here, it leaves wherever else it was.
+                for other in self.st.structures_of(&who) {
+                    settle(self.s, self.st, &other);
+                    let mut left = vec![];
+                    if let Some(m) = self.st.occupancy.get_mut(&other) {
+                        for (sp, bodies) in m.iter_mut() {
+                            if bodies.remove(&who) {
+                                left.push(sp.clone());
+                            }
+                        }
+                        m.retain(|_, b| !b.is_empty());
+                        if m.is_empty() {
+                            self.st.occupancy.remove(&other);
+                        }
+                    }
+                    self.st.touch_structure(&other);
+                    for sp in left {
+                        self.st.record_departure(&sp, &who, VacateReason::Left);
+                        self.emit(EventBody::Vacated { occupant: who.clone(), space: sp, by: Some(self.participant.into()), reason: VacateReason::Left });
+                    }
+                }
                 settle(self.s, self.st, &sid);
                 self.st.occupancy.entry(sid.clone()).or_default().entry(space.clone()).or_default().insert(who.clone());
                 self.st.touch_structure(&sid);

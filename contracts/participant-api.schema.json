@@ -193,6 +193,10 @@
                 "maximum": 9007199254740991
               },
               "maxProperties": 100
+            },
+            "in": {
+              "description": "The space it's in (a body is in one at a time), if any.",
+              "$ref": "urn:terrarium:contracts:0.7:common#/$defs/Id"
             }
           }
         },
