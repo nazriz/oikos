@@ -891,15 +891,17 @@ export function generate(spec: TownSpec): any {
     [laws, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "patrol", kind: "sites", area: "all", every: 14 * DAY }],
     code("city.inspector"));
   const civic = (id: string, kinds: string[]) => ({ id, kind: "records", match: { statement_kinds: kinds } });
-  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"]), priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
-    // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
-    budget_lines: {
+  // The town budget's lines, and what each pays for: the finance office's brief, and the council proposal form's fields.
+  const budgetLines: Record<string, string> = {
       parks: "building a park on one of the town's free lots, commissioned from a builder.",
       staff: `the wages of the town's works crew, who collect waste from every home each week and keep the town's parks${RDS ? ", hall and roads" : " and hall"} up (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody collects the waste).`,
       services: "the services' running costs: the landfill's charge for the waste collected (invoiced monthly).",
       ...(RDS ? { roads: "building roads on the town's free lots, commissioned from a builder (a road a lot): the town's streets, which people travel far quicker on than on foot across lots." } : {}),
       ...(L ? { environment: `the wages of the town's environment office, whose scientists survey the district's wildlife each quarter and report on it (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody counts).` } : {}),
-    } }));
+  };
+  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"]), priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
+    // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
+    budget_lines: budgetLines }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
   const hallCell = structures.find((x) => x.id === "town-hall")!.at;
   office("works", "city", "Works manager", "works_manager", [mine("works-business"), civic("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
@@ -1010,9 +1012,8 @@ export function generate(spec: TownSpec): any {
       proposal: { type: "text", required: true, description: "What's proposed, in full: the law's words, or what the budget is for." },
       kind: { type: "choice", required: true, options: ["law", "budget", "other"], description: "A law, a budget, or something else." },
       affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." },
-      parks: { type: "amount", description: "For a budget: the parks line." },
-      staff: { type: "amount", description: "For a budget: the staff line (the works crew's wages)." },
-      services: { type: "amount", description: "For a budget: the services line (their running costs)." } } } });
+      // A budget's lines, one field each (the finance office's brief says what each pays for).
+      ...Object.fromEntries(Object.keys(budgetLines).map((k) => [k, { type: "amount", description: `For a budget: the ${k} line.` }])) } } });
   // The planning office publishes the form it expects applications on (docs/design/translator-and-resolver.md §9.3).
   records.push({ id: "form-permit", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
     text: "Planning permit application: the lot and the kind of building.",

@@ -108,3 +108,25 @@ That was **our bug**, not the model's. The mayor's only memory between wakes is 
 A pattern across the pilots: each gap was something **a real office would tell a new mayor on day one**, which the code mayor never needed because it reads config. Pilots with a real model are finding the places where the code stand-ins were quietly reading what nobody in the world would tell them. An audit of every direct config read by a code participant (2026-09-28) found no others that matter. Landlords read their own buildings' types, builders read materials prices, and citizens read their biology and the calendar: all things those parties would know. The mayor's park price was the only knowledge its position couldn't get from the world, and the budget brief now supplies it.
 
 **Cost and speed:** each Codex call takes about 10 seconds and carries about 14,000 tokens of Codex's own instructions. The mayor makes 2–3 calls a simulated day while it's gathering information.
+
+**Pilot 7a** (2026-10-02; the 1,000-person town, a year asked for; stopped on day 0 after 51 calls in 13 minutes; log
+kept as `runs/pilot-7a-day0-loop`). The first pilot on the expanded world, with contracts 0.8.
+- **What the mayor did, on the first morning:**
+  - tabled a $1.1M budget (staff and services);
+  - asked the clerk to put it to the council;
+  - answered two tenants' petitions with a law (90 days' notice to end a tenancy), translated first time;
+  - asked the rates office to value land and issue notices;
+  - asked the works office for a plan to clear the waste backlog.
+- **Why it looped:** two offices' reports gave it nothing to act on, so it asked again, and each reply woke it.
+  - **The works report** listed every home as "a week or more overdue" at dawn on day 0: a home never collected from counted as overdue since the beginning of time. Fixed (city.works 0.2.1): overdue from when the office first knew of the home.
+  - **The rates office** said "$0 levied, nothing overdue" and nothing about when notices go out. Behind it, a real bug: its first instalment went out on the first morning, before the valuer had valued anything. It levied nothing, and the next waited a quarter, so **the town had no rates for its first three months in every run**. Fixed (city.rates_officer 0.2.0): no notices before valuations; the report says how many properties are valued and when the next notices go out.
+- **Left as designed:** a reply wakes the mayor before the days it gave (the tool says so). With reports that answer, there should be less to ask. Pilot 7b tests that.
+
+**Pilot 7b** (stopped on day 2, 29 calls; `runs/pilot-7b-budget-form`). With the reports answering, the pace was right:
+about ten calls a simulated day while it got its bearings, not fifty in an hour. It found one more gap:
+- **The council proposal form had budget fields for only three of the town's five lines** (parks, staff, services), not
+  environment (missing since nature was added) or roads. The mayor proposed all five, saw in each preview that two would
+  be dropped, and declined the draft four times. Then it wrote to the clerk to ask how to submit a complete budget.
+  Right every time. The code mayor never used the form, so no test noticed.
+- Fixed (city.council_clerk 0.5.3; generator): the form's budget fields come from the same list as the finance office's
+  brief, and the clerk reads every amount on the form as a line.

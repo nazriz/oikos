@@ -174,7 +174,7 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.5.2",
+  version: "0.5.3",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -465,7 +465,7 @@ export const taxClerk: BehaviourModule = {
  */
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
-  version: "0.1.1",
+  version: "0.2.0",
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -499,8 +499,10 @@ export const ratesOfficer: BehaviourModule = {
         const dueDays: number = terms.due_days ?? 30;
         const interestBps: number = terms.penalty_interest_bps ?? 0;
         if (!acc || !law) return steps;
-        // Notices: each owner's share of a year's rates on what they own, as last valued.
-        if (t >= next && ratePpm > 0) {
+        // Notices: each owner's share of a year's rates on what they own, as last valued. (Not before there are valuations:
+        // until 2026-10-02 the first instalment went out on the first morning, before the valuer had valued anything,
+        // levied nothing, and the next waited a quarter.)
+        if (t >= next && ratePpm > 0 && book.open("valuation").length) {
           next = t + Math.floor(365 / instalments) * DAY;
           const latest = new Map<string, StatementRecord>(); // lot -> its latest valuation
           for (const v of book.open("valuation").sort((a, b) => a.at - b.at)) latest.set(v.data?.lot, v);
@@ -533,8 +535,11 @@ export const ratesOfficer: BehaviourModule = {
         }
         steps.push(...letters.answer(() => {
           const overdue = [...new Set((book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates" && !settled.has(r.id) && t >= (r as any).about.due) as any[]).map((c) => c.counterparty))];
-          return `Report from the rates officer: rates at ${ratePpm / 10_000}% of value a year, in ${instalments} instalments; ${usd(levied)} levied so far, ${usd(received)} received.` +
-            (overdue.length ? ` Overdue: ${overdue.join(", ")}.` : " Nothing is overdue.");
+          const valued = new Set(book.open("valuation").map((v) => v.data?.lot)).size;
+          const when = !valued ? " No property has been valued yet (the valuer values every property once a year): the first notices go out once it has."
+            : t >= next ? " The next instalment's notices go out today." : ` The next instalment's notices go out on day ${Math.floor(next / DAY) + 1}.`;
+          return `Report from the rates officer: rates at ${ratePpm / 10_000}% of value a year, in ${instalments} instalments, each due ${dueDays} days after its notice; ${valued} properties valued; ${usd(levied)} levied so far, ${usd(received)} received.` +
+            when + (overdue.length ? ` Overdue: ${overdue.join(", ")}.` : " Nothing is overdue.");
         }));
         return steps;
       },
@@ -553,7 +558,7 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -577,6 +582,7 @@ export const works: BehaviourModule = {
     let depotView: SiteStructure | undefined; // the depot, as its own channel shows it (who's there, by name)
     let atDepot = 0; // what's been collected and is held at the depot (holdings are seen as they change)
     const collectedAt = new Map<string, number>(); // home (a building) -> when we last collected from it
+    const knownSince = new Map<string, number>(); // home -> when we first saw it (one never collected is due from then)
     const complained = new Set<string>(); // homes complained about, not yet collected
     const handled = new Set<string>();
     const used = new Map<string, number>(); // crew member -> seconds worked today
@@ -704,9 +710,12 @@ export const works: BehaviourModule = {
           }
         }
 
+        for (const b of buildings) if (!knownSince.has(b.structure)) knownSince.set(b.structure, t);
         steps.push(...letters.answer(() => {
           const homes = buildings.filter((b) => b.variables?.[p.waste]);
-          const overdue = homes.filter((b) => t - (collectedAt.get(b.structure) ?? -Infinity) >= (p.collect_every_days + 7) * DAY).map((b) => b.structure);
+          // (A home never collected from is overdue a week after it was first due, not from the beginning of time: pilot 7
+          // found every home "a week or more overdue" on the first morning, and the mayor kept asking why.)
+          const overdue = homes.filter((b) => t - (collectedAt.get(b.structure) ?? knownSince.get(b.structure) ?? t) >= (p.collect_every_days + 7) * DAY).map((b) => b.structure);
           const assets = buildings.filter((b) => b.variables?.[p.wear]).map((b) => `${b.structure} ${Math.round(((variableToday(b.variables![p.wear], t) ?? 0) * 100) / Math.max(1, b.variables![p.wear]!.max))}% worn`);
           return `Report from the works office: a crew of ${workers.length} (the adopted budget's ${p.staff_line} line, ${usd(line)}, pays for ${target} at ${usd(annual)} a year each). ` +
             `Waste is collected from every home every ${p.collect_every_days} days as the crew's hours allow; ${collectedKg} loads collected so far. ` +
@@ -721,14 +730,20 @@ export const works: BehaviourModule = {
 };
 
 /** What a proposal made on the council proposal form enacts if it passes: a law, or a budget (with its lines: parks,
- * and staff and services where the form gives them). */
+ * and every other amount the form gives). */
 function fromForm(prop: StatementRecord | undefined, t: number): any {
   const d = prop?.data;
   if (!d?.proposal) return undefined;
   if (d.kind === "law") return { kind: "law", text: d.proposal };
   if (d.kind === "budget") {
     const line = (x: unknown) => (x === undefined ? 0 : cents(x as string));
-    return { kind: "budget", text: d.proposal, data: { year: Math.floor(t / YEAR) + 1, lines: { parks: line(d.parks), ...(d.staff !== undefined ? { staff: line(d.staff) } : {}), ...(d.services !== undefined ? { services: line(d.services) } : {}) } } };
+    // Every amount on the form is a line (whatever lines the town's form has; pilot 7 found the form had only three of
+    // the five, and the mayor, rightly, wouldn't table a budget that dropped two).
+    const lines: Record<string, number> = { parks: line(d.parks) };
+    for (const [k, v] of Object.entries(d)) if (!["proposal", "kind", "affects", "form"].includes(k) && (typeof v === "string" || typeof v === "number")) {
+      try { lines[k] = line(v); } catch { /* not an amount */ }
+    }
+    return { kind: "budget", text: d.proposal, data: { year: Math.floor(t / YEAR) + 1, lines } };
   }
   return undefined;
 }

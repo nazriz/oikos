@@ -1,6 +1,6 @@
 {
   "name": "city.rates_officer",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "doc": "docs/behaviour/public-finance.md",
   "params": {
     "first_day": {
