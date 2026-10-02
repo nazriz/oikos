@@ -16,6 +16,20 @@ pub fn seconds(s: &Statics, st: &State, from: &str, to: &str) -> i64 {
     if from == to {
         return 0;
     }
+    // (The same trip over unchanged ground takes the same time: worked out once. TERRARIUM_CHECK_TRAVEL checks it.)
+    if let Some(secs) = st.ground.get(from, to) {
+        if std::env::var_os("TERRARIUM_CHECK_TRAVEL").is_some() {
+            assert_eq!(secs, path(s, st, travel, from, to), "travel cache stale for {from} -> {to}");
+        }
+        return secs;
+    }
+    let secs = path(s, st, travel, from, to);
+    st.ground.put(from, to, secs);
+    secs
+}
+
+/// The quickest path's time, worked out.
+fn path(s: &Statics, st: &State, travel: &terrarium_contracts::config::TravelCfg, from: &str, to: &str) -> i64 {
     let (Some(a), Some(b)) = (st.structures.get(from), st.structures.get(to)) else { return 0 };
     let (Some((ax, ay)), Some((bx, by))) = (crate::config::cell_xy(&a.at), crate::config::cell_xy(&b.at)) else { return 0 };
     let cost = |x: i64, y: i64| -> Option<i64> {

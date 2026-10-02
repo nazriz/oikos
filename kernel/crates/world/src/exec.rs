@@ -415,6 +415,9 @@ fn nature_day(s: &Statics, st: &mut State, day: i64) -> Vec<Timed> {
                 x.terrain = Some(cover.clone());
             }
         }
+        if !out.cover_changes.is_empty() {
+            st.ground.changed();
+        }
         for cell in &touched {
             if let Some(x) = st.cells.get_mut(cell) {
                 x.changed = c;
@@ -734,6 +737,7 @@ impl<'a> Exec<'a> {
     /// A structure comes down: off the ground, and gone (what was held there stays held there, to be moved out).
     fn bring_down(&mut self, sid: &str) {
         let Some(x) = self.st.structures.remove(sid) else { return };
+        self.st.ground.changed();
         let c = self.st.stamp();
         let cleared = self.st.nature.is_some().then(|| self.s.config.catalogue.cleared_cover.clone()).flatten();
         for cell in &x.cells {
@@ -1485,6 +1489,7 @@ impl<'a> Exec<'a> {
                     },
                 );
                 let c = self.st.stamp();
+                self.st.ground.changed();
                 for cell in &cells {
                     let p = self.st.cells.get_mut(cell).unwrap();
                     p.structure = Some(id.clone());

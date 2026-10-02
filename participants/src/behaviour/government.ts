@@ -29,7 +29,7 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.8.0",
+  version: "0.9.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -38,7 +38,9 @@ export const mayorCode: BehaviourModule = {
       staff_budget: 0, services_budget: 0, environment_budget: 0,
       // Roads (docs/behaviour/daily-round.md): a year's budget for them, and how far (cells) a building may stand from one
       // before we build toward it, a road a time.
-      road_budget: 0, road_type: "road", road_within: 3 }, ctx.params);
+      road_budget: 0, road_type: "road", road_within: 3,
+      stands_again: true, // false: it doesn't stand at the next election (retiring)
+    }, ctx.params);
     need(p, ["builder"], "city.mayor_code");
     const book = new Book();
     let tabledYear = 0; // the year we last tabled a budget for
@@ -67,7 +69,7 @@ export const mayorCode: BehaviourModule = {
         const steps: Step[] = [];
         // An election for our office: standing again (once each notice, while nominations are open), on what we've done.
         for (const n of book.open("election_notice")) {
-          if (handled.has(n.id) || !ctx.position || n.data?.office !== ctx.position || t >= (n.data?.nominations_close_at ?? Infinity)) continue;
+          if (handled.has(n.id) || !p.stands_again || !ctx.position || n.data?.office !== ctx.position || t >= (n.data?.nominations_close_at ?? Infinity)) continue;
           handled.add(n.id);
           const platform = "Standing again: keeping the town's services running, its parks built and its budget balanced.";
           steps.push(because("An election for this office: nominating, as the incumbent.",
@@ -558,7 +560,7 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
-  version: "0.2.1",
+  version: "0.2.2",
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -661,7 +663,9 @@ export const works: BehaviourModule = {
             const due = buildings.filter((b) => b.variables?.[p.waste] && (complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= p.collect_every_days * DAY - DAY / 2))
               .sort((a, b) => Number(complained.has(b.structure)) - Number(complained.has(a.structure)) || (collectedAt.get(a.structure) ?? -1) - (collectedAt.get(b.structure) ?? -1) || (a.structure < b.structure ? -1 : 1));
             for (const b of due) {
-              const units = Math.floor((variableToday(b.variables![p.waste], t) ?? 0) / p.collect_per_unit);
+              // (Every bin emptied, however little is in it, as a round does: until 2026-10-02 what was under a load was
+              // left, so small households' bins never emptied and they complained while the round counted them done.)
+              const units = Math.ceil((variableToday(b.variables![p.waste], t) ?? 0) / p.collect_per_unit);
               if (units === 0) {
                 collectedAt.set(b.structure, t);
                 complained.delete(b.structure);

@@ -40,6 +40,11 @@ test("water is drawn from the river and energy bought from the grid, as the town
   expect([...census].sort((a, b) => a - b)).toEqual(census);
   const supplyBefore = ev.filter((e) => e.event === "worked" && e.task === "supply_energy" && e.t <= ev.find((x) => x.event === "counter_census")!.t).reduce((a, e) => a + e.units, 0);
   expect(census[0]).toBe(supplyBefore * 780);
+  // Bought from the grid a month's worth at a time, not again until it's come (pilot 7d's retailer ordered 1,400 times in
+  // a day, each paid up front, the energy not yet delivered).
+  const gridOrders = recs.filter((r) => r.kind === "order" && r.speaks_for === "energy-co");
+  expect(gridOrders.length).toBeGreaterThan(0);
+  expect(gridOrders.length).toBeLessThanOrEqual(Math.ceil(120 / 14));
   // Bills: energy monthly to customers, water quarterly to owners; all paid.
   const bills = recs.filter((r) => r.kind === "invoice" && r.data?.service);
   expect(bills.some((b) => b.data.service === "water")).toBe(true);

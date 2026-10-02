@@ -198,6 +198,7 @@ impl World {
             records: crate::state::Map::new(),
             marks: Default::default(),
             agreements_of: Default::default(),
+            ground: Default::default(),
             record_order: imbl::Vector::new(),
             participants: c
                 .participants

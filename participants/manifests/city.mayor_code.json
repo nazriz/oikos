@@ -1,6 +1,6 @@
 {
   "name": "city.mayor_code",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "doc": "docs/behaviour/government.md",
   "params": {
     "builder": {
@@ -88,6 +88,14 @@
         "type": "integer"
       },
       "default": 0,
+      "source": "placeholder"
+    },
+    "stands_again": {
+      "schema": {
+        "type": "boolean",
+        "description": "false: it doesn't stand at the next election (retiring)"
+      },
+      "default": true,
       "source": "placeholder"
     }
   },

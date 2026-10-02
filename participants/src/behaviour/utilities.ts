@@ -10,7 +10,7 @@ import { need, params, type BehaviourModule, type ParticipantContext } from "../
 import { because, Book, DAY, lotOf, ownAccount, say, type Step, usd } from "./common";
 import { stepper } from "./firms";
 import { ownerOf } from "./institutions";
-import { goodsPrices, held as heldAt, order } from "./trade";
+import { Deliveries, goodsPrices, held as heldAt, order } from "./trade";
 
 export const water: BehaviourModule = {
   name: "utility.water",
@@ -104,7 +104,7 @@ export const water: BehaviourModule = {
 
 export const energy: BehaviourModule = {
   name: "utility.energy",
-  version: "0.1.0",
+  version: "0.1.1",
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -124,7 +124,8 @@ export const energy: BehaviourModule = {
     const ended = new Set<string>();
     let lastDay = -1;
     let owed = 0; // units supplied by the network, not yet taken from what we hold
-    let onOrder = 0;
+    let onOrder = 0; // ordered from the grid, not yet delivered (or refunded)
+    const deliveries = new Deliveries();
     let nextBill = p.bill_every_days * DAY;
     return stepper(
       (obs) => void book.absorb(obs),
@@ -145,6 +146,8 @@ export const energy: BehaviourModule = {
           lastDay = day;
           owed += customers.size * p.units_per_customer_per_day * days;
         }
+        // What's come (or been refunded) is no longer on order.
+        for (const d of deliveries.take(book, me)) if (d.kind === p.kind) onOrder = Math.max(0, onOrder - d.ordered);
         const held = heldAt(obs, p.depot, p.kind);
         const supply = Math.min(owed, held);
         if (supply > 0) {
@@ -160,7 +163,9 @@ export const energy: BehaviourModule = {
           if (acc.balance >= q * unit) {
             onOrder += q;
             const st = order({ me, seller: p.grid, sellerAccount: grid.account, kind: p.kind, quantity: q, unitPrice: unit, at: p.depot, from: acc.account, why: `Below a fortnight's supply: buying a month's from the grid (${q}).` });
-            st.then = () => { onOrder = 0; };
+            // (On order until it's delivered: until 2026-10-02 the order's own acceptance cleared it, and the office
+            // ordered again at every step until the energy came, 1,400 times on one day of pilot 7d.)
+            st.then = (out) => { if (out.status !== "applied") onOrder = Math.max(0, onOrder - q); };
             steps.push(st);
           }
         }

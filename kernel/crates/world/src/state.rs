@@ -55,6 +55,10 @@ pub struct State {
     /// someone (the truth audits, docs/design/rebuild.md 8.2).
     #[serde(skip)]
     pub agreements_of: Map<Id, imbl::Vector<Id>>,
+    /// Travel times already worked out, while the ground they cross is unchanged (derived: never serialised, ignored by
+    /// equality; see travel.rs).
+    #[serde(skip)]
+    pub ground: GroundCache,
     /// Record ids in the order they were made (record i has seq i+1).
     pub record_order: imbl::Vector<Id>,
     pub participants: Map<Id, Arc<Participant>>,
@@ -698,5 +702,44 @@ impl State {
             return b.participant.iter().map(|p| (p.clone(), crate::config::SELF.to_string())).collect();
         }
         self.positions.iter().filter(|(_, x)| x.entity == entity).filter_map(|(id, x)| x.holder.clone().map(|h| (h, id.clone()))).collect()
+    }
+}
+
+/// What travel depends on, changing (a cell's cover, or the building on it): `epoch` goes up with each change, and a
+/// trip worked out at another epoch is worked out again. A cache only: the answer is the same with it or without it.
+#[derive(Default)]
+pub struct GroundCache {
+    pub epoch: u64,
+    pub trips: std::sync::Mutex<Map<(Id, Id), (u64, i64)>>,
+}
+impl GroundCache {
+    /// The ground has changed: every trip is worked out afresh.
+    pub fn changed(&mut self) {
+        self.epoch += 1;
+    }
+    pub fn get(&self, from: &str, to: &str) -> Option<i64> {
+        let trips = self.trips.lock().ok()?;
+        trips.get(&(from.to_string(), to.to_string())).filter(|(e, _)| *e == self.epoch).map(|(_, s)| *s)
+    }
+    pub fn put(&self, from: &str, to: &str, seconds: i64) {
+        if let Ok(mut trips) = self.trips.lock() {
+            trips.insert((from.to_string(), to.to_string()), (self.epoch, seconds));
+        }
+    }
+}
+impl Clone for GroundCache {
+    fn clone(&self) -> Self {
+        GroundCache { epoch: self.epoch, trips: std::sync::Mutex::new(self.trips.lock().map(|t| t.clone()).unwrap_or_default()) }
+    }
+}
+impl PartialEq for GroundCache {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+impl Eq for GroundCache {}
+impl std::fmt::Debug for GroundCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GroundCache(epoch {})", self.epoch)
     }
 }

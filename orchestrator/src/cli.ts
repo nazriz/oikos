@@ -169,7 +169,7 @@ try {
     console.log((await costReport(await measureDir(positional()[0]!), { translatorModel: flag("translator-model") })).text);
   } else if (cmd === "story" && positional()[0]) {
     const { story } = await import("./story");
-    console.log(story(positional()[0]!, positional()[1]));
+    console.log(await story(positional()[0]!, positional()[1]));
   } else if (cmd === "replay" && rest[0]) {
     // A compressed log is replayed from a plain copy (the kernel reads plain logs).
     let log = rest[0];

@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.33.0",
+  version: "0.34.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -258,6 +258,10 @@ export const citizen: BehaviourModule = {
     let toldUnion: string | undefined; // where we last said we work, as a member (the union's register, at the start)
     const industryOf = new Map<string, string>(); // employer -> the industry its posting said
     let complainedOf: string | null = null; // the home we've complained about, until it's seen to
+    // When we last saw the waste at home go down (a collection), and what it was then: how long it's been is what we go
+    // by, not what's in the bin over how fast it's filling now (which depends on who's home at the moment: pilot 7d's
+    // flats, judged in the daytime with half the building out, complained of a week's waste as two).
+    const binSeen = { structure: "", value: 0, emptiedAt: -1 };
     // Moving to a better-paid job: the offer we've taken, to sign once our notice at the old one is worked out.
     let switching: { offer: string; wage: number } | null = null;
     let searchingWork = false; // this month's look for a better-paid job while employed
@@ -511,7 +515,14 @@ export const citizen: BehaviourModule = {
           job.paidAt = obs.t; // our pay restarts from now (none for the time on strike)
         }
       }
-      for (const c of channels.cells(obs)) if (home && c.structure?.structure === home.structure) homeSite = c.structure;
+      for (const c of channels.cells(obs)) if (home && c.structure?.structure === home.structure) {
+        homeSite = c.structure;
+        // The bin at home, each time we see it: emptied if there's less in it than last time.
+        const now = variableToday(c.structure.variables?.[p.complain_about], obs.t) ?? 0;
+        if (binSeen.structure !== home.structure) Object.assign(binSeen, { structure: home.structure, value: now, emptiedAt: obs.t });
+        else if (now < binSeen.value) binSeen.emptiedAt = obs.t;
+        binSeen.value = now;
+      }
       if (pendingFirm && founded) {
         const id = obs.outcomes.flatMap((o) => (o.created?.firm ? [o.created.firm] : []))[0];
         if (id) {
@@ -1234,17 +1245,18 @@ export const citizen: BehaviourModule = {
       if (p.complain_to && home && isLeaseholder() && homeSite?.structure === home.structure) {
         const v = homeSite.variables?.[p.complain_about];
         const now = variableToday(v, t) ?? 0;
-        const rate = v?.per_day ?? 0;
-        if (complainedOf === home.structure && now < rate * 7) complainedOf = null;
+        if (binSeen.structure !== home.structure) Object.assign(binSeen, { structure: home.structure, value: now, emptiedAt: t });
+        const days = Math.floor((t - binSeen.emptiedAt) / DAY);
+        if (complainedOf === home.structure && days < 7) complainedOf = null;
         // Angry with whoever should collect it, the more so the longer it's been (half-way at `complain_after_days`);
         // we write once our anger passes our own threshold (the conformist bears it longer), with the week's chance.
-        if (rate > 0) feelings.feel("anger", p.complain_to, Math.min(10_000, (now * 5_000) / (rate * p.complain_after_days)), t);
+        if (now > 0) feelings.feel("anger", p.complain_to, Math.min(10_000, Math.floor(((t - binSeen.emptiedAt) * 5_000) / (DAY * p.complain_after_days))), t);
         const bearing = 5_000 + Math.round((mind.person.temperament.conformity - 5_000) * 0.4);
-        // (And only while it's still there: a week's worth or more.)
-        if (rate > 0 && now >= rate * 7 && feelings.level("anger", p.complain_to, t) >= bearing && complainedOf !== home.structure && ctx.rng(`complain-${t}`).below(10_000) < p.complain_bps) {
+        // (And only while it's still there, a week or more on.)
+        if (now > 0 && days >= 7 && feelings.level("anger", p.complain_to, t) >= bearing && complainedOf !== home.structure && ctx.rng(`complain-${t}`).below(10_000) < p.complain_bps) {
           complainedOf = home.structure;
-          steps.push(because(`Our ${p.complain_about} hasn't been collected for about ${Math.floor(now / rate)} days: writing to the town.`,
-            say("complaint", `Our ${p.complain_about} at ${home.structure} hasn't been collected for about ${Math.floor(now / rate)} days.`, { to: [p.complain_to], visible: [me, p.complain_to], data: { structure: home.structure, about: p.complain_about, days: Math.floor(now / rate) } })));
+          steps.push(because(`Our ${p.complain_about} hasn't been collected for about ${days} days: writing to the town.`,
+            say("complaint", `Our ${p.complain_about} at ${home.structure} hasn't been collected for about ${days} days.`, { to: [p.complain_to], visible: [me, p.complain_to], data: { structure: home.structure, about: p.complain_about, days } })));
         }
       }
 

@@ -1231,6 +1231,14 @@ See the design note, §16.
   - **What it changes for a steward:** within a day it's slower to respond (as real offices are). It can't act on something the same afternoon once its sitting's over. Recorded with each run (the seat's params).
   - **Revisit if:** a study needs a steward that responds within the day (an emergency): a world can leave office hours out, or a warning could open a sitting.
 
+- **Pilot 7d's findings, and the simulation's speed** (2026-10-02; docs/real-models.md).
+  - **Waste:** every bin emptied however little is in it, and residents judge by when they last saw it emptied (citizen 0.34.0, city.works 0.2.2). A crew collecting weekly gets no complaints now (before: about 100 in 90 days in the 1,000-person town).
+  - **Energy:** on order until delivered (utility.energy 0.1.1).
+  - **The election test** no longer asks who wins. A negligent mayor loses support against a kept town with the same number standing; with many standing the vote splits and it held on in every variant tried, so whether it loses is an outcome. A mayor who doesn't stand again (city.mayor_code 0.9.0, `stands_again`) tests what a successor does.
+  - **Travel times cached** (kernel): 87% of the kernel's time went to working out the same trips (home to work, and back) every day. Now a trip is worked out once while the ground it crosses is unchanged (a counter bumped on every change of cover or building; derived state, never serialised or hashed). `TERRARIUM_CHECK_TRAVEL=1` recomputes every cached trip and asserts it matches: run on 20 days of the 1,000-person town, identical. 60 days took 98 s, against 132.
+  - **Revisit if:** something else starts affecting a cell's travel cost (wear slowing roads, floods): it must bump the counter.
+  - **The energy loop mattered beyond energy:** with it fixed, the insolvency test's factory found customers among the town's shops and didn't fail (the test now takes the shops away too). The loop drained up to about $1M a day out of town on the days it ran: earlier calibration runs (C6) carried it. Worth rechecking the calibration measures.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

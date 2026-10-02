@@ -2,18 +2,22 @@
 // the translator made and whether it confirmed them, translations that failed, the letters it received and the
 // acts that took effect. For reading pilots (docs/real-models.md); measurement proper is measure/.
 
-import { readLog } from "./logs";
+import { logLines } from "./logs";
 
 const clip = (s: string, n = 220) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
-export function story(logPath: string, only?: string): string {
+export async function story(logPath: string, only?: string): Promise<string> {
   const out: string[] = [];
-  const entries = readLog(logPath).trim().split("\n").map((l) => JSON.parse(l));
+  // (Streamed, a line at a time: a year of a large town's log is gigabytes. Only lines that could matter are parsed.)
+  const RELEVANT = /"kind":"annotation"|"event":"(message_delivered|action_applied|action_refused)"/;
+  async function* entries() {
+    for await (const l of logLines(logPath)) if (l && RELEVANT.test(l)) yield JSON.parse(l);
+  }
   const models = new Set<string>();
-  for (const e of entries) if (e.kind === "annotation" && e.body.annotation === "usage" && e.body.purpose === "participant") models.add(e.body.subject);
+  if (!only) for await (const e of entries()) if (e.kind === "annotation" && e.body.annotation === "usage" && e.body.purpose === "participant") models.add(e.body.subject);
   const who = only ? new Set([only]) : models;
   const day = (t: number) => `day ${String(Math.floor(t / 86_400)).padStart(3)}`;
-  for (const e of entries) {
+  for await (const e of entries()) {
     const b = e.body;
     if (e.kind === "annotation" && b.annotation === "transcript" && who.has(b.subject) && b.data?.purpose === "participant")
       for (const o of b.data.output ?? []) {

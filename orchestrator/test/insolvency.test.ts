@@ -19,6 +19,9 @@ test("a factory with no customers and no credit is wound up: everyone let go, wh
   acc.balance = "200000";
   const trader = config.participants.find((p: any) => p.id === "outside-trade-system").controller.params;
   trader.buys.goods.from["factory-2"] = 0;
+  // ... nor the town's shops (with the energy retailer's ordering loop fixed, 2026-10-02, they bought from it, and it
+  // didn't fail).
+  for (const p of [...config.participants, ...(config.positions ?? [])]) for (const prm of [p.controller?.params, p.role_module?.params]) if (Array.isArray(prm?.suppliers)) prm.suppliers = prm.suppliers.filter((x: string) => x !== "factory-2");
   // ... and nothing in stock to sell (a firm with goods to sell can still pay).
   config.world.holdings = config.world.holdings.filter((h: any) => h.holder !== "factory-2");
   const out = join(root, "runs", "test-insolvency");

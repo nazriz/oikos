@@ -142,3 +142,18 @@ about ten calls a simulated day while it got its bearings, not fifty in an hour.
   - several actions an answer;
   - office hours, one sitting a working day.
 - Pilot 7d runs the same town and seed, to compare.
+
+**Pilot 7d** (2026-10-02; a full year: 245 calls, 2 h 15 min; `runs/pilot-7d`). The first pilot with the new rhythm,
+about 13 times fewer calls a simulated day than 7c. Recorded cost $0 (Codex). The cost report projects $12.55 for the
+year on the Anthropic API, but that counts Codex's own preamble on every call as input. An API run would be a few
+dollars.
+- **What the mayor did:**
+  - a five-line budget, revised once and adopted 5–0;
+  - the tenant protection law: rejected 2–3 on day 17, reworked, and passed on day 254 (90 days' notice; rent rises capped at 5% a year);
+  - the town's account stayed between $2.1M and $2.4M.
+- **What dominated its year was a contradiction it couldn't resolve:** residents complained of waste uncollected for 20–31 days, while the works office reported no home overdue. It wrote 363 letters, many of them chasing this. Both sides were wrong, and the world was at fault:
+  - **The crew rounded each bin down to whole loads.** A small household's bin was never emptied ("collected" with nothing taken), so its waste was always about two weeks old. Fixed: every bin is emptied, however little is in it (city.works 0.2.2).
+  - **Residents judged how long it had been** by what was in the bin over how fast it was filling at that moment. That depends on who's home, and in the daytime half a block of flats is out. So a week's waste looked like two. Fixed (citizen 0.34.0): they go by when they last saw the bin emptied, watched at every wake. With both fixes, a crew collecting weekly gets no complaints; with no crew, as many as before.
+- **The energy retailer ordered from the grid about 1,400 times on each of three days**, each order paid up front. Its "on order" was cleared when the order was accepted, not when the energy arrived. Fixed (utility.energy 0.1.1): on order until delivered; the utilities test checks it.
+- **3 of the first 12 notebook updates were lost** to stray characters after the JSON (fixed after 7d started).
+- **`terrarium story`** couldn't read a year's log of the 1,000-person town (over 2 GB). It now streams.
