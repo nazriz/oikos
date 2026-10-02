@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.7:common",
+  "$id": "urn:terrarium:contracts:0.8:common",
   "title": "Terrarium common types",
   "description": "Primitives shared by every Terrarium contract. Contract-wide rule: no floating-point numbers anywhere. Every number is an integer within the IEEE-754 safe range, so Rust, TypeScript and Python all read it exactly and canonical JSON is trivial.",
   "$defs": {

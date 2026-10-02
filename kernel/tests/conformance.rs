@@ -78,9 +78,9 @@ fn schemas() -> Schemas {
         opts.build(&root).unwrap()
     };
     Schemas {
-        entry: build(json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.7:log"})),
+        entry: build(json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.8:log"})),
         observation: build(
-            json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.7:participant-api#/$defs/Observation"}),
+            json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.8:participant-api#/$defs/Observation"}),
         ),
     }
 }

@@ -1217,6 +1217,12 @@ See the design note, §16.
   - **Outcomes, not tuned:** with real savings, more of the poorest leave town broke (28 a year against 23) and fewer owners sell (5 against 17). A heatwave in a town of 200 makes about one more person ill.
   - **Revisit if:** a study needs traffic, walking versus driving, bushfire, wind damage, responses to warnings, or a changing climate.
 
+- **Contracts v0.8 closed** (2026-10-02; Naz: "yes 3 then 1, go ahead"; contracts/README.md).
+  - **What:** v0.7 plus the world expansion's signed changes (nature, services, water and energy, the daily round, floods and crime, periodic agreements, the ratified extras). The `$id`s and every world and log now say 0.8. Nature's changes had been built and signed but missing from the README's list: added.
+  - **Why now:** the AI side (real-model mayors, the translator's data) should be built against an interface that won't move under it.
+  - **Old runs:** logs and datasets from before say 0.7 and stay valid logs of their own version (D6). The saved LLM runs are 0.7: a translator data pipeline reading them reads both versions (the changes are additions).
+  - **Revisit if:** anything the AI side needs isn't expressible: that opens 0.9, proposed and signed off as before.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

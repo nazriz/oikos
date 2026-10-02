@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:terrarium:contracts:0.7:module",
+  "$id": "urn:terrarium:contracts:0.8:module",
   "title": "Behaviour module manifest",
   "description": "What a behaviour module declares, checked when a world loads (docs/design/rebuild.md 5.2): its parameters (types, units, ranges, and each figure's source or that it's a placeholder), what it relies on perceiving, the beliefs it keeps (for truth audits), the decisions it records, and that its state can be saved (for checkpoints). A world that doesn't give a module what it declares is refused at load, naming the module.",
   "type": "object",

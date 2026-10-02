@@ -1,15 +1,17 @@
-# Terrarium contracts, v0.5 (draft, in progress)
+# Terrarium contracts, v0.8
 
-*Status: **v0.5 is being built, phase A of docs/design/foundation-for-scale.md** (D58, approved 2026-09-28). It's v0.4 made ready for scale: money exact beyond 2^53 and in currencies (done), several boundaries (done), a tree of places (done), and one state per simulated moment for everyone who wakes in it (done: an orchestration rule, no contract change). See "Changes from v0.4". What follows describes v0.4 where v0.5 hasn't changed it yet.*
+*Status: **v0.8 is closed** (2026-10-02). It is v0.7 plus everything the world expansion needed, each part signed off
+before it was built (docs/design/world-expansion.md; the list is under "Changes from v0.7"). This is the interface the
+AI side builds against. A further change opens v0.9, proposed and signed off as before.*
 
-*Status: **v0.4 is a draft, built and tested, awaiting Naz's review of the details** (opened 2026-09-27, D47). It is v0.3 plus a world whose cast and land can change: participants and positions, bodies that arrive, leave, are born, fall ill, are hurt and die, and ground made of cells with buildings made of spaces. The concepts were agreed ("design and build it all now"; "participant is fine, and yes overcrowding possible, go ahead and build"); the design and its reasoning are in [docs/design/v0.4-cast-and-land.md](../docs/design/v0.4-cast-and-land.md). v0.3 (D40) was v0.2 (approved 2026-09-25, D28, with one reservation: the construction payment liberty) plus the translator and resolver, perception as changes, attention and opting out. v0.2 replaced v0.1, which put law, authority and ownership inside the kernel; see [the audit](../docs/audit-kernel-law.md), [the design](../docs/design/v0.2-physics-and-constructs.md), [the borrowing survey](../docs/research/borrowing-survey.md) and D18–D27 in [docs/decisions.md](../docs/decisions.md).*
+*History: v0.2 replaced v0.1, which put law, authority and ownership inside the kernel ([the audit](../docs/audit-kernel-law.md), D18–D27); v0.3 added the translator and resolver, perception as changes, attention and opting out (D40); v0.4 a world whose cast and land can change ([design](../docs/design/v0.4-cast-and-land.md)); v0.5 readiness for scale (D58); v0.6–0.7 the citizens' minds and assertions ([contracts-0.7](../docs/design/contracts-0.7.md)); v0.8 the world expansion.*
 
 These schemas are the constitution. Humans review them and the invariant tests; implementations sit behind them. Changing a contract is an explicit, signed-off decision. A researcher should be able to write a participant's controller, a world or a measurement from this directory alone.
 
 | File | What it defines |
 |---|---|
 | [`common.schema.json`](common.schema.json) | Integers, money, time, ids (cells, spaces, channel paths, capacities), labels (the world's vocabulary), visibility, opaque data |
-| [`blocks.schema.json`](blocks.schema.json) | The 26 acts: 11 physical, 4 about the cast, 11 record-keeping; agreements; the Institutional Grammar breakdown; formal (CEL) conditions |
+| [`blocks.schema.json`](blocks.schema.json) | The 29 acts (physical, about the cast, record-keeping); agreements; the Institutional Grammar breakdown; formal (CEL) conditions |
 | [`records.schema.json`](records.schema.json) | Claims, agreements, signatures, notices, statements, withdrawals, votes, entity declarations; each with its author and the position it was made in |
 | [`world-config.schema.json`](world-config.schema.json) | The world seed: ground, entities (people with bodies), accounts, structures, occupancy, records; participants, positions and templates; life (the physics of bodies); the catalogue; parameters |
 | [`participant-api.schema.json`](participant-api.schema.json) | Observation, ParticipantAction, Draft, StepResult (PettingZoo AEC shape) |
@@ -17,7 +19,7 @@ These schemas are the constitution. Humans review them and the invariant tests; 
 | [`calls.md`](calls.md), [`calls.schema.json`](calls.schema.json) | The call language: structured intents the resolver turns into a participant's own acts |
 | [`outcomes.schema.json`](outcomes.schema.json) | Shared encodings: requests, commitments as outcomes, forms |
 
-`bun test` checks that every schema compiles under JSON Schema 2020-12 strict mode, every valid example passes, and every invalid example is rejected (127 tests). The examples include Riverbend rebuilt for v0.4 and a valid empty world.
+`bun test` checks that every schema compiles under JSON Schema 2020-12 strict mode, every valid example passes, and every invalid example is rejected (143 tests). The examples include Riverbend rebuilt for v0.4 and a valid empty world.
 
 ---
 
@@ -40,7 +42,7 @@ These schemas are the constitution. Humans review them and the invariant tests; 
 - **Capacity.** Every act, message and look is done in one capacity: as the participant itself, or in a position it holds (`as`). Records carry the position they were made in (`in_position`) as well as their author. What a participant perceives in a position comes through that position's channels, which a new holder takes over (the office's files); its own memory stays with it.
 - **Bodies.** A person has a body: when born, its sex where the world models it (for physics only: who can bear a child; gender and identity are content), whether present in the world, alive, parents and children, and current conditions. A person sees their own body, including their children. Bodies occupy spaces. The world's **life** physics (config `life`) decides, on each birthday, illness, accidents and other causes of death from tables by age, and how far away someone must be to conceive with, or to harm, another. Conditions are categorical (illness or injury, a severity label, since and until); the kernel schedules their end and any death they cause. **Nothing about health is scored**: a world's docs say where its tables come from.
 
-## Acts: 26 blocks
+## Acts: 29 blocks
 
 An action is 1–32 blocks applied **atomically**. The acting participant and its capacity are bound by the orchestrator and never named in a block.
 
@@ -180,7 +182,9 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 7. **A seat acts as exactly one entity.** *(Superseded in v0.4: a participant acts as itself, or for an organisation in a position it holds.)*
 8. **`sites` channels have a refresh interval** (since v0.3, any channel's `every`), so detection can be delayed and partial. Coverage and frequency are experimental variables.
 
-## Changes from v0.7 (in progress, becoming 0.8; docs/design/world-expansion.md)
+## Changes from v0.7 (v0.8, closed 2026-10-02; docs/design/world-expansion.md)
+
+- **Nature** (signed 2026-10-01; world-expansion §2.4): `catalogue.land_covers` (with succession), `default_cover`, `cleared_cover`, `fields` (sources by cover and by building, decay, diffusion, flow, bounds) and `species` (growth, capacities by cover, tolerances, dispersal, barriers, detection); structure types' `cover`; a `flow` layer on places; fields and populations on cells in state and log; events `species_extinct` and `nature_census`; tasks that `survey` (the estimate in the actor's outcome, `surveyed`, for it alone); cover and conspicuous species in the sites view. Reserved covers `built` and `open`.
 
 - **Periodic agreements** (signed 2026-10-01): an agreement's terms may say `then: "periodic"`: once its term runs out it continues until ended by notice under its termination clauses, as tenancy law commonly provides for a fixed-term lease. `terms` reads it (reader `terms-0.2.0`), offers may carry it, and the call language's `agreement` takes `then=periodic`.
 - **Ratified as built** (signed 2026-10-01): `log.detail`; the run dataset format and the log's `observation` annotation; `notices` on the observation; `framing.debrief_text`.
@@ -189,7 +193,8 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 - **Water and energy** (signed 2026-10-01; world-expansion §6.4): tasks' `draws` (from a field, at the cell with the most of it; refusal `field_exhausted`) and `emits` (to a field at the corner cell, or a world counter); `catalogue.counters`, kept in state and censused monthly (`counter_census`).
 - **The daily round** (signed 2026-10-01; world-expansion §6.4): a body is in one space at a time (occupying one leaves the others; a config may place each body once); `catalogue.travel` (`seconds_per_cell`, `by_cover`): an act moving a body between structures takes the quickest path's time on top; one's own body's `in` (the space it's in).
 - **Floods and crime** (signed 2026-10-02; world-expansion §7.3): fields' `spills_above`/`spill_bps_per_day` and `source_by_day`, negative cover sources; structure types' `floods` (occupants moved out, reason `flooded`; refusal `flooded`; wear); events `flooded`, `flood_receded`; block `take` and event `taken`; tasks that `investigate` (`detection_bps`) with `work.investigate`, the finding in the outcome's `investigated`; refusal `bad_investigation`; the call language's `take(...)` and `work(investigate=, taken_at=, kind=)`.
-- The `$id`s stay `…:0.7:…` until 0.8 closes, with nature's changes (world-expansion §9).
+- Built on these with no contract change (2026-10-02): elections and the paper, the tribunal, home buying and selling, roads (a structure type's `cover`), weather (fields' `source_by_day`, `illness.fields`).
+- The `$id`s are `urn:terrarium:contracts:0.8:…`; worlds and logs say `contracts: "0.8"`.
 
 ## Changes from v0.4
 
@@ -205,7 +210,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
   - **Retired:** `materials_cost`, `demolition_cost`, `materials_from`, `costs_from`, and the transfer reasons `materials` and `demolition`: money paid to nowhere.
   - **New events** `worked` and `demolition_started`; **refusal codes** `unknown_task`, `not_at_work`, `no_time_left`, `not_being_built`, `not_coming_down`, `coming_down`.
 - **The call language** (phase B, stage B3): `goods(...)` (move your own goods; a goods outcome in requests and agreements) and `work(...)`; `structure(...)` takes `materials_at` when you build yourself, and no longer pays for materials. Outcomes gain `goods`. The translator's test set has goods and work cases (one held out).
-- The version: every `$id` is `urn:terrarium:contracts:0.7:…`, and configs and log headers say `contracts: "0.7"` (0.6, 2026-09-29: typed commitments, offers and practices, `match.has`; docs/design/ai-citizens.md).
+- The version: every `$id` is `urn:terrarium:contracts:0.8:…`, and configs and log headers say `contracts: "0.8"` (0.6, 2026-09-29: typed commitments, offers and practices, `match.has`; docs/design/ai-citizens.md).
 
 ## Changes from v0.3
 
@@ -232,7 +237,7 @@ Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, 
 
 ## Versioning
 
-`contracts: "0.4"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version (like v0.4 now) collects agreed changes until it's frozen. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).
+`contracts: "0.8"`. Pre-1.0, every change bumps the minor version and is proposed explicitly. A draft version collects agreed changes until it's closed. Older logs remain valid logs of their own version and replay only on a kernel build of that version (D6).
 
 ## Canary
 

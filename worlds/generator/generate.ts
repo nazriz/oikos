@@ -895,8 +895,9 @@ export function generate(spec: TownSpec): any {
     // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
     budget_lines: {
       parks: "building a park on one of the town's free lots, commissioned from a builder.",
-      staff: `the wages of the town's works crew, who collect waste from every home each week and keep the town's parks and hall up (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody collects the waste).`,
+      staff: `the wages of the town's works crew, who collect waste from every home each week and keep the town's parks${RDS ? ", hall and roads" : " and hall"} up (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody collects the waste).`,
       services: "the services' running costs: the landfill's charge for the waste collected (invoiced monthly).",
+      ...(RDS ? { roads: "building roads on the town's free lots, commissioned from a builder (a road a lot): the town's streets, which people travel far quicker on than on foot across lots." } : {}),
       ...(L ? { environment: `the wages of the town's environment office, whose scientists survey the district's wildlife each quarter and report on it (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody counts).` } : {}),
     } }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
@@ -1125,7 +1126,7 @@ export function generate(spec: TownSpec): any {
     } }));
 
   return {
-    contracts: "0.7",
+    contracts: "0.8",
     meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${everyone.length} people in ${households.length} households, ${homes.length} homes, ${jobSlots.length} jobs.`, canary: CANARY },
     seed: spec.seed,
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
