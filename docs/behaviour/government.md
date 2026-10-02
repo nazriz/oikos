@@ -23,12 +23,13 @@ The genesis records that set this up are world content, made by the generator:
 A rule-following mayor. In AI experiments an LLM takes this seat instead (M2), and this module is the baseline it's compared against.
 - **Budget:** each year without an adopted budget (at the year's start, or on taking office), it proposes one (`data.enact` = a `budget` statement with `lines`: `parks`, and since C4b `staff`, the works crew's wages, and `services`, the landfill's charges; [services.md](services.md)). If the council hasn't adopted one within 45 days, it tables it again.
 - **A park a year:** when the current year's adopted budget can pay for one and the town owns a free parcel, it applies for planning permission. Once that is granted, it proposes and signs a construction agreement with the builder at 1.2× materials cost.
+- **Roads** (0.8.0; daily-round.md): with a `roads` line in the adopted budget, when a building stands more than `road_within` cells (3) from any road, it applies for a permit for a road on the town's free lot beside the network that comes nearest that building, and commissions the builder once granted: one road at a time, as many a year as the line pays for.
 - **Approvals:** it writes an `approval` for each invoice for work it commissioned. The payments procedure needs one over $50,000.
 - **Elections** (docs/behaviour/elections.md): given notice of an election for its office, while nominations are open, it stands as the incumbent, on its record.
 - **The office's record:** what it has acted on (a permit decision, an invoice, a petition) and when it last applied for a park, it reads from the office's records, whoever made them. So whoever takes the office, elected or appointed, carries on from where the office left off. (Until 2026-10-01 it kept these in memory: a newly elected mayor commissioned again a park already built.)
 - **Petitions:** once a petition's organiser's published count (`petition_count`) reaches `petition_threshold_bps` of the population, it turns the petition into a proposal carrying the petition's demand, with probability `responsiveness_bps`.
 
-Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 200, `park_budget` $80,000, `builder`, `park_type`.
+Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 200, `park_budget` $80,000, `builder`, `park_type`, `road_budget` (none), `road_type`, `road_within` 3.
 
 **Found in M1c:** the first version commissioned parks without a permit, and the inspector fined the town. That was correct behaviour from the inspector; the mayor module was wrong, since a rule-following mayor applies like anyone else.
 

@@ -6,10 +6,11 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, Randomness, withholding, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw } from "@terrarium/participants";
+import { adultAgeBands, drawHousehold, drawSavings, Randomness, withholding, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw } from "@terrarium/participants";
 import law from "../law/basic.json";
 import { loadProfile, type Profile } from "./profile";
 import { landscape } from "./nature";
+import { drawWeather } from "./weather";
 
 /** The share of its staff's hours a shop plans to fill with serving (firm.retailer's default; placeholder). */
 const SHOP_UTILISATION_BPS = 8000;
@@ -40,7 +41,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.22.0";
+export const GENERATOR_VERSION = "0.23.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -79,6 +80,15 @@ export interface TownSpec {
   crime?: boolean;
   /** Rain and drought (world-expansion 7.3): the river's inflow from a day of the run on, as a share (10,000 = usual). */
   weather?: { from_day: number; bps: number }[];
+  /** Weather drawn from the profile's climate (rain, drought, heatwaves, the bureau's warnings). Default: yes; false: the
+   * usual every day (or `weather`, if given). */
+  climate?: boolean;
+  /** The calendar month the run starts in (1 = January), for the seasons. Default 1. */
+  start_month?: number;
+  /** Roads, where the profile describes them and there's a daily round. Default: yes; false: none (the lots are the streets). */
+  roads?: boolean;
+  /** How often streets cross the town: a street every `rows` rows and every `cols` columns. Default 6 and 8. */
+  road_every?: { rows: number; cols: number };
   /** The daily round, where the profile describes it (world-expansion 6.3): people go to work and school and come home;
    * moving takes time. Default: yes; false: a body stays where it went, and moving takes none. */
   round?: boolean;
@@ -95,6 +105,8 @@ export interface TownSpec {
   housed_bps: number;
   employed_bps: number;
   savings_months: [number, number];
+  /** Savings as months of pay only, ignoring the profile's distribution by age (an experiment's). */
+  savings_months_only?: boolean;
   /** How often landlords obey a permit refusal, a fine or a demolition order (default 10000 = always). */
   landlord_compliance_bps?: number;
   /** Each landlord's opening balance, cents (default $600,000). */
@@ -185,7 +197,12 @@ export function generate(spec: TownSpec): any {
   for (let y = 0; y < spec.grid.h; y++) for (let x = 0; x < spec.grid.w; x++) parcels.push({ id: `lot-${pad(x, 2)}-${pad(y, 2)}`, cell: `cell.${x}.${y}`, x, y });
   const cellOf = new Map(parcels.map((p) => [p.id, p.cell]));
   const river = new Set(parcels.filter((p) => p.y === spec.grid.h - 1).map((p) => p.id));
-  const buildable = parcels.filter((p) => !river.has(p.id));
+  // Roads (world-expansion 6.3): streets across the town every few rows and columns, laid before anything is built.
+  // (A road is ground of its own, a cover: so only where there's nature, which has covers.)
+  const RDS = V.round?.roads && spec.round !== false && spec.roads !== false && V.nature && spec.nature !== false ? V.round.roads : undefined;
+  const every = spec.road_every ?? { rows: 6, cols: 8 };
+  const roadLots = new Set(RDS ? parcels.filter((p) => !river.has(p.id) && (p.y % every.rows === Math.floor(every.rows / 2) || p.x % every.cols === Math.floor(every.cols / 2))).map((p) => p.id) : []);
+  const buildable = parcels.filter((p) => !river.has(p.id) && !roadLots.has(p.id));
   const order = [...buildable];
   const shuffle = rng("layout");
   for (let i = order.length - 1; i > 0; i--) {
@@ -254,6 +271,11 @@ export function generate(spec: TownSpec): any {
   const RD = V.round && spec.round !== false ? V.round : undefined;
   const HZ = V.hazards && UT ? V.hazards : undefined; // (floods: where the river carries water)
   const CR = V.crime && JU && spec.crime !== false ? V.crime : undefined;
+  // Weather (world-expansion 7.3): drawn from the climate for the run, unless the spec gives the river's own (an
+  // experiment's). Rain and drought need the river (utilities); heat, the land's fields (nature).
+  const CL = V.climate && spec.climate !== false ? V.climate : undefined;
+  const weatherRng = rng("weather");
+  const W = CL ? drawWeather(CL, spec.years * 365 + 1, (n) => weatherRng.below(n), spec.start_month ?? 1) : undefined;
   // (With the round, employers look at the day's work an hour after it starts, when their staff are in.)
   const look = RD ? { look_at: (RD.work_start_hour + 1) * HOUR, look_days: RD.work_days } : {};
   const SHOP_DAYS = RD ? RD.work_days : 6; // (a shop opens when its staff are in)
@@ -345,6 +367,7 @@ export function generate(spec: TownSpec): any {
     own(substationLot, "energy-co");
     entities.push({ id: "water-corp", kind: "utility", name: `${spec.name} Water` }, { id: "energy-co", kind: "utility", name: "Energy retailer" });
   }
+  for (const lot of [...roadLots].sort()) structures.push({ id: `road-${lot.slice(4)}`, at: cellOf.get(lot), type: "road", built_by: "builder" });
   for (const p of parcels) if (!records.some((r) => r.id === `title-${p.id}`)) own(p.id, "city");
   // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----
   const E = V.elections && spec.elections !== false ? V.elections : undefined;
@@ -483,8 +506,10 @@ export function generate(spec: TownSpec): any {
     const w = employed ? jobSlots[job++]! : undefined;
     const monthly = w ? Math.floor((w.wage * MONTH) / (14 * DAY)) : 0;
     monthlyPay.set(c.id, monthly);
-    const months = spec.savings_months[0] + pick.below(spec.savings_months[1] - spec.savings_months[0] + 1);
-    accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: Math.max(100_000, monthly * months) });
+    // Savings: drawn from the profile's distribution by age (else, the spec's months of pay).
+    const band = V.savings_by_age && !spec.savings_months_only ? [...V.savings_by_age].reverse().find((b) => b.from <= ageOf(c)) : undefined;
+    const saved = band ? drawSavings(band.pct, pick.below(10_000)) : monthly * (spec.savings_months[0] + pick.below(spec.savings_months[1] - spec.savings_months[0] + 1));
+    accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: Math.max(100_000, saved) });
     if (!w) continue;
     staffCount.set(w.employer, (staffCount.get(w.employer) ?? 0) + 1);
     const ag = `job-${c.id}`;
@@ -727,6 +752,7 @@ export function generate(spec: TownSpec): any {
     { id: "yard", category: "industrial", materials: { materials: kg(30) }, build_labour: 1_000 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: CREW.capacity }], ...(spec.life === false ? {} : { injury_bps: INJURY.factory }) },
     // (A civic building has a hall, where groups and meetings gather: docs/design/ai-citizens.md 2b.)
     { id: "civic", category: "civic", materials: { materials: kg(330) }, build_labour: 10_000 * HOUR, demolition_labour: 800 * HOUR, build_time: 120 * DAY, footprint: { w: 1, h: 1 }, spaces: [{ kind: "workplace", count: 1, capacity: 20 }, { kind: "hall", count: 1, capacity: spec.hall_capacity ?? 200 }] },
+    ...(RDS ? [{ id: "road", category: "transport", cover: "road", materials: { materials: kg(10) }, build_labour: 400 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [] }] : []),
     { id: "park", category: "green", materials: { materials: kg(20) }, build_labour: 1_500 * HOUR, demolition_labour: 100 * HOUR, build_time: 30 * DAY, footprint: { w: 1, h: 1 }, spaces: [] },
     ...(CR ? [{ id: "station", category: "civic", materials: { materials: kg(300) }, build_labour: 8_000 * HOUR, demolition_labour: 600 * HOUR, build_time: 120 * DAY, footprint: { w: 1, h: 1 },
       spaces: [{ kind: "workplace", count: 1, capacity: Math.max(1, Math.ceil((CR.police_per_1000 * everyone.length) / 1000)) + 2 }] }] : []),
@@ -816,12 +842,14 @@ export function generate(spec: TownSpec): any {
   // profile's staff per 1,000 residents gives, and the landfill for a year's waste.
   // (With nature, the town's environment office: its scientists, at the public wage.)
   const envStaff = L ? V.nature!.survey_staff : 0;
-  const mayorParams = { population: adultCount, builder: "builder", park_budget: 15_000_000, staff_budget: crew * crewAnnual, services_budget: servicesBudget, ...(envStaff ? { environment_budget: envStaff * crewAnnual } : {}) };
+  const mayorParams = { population: adultCount, builder: "builder", park_budget: 15_000_000,
+    ...(RDS ? { road_budget: RDS.budget_per_resident * everyone.length, road_within: RDS.within_cells } : {}), staff_budget: crew * crewAnnual, services_budget: servicesBudget, ...(envStaff ? { environment_budget: envStaff * crewAnnual } : {}) };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
     [{ id: "budget", title: "The town's accounts", kind: "accounts" }, { id: "laws", title: "Laws, the charter and procedures", kind: "records", match: { statement_kinds: ["charter", "law", "procedure"] } },
       { ...mine("city-business"), title: "Correspondence and filings concerning the town" }, { id: "files", title: "The town's files: every record the town can see, looked up on request (look, with what to find)", kind: "records", match: {}, on_request: true }, { ...forms, title: "Forms on file" }, { ...priceLists, title: "Price lists" }, { id: "who", title: "Who's who", kind: "directory" },
       { id: "civic", title: "Petitions, budgets, invoices, council results and complaints", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "invoice", "ballot_result", "complaint"] } },
+      ...(W?.events.length ? [{ id: "weather", title: "The weather bureau's warnings", kind: "records", match: { statement_kinds: ["weather_warning"] } }] : []),
       ...(E ? [{ id: "elections", title: "Elections, and the local paper", kind: "records", match: { statement_kinds: ["election_notice", "nomination", "ballot", "electoral_roll", "news"] } }] : []), { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
     spec.mayor === "code" ? mayorCode : { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       // Until a real model is used, the mock runs the office with the code mayor as its brain (docs/design/m2-llm-participants.md).
@@ -835,6 +863,8 @@ export function generate(spec: TownSpec): any {
   office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), { id: "who", kind: "directory" }],
     code("bank.lending", { rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
       default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: 10_000_000, ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
+  // The weather bureau (the outside world's): warns of heavy rain, drought and heatwaves a few days ahead.
+  if (W?.events.length) office("weather-bureau", "outside", "Weather bureau", undefined, [mine("bureau")], code("world.weather", { events: W.events, lead_days: CL!.warning_lead_days }));
   office("outside-funding", "outside", "Wholesale funding", undefined, [{ id: "ledger", kind: "accounts" }, mine("draws")], code("world.funding", { account: "acc-outside" }));
   office("bank-payments", "bank", "Bank payment system", undefined, [{ id: "ledger", kind: "accounts" }, { id: "instructions", kind: "records", match: { records: ["statement", "withdrawal"], involving: ["self"] } }, { id: "who", kind: "directory" }, deaths], code("bank.payment_system", { town: "city", ...(JU ? { courts: ["tribunal"] } : {}) }));
   // The outside world as a trader (world.trade): it sells at world prices to whoever orders and pays.
@@ -1083,7 +1113,7 @@ export function generate(spec: TownSpec): any {
   if (spec.migration !== false) {
     office("migration", "outside", "People moving from elsewhere", undefined, [{ id: "jobs", kind: "records", match: { statement_kinds: ["job_posting"] }, on_request: true }, { id: "who", kind: "directory" },
       { id: "statistics", kind: "records", match: { statement_kinds: ["support_statistics"] } }],
-      code("world.migration", { households: H, participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", jobseekers_payment: "unemployment",
+      code("world.migration", { households: H, ...(V.savings_by_age && !spec.savings_months_only ? { savings_by_age: V.savings_by_age } : {}), participation_bps: V.labour_force_participation_bps, template_outside_lf: "newcomer-outside-lf", jobseekers_payment: "unemployment",
         ...(ED && HE ? { schooling: { school_ages: ED.school_ages, attainment: ED.attainment, variable: "skill", per_year: SKILL_PER_YEAR } } : {}), ...(spec.migration ?? {}) }));
   }
   // Support paid from outside the town (for a town, the national government's): the profile's payments.
@@ -1112,7 +1142,7 @@ export function generate(spec: TownSpec): any {
       // wear on the town's parks and hall (0 to 100,000 over their life).
       variables: [
         { id: "waste", min: 0, max: 100_000_000, initial: 0, per_occupant_per_day: V.services.waste_per_person_per_day_g, types: structureTypes.filter((x) => x.spaces.some((sp: any) => sp.kind === "dwelling")).map((x) => x.id) },
-        { id: "wear", min: 0, max: 100_000, initial: 0, per_day: wearPerDay, types: ["park", "civic"] },
+        { id: "wear", min: 0, max: 100_000, initial: 0, per_day: wearPerDay, types: ["park", "civic", ...(RDS ? ["road"] : [])] },
       ],
       // Making goods: a worker's hours at a workplace turn inputs into goods.
       tasks: [
@@ -1143,16 +1173,22 @@ export function generate(spec: TownSpec): any {
         ] : []),
       ],
       ...(UT ? { counters: [{ id: "greenhouse_gas" }] } : {}),
-      ...(RD ? { travel: { seconds_per_cell: RD.travel_seconds_per_cell, by_cover: RD.travel_by_cover } } : {}),
+      ...(RD ? { travel: { seconds_per_cell: RD.travel_seconds_per_cell, by_cover: { ...RD.travel_by_cover, ...(RDS ? { road: RDS.seconds_per_cell } : {}) } } } : {}),
       ...(HE && ED ? { body_variables: [{ id: "skill", min: 0, max: ED.max_years * SKILL_PER_YEAR, initial: 0 }] } : {}),
       working_day: WORKING_DAY,
       // (The river carries water where there are utilities: fed along its course, flowing downstream, lost along the way.)
-      ...(L ? { land_covers: L.land_covers, default_cover: L.default_cover, cleared_cover: L.cleared_cover, species: L.species,
+      // (A road is a cover, as building is: a barrier to whatever building is one to.)
+      ...(L ? { land_covers: [...L.land_covers, ...(RDS ? [{ id: "road" }] : [])], default_cover: L.default_cover, cleared_cover: L.cleared_cover,
+        species: RDS ? L.species.map((x: any) => (x.barriers?.includes("built") ? { ...x, barriers: [...x.barriers, "road"] } : x)) : L.species,
         fields: [...L.fields, ...(UT ? [{ id: "water", min: 0, max: 1_000_000_000_000, decay_bps_per_day: UT.water.river_decay_bps_per_day, flow_bps_per_day: UT.water.river_flow_bps_per_day,
           from_covers: { [V.nature!.river_cover]: UT.water.river_inflow_kl_per_cell_per_day, ...(HZ ? { wetland: -HZ.wetland_soak_kl_per_day } : {}) },
           // (Floods: over its banks it spills onto the land around; rain and drought scale what comes down.)
           ...(HZ ? { spills_above: HZ.river_bank_kl, spill_bps_per_day: HZ.spill_bps_per_day } : {}),
-          ...(spec.weather?.length ? { source_by_day: spec.weather } : {}) }] : [])] } : {}),
+          ...(spec.weather?.length ? { source_by_day: spec.weather } : W ? { source_by_day: W.rain } : {}) }] : []),
+        // Heat: on every cell on heatwave days (more on built ground), gone the next day.
+        ...(W && CL ? [{ id: "heat", min: 0, max: CL.built_heat_units, decay_bps_per_day: 10_000,
+          from_covers: { ...Object.fromEntries([...L.land_covers.map((c: any) => c.id), V.nature!.river_cover].map((c) => [c, CL.heat_units])), built: CL.built_heat_units, ...(RDS ? { road: CL.built_heat_units } : {}) },
+          source_by_day: W.heat }] : [])] } : {}),
     },
     world: { boundaries: ["outside"], currencies: [V.currency], ground: L ? L.ground : { w: spec.grid.w, h: spec.grid.h },
       // The places (D58): the town, detailed, covering its ground; with nature, within its district, the landscape.
@@ -1163,7 +1199,8 @@ export function generate(spec: TownSpec): any {
     participants,
     positions,
     templates,
-    ...(spec.life === false ? {} : { life }),
+    // (Heat makes illness likelier where the body is: docs/behaviour/weather.md.)
+    ...(spec.life === false ? {} : { life: W && CL && L ? { ...life, illness: { ...(life.illness as object), fields: [...((life.illness as any).fields ?? []), { field: "heat", bps_per_unit: CL.heat_illness_bps_per_unit }] } } : life }),
     caps: { max_created_entities: 50 },
     orchestration: { thinking_time: "free", act_time: ACT_TIME },
   };

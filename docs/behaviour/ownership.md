@@ -34,7 +34,7 @@ holder's transfer.
 
 | | Rule | Source |
 |---|---|---|
-| **Who sells** | An owner who'd leave town; an heir holding a house they don't live in (once it's valued in their name). | — |
+| **Who sells** | An owner who'd leave town; an owner whose mortgage is in default (sold before the bank takes it; they rent after); an heir holding a house they don't live in (once it's valued in their name). | — |
 | **The price** | The valuer's latest valuation (the land, and what building the house would cost now). Unsold after `relist_days` (30), it's relisted for `cut_bps` (5%) less, down to `floor_bps` (80%) of the first asking price. | Placeholders: sellers cut prices the longer a home is on the market (Merlo and Ortalo-Magné 2004, to confirm) |
 | **Who buys** | A renting household with income, whose savings cover the deposit and costs (`deposit_bps` 20%, `costs_bps` 5%) of a listed home with the bedrooms it needs. Each month, with the chance `buy_bps_per_month` (1%), it takes the cheapest such home. | APRA's guidance on LVRs (20% deposit); SRO Victoria duty rates (costs); chance a placeholder |
 | **The mortgage** | Purpose "a home": the bank lends at `mortgage_rate_bps` (6.2%) over up to 30 years, at most 80% of the price (`max_lvr_bps`), within its usual rule on income (30% at its rate plus the buffer, over the least of the last three months' pay). | RBA lending rates; APRA (to confirm) |
@@ -62,10 +62,12 @@ made, owners pay their rates, and none goes looking for a rental.
 
 ## Leaves out (for now)
 
-- **Few buyers:** the generator gives people a few months' pay in savings, so almost no renter has a deposit. Homes
-  listed go unsold for months, and the sellers, out of work, fall behind on their mortgages. A real wealth distribution
-  (ABS Survey of Income and Housing) would give some renters deposits.
-- **Mortgagee sales:** a bank whose borrower defaults doesn't take possession and sell; the loan just stays in default.
+- **Savings** (generator 0.23.0) are drawn by age from the profile's distribution (`savings_by_age`), not as a few
+  months' pay: some renters have a deposit now (16 of 44 leaseholders in the small town, many of them retirees the bank
+  won't lend to on a pension). Owners have savings too, so fewer fall behind and sell (5 listings a year, against 17).
+  The poorest have less than before, and more households leave town broke (28 a year against 23).
+- **Mortgagee sales:** an owner in default sells; one who didn't would keep the house, as the bank doesn't take
+  possession (that needs the registry to act for it).
 - **Bargaining:** a home sells at its asking price to the first buyer to pay; no offers, no auctions (common in
   Victoria), no agents, no conveyancing time.
 - **Who buys:** only renters wanting a home of their own. Not owners moving house, investors, or newcomers from outside.

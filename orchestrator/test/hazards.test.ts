@@ -63,7 +63,9 @@ test("taking from work, found at a stocktake, investigated, charged, ordered and
   expect(reports.length).toBeGreaterThan(0);
   const charges = recs.filter((r) => r.kind === "tribunal_application" && r.data.kind === "charge");
   const unsolved = recs.filter((r) => r.kind === "investigation_closed");
-  expect(charges.length + unsolved.length).toBeGreaterThanOrEqual(reports.length - 2);
+  // (Each report made a fortnight before the end, by then: officers take them in turn, as their hours allow.)
+  const dealt = new Set([...charges, ...unsolved].map((r) => r.data.report));
+  expect(reports.filter((r) => r.at < 186 * DAY && !dealt.has(r.id)).map((r) => r.id)).toEqual([]);
   // A charge names someone who did take from that shop; the tribunal orders them to pay; paid.
   for (const c of charges) expect(taken.some((e) => e.by === c.data.against && e.from === c.data.victim)).toBe(true);
   const orders = recs.filter((r) => r.kind === "tribunal_order" && r.data.kind === "charge");

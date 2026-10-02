@@ -1,6 +1,6 @@
 {
   "name": "world.migration",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "households": {
@@ -58,6 +58,13 @@
       "unit": "bps",
       "default": 1000,
       "source": "chance per posting, per 100% gap, that a household comes this month (placeholder)"
+    },
+    "savings_by_age": {
+      "schema": {
+        "description": "the world's: an adult's savings by age (else months of income elsewhere)"
+      },
+      "default": null,
+      "source": "placeholder"
     },
     "savings_months": {
       "schema": {

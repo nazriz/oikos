@@ -225,3 +225,12 @@ export function adultAgeBands(H: HouseholdSpec, below: (n: number) => number, n 
   const sum = need.reduce((a, b) => a + b, 0) || 1;
   return bands.map((b, i) => ({ from: b.from, to: b.to, bps: Math.round((need[i]! * 10_000) / sum) }));
 }
+
+/** A draw from percentiles 10, 25, 50, 75, 90 at the quantile `q` (of 10,000): linear between them, from nothing below
+ * the 10th, and above the 90th up to three times it. */
+export function drawSavings(pct: [number, number, number, number, number], q: number): number {
+  const at = [0, 1000, 2500, 5000, 7500, 9000, 10_000];
+  const v = [0, ...pct, pct[4] * 3];
+  for (let i = 1; i < at.length; i++) if (q < at[i]!) return Math.floor(v[i - 1]! + ((v[i]! - v[i - 1]!) * (q - at[i - 1]!)) / (at[i]! - at[i - 1]!));
+  return v[6]!;
+}

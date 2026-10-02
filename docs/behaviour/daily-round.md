@@ -38,11 +38,23 @@ Employers whose staff work in a place (factories, shops, the builder, the works 
 the day's work an hour after it starts (`look_at`), on working days: their staff are in. The clinic opens half an hour
 after the working day starts; the school's lessons begin half an hour after school does.
 
+## Roads
+
+A road is a building type whose ground is the cover `road` (no contract change: a type's cover is the ground under it,
+and travel goes by cover). The generator lays streets across the town every 6 rows and 8 columns, before anything else
+is built; the town owns them. On foot, a cell takes about 18 seconds; on a road, about 2. So the quickest way anywhere
+is to the nearest street and along it.
+
+- **Wear:** roads wear out over their life like the parks and the hall, and the works crew keeps them up.
+- **The town builds roads** (city.mayor_code 0.8.0): within a roads budget (about $300 a resident a year), a road
+  toward any building standing more than 3 cells from one, a road at a time, permit first (government.md). A road costs
+  about $33,000 at the builder's prices (25 m of local road: placeholder).
+- **Nature:** a road is a barrier to whatever building is one to.
+
 ## The profile
 
 Working hours 9 to 5, Monday to Friday, for everyone (shops included: a liberty; they'd roster Saturday staff). School
-9 to 3. A 25 m cell in about 4 seconds, driving through a small town; slower across water, wetland and bush. No roads
-yet: the town's lots are its streets.
+9 to 3. Walking about 1.4 m/s; driving at 45 km/h on roads; slower across water, wetland and bush.
 
 ## In the small town (90 days, against the round's absence)
 
@@ -61,7 +73,7 @@ yet: the town's lots are its streets.
 
 ## Leaves out (for now)
 
-- **Roads** as structures the town builds (a cover that's quicker), traffic, vehicles, public transport.
+- Traffic, congestion, vehicles, public transport, parking. Worn roads aren't slower. Who walks and who drives: all drive on roads and walk off them.
 - Rosters: everyone works the same hours, five days.
 - **Being in transit:** a body is where it was until it arrives.
 - Nights out, errands, visiting: people are at work, school, the clinic, a gathering, or home.

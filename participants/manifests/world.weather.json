@@ -1,0 +1,24 @@
+{
+  "name": "world.weather",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/weather.md",
+  "params": {
+    "events": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "lead_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 2,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

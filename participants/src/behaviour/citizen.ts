@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.32.0",
+  version: "0.33.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -1387,7 +1387,10 @@ export const citizen: BehaviourModule = {
       }
       // Taking (crime): in need (less than a month's essentials), at work where our employer keeps goods, rarely, the more
       // rarely the likelier we'd be caught; and home with them.
-      if (p.crime && job?.workplace && obs.body?.in === job.workplace && acc.balance < p.essentials && t >= nextTakeChance) {
+      // (Where the employer keeps goods: one that sells them, by its price list. A builder's yard holds materials: until
+      // 2026-10-02 its workers tried, and found none.)
+      const sellsGoods = !!job && goodsPrices(book, job.employer).prices[p.goods] !== undefined;
+      if (p.crime && job?.workplace && sellsGoods && obs.body?.in === job.workplace && acc.balance < p.essentials && t >= nextTakeChance) {
         nextTakeChance = t + MONTH;
         const chance = Math.round((p.crime.take_bps * (10_000 - p.crime.caught_bps)) / 10_000);
         const homeAt = home?.movedIn ? structureOf(home.space) : livingAt ? structureOf(livingAt) : undefined;
@@ -1831,6 +1834,12 @@ export const citizen: BehaviourModule = {
       const m = p.market;
       const acc = ownBanked(obs, me);
       if (!m || !acc || !isLeaseholder()) return;
+      // Our mortgage in default: the home sold before the bank takes it (we rent after).
+      const ourLoan = home?.owned ? mortgageFor(home.space) : undefined;
+      if (!selling && ourLoan && book.all("loan_default").some((r) => r.data?.loan === ourLoan.id && (r.addressed_to ?? []).includes(me))) {
+        const lot = lotOf(obs, home!.structure);
+        if (lot) sell(obs, lot, false);
+      }
       // Inherited land with a house we don't live in: sold.
       if (!selling) for (const r of book.ofType("claim_transfer")) {
         const lot = r.to === me ? (book.records.get(r.claim) as any)?.about?.object as string | undefined : undefined;
@@ -1867,7 +1876,9 @@ export const citizen: BehaviourModule = {
             say("property_sold", `Sold: ${s.structure} to ${s.buyer} for ${usd(s.price)}.`, { visible: "public", basis: s.listing, data: { structure: s.structure, lot: s.lot, buyer: s.buyer, price: s.price } })));
           if (s.loan) steps.push(because("Sold: asking the bank what paying our mortgage off takes.",
             say("loan_payout_request", `What does paying off ${s.loan} take?`, { to: [p.bank], visible: [me, p.bank], data: { loan: s.loan } })));
-          // (Leaving: we stay in it until we go, a day or so. Not leaving: it wasn't our home.)
+          // (Leaving: we stay in it until we go, a day or so. Not leaving: we look for somewhere to rent, and stay until we
+          // find it.)
+          if (!s.leaveAfter && home?.owned && home.space === s.space) home = null;
           if (!s.loan) {
             if (s.leaveAfter) soldAndGoing = t;
             selling = null;

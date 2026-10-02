@@ -135,6 +135,14 @@ sources); this list is for the architecture and design ideas.
 | Sellers cut their asking price the longer a home is on the market | Merlo, A. & Ortalo-Magné, F. (2004), "Bargaining over residential real estate: evidence from England", *Journal of Urban Economics* 56(2), 192–216 **(to confirm)** | A home unsold after a month is relisted for less, down to a floor |
 | Lending above 80% of a home's value as higher risk (a 20% deposit, or mortgage insurance) | APRA, *Prudential Practice Guide APG 223: Residential Mortgage Lending* **(to confirm)** | The bank's `max_lvr_bps`; buyers' `deposit_bps` |
 
+## Roads and weather (docs/behaviour/daily-round.md, weather.md)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Comfortable walking speed, about 1.4 m/s | Bohannon, R. W. (1997), "Comfortable and maximum walking speed of adults aged 20–79 years", *Age and Ageing* 26(1), 15–19 **(to confirm)** | Travel off roads, 18 s a 25 m cell |
+| The urban heat island: built ground hotter than open land | Oke, T. R. (1982), "The energetic basis of the urban heat island", *Quarterly Journal of the Royal Meteorological Society* 108(455), 1–24 **(to confirm)** | More heat on built cells and roads |
+| Heatwaves raise illness and death, most among the old | Department of Human Services (2009), *January 2009 Heatwave in Victoria: an Assessment of Health Impacts* **(to confirm)** | Heat raises the chance of illness; the elderly die of it more (fatality by age) |
+
 ## Crime (docs/behaviour/crime.md; docs/design/world-expansion.md §7.2)
 
 | Idea | Citation | Used in |

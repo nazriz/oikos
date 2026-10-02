@@ -30,6 +30,8 @@ export interface Profile {
       house_types: { id: string; bedrooms: number; share_bps: number; rent: number }[];
     };
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number };
+    /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
+    savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
     retirement_age: number;
     labour_force_participation_bps: number;
     tenancy: { rent_review_months: number; rent_increase_notice_days: number; after_fixed_term?: "periodic" };
@@ -78,7 +80,10 @@ export interface Profile {
     education?: { school_ages: [number, number]; students_per_teacher: number; school_days_per_year: number; hours_per_day: number; teacher_wage_per_fortnight: number;
       attainment: { label: string; share_bps: number; years: number }[]; return_per_year_bps: number; max_years: number };
     /** The daily round (world-expansion 6.3): working and school hours, and what crossing a cell takes (seconds). */
-    round?: { work_start_hour: number; work_end_hour: number; work_days: number; school_start_hour: number; school_end_hour: number; travel_seconds_per_cell: number; travel_by_cover: { [cover: string]: number } };
+    round?: { work_start_hour: number; work_end_hour: number; work_days: number; school_start_hour: number; school_end_hour: number; travel_seconds_per_cell: number; travel_by_cover: { [cover: string]: number };
+      /** Roads (world-expansion 6.3): a road cell's travel time, how far from one a building may stand before the town builds
+       * toward it, and what the town budgets for roads a year per resident (cents). */
+      roads?: { seconds_per_cell: number; within_cells: number; budget_per_resident: number } };
     /** Home ownership (world-expansion 6.2): which houses their households own, with a mortgage or outright. */
     ownership?: { house_owner_bps: number; mortgage_bps_by_age: { from: number; bps: number }[]; mortgage_payment_per_month: number; mortgage_rate_bps: number; mortgage_years_left: [number, number];
       /** Buying and selling homes: a renting household's chance a month, the deposit and costs (of the price), the mortgage term; a seller's price cut when unsold. */
@@ -90,6 +95,14 @@ export interface Profile {
       energy: { kwh_per_household_per_day: number; price_per_kwh: number; supply_per_day: number; grid_price_per_kwh: number; grid_emissions_g_per_kwh: number };
     };
     /** Floods (world-expansion 7.3): the river's banks and spill, how deep before a building floods, wetland's soaking. */
+    /** The climate (world-expansion 7.3), for weather drawn for a run: the river's inflow by calendar month (10,000 = the
+     * year's usual), heavy rain (a month's chance, how many days, how much), drought (a year's chance, how many months,
+     * how little), and heatwaves (a summer week's chance, how many days; heat on the land and, more, on built ground;
+     * the yearly chance of illness each unit of heat adds). */
+    climate?: { rain_by_month_bps: number[]; storm_bps_per_month: number; storm_days: [number, number]; storm_bps: number;
+      drought_bps_per_year: number; drought_months: [number, number]; drought_bps: number;
+      summer_months: number[]; heatwave_bps_per_week: number; heatwave_days: [number, number]; heat_units: number; built_heat_units: number; heat_illness_bps_per_unit: number;
+      warning_lead_days: number };
     hazards?: { river_bank_kl: number; spill_bps_per_day: number; flood_above_kl: number; wetland_soak_kl_per_day: number };
     /** Crime and policing (world-expansion 7.2): how rarely people in need take from work, the police's establishment, and
      * how often an investigation finds who. */

@@ -1199,6 +1199,24 @@ See the design note, §16.
   - **Outcome, not tuned:** in the generated town nobody has a deposit (savings are a few months' pay), so listings sit unsold and the sellers fall behind on their mortgages.
   - **Revisit if:** savings follow a real wealth distribution; a study needs auctions, investors, owners moving house, or mortgagee sales.
 
+- **The last world-expansion pass: savings, forced sales, roads, weather** (2026-10-02; no contract change; docs/behaviour/ownership.md, daily-round.md, weather.md).
+  - **What:**
+    - savings by age from a distribution, not months of pay (newcomers too);
+    - an owner whose mortgage defaults sells and rents;
+    - roads: a building type with the `road` cover, streets every 6 rows and 8 columns, walking off them and driving on them, worn and kept up, and the mayor building toward far buildings within a roads budget;
+    - weather drawn for the run from the climate: rain by season, heavy rain, drought, heatwaves (a heat field that raises illness, more on built ground), and the bureau's warnings.
+  - **Why no contract change:** a type's cover already sets its ground, travel goes by cover, fields' sources by day and illness by field were signed in §6.4 and §7.3.
+  - **Why weather is drawn before the run:** like the town, it's a scenario. Fixed in config, it's reproducible, and the same weather can be replayed under different stewards.
+  - **Found:**
+    - a road at first cost more than the year's roads budget, so the town never built one;
+    - a fresh random stream for each draw gave the same number every time, so no weather ever happened;
+    - the mayor looked only at finished buildings, and houses take most of a year.
+    - with poorer people in need more often, a builder's labourer tried to take goods from the yard, which holds none: taking is now only where the employer sells goods;
+    - the police lost the first of two investigations done in a day (its finding came while the second was under way): found by more crime;
+    - with savings drawn by age, the mayor who funds no works crew kept office in the election test on a quarter of first preferences (economic voting): the test now checks support is lost, and tests the next mayor in a poorer town.
+  - **Outcomes, not tuned:** with real savings, more of the poorest leave town broke (28 a year against 23) and fewer owners sell (5 against 17). A heatwave in a town of 200 makes about one more person ill.
+  - **Revisit if:** a study needs traffic, walking versus driving, bushfire, wind damage, responses to warnings, or a changing climate.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

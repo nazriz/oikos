@@ -313,7 +313,8 @@ consultation (a payment from outside on the practice's claim).
 
 ### 6.3 Roads and commuting
 
-*Built 2026-10-01 (the daily round and travel; roads as structures not yet): docs/behaviour/daily-round.md.*
+*Built 2026-10-01 (the daily round and travel): docs/behaviour/daily-round.md. Roads built 2026-10-02: a building type
+with the `road` cover; streets laid by the generator; the town builds toward buildings far from one.*
 
 - **Travel takes time** (Rust): moving between spaces costs time by distance, less along road cells (a cover). It
   uses the person's timeline, as acts do now.
@@ -361,13 +362,14 @@ rebuild. I'd do it on its own branch, with the invariance and reliability tests 
 
 ### 7.1 Hazards
 
-*Floods built 2026-10-02: docs/behaviour/floods.md. Wetland's mitigation isn't captured (needs a bank by cover).*
+*Floods built 2026-10-02: docs/behaviour/floods.md. Wetland's mitigation isn't captured (needs a bank by cover).
+Weather built 2026-10-02 (rain by season, heavy rain, drought, heatwaves, the bureau's warnings): docs/behaviour/weather.md.*
 
 - **Floods:** the boundary sets the river's inflow, and when a cell's `water_level` passes a structure type's
   threshold, the structure takes damage (its wear variable) and its occupants are displaced (the kernel moves bodies
   out, as it does on demolition). Wetland cover holds water (a field sink), so draining it raises flood risk
   downstream.
-- **Heat:** later.
+- **Heat:** a field on heatwave days, more on built ground, raising illness where the body is (built: weather.md).
 
 ### 7.2 Crime and policing
 

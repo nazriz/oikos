@@ -12,7 +12,7 @@ import { Staffing, stepper } from "./firms";
 
 export const station: BehaviourModule = {
   name: "police.station",
-  version: "0.1.0",
+  version: "0.1.1",
   doc: "docs/behaviour/crime.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),
@@ -37,10 +37,14 @@ export const station: BehaviourModule = {
     const used = new Map<string, number>();
     let usedDay = -1;
     const asked = new Map<string, (typeof queue)[number]>(); // an investigation under way -> its report
+    // What investigations found, as each comes in (one done while the next is under way is seen then, not at our next
+    // plan: until 2026-10-02 the first of two in a day was lost).
+    const results = new Map<string, { taker?: string | null }>();
     return stepper(
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
+        for (const o of obs.outcomes) if (o.investigated) results.set(o.action, o.investigated);
         const ch = obs.channels[p.channel];
         if (ch?.kind === "sites") for (const c of ch.cells) if (c.structure?.structure === p.building) view = c.structure;
       },
@@ -55,11 +59,11 @@ export const station: BehaviourModule = {
           queue.push({ report: r.id, from: r.speaks_for!, at: String(r.data?.at), kind: String(r.data?.kind), value: Number(r.data?.value ?? 0), account: r.data?.account as string | undefined });
         }
         // What our investigations found (only we see it): a charge where we found who; else, unsolved.
-        for (const o of obs.outcomes) {
-          const found = o.investigated;
-          const q = asked.get(o.action);
-          if (!found || !q) continue;
-          asked.delete(o.action);
+        for (const [action, found] of [...results]) {
+          const q = asked.get(action);
+          if (!q) continue;
+          asked.delete(action);
+          results.delete(action);
           if (found.taker) steps.push(because(`Our investigation of report ${q.report} found who took the ${q.kind}: ${found.taker}. Charging them.`,
             say("tribunal_application", `Charge: ${found.taker} took ${q.kind} from ${q.from} at ${q.at} (report ${q.report}); we ask that they make good the ${usd(q.value)} it was worth.`,
               { to: [p.tribunal], visible: [me, p.tribunal, found.taker], basis: q.report, data: { kind: "charge", against: found.taker, victim: q.from, report: q.report, amount: q.value, account: q.account, evidence: { found: found.taker, at: q.at, goods: q.kind } } })));

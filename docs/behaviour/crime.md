@@ -39,3 +39,8 @@ a handful found at shops' stocktakes, each investigated, about one in five charg
   author, a change to the records model.
 - Burglary, violence (harm exists in the physics, but no one does it), sentencing beyond restitution, prisons,
   deterrence learned from others' convictions, and policing that patrols or prevents.
+
+**Found 2026-10-02:** the station lost the finding of the first of two investigations done in one day (it arrived while the
+second was under way, and was read only at the next plan): those reports were never charged or closed. Findings are
+now kept as they come (police.station 0.1.1). And taking is only from an employer that sells goods (citizen 0.33.0):
+a builder's labourer had tried the yard, which holds materials.

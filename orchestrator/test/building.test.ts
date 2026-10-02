@@ -127,7 +127,10 @@ test("a construction contract is known by its terms, not its name; one offered b
       { who: "city", does: { outcome: { money: { amount: cents, from: "acc-city", to: "builder" } } } },
       { who: "builder", does: { outcome: { structure: { on, type: "park" } } } }] } },
     { id: `${id}-sig-city`, record: "signature", author: "genesis", at: 0, visible_to: ["city", "builder"], speaks_for: "city", agreement: id, as: "city" }];
-  config.world.records.push(...deal("town-park-fair", "90000000", "lot-00-00"), ...deal("town-park-cheap", "100", "lot-00-01"));
+  // Two of the town's lots with nothing on them (the generator's layout decides which).
+  const built = new Set(config.world.structures.map((x: any) => x.at));
+  const [fair, cheap] = config.world.records.filter((r: any) => r.record === "claim" && r.about?.kind === "ownership" && r.holder === "city" && !built.has(`cell.${Number(r.about.object.slice(4, 6))}.${Number(r.about.object.slice(7, 9))}`) && /^lot-\d\d-\d\d$/.test(r.about.object)).map((r: any) => r.about.object).sort();
+  config.world.records.push(...deal("town-park-fair", "90000000", fair), ...deal("town-park-cheap", "100", cheap));
   const { recs } = await run("by-terms", config, 30 * DAY);
   expect(recs.some((r) => r.record === "signature" && r.agreement === "town-park-fair" && r.as === "builder")).toBe(true);
   expect(recs.some((r) => r.record === "signature" && r.agreement === "town-park-cheap" && r.as === "builder")).toBe(false);

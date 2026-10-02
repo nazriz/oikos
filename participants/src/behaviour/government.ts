@@ -29,18 +29,23 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.7.0",
+  version: "0.8.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
     const p = params({ responsiveness_bps: 7000, petition_threshold_bps: 1500, population: 200, park_budget: 8_000_000, builder: "", park_type: "park",
       // The rest of the budget's lines (docs/behaviour/services.md): the town's staff, and its services' running costs.
-      staff_budget: 0, services_budget: 0, environment_budget: 0 }, ctx.params);
+      staff_budget: 0, services_budget: 0, environment_budget: 0,
+      // Roads (docs/behaviour/daily-round.md): a year's budget for them, and how far (cells) a building may stand from one
+      // before we build toward it, a road a time.
+      road_budget: 0, road_type: "road", road_within: 3 }, ctx.params);
     need(p, ["builder"], "city.mayor_code");
     const book = new Book();
     let tabledYear = 0; // the year we last tabled a budget for
     let lastTabled = 0;
     let parkYear = -1;
+    const roadsAsked: { at: number; id: string }[] = []; // our applications for roads (the office's record)
+    let roadWait = 0;
     const handled = new Set<string>();
     // The office's own records: made in this position (whoever held it then), or by this participant as itself.
     const ours = (r: { author: string; in_position?: string }) => (ctx.position ? r.in_position === ctx.position : r.author === ctx.participant);
@@ -52,7 +57,8 @@ export const mayorCode: BehaviourModule = {
         for (const r of book.absorb(obs)) {
           if (!ours(r)) continue;
           if (r.basis) acted.add(r.basis);
-          if (r.record === "statement" && r.kind === "permit_application") parkYear = Math.max(parkYear, Math.floor(r.at / YEAR));
+          if (r.record === "statement" && r.kind === "permit_application" && r.data?.structure_type === p.park_type) parkYear = Math.max(parkYear, Math.floor(r.at / YEAR));
+          if (r.record === "statement" && r.kind === "permit_application" && r.data?.structure_type === p.road_type) roadsAsked.push({ at: r.at, id: r.id });
         }
       },
       (obs) => {
@@ -75,7 +81,7 @@ export const mayorCode: BehaviourModule = {
           const newYear = tabledYear !== thisYear;
           tabledYear = thisYear;
           lastTabled = t;
-          const lines = { parks: p.park_budget, ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
+          const lines = { parks: p.park_budget, ...(p.road_budget ? { roads: p.road_budget } : {}), ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
           steps.push(because(newYear ? "A new year: tabling the town's budget." : "No budget adopted for this year yet: tabling it again.", say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: ${Object.entries(lines).map(([k, v]) => `${k} ${v} cents`).join(", ")}.`, { to: [me],
             data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines } }, tags: ["budget"] } })));
         }
@@ -97,6 +103,29 @@ export const mayorCode: BehaviourModule = {
             steps.push(because(`The adopted budget has ${usd(budget.data?.lines?.parks ?? 0)} for parks and ${lot} is free: applying for a permit for a park, as anyone would.`, C.call("form", { to: me, form: "permit_application", lot, structure_type: p.park_type })));
           }
         }
+        // Roads: a building further than `road_within` cells from any road, and room in the year's roads budget: a road on
+        // the town's free lot beside the network that comes nearest it (one at a time, permit first, as anyone).
+        const roadPrice = p.road_budget ? publishedPrice(book, p.builder, p.road_type) ?? 0 : 0;
+        const roadsThisYear = roadsAsked.filter((r) => Math.floor(r.at / YEAR) === year).length;
+        const pending = roadsAsked.some((r) => !book.open("permit_decision").some((d) => d.data?.application === r.id) && t - r.at < 30 * DAY);
+        if (budget && budget.data?.year === year + 1 && roadPrice > 0 && !pending && t >= roadWait && (roadsThisYear + 1) * roadPrice <= (budget.data?.lines?.roads ?? 0)) {
+          const cells = channels.cells(obs);
+          const roads = cells.filter((c) => c.structure?.type === p.road_type);
+          const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+          const far = roads.length ? cells.filter((c) => c.structure && c.structure.type !== p.road_type && Math.min(...roads.map((r) => dist(r, c))) > p.road_within)
+            .sort((a, b) => (a.structure!.structure < b.structure!.structure ? -1 : 1))[0] : undefined;
+          if (far) {
+            const nextTo = (c: { x: number; y: number }) => roads.some((r) => dist(r, c) === 1);
+            const site = cells.filter((c) => !c.structure && nextTo(c)).map((c) => ({ c, lot: lotOf(book, c.cell) }))
+              .filter((x): x is { c: typeof x.c; lot: string } => !!x.lot && ownerOf(book, x.lot) === me && cellsOf(book, x.lot).length === 1)
+              .sort((a, b) => dist(a.c, far) - dist(b.c, far) || (a.lot < b.lot ? -1 : 1))[0];
+            if (site && dist(site.c, far) < Math.min(...roads.map((r) => dist(r, far)))) {
+              roadWait = t + 7 * DAY; // (until our application is on the record)
+              steps.push(because(`${far.structure!.structure} is ${Math.min(...roads.map((r) => dist(r, far)))} cells from the nearest road (we build toward anything further than ${p.road_within}), and the roads budget has room: applying for a permit for a road on ${site.lot}, toward it.`,
+                C.call("form", { to: me, form: "permit_application", lot: site.lot, structure_type: p.road_type })));
+            }
+          }
+        }
         for (const d of book.open("permit_decision")) {
           if (handled.has(d.id) || acted.has(d.id) || !(d.addressed_to ?? []).includes(me)) continue;
           const app = book.records.get(d.data?.application);
@@ -105,7 +134,10 @@ export const mayorCode: BehaviourModule = {
           if (d.data?.decision !== "granted") continue;
           const site = app.data?.lot;
           const from = ownAccount(obs)?.account;
-          steps.push(because("The park's permit was granted: commissioning the builder.", ["park", C.call("structure", { type: p.park_type, on: site, by: p.builder, price: C.dollars(price), from, basis: d.id })]));
+          const type = app.data?.structure_type === p.road_type ? p.road_type : p.park_type;
+          const cost = type === p.road_type ? roadPrice : price;
+          if (!cost) continue;
+          steps.push(because(`The ${type}'s permit was granted: commissioning the builder.`, [type, C.call("structure", { type, on: site, by: p.builder, price: C.dollars(cost), from, basis: d.id })]));
         }
         // Approve invoices for work we commissioned (the payments procedure requires it over $50k).
         for (const inv of book.open("invoice")) {

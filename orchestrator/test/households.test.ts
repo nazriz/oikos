@@ -69,8 +69,9 @@ test("households live, move and pay together", async () => {
   for (const x of shares) if (known(holder.get(x.from)!)) expect(householdOf.get(holder.get(x.from)!)?.leaseholder).toBe(holder.get(x.to));
   // Nobody was refused anything, but for same-moment races (D58): someone who had just left or moved, named for work by
   // a firm acting on what it saw at the moment's start; and a household moving into a home its last tenants are still
-  // leaving (refused, and tried again: docs/behaviour/citizen.md).
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
+  // leaving (refused, and tried again: docs/behaviour/citizen.md); and a child home from school by its own round while the
+  // parent's act moving the household in is still under way.
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "already_present"].includes(e.code))).toEqual([]);
 }, 300_000);
 
 test("a child born here is brought home by the parent who bore them and added to the household's record", async () => {

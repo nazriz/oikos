@@ -10,7 +10,7 @@ import { because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdr
 import { ownerOf } from "./institutions";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
-import { drawHousehold, type HouseholdSpec } from "./household";
+import { drawHousehold, drawSavings, type HouseholdSpec } from "./household";
 import { yearsOfSchooling, type SchoolingSpec } from "./school";
 
 export const exportDemand: BehaviourModule = {
@@ -324,6 +324,40 @@ export const funding: BehaviourModule = {
 };
 
 /**
+ * world.weather: the weather bureau (the outside world's, as a state's or nation's is). It knows the weather the world
+ * will have (`events`: heavy rain, drought, heatwaves, each from a day for some days; the run's weather, drawn from the
+ * climate by the generator) and warns of each publicly `lead_days` ahead, saying when it's expected to end. It changes
+ * nothing: the weather comes whether or not anyone listens. Documented in docs/behaviour/weather.md.
+ */
+export const weather: BehaviourModule = {
+  name: "world.weather",
+  version: "0.1.0",
+  doc: "docs/behaviour/weather.md",
+  cadence: () => DAY,
+  firstWake: () => 6 * 3600,
+  create(ctx) {
+    const p = params({ events: [] as { kind: string; from_day: number; days: number }[], lead_days: 2 }, ctx.params);
+    const said = { heavy_rain: "Heavy rain", drought: "Drought", heatwave: "Heatwave" } as { [kind: string]: string };
+    const warnAt = (e: { from_day: number }) => Math.max(0, (e.from_day - p.lead_days) * DAY + 6 * 3600);
+    let next = 0; // the events warned of so far (they're in order)
+    return stepper(
+      () => {},
+      (obs) => {
+        const steps: Step[] = [];
+        while (next < p.events.length && warnAt(p.events[next]!) <= obs.t) {
+          const e = p.events[next++]!;
+          const from = e.from_day * DAY, until = (e.from_day + e.days) * DAY;
+          steps.push(because(`${said[e.kind] ?? e.kind} expected from day ${e.from_day} for ${e.days} days: warning the public.`,
+            say("weather_warning", `${said[e.kind] ?? e.kind} warning: expected from day ${e.from_day + 1} for about ${e.days} days.`, { visible: "public", data: { kind: e.kind, from, until } })));
+        }
+        return steps;
+      },
+      () => (next < p.events.length ? warnAt(p.events[next]!) : ctx.world.runEnd + DAY),
+    );
+  },
+};
+
+/**
  * world.valuer: the valuer the world's government keeps (for a town, an office of a higher government: the outside
  * world, D31). Once a year it values every property that someone other than the exempt owns: the lot's land, at the
  * world's land value, plus each building on it at what the builder would charge to build it now (its published
@@ -482,7 +516,7 @@ export const idle: BehaviourModule = {
  */
 export const migration: BehaviourModule = {
   name: "world.migration",
-  version: "0.3.0",
+  version: "0.4.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => 30 * DAY,
   firstWake: () => 30 * DAY,
@@ -494,6 +528,7 @@ export const migration: BehaviourModule = {
         max_households_per_month: 8,
         memory_days: 90,
         savings_months: [1, 3] as [number, number],
+        savings_by_age: null as { from: number; pct: [number, number, number, number, number] }[] | null, // the world's: an adult's savings by age (else months of income elsewhere)
         template: "newcomer",
         households: null as HouseholdSpec | null, // who comes, as the world's profile describes households (required)
         search_limit: 200,
@@ -508,6 +543,11 @@ export const migration: BehaviourModule = {
     );
     if (!p.households) throw new Error("world.migration: params.households is required (the world's household mix)");
     const H: HouseholdSpec = p.households;
+    /** What an adult brings: the world's savings by age, else a few months' income from elsewhere. */
+    const savingsOf = (age: number, r: { below(n: number): number }) => {
+      const band = p.savings_by_age ? [...p.savings_by_age].reverse().find((b) => b.from <= age) : undefined;
+      return band ? drawSavings(band.pct, r.below(10_000)) : Math.floor((p.savings_months[0] + r.below(p.savings_months[1] - p.savings_months[0] + 1)) * p.outside_monthly_income);
+    };
     const book = new Book();
     const brought: { t: number; adults: number }[] = [];
     let arrivals = 0;
@@ -569,7 +609,7 @@ export const migration: BehaviourModule = {
             const templateOf = (j: number) => (j === d.leaseholder || !p.template_outside_lf || r.below(10_000) < p.participation_bps ? p.template : p.template_outside_lf);
             const blocks = d.members.map((m, j) => C.call("presence", {
               name: C.text(`m${++arrivals}`), age: C.text(`${m.age * 365 + m.day} days`), sex: m.sex, template: templateOf(j),
-              ...(m.age >= 18 ? { carrying: C.dollars(Math.floor(((p.savings_months[0] + r.below(p.savings_months[1] - p.savings_months[0] + 1)) * p.outside_monthly_income))) } : {}),
+              ...(m.age >= 18 ? { carrying: C.dollars(savingsOf(m.age, r)) } : {}),
               ...(p.schooling ? { variables: C.json({ [p.schooling.variable]: yearsOfSchooling(m.age, p.schooling, (n) => r.below(n)) * p.schooling.per_year }) } : {}),
             }));
             todo.push(because(`A household moves here: the town's expected wage (${usd(Math.floor(mean))} a month x a ${Math.round(chance * 100)}% chance of a job) beats ${usd(p.outside_monthly_income)} elsewhere.`, ...blocks.map((b, j) => [refs[j]!, b] as [string, C.Call])));

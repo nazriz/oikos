@@ -15,8 +15,8 @@ const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 const POLL = 200;
 
-async function town(name: string, negligent: boolean, days: number, standBps?: number) {
-  const config = generate({ ...spec, years: 1, first_election_days: POLL });
+async function town(name: string, negligent: boolean, days: number, standBps?: number, extra: object = {}) {
+  const config = generate({ ...spec, years: 1, first_election_days: POLL, ...extra });
   if (negligent) for (const x of config.participants) if (x.controller?.impl === "city.mayor_code") x.controller.params.staff_budget = 0;
   // (How readily people stand, where the test needs a contest, or none.)
   if (standBps !== undefined) for (const c of [...config.participants.map((x: any) => x.controller), ...config.templates.map((x: any) => x.controller)]) if (c?.params?.civic) c.params = { ...c.params, civic: { ...c.params.civic, stand_bps: standBps } };
@@ -77,13 +77,20 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   expect(Math.floor(alone.result.at / DAY)).toBe(POLL - 30);
   expect(alone.recs.some((r) => r.kind === "ballot" && r.data?.electorate === "roll")).toBe(false);
 
-  const voted = await town("voted-out", true, POLL + 40, 1000);
+  // A mayor who funds no works crew loses support (the waste piles up): its first preferences well below the kept
+  // town's. Whether that loses it the election depends on the town: where people are better off they forgive more
+  // (economic voting), and with savings drawn by age the incumbent held on with a quarter of first preferences. So the
+  // town here is a poorer one (savings as months of pay), where it loses, to test what the winner does next.
+  const voted = await town("voted-out", true, POLL + 40, 1000, { savings_months_only: true });
+  const share = (r: any, who: string) => (r.data.rounds[0][who] ?? 0) / Object.values(r.data.rounds[0] as { [k: string]: number }).reduce((a, b) => a + b, 0);
+  expect(share(voted.result, voted.incumbent)).toBeLessThan(share(kept.result, kept.incumbent) * 0.75);
   expect(voted.result.data.winner).not.toBe(voted.incumbent);
   const mayor = voted.appointed[0]?.holder;
   expect(mayor).toBe(voted.result.data.winner);
   expect(mayor).toMatch(/^c\d+-self$|^par\./); // a resident
   // Whoever is elected carries on from the office's record: nothing it had already acted on is acted on again.
-  const office = voted.recs.filter((r) => r.in_position === "mayor" && r.basis);
+  // (Applications on a form have the form as their basis: a park and a road are two.)
+  const office = voted.recs.filter((r) => r.in_position === "mayor" && r.basis && !String(r.basis).startsWith("form-"));
   const bases = office.map((r) => `${r.record}:${r.kind ?? ""}:${r.basis}`);
   expect(new Set(bases).size).toBe(bases.length);
 }, 900_000);

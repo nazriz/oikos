@@ -11,11 +11,11 @@ export { ASKING, CONSULT_THINGS } from "./behaviour/citizen";
 export { drawPerson, NEEDS, VALUES, type PopulationValues } from "./behaviour/mind";
 export { repayment } from "./behaviour/credit";
 export { annualTax, withholding, type IncomeTaxLaw } from "./behaviour/tax";
-export { adultAgeBands, drawHousehold, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
+export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, type DrawnHousehold, type HouseholdSpec } from "./behaviour/household";
 export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
-import { disposal, exportDemand, funding, grants, idle, migration, trade, transfers, valuer } from "./behaviour/world";
+import { disposal, exportDemand, funding, grants, idle, migration, trade, transfers, valuer, weather } from "./behaviour/world";
 import { lending } from "./behaviour/credit";
 import { organiser } from "./behaviour/union";
 import { citizen } from "./behaviour/citizen";
@@ -44,6 +44,7 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [trade, "behaviour/world.ts"],
       [transfers, "behaviour/world.ts"],
       [funding, "behaviour/world.ts"],
+      [weather, "behaviour/world.ts"],
       [valuer, "behaviour/world.ts"],
       [grants, "behaviour/world.ts"],
       [disposal, "behaviour/world.ts"],

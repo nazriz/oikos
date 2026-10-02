@@ -44,4 +44,4 @@ water.
 - **Wetland's flood mitigation.** The river spills the same way into any land beside it, so wetland soaking up
   what reaches it doesn't lower the river's peak downstream. Draining the wetland changes nothing here (found). Doing it
   needs a bank by cover, a contract addition.
-- Warnings, evacuation orders, insurance, repair, damage to goods; heat.
+- Evacuation orders, insurance, repair, damage to goods. (Rain, drought, heat and the bureau's warnings: weather.md.)

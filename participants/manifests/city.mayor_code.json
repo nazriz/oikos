@@ -1,6 +1,6 @@
 {
   "name": "city.mayor_code",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "doc": "docs/behaviour/government.md",
   "params": {
     "builder": {
@@ -53,6 +53,27 @@
       },
       "unit": "bps",
       "default": 7000,
+      "source": "placeholder"
+    },
+    "road_budget": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "road_type": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "road",
+      "source": "placeholder"
+    },
+    "road_within": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 3,
       "source": "placeholder"
     },
     "services_budget": {
