@@ -4,6 +4,25 @@
 sure we have all of our bases thoroughly covered"). It separates what's done (with where it's shown), what's open, and
 who decides each open item.
 
+## Update, 2026-10-02 (pilot 7: a year with a model mayor)
+
+- **Contracts 0.8 closed:** the interface the AI side builds on.
+- **A year runs:**
+  - pilot 7d governed the 1,000-person town for a full year through Codex: 245 calls, 2¼ hours;
+  - the seat now takes several actions an answer and keeps office hours (one sitting a working day), about 13 times fewer calls than before;
+  - projected on the Anthropic API, a few dollars a year.
+- **The pilots keep finding the world's gaps, as designed, all fixed (docs/real-models.md):**
+  - offices that told a new mayor nothing useful;
+  - rates never levied for the first quarter;
+  - a budget form missing two lines;
+  - bins never emptied;
+  - an energy retailer ordering 1,400 times a day.
+- **Decision 1 (the translator's pass mark) now has data:** 29 held-out cases.
+  - gpt-6-luna 55%, gpt-6-sol 59%, both through Codex;
+  - both refuse plain requests as "unclear", which points at the prompt or Codex, not the model;
+  - neither is good enough for research runs.
+- **Still Naz's:** decisions 1–4 and 7 below; the provider for research runs (an API, which also removes Codex's instructions from under ours).
+
 ## The answer
 
 **Ready for more pilots now; not yet for research runs.**
