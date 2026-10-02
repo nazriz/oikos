@@ -157,3 +157,18 @@ dollars.
 - **The energy retailer ordered from the grid about 1,400 times on each of three days**, each order paid up front. Its "on order" was cleared when the order was accepted, not when the energy arrived. Fixed (utility.energy 0.1.1): on order until delivered; the utilities test checks it.
 - **3 of the first 12 notebook updates were lost** to stray characters after the JSON (fixed after 7d started).
 - **`terrarium story`** couldn't read a year's log of the 1,000-person town (over 2 GB). It now streams.
+
+**Translator test set, grown** (2026-10-02; `runs/translator-eval-{luna,sol}-2026-10-02.json`). From 6 held-out cases to 29, so a pass mark can mean something. The new ones are phrased the way the pilots' mayors wrote, and cover every call and the five refusals. Two answer-key entries were corrected after the first run, both noted in `cases.ts`: a firm named by name, and two letters in place of one to two people. The comparison now treats a simple value the same quoted or bare (`task="make"` is `task=make`), for every model alike.
+
+| Translator (through Codex) | Seen | Held out |
+|---|---|---|
+| gpt-6-luna | 19/22 | 16/29 (55%) |
+| gpt-6-sol | 19/22 | 17/29 (59%) |
+
+- **Both refuse plain requests as "unclear":** "Could you get $75 over to Millbrook Builders out of the town account", and a fortnightly wage to Dana Reyes. When the stronger model refuses too, the likelier cause is the translator's prompt, or Codex's own instructions above it, not the model. The held-out cases mustn't be used to tune the prompt: work on it from the seen cases and the pilots' transcripts, then measure again here.
+- **Other misses:**
+  - an id made up ("dana-reyes");
+  - a construction agreement written out by hand where `structure(...)` would do it;
+  - a form sent for a form that doesn't exist;
+  - the wrong refusal label (unclear for too_much, unknown_form).
+- **For the pass mark (Naz's call):** neither model is near a mark that would make research runs trustworthy. That argues for a stronger translator, a better prompt, or the trained translator before any comparison between stewards.

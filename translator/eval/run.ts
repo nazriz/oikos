@@ -29,12 +29,17 @@ export function fixture(): Knowledge {
 export interface CaseResult { id: string; held_out: boolean; pass: boolean; got?: string; expect: string[]; error?: string; raw?: string }
 export interface EvalReport { model: string; results: CaseResult[]; seen: { passed: number; of: number }; held_out: { passed: number; of: number }; cost_microusd: number }
 
-const canonical = (program: string) => {
+/** A program in canonical form, for comparing: a simple value means the same quoted or bare (`task="make"` is
+ * `task=make`; `quantity="40"` is `quantity=40`), so neither spelling counts against a translation (added 2026-10-02,
+ * applied to every model alike; amounts and durations, with their `$` and spaces, are unaffected). */
+export const canonical = (program: string) => {
+  let text: string;
   try {
-    return calls.programText(calls.parseProgram(program));
+    text = calls.programText(calls.parseProgram(program));
   } catch {
-    return program;
+    text = program;
   }
+  return text.replace(/="([a-z0-9][a-z0-9._\/-]*)"/g, "=$1");
 };
 
 /** What a program comes to: the acts it resolves to for the test mayor (or undefined if it doesn't resolve). */
@@ -46,6 +51,12 @@ const actsOf = (program: string): string | undefined => {
     return undefined;
   }
 };
+
+/** Whether an answer passes a case: one of the accepted programs, or the same acts as one. */
+export function passes(c: Case, got: string): boolean {
+  const acts = actsOf(got);
+  return c.expect.map(canonical).includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e) === acts));
+}
 
 /**
  * Run every case (or those given) through the translator on `adapter`. An answer passes if it's one of the accepted
@@ -65,8 +76,7 @@ export async function evaluate(adapter: LlmAdapter, o: { prices?: Record<string,
     try {
       const r = await t.translate({ draftId: `eval.${c.id}`, participant: "mayor-system", as: "mayor", proposal: c.request, knowledge: fixture() });
       const got = r.ok ? r.draft.call : r.call;
-      const acts = got !== undefined ? actsOf(got) : undefined;
-      const pass = got !== undefined && (expect.includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e) === acts)));
+      const pass = got !== undefined && passes(c, got);
       // No program at all: keep what came back instead, to see why.
       const raw = !r.ok && got === undefined ? JSON.stringify(r.raw ?? r.notices).slice(0, 500) : undefined;
       results.push({ id: c.id, held_out: !!c.held_out, pass, ...(got !== undefined ? { got } : {}), expect, ...(raw ? { raw } : {}) });
