@@ -2,6 +2,7 @@
 // these check what would be sent and how replies are read, never a real call.
 
 import { expect, test } from "bun:test";
+import { leadingObject } from "../src/llm/codex";
 import { AnthropicAdapter, callModel, OpenAICompatibleAdapter, SpendingLimitReached, toChat, type LlmRequest } from "../src/llm";
 
 const req: LlmRequest = {
@@ -149,4 +150,11 @@ test("Codex CLI: one `codex exec` per call, read-only and ephemeral; the schema-
   // Also when it's reported as an event and the process exits cleanly.
   const asEvent = async () => ({ code: 0, stderr: "", stdout: '{"type":"turn.failed","error":{"message":"429 Too Many Requests: usage_limit_reached"}}' });
   await expect(new CodexCliAdapter("gpt-5", asEvent).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
+});
+
+test("a Codex answer's tool input: a whole object followed by stray characters is the object (pilot 7d); anything else is malformed", () => {
+  expect(leadingObject('{"text":"Day 2: a {brace} and \\"quotes\\"."}]}],')).toEqual({ text: 'Day 2: a {brace} and "quotes".' });
+  expect(leadingObject('{"text":"cut off')).toBeUndefined();
+  expect(leadingObject('["not", "an object"]')).toBeUndefined();
+  expect(leadingObject("nothing")).toBeUndefined();
 });

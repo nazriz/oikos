@@ -1223,6 +1223,14 @@ See the design note, §16.
   - **Old runs:** logs and datasets from before say 0.7 and stay valid logs of their own version (D6). The saved LLM runs are 0.7: a translator data pipeline reading them reads both versions (the changes are additions).
   - **Revisit if:** anything the AI side needs isn't expressible: that opens 0.9, proposed and signed off as before.
 
+- **A language-model seat's rhythm: several actions an answer, and office hours** (2026-10-02; Naz: "do both 1 and 2"; participants/src/llm/participant.ts 0.5.0).
+  - **Why:** pilot 7c's mayor made about 9 calls a simulated day (80 on a busy one), one action a call, and every reply woke it. A year took about 18 hours through Codex.
+  - **Several actions an answer** (up to 8): carried out in the order given, with no call in between. Each one's result (the report after it) comes back together at the next call. Anything depending on a result (confirming a draft not yet seen) waits for that call.
+  - **Office hours** (where the world has working hours): one sitting a working day. What comes in between is kept and shown at the next sitting, with sections that repeat unchanged shown once. "Done for now" with no days means its usual rhythm (a week), sooner at the next sitting if someone writes.
+  - **Mock brains** read the observations from skipped wakes too, so the code mayor behind the mock sees everything the model is shown.
+  - **What it changes for a steward:** within a day it's slower to respond (as real offices are). It can't act on something the same afternoon once its sitting's over. Recorded with each run (the seat's params).
+  - **Revisit if:** a study needs a steward that responds within the day (an emergency): a world can leave office hours out, or a warning could open a sitting.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Periodic tenancies (a contract change, proposed 2026-09-30).** A lease can say a fixed `term` or none. Real tenancy law (Victoria's included) continues a fixed-term lease as a periodic one when neither side gives notice. Proposal: an optional `then: "periodic"` on an agreement's terms, read by `terms` as "in force after the term until notice". Until signed off, landlords renew instead (above).

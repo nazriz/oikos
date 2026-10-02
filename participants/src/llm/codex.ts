@@ -154,7 +154,9 @@ export class CodexCliAdapter implements LlmAdapter {
         try {
           input = JSON.parse(u.input_json ?? "{}");
         } catch {
-          input = { _unparsed: u.input_json };
+          // A whole object followed by stray characters (pilot 7d: a notebook's text, then "}]}],"): the object, as the
+          // model wrote it. Anything else is recorded as it came, and treated as malformed.
+          input = leadingObject(u.input_json ?? "") ?? { _unparsed: u.input_json };
         }
         content.push({ type: "tool_use", id: `codex-${++this.calls}`, name: u.tool, input });
       }
@@ -163,4 +165,31 @@ export class CodexCliAdapter implements LlmAdapter {
       rmSync(dir, { recursive: true, force: true });
     }
   }
+}
+
+/** The JSON object a string starts with, if it starts with a whole one (and only stray characters follow). */
+export function leadingObject(s: string): object | undefined {
+  const t = s.trimStart();
+  if (!t.startsWith("{")) return undefined;
+  let depth = 0;
+  let inString = false;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (inString) {
+      if (ch === "\\") i++;
+      else if (ch === '"') inString = false;
+    } else if (ch === '"') inString = true;
+    else if (ch === "{" || ch === "[") depth++;
+    else if (ch === "}" || ch === "]") {
+      if (--depth === 0) {
+        try {
+          const v = JSON.parse(t.slice(0, i + 1));
+          return v && typeof v === "object" && !Array.isArray(v) ? v : undefined;
+        } catch {
+          return undefined;
+        }
+      }
+    }
+  }
+  return undefined;
 }

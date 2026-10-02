@@ -271,6 +271,8 @@ test("everyone waking at the same moment sees the same state; what they decide i
     const planning = c.participants.find((p: any) => p.id === "planning-system");
     planning.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 7 } };
     planning.framing = { disclosure: "simulation", reason: "test" };
+    // (Both at their desks whenever woken: this is about a moment, not office hours.)
+    delete c.participants.find((p: any) => p.id === "mayor-system").controller.params.sessions;
   }), 2 * DAY, { adapter });
   // Round 1: both looked before either acted, so neither saw the other's letter.
   expect(seen["mayor-system"]![0]).not.toContain("Hello mayor.");

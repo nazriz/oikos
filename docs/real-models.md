@@ -130,3 +130,15 @@ about ten calls a simulated day while it got its bearings, not fifty in an hour.
   Right every time. The code mayor never used the form, so no test noticed.
 - Fixed (city.council_clerk 0.5.3; generator): the form's budget fields come from the same list as the finance office's
   brief, and the clerk reads every amount on the form as a line.
+
+**Pilot 7c** (stopped on day 57 to change the seat's rhythm; 589 calls in 2 h 44 min; kept as `runs/pilot-7c-baseline`):
+- **What the mayor did, with the fixes in:**
+  - a complete five-line budget on day 1, adopted 5–0 on day 15;
+  - it noticed its staff line ($400,000) was short of the crew's pay (six at $3,000 a fortnight) and amended it;
+  - it permitted and commissioned a park and three roads extending the street network;
+  - the council passed its tenant protection law, and it notified every landlord.
+- **The time was nearly all the model's:** about 19 seconds a call. Calls ran about 9 a simulated day, one action each, and every reply woke the mayor. So a year would have taken about 18 hours.
+- **Changed (llm participant 0.5.0):**
+  - several actions an answer;
+  - office hours, one sitting a working day.
+- Pilot 7d runs the same town and seed, to compare.

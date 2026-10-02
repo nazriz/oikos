@@ -17,7 +17,7 @@ import { slice, type ParticipantAction } from "../contracts";
 import type { Controller, ParticipantContext } from "../module";
 import type { ContentBlock, LlmRequest, MockPolicy } from "./adapter";
 
-export const MOCK_VERSION = "0.2.0";
+export const MOCK_VERSION = "0.3.0";
 
 export interface MockBrain {
   controller: Controller;
@@ -53,6 +53,11 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     // The brain sees every observation (its capacity's slice), as it would running the participant itself; what it wants done queues up.
     const q = queues.get(id) ?? [];
     queues.set(id, q);
+    // What it was shown while away from its desk (office hours), first: the brain reads every observation, in order.
+    for (const m of (req.context.missed ?? []) as typeof obs[]) {
+      const x = (await brain.controller.step(slice(m, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
+      if (x.type === "call" || x.type === "message") q.push(x);
+    }
     const a = (await brain.controller.step(slice(obs, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
     if (a.type === "call" || a.type === "message") q.push(a);
     if (a.type === "opt_out") return [tool("opt_out", { statement: a.statement })];

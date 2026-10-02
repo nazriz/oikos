@@ -110,6 +110,6 @@ test("done for now alongside an action: the action, then no call until the next 
   // The next wake: one call, and its report carries what the skipped step showed.
   await participant.step(obs({}, { t: 3 * 86_400 + 100 }), ctx);
   expect(seen.length).toBe(2);
-  expect(JSON.stringify(seen[1])).toContain("After your last action");
+  expect(JSON.stringify(seen[1])).toContain("Since you last looked");
   expect(JSON.stringify(seen[1])).toContain("Figures: $1,000.");
 });
