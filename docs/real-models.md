@@ -172,3 +172,14 @@ dollars.
   - a form sent for a form that doesn't exist;
   - the wrong refusal label (unclear for too_much, unknown_form).
 - **For the pass mark (Naz's call):** neither model is near a mark that would make research runs trustworthy. That argues for a stronger translator, a better prompt, or the trained translator before any comparison between stewards.
+
+**Pilot 7e** (2026-10-02; a full year with every fix so far: 236 calls, 2 h 8 min; `runs/pilot-7e`).
+- **With the waste contradiction gone,** the mayor wrote 144 letters, against 363 in 7d.
+- **Lost notebook updates:** none.
+- **Rates:** levied from the first quarter now ($848k levied, $672k received, 21 owners overdue).
+- **What it did:**
+  - adopted a budget with all five lines;
+  - kept bringing the tenants' petitions back as a rent-cap law; the council rejected it 2–3 and then 1–4;
+  - asked the environment office about a declining squirrel glider population;
+  - had the year-2 budget on the ballot at the year's end.
+- **One more gap:** the planning office reported "39 applications decided: 0 granted, 0 refused". Its channels show it applications, not its own decisions, so its report could never count them. The mayor asked for a reconciliation. Fixed (city.planning_officer 0.8.1): it keeps its own record, and counts those sent back incomplete.

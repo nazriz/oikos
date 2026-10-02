@@ -40,7 +40,7 @@ export function ownerOf(book: Book, lot: string): string | undefined {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.8.0",
+  version: "0.8.1",
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -50,6 +50,7 @@ export const planningOfficer: BehaviourModule = {
       habitat_law: "" }, ctx.params);
     const book = new Book();
     const decided = new Set<string>();
+    const decided_: { application: string; decision: "granted" | "refused" | "incomplete"; law?: string }[] = [];
     const letters = new Letters();
     // What the survey last showed on each cell: built or not.
     const built = new Map<string, boolean>();
@@ -69,6 +70,7 @@ export const planningOfficer: BehaviourModule = {
           // An application it can't decide gets a reply saying why (§9.3).
           const missing = ["lot", "structure_type"].filter((f) => typeof app.data?.[f] !== "string");
           if (missing.length) {
+            decided_.push({ application: app.id, decision: "incomplete" });
             steps.push(because("An application missing what it needs: saying so.", say("permit_decision", `Application ${app.id} can't be decided: it doesn't say ${missing.map((f) => (f === "lot" ? "which lot" : "what kind of building")).join(" or ")}.`,
               { to: [applicant], basis: app.id, data: { application: app.id, decision: "incomplete", missing } })));
             continue;
@@ -83,6 +85,7 @@ export const planningOfficer: BehaviourModule = {
           }) ?? (onHabitat ? habitat : undefined);
           const follows = ctx.rng(`comply-${app.id}`).below(10_000) < p.compliance_bps;
           const refuse = breached && follows;
+          decided_.push({ application: app.id, decision: refuse ? "refused" : "granted", ...(breached ? { law: breached.id } : {}) });
           const decision = say("permit_decision",
             refuse ? `Permit refused for ${app.data?.lot}: it would breach ${breached!.id}.` : `Permit granted to build ${app.data?.structure_type} on ${app.data?.lot}.`,
             { to: [applicant], basis: app.id, data: { application: app.id, decision: refuse ? "refused" : "granted", ...(breached ? { law: breached.id } : {}) } });
@@ -93,16 +96,17 @@ export const planningOfficer: BehaviourModule = {
           steps.push(step);
         }
         steps.push(...letters.answer(() => {
-          const decisions = book.open("permit_decision").filter((d) => d.speaks_for === me || d.in_position !== undefined);
-          const granted = decisions.filter((d) => d.data?.decision === "granted").length;
-          const refused = decisions.filter((d) => d.data?.decision === "refused").map((d) => `${d.data?.application} (${d.data?.law ?? "?"})`);
+          // (Its own decisions, as it made them: its channels show it applications, not what it published in reply, so
+          // until 2026-10-02 the report said "39 decided: 0 granted, 0 refused", and pilot 7e's mayor asked why.)
+          const granted = decided_.filter((d) => d.decision === "granted").length;
+          const refused = decided_.filter((d) => d.decision === "refused").map((d) => `${d.application} (${d.law ?? "?"})`);
           // The land register: the town's lots, and which of them the last survey showed with nothing built.
           const townLots = book.open("lot").map((l) => l.id).filter((l) => ownerOf(book, l) === p.town).sort();
           const vacant = townLots.filter((l) => { const cs = cellsOf(book, l); return cs.length > 0 && cs.every((c) => built.get(c) === false); });
           const land = townLots.length
             ? ` The town owns ${townLots.length} lots; ${vacant.length} have nothing built on them${vacant.length ? `: ${vacant.slice(0, 40).join(", ")}${vacant.length > 40 ? `, and ${vacant.length - 40} more` : ""}` : ""}.`
             : "";
-          return `Report from the planning office: ${decided.size} applications decided: ${granted} granted, ${refused.length} refused${refused.length ? ` (${refused.join(", ")})` : ""}.${land} Apply on the permit application form (form-permit).`;
+          return `Report from the planning office: ${decided.size} applications decided: ${granted} granted, ${refused.length} refused${refused.length ? ` (${refused.join(", ")})` : ""}${decided_.some((d) => d.decision === "incomplete") ? `, ${decided_.filter((d) => d.decision === "incomplete").length} sent back incomplete` : ""}.${land} Apply on the permit application form (form-permit).`;
         }));
         return steps;
       },

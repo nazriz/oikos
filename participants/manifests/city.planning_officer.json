@@ -1,6 +1,6 @@
 {
   "name": "city.planning_officer",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "compliance_bps": {
