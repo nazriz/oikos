@@ -199,6 +199,12 @@ impl Knowledge {
         let n = name.trim().to_lowercase();
         let mut v: Vec<String> = self.names.iter().filter(|(_, x)| x.to_lowercase() == n).map(|(k, _)| k.clone()).collect();
         v.sort();
+        // (An id written in quotes is that id: "works" for the post works. Pilot 8: a letter to "works" came back
+        // "you don't know of anyone called works".)
+        let id = name.trim();
+        if v.is_empty() && (self.names.iter().any(|(k, _)| k == id) || self.positions.contains_key(id) || self.participant_person.iter().any(|(k, _)| k == id)) {
+            v.push(id.to_string());
+        }
         v
     }
 

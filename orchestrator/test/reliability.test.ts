@@ -79,16 +79,24 @@ test("a kernel that dies ends the run at once, as a dead kernel, not an off-cont
   expect(Date.now() - t0).toBeLessThan(10_000);
 }, 60_000);
 
-test("a model that never answers times out, is retried, and its participant waits; the run goes on", async () => {
+test("a model that never answers times out and is retried; its participant waits; unanswered three times running, the run stops to be resumed, and nobody is retired", async () => {
   // A fetch that never answers (only the adapter's own time limit ends it).
   const never = ((_url: string, init: RequestInit) => new Promise((_, reject) => init.signal!.addEventListener("abort", () => reject(init.signal!.reason)))) as unknown as typeof fetch;
   const adapter = new OpenAICompatibleAdapter("openai", "never", { fetch: never, timeoutMs: 50, retries: 1, backoffMs: 1 });
-  const s = await runWorld({ config: generate({ ...spec, citizens: 40, mayor: "llm" }), runId: "silent", outDir: dir("silent"), until: 3 * DAY, adapter,
+  const s = await runWorld({ config: generate({ ...spec, citizens: 40, mayor: "llm" }), runId: "silent", outDir: dir("silent"), until: 30 * DAY, adapter,
     prices: { "openai/never": { input: 0, output: 0, cache_read: 0, cache_write: 0 } } });
-  expect(s.t).toBe(3 * DAY);
-  const errors = lines(s.logPath).map((l) => JSON.parse(l)).filter((e) => e.kind === "annotation" && e.body.data?.participant_error);
-  expect(errors.length).toBeGreaterThan(0);
+  const log = lines(s.logPath).map((l) => JSON.parse(l));
+  const errors = log.filter((e) => e.kind === "annotation" && e.body.data?.participant_error);
+  // The first time, its participant waits and the run goes on (the mayor's next sitting is a later day).
+  expect(errors.length).toBe(3);
   expect(errors[0].body.data.participant_error.error).toMatch(/^ModelCallFailed: openai\/never \(participant, for mayor-system\): .*no answer within 0 s \(after 2 attempts\)/);
+  expect(errors[2].t).toBeGreaterThan(errors[0].t);
+  // The third in a row: the model's out of reach. The run stops there, saying so; the mayor is still the mayor (pilot 8:
+  // an outage retired every model seat, and the town ran ten months without them).
+  expect(s.t).toBeLessThan(30 * DAY);
+  expect(log.some((e) => e.kind === "annotation" && /can't be reached/.test(e.body.data?.stopped ?? ""))).toBe(true);
+  expect(log.some((e) => e.kind === "annotation" && e.body.data?.participant_retired)).toBe(false);
+  expect(log.at(-1).body.reason).toBe("aborted");
 }, 60_000);
 
 test("a stopped run resumes: model responses served from its log reproduce it exactly, and only the rest is asked anew", async () => {

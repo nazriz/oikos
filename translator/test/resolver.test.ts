@@ -231,3 +231,13 @@ test("goods and work (phase B): your own goods move from where you hold them; wo
   const a = r('agreement(with=builder, they_do=goods(kind=materials, quantity=2000, to=city, at=str.1, every="30 days"), we_do=money(amount="$900", to=acc-builder))');
   expect(a.ok && (a.blocks[0] as any).terms.commitments[1]).toEqual({ who: "builder", does: { outcome: { goods: { kind: "materials", quantity: "2000", to: "city", at: "str.1" } } }, every: 2592000 });
 });
+
+test("an id written in quotes is that id (a letter to \"planning\", the post)", () => {
+  const { fixture } = require("../eval/run");
+  const { calls } = require("@terrarium/participants");
+  const quoted = resolve(calls.parseProgram('message(to="planning", text="Hello.")'), fixture(), () => undefined, "mayor");
+  const bare = resolve(calls.parseProgram('message(to=planning, text="Hello.")'), fixture(), () => undefined, "mayor");
+  expect(quoted.ok).toBe(true);
+  expect(quoted).toEqual(bare);
+  expect(resolve(calls.parseProgram('message(to="nobody at all", text="Hello.")'), fixture(), () => undefined, "mayor").ok).toBe(false);
+});

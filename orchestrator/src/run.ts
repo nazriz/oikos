@@ -26,7 +26,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { calls, canonical, DECISIONS, paramErrors, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
-import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
+import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@terrarium/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution } from "@terrarium/translator";
 import { Kernel } from "./kernel";
 import { divergences } from "./truth";
@@ -784,6 +784,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   /** The capacity an action is done in: the unit's own, or the one it names, or its only one. */
   const asOf = (u: Unit, action: ParticipantAction): string | undefined => (u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u));
 
+  let unanswered = 0; // model calls failed in a row, with none answered between (any seat's, or the translator's)
+
   /** A request's translation: its draft id, what came of it, and what the model calls recorded on the way. */
   type Translated = { draftId: string; tr: Awaited<ReturnType<typeof translator.translate>>; notes: object[] };
   const translated = new Map<string, Translated>();
@@ -795,6 +797,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
       } catch (e) {
         if (!(e instanceof ModelCallFailed)) throw e;
+        if (++unanswered >= MAX_FAILURES_IN_A_ROW) throw new ModelUnreachable(`the model can't be reached (${unanswered} calls in a row failed; the last, the translator's: ${String(e.message).slice(0, 300)}): the run stops here; resume it once it can be (terrarium resume <log>)`);
         // The translator's model failed after its retries (D59): the participant is told it couldn't be drafted now.
         return { ok: false as const, notices: ["That couldn't be drafted just now. You could try again."], raw: { model_call_failed: e.message } };
       }
@@ -896,7 +899,14 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           if (r.status === "rejected") {
             participantErrors++;
             const err = r.reason as Error;
-            const inARow = (failures.get(x.u.key) ?? 0) + 1;
+            // A model call that failed isn't the seat's failing: it waits this wake, and isn't retired for it. Call after
+            // call failing, with none answered between, is the model out of reach: the run stops, to be resumed.
+            const modelDown = err instanceof ModelCallFailed;
+            if (modelDown && ++unanswered >= MAX_FAILURES_IN_A_ROW) {
+              await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err.name}: ${String(err.message)}`.slice(0, 2000) } } } });
+              throw new ModelUnreachable(`the model can't be reached (${unanswered} calls in a row failed; the last: ${String(err.message).slice(0, 300)}): the run stops here; resume it once it can be (terrarium resume <log>)`);
+            }
+            const inARow = modelDown ? failures.get(x.u.key) ?? 0 : (failures.get(x.u.key) ?? 0) + 1;
             failures.set(x.u.key, inARow);
             await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err?.name ?? "Error"}: ${String(err?.message ?? err)}`.slice(0, 2000), in_a_row: inARow } } } });
             log(`${o.runId}: ${x.u.key} failed to decide at t=${t} (it waits this wake): ${String(err?.message ?? err).slice(0, 200)}`);
@@ -904,6 +914,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
             continue;
           }
           failures.delete(x.u.key);
+          if (x.u.llm) unanswered = 0;
           // A code citizen's decisions on the way to this action (docs/design/ai-citizens.md 7): training data, in full logs.
           const decisions = (r.value as any)?.[DECISIONS] as DecisionRecord[] | undefined;
           if (decisions?.length && !lean) for (const d of decisions) await k.request({ op: "annotate", annotation: { annotation: "decision", subject: x.u.participant, data: d } });

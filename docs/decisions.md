@@ -1253,6 +1253,13 @@ See the design note, §16.
   - **More seats:** `model_seats` in a world's spec ("planning,finance") hands those offices to a model: the same office and channels, honest disclosure, office hours, and its own code module as the mock's brain.
   - **Revisit if:** the previews should be against the state as each request is carried out (they're against the round's start, as everyone's look was); or a seat needs more than its office's report to do the job (what the pilots are for).
 
+- **An outage stops the run, and retires nobody** (2026-10-04; pilot 8; changes D59's rule for model calls).
+  - **Was:** a model call that failed after its retries was recovered in place (the seat waits), and three failures in a row retired the participant, as for a module that throws.
+  - **Found:** a network outage is three failures in a row for every model seat. Pilot 8 lost its mayor, planning and finance officers on day 74 and ran ten months without them.
+  - **Now:** a failed model call still makes its seat wait that wake, but doesn't count toward retiring it. Three model calls unanswered in a row, with none answered between, is the model out of reach: the run stops as at a usage limit, and `terrarium resume` picks it up (calls with no recorded answer are asked again).
+  - **A code module that throws** is still retired after three, as before: that failure is its own.
+  - **Revisit if:** runs should wait out an outage themselves (retry for an hour before stopping), which matters once runs are left unattended for days.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration after the world expansion (measured 2026-10-02, not chased: for the checkpoint).** The small town, 3 seeds × 2 years, code only, at 2fd20b4. Health: 6 breaches of 15.

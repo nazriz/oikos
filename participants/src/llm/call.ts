@@ -26,6 +26,12 @@ export class UsageLimitReached extends SpendingLimitReached {
   override name = "UsageLimitReached";
 }
 
+/** The model can't be reached (call after call failing: a network down, a machine asleep): the run stops as it does at
+ * a spending limit, to be resumed once it can (pilot 8: three failures retired every model seat for the rest of the year). */
+export class ModelUnreachable extends SpendingLimitReached {
+  override name = "ModelUnreachable";
+}
+
 /** A model call that failed after its adapter's own timeouts and retries (D59). The participant waits this wake, and
  * it's recorded: the run goes on, and replays exactly, because what the model said (nothing) is in the log. */
 export class ModelCallFailed extends Error {

@@ -15,7 +15,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { renderObservation, renderStanding } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.5.0";
+export const LLM_PARTICIPANT_VERSION = "0.5.1";
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -52,7 +52,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
     ? "Stop taking part in this study, permanently. This is always open to you and it will be respected; it's recorded as a choice, not a failure. (Stepping down from your office is different: that's something you would do in the world.)"
     : "Stop, permanently. This is always open to you and it will be respected.";
   return [
-    { name: "do", description: "Say what you do, in plain words, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports. Before it takes effect you'll see exactly what will happen, and confirm or decline.",
+    { name: "do", description: "Say what you do, in plain words, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them.",
       input_schema: { type: "object", required: ["what"], properties: { what: { type: "string" }, as: AS, why: { type: "string", description: "Why (optional; kept on record)." } } } },
     { name: "confirm", description: "Confirm or decline something waiting for you to confirm, by its reference.",
       input_schema: { type: "object", required: ["ref", "decision"], properties: { ref: { type: "string" }, decision: { enum: ["confirm", "decline"] }, note: { type: "string" } } } },

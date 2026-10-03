@@ -128,7 +128,10 @@ export class Knowledge {
   /** An entity id for a name the participant wrote, if exactly one matches. */
   byName(name: string): string[] {
     const n = name.trim().toLowerCase();
-    return [...this.names].filter(([, v]) => v.toLowerCase() === n).map(([k]) => k).sort();
+    const found = [...this.names].filter(([, v]) => v.toLowerCase() === n).map(([k]) => k).sort();
+    // (An id written in quotes is that id: "works" for the post works.)
+    const id = name.trim();
+    return found.length || !(this.names.has(id) || this.positions.has(id) || this.participantPerson.has(id)) ? found : [id];
   }
 
   name(id: string): string {
