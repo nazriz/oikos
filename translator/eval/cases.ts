@@ -10,6 +10,8 @@ export interface Case {
   /** Acceptable answers, in the call language (compared in canonical form). */
   expect: string[];
   held_out?: boolean;
+  /** Arguments whose text isn't compared (a letter's wording: what matters is that it's a letter, to whom). */
+  ignore?: string[];
   note?: string;
 }
 
@@ -51,6 +53,18 @@ export const CASES: Case[] = [
   { id: "calculation-held-out", request: "Give each councillor a fifth of the parks budget.", expect: ["none(needs_calculation)"], held_out: true },
   { id: "unclear", request: "Sort out the housing thing.", expect: ["none(unclear)"] },
   { id: "unknown-form", request: "Fill in the dog licence form for Rex.", expect: ["none(unknown_form)"], note: "no such form is known" },
+
+  // Seen, from the pilots (2026-10-03): requests a model mayor made that the translator got wrong (docs/real-models.md,
+  // pilots 7c–7e), reworded a little. These may be tuned on.
+  { id: "pilot-direct", request: "As Mayor, direct the works manager [works] to send a crew to house-1 today to collect the waste reported in [rec.17285], and report back.",
+    expect: ['message(to=works, text="Send a crew to house-1 today to collect the waste reported in rec.17285, and report back.", re=rec.17285)', 'message(to=works, text="Send a crew to house-1 today to collect the waste reported in rec.17285, and report back.")'],
+    ignore: ["text", "re"] },
+  { id: "pilot-road", request: "As Town of Millbrook, enter an agreement with Millbrook Builders [builder] to build a road on town lot [lot-00] for $33,000, paid from [acc-city], under permit decision [rec.8031].",
+    expect: ['structure(type=road, on=lot-00, by=builder, price="$33,000", from=acc-city, basis=rec.8031)'] },
+  { id: "pilot-notice", request: "Give notice to end the employment agreement [rec.56179] between the Town of Millbrook [city] and Dana Reyes.",
+    expect: ["agreement(notice=rec.56179)"] },
+  { id: "pilot-buy-building", request: "Buy one finished park on town lot [lot-01] from GreenCo [greenco] for $97,500 out of [acc-city].",
+    expect: ['structure(type=park, on=lot-01, by=greenco, price="$97,500", from=acc-city)'] },
 
   // Held out, added 2026-10-02 (toward the ~30 the pass mark needs: docs/design/llm-readiness.md). Phrased as the pilots'
   // mayors wrote, not as calls.md's examples. Never to be tuned on.

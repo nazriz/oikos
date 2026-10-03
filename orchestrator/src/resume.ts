@@ -72,7 +72,9 @@ export function recordedCalls(logPath: string): Map<string, Recorded[]> {
     if (a.annotation === "transcript") {
       const u = usage.get(a.subject)?.shift();
       if (!u) return;
-      const key = `${a.subject}|${a.data.purpose}`;
+      // (A call made for something in particular, a draft's translation, is found by it: translations in a round are
+      // made at once, and a second attempt at one may come back before or after another's.)
+      const key = `${a.subject}|${a.data.purpose}${a.data.ref ? `|${a.data.ref}` : ""}`;
       calls.set(key, [...(calls.get(key) ?? []), {
         systemSha256: a.data.system_sha256, input: a.data.input, output: a.data.output, provider: a.data.provider, model: a.data.model,
         ...(a.data.usage_estimated ? { estimated: true } : {}),
@@ -98,7 +100,7 @@ export class Serving {
       provider: live.provider,
       model: live.model,
       complete: async (req: LlmRequest): Promise<LlmResponse> => {
-        const key = `${req.subject}|${req.purpose}`;
+        const key = `${req.subject}|${req.purpose}${req.ref ? `|${req.ref}` : ""}`;
         const i = this.next.get(key) ?? 0;
         const r = this.diverged ? undefined : this.calls.get(key)?.[i];
         if (r) {

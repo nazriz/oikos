@@ -22,6 +22,7 @@
 // provenance, or discards it. Until a real model is configured, every model
 // call goes to the mock adapter.
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { calls, canonical, DECISIONS, paramErrors, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@terrarium/participants";
@@ -277,10 +278,15 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // While a cohort decides, annotations from its model calls are held by subject and written afterwards in the
   // cohort's order, so the log doesn't depend on which call came back first (D58 §4.8).
   let holding: Map<string, object[]> | null = null;
+  // A round's translations are made at once (each a model call or two): what each one records is kept with it, and
+  // written when its request is carried out, in the cohort's order, as if they had been made one after another.
+  const translating = new AsyncLocalStorage<object[]>();
   const io: LlmIO = {
     adapter: watched(o.adapter ?? new MockAdapter("mock", mockPolicies(brains))),
     annotate: async (annotation) => {
-      if (holding) {
+      const mine = translating.getStore();
+      if (mine) mine.push(annotation);
+      else if (holding) {
         const who = String((annotation as { subject?: unknown }).subject ?? "");
         holding.set(who, [...(holding.get(who) ?? []), annotation]);
       } else await k.request({ op: "annotate", annotation });
@@ -680,7 +686,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       return false;
     }
     // The capacity: a code unit's own; a language-model participant says which position it acts in, if any.
-    const as = u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u);
+    const as = asOf(u, action);
     const asField = as ? { as } : {};
     if (action.type === "act" || action.type === "message") {
       const blocks = action.type === "act" ? action.blocks : [{ block: "message", to: action.to, text: action.text, ...(action.re ? { re: action.re } : {}) }];
@@ -742,15 +748,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       return false;
     }
     if (action.type === "propose") {
-      const draftId = `draft.${u.participant}.${++L.drafted}`;
-      let tr: Awaited<ReturnType<typeof translator.translate>>;
-      try {
-        tr = await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
-      } catch (e) {
-        if (!(e instanceof ModelCallFailed)) throw e;
-        // The translator's model failed after its retries (D59): the participant is told it couldn't be drafted now.
-        tr = { ok: false, notices: ["That couldn't be drafted just now. You could try again."], raw: { model_call_failed: e.message } };
-      }
+      // (Translated already, with the round's others, or now.)
+      const pre = translated.get(u.key) ?? (await translateFor(u, action, as));
+      translated.delete(u.key);
+      const { draftId, tr } = pre;
+      for (const annotation of pre.notes) await k.request({ op: "annotate", annotation });
       // Earlier attempts the translator retried (its own, not the participant's): kept on record.
       for (const [i, x] of (tr.retries ?? []).entries())
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
@@ -778,6 +780,27 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     return true;
   };
+
+  /** The capacity an action is done in: the unit's own, or the one it names, or its only one. */
+  const asOf = (u: Unit, action: ParticipantAction): string | undefined => (u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u));
+
+  /** A request's translation: its draft id, what came of it, and what the model calls recorded on the way. */
+  type Translated = { draftId: string; tr: Awaited<ReturnType<typeof translator.translate>>; notes: object[] };
+  const translated = new Map<string, Translated>();
+  async function translateFor(u: Unit, action: { text: string }, as: string | undefined): Promise<Translated> {
+    const draftId = `draft.${u.participant}.${++u.llm!.drafted}`;
+    const notes: object[] = [];
+    const tr = await translating.run(notes, async () => {
+      try {
+        return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
+      } catch (e) {
+        if (!(e instanceof ModelCallFailed)) throw e;
+        // The translator's model failed after its retries (D59): the participant is told it couldn't be drafted now.
+        return { ok: false as const, notices: ["That couldn't be drafted just now. You could try again."], raw: { model_call_failed: e.message } };
+      }
+    });
+    return { draftId, tr, notes };
+  }
 
   // Deciding takes world time if the world says so (docs/design/rebuild.md 6.4): a model by its tokens, code a fixed time.
   const thinkingCosts = cfg.orchestration.thinking_time === "costs_world_time";
@@ -852,6 +875,20 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         // after its retries) is deterministic, so it's recovered in place (D59): recorded, and the participant waits.
         const limit = decided.find((r): r is PromiseRejectedResult => r.status === "rejected" && r.reason instanceof SpendingLimitReached);
         if (limit) throw limit.reason;
+        // The round's requests are translated at once (they were all made looking at the same state, and a translation
+        // changes nothing): with several model seats, each no longer waits for every translation before its own. They're
+        // carried out below in the cohort's order, as before.
+        const proposing = looking.flatMap((x, i) => {
+          const r = decided[i]!;
+          return x.u.llm && units.get(x.u.key) === x.u && r.status === "fulfilled" && (r.value as ParticipantAction)?.type === "propose" ? [{ u: x.u, action: r.value as ParticipantAction & { type: "propose" } }] : [];
+        });
+        if (proposing.length > 1) {
+          mark({ doing: "translating" });
+          const done = await Promise.allSettled(proposing.map((p) => translateFor(p.u, p.action, asOf(p.u, p.action))));
+          const failed = done.find((r): r is PromiseRejectedResult => r.status === "rejected");
+          if (failed) throw failed.reason;
+          for (const [i, p] of proposing.entries()) translated.set(p.u.key, (done[i] as PromiseFulfilledResult<Translated>).value);
+        }
         const next: { u: Unit; n: number }[] = [];
         for (const [i, x] of looking.entries()) {
           if (units.get(x.u.key) !== x.u) continue; // it ended this round (opted out, or its capacity went)

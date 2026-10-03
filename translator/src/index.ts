@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.4.0";
+export const TRANSLATOR_VERSION = "0.5.0";
 
 export interface TranslatorId {
   id: string;
@@ -72,7 +72,7 @@ const GLOSS: { [fn: string]: string } = {
   structure: "a building goes up, or comes down (and who does it)",
   occupancy: "someone moves into or out of a building",
   entity: "a new organisation exists",
-  claim: "a right, permission, power or immunity is on record (or passed on, or released)",
+  claim: "a right, liberty (a permission to do something), power or immunity is on record (or passed on, or released); position is one of right, liberty, power, immunity",
   agreement: "an agreement is offered (with what each side commits to), signed, or given notice on",
   statement: "something is published (a notice, a law, a report, …), or withdrawn",
   vote: "a choice is cast on a ballot",
@@ -93,9 +93,27 @@ export function translatorSystem(): string {
   return [
     "You translate one plain-language request into the call language below. You don't judge it, improve it or complete it: write exactly what was asked, with exactly the inputs given.",
     "- Copy ids exactly as written (lot-00-00, apts-3/dwelling.2, acc-city, rec.412). Copy names, amounts and durations as quoted text, exactly as written; never calculate anything.",
-    "- If something the request needs isn't there, leave that argument out: whoever resolves the call will ask.",
-    "- If the request is someone else's decision, needs a calculation, does too much at once, or isn't clear, answer none(<label>) with the matching label.",
+    "- If something the request needs isn't there, leave that argument out: whoever resolves the call will ask. A request that's plain but leaves a detail out is not unclear.",
+    "- Never make up an id. Something named without its id is written by the name the request used, in quotes (\"Millbrook Builders\"); something only described (\"the town account\") is left out.",
+    "- Telling, asking, directing or instructing someone to do something is a message to them: message(to=<them>, text=\"<what's asked, in the request's words>\"). It is not work(...): work is done by your own people, at a place, as a named task.",
+    "- Having someone build something for you is structure(type=..., on=..., by=<them>, price=..., from=...), on its own line: never wrapped in an agreement. Having something demolished is structure(remove=<the building>, by=...).",
+    "- Ending an agreement by notice is agreement(notice=<the agreement>); accepting one offered to you is agreement(sign=<the agreement>).",
+    "- Refuse, with none(<label>), a request that can't honestly be written as one call:",
+    "  - needs_calculation: the amount isn't stated but must be worked out (a share, a percentage, \"whatever's left\", \"a fifth each\"). Never write money(...) without the amount.",
+    "  - not_yours: it wants an outcome that's someone else's to decide (\"make the council pass it\", \"make them lower their prices\"). (Asking or telling them is different: that's a message.)",
+    "  - too_much: several separate things in one request.",
+    "  - unknown_form: it names a form that isn't listed below the request. Don't use another form in its place.",
+    "  - unclear: it doesn't say what should happen (\"sort out the housing thing\").",
     "- To fill in a form, use form(...) with the form's own field names, listed below the request.",
+    "",
+    "A few more examples:",
+    "  Have Acme build a shed on lot-07 for $9,000 from acc-1, under permit rec.30.  ->  structure(type=shed, on=lot-07, by=acme, price=\"$9,000\", from=acc-1, basis=rec.30)",
+    "  Get Acme to pull down str.4, paying $2k from acc-1.  ->  structure(remove=str.4, by=acme, price=\"$2k\", from=acc-1)",
+    "  Direct the clerk [clerk] to send me the minutes by Friday.  ->  message(to=clerk, text=\"Please send me the minutes by Friday.\")",
+    "  Give notice on our agreement rec.9.  ->  agreement(notice=rec.9)",
+    "  Pay Acme half of what we hold.  ->  none(needs_calculation)",
+    "  Make the board approve the plan.  ->  none(not_yours)",
+    "",
     "Answer with the call tool, whose program is your answer.",
     "",
     syntax,
@@ -156,6 +174,9 @@ export function draftHash(d: Draft): string {
  * this package's, from the request's knowledge. */
 export type ResolveFn = (req: TranslateRequest, program: calls.Program) => Promise<Resolution>;
 
+/** Resolver questions another attempt at the call could fix (a name it didn't recognise, a refusal's own text). */
+const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name/;
+
 export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {
   const tid: TranslatorId = { id, version: TRANSLATOR_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` };
   const seen = new Set<string>();
@@ -172,7 +193,12 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     }
     const call = calls.programText(program);
     const r = resolver ? await resolver(req, program) : resolve(program, req.knowledge, typeOf, req.as);
-    if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}) };
+    // A question another attempt can't answer (which account? which cell?) goes to the participant as it is: the call
+    // was right, and something isn't known. Another attempt helps only where the call itself is the trouble: it's
+    // invalid, a refusal, or names something by a name nobody has (2026-10-03: asked again after "which account?",
+    // models gave up a correct call for none(unclear)).
+    const retryable = !!r.ok || !!(r as any).invalid || "none" in program || (r as any).questions.some((q: string) => RETRYABLE.test(q));
+    if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}), ...(retryable ? {} : { final: true }) };
     const k = await check(req.participant, req.as, r.blocks);
     if (k.error) return { ok: false, notices: [LABEL_TEXT.unclear], call, final: true };
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
@@ -191,7 +217,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
       const retries: { call?: string; reason: string }[] = [];
       for (let n = 1; ; n++) {
         const res = await callModel(io, {
-          purpose: "translator", subject: id, ref: req.draftId, system: translatorSystem(), maxTokens: 1000, tools: TOOLS, messages,
+          purpose: "translator", subject: id, ref: req.draftId, system: translatorSystem(), maxTokens: 2000, tools: TOOLS, messages,
           context: { proposal: req.proposal, participant: req.participant, attempt: n },
         }, seen);
         const out = res.content.find((b): b is Extract<typeof b, { type: "tool_use" }> => b.type === "tool_use" && b.name === "call");
@@ -202,7 +228,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
         }
         retries.push({ ...(r.call ? { call: r.call } : {}), reason: r.notices.join(" ") });
         // Feedback in the same exchange: the answer, then what went wrong with it.
-        const feedback = `That didn't work: ${r.notices.join(" ")}${r.call ? ` (your call: ${r.call})` : ""}. Read the request again. If it can be written as a call with what's known, write it; if it really can't, answer none(...) again.`;
+        const feedback = `That didn't work: ${r.notices.join(" ")}${r.call ? ` (your call: ${r.call})` : ""}. Read the request again, and write it as a call if any call can say it: a name exactly as the request wrote it, in quotes; an argument left out if it isn't given. Answer none(...) only if no call can.`;
         messages.push({ role: "assistant", content: res.content });
         messages.push(out ? { role: "user", content: [{ type: "tool_result", tool_use_id: out.id, content: feedback }] } : { role: "user", content: feedback });
       }

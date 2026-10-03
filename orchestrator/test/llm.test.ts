@@ -287,3 +287,73 @@ test("everyone waking at the same moment sees the same state; what they decide i
   const usage = log.filter((e) => e.kind === "annotation" && e.body.annotation === "usage").map((e) => e.body.subject);
   expect(usage.slice(0, 2)).toEqual(["mayor-system", "planning-system"]);
 }, 300_000);
+
+test("a round's requests are translated at once, and recorded in the cohort's order whichever comes back first", async () => {
+  const asked = new Set<string>();
+  let inFlight = 0, most = 0;
+  const order: string[] = [];
+  const inner = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      const who = req.subject;
+      if (!asked.has(who)) {
+        asked.add(who);
+        const as = who === "mayor-system" ? "mayor" : "planning";
+        return [{ type: "tool_use", id: `${who}-1`, name: "do", input: { what: `(mock) message(to=finance, text="From ${as}.")`, as } }];
+      }
+      return [{ type: "tool_use", id: `${who}-w`, name: "done_for_now", input: { days: 30 } }];
+    },
+    translator: (req: LlmRequest) => [{ type: "tool_use", id: "x", name: "call", input: { program: String(req.context.proposal).slice("(mock) ".length) } }],
+    debrief: () => [{ type: "text", text: "Thanks." }],
+  });
+  // The mayor's translation is slow, planning's quick: they come back in the other order.
+  const adapter = { provider: inner.provider, model: inner.model, complete: async (req: LlmRequest) => {
+    if (req.purpose !== "translator") return inner.complete(req);
+    most = Math.max(most, ++inFlight);
+    await Bun.sleep(String(req.context.proposal).includes("From mayor") ? 60 : 5);
+    inFlight--;
+    order.push(String(req.context.proposal).includes("From mayor") ? "mayor" : "planning");
+    return inner.complete(req);
+  } };
+  const config = () => town((c) => {
+    const planning = c.participants.find((p: any) => p.id === "planning-system");
+    planning.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5", params: { cadence_days: 7 } };
+    planning.framing = { disclosure: "simulation", reason: "test" };
+    delete c.participants.find((p: any) => p.id === "mayor-system").controller.params.sessions;
+  });
+  const s = await run("translate-at-once", config(), 2 * DAY, { adapter });
+  // Both were being translated at the same time, and planning's came back first.
+  expect(most).toBe(2);
+  expect(order.slice(0, 2)).toEqual(["planning", "mayor"]);
+  // The log has them in the cohort's order all the same: each draft, with its translator's calls just before it.
+  const ann = lines(s.logPath).filter((e) => e.kind === "annotation").map((e) => e.body);
+  const drafts = ann.filter((a) => a.annotation === "draft").map((a) => a.draft.participant);
+  expect(drafts.slice(0, 2)).toEqual(["mayor-system", "planning-system"]);
+  const refs = ann.filter((a) => a.annotation === "transcript" && a.data.purpose === "translator").map((a) => a.data.ref);
+  expect(refs.slice(0, 2)).toEqual(["draft.mayor-system.1", "draft.planning-system.1"]);
+  // And the run is the same run made again (the other way round in time, the same in the log).
+  inFlight = 0; asked.clear(); order.length = 0;
+  const again = await run("translate-at-once-again", config(), 2 * DAY, { adapter });
+  expect(again.stateHash).toBe(s.stateHash);
+}, 300_000);
+
+test("other offices handed to a model (mocked) do their jobs through words, translation and confirmation", async () => {
+  const config = generate({ ...spec, citizens: 80, mayor: "llm", model_seats: "planning,finance" });
+  for (const id of ["planning-system", "finance-system"]) expect(config.participants.find((p: any) => p.id === id).controller.type).toBe("llm");
+  expect(() => generate({ ...spec, citizens: 80, model_seats: ["nobody"] })).toThrow(/no office "nobody"/);
+  const s = await run("seats", config, 60 * DAY);
+  expect(s.participantErrors).toBe(0);
+  const log = lines(s.logPath);
+  const ann = log.filter((e) => e.kind === "annotation").map((e) => e.body);
+  const bound = ann.find((a) => a.annotation === "orchestrator").data.llm.participants;
+  expect(bound["planning-system"].mock_brain).toBe("city.planning_officer");
+  expect(bound["finance-system"].mock_brain).toBe("city.finance_officer");
+  const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
+  const acts = log.filter((e) => e.kind === "command" && e.body.command === "act").map((e) => e.body);
+  // Planning decided the mayor's park application, through the translator.
+  expect(recs.some((r) => r.kind === "permit_decision" && r.author === "planning-system")).toBe(true);
+  expect(acts.filter((a) => a.participant === "planning-system").every((a) => a.provenance.via === "translator")).toBe(true);
+  // Finance paid the town's wages or a bill, the same way.
+  const paid = acts.filter((a) => a.participant === "finance-system");
+  expect(paid.length).toBeGreaterThan(0);
+  expect(paid.every((a) => a.provenance.via === "translator")).toBe(true);
+}, 600_000);

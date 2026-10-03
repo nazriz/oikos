@@ -20,7 +20,8 @@ test("the harness: a model answering with the accepted call passes; one answerin
   });
   const r = await evaluate(adapter);
   const seen = CASES.filter((c) => !c.held_out).length;
-  expect(r.seen).toEqual({ passed: seen, of: seen });
+  expect(r.seen).toEqual({ passed: seen, of: seen, no_draft: 0, wrong_draft: 0 });
   expect(r.held_out.passed).toBeLessThan(r.held_out.of); // "none(unclear)" is right for none of them
+  expect(r.held_out.wrong_draft).toBe(0); // a refusal where a call was wanted is no draft, not a wrong one
   expect(reportText(r)).toContain("held out");
 });

@@ -1239,6 +1239,20 @@ See the design note, §16.
   - **Revisit if:** something else starts affecting a cell's travel cost (wear slowing roads, floods): it must bump the counter.
   - **The energy loop mattered beyond energy:** with it fixed, the insolvency test's factory found customers among the town's shops and didn't fail (the test now takes the shops away too). The loop drained up to about $1M a day out of town on the days it ran: earlier calibration runs (C6) carried it. Worth rechecking the calibration measures.
 
+- **The translator's prompt, translations at once, and more seats on models** (2026-10-03; Naz: "fix the translator, add parallelism, and then add more seats"; translator 0.5.0).
+  - **The plan for data (Naz, 2026-10-03):** stay on Codex until the translator is trained and the platform is mature. Training pairs are mostly generated, from the calls code participants make, with requests written in several styles by several models, not leaning to one steward's voice. Real pilot requests are for style and for the test. The held-out cases stay out of all of it.
+  - **Why plain requests came back "unclear":** the model's first call was usually right. The test's fixture knew nobody's account, so the resolver asked "which account?". The translator then tried again, with feedback that ended "answer none(...) again", and the model gave up a correct call. Now a question another attempt can't answer goes to the participant as it is, and the fixture knows the accounts a town would.
+  - **The prompt** (tuned on seen cases and the pilots' real failures only):
+    - a request to direct or ask someone is a letter to them, not `work`;
+    - having someone build is `structure(by=...)`, not an agreement written out;
+    - notice and signing;
+    - never make up an id;
+    - when to refuse, with each label spelt out.
+  - **Three outcomes, not pass/fail:** right; no draft (a refusal or question came back: a rewording's cost); wrong draft (the one that matters). The pass mark is better set on wrong drafts.
+  - **Translations at once:** a round's requests are translated together (they were made looking at the same state, and a translation changes nothing), and carried out in the cohort's order as before. Each translation's records are kept with it and written in that order, so the log is the same whichever comes back first. A resume finds a translation's recorded answers by its draft.
+  - **More seats:** `model_seats` in a world's spec ("planning,finance") hands those offices to a model: the same office and channels, honest disclosure, office hours, and its own code module as the mock's brain.
+  - **Revisit if:** the previews should be against the state as each request is carried out (they're against the round's start, as everyone's look was); or a seat needs more than its office's report to do the job (what the pilots are for).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration after the world expansion (measured 2026-10-02, not chased: for the checkpoint).** The small town, 3 seeds × 2 years, code only, at 2fd20b4. Health: 6 breaches of 15.

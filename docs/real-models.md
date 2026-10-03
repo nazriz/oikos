@@ -183,3 +183,18 @@ dollars.
   - asked the environment office about a declining squirrel glider population;
   - had the year-2 budget on the ballot at the year's end.
 - **One more gap:** the planning office reported "39 applications decided: 0 granted, 0 refused". Its channels show it applications, not its own decisions, so its report could never count them. The mayor asked for a reconciliation. Fixed (city.planning_officer 0.8.1): it keeps its own record, and counts those sent back incomplete.
+
+**The translator's prompt, reworked** (2026-10-03; translator 0.5.0; `runs/translator-eval-luna-2026-10-03-prompt-0.5b.json`). Tuned on the seen cases and the pilots' real failures only. Scored three ways: right, no draft (a refusal or a question came back), wrong draft.
+
+| gpt-6-luna (Codex) | Right | No draft | Wrong draft |
+|---|---|---|---|
+| Seen (26) | 21 | 5 | 0 |
+| Held out (29) | 18 (62%; was 55%) | 8 | 3 |
+
+- **"Unclear" for plain requests is gone.** It had come from a retry after "which account?": the model gave up a correct call.
+- **The 3 wrong drafts:**
+  - an invoice cited rather than settled: a real error;
+  - a lease without its template;
+  - a letter asking GreenCo to lower its prices where a refusal was expected (arguably fine).
+- **Luna still won't refuse** a calculation or a form it doesn't know. The resolver catches those (no draft), so the participant is asked to say it another way.
+- **An intermediate version told it to refuse only when no call could say it.** It then refused nothing, and wrote calls with the amount missing.
