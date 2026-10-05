@@ -822,6 +822,8 @@ export async function generate(gold: Gold[], o: {
   back?: { model: string; translate: (request: string, forms: string[], gold?: Gold) => Promise<string | undefined> };
   heldOut?: Case[];
   seed?: number;
+  /** How many requests are written and translated back at a time (1 if absent). */
+  concurrency?: number;
   log?: (s: string) => void;
 }): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[] }> {
   const styles = o.styles ?? Object.keys(STYLES);
@@ -849,47 +851,68 @@ export async function generate(gold: Gold[], o: {
   const positives: Example[] = [];
   const styleRand = sampler((o.seed ?? 1) + 11);
   let turn = 0;
-  for (const [gi, g] of gold.entries()) {
-    const forms = (g.forms ?? []).map(formLine);
-    for (let i = 0; i < perGold && !stopped; i++, turn++) {
-      const writer = o.writers[turn % o.writers.length]!;
-      const { style, instruction, riders } = styleBrief(styles[turn % styles.length]!, g, styleRand);
-      const model = `${writer.provider}/${writer.model}`;
-      const request = await attempt(() => writeRequest(writer, g, instruction, add(model)));
-      if (!request) continue;
-      // What the program takes from the request is looked for outside its riders, and each rider must be there as given.
-      const bare = withoutRiders(request, riders);
-      if (!riders.every((r) => request.includes(r.text)) || !copies(bare, g.program)) {
-        dropped.not_copied++;
-        rejects.push({ request, program: g.program, why: "not_copied", written_by: model, style });
-        continue;
-      }
-      const key = request.toLowerCase().replace(/\s+/g, " ");
-      if (seen.has(key)) {
-        dropped.duplicate++;
-        continue;
-      }
-      seen.add(key);
-      let verified: string | undefined;
-      if (o.back) {
-        const failed = dropped.failed;
-        const got = await attempt(() => o.back!.translate(request, forms, g));
-        if (stopped || dropped.failed > failed) continue;
-        if (got === undefined || !sameProgram(got, g.program)) {
-          dropped.round_trip++;
-          rejects.push({ request, program: g.program, why: "round_trip", ...(got !== undefined ? { got } : {}), written_by: model, style });
-          continue;
+  // Who writes what, in which style, is settled first and in order (so the same gold and seed give the same plan);
+  // the writing and the translating back then run several at a time (`concurrency`: a model call is nearly all waiting),
+  // and what came back is gone through in the plan's order, so the result doesn't depend on which call returned first.
+  const plan = gold.flatMap((g) => Array.from({ length: perGold }, () => {
+    const writer = o.writers[turn % o.writers.length]!;
+    const brief = styleBrief(styles[turn++ % styles.length]!, g, styleRand);
+    return { g, forms: (g.forms ?? []).map(formLine), writer, model: `${writer.provider}/${writer.model}`, ...brief };
+  }));
+  type Came = { request?: string; copied?: boolean; got?: string; backFailed?: boolean };
+  const came: Came[] = new Array(plan.length);
+  let next = 0, done = 0;
+  await Promise.all(Array.from({ length: Math.max(1, o.concurrency ?? 1) }, async () => {
+    while (next < plan.length && !stopped) {
+      const n = next++;
+      const t = plan[n]!;
+      const request = await attempt(() => writeRequest(t.writer, t.g, t.instruction, add(t.model)));
+      const out: Came = (came[n] = request ? { request } : {});
+      if (request) {
+        // What the program takes from the request is looked for outside its riders, and each rider must be there as given.
+        out.copied = t.riders.every((r) => request.includes(r.text)) && copies(withoutRiders(request, t.riders), t.g.program);
+        if (out.copied && o.back) {
+          const failed = dropped.failed;
+          const got = await attempt(() => o.back!.translate(request, t.forms, t.g));
+          if (got === undefined && (stopped || dropped.failed > failed)) out.backFailed = true;
+          else if (got !== undefined) out.got = got;
         }
-        verified = o.back.model;
       }
-      positives.push({
-        id: exampleId(request, g.program), request, forms, program: g.program, kind: "positive", shape: g.shape, style, spans: spansIn(bare, g.program), written_by: model, ...(verified ? { verified_by: verified } : {}),
-        source: g.source, ...(g.origin ? { origin: g.origin } : {}), gold: g.family ?? g.program,
-        ...(riders.length ? { riders: riders.map((r) => ({ ...r, at: [request.indexOf(r.text), request.indexOf(r.text) + r.text.length] as [number, number], adds: "nothing" as const })) } : {}),
-      });
+      if (o.log && ++done % 50 === 0) o.log(`${done}/${plan.length} requests written and checked`);
     }
-    if (stopped) break;
-    if (o.log && (gi + 1) % 25 === 0) o.log(`${gi + 1}/${gold.length} programs; ${positives.length} examples kept`);
+  }));
+  for (const [n, t] of plan.entries()) {
+    const c = came[n];
+    if (!c?.request) continue;
+    const { g, forms, model, style, riders } = t;
+    const request = c.request;
+    if (!c.copied) {
+      dropped.not_copied++;
+      rejects.push({ request, program: g.program, why: "not_copied", written_by: model, style });
+      continue;
+    }
+    const key = request.toLowerCase().replace(/\s+/g, " ");
+    if (seen.has(key)) {
+      dropped.duplicate++;
+      continue;
+    }
+    seen.add(key);
+    let verified: string | undefined;
+    if (o.back) {
+      if (c.backFailed) continue;
+      if (c.got === undefined || !sameProgram(c.got, g.program)) {
+        dropped.round_trip++;
+        rejects.push({ request, program: g.program, why: "round_trip", ...(c.got !== undefined ? { got: c.got } : {}), written_by: model, style });
+        continue;
+      }
+      verified = o.back.model;
+    }
+    const bare = withoutRiders(request, riders);
+    positives.push({
+      id: exampleId(request, g.program), request, forms, program: g.program, kind: "positive", shape: g.shape, style, spans: spansIn(bare, g.program), written_by: model, ...(verified ? { verified_by: verified } : {}),
+      source: g.source, ...(g.origin ? { origin: g.origin } : {}), gold: g.family ?? g.program,
+      ...(riders.length ? { riders: riders.map((r) => ({ ...r, at: [request.indexOf(r.text), request.indexOf(r.text) + r.text.length] as [number, number], adds: "nothing" as const })) } : {}),
+    });
   }
   // Refusals that have to be worded: each brief to a writer in turn, kept if it carries what it must and (with a second
   // model) comes back refused with the same label.

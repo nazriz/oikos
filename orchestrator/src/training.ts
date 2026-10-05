@@ -50,6 +50,8 @@ export interface TrainingDataOptions {
   /** The share of gold programs whose examples are set aside for validation (default 0.15; 0: no split written). */
   validation?: number;
   seed?: number;
+  /** Requests written and checked at a time (4 if absent: a model call is nearly all waiting). */
+  concurrency?: number;
   log?: (s: string) => void;
 }
 
@@ -205,6 +207,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   })();
   const heldOut = loadHeldOut();
   const { examples, manifest, rejects } = await generate(gold, {
+    concurrency: o.concurrency ?? 4,
     writers: o.writers.map(guarded), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
     ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(back ? { back } : {}), ...(heldOut ? { heldOut } : {}), seed: o.seed ?? 1, log,
   });
