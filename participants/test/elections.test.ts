@@ -124,6 +124,25 @@ test("on polling day the office counts each elector's last formal vote by instan
   expect(at(440 * DAY).of("statement", "election_notice")[0]!.args.data).toMatchObject({ poll_at: 500 * DAY });
 });
 
+test("only votes made while the ballot is open count: not one made before it opens, nor one made at or after its close, however late the office comes to count", () => {
+  const { at, ballot } = atClose([...NINE.map((p) => enrolment(p)), ...THREE]);
+  const b = ballot.id;
+  expect([ballot.data.opens_at, ballot.data.closes_at]).toEqual([OPENS, POLL]);
+  const votes = [
+    vote("v-early", OPENS - 1, "c1", b, "1>2>3"), // the paper is published at the close of nominations, 16 days before voting opens
+    vote("v-open", OPENS, "c2", b, "2>1>3"),
+    vote("v-last", POLL - 1, "c3", b, "2>1>3"),
+    vote("v-at-close", POLL, "c4", b, "1>2>3"),
+    vote("v-late", POLL + 600, "c5", b, "1>2>3"),
+    // A vote in time, then a change of mind after the close: the vote in time stands.
+    vote("v-c6", 90 * DAY, "c6", b, "3>2>1"),
+    vote("v-c6-late", POLL + 600, "c6", b, "1>2>3"),
+  ];
+  // (The office wakes in the morning of polling day, hours after the ballot closed at its start.)
+  const result = at(POLL + 9 * 3600, votes).said[0]!.args.data;
+  expect(result).toMatchObject({ formal: 3, electors: 9, winner: "c2-self", rounds: [{ "c1-self": 0, "c2-self": 2, "mayor-system": 1 }] });
+});
+
 test("under plurality only first preferences count: whoever has most of them is elected; and with no formal vote nobody is elected or appointed", () => {
   const { at, ballot } = atClose([...NINE.map((p) => enrolment(p)), ...THREE], { method: "plurality" });
   expect(ballot.data.method).toBe("plurality");

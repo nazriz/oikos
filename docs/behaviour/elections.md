@@ -1,4 +1,4 @@
-# `city.electoral_office` (v0.2.0): the town's elections
+# `city.electoral_office` (v0.3.1): the town's elections
 
 **Source:** `participants/src/behaviour/elections.ts`. A position of the town's (`entity: city`), run by code here; a
 person or a model could hold it. Design: docs/design/world-expansion.md §3.1. The voters are citizens
@@ -19,7 +19,7 @@ preferential vote is a ranking (`a>b>c`).
 | **Unopposed** | One candidate at the close: elected unopposed, with no ballot (a `ballot_result` saying so, and the appointment). None: no one is elected, and the office stays as it is. | Local Government Act 2020 (Vic): an unopposed candidate is declared elected (to confirm the section) |
 | **The ballot paper** | Each candidate has a number on it, in order; a vote ranks the numbers (`2>1>3`), as on a real ballot. (Ranking by ids ran past a vote's length limit with 18 candidates, and every vote was rejected: found.) | — |
 | **The roll and the ballot** | At the close: the `electoral_roll` (who may vote) and a `ballot` for `electorate: "roll"`, listing the candidates, open for `voting_days` (14) up to polling day. | — |
-| **The count** | On polling day: each elector's last formal vote (a ranking of at least one candidate; others are informal), counted by instant runoff (the last-placed candidate is out, their ballots go to the next preference still standing, until one has a majority). Under `plurality`, only first preferences count, for one round. | Instant runoff, as in Victoria's single-member elections |
+| **The count** | On polling day: each elector's last formal vote (a ranking of at least one candidate; others are informal) made while the ballot was open (0.3.1: one made before it opened, or at or after its close, isn't counted), counted by instant runoff (the last-placed candidate is out, their ballots go to the next preference still standing, until one has a majority). Under `plurality`, only first preferences count, for one round. | Instant runoff, as in Victoria's single-member elections |
 | **The result** | A public `ballot_result` with the winner, the rounds, formal votes, electors and turnout. The winner is appointed to the office. The next election is a term later. | — |
 
 ## What it does in the small town (three seeds; elections at day 365 and, in the test, day 200)

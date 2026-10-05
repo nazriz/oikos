@@ -36,7 +36,7 @@ export function instantRunoff(candidates: string[], rankings: string[][]): { win
 
 export const electoralOffice: BehaviourModule = {
   name: "city.electoral_office",
-  version: "0.3.0",
+  version: "0.3.1",
   doc: "docs/behaviour/elections.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -109,10 +109,13 @@ export const electoralOffice: BehaviourModule = {
           const candidates: string[] = b?.data?.options ?? []; // (their numbers on the ballot)
           const byNumber = new Map(((b?.data?.candidates ?? []) as { candidate: string; number?: string }[]).map((c) => [c.number ?? c.candidate, c.candidate]));
           const electors = new Set((book.open("electoral_roll").sort((a, x) => x.at - a.at)[0]?.data?.electors as string[] | undefined) ?? []);
-          // Each elector's last vote on this ballot, if it ranks the candidates (others are informal).
+          // Each elector's last vote on this ballot, if it ranks the candidates (others are informal), made while the
+          // ballot was open: one made before it opened, or at or after its close (before we came to count), isn't
+          // counted. (Until 0.3.1 both were.)
+          const opens = Number(b?.data?.opens_at ?? -Infinity), closes = Number(b?.data?.closes_at ?? Infinity);
           const last = new Map<string, string[]>();
           for (const v of book.ofType("vote").filter((v: any) => v.ballot === ballot).sort((a, x) => a.at - x.at) as any[]) {
-            if (!electors.has(v.speaks_for)) continue;
+            if (!electors.has(v.speaks_for) || v.at < opens || v.at >= closes) continue;
             const ranking = String(v.choice).split(">").map((x) => x.trim()).filter((x) => candidates.includes(x));
             if (ranking.length) last.set(v.speaks_for, p.method === "plurality" ? ranking.slice(0, 1) : ranking);
           }
