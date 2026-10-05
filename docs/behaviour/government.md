@@ -1,4 +1,4 @@
-# The town's government (code mayor v0.10.0, clerk v0.6.0)
+# The town's government (code mayor v0.10.0, clerk v0.6.1)
 
 **Source:** `participants/src/behaviour/government.ts`. These are code seats of the town (`entity: city`), plus the mayor's code stand-in. None of this is kernel mechanics (D19, D20). A law exists because a clerk published it after counting a ballot. Money leaves the town's account because the finance officer instructed the bank, and the bank checked its list of signatories. Every step is a person following, or not following, a procedure written as a record.
 
@@ -43,7 +43,7 @@ Params: `responsiveness_bps` 7000, `petition_threshold_bps` 1500, `population` 2
 It wakes daily.
 - It counts only the council's ballots (`electorate: "council"`), not the town's elections.
 - It puts each proposal addressed to the town to a council ballot, open for `vote_days` (14).
-- At close, it counts the latest vote of each **councillor seat**, checked against the directory's roles, so votes from anyone else don't count.
+- At close, it counts the latest vote of each **councillor seat**, checked against the directory's roles, so votes from anyone else don't count. Only votes made before the closing time count (0.6.1: until then a vote made after the close was counted if it reached the clerk before its daily count).
 - A proposal passes with more yes than no *and* a majority of all councillors (so abstentions count against).
 - It publishes the `ballot_result`. If the proposal passed, it publishes the law or budget itself, with the ballot as its basis.
 - It drafts: a proposal on a law's amendment form that passes is written into law by the law's schedule (next section).

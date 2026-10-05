@@ -181,6 +181,24 @@ test("a proposal passes with more yes than no AND a majority of all councillors:
   expect(count(votes(["yes", "yes", "yes", null, null])).result.passed).toBe(true);
 });
 
+test("the ballot closes at its closing time: a vote made at or after it isn't counted, however late the clerk comes to count", () => {
+  // Two yes in time; a third councillor's yes at the closing time and a fourth's a minute after, before the clerk has
+  // counted (it wakes daily).
+  const { result } = count([
+    cast("v1", "b1", 2 * DAY, "councillor-1", "yes"),
+    cast("v2", "b1", 15 * DAY - 1, "councillor-2", "yes"),
+    cast("v3", "b1", 15 * DAY, "councillor-3", "yes"),
+    cast("v4", "b1", 15 * DAY + 60, "councillor-4", "yes"),
+  ], { closeAt: 15 * DAY + 3600 });
+  expect(result).toEqual({ ballot: "b1", yes: 2, no: 0, passed: false });
+  // And a change of mind after the close doesn't replace the vote made in time.
+  const changed = count([
+    ...["councillor-1", "councillor-2", "councillor-3"].map((s, i) => cast(`v${i}`, "b1", 2 * DAY, s, "yes")),
+    cast("v9", "b1", 15 * DAY + 60, "councillor-3", "no"),
+  ], { closeAt: 15 * DAY + 3600 });
+  expect(changed.result).toEqual({ ballot: "b1", yes: 3, no: 0, passed: true });
+});
+
 test("the clerk counts only the council's ballots, each once, and reports what's open and what was decided", () => {
   const election = stmt("b-roll", DAY, "ballot", { author: "electoral-system", data: { office: "mayor", electorate: "roll", closes_at: 10 * DAY, options: ["1", "2"] } });
   const elsewhere = stmt("b-other", DAY, "ballot", { author: "x", speaks_for: "other-town", data: { proposal: "p", electorate: "council", closes_at: 10 * DAY, options: ["yes", "no"] } });

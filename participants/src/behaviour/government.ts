@@ -203,7 +203,7 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.6.0",
+  version: "0.6.1",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -240,7 +240,9 @@ export const councilClerk: BehaviourModule = {
           if (closed.has(ballot.id) || ballot.speaks_for !== me || ballot.data?.electorate !== "council" || t < (ballot.data?.closes_at ?? Infinity)) continue;
           closed.add(ballot.id);
           const latest = new Map<string, string>();
-          for (const r of book.ofType("vote")) if (r.ballot === ballot.id && r.in_position && councillors.has(r.in_position)) latest.set(r.in_position, r.choice);
+          // (Votes made while the ballot was open: one made at or after its closing time isn't counted, however late we
+          // come to count. Until 0.6.1 it was, if it reached us before we did.)
+          for (const r of book.ofType("vote")) if (r.ballot === ballot.id && r.in_position && councillors.has(r.in_position) && r.at < ballot.data.closes_at) latest.set(r.in_position, r.choice);
           const yes = [...latest.values()].filter((c) => c === "yes").length;
           const no = [...latest.values()].filter((c) => c === "no").length;
           const passed = yes > no && yes * 2 > councillors.size;
