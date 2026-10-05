@@ -169,7 +169,7 @@ test("gold programs from the seen cases cover what a town's code rarely calls", 
 test("refusals that have to be worded: the label comes from how the brief is built; the request must carry what the brief keeps", async () => {
   const gold = await goldFromLog(LOG);
   const briefs = refusalBriefs(gold, 2, 9);
-  expect(briefs.map((b) => b.label)).toEqual(["needs_calculation", "not_yours", "unclear", "not_an_act", "needs_calculation", "not_yours", "unclear", "not_an_act"]);
+  expect(briefs.map((b) => b.label)).toEqual(["needs_calculation", "not_yours", "unclear", "not_an_act", "no_such_act", "needs_calculation", "not_yours", "unclear", "not_an_act", "no_such_act"]);
   // Something to look at and nothing to do: what's named must be in the request as written.
   expect(briefs[3]!.brief).toContain("to bring nothing about");
   for (const b of briefs.filter((x) => x.label === "not_an_act")) for (const l of b.mustCopy) expect(b.brief).toContain(l);
@@ -194,6 +194,50 @@ test("refusals that have to be worded: the label comes from how the brief is bui
   expect(refusals.filter((x) => x === "none(needs_calculation)").length).toBe(2);
   expect(refusals.filter((x) => x === "none(not_yours)").length).toBe(2);
   expect(refusals).not.toContain("none(unclear)"); // the second model made something of them: not kept
+});
+
+test("what no function does is written to a brief too: something standing to be held and resumed, a place to be gone to, an office's own routine", async () => {
+  const g = (program: string): Gold => ({ program, shape: shapeOf(calls.parseProgram(program)), names: {}, source: "t" });
+  const rent = 'money(to=acc-landlord-1, amount="$850", from=acc-city, every="monthly", for="rent")';
+  const gold = [g(rent), g('work(task=make, units="3", at=str.7, by=c0042)'), g('money(to=builder, amount="$500", from=acc-city)')];
+  const briefs = refusalBriefs(gold, 3, 4).filter((b) => b.label === "no_such_act");
+  expect(briefs.length).toBe(3);
+  const [pause, visit, routine] = briefs as [typeof briefs[number], typeof briefs[number], typeof briefs[number]];
+  // A payment that repeats (never the one-off), held and not ended: its ids are the request's to carry, and it goes
+  // with that payment's family when the examples are split.
+  expect(pause.brief).toContain(rent);
+  expect(pause.brief).toContain("not ended, cancelled or withdrawn");
+  expect(pause.mustCopy).toEqual(expect.arrayContaining(["acc-landlord-1", "acc-city"]));
+  expect(pause.mustCopy).not.toContain("$850"); // the amount may be said or not: the hold isn't about it
+  expect(pause.gold).toBe(rent);
+  // A place some program names, to be gone to: not read about, and nobody sent.
+  expect(visit.mustCopy).toEqual(["str.7"]);
+  expect(visit.brief).toContain("go to str.7 in person");
+  // The speaker's own office's routine (another's would be theirs to decide: not_yours).
+  expect(routine.mustCopy).toEqual([]);
+  expect(routine.brief).toContain("a routine of their own office or organisation");
+  expect(refusalBriefs(gold, 3, 4).filter((b) => b.label === "no_such_act")).toEqual(briefs);
+  // With nothing standing and nowhere named, every one is a routine: the label never waits on the gold programs.
+  const bare = refusalBriefs([g('money(to=builder, amount="$500")')], 3, 4).filter((b) => b.label === "no_such_act");
+  expect(bare.map((b) => b.mustCopy)).toEqual([[], [], []]);
+  for (const b of bare) expect(b.brief).toContain("a routine of their own office");
+  // Written and translated back: kept when the second model refuses it as that, dropped when it forces it into a call;
+  // and the floor on refusals counts the label, saying when it came out short.
+  const said = (content: string) => (content.includes("already stands") ? "Hold the rent from acc-city to acc-landlord-1 until I say." : content.includes("in person") ? "Go to str.7 and see how it stands." : content.includes("routine of their own") ? `Stop doing that by yourselves. (${content.length})` : `Something else. (${content.length})`);
+  const w: LlmAdapter = { provider: "stand-in", model: "w", complete: async (req) => {
+    const content = String((req.messages[0] as any).content);
+    return { content: [{ type: "text", text: content.startsWith("Situation:") ? said(content) : "x" }], usage: { input_tokens: 1, output_tokens: 1 } };
+  } };
+  const back = (forced: boolean) => ({ model: "stand-in/back", translate: async (q: string) => (q.startsWith("Hold") ? (forced ? "statement(withdraw=rec.1)" : "none(no_such_act)") : q.startsWith("Go to") || q.startsWith("Stop doing") ? "none(no_such_act)" : "none(unclear)") });
+  const r = await generate(gold, { writers: [w], perGold: 1, refusalFloor: 3, seed: 4, back: back(false) });
+  const kept = r.examples.filter((e) => e.program === "none(no_such_act)");
+  expect(kept.map((e) => e.request.split(" ")[0]).sort()).toEqual(["Go", "Hold", "Stop"]);
+  expect(kept.find((e) => e.request.startsWith("Hold"))!.gold).toBe(rent);
+  expect(Object.keys(r.manifest.short_of_floor!)).not.toContain("no_such_act");
+  const forced = await generate(gold, { writers: [w], perGold: 1, refusalFloor: 3, seed: 4, back: back(true) });
+  expect(forced.examples.filter((e) => e.program === "none(no_such_act)").length).toBe(2);
+  expect(forced.rejects.some((x) => x.program === "none(no_such_act)" && x.got === "statement(withdraw=rec.1)")).toBe(true);
+  expect(forced.manifest.short_of_floor!.no_such_act).toBe(2);
 });
 
 test("what a gold program is kept as, what a request must carry word for word, and what's too much to ask in a sentence", () => {
