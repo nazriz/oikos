@@ -137,17 +137,22 @@ test("a form is shown whole, on file and in a report, however many fields it has
   for (const f of forms) for (const name of Object.keys(f.data.fields)) expect(filed).toContain(`"${name}":`);
 });
 
-test("a law's rule and the condition acts are checked against are shown to whoever reads it; a law in words only shows neither", () => {
+test("a law's rule is shown to whoever reads it, and that acts are checked against it; a law in words only shows neither", () => {
   const law = { adico: { attribute: "landlords", deontic: "must_not", aim: "raise a rent", condition: "with less than 90 days' notice", or_else: "the rise is invalid" },
     formal: { language: "cel", condition: "block.kind == 'rent_increase' && block.data.from - now < 7776000" } };
-  expect(ruleWords(law)).toBe("Its rule, as recorded: landlords must not raise a rent, with less than 90 days' notice; or else: the rise is invalid. The condition acts are checked against, as written: block.kind == 'rent_increase' && block.data.from - now < 7776000.");
+  expect(ruleWords(law)).toBe("Its rule, as recorded: landlords must not raise a rent, with less than 90 days' notice; or else: the rise is invalid. Offices and others check what they do against it.");
+  expect(ruleWords({ adico: law.adico })).toBe("Its rule, as recorded: landlords must not raise a rent, with less than 90 days' notice; or else: the rise is invalid.");
+  expect(ruleWords({ formal: law.formal })).toBe("Offices and others check what they do against a condition recorded with it.");
   expect(ruleWords({})).toBe("");
-  // On file for a seat (its standing documents), and in a report that lists the law.
+  // Word for word only where an act that would publish it is being confirmed (the preview).
+  expect(ruleWords(law, { asWritten: true })).toContain("The condition acts are checked against, as written: block.kind == 'rent_increase' && block.data.from - now < 7776000.");
+  // On file for a seat (its standing documents), and in a report that lists the law: never the platform's notation.
   const record = { id: "law-1", record: "statement", author: "clerk", at: 0, visible_to: "public", kind: "law", speaks_for: "city", text: "No rent rise without ninety days' notice.", ...law };
   const obs = { participant: "mayor-system", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: { laws: { kind: "records", records: [record, { ...record, id: "law-2", text: "Be kind.", adico: undefined, formal: undefined }] } } } as any;
   const onFile = renderStanding(obs, new Set(["laws"]));
   expect(onFile).toContain('[law-1] law of city: "No rent rise without ninety days\' notice." Its rule, as recorded: landlords must not raise a rent');
-  expect(onFile).toContain('- [law-2] law of city: "Be kind."');
-  expect(onFile.split("\n")[1]).not.toContain("Its rule");
-  expect(renderObservation(obs, { standing: new Set(), titles: new Map() })).toContain("The condition acts are checked against, as written: block.kind == 'rent_increase'");
+  expect(onFile.split("\n")[1]).toBe('- [law-2] law of city: "Be kind."');
+  const report = renderObservation(obs, { standing: new Set(), titles: new Map() });
+  expect(report).toContain("Offices and others check what they do against it.");
+  for (const shown of [onFile, report]) expect(shown).not.toContain("block.");
 });

@@ -39,17 +39,23 @@ const dataWords = (r: { kind: string; data?: unknown }) => details(r.data, r.kin
 
 /**
  * A statement's rule, where it has one on record: its Institutional Grammar breakdown (who may, must or must not do
- * what, when, or else what), and the condition acts are checked against. This is what gives a law its force for
- * every office, landlord and firm that checks what it's about to do: someone reading a law, or about to pass one,
- * sees it (VISION 15: nothing that binds is in a field only code reads). Empty for a statement in words only.
+ * what, when, or else what), and whether there is a condition acts are checked against. This is what gives a law its
+ * force for every office, landlord and firm that checks what it's about to do: someone reading a law sees whether it
+ * has one (VISION 15: nothing that binds is in a field only code reads). Empty for a statement in words only.
+ *
+ * The condition itself is written in the platform's own notation (`block.kind == …`), which a participant reading its
+ * reports never sees (principle 14): there it's said that acts are checked against the rule. `asWritten` gives the
+ * condition word for word, for the one place it has to be seen: the preview of an act that would publish it, where
+ * whoever confirms must see everything the act carries.
  */
-export function ruleWords(r: { adico?: any; formal?: any }): string {
+export function ruleWords(r: { adico?: any; formal?: any }, o: { asWritten?: boolean } = {}): string {
   const a = r.adico;
-  const more = (o: any, said: string[]) => Object.entries(o).filter(([k]) => !said.includes(k)).map(([k, v]) => `; ${words(k)}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("");
+  const more = (x: any, said: string[]) => Object.entries(x).filter(([k]) => !said.includes(k)).map(([k, v]) => `; ${words(k)}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("");
   const deontic = ({ may: "may", must: "must", must_not: "must not" } as { [k: string]: string })[a?.deontic] ?? a?.deontic;
   const rule = a ? `Its rule, as recorded: ${[a.attribute ?? "(nobody named)", deontic ?? "(may, must or must not isn't said)", a.aim ?? "(no action named)"].join(" ")}${a.condition ? `, ${a.condition}` : ""}${a.or_else ? `; or else: ${a.or_else}` : ""}${more(a, ["attribute", "deontic", "aim", "condition", "or_else"])}.` : "";
   const f = r.formal;
-  const formal = f ? `The condition acts are checked against, as written${f.language === "cel" ? "" : ` (in ${f.language})`}: ${f.condition}${more(f, ["language", "condition"])}.` : "";
+  const formal = !f ? "" : o.asWritten ? `The condition acts are checked against, as written${f.language === "cel" ? "" : ` (in ${f.language})`}: ${f.condition}${more(f, ["language", "condition"])}.`
+    : a ? "Offices and others check what they do against it." : "Offices and others check what they do against a condition recorded with it.";
   return [rule, formal].filter(Boolean).join(" ");
 }
 

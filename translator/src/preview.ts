@@ -48,7 +48,7 @@ export class Preview {
   }
   /** A law's rule and the condition acts are checked against, as anyone reading the law later is shown them. */
   private rule(b: any): string {
-    const words = ruleWords(b);
+    const words = ruleWords(b, { asWritten: true });
     return words ? ` ${words}` : "";
   }
 
