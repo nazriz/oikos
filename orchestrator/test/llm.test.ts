@@ -116,6 +116,28 @@ test("a participant is told when a request can't be done, declines an unfaithful
   expect(ann.find((a) => a.annotation === "debrief")?.data.prompt).toMatch(/Your notebook, as you left it: [\s\S]*(You didn't act during the run\.|From day \d+ to day \d+ you wrote \d+ letters?)/);
 }, 300_000);
 
+test("opting out with no statement at all is honoured, and recorded as leaving the study (not as stepping down from the office)", async () => {
+  let calls = 0;
+  const adapter = new MockAdapter("mock", {
+    // (As a model might: the tool used with nothing in it.)
+    participant: () => [{ type: "tool_use" as const, id: `t${++calls}`, name: "opt_out", input: {} }],
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
+    debrief: () => [{ type: "text", text: "Thanks for asking." }],
+  });
+  const s = await run("opt-out-empty", town(), 5 * DAY, { adapter });
+  const log = lines(s.logPath);
+  expect(calls).toBe(1); // asked once: it isn't woken again to be asked the same thing
+  const cmd = log.find((e) => e.kind === "command" && e.body.command === "opt_out");
+  expect(cmd.body).toEqual({ command: "opt_out", participant: "mayor-system", statement: "" });
+  expect(log.some((e) => e.kind === "event" && e.body.event === "participant_opted_out" && e.body.participant === "mayor-system")).toBe(true);
+  // Nothing was done in the world in its name: no resignation, no act at all.
+  expect(log.some((e) => e.kind === "command" && e.body.command === "act" && e.body.participant === "mayor-system")).toBe(false);
+  const ann = log.filter((e) => e.kind === "annotation").map((e) => e.body);
+  expect(ann.some((a) => a.annotation === "note" && a.subject === "mayor-system" && a.data.opt_out_as_given)).toBe(true);
+  expect(ann.some((a) => a.annotation === "note" && a.data.malformed_tool_use)).toBe(false);
+  expect(Bun.spawnSync([kernelBinary(), "replay", s.logPath, "--anchors", s.anchorsPath]).exitCode).toBe(0);
+}, 300_000);
+
 test("after opting out, a stand-in named in the world config carries the participant on", async () => {
   const config = town((c) => {
     const mayor = c.participants.find((x: any) => x.id === "mayor-system");

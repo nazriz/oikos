@@ -113,3 +113,26 @@ test("done for now alongside an action: the action, then no call until the next 
   expect(JSON.stringify(seen[1])).toContain("Since you last looked");
   expect(JSON.stringify(seen[1])).toContain("Figures: $1,000.");
 });
+
+test("a form is shown whole, on file and in a report, however many fields it has (other details are still cut short)", async () => {
+  const { renderStanding } = await import("../src/llm/render");
+  const fields = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`line_${i}`, { type: "amount", description: `For a budget: line ${i} of the thirty.` }]));
+  const form = { id: "form-budget", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form", text: "A budget.", data: { form: "budget", submit_as: "proposal", submit_to: ["city"], fields } };
+  const long = { ...form, id: "minutes-1", kind: "minutes" };
+  const o = obs({ forms: { kind: "records", records: [form, long] } });
+  const whole = JSON.stringify(form.data);
+  expect(whole.length).toBeGreaterThan(1500);
+  const onFile = renderStanding(o, new Set(["forms"])).split("\n");
+  expect(onFile[0]).toContain(whole);
+  expect(onFile[1]).not.toContain("line_29"); // (not a form: its details are cut short, with a mark)
+  expect(onFile[1]).toContain("…");
+  expect(renderObservation(o).split("\n").find((l) => l.includes("[form-budget]"))).toContain(whole);
+  // The generated town's forms: every field is in what its mayor has on file.
+  const { generate } = await import("../../worlds/generator/generate");
+  const { readFileSync } = await import("node:fs");
+  const c = generate({ ...(Bun.YAML.parse(readFileSync(`${import.meta.dir}/../../worlds/town.yaml`, "utf8")) as any), citizens: 80 });
+  const forms = c.world.records.filter((r: any) => r.kind === "form");
+  expect(forms.length).toBeGreaterThan(0);
+  const filed = renderStanding(obs({ forms: { kind: "records", records: forms } }), new Set(["forms"]));
+  for (const f of forms) for (const name of Object.keys(f.data.fields)) expect(filed).toContain(`"${name}":`);
+});

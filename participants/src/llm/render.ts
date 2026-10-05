@@ -33,6 +33,9 @@ const details = (x: unknown, max = 400) => {
   const flat = entries.every(([, v]) => v === null || ["string", "number", "boolean"].includes(typeof v));
   return clip(flat ? entries.map(([k, v]) => `${words(k)}: ${v}`).join("; ") : JSON.stringify(x), max);
 };
+/** A statement's details. A form's are always whole: its fields are what it's filled in from, and whoever reads the
+ * request made on it sees every one (a long form cut short reads as a form without its last fields). */
+const dataWords = (r: { kind: string; data?: unknown }) => details(r.data, r.kind === "form" ? Infinity : 400);
 
 /** An outcome someone commits to or is asked for (§9), in words. */
 export function outcomeWords(o: any, every?: number): string {
@@ -53,7 +56,7 @@ function describeRecord(r: Record): string {
   switch (r.record) {
     case "statement": {
       if (r.kind === "request" && r.data?.outcome) return `[${r.id}] ${who} asked ${(r.addressed_to ?? []).join(", ")} to ${outcomeWords(r.data.outcome, r.data.every)}${from}`;
-      const d = details(r.data);
+      const d = dataWords(r);
       return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${r.basis}` : ""}`;
     }
     case "claim":
@@ -279,7 +282,7 @@ export function renderStanding(obs: Observation, standing: Set<string>): string 
   const out: string[] = [];
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (!standing.has(id) || ch.kind !== "records") continue;
-    for (const r of ch.records) if (r.record === "statement") out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${details(r.data)})` : ""}`);
+    for (const r of ch.records) if (r.record === "statement") out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}`);
   }
   return out.join("\n");
 }

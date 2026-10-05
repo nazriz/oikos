@@ -2,7 +2,7 @@
 // these check what would be sent and how replies are read, never a real call.
 
 import { expect, test } from "bun:test";
-import { leadingObject } from "../src/llm/codex";
+import { codexPrompt, LIMITED, leadingObject, runBounded } from "../src/llm/codex";
 import { AnthropicAdapter, callModel, OpenAICompatibleAdapter, SpendingLimitReached, toChat, type LlmRequest } from "../src/llm";
 
 const req: LlmRequest = {
@@ -158,3 +158,48 @@ test("a Codex answer's tool input: a whole object followed by stray characters i
   expect(leadingObject('["not", "an object"]')).toBeUndefined();
   expect(leadingObject("nothing")).toBeUndefined();
 });
+
+test("Codex CLI: the wrapper's wording agrees with the instructions that several tools can be used in one answer", () => {
+  const prompt = codexPrompt({ ...req, system: "You can take several actions at once (up to 8)." });
+  expect(prompt).not.toContain("one per answer");
+  expect(prompt).not.toContain("Choose one tool");
+  expect(prompt).toContain("=== Tools you can use ===");
+  expect(prompt).toContain("If you use more than one tool in this answer, as your instructions allow, the first goes in `tool` and every other one in `also`");
+});
+
+test("Codex CLI: only the subscription's usage limit and rate limits stop the run; another limit reached is an ordinary failure", async () => {
+  const { CodexCliAdapter } = await import("../src/llm/codex");
+  const { UsageLimitReached } = await import("../src/llm/call");
+  for (const s of ["ERROR: You've hit your usage limit. Try again in 2 hours.", "429 Too Many Requests: usage_limit_reached", "stream error: exceeded retry limit, last status: 429 Too Many Requests", "Rate limit reached for gpt-6.1-sol. Please try again in 20s.", "rate_limit_exceeded"]) expect(LIMITED.test(s)).toBe(true);
+  for (const s of ["Your input exceeds the context window: token limit reached.", "maximum output limit reached", "the model hit your limit of 4000 tokens", "not signed in"]) expect(LIMITED.test(s)).toBe(false);
+  // Through the adapter: retried like any failure, then reported as one, with what was said (the seat waits; the run goes on).
+  let tries = 0;
+  const contextFull = async () => (tries++, { code: 1, stdout: "", stderr: "ERROR: context length limit reached for this conversation" });
+  const e = await new CodexCliAdapter("gpt-5", contextFull, { attempts: 1 }).complete(req).catch((x) => x);
+  expect(e).not.toBeInstanceOf(UsageLimitReached);
+  expect(String(e.message)).toContain("context length limit reached");
+  expect(tries).toBe(1);
+  const limited = async () => ({ code: 1, stdout: "", stderr: "Rate limit reached for gpt-6.1-sol." });
+  await expect(new CodexCliAdapter("gpt-5", limited).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
+});
+
+test("a command that won't end can't hang a call: asked to end at the time limit, killed after a grace period, and its pipes not waited on", async () => {
+  // Ignores the request to end, and leaves something behind holding its output open.
+  const stuck = ["sh", "-c", "trap '' TERM; echo started; sleep 6 & while :; do sleep 1; done"];
+  const t0 = performance.now();
+  const r = await runBounded(stuck, "", import.meta.dir, 300, 300, 300);
+  const took = performance.now() - t0;
+  expect(r.timedOut).toBe(true);
+  expect(r.stdout).toBe("started\n"); // what it had said is kept
+  expect(took).toBeGreaterThanOrEqual(600);
+  expect(took).toBeLessThan(5000);
+  // One that ends when asked is done at once, and one that finishes in time is read whole.
+  const t1 = performance.now();
+  expect((await runBounded(["sleep", "30"], "", import.meta.dir, 200, 5000)).timedOut).toBe(true);
+  expect(performance.now() - t1).toBeLessThan(3000);
+  expect(await runBounded(["sh", "-c", "cat; echo err >&2; exit 3"], "said on stdin", import.meta.dir, 5000)).toEqual({ code: 3, stdout: "said on stdin", stderr: "err\n", timedOut: false });
+  // Through the adapter: a call whose every attempt times out fails, saying so.
+  const { CodexCliAdapter } = await import("../src/llm/codex");
+  const never = (_a: string[], stdin: string, cwd: string, timeoutMs: number) => runBounded(stuck, stdin, cwd, timeoutMs, 100, 100);
+  await expect(new CodexCliAdapter("gpt-5", never, { timeoutMs: 200, attempts: 1 }).complete(req)).rejects.toThrow("no answer within");
+}, 30_000);
