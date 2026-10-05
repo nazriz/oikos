@@ -34,7 +34,7 @@ export interface RealCase {
   /** Arguments that aren't compared, present or not. */
   ignore?: string[];
   /** What the request asks for that the call language can't say (a name in GAPS). */
-  gap?: keyof typeof GAPS;
+  gap?: Extract<keyof typeof GAPS, string>;
   note?: string;
 }
 
