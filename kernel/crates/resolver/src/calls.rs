@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
 pub const FUNCTIONS: [&str; 19] = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take"];
-pub const LABELS: [&str; 6] = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act"];
+pub const LABELS: [&str; 7] = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act", "no_such_act"];
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

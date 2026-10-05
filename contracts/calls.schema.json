@@ -34,7 +34,8 @@
             "too_much",
             "unclear",
             "unknown_form",
-            "not_an_act"
+            "not_an_act",
+            "no_such_act"
           ]
         }
       }

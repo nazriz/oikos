@@ -63,6 +63,10 @@ export const CASES: Case[] = [
   { id: "look-record", request: "Read rec.3 and tell me what it says.", expect: ["none(not_an_act)"] },
   { id: "look-post", request: "Show me who currently holds the planning post.", expect: ["none(not_an_act)"] },
   { id: "look-ask", request: "Ask the planning officer to send me the list of permits decided this month.", expect: ['message(to=planning, text="Please send me the list of permits decided this month.")', 'message(to="the planning officer", text="Please send me the list of permits decided this month.")', 'message(to="planning officer", text="Please send me the list of permits decided this month.")'], ignore: ["text"], note: "asking someone for it is an act: a letter" },
+  // nothing does it (seen; added 2026-10-06, of the kind the pilots' offices asked for)
+  { id: "hold-payment", request: "Temporarily pause the recurring payment rec.90 from acc-city until I release the pause. Keep it on record.", expect: ["none(no_such_act)"] },
+  { id: "go-and-see", request: "Visit str.9 today and record whether the waste there has been collected.", expect: ["none(no_such_act)"] },
+  { id: "cancel-for-good", request: "Cancel the standing payment rec.90 from acc-city.", expect: ["statement(withdraw=rec.90)"], note: "ending it for good is a withdrawal" },
   { id: "unknown-form", request: "Fill in the dog licence form for Rex.", expect: ["none(unknown_form)"], note: "no such form is known" },
 
   // Seen, from the pilots (2026-10-03): requests a model mayor made that the translator got wrong (docs/real-models.md,

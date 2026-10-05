@@ -35,6 +35,7 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
   unclear: "It isn't clear what should happen. Could you say it more plainly?",
   unknown_form: "You haven't seen a form by that name.",
   not_an_act: "That's something to look up or read, not something to do. Look at your reports and papers, or write to whoever keeps it.",
+  no_such_act: "Nothing here does that as such. You could write to whoever would have to see to it, or go about it another way.",
 };
 
 class Ask extends Error {}
