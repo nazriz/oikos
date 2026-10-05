@@ -464,8 +464,16 @@ fn uniform(s: &Statics, key: &[&str], n: i64) -> i64 {
 pub fn nature_land(s: &Statics, st: &State, ground: &oikos_nature::Ground) -> oikos_nature::Land {
     let cat = &s.config.catalogue;
     let mut land = oikos_nature::Land::default();
+    // (The ground's cells and the state's are both in id order: walked together, each cell is found without looking it up.)
+    let mut cells = st.cells.iter().peekable();
     for id in &ground.cells {
-        let c = &st.cells[id];
+        while cells.peek().is_some_and(|(k, _)| *k < id) {
+            cells.next();
+        }
+        let c = match cells.peek() {
+            Some((k, c)) if *k == id => *c,
+            _ => &st.cells[id],
+        };
         let building = c.structure.as_ref().and_then(|x| st.structures.get(x));
         land.cover.push(oikos_nature::cover_of(cat, c.terrain.as_deref(), building.map(|b| s.types.get(&b.structure_type).and_then(|t| t.cover.as_deref()))));
         land.built.push(building.is_some());

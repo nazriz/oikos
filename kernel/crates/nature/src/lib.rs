@@ -191,12 +191,12 @@ pub fn step_day(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSt
 fn succession(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureState, day: i64, out: &mut DayResult) {
     let next: BTreeMap<&str, (&str, i64)> =
         cat.land_covers.iter().filter_map(|c| c.succeeds_to.as_ref().map(|s| (c.id.as_str(), (s.cover.as_str(), s.after_days)))).collect();
+    // A cell whose cover doesn't succeed (or that's built on) keeps no day: those are taken out by going through the
+    // days kept (few), not by looking every cell up among them.
+    st.since.retain(|cell, _| ground.index.get(cell).is_none_or(|&i| !land.built[i] && next.contains_key(land.cover[i].as_str())));
     for (i, cell) in ground.cells.iter().enumerate() {
         let cover = &land.cover[i];
-        let Some(&(to, after)) = next.get(cover.as_str()).filter(|_| !land.built[i]) else {
-            st.since.remove(cell);
-            continue;
-        };
+        let Some(&(to, after)) = next.get(cover.as_str()).filter(|_| !land.built[i]) else { continue };
         match st.since.get(cell) {
             Some((c, from)) if c == cover => {
                 if day - from >= after {
