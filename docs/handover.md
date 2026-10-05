@@ -39,10 +39,17 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
   gpt-6.1-sol or gpt-6-luna. Two things stopped on it, both cleanly:
   - **Pilot 9, on day 175** (0.48 years). Its log is whole (`runs/pilot-9/town-1000.seed1.jsonl`); resume it when the
     limit resets, from the worktree `pilot9-fix` as below.
-  - **The training data, in part 13 of 24.** Parts 1 to 12 are whole (about 595 examples each); `part-13` holds what
-    was written before the stop (145) and is redone by `make.ts` when it runs again. The parts still to write are
-    being written by other models through files (`oikos translator-data --briefs`, `translator-data-write`), so the
-    set's voices are gpt-6.1-sol for about half and Claude models for the rest.
+  - **The training data** stopped in part 13 of 24 and was finished without Codex (next item).
+- **The translator’s training set is written, blind-checked and split** (2026-10-06): `runs/translator-data-2026-10-06/`
+  on the mini. Parts 1 to 12 were written by codex/gpt-6.1-sol (6,897 of 7,144 examples agreed in the blind check),
+  parts 13 to 24 by Claude subagents through files, a third each to Sonnet, Haiku and Opus (5,843 of 6,156 agreed).
+  Whole set: 12,740 of 13,300. `all/` holds the checked examples (12,736 after four exact repeats), `train.jsonl`
+  (10,856) and `validation.jsonl` (1,880), split by gold program and by form by `split.ts` there, and a manifest.
+  - **Known weakness:** the blind reader of every part was Claude Sonnet, so for parts 13 to 24 the reader is of the
+    writers’ family (for a third of them, the same model). Reading those parts again with gpt-6.1-sol once the
+    Codex limit resets would close that; `part-NN/blind.jsonl` is what a reader is given.
+  - `part-13-sol-partial` (145 examples sol wrote before the stop) is kept and is in neither side: never blind-checked.
+  - **Next:** the choice of base model and where it trains (Naz’s, not made).
   - What follows in this section was written before the stop.
 - **The translator's training data is being written**: `runs/translator-data-2026-10-06/` on the mini, 24 parts
   (`part-NN/examples.jsonl`, `manifest.json`, `rejects.jsonl`), by `make.ts` there (its pid in `pid`, its console in
