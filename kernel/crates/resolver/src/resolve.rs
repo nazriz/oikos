@@ -838,8 +838,57 @@ impl Resolver<'_> {
     }
 
     fn form(&self, c: &Call, bind: Option<&str>) -> R<Vec<Json>> {
-        let to = self.need(c, "to", "Which office's form?")?;
-        let name = self.need(c, "form", "Which form?")?;
+        // The form, by its name as written: its own name or record id, or the same in ordinary words ("permit
+        // application", "the event permit form"). One nobody has seen is said to be that before anything else is
+        // asked. Known, and its office not said: it goes where it says it goes, if that's one place.
+        // (translator/src/resolver.ts is the same, step for step.)
+        let written = match c.get("form") {
+            Some(Value::Id(x)) | Some(Value::Text(x)) => x.clone(),
+            _ => return ask("Which form?"),
+        };
+        let lower = written.trim().to_lowercase();
+        let no_the = match lower.strip_prefix("the") {
+            Some(rest) if rest.starts_with(char::is_whitespace) => rest.trim_start().to_string(),
+            _ => lower.clone(),
+        };
+        let mut plain = String::new();
+        let mut gap = false;
+        for ch in no_the.chars() {
+            if ch.is_whitespace() || ch == '-' {
+                gap = true;
+            } else {
+                if gap && !plain.is_empty() {
+                    plain.push('_');
+                }
+                gap = false;
+                plain.push(ch);
+            }
+        }
+        if gap && !plain.is_empty() {
+            plain.push('_');
+        }
+        let short = plain.strip_suffix("_form").unwrap_or(&plain).to_string();
+        let spelled = |x: &Json| x["data"]["form"].as_str().is_some_and(|f| f == written || f == plain || f == short);
+        let known: Vec<&Json> = self.k.standing_forms().into_iter().filter(|x| spelled(x) || x["id"].as_str() == Some(written.as_str())).collect();
+        if known.is_empty() {
+            return ask(label_text("unknown_form"));
+        }
+        let name = if known.iter().any(|x| x["id"].as_str() == Some(written.as_str())) { written.clone() } else { known[0]["data"]["form"].as_str().unwrap_or_default().to_string() };
+        let mut goes: Vec<String> = vec![];
+        for x in &known {
+            let w = x["in_position"].as_str().or(x["speaks_for"].as_str()).or(x["author"].as_str()).unwrap_or_default().to_string();
+            if !goes.contains(&w) {
+                goes.push(w);
+            }
+        }
+        goes.sort();
+        let to = if Self::has(c, "to") {
+            self.need(c, "to", "Which office's form?")?
+        } else if goes.len() == 1 {
+            goes[0].clone()
+        } else {
+            return ask("Which office's form?");
+        };
         let Some(f) = self.k.form(&to, &name) else {
             // Known by name but not from that office: say where it goes, rather than that it's unknown.
             let elsewhere: Vec<&Json> = self.k.standing_forms().into_iter().filter(|x| x["data"]["form"].as_str() == Some(name.as_str()) || x["id"].as_str() == Some(name.as_str())).collect();

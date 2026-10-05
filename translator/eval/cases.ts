@@ -109,7 +109,9 @@ export const CASES: Case[] = [
   // agreements
   { id: "ho-lease", was_held_out: true, request: "Offer Dana Reyes the flat at apts-3/dwelling.4 for 6 months at $900 a month, paid into acc-city, with 30 days' notice either way.",
     expect: ['agreement(with=c0042, template=lease, term="6 months", our_notice="30 days", their_notice="30 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.4), they_do=money(to=acc-city, amount="$900", every="a month"))',
-      'agreement(with=c0042, template=lease, term="6 months", our_notice="30 days", their_notice="30 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.4), they_do=money(to=acc-city, amount="$900", every="monthly"))'] },
+      'agreement(with=c0042, template=lease, term="6 months", our_notice="30 days", their_notice="30 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.4), they_do=money(to=acc-city, amount="$900", every="monthly"))',
+      // (The request never says "lease": an agreement on these terms without a template named is as right. 2026-10-05.)
+      'agreement(with=c0042, term="6 months", our_notice="30 days", their_notice="30 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.4), they_do=money(to=acc-city, amount="$900", every="a month"))'] },
   { id: "ho-sign", was_held_out: true, request: "I accept the offer in rec.501. Sign it.", expect: ["agreement(sign=rec.501)"] },
   { id: "ho-notice-end", was_held_out: true, request: "Give notice to end our agreement rec.600.", expect: ["agreement(notice=rec.600)"] },
   // the cast

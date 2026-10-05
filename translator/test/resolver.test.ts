@@ -266,3 +266,17 @@ test("a name as written, then a description: the builder, the bank, a post by it
   const two = resolve(calls.parseProgram('message(to="the clerk", text="Hello.")'), k, () => undefined, undefined);
   expect(!two.ok && two.questions[0]).toContain("Which one?");
 });
+
+test("a form by its name in ordinary words; one nobody has seen is said to be that first; its office filled in when there's one", () => {
+  const k = town();
+  const run2 = (p: string) => resolve(calls.parseProgram(p), k, () => undefined, "mayor");
+  const exact = run2("form(to=planning, form=permit_application, lot=lot-00, structure_type=park)");
+  for (const p of ['form(form="permit application", lot=lot-00, structure_type=park)', 'form(form="the permit application form", lot=lot-00, structure_type=park)', "form(form=permit_application, lot=lot-00, structure_type=park)"]) {
+    const r = run2(p);
+    expect(r.ok && r.blocks).toEqual(exact.ok && exact.blocks);
+  }
+  for (const p of ['form(form="event permit")', 'form(to=planning, form="event permit form")', "form(form=dog_licence, to=planning)"]) {
+    const r = run2(p);
+    expect(!r.ok && r.questions).toEqual(["You haven't seen a form by that name."]);
+  }
+});
