@@ -16,28 +16,63 @@ import { join } from "node:path";
 import type { ContentBlock, LlmAdapter, LlmMessage, LlmRequest, LlmResponse } from "./adapter";
 import { UsageLimitReached } from "./call";
 
-/** What the Codex CLI says when the subscription's usage limit is reached, or when its own retries on rate limits give
- * up: either way, no call will go through for a while. */
-const LIMITED = /usage limit|usage_limit|hit your limit|limit reached|rate limit|too many requests|\b429\b/i;
+/** What the Codex CLI says when the subscription's usage limit is reached ("You've hit your usage limit",
+ * "usage_limit_reached"), or when its own retries on rate limits give up ("rate limit", "429 Too Many Requests"): either
+ * way, no call will go through for a while. Only those: some other limit reached (a context window's, an output's) is an
+ * ordinary failure, retried and then reported, not a reason to stop the run. */
+export const LIMITED = /usage[ _-]?limit|rate[ _-]?limit|too many requests|\b429\b/i;
 
 /** Runs the codex binary: args, stdin and a working directory in; stdout out; ended if it takes longer than
  * `timeoutMs`. Injectable for tests. */
 export type CodexRunner = (args: string[], stdin: string, cwd: string, timeoutMs: number) => Promise<{ code: number; stdout: string; stderr: string; timedOut?: boolean }>;
 
-export const spawnCodex: CodexRunner = async (args, stdin, cwd, timeoutMs) => {
-  const p = Bun.spawn(["codex", ...args], { cwd, stdin: new Blob([stdin]), stdout: "pipe", stderr: "pipe" });
+/** A stream's text as it arrives, so that what came is kept if we stop waiting for the rest. */
+function collect(stream: ReadableStream<Uint8Array>): { text: () => string; done: Promise<void>; stop: () => void } {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  const done = (async () => {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+    }
+  })().catch(() => {});
+  return { text: () => text, done, stop: () => void reader.cancel().catch(() => {}) };
+}
+
+/**
+ * Runs a command with a time limit that holds whatever the command does. At `timeoutMs` it's asked to end (TERM); if
+ * it's still there `graceMs` later it's killed (KILL); and `drainMs` after that we stop waiting, for it and for its
+ * output (something it started may still hold the pipes open), and return what came. So a stuck child can't hang a call.
+ */
+export async function runBounded(cmd: string[], stdin: string, cwd: string, timeoutMs: number, graceMs = 5000, drainMs = 1000): Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean }> {
+  const p = Bun.spawn(cmd, { cwd, stdin: new Blob([stdin]), stdout: "pipe", stderr: "pipe" });
+  const out = collect(p.stdout);
+  const err = collect(p.stderr);
   let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    p.kill();
-  }, timeoutMs);
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const gaveUp = new Promise<void>((resolve) => {
+    timers.push(setTimeout(() => {
+      timedOut = true;
+      p.kill();
+      timers.push(setTimeout(() => {
+        p.kill("SIGKILL");
+        timers.push(setTimeout(resolve, drainMs));
+      }, graceMs));
+    }, timeoutMs));
+  });
   try {
-    const [code, stdout, stderr] = await Promise.all([p.exited, new Response(p.stdout).text(), new Response(p.stderr).text()]);
-    return { code, stdout, stderr, timedOut };
+    await Promise.race([Promise.all([p.exited, out.done, err.done]), gaveUp]);
+    return { code: p.exitCode ?? 137, stdout: out.text(), stderr: err.text(), timedOut };
   } finally {
-    clearTimeout(timer);
+    for (const t of timers) clearTimeout(t);
+    out.stop();
+    err.stop();
   }
-};
+}
+
+export const spawnCodex: CodexRunner = (args, stdin, cwd, timeoutMs) => runBounded(["codex", ...args], stdin, cwd, timeoutMs);
 
 /**
  * The answer's shape: the main tool use (exactly one, as a tool-using API would force), any further uses alongside it
@@ -80,12 +115,13 @@ export function codexPrompt(req: LlmRequest): string {
     "",
     "=== Instructions ===",
     req.system,
-    ...(tools ? ["", "=== Tools you can use (one per answer) ===", tools] : []),
+    ...(tools ? ["", "=== Tools you can use ===", tools] : []),
     "",
     "=== Conversation so far ===",
     transcript(req.messages),
     "",
-    tools ? "=== Your answer ===\nChoose one tool and give its input as a JSON object in input_json. Any other tool used alongside it (such as your notebook) goes in `also`." : "=== Your answer ===\nAnswer in text.",
+    // (How many tools an answer may use is the instructions' to say: a participant's say several, the translator's one.)
+    tools ? "=== Your answer ===\nGive the tool you use in `tool`, with its input as a JSON object in input_json. If you use more than one tool in this answer, as your instructions allow, the first goes in `tool` and every other one in `also`, each with its own input_json, in the order they're to be carried out. With only the one, leave `also` empty." : "=== Your answer ===\nAnswer in text.",
   ].join("\n");
 }
 

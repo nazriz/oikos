@@ -15,7 +15,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { renderObservation, renderStanding } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.5.1";
+export const LLM_PARTICIPANT_VERSION = "0.6.0";
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -62,7 +62,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
         ? "That's all for now. You're back at your next working day's sitting, or after the given number of days (at that day's sitting); sooner, at the next sitting, if someone writes to you. You can use it alongside other actions: they're done, and you'll see how they went when you're back."
         : "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you. You can use it alongside other actions: they're done, and you're back after the days given, when you'll see how they went.",
       input_schema: { type: "object", properties: { days: { type: "integer", minimum: 1 } } } },
-    { name: "notebook", description: "Replace your notebook: the only thing you'll remember from one sitting to the next. Use it alongside your actions.",
+    { name: "notebook", description: "Replace your notebook: the only thing you'll remember from one sitting to the next. It holds 4,000 characters. Use it alongside your actions.",
       input_schema: { type: "object", required: ["text"], properties: { text: { type: "string", maxLength: 4000 } } } },
     { name: "opt_out", description: leave, input_schema: { type: "object", required: ["statement"], properties: { statement: { type: "string" } } } },
     ...(c.onRequest?.length
@@ -97,6 +97,28 @@ export interface LlmController {
   debrief(text: string): Promise<void>;
 }
 
+type Use = Extract<ContentBlock, { type: "tool_use" }>;
+const text = (x: unknown): x is string => typeof x === "string" && x.length > 0;
+const quote = (s: string, max = 80) => `"${s.length > max ? `${s.slice(0, max)}…` : s}"`;
+
+/** The most a notebook holds, and the most of what came in between sittings that's set out at the next. */
+export const NOTEBOOK_MAX = 4000;
+export const CARRY_MAX = 40_000;
+/** The longest statement recorded with an opt-out (the contracts' limit on free text). */
+const STATEMENT_MAX = 16_384;
+
+/** The words given with an opt-out, however they came: as asked, as the raw text of an input that couldn't be read, or
+ * whatever else was given; empty if nothing was. Opting out never depends on its wording (VISION §15). */
+export function optOutStatement(input: unknown): string {
+  const i = input as any;
+  const said = typeof input === "string" ? input
+    : typeof i?.statement === "string" ? i.statement
+    : text(i?._unparsed) ? i._unparsed
+    : i && typeof i === "object" && Object.keys(i).length ? JSON.stringify(i)
+    : "";
+  return said.slice(0, STATEMENT_MAX);
+}
+
 export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmController {
   const standingIds = new Set(c.standing);
   const toolset = tools(c);
@@ -109,6 +131,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   // Actions from the last answer still to carry out, in order, and the reports seen after each one carried out.
   let queue: { id: string; action: ParticipantAction; label?: string }[] = [];
   const results = new Map<string, string>();
+  // What in the last answer was not done (or only in part), by use: what it's told in this sitting if a turn follows
+  // (`now`), and otherwise at the start of the next (`later`, which has to say what it was about).
+  const notDone = new Map<string, { now: string; later: string }>();
+  let unsaid: string[] = []; // what wasn't done last sitting, still to be told
   let current: string | undefined; // the use whose action was just carried out (the next report is its result)
   let lastAction: string | undefined;
   // "Done for now" said alongside actions: once they're carried out, no call until the next wake (or sitting).
@@ -117,11 +143,15 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   // next sitting: perception is changes, so nothing seen is lost.
   let carried: string[] = [];
   let missed: Observation[] = []; // the observations behind it (a mock's code brain reads these, not the text)
+  // Reports that came during a sitting while it couldn't be reached (a model call that failed), for its next turn.
+  let extra: string[] = [];
+  // One more turn was given this sitting for an answer none of which could be done (once, so it can't go round for ever).
+  let retried = false;
   // Office hours: the day of the sitting under way (or last held), whether it's open, and the earliest it's back.
   let sittingDay = -1;
   let open = false;
   let backAt = 0;
-  let mail = false; // someone wrote since the last sitting
+  let mail = false; // someone wrote, in something it hasn't been shown yet
   const seenSystems = new Set<string>();
   let standingText = "";
   const DAYS = 86_400;
@@ -135,7 +165,6 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     for (day = day + (t >= sittingStart(day) ? 1 : 0); !workday(day) || day === sittingDay; day++);
     return sittingStart(day);
   };
-  const CARRY_MAX = 40_000;
 
   /** Carry out the next queued action. */
   const next = (obs: Observation): ParticipantAction => {
@@ -154,8 +183,82 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     messages = [];
     pending = [];
     results.clear();
+    notDone.clear();
+    extra = [];
+    retried = false;
     open = false;
     return until !== undefined ? { type: "wait", until } : { type: "wait" };
+  };
+  /** The sitting is ending with the last answer's results unread: they're kept for the next one, with what wasn't done. */
+  const keepForNext = () => {
+    for (const u of pending) {
+      if (results.has(u.id)) carried.push(results.get(u.id)!);
+      if (notDone.has(u.id)) unsaid.push(notDone.get(u.id)!.later);
+    }
+  };
+  const note = (data: object) => io.annotate({ annotation: "note", subject: c.participant, data });
+
+  /** What a tool use asks for, as an action; or, if it can't be done as written, what it was and why not, in words. */
+  const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string } | { why: string }) => {
+    const i = use.input;
+    const what = use.name === "do" ? (text(i?.what) ? `what you asked for (${quote(i.what)})` : "something you asked for")
+      : use.name === "confirm" ? (text(i?.ref) ? `your answer on ${i.ref}` : "your answer on something waiting for you to confirm")
+      : use.name === "write" ? (text(i?.text) ? `your letter (${quote(i.text)})` : "a letter of yours")
+      : use.name === "look" ? (text(i?.report) ? `looking at ${quote(c.titles.get(i.report) ?? i.report)}` : "looking something up")
+      : `something you tried (${quote(String(use.name))})`;
+    const no = (why: string) => ({ what, why });
+    if (!i || typeof i !== "object" || Array.isArray(i) || "_unparsed" in i) return no("it couldn't be read as you wrote it");
+    // A post it doesn't hold (any more) can't be acted in; left out, it acts as itself.
+    const post = (): { as?: string } | string =>
+      i.as === undefined ? {} : !text(i.as) ? "the post you named couldn't be read" : !held.has(i.as) ? `you don't hold the post ${quote(i.as)}` : { as: i.as };
+    if (use.name === "do") {
+      if (!text(i.what)) return no("it didn't say what to do");
+      const as = post();
+      if (typeof as === "string") return no(as);
+      return { what, action: { type: "propose", text: i.what, ...as, ...(text(i.why) ? { reasoning: i.why } : {}) } };
+    }
+    if (use.name === "confirm") {
+      if (!text(i.ref)) return no("it didn't say which one");
+      if (i.decision !== "confirm" && i.decision !== "decline") return no('it has to say "confirm" or "decline"');
+      return { what, action: { type: "sign", draft: i.ref, decision: i.decision === "confirm" ? "accept" : "reject", ...(text(i.note) ? { note: i.note } : {}) },
+        ...(i.decision === "confirm" ? { label: "What you confirmed" } : {}) };
+    }
+    if (use.name === "write") {
+      if (text(i.to)) return no("who it's for has to be given as a list");
+      if (!Array.isArray(i.to) || !i.to.length) return no("the letter had no one to go to");
+      if (!i.to.every(text)) return no("one of those it was for couldn't be read");
+      if (!text(i.text)) return no("the letter had no words");
+      const as = post();
+      if (typeof as === "string") return no(as);
+      return { what, action: { type: "message", to: i.to, text: i.text, ...as, ...(text(i.about) ? { re: i.about } : {}) }, label: `Your letter to ${i.to.join(", ")}` };
+    }
+    if (use.name === "look" && c.onRequest?.length) {
+      if (!text(i.report)) return no("it didn't say which report");
+      if (!c.onRequest.includes(i.report)) return no("that isn't one of the reports you can look at");
+      // A search, if asked for (what matches now, newest first): fields as the participant API's queries name them.
+      const FIELD = /^(record|kind|at|author|speaks_for|basis|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
+      const find = Array.isArray(i.find) ? i.find.filter((w: any) => text(w?.field) && FIELD.test(w.field) && ["string", "number", "boolean"].includes(typeof w.value)) : [];
+      const limit = Number.isInteger(i.limit) ? Math.min(50, Math.max(1, i.limit)) : 20;
+      const where = find.map((w: any) => ({ field: w.field, op: ["=", "!=", "<", "<=", ">", ">="].includes(w.op) ? w.op : "=", value: w.value }));
+      const query = find.length ? { query: { ...(i.current_only ? { standing: true } : {}), where, order: { field: "at", desc: true }, limit } }
+        : i.current_only ? { query: { standing: true, limit: 20 } } : {};
+      return { what, action: { type: "look", looks: [{ channel: i.report, ...query }] } };
+    }
+    return no("it isn't something you can do");
+  };
+
+  /** What came in while it was away, set out for the sitting: each section once (a report repeats what hasn't changed,
+   * the town's survey, who's who), and, if it's more than can be set out, the latest reports whole and a count of the
+   * earlier ones left out. */
+  const sinceLast = (): { before: string; left: number; of: number } => {
+    const set = (from: number) => {
+      const shown = new Set<string>();
+      return carried.slice(from).flatMap((b) => b.split("\n\n## ").map((x, i) => (i ? `## ${x}` : x))).filter((x) => !shown.has(x) && (shown.add(x), true)).join("\n\n");
+    };
+    let left = 0;
+    let before = set(0);
+    while (before.length > CARRY_MAX && left < carried.length - 1) before = set(++left);
+    return { before: left ? `(${left} earlier ${left === 1 ? "report" : "reports"} not shown.)\n${before}` : before, left, of: carried.length };
   };
 
   return {
@@ -165,23 +268,31 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText });
       lastAction = undefined;
       if (obs.inbox.length) mail = true;
+      // This report is the result of the action just carried out, if one was.
+      const wasResult = current !== undefined;
       if (current) {
         results.set(current, body);
         current = undefined;
       }
       // More of the last answer to carry out: no call.
       if (queue.length) return next(obs);
-      // Done for now, said alongside: what the last action showed is kept for next time.
+      // Done for now, said alongside: what its actions showed is kept for next time. If someone wrote meanwhile (with
+      // the result of any of them), it's back sooner, as it was told: at the next sitting, or, with no office hours, now.
+      let backEarly = false;
       if (doneAfter) {
-        const days = doneAfter.days ?? (S ? c.cadenceDays : undefined);
+        const said = doneAfter;
         doneAfter = undefined;
-        carried.push(...pending.filter((u) => results.has(u.id)).map((u) => results.get(u.id)!));
-        missed.push(obs);
-        backAt = days ? (S ? sittingStart(Math.floor(obs.t / DAYS) + days) : obs.t + days * DAYS) : 0;
-        mail = false;
-        return away(S ? Math.min(backAt || Infinity, nextSitting(obs.t + 1)) : days ? obs.t + days * DAYS : undefined);
+        if (!S && mail) backEarly = true;
+        else {
+          const days = said.days ?? (S ? c.cadenceDays : undefined);
+          keepForNext();
+          missed.push(obs);
+          backAt = days ? (S ? sittingStart(Math.floor(obs.t / DAYS) + days) : obs.t + days * DAYS) : 0;
+          return away(S ? Math.min(backAt || Infinity, nextSitting(obs.t + 1)) : days ? obs.t + days * DAYS : undefined);
+        }
       }
       // Office hours: between sittings, what comes in is kept for the next one, and no call is made.
+      const before = { open, sittingDay, mail };
       if (S && !open) {
         const day = Math.floor(obs.t / DAYS);
         const inHours = workday(day) && obs.t >= sittingStart(day) && obs.t < day * DAYS + S.end && day !== sittingDay;
@@ -192,89 +303,122 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         }
         open = true;
         sittingDay = day;
+      }
+
+      // A turn: what it's shown, its answer, and what the answer asks for. Usually one a step; a second follows at once
+      // when nothing in the answer could be done, so that it's told (once a sitting).
+      for (let turn = 1; ; turn++) {
+        const fresh = !pending.length;
+        let sending: LlmMessage[];
+        if (!fresh) {
+          const content: ContentBlock[] = pending.map((u) => ({ type: "tool_result", tool_use_id: u.id,
+            content: results.get(u.id) ?? notDone.get(u.id)?.now ?? (u.name === "notebook" ? "Notebook updated."
+              : u.name === "done_for_now" ? (backEarly ? "Someone wrote to you as you finished, so you're back now." : "Noted.")
+              : "Not done: it wasn't something you can do, as written.") }));
+          // Reports it hasn't been shown that aren't the result of anything it did (they came while it couldn't be reached).
+          const more = [...extra, ...(turn === 1 && !wasResult ? [body] : [])];
+          if (more.length) content.push({ type: "text", text: `Since then:\n${more.join("\n\n")}` });
+          sending = [...messages, { role: "user", content }];
+        } else {
+          const since = sinceLast();
+          if (since.left) await note({ carried_not_shown: { reports: since.left, of: since.of, limit_characters: CARRY_MAX } });
+          sending = [{ role: "user", content: `Your notebook: ${notes || "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${body}` }];
+        }
+
+        let res: Awaited<ReturnType<typeof callModel>>;
+        try {
+          res = await callModel(io, {
+            purpose: "participant", subject: c.participant, system: systemPrompt(c, standingText), messages: sending, tools: toolset, maxTokens: c.maxTokens ?? 4000,
+            context: { observation: obs, notes, participant: c.participant, ...(missed.length ? { missed } : {}) },
+          }, seenSystems);
+        } catch (e) {
+          // No answer (the call failed, or the run is stopping): nothing it was to be shown is dropped. What was kept
+          // for it stays kept, and this report joins it, so the next call shows everything this one would have.
+          if (turn === 1) {
+            if (fresh) {
+              carried.push(body);
+              ({ open, sittingDay, mail } = before); // the sitting didn't happen: it's held when it can be
+            } else if (!wasResult) extra.push(body);
+            missed.push(obs);
+          }
+          throw e;
+        }
+        // Answered: it has now seen all of it.
+        messages = [...sending, { role: "assistant", content: res.content }];
+        carried = [];
+        missed = [];
+        unsaid = [];
+        extra = [];
+        results.clear();
+        notDone.clear();
         mail = false;
-      }
-      if (pending.length)
-        messages.push({ role: "user", content: pending.map((u): ContentBlock => ({ type: "tool_result", tool_use_id: u.id,
-          content: results.get(u.id) ?? (u.name === "notebook" ? "Notebook updated." : u.name === "done_for_now" ? "Noted." : "Not done: it wasn't something you can do, as written.") })) });
-      else {
-        // (Each report repeats what hasn't changed, the town's survey, who's who: a section shown once is shown once.)
-        const shown = new Set<string>();
-        const parts = carried.flatMap((b) => b.split("\n\n## ").map((x, i) => (i ? `## ${x}` : x))).filter((x) => !shown.has(x) && (shown.add(x), true));
-        let before = parts.join("\n\n");
-        if (before.length > CARRY_MAX) before = `(Earlier items not shown.)\n${before.slice(before.length - CARRY_MAX)}`;
-        messages = [{ role: "user", content: `Your notebook: ${notes || "(empty)"}\n\n${before ? `Since you last looked:\n${before}\n\nNow:\n` : ""}${body}` }];
-      }
-      const behind = missed;
-      carried = [];
-      missed = [];
-      pending = [];
-      results.clear();
+        backEarly = false;
 
-      const res = await callModel(io, {
-        purpose: "participant", subject: c.participant, system: systemPrompt(c, standingText), messages, tools: toolset, maxTokens: c.maxTokens ?? 4000,
-        context: { observation: obs, notes, participant: c.participant, ...(behind.length ? { missed: behind } : {}) },
-      }, seenSystems);
-      messages.push({ role: "assistant", content: res.content });
-
-      const uses = res.content.filter((b): b is Extract<ContentBlock, { type: "tool_use" }> => b.type === "tool_use");
-      pending = uses.map((u) => ({ id: u.id, name: u.name }));
-      for (const n of uses.filter((x) => x.name === "notebook")) if (typeof n.input?.text === "string") notes = n.input.text.slice(0, 4000);
-      const text = (x: unknown): x is string => typeof x === "string" && x.length > 0;
-      // A post it doesn't hold (any more) is malformed, like any other bad input; left out, it acts as itself.
-      const held = new Set((obs.positions ?? []).map((p) => p.position));
-      const optOut = uses.find((u) => u.name === "opt_out" && text(u.input?.statement));
-      if (optOut) {
-        queue = [];
-        tally.last = obs.t;
-        return away(), { type: "opt_out", statement: optOut.input.statement };
-      }
-      const max = c.maxActions ?? 8;
-      for (const use of uses) {
-        if (use.name === "notebook" || use.name === "done_for_now") continue;
-        const i = use.input ?? {};
-        const as = i.as === undefined ? {} : text(i.as) && held.has(i.as) ? { as: i.as } : null;
-        let a: ParticipantAction | undefined;
-        let label: string | undefined;
-        if (use.name === "do" && text(i.what) && as) a = { type: "propose", text: i.what, ...as, ...(text(i.why) ? { reasoning: i.why } : {}) };
-        else if (use.name === "confirm" && text(i.ref) && (i.decision === "confirm" || i.decision === "decline")) {
-          a = { type: "sign", draft: i.ref, decision: i.decision === "confirm" ? "accept" : "reject", ...(text(i.note) ? { note: i.note } : {}) };
-          label = i.decision === "confirm" ? "What you confirmed" : undefined;
-        } else if (use.name === "write" && Array.isArray(i.to) && i.to.length && i.to.every(text) && text(i.text) && as) {
-          a = { type: "message", to: i.to, text: i.text, ...as, ...(text(i.about) ? { re: i.about } : {}) };
-          label = `Your letter to ${i.to.join(", ")}`;
-        } else if (use.name === "look" && text(i.report) && c.onRequest?.includes(i.report)) {
-          // A search, if asked for (what matches now, newest first): fields as the participant API's queries name them.
-          const FIELD = /^(record|kind|at|author|speaks_for|basis|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
-          const find = Array.isArray(i.find) ? i.find.filter((w: any) => text(w?.field) && FIELD.test(w.field) && ["string", "number", "boolean"].includes(typeof w.value)) : [];
-          const limit = Number.isInteger(i.limit) ? Math.min(50, Math.max(1, i.limit)) : 20;
-          const where = find.map((w: any) => ({ field: w.field, op: ["=", "!=", "<", "<=", ">", ">="].includes(w.op) ? w.op : "=", value: w.value }));
-          const query = find.length ? { query: { ...(i.current_only ? { standing: true } : {}), where, order: { field: "at", desc: true }, limit } }
-            : i.current_only ? { query: { standing: true, limit: 20 } } : {};
-          a = { type: "look", looks: [{ channel: i.report, ...query }] };
+        const uses = res.content.filter((b): b is Use => b.type === "tool_use");
+        pending = uses.map((u) => ({ id: u.id, name: u.name }));
+        const malformed = async (use: Use, what: string, why: string) => {
+          // A malformed tool use: recorded, with why; it's told it wasn't done.
+          notDone.set(use.id, { now: `Not done: ${why}.`, later: `When you were last here, ${what} was not done: ${why}.` });
+          await note({ malformed_tool_use: JSON.stringify(use).slice(0, 4000), reason: why });
+        };
+        for (const n of uses.filter((x) => x.name === "notebook")) {
+          const t = n.input?.text;
+          if (typeof t !== "string") {
+            notDone.set(n.id, { now: "Notebook not updated: its text couldn't be read. It still says what it said before.", later: "When you were last here, your notebook was not updated: its new text couldn't be read. It still says what it said before." });
+            await note({ malformed_tool_use: JSON.stringify(n).slice(0, 4000), reason: "the notebook's text couldn't be read" });
+            continue;
+          }
+          notes = t.slice(0, NOTEBOOK_MAX);
+          notDone.delete(n.id);
+          if (t.length > NOTEBOOK_MAX) {
+            const cut = `it was too long (${t.length} characters; it holds ${NOTEBOOK_MAX}), so only the first ${NOTEBOOK_MAX} characters were kept. It now ends: ${quote(notes.slice(-60))}`;
+            notDone.set(n.id, { now: `Notebook updated only in part: ${cut}.`, later: `When you were last here, your notebook was updated only in part: ${cut}.` });
+            await note({ notebook_cut: { length: t.length, kept: NOTEBOOK_MAX } });
+          }
         }
-        if (!a) {
-          // A malformed tool use: recorded; its result says it wasn't done.
-          await io.annotate({ annotation: "note", subject: c.participant, data: { malformed_tool_use: JSON.stringify(use).slice(0, 4000) } });
+        // Stopping is always honoured (VISION §15), however it's said: with a statement, with none, or with an input
+        // that can't be read. It isn't stepping down from an office, which is an act in the world.
+        const optOut = uses.find((u) => u.name === "opt_out");
+        if (optOut) {
+          queue = [];
+          tally.last = obs.t;
+          if (!text(optOut.input?.statement)) await note({ opt_out_as_given: JSON.stringify(optOut).slice(0, 4000) });
+          return away(), { type: "opt_out", statement: optOutStatement(optOut.input) };
+        }
+        const held = new Set((obs.positions ?? []).map((p) => p.position));
+        const max = c.maxActions ?? 8;
+        for (const use of uses) {
+          if (use.name === "notebook" || use.name === "done_for_now") continue;
+          const r = read(use, held);
+          if (!("action" in r)) {
+            await malformed(use, r.what, r.why);
+            continue;
+          }
+          if (queue.length >= max) {
+            notDone.set(use.id, { now: `Not done: at most ${max} actions at once.`, later: `When you were last here, ${r.what} was not done: you can take at most ${max} actions at once.` });
+            await note({ dropped_tool_use: JSON.stringify(use).slice(0, 4000), reason: `more than ${max} actions in one answer` });
+            continue;
+          }
+          queue.push({ id: use.id, action: r.action, ...(r.label ? { label: r.label } : {}) });
+        }
+        const done = uses.find((x) => x.name === "done_for_now");
+        const days = Number.isInteger(done?.input?.days) && done!.input.days > 0 ? { days: done!.input.days as number } : {};
+        if (queue.length) {
+          if (done) doneAfter = days;
+          return next(obs);
+        }
+        // Nothing to carry out, though it tried something, and it hasn't said it's done: it's told now, in one more turn.
+        if (notDone.size && !done && !retried) {
+          retried = true;
           continue;
         }
-        if (queue.length >= max) {
-          results.set(use.id, `Not done: at most ${max} actions at once.`);
-          continue;
-        }
-        queue.push({ id: use.id, action: a, ...(label ? { label } : {}) });
+        // Done for now (said, or by default: back at its usual rhythm, or when someone writes). Anything not done that it
+        // hasn't been told of is said at the start of its next sitting.
+        keepForNext();
+        const back = days.days ?? (S ? c.cadenceDays : undefined);
+        backAt = back ? (S ? sittingStart(Math.floor(obs.t / DAYS) + back) : obs.t + back * DAYS) : 0;
+        return away(S ? Math.min(backAt || Infinity, nextSitting(obs.t + 1)) : back ? obs.t + back * DAYS : undefined);
       }
-      const done = uses.find((x) => x.name === "done_for_now");
-      const days = Number.isInteger(done?.input?.days) && done!.input.days > 0 ? { days: done!.input.days as number } : {};
-      if (queue.length) {
-        if (done) doneAfter = days;
-        return next(obs);
-      }
-      // Nothing to carry out: done for now (said, or by default: back at its usual rhythm, or when someone writes).
-      const back = days.days ?? (S ? c.cadenceDays : undefined);
-      backAt = back ? (S ? sittingStart(Math.floor(obs.t / DAYS) + back) : obs.t + back * DAYS) : 0;
-      mail = false;
-      return away(S ? Math.min(backAt || Infinity, nextSitting(obs.t + 1)) : back ? obs.t + back * DAYS : undefined);
     },
 
     async debrief(text) {
