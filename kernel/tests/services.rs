@@ -217,3 +217,34 @@ fn goods_are_taken_and_investigation_finds_the_taker_with_its_chance() {
     // Not an investigation: refused.
     assert_eq!(act(&mut run, "carol-self", None, json!([{"block": "work", "task": "mend", "units": 1, "at": "s-shop", "performers": ["carol"], "investigate": {"from": "alice", "at": "s-house", "kind": "goods"}}])), Err(RefusalCode::BadInvestigation));
 }
+
+/// Two investigations in one action are two tries, each with its own draw: keyed by the block as well as the action,
+/// as harm is. (Until 2026-10-05 they shared the action's one draw: both found the taker, or neither.)
+#[test]
+fn two_investigations_in_one_action_draw_independently() {
+    let mut w = services_world();
+    w["catalogue"]["tasks"].as_array_mut().unwrap().push(json!({"id": "ask_around", "labour": 600, "in": "workplace", "investigates": true, "detection_bps": 5000}));
+    let mut run = start(&w);
+    act(&mut run, "bob-self", None, json!([{"block": "occupy", "space": "s-house/dwelling.1"}])).unwrap();
+    act(&mut run, "bob-self", None, json!([{"block": "take", "kind": "goods", "quantity": "3", "from": "alice", "at": "s-house"}])).unwrap();
+    let ask = json!({"block": "work", "task": "ask_around", "units": 1, "at": "s-shop", "performers": ["carol"], "investigate": {"from": "alice", "at": "s-house", "kind": "goods"}});
+    let (mut differ, mut found_some, mut found_none) = (0, 0, 0);
+    for day in 1..=24 {
+        advance(&mut run, day * DAY);
+        let cmd = direct("carol-self", None, serde_json::from_value(json!([ask.clone(), ask.clone()])).unwrap()).unwrap();
+        step(&mut run, &cmd).unwrap();
+        let o = run.command(&Command::Observe { participant: "carol-self".into(), only: None }).unwrap().observation.unwrap();
+        let o = serde_json::to_value(&o).unwrap();
+        let outcome = o["outcomes"].as_array().unwrap().last().unwrap().clone();
+        let action = outcome["action"].as_str().unwrap();
+        // Each block's own draw: the taker is found with the task's chance, 5,000 in 10,000.
+        let finds = |index: &str| run.kernel().statics().randomness.stream(&["investigate", action, index]).below(10_000) < 5_000;
+        let (first, second) = (finds("0"), finds("1"));
+        // The outcome carries the action's last investigation: the second block's.
+        assert_eq!(outcome["investigated"]["taker"], if second { json!("bob") } else { json!(null) }, "day {day}, {action}");
+        differ += usize::from(first != second);
+        found_some += usize::from(second);
+        found_none += usize::from(!second);
+    }
+    assert!(differ > 0 && found_some > 0 && found_none > 0, "the two tries differ on some days ({differ}), and each way happens ({found_some}, {found_none})");
+}

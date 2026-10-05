@@ -800,7 +800,7 @@ impl<'a> Exec<'a> {
     /// that they're there, alive, and have time left today; that the inputs are held there; that what's worked on can
     /// be. Who works for whom is content (D20).
     #[allow(clippy::too_many_arguments)]
-    fn work(&mut self, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>, survey: Option<&crate::blocks::Survey>, investigate: Option<&crate::blocks::Investigate>) -> R<()> {
+    fn work(&mut self, index: usize, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>, survey: Option<&crate::blocks::Survey>, investigate: Option<&crate::blocks::Investigate>) -> R<()> {
         use crate::config::{TASK_BUILD, TASK_DEMOLISH};
         let (at, on) = (self.r(at)?, self.ro(on)?);
         let builtin = task == TASK_BUILD || task == TASK_DEMOLISH;
@@ -1018,14 +1018,17 @@ impl<'a> Exec<'a> {
             }
         }
         if let Some(sv) = survey {
-            self.surveyed = Some(self.survey_estimates(sv));
+            self.surveyed = Some(self.survey_estimates(sv, index));
         }
         // What it finds: the latest such taking, and who did it, with the task's chance (to the actor only).
         if let Some(iv) = investigate {
             let (from, at) = (self.r(&iv.from)?, self.r(&iv.at)?);
             let found = self.st.takings.iter().rev().find(|x| x.from == from && x.at == at && x.kind == iv.kind).cloned();
             let chance = spec.as_ref().map_or(0, |x| x.detection_bps);
-            let mut rng = self.s.randomness.stream(&["investigate", self.action]);
+            // (Keyed by the block as well as the action, as harm is: two investigations in one action draw
+            // independently. Until 2026-10-05 they shared the action's one draw.)
+            let idx = index.to_string();
+            let mut rng = self.s.randomness.stream(&["investigate", self.action, &idx]);
             let taker = found.as_ref().filter(|_| rng.below(10_000) < chance as u64).map(|x| x.by.clone());
             self.investigated = Some(serde_json::json!({ "from": from, "at": at, "kind": iv.kind, "taken": found.is_some(), "taker": taker }));
         }
@@ -1101,11 +1104,13 @@ impl<'a> Exec<'a> {
 
     /// What a survey finds: for a species, each one in the cell found with its detection chance; for a field, the value
     /// with an error of up to (10,000 - detection) basis points (the survey task's own figure isn't needed: the species'
-    /// or, for a field, 9,000). Drawn from the action's keyed randomness.
-    fn survey_estimates(&self, sv: &crate::blocks::Survey) -> Value {
+    /// or, for a field, 9,000). Drawn from the action's keyed randomness, by the block (two surveys of the same thing in
+    /// one action draw independently; until 2026-10-05 they shared the action's draws).
+    fn survey_estimates(&self, sv: &crate::blocks::Survey, index: usize) -> Value {
         let cat = &self.s.config.catalogue;
         let nature = self.st.nature.as_deref();
-        let mut rng = self.s.randomness.stream(&["survey", self.action, &sv.of]);
+        let idx = index.to_string();
+        let mut rng = self.s.randomness.stream(&["survey", self.action, &idx, &sv.of]);
         let species = cat.species.iter().find(|x| x.id == sv.of);
         let mut found = serde_json::Map::new();
         for cell in &sv.cells {
@@ -1587,7 +1592,7 @@ impl<'a> Exec<'a> {
                 Ok(())
             }
 
-            Block::Work { task, units, at, performers, on, survey, investigate } => self.work(task, *units, at, performers, on, survey.as_ref(), investigate.as_ref()),
+            Block::Work { task, units, at, performers, on, survey, investigate } => self.work(index, task, *units, at, performers, on, survey.as_ref(), investigate.as_ref()),
 
             Block::Occupy { space, who } => {
                 let space = self.r(space)?;
