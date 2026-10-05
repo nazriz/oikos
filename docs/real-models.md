@@ -37,10 +37,11 @@ oikos run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claude-so
 oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/translator-eval.json
 ```
 
-- 26 plain-language requests (`translator/eval/cases.ts`), each with the call it should become, or the refusal it should get.
-- Six are **held out**: phrased unlike the call language's own examples. They must never be used to tune the prompt or train a model.
-- The report gives seen and held-out pass rates, and what failed.
+- 55 plain-language requests in the repository (`translator/eval/cases.ts`), each with the call it should become, or the refusal it should get. All of them are **seen**: they may be read and tuned on.
+- The **held-out** cases are not in the repository (`translator/eval/held-out.ts` says why): 60 of them, in a file on the run server. They must never be read while working on the prompt, used to train a model, or quoted anywhere. The command runs them where the machine has them, and reports each by its id, its outcome and the shape of what was wanted and what came back, nothing more.
+- The report gives seen and held-out results three ways (right, no draft, wrong draft), and says so if a held-out case shares wording with the prompt.
 - VISION §14: a translation model is adopted only if it passes a held-out set that includes novel requests. What "passes" means (a threshold) is for Naz to set, before the first real run.
+- **The held-out figures further down this page (55%, 59%, 62%) are from the first held-out set, which had leaked into the prompt by the last of them** (docs/decisions.md, 2026-10-05). Read them as seen-case figures.
 
 ## A ChatGPT subscription, through the Codex CLI
 

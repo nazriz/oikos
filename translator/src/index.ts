@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.5.0";
+export const TRANSLATOR_VERSION = "0.5.1";
 
 export interface TranslatorId {
   id: string;
@@ -174,6 +174,20 @@ export function draftHash(d: Draft): string {
  * this package's, from the request's knowledge. */
 export type ResolveFn = (req: TranslateRequest, program: calls.Program) => Promise<Resolution>;
 
+/**
+ * What the participant is told when its words couldn't be turned into acts and the fault isn't in the words: no call
+ * came back, the call wasn't in the call language, or it was put together wrongly. Until 2026-10-05 all of these, and
+ * a failed dry run, read "It isn't clear what should happen. Could you say it more plainly?": the participant was
+ * blamed for its wording, and the log couldn't tell them apart. What went wrong is in the failure's `invalid`.
+ */
+export const NOT_PUT = "That couldn't be put into effect as it was said, and nothing was done. You could say it again, or another way.";
+/** The acts were worked out, and checking them failed (not a refusal: the check itself). */
+export const NOT_CHECKED = "That couldn't be put into effect, and nothing was done. Saying it another way may not help.";
+
+/** Resolver answers that are about how the call was put together (an argument of the wrong shape), not about anything
+ * the participant said or knows: the call is at fault, so it's tried again, and the participant never reads these. */
+const MALFORMED = /should name something, not (data|a call)\.$|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|\(then=periodic\)/;
+
 /** Resolver questions another attempt at the call could fix (a name it didn't recognise, a refusal's own text). */
 const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name/;
 
@@ -184,15 +198,16 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
   /** One answer, resolved and checked. `final`: a failure that another attempt can't help (the world, not the call). */
   async function attempt(req: TranslateRequest, out: { input?: any } | undefined, raw: unknown): Promise<{ ok: true; draft: Draft; hash: string } | (Failure & { final?: boolean })> {
     const text = typeof out?.input?.program === "string" ? out.input.program : undefined;
-    if (!text) return { ok: false, notices: [LABEL_TEXT.unclear], raw };
+    if (!text) return { ok: false, notices: [NOT_PUT], raw, invalid: ["no call came back"] };
     let program: calls.Program;
     try {
       program = calls.parseProgram(text);
-    } catch {
-      return { ok: false, notices: [LABEL_TEXT.unclear], call: text };
+    } catch (e) {
+      return { ok: false, notices: [NOT_PUT], call: text, invalid: [`not in the call language: ${String((e as Error).message).slice(0, 300)}`] };
     }
     const call = calls.programText(program);
     const r = resolver ? await resolver(req, program) : resolve(program, req.knowledge, typeOf, req.as);
+    if (!r.ok && r.questions.some((q) => MALFORMED.test(q))) return { ok: false, notices: [NOT_PUT], call, invalid: [...(r.invalid ?? []), ...r.questions] };
     // A question another attempt can't answer (which account? which cell?) goes to the participant as it is: the call
     // was right, and something isn't known. Another attempt helps only where the call itself is the trouble: it's
     // invalid, a refusal, or names something by a name nobody has (2026-10-03: asked again after "which account?",
@@ -200,7 +215,7 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
     const retryable = !!r.ok || !!(r as any).invalid || "none" in program || (r as any).questions.some((q: string) => RETRYABLE.test(q));
     if (!r.ok) return { ok: false, notices: r.questions, call, ...(r.invalid ? { invalid: r.invalid } : {}), ...(retryable ? {} : { final: true }) };
     const k = await check(req.participant, req.as, r.blocks);
-    if (k.error) return { ok: false, notices: [LABEL_TEXT.unclear], call, final: true };
+    if (k.error) return { ok: false, notices: [NOT_CHECKED], call, invalid: [`the check failed: ${String(k.error).slice(0, 500)}`], final: true };
     const warnings = lawWarnings(r.blocks, req.knowledge, typeOf, req.as);
     const draft: Draft = {
       id: req.draftId, participant: req.participant, ...(req.as ? { as: req.as } : {}), proposal: req.proposal.slice(0, 16384), call, resolver: RESOLVER,
@@ -226,9 +241,11 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
           const { final: _, ...t } = r as Failure & { final?: boolean };
           return { ...(r.ok ? r : t), ...(retries.length ? { retries } : {}) };
         }
-        retries.push({ ...(r.call ? { call: r.call } : {}), reason: r.notices.join(" ") });
+        // What went wrong, for the record and for the next attempt: the call's own fault where there is one.
+        const reason = (r.invalid?.length ? r.invalid : r.notices).join(" ");
+        retries.push({ ...(r.call ? { call: r.call } : {}), reason });
         // Feedback in the same exchange: the answer, then what went wrong with it.
-        const feedback = `That didn't work: ${r.notices.join(" ")}${r.call ? ` (your call: ${r.call})` : ""}. Read the request again, and write it as a call if any call can say it: a name exactly as the request wrote it, in quotes; an argument left out if it isn't given. Answer none(...) only if no call can.`;
+        const feedback = `That didn't work: ${reason}${r.call ? ` (your call: ${r.call})` : ""}. Read the request again, and write it as a call if any call can say it: a name exactly as the request wrote it, in quotes; an argument left out if it isn't given. Answer none(...) only if no call can.`;
         messages.push({ role: "assistant", content: res.content });
         messages.push(out ? { role: "user", content: [{ type: "tool_result", tool_use_id: out.id, content: feedback }] } : { role: "user", content: feedback });
       }

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { MockAdapter } from "@oikos/participants/llm";
-import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, translatorContext, translatorSystem } from "../src/index";
+import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, NOT_CHECKED, NOT_PUT, translatorContext, translatorSystem } from "../src/index";
 
 const law = { id: "law-planning", record: "statement", author: "genesis", at: 0, visible_to: "public", kind: "law", text: "No building without a permit.",
   adico: { deontic: "must_not" }, formal: { language: "cel", condition: "block.block == 'construct' && !holds_liberty(actor, 'build', block.lot)" } } as any;
@@ -29,7 +29,10 @@ test("law warnings flag an act that a known prohibition's formal condition match
 
 test("an unreadable answer, or a question from the resolver, comes back as notices", async () => {
   const bad = await createTranslator(io("pay(to=x)"), ok, () => ({ footprint: { w: 2, h: 1 } })).translate({ draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "p", knowledge: knows() });
-  expect(bad).toMatchObject({ ok: false, notices: ["It isn't clear what should happen. Could you say it more plainly?"] });
+  // Not in the call language: the translator's doing, not the wording's, and the participant is told as much. What
+  // went wrong is on the failure, for the log.
+  expect(bad).toMatchObject({ ok: false, notices: [NOT_PUT], call: "pay(to=x)" });
+  expect((bad as any).invalid[0]).toStartWith("not in the call language:");
   const ask = await createTranslator(io("structure(type=park, on=p1)"), ok, () => ({ footprint: { w: 2, h: 1 } })).translate({ draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "Build a park on p1.", knowledge: knows() });
   expect(ask).toMatchObject({ ok: false, notices: ["Who should build a park on p1?"] });
 });
@@ -81,4 +84,31 @@ test("a request the translator can't turn into a working call is tried once more
   asked.length = 0;
   await createTranslator(scripted(["none(unclear)", "none(unclear)", "none(unclear)"]), ok, () => undefined).translate({ draftId: "d3", participant: "mayor-system", proposal: "?", knowledge: knows() });
   expect(asked).toHaveLength(2);
+});
+
+test("a call put together wrongly, no call at all, and a check that fails are told apart: to the participant, and on record", async () => {
+  const req = { draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "p", knowledge: knows() };
+  const type = () => ({ footprint: { w: 2, h: 1 } });
+  // An argument of the wrong shape (a list of data where ids go): the call is at fault. It's tried again, and the
+  // participant never reads the resolver's words about arguments.
+  let asked = 0;
+  const feedback: string[] = [];
+  const wrongShape = { adapter: new MockAdapter("mock", { translator: (r) => {
+    if (asked++) feedback.push(JSON.stringify(r.messages.at(-1)));
+    return [{ type: "tool_use", id: "1", name: "call", input: { program: 'statement(kind=notice, text="Hello.", visible={"a":1})' } }];
+  } }), annotate: async () => {}, now: () => 0 };
+  const shaped = await createTranslator(wrongShape, ok, type).translate(req);
+  expect(shaped).toMatchObject({ ok: false, notices: [NOT_PUT], invalid: ["visible should be a list of names or ids."] });
+  expect(asked).toBe(2);
+  expect(feedback[0]).toContain("That didn't work: visible should be a list of names or ids.");
+  // No call came back.
+  const silent = { adapter: new MockAdapter("mock", { translator: () => [{ type: "text", text: "I'd rather not." }] }), annotate: async () => {}, now: () => 0 };
+  expect(await createTranslator(silent, ok, type).translate(req)).toMatchObject({ ok: false, notices: [NOT_PUT], invalid: ["no call came back"] });
+  // The acts were worked out and the check of them failed: saying it again won't help, and it isn't tried again.
+  const failing = async () => ({ ok: false, error: "the engine stopped" });
+  const checked = await createTranslator(io('statement(kind=notice, text="Hello.")'), failing, type).translate(req);
+  expect(checked).toMatchObject({ ok: false, notices: [NOT_CHECKED], invalid: ["the check failed: the engine stopped"] });
+  expect((checked as any).retries).toBeUndefined();
+  // A request that really is unclear still reads as before.
+  expect(await createTranslator(io("none(unclear)"), ok, type).translate(req)).toMatchObject({ ok: false, notices: ["It isn't clear what should happen. Could you say it more plainly?"] });
 });

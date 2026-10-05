@@ -36,7 +36,8 @@
 //     The translator corpus: every translation in the logs (proposal, the translator's exchange, call, resolution, dry
 //     run, the participant's decision, what the kernel did), one JSON line each, for training the translator later.
 //   oikos translator-eval --model provider/model [--budget DOLLARS] [--base-url URL] [--out FILE]
-//     The translator's test set (translator/eval/cases.ts) on a real model: seen and held-out pass rates, and cost.
+//     The translator's test set (translator/eval/cases.ts, and the held-out cases where this machine has them) on a real
+//     model: seen and held-out pass rates, and cost.
 //   oikos replay <log.jsonl> [--anchors <anchors.jsonl>]      (the kernel's own replay)
 //   oikos story <log.jsonl> [participant]                     (what a language-model participant did, day by day)
 //
@@ -141,11 +142,15 @@ try {
     await Bun.write(out.replace(/\.json$/, ".calls.jsonl"), annotations.map((a) => JSON.stringify(a)).join("\n") + "\n");
     console.log(`\nReport: ${out}`);
   } else if (cmd === "translator-eval" && flag("model")) {
-    const { evaluate, reportText } = await import("@oikos/translator/eval");
+    // The held-out cases are outside the repository (translator/eval/held-out.ts): with them, their results go out by
+    // id, outcome and shape only, and the full report is written beside them, never into `--out`.
+    const { evaluate, heldOutPath, loadHeldOut, publicReport, reportText } = await import("@oikos/translator/eval");
     const m = chooseModel(flag("model")!, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
-    const r = await evaluate(m.adapter, { prices: m.prices, ...(m.budget ? { budget: m.budget } : {}) });
+    const heldOut = loadHeldOut();
+    const r = await evaluate(m.adapter, { prices: m.prices, ...(m.budget ? { budget: m.budget } : {}), ...(heldOut ? { heldOut } : {}) });
     console.log(reportText(r));
-    if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(r, null, 2));
+    if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(publicReport(r), null, 2));
+    if (heldOut) await Bun.write(join(heldOutPath(), "..", "results", `${r.model.replace(/[^a-z0-9.-]+/gi, "-")}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`), JSON.stringify(r, null, 2));
   } else if (cmd === "dataset" && positional()[0]) {
     // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
     const { logsIn } = await import("./corpus");

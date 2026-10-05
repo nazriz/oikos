@@ -73,7 +73,7 @@ test("4.1: paying someone asks the bank that keeps the account", () => {
   if (!r.ok) throw new Error(r.questions.join(" "));
   expect(r.blocks).toEqual([{ block: "publish", kind: "request", speaks_for: "city", addressed_to: ["bank"], visible_to: ["city", "bank"],
     text: "Please pay $500.00 from acc-city to acc-builder, for the fence.", data: { outcome: { money: { from: "acc-city", to: "acc-builder", amount: "50000", for: "the fence" } } } }]);
-  expect(new Preview(town()).of(r.blocks)).toBe("You will ask Millbrook Bank (bank) to pay $500.00 from your account (acc-city) to acc-builder, for the fence.");
+  expect(new Preview(town()).of(r.blocks)).toBe('You will ask Millbrook Bank (bank) to pay $500.00 from your account (acc-city) to acc-builder, for the fence, seen only by you, Millbrook Bank (bank). Your request will read: "Please pay $500.00 from acc-city to acc-builder, for the fence.".');
 });
 
 test("4.2: a repeating payment is a standing request", () => {
