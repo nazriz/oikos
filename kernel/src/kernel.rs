@@ -226,17 +226,23 @@ impl Kernel {
         self.world.precheck(cmd)
     }
 
+    /// `precheck`, for a caller that has the command's JSON already.
+    pub fn precheck_as(&self, cmd: &Command, body: &Value) -> Result<(), ProtocolError> {
+        self.world.precheck_as(cmd, body)
+    }
+
     pub fn apply(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
+        self.world.precheck(cmd)?;
+        self.apply_prechecked(cmd)
+    }
+
+    /// `apply`, for a caller that has just prechecked this command against the world as it is (nothing done since):
+    /// a run checks a command once, before logging it, and not again to apply it.
+    pub fn apply_prechecked(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         match cmd {
-            Command::Observe { participant, only } => {
-                self.world.precheck(cmd)?;
-                Ok(self.observe(participant, only.as_deref(), &[]))
-            }
-            Command::Look { participant, only, looks } => {
-                self.world.precheck(cmd)?;
-                Ok(self.observe(participant, only.as_deref(), looks))
-            }
-            _ => Ok(Output { events: self.world.apply(cmd)?.events, observation: None, observed: None }),
+            Command::Observe { participant, only } => Ok(self.observe(participant, only.as_deref(), &[])),
+            Command::Look { participant, only, looks } => Ok(self.observe(participant, only.as_deref(), looks)),
+            _ => Ok(Output { events: self.world.apply_prechecked(cmd)?.events, observation: None, observed: None }),
         }
     }
 

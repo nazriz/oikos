@@ -447,8 +447,13 @@ impl World {
     /// rejected before it reaches the log.
     pub fn precheck(&self, cmd: &Command) -> Result<(), ProtocolError> {
         let body = serde_json::to_value(cmd).map_err(|e| ProtocolError(e.to_string()))?;
-        canon::check_integers(&body).map_err(|e| ProtocolError(e.to_string()))?;
-        crate::contracts::check(&crate::contracts::contracts().command, &body).map_err(|e| ProtocolError(format!("command {e}")))?;
+        self.precheck_as(cmd, &body)
+    }
+
+    /// `precheck`, for a caller that has the command's JSON (`serde_json::to_value` of it) already.
+    pub fn precheck_as(&self, cmd: &Command, body: &Value) -> Result<(), ProtocolError> {
+        canon::check_integers(body).map_err(|e| ProtocolError(e.to_string()))?;
+        crate::contracts::check(&crate::contracts::contracts().command, body).map_err(|e| ProtocolError(format!("command {e}")))?;
         let exists = |p: &str| if self.state.participants.contains_key(p) { Ok(()) } else { perr(format!("unknown participant {p}")) };
         match cmd {
             Command::Act { participant, position, thinking, .. } => {
@@ -512,6 +517,11 @@ impl World {
 
     pub fn apply(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         self.precheck(cmd)?;
+        self.apply_prechecked(cmd)
+    }
+
+    /// `apply`, for a caller that has just prechecked this command against the world as it is (nothing done since).
+    pub fn apply_prechecked(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         Ok(match cmd {
             Command::Act { participant, position, blocks, thinking, .. } => self.begin(participant, position.as_deref(), blocks, thinking.unwrap_or(0)),
             Command::Advance { to } => self.advance(*to),

@@ -151,12 +151,14 @@ impl<W: Write> Run<W> {
 
     pub fn command(&mut self, cmd: &Command) -> Result<Response, RunError> {
         self.not_ended()?;
-        self.kernel.precheck(cmd)?;
+        // (Its JSON once, for the check and for the log; checked once, before it's logged: nothing changes the world
+        // between that and applying it.)
+        let body = serde_json::to_value(cmd).map_err(|e| ProtocolError(e.to_string()))?;
+        self.kernel.precheck_as(cmd, &body)?;
         let from = self.kernel.t();
-        let body = serde_json::to_value(cmd).expect("commands serialize");
         let seq = self.log.append(from, Kind::Command, body)?.seq;
         self.observed = None;
-        let Output { events, observation, observed } = self.kernel.apply(cmd)?;
+        let Output { events, observation, observed } = self.kernel.apply_prechecked(cmd)?;
         self.observed = observed;
         let mut logged = Vec::with_capacity(events.len());
         for mut timed in events {
