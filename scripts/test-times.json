@@ -60,6 +60,7 @@
  "participants/test/rng.test.ts": 0.1,
  "participants/test/stepper.test.ts": 0.1,
  "participants/test/tribunal.test.ts": 0.1,
+ "translator/test/eval-pilot.test.ts": 0.1,
  "translator/test/eval.test.ts": 0.1,
  "translator/test/resolver.test.ts": 0.1,
  "translator/test/translator.test.ts": 0.1,

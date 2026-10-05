@@ -39,9 +39,10 @@
 //   oikos corpus <DIR|log.jsonl> [--out FILE]
 //     The translator corpus: every translation in the logs (proposal, the translator's exchange, call, resolution, dry
 //     run, the participant's decision, what the kernel did), one JSON line each, for training the translator later.
-//   oikos translator-eval --model provider/model [--budget DOLLARS] [--base-url URL] [--out FILE]
+//   oikos translator-eval --model provider/model [--budget DOLLARS] [--base-url URL] [--out FILE] [--real | --only-real] [--jobs N]
 //     The translator's test set (translator/eval/cases.ts, and the held-out cases where this machine has them) on a real
-//     model: seen and held-out pass rates, and cost.
+//     model: seen and held-out pass rates, and cost. --real adds the pilots' real requests (translator/eval/
+//     pilot-cases.ts) as a third group, N at a time (default 4); --only-real runs those alone.
 //   oikos translator-data <LOG|DIR>... --model provider/model [--model ...] [--back-model provider/model] --out DIR
 //         [--per-shape N] [--per-gold N] [--refusals N] [--limit N] [--seed N]
 //     Training data for the local translation model: requests written by the models given for the calls code
@@ -69,7 +70,7 @@ const flag = (name: string, dflt?: string) => {
 const flags = (name: string) => rest.flatMap((x, i) => (x === `--${name}` && rest[i + 1] !== undefined ? [rest[i + 1]!] : []));
 const has = (name: string) => rest.includes(`--${name}`);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
@@ -103,7 +104,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl> | story <log.jsonl> [participant]";
+const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -184,13 +185,24 @@ try {
   } else if (cmd === "translator-eval" && flag("model")) {
     // The held-out cases are outside the repository (translator/eval/held-out.ts): with them, their results go out by
     // id, outcome and shape only, and the full report is written beside them, never into `--out`.
-    const { evaluate, heldOutPath, loadHeldOut, publicReport, reportText } = await import("@oikos/translator/eval");
+    const { evaluate, evaluateReal, heldOutPath, loadHeldOut, publicReport, realReportText, reportText } = await import("@oikos/translator/eval");
     const m = chooseModel(flag("model")!, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
-    const heldOut = loadHeldOut();
-    const r = await evaluate(m.adapter, { prices: m.prices, ...(m.budget ? { budget: m.budget } : {}), ...(heldOut ? { heldOut } : {}) });
-    console.log(reportText(r));
-    if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(publicReport(r), null, 2));
-    if (heldOut) await Bun.write(join(heldOutPath(), "..", "results", `${r.model.replace(/[^a-z0-9.-]+/gi, "-")}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`), JSON.stringify(r, null, 2));
+    const with_ = { prices: m.prices, ...(m.budget ? { budget: m.budget } : {}) };
+    let report: object = {};
+    if (!has("only-real")) {
+      const heldOut = loadHeldOut();
+      const r = await evaluate(m.adapter, { ...with_, ...(heldOut ? { heldOut } : {}) });
+      console.log(reportText(r));
+      report = publicReport(r);
+      if (heldOut) await Bun.write(join(heldOutPath(), "..", "results", `${r.model.replace(/[^a-z0-9.-]+/gi, "-")}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`), JSON.stringify(r, null, 2));
+    }
+    if (has("real") || has("only-real")) {
+      // The pilots' real requests: seen cases, so their report is kept whole.
+      const real = await evaluateReal(m.adapter, { ...with_, jobs: Number(flag("jobs", "4")), log: (line) => console.error(line) });
+      console.log(realReportText(real));
+      report = { ...report, real_requests: real };
+    }
+    if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(report, null, 2));
   } else if (cmd === "translator-data" && positional()[0] && flags("model").length && flag("out")) {
     // Training data for the local translation model, from runs' logs (training.ts).
     const { trainingData } = await import("./training");
