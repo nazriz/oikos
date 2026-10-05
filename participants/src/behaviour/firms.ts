@@ -80,7 +80,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.12.1",
+  version: "0.12.2",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -125,7 +125,8 @@ export const landlord: BehaviourModule = {
     const book = new Book();
     // The homes we own: each a unit (a dwelling space) in a finished building on one of our lots.
     const owned: { structure: string; type: string; space: string; bedrooms?: number }[] = [];
-    const received = new Map<string, number>(); // tenant account -> total received
+    const received = new Map<string, { t: number; amount: number }[]>(); // tenant account -> each payment received, and when
+    const renewsAt = new Map<string, number>(); // a lease we've offered to renew -> when its term ends (the new one's rent runs from then)
     const listedAt = new Map<string, number>();
     const noticeGiven = new Map<string, number>(); // agreement -> when we gave notice
     const handled = new Set<string>();
@@ -145,9 +146,11 @@ export const landlord: BehaviourModule = {
       book.absorb(obs);
       if (dev?.stage === "applying") for (const o of obs.outcomes) if (o.created?.app) { dev.app = o.created.app; dev.stage = "applied"; }
       const acc = ownAccount(obs);
-      if (acc) for (const [from, amount] of receipts(obs, acc.account)) {
-        received.set(from, (received.get(from) ?? 0) + amount);
-        income += amount;
+      if (acc) for (const tx of channels.transactions(obs)) if (tx.to === acc.account && tx.from !== acc.account) {
+        income += cents(tx.amount);
+        const list = received.get(tx.from);
+        if (list) list.push({ t: tx.t, amount: cents(tx.amount) });
+        else received.set(tx.from, [{ t: tx.t, amount: cents(tx.amount) }]);
       }
     };
     // The leases we hold in force, as we have them (truth audits).
@@ -239,6 +242,7 @@ export const landlord: BehaviourModule = {
         const lt = leaseTerms(a, tenant);
         if (!lt.space || !owned.some((o) => o.space === lt.space)) continue;
         renewed.add(a.id);
+        renewsAt.set(a.id, ends);
         const rent = rentAt(a, ends);
         const months = between(p.min_term_months, p.max_term_months, ctx.rng(`renew-${a.id}`).below(1_000_000) / 1_000_000);
         const household = (a.terms.text as string | undefined)?.match(/household: (.*)\.$/)?.[1];
@@ -314,12 +318,17 @@ export const landlord: BehaviourModule = {
         if (noticeGiven.has(a.id)) continue;
         const tenant = tenantOf(a);
         const rent = rentAt(a, t);
-        const since = book.signedAt(a.id)!;
-        const due = Math.floor((t - since) / MONTH) + 1;
+        // Each lease is judged on its own: what has fallen due under it against what has come in since its rent began
+        // (its signing; for a lease that renews one of ours, the end of that one's term, which the old lease's rent
+        // covers until). Everything the tenant ever paid us, set against this lease's dues alone, would let someone
+        // on a renewed lease stop paying for as long as they had paid before.
+        const since = Math.max(book.signedAt(a.id)!, (a.basis && renewsAt.get(a.basis)) || 0);
+        const due = t < since ? 0 : Math.floor((t - since) / MONTH) + 1;
         let owed = 0;
         for (let k = 0; k < due; k++) owed += rentAt(a, since + k * MONTH);
         const paying = payingAccount.get(tenant);
-        const paid = paying ? received.get(paying) ?? 0 : 0;
+        let paid = 0;
+        for (const x of (paying && received.get(paying)) || []) if (x.t >= since) paid += x.amount;
         if ((owed - paid) >= p.arrears_months_before_notice * rent && t - since >= p.arrears_months_before_notice * MONTH) {
           noticeGiven.set(a.id, t);
           steps.push(because(`Rent is ${p.arrears_months_before_notice} or more months in arrears: giving notice.`, notice(a.id, "Notice: rent is in arrears.")));
