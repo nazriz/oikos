@@ -85,6 +85,14 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   const stops = recs.filter((r) => r.kind === "stop_work");
   expect(stops.length).toBeGreaterThanOrEqual(1);
   for (const s of stops) expect(notices.some((n) => n.at <= s.at - 5 * DAY && n.at > s.at - 8 * DAY)).toBe(true);
+  // Each notice as it stands on the record (a moment after the union decided on it) gives the law's five days in full:
+  // the stoppage starts with a day, the first once the notice has run.
+  expect(notices.length).toBeGreaterThanOrEqual(1);
+  for (const n of notices) {
+    expect(n.data.from - n.at).toBeGreaterThanOrEqual(5 * DAY);
+    expect(n.data.from - n.at).toBeLessThan(6 * DAY + 3600);
+    expect(n.data.from % DAY).toBe(0);
+  }
   // On strike: members leave the works, and their pay stops (their wage orders withdrawn); back: in again, paid again.
   const first = stops[0];
   const back = recs.find((r) => r.kind === "return_to_work" && r.at > first.at);

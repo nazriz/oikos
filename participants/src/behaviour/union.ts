@@ -30,7 +30,7 @@ interface Dispute {
 
 export const organiser: BehaviourModule = {
   name: "union.organiser",
-  version: "0.4.0",
+  version: "0.4.1",
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -207,9 +207,13 @@ export const organiser: BehaviourModule = {
             const r = x.result ?? { voted: 0, yes: 0, eligible: members.length };
             const notice = (from: number) => ({ employer, from, until: from + days * DAY, members, ballot: x.ballot, ...r });
             const act = (from: number) => ({ block: "publish", kind: "industrial_action", data: notice(from) });
+            // A stoppage starts with a day: the first to begin once the notice has run. (Until 2026-10-06 it started to
+            // the second, counted from when we decided; the notice is on the record a moment later, so one given on
+            // exactly the law's period was short of it by that moment: the landlord's fault of 0.12.1, here.)
+            const startsOn = (at: number, lead: number) => (Math.floor((at + lead) / DAY) + 1) * DAY;
             let lead = p.notice_days * DAY;
-            let broken = breaches(book, act(t + lead), me, t);
-            while (broken.length && lead < (p.notice_days + 30) * DAY) broken = breaches(book, act(t + (lead += DAY)), me, t);
+            let broken = breaches(book, act(startsOn(t, lead)), me, t);
+            while (broken.length && lead < (p.notice_days + 30) * DAY) broken = breaches(book, act(startsOn(t, (lead += DAY))), me, t);
             if (broken.length && ctx.rng(`comply-${employer}-${t}`).below(10_000) < p.compliance_bps) {
               steps.push(because(`Action at ${employer} would breach ${broken.map((l) => l.id).join(", ")}: no action. We'll claim again in three months.`));
               disputes.delete(employer);
@@ -221,7 +225,7 @@ export const organiser: BehaviourModule = {
             x.members = members;
             // The notice counts from when it's given (later than now, if a wake runs out of actions first).
             const give = (at: number): Step => {
-              x.from = at + lead;
+              x.from = startsOn(at, lead);
               x.until = x.from + days * DAY;
               return Object.assign(because(`Notice to ${employer}: our members there stop work for ${days} day${days > 1 ? "s" : ""}, in ${Math.round(lead / DAY)} days${broken.length ? `; this breaches ${broken.map((l) => l.id).join(", ")}, and we act anyway` : ""}.`,
                 say("industrial_action", `Notice of protected action: our members at ${employer} will stop work for ${days} day${days > 1 ? "s" : ""} from day ${Math.floor(x.from / DAY)}. Ballot ${x.ballot}: ${r.voted} of ${r.eligible} voted, ${r.yes} yes.`, { to: [employer, ...members], visible: "public", data: notice(x.from) })), { redo: give });
