@@ -16,7 +16,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { renderObservation, renderStanding, type Looked } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.7.0";
+export const LLM_PARTICIPANT_VERSION = "0.7.1"; // 0.7.1: "On file" shows only what stands (not a law withdrawn, or replaced by an amended one)
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -356,7 +356,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     async step(obs, ctx) {
       inCurrency(ctx.world.currency);
       const standing = renderStanding(obs, standingIds);
-      if (standing) standingText = standing;
+      // (What stands now, as this report's standing documents show it: nothing, once the last of them is withdrawn. A
+      // report that brings none of those documents leaves what's on file as it was.)
+      if (standing || Object.entries(obs.channels).some(([id, ch]) => standingIds.has(id) && ch.kind === "records" && ch.records.length)) standingText = standing;
       const body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}) });
       lastAction = undefined;
       lastLooked = undefined;

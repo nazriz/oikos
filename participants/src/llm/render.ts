@@ -504,12 +504,26 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   return out.join("\n");
 }
 
-/** Standing documents (laws, charters, procedures) from the given reports, in full. */
+/**
+ * Standing documents (laws, charters, procedures) from the given reports, in full: those that stand. One that has been
+ * withdrawn (by its own author, or whoever it speaks for) isn't on file any more; nor is one that a later document of
+ * the same kind, from whoever it speaks for, says it replaces (an amended law names the law it replaces), whether or
+ * not the withdrawal is among what's shown. The same reading as a code participant's book (`Book`, behaviour/common.ts).
+ */
 export function renderStanding(obs: Observation, standing: Set<string>): string {
   const out: string[] = [];
+  const shown = Object.entries(obs.channels).flatMap(([id, ch]) => (standing.has(id) && ch.kind === "records" ? ch.records : []));
+  const byId = new Map(shown.map((r) => [r.id, r]));
+  const down = new Set<string>();
+  for (const r of shown) {
+    const old = byId.get(r.record === "withdrawal" ? r.withdraws : r.record === "statement" && typeof r.data?.replaces === "string" ? r.data.replaces : "");
+    if (old?.record !== "statement") continue;
+    const sameVoice = !!old.speaks_for && old.speaks_for === r.speaks_for;
+    if (r.record === "withdrawal" ? sameVoice || old.author === r.author : sameVoice && r.record === "statement" && old.kind === r.kind) down.add(old.id);
+  }
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (!standing.has(id) || ch.kind !== "records") continue;
-    for (const r of ch.records) if (r.record === "statement") out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
+    for (const r of ch.records) if (r.record === "statement" && !down.has(r.id)) out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
   }
   return out.join("\n");
 }

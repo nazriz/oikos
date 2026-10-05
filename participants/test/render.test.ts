@@ -323,3 +323,48 @@ test("why something couldn't be done is said from inside the world", async () =>
   const log = JSON.parse(await Bun.file(new URL("../../contracts/log.schema.json", import.meta.url)).text());
   for (const code of log.$defs.RefusalCode.enum as string[]) expect(refusalText(code)).not.toMatch(/\bworld\b|simulat|platform/i);
 });
+
+test("on file shows only what stands: not a law withdrawn, nor one an amended law replaces; and nothing once the last is withdrawn", async () => {
+  const law = (id: string, at: number, text: string, x: object = {}) => ({ id, record: "statement", author: "clerk", at, visible_to: "public", kind: "law", speaks_for: "city", text, ...x });
+  const withdrawal = (id: string, of: string, x: object = {}) => ({ id, record: "withdrawal", author: "clerk", at: 9, visible_to: "public", speaks_for: "city", withdraws: of, ...x });
+  const file = (records: any[]) => renderStanding(obs({ laws: { kind: "records", records } }), new Set(["laws"])).split("\n").filter(Boolean).map((l) => /^- \[([\w.-]+)\]/.exec(l)![1]);
+  const notice60 = law("law-1", 0, "Sixty days' notice.");
+  const kind = law("law-2", 0, "Be kind.");
+  expect(file([notice60, kind])).toEqual(["law-1", "law-2"]);
+  // Repealed by the town: gone from the file.
+  expect(file([notice60, kind, withdrawal("w1", "law-2")])).toEqual(["law-1"]);
+  // Amended: the new law names the one it replaces, and stands in its place, with or without the withdrawal shown.
+  const notice75 = law("law-3", 5, "Seventy-five days' notice.", { data: { replaces: "law-1" } });
+  expect(file([notice60, kind, notice75])).toEqual(["law-2", "law-3"]);
+  expect(file([notice60, kind, notice75, withdrawal("w2", "law-1")])).toEqual(["law-2", "law-3"]);
+  // Amended twice: only the last stands.
+  expect(file([notice60, notice75, law("law-4", 8, "Ninety days' notice.", { data: { replaces: "law-3" } })])).toEqual(["law-4"]);
+  // Someone else's "law" naming the town's as replaced doesn't replace it; nor does a document of another kind; nor
+  // does a withdrawal by someone who neither made the law nor speaks for the town take it down.
+  expect(file([notice60, law("fake", 5, "No notice at all.", { speaks_for: "c9", author: "c9-self", data: { replaces: "law-1" } })])).toEqual(["law-1", "fake"]);
+  expect(file([notice60, law("form-1", 5, "A form.", { kind: "form", data: { replaces: "law-1" } })])).toEqual(["law-1", "form-1"]);
+  expect(file([notice60, withdrawal("w3", "law-1", { author: "c9-self", speaks_for: "c9" })])).toEqual(["law-1"]);
+
+  // Through a seat: what its next call has on file follows the record. The amended law in place of the old; and once
+  // the last standing law is withdrawn, nothing on file (not the last list it had).
+  const { createLlmParticipant } = await import("../src/llm/participant");
+  const systems: string[] = [];
+  const adapter = { provider: "mock", model: "mock", complete: async (req: any) => {
+    systems.push(req.system);
+    return { content: [{ type: "tool_use", id: `end-${systems.length}`, name: "done_for_now", input: {} }], usage: { input_tokens: 1, output_tokens: 1 } };
+  } };
+  const seat = createLlmParticipant({ participant: "mayor-system", entity: "city", title: "Mayor", framing: { disclosure: "simulation", reason: "test" }, standing: ["laws"], titles: new Map(), cadenceDays: 7, draftText: () => "" } as any,
+    { adapter, annotate: async () => {}, now: () => 0 } as any);
+  const ctx = { world: { currency: PROFILE.values.currency } } as any;
+  const at = (t: number, records: any[]) => obs({ laws: { kind: "records", records } }, { t, positions: [{ position: "mayor", entity: "city", title: "Mayor" }] });
+  await seat.step(at(0, [notice60]), ctx);
+  await seat.step(at(30 * 86_400, [notice60, notice75, withdrawal("w2", "law-1")]), ctx);
+  await seat.step(at(60 * 86_400, [notice60, notice75, withdrawal("w2", "law-1"), withdrawal("w4", "law-3")]), ctx);
+  expect(systems.length).toBe(3);
+  expect(systems[0]).toContain("On file:");
+  expect(systems[0]).toContain("[law-1]");
+  expect(systems[1]).toContain("[law-3]");
+  expect(systems[1]).not.toContain("[law-1]");
+  expect(systems[2]).not.toContain("On file:");
+  expect(systems[2]).not.toContain("Seventy-five days");
+});
