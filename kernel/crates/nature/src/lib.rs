@@ -221,21 +221,41 @@ fn step_field(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Lan
 /// 128 it can't (under 2^64 x 2^20), and the share is no larger than what it's a share of (or 100 times it, for a
 /// scale), which fits. The same answer wherever the 64-bit product fitted.
 fn share(x: i64, bps: i64) -> i64 {
-    (x as i128 * bps as i128 / BPS as i128).clamp(i64::MIN as i128, i64::MAX as i128) as i64
+    // (Where the product fits in 64 bits, as it nearly always does, it's worked there: the same division, toward zero.)
+    match x.checked_mul(bps) {
+        Some(product) => product / BPS,
+        None => (x as i128 * bps as i128 / BPS as i128).clamp(i64::MIN as i128, i64::MAX as i128) as i64,
+    }
 }
 
-fn step_field_dense(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, mut v: Vec<i64>, day: i64) -> Vec<i64> {
+/// What a field's sources add to each cell in a day, before the day's scale: its cover's, and each building's with its
+/// corner there (the same from day to day while the land is).
+fn field_sources(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land) -> Vec<i64> {
+    (0..ground.cells.len())
+        .map(|i| {
+            // (Sums here and below saturate: each term is within a few times 2^53, so only a world with hundreds of
+            // cells of the largest values the contracts allow all moving into one could reach 64 bits, and it's held
+            // to the field's bounds at the end of the day either way.)
+            let mut add = f.from_covers.get(&land.cover[i]).copied().unwrap_or(0);
+            for ty in &land.anchored[i] {
+                add = add.saturating_add(f.from_structures.get(ty).copied().unwrap_or(0));
+            }
+            add
+        })
+        .collect()
+}
+
+fn step_field_dense(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, v: Vec<i64>, day: i64) -> Vec<i64> {
+    step_field_from(f, ground, &field_sources(f, ground, land), v, day)
+}
+
+/// A field's day, from what its sources add to each cell (`field_sources`).
+fn step_field_from(f: &oikos_contracts::config::FieldCfg, ground: &Ground, sources: &[i64], mut v: Vec<i64>, day: i64) -> Vec<i64> {
     let n = ground.cells.len();
     // Sources (a cover's may be negative: soaking it up), scaled for the day (rain, drought).
     let scale = f.source_by_day.iter().rev().find(|s| s.from_day <= day).map_or(BPS, |s| s.bps);
     for i in 0..n {
-        // (Sums here and below saturate: each term is within a few times 2^53, so only a world with hundreds of cells
-        // of the largest values the contracts allow all moving into one could reach 64 bits, and it's held to the
-        // field's bounds at the end of the day either way.)
-        let mut add = f.from_covers.get(&land.cover[i]).copied().unwrap_or(0);
-        for ty in &land.anchored[i] {
-            add = add.saturating_add(f.from_structures.get(ty).copied().unwrap_or(0));
-        }
+        let add = sources[i];
         v[i] = v[i].saturating_add(if add > 0 { add.saturating_mul(scale) / BPS } else { add });
     }
     // Decay toward the baseline (at least one step while it's away from it).
@@ -456,9 +476,11 @@ pub fn spin_up(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSta
     let mut gone = vec![];
     // (The land doesn't change in a spin-up: each species' capacity, once.)
     let caps: Vec<Capacity> = cat.species.iter().map(|sp| capacity(sp, ground, land)).collect();
+    // (And what each field's sources add to each cell.)
+    let sources: Vec<Vec<i64>> = cat.fields.iter().map(|f| field_sources(f, ground, land)).collect();
     for day in first_day..first_day + days {
         for (k, f) in cat.fields.iter().enumerate() {
-            fields[k] = step_field_dense(f, ground, land, std::mem::take(&mut fields[k]), day);
+            fields[k] = step_field_from(f, ground, &sources[k], std::mem::take(&mut fields[k]), day);
         }
         let values: BTreeMap<Id, Vec<i64>> = cat.fields.iter().zip(&fields).map(|(f, v)| (f.id.clone(), v.clone())).collect();
         for (k, sp) in cat.species.iter().enumerate() {
