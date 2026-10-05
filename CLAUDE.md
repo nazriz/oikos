@@ -42,6 +42,7 @@ Naz values honest pushback over agreement. Have opinions, flag trade-offs, and s
 - **Nothing references the project's old name** (renamed Oikos, 2026-10-05).
 
 ## Where things run
-- The repo is `nazriz/oikos` (private). Code changes: edit, push, then `scripts/mini sync` on the run server.
-- Runs and the whole test suite belong on the run server (an always-on Mac), driven with `scripts/mini` (set `OIKOS_MINI=user@host`). Run logs live there, in `runs/`, and nowhere in git.
+- The repo is `nazriz/oikos` (private). Run logs live on the run server, in `runs/`, and nowhere in git.
+- Runs and the whole test suite belong on the run server (an always-on Mac). A session opened through Remote Control is already on it: run things there directly. From another machine, drive it with `scripts/mini` (set `OIKOS_MINI=user@host`; after a push, `scripts/mini sync`).
+- A long run is started detached (`nohup`, with `caffeinate -i -w <pid>`), never as a session's background command: those are stopped after about half an hour.
 - Start here in a new session: `docs/handover.md`.

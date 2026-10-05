@@ -1,28 +1,43 @@
 #!/bin/bash
 # Set up a Mac as Oikos's run server: the tools, the repo, a build, and the quick tests. Run it on that machine, once
 # (it's safe to run again). Needs Homebrew and Apple's command line tools (xcode-select --install) already there.
-# Afterwards, by hand, because they open a browser: `gh auth login` (before this, if the repo isn't cloned yet) and
-# `codex login`.
+# By hand, because they open a browser: `codex login` afterwards; and before this, if the repo isn't cloned yet, either
+# `gh auth login` or a deploy key (then give the address to clone from: OIKOS_REPO_URL=git@<ssh host alias>:nazriz/oikos.git).
 set -euo pipefail
 
 DIR="${OIKOS_DIR:-$HOME/oikos}"
 REPO="${OIKOS_REPO:-nazriz/oikos}"
+REPO_URL="${OIKOS_REPO_URL:-}"
 
 command -v brew >/dev/null || { echo "Homebrew isn't installed: see https://brew.sh"; exit 1; }
 xcode-select -p >/dev/null 2>&1 || { echo "Apple's command line tools aren't installed: run xcode-select --install"; exit 1; }
 
+# Homebrew doesn't link its rustup into its usual folder (it would clash with its rust), so cargo and rustc aren't found
+# after installing it: look in rustup's own folder too. scripts/mini does the same; a shell opened by hand needs
+# $RUSTUP_BIN on its PATH (said at the end, if it isn't).
+ORIGINAL_PATH="$PATH"
+RUSTUP_BIN="$(brew --prefix)/opt/rustup/bin"
+export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.cargo/bin:$RUSTUP_BIN:$PATH"
+
 for tool in gh zstd rustup codex; do command -v "$tool" >/dev/null || brew install "$tool"; done
 command -v bun >/dev/null || brew install oven-sh/bun/bun
+command -v cargo >/dev/null || { echo "rustup is installed but cargo isn't found (looked in $RUSTUP_BIN and ~/.cargo/bin)"; exit 1; }
 rustup toolchain list | grep -q stable || rustup default stable
 rustup target list --installed | grep -q wasm32-unknown-unknown || rustup target add wasm32-unknown-unknown
 
 if [ ! -d "$DIR/.git" ]; then
-  gh auth status >/dev/null 2>&1 || { echo "Sign in to GitHub first: gh auth login"; exit 1; }
-  gh repo clone "$REPO" "$DIR"
+  if [ -n "$REPO_URL" ]; then
+    git clone "$REPO_URL" "$DIR"
+  else
+    gh auth status >/dev/null 2>&1 || { echo "Sign in to GitHub first (gh auth login), or set OIKOS_REPO_URL to clone with a deploy key"; exit 1; }
+    gh repo clone "$REPO" "$DIR"
+  fi
 fi
 cd "$DIR"
 git pull --ff-only
 bun install
+# Packages outside the workspace have their own dependencies (a test there fails without them).
+(cd docs/research/cel-check && bun install)
 bun run kernel
 bun run test:fast
 
@@ -30,3 +45,7 @@ echo
 echo "Oikos is built in $DIR and its quick tests pass."
 echo "Still to do by hand: codex login   (then: codex exec -m gpt-6.1-sol 'say ok' to check)"
 echo "For the whole suite: bun run test:all"
+case ":$ORIGINAL_PATH:" in *":$RUSTUP_BIN:"*|*":$HOME/.cargo/bin:"*) ;; *)
+  [ -x "$RUSTUP_BIN/cargo" ] && ! PATH="$ORIGINAL_PATH" command -v cargo >/dev/null &&
+    echo "cargo isn't on your shell's PATH: add $RUSTUP_BIN to it (scripts/mini doesn't need this)" ;;
+esac

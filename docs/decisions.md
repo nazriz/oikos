@@ -1273,6 +1273,12 @@ See the design note, §16.
   - **Tests changed, not behaviour:** the election test no longer compares how many complain (a kept town's one-person crew left, and six weeks passed before the next started); the reliability test doesn't pin the second a module wakes; a seasonal flood's refusals are allowed in the deaths test.
   - **Worth knowing:** every earlier measurement of deaths, illness and injury in a run's first year is low by about half. Calibration against the life table should be redone.
 
+- **Where sessions and runs live: on the run server, through Remote Control** (2026-10-05). The plan had been cloud sessions that edit and push, with the Mac mini driven over SSH. A cloud session's network goes through a web proxy: no SSH and no tailnet, so it can't reach the mini at all. So the session runs on the mini itself (Claude Code's Remote Control, opened from the browser or the phone), where a run or the suite is a local command; `scripts/mini` stays for driving it from the laptop.
+  - **It starts at login** (a launch agent, in tmux, started again a minute after it stops), and its sessions have full permissions: Naz's choice, for runs nobody is watching. The mini's own setup (the agent, its script) is outside the repo; docs/handover.md says where.
+  - **The setup script, corrected for what the mini found:** Homebrew keeps its rustup out of its usual folder, so cargo wasn't found after installing it (the script and `scripts/mini` now look there themselves; no shell profile is edited); the package outside the workspace (docs/research/cel-check) needs its own install or its test fails; and the repo can be cloned with a deploy key (`OIKOS_REPO_URL`), which is how the mini has it: a key that reaches this repo only, not Naz's GitHub login.
+  - **What that costs:** the session's history and memory live on the mini, not in the cloud; a session's background commands still stop after about half an hour, so long runs are detached. The script hasn't been run from scratch since the corrections.
+  - **Revisit if** cloud sessions gain a way to reach a private machine, or Remote Control proves unreliable over days (then: SSH from the laptop, which works today).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration after the world expansion (measured 2026-10-02, not chased: for the checkpoint).** The small town, 3 seeds × 2 years, code only, at 2fd20b4. Health: 6 breaches of 15.

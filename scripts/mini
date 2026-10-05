@@ -15,8 +15,10 @@
 set -euo pipefail
 : "${OIKOS_MINI:?set OIKOS_MINI=user@host (the run server)}"
 DIR="${OIKOS_MINI_DIR:-oikos}"
-# A login shell there, so Homebrew's and bun's paths are set.
-remote() { ssh -o BatchMode=yes "$OIKOS_MINI" "bash -lc $(printf '%q' "cd $DIR && $1")"; }
+# A login shell there, and the places the tools are installed whatever its profile says (Homebrew keeps its rustup, so
+# cargo, out of its usual folder).
+TOOLS='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.cargo/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/bin:$PATH"'
+remote() { ssh -o BatchMode=yes "$OIKOS_MINI" "bash -lc $(printf '%q' "$TOOLS; cd $DIR && $1")"; }
 q() { printf '%q ' "$@"; }
 
 cmd="${1:-status}"; shift || true
