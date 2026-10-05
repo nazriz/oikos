@@ -19,7 +19,7 @@ import { channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
-import { because, between, Book, breaches, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
+import { because, between, Book, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -156,7 +156,7 @@ export const landlord: BehaviourModule = {
     // The leases we hold in force, as we have them (truth audits).
     const leasesHeld = (): Belief[] => [{ of: "held", party: me, template: "lease",
       agreements: book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "lease" && r.terms.parties[0] === me && book.inForce(r.id)).map((r) => r.id) }];
-    return Object.assign(stepper(absorb, (obs) => {
+    return noting(book, Object.assign(stepper(absorb, (obs) => {
       const t = obs.t;
       const acc = ownAccount(obs);
       if (!acc) return [];
@@ -493,7 +493,7 @@ export const landlord: BehaviourModule = {
         steps.push(because(`The tribunal has found our notice of rent increase ${n.id} invalid: withdrawing it; the rent stays as it was.`, withdraw(n.id, `Withdrawn: found invalid by the tribunal (${o.id}).`)));
       }
       return steps;
-    }), { beliefs: (): Belief[] => leasesHeld() });
+    }), { beliefs: (): Belief[] => leasesHeld() }));
   },
 };
 

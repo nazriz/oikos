@@ -11,7 +11,7 @@ import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { smallestNow } from "../money";
-import { because, Book, breaches, DAY, MONTH, offer, pay, say, type Step } from "./common";
+import { because, Book, breaches, noting, DAY, MONTH, offer, pay, say, type Step } from "./common";
 import { stepper } from "./firms";
 
 interface Dispute {
@@ -74,7 +74,7 @@ export const organiser: BehaviourModule = {
       const closed = new Set(book.open("closure").map((r) => (typeof r.data?.firm === "string" ? r.data.firm : r.speaks_for!)));
       return [...employerOf].filter(([m, e]) => e && members.has(m) && !closed.has(e)).sort().map(([m, e]): Belief => ({ of: "between", template: "employment", parties: [e, m], in_force: true }));
     };
-    return Object.assign(stepper(
+    return noting(book, Object.assign(stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
         const t = obs.t;
@@ -249,6 +249,6 @@ export const organiser: BehaviourModule = {
         }
         return steps;
       },
-    ), { beliefs });
+    ), { beliefs }));
   },
 };

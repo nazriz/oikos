@@ -30,7 +30,7 @@ import { channels } from "../contracts";
 import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { because, Book, breaches, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
 import { ownerOf } from "./institutions";
@@ -2295,7 +2295,7 @@ export const citizen: BehaviourModule = {
         if (leaving && todo.length === 0) departed = true; // the last of leaving is under way
         // (A gathering to go to, or come back from, before the week is out: awake then.)
         if (next && (next as any).goTo) pendingGo = (next as any).goTo;
-        const action = next ? callAction(next)
+        const action = next ? noted(book, callAction(next))
           : p.round ? wait(Math.min(practiceWake ?? Infinity, nextPlanAt, nextChange(obs.t)))
           : wait(practiceWake !== null ? Math.min(practiceWake, obs.t + 7 * DAY) : undefined);
         if (decided.length) Object.defineProperty(action, DECISIONS, { value: decided.splice(0), enumerable: false });

@@ -6,7 +6,7 @@
 
 import { cents } from "../money";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, breaches, DAY, say, type Step, usd } from "./common";
+import { because, Book, breaches, noting, DAY, say, type Step, usd } from "./common";
 import { stepper } from "./firms";
 
 /** The kinds of application a tribunal hears here: a notice of rent increase said to breach the law; a debt unpaid. */
@@ -27,7 +27,7 @@ export const member: BehaviourModule = {
     const book = new Book();
     const listed = new Map<string, number>(); // application -> its hearing
     const decided = new Set<string>();
-    return stepper(
+    return noting(book, stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
         const t = obs.t;
@@ -101,7 +101,7 @@ export const member: BehaviourModule = {
         }
         return steps;
       },
-    );
+    ));
   },
 };
 

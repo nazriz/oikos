@@ -37,6 +37,24 @@ export class Book {
    * section 7), and the time of the latest observation. */
   readonly readings = new Map<string, Reading>();
   now = 0;
+  /** Laws whose formal condition couldn't be read against an act this reader weighed (it names a field the act lacks,
+   * say), and how many times: such a law doesn't bind that act. Said once per law, with the reader's next reasons. */
+  readonly unread = new Map<string, number>();
+  private unreadToSay: string[] = [];
+
+  /** A law's condition gave an error, not an answer, against an act: counted, and to be said (once per law). */
+  noteUnread(law: string, act: unknown, error: string): void {
+    const times = this.unread.get(law) ?? 0;
+    this.unread.set(law, times + 1);
+    const a = act as { block?: unknown; kind?: unknown } | undefined;
+    const what = [a?.block, a?.kind].filter((x) => typeof x === "string").join(" ") || "an act";
+    if (!times) this.unreadToSay.push(`${law} couldn't be read against ${what} (${String(error).slice(0, 200)}), so it wasn't applied`);
+  }
+
+  /** What hasn't been said yet of laws that couldn't be read, as a sentence for a reason (then it has been said). */
+  takeUnread(): string | undefined {
+    return this.unreadToSay.length ? `(A law that can't be read against an act doesn't bind it: ${this.unreadToSay.splice(0).join("; ")}.)` : undefined;
+  }
   private lastDirectory: unknown; // the directory lists last read (the view hands back the same lists until they change)
 
   absorb(obs: Observation): Record[] {
@@ -198,10 +216,35 @@ export function prohibitions(book: Book, at?: number): StatementRecord[] {
  */
 export function breaches(book: Book, act: object, actor: string, now: number): StatementRecord[] {
   // (The laws in force at `now`, the moment of the act: a notice is judged by the law as it stood when it was given.)
-  return prohibitions(book, now).filter((l) => {
-    const v = evaluate(l.formal!.condition, { block: act, actor, now }, []);
-    return "value" in v && v.value;
-  });
+  return prohibitions(book, now).filter((l) => holdsOf(book, l, { block: act, actor, now }));
+}
+
+/**
+ * Is a law's formal condition true of an act, as this reader reads it? A condition that gives an error and no answer
+ * (it names a field the act lacks: a law written for another kind of act, or written wrongly) isn't true of it, so the
+ * law doesn't bind the act; but never silently: the reader's book counts it (`Book.unread`) and the reader says so
+ * with its next reasons (`noted`), which is how it reaches the log.
+ */
+export function holdsOf(book: Book, law: StatementRecord, vars: { block: object; actor: string; now: number }, claims: Parameters<typeof evaluate>[2] = []): boolean {
+  const v = evaluate(law.formal!.condition, vars, claims);
+  if ("value" in v) return !!v.value;
+  book.noteUnread(law.id, vars.block, v.error);
+  return false;
+}
+
+/** An action with, in its reasons, whatever its maker's book couldn't read of the laws and hasn't yet said. */
+export function noted(book: Book, action: ParticipantAction): ParticipantAction {
+  if (action.type === "wait") return action;
+  const note = book.takeUnread();
+  if (note) (action as { reasoning?: string }).reasoning = "reasoning" in action && action.reasoning ? `${action.reasoning} ${note}` : note;
+  return action;
+}
+
+/** A controller whose every action is `noted`: for a module that weighs acts against the laws in its book. */
+export function noting<T extends { step(obs: Observation, ...rest: any[]): ParticipantAction }>(book: Book, controller: T): T {
+  const step = controller.step.bind(controller);
+  controller.step = (obs: Observation, ...rest: any[]) => noted(book, step(obs, ...rest));
+  return controller;
 }
 
 // ------------------------------------------------------------------ laws made from figures (docs/behaviour/government.md)

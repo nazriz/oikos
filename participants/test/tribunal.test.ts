@@ -6,6 +6,7 @@
 import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
 import { member, registrar } from "../src/behaviour/tribunal";
+import { Book, breaches } from "../src/behaviour/common";
 import { inCurrency } from "../src/money";
 import { Randomness } from "../src/rng";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
@@ -68,6 +69,53 @@ test("a law repealed is no longer applied: a notice given after the repeal is va
   const orders = said(run(m, obs(t0 + 21 * DAY, [])), "tribunal_order");
   expect(orders.find((o) => o.application === "rec.4")).toMatchObject({ finding: "invalid", laws: ["law-rent"] });
   expect(orders.find((o) => o.application === "rec.5")).toMatchObject({ finding: "valid" });
+});
+
+test("a law whose condition can't be read against an act doesn't bind it, and the reader says so: counted, and once in its reasons", () => {
+  // A cap written against a field no notice of rent increase has (`data.increase_bps`): its condition gives an error,
+  // not an answer. The 60-day law beside it reads cleanly, and binds as it always did.
+  const cap = rec("law-cap", 0, { record: "statement", speaks_for: "outside", kind: "law", visible_to: "public", text: "Rent increases: no more than 4%.", adico: { attribute: "landlords", deontic: "must_not", aim: "increase a rent by more than 4%" },
+    formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase' && block.data.increase_bps > 400" } });
+  const t0 = 400 * DAY;
+  const short = notice("rec.1", t0 - 10 * DAY, t0 + 20 * DAY, t0 - 400 * DAY); // breaks the 60-day law
+  const fine = notice("rec.2", t0 - 10 * DAY, t0 + 60 * DAY, t0 - 400 * DAY); // breaks none that can be read
+  const book = new Book();
+  book.absorb(obs(t0, [law, cap]));
+  const act = (n: any) => ({ block: "publish", kind: "rent_increase", data: n.data });
+  expect(breaches(book, act(short), "landlord-1", short.at).map((l) => l.id)).toEqual(["law-rent"]);
+  expect(breaches(book, act(fine), "landlord-1", fine.at)).toEqual([]);
+  expect([...book.unread]).toEqual([["law-cap", 2]]);
+  const said1 = book.takeUnread()!;
+  expect(said1).toMatch(/law-cap couldn't be read against publish rent_increase \(.+\), so it wasn't applied/);
+  expect(said1).not.toContain("law-rent");
+  breaches(book, act(fine), "landlord-1", fine.at);
+  expect(book.unread.get("law-cap")).toBe(3);
+  expect(book.takeUnread()).toBeUndefined(); // said once
+
+  // Through a module: the tribunal's orders are what they were (invalid under the law that reads; valid otherwise), and
+  // the reasons of its first act after weighing the cap say that the cap couldn't be read. Nowhere else.
+  const m = member.create(ctx("tribunal-member-system", { hearing_after_days: 21 }));
+  const a1 = apply("rec.3", t0, { kind: "rent_increase", against: "landlord-1", notice: "rec.1", evidence: short });
+  const a2 = apply("rec.4", t0, { kind: "rent_increase", against: "landlord-1", notice: "rec.2", evidence: fine });
+  const acts = (o: Observation) => {
+    const out: any[] = [];
+    for (let i = 0; i < 20; i++) {
+      const a: any = m.step(o, undefined as any);
+      if (a.type === "wait") break;
+      out.push(a);
+    }
+    return out;
+  };
+  const listed = acts(obs(t0, [law, cap, a1, a2]));
+  expect(listed.some((a) => /couldn't be read/.test(a.reasoning ?? ""))).toBe(false); // (nothing weighed yet)
+  const heard = acts(obs(t0 + 21 * DAY, []));
+  const orders = said(heard.map((a) => a.call).join("\n"), "tribunal_order");
+  expect(orders.find((o) => o.application === "rec.3")).toMatchObject({ finding: "invalid", laws: ["law-rent"] });
+  expect(orders.find((o) => o.application === "rec.4")).toMatchObject({ finding: "valid" });
+  const noting = heard.filter((a) => /couldn't be read/.test(a.reasoning ?? ""));
+  expect(noting.length).toBe(1);
+  expect(noting[0]).toBe(heard[0]);
+  expect(noting[0].reasoning).toMatch(/^The notice .*\(A law that can't be read against an act doesn't bind it: law-cap couldn't be read against publish rent_increase \(.+\), so it wasn't applied\.\)$/);
 });
 
 test("a debt is ordered paid, less what the respondent says it paid; unpaid once due, the debtor's bank is ordered to pay", () => {

@@ -9,9 +9,9 @@ import { amount, cents, smallestNow } from "../money";
 import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { evaluate, standingClaims } from "../law";
+import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, prohibitions, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 
@@ -54,7 +54,7 @@ export const planningOfficer: BehaviourModule = {
     const letters = new Letters();
     // What the survey last showed on each cell: built or not.
     const built = new Map<string, boolean>();
-    return stepper(
+    return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
         letters.take(obs, book);
@@ -80,10 +80,7 @@ export const planningOfficer: BehaviourModule = {
           const habitat = p.habitat_law ? book.current(p.habitat_law) : undefined;
           const register = book.open("habitat_register").sort((a, b) => b.at - a.at)[0];
           const onHabitat = habitat && ((register?.data?.lots as string[] | undefined) ?? []).includes(app.data?.lot);
-          const breached = prohibitions(book).find((l) => {
-            const v = evaluate(l.formal!.condition, { block: granting, actor: applicant, now: obs.t }, []);
-            return "value" in v && v.value;
-          }) ?? (onHabitat ? habitat : undefined);
+          const breached = prohibitions(book).find((l) => holdsOf(book, l, { block: granting, actor: applicant, now: obs.t })) ?? (onHabitat ? habitat : undefined);
           const follows = ctx.rng(`comply-${app.id}`).below(10_000) < p.compliance_bps;
           const refuse = breached && follows;
           decided_.push({ application: app.id, decision: refuse ? "refused" : "granted", ...(breached ? { law: breached.id } : {}) });
@@ -111,7 +108,7 @@ export const planningOfficer: BehaviourModule = {
         }));
         return steps;
       },
-    );
+    ));
   },
 };
 
@@ -137,7 +134,7 @@ export const inspector: BehaviourModule = {
     const letters = new Letters();
     const report = () =>
       `Report from the building inspector: ${known.size} buildings on record. ${found.length ? `Breaches found and acted on (a fine and a demolition order each): ${found.join(", ")}.` : "No breaches found."}`;
-    return stepper(
+    return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
         letters.take(obs, book);
@@ -160,10 +157,7 @@ export const inspector: BehaviourModule = {
           const owner = (lot && ownerOf(book, lot)) ?? st.built_by ?? "unknown";
           const cells = channels.cells(obs).filter((c) => c.structure?.structure === st.structure).map((c) => c.cell).sort();
           const act = { block: "construct", lot, at: st.at, cells, structure_type: st.type };
-          const breached = prohibitions(book).find((l) => {
-            const v = evaluate(l.formal!.condition, { block: act, actor: owner, now: obs.t }, claims);
-            return "value" in v && v.value;
-          });
+          const breached = prohibitions(book).find((l) => holdsOf(book, l, { block: act, actor: owner, now: obs.t }, claims));
           if (!breached || ctx.rng(`act-${st.structure}`).below(10_000) >= p.compliance_bps) continue;
           found.push(`${st.structure} on ${lot ?? st.at} (${breached.id})`);
           steps.push(because(`On patrol: ${st.structure} was built in breach of ${breached.id}; fining the owner and ordering it demolished.`,
@@ -174,7 +168,7 @@ export const inspector: BehaviourModule = {
         steps.push(...letters.answer(report));
         return steps;
       },
-    );
+    ));
   },
 };
 
