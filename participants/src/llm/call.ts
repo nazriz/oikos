@@ -2,6 +2,12 @@
 // annotation (tokens and cost, priced from the table recorded in the log's
 // orchestrator annotation) and a transcript annotation (what was sent and
 // what came back). Every run records token usage and cost (CLAUDE.md).
+//
+// A call that fails (after its adapter's own time limits and retries) is
+// recorded too, as a model_call_failed annotation: what was sent, and the
+// error. The run goes on (its participant waits this wake), so the failure is
+// part of what happened: a resumed run is served it as a failure at the same
+// point, and takes the same path (orchestrator/src/resume.ts).
 
 import { costMicroUsd, estimateTokens, PRICES, requestText, type LlmAdapter, type LlmRequest, type LlmResponse, type Price } from "./adapter";
 
@@ -71,8 +77,19 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
   try {
     res = await adapter.complete(req);
   } catch (e) {
-    if (e instanceof SpendingLimitReached || e instanceof ModelCallFailed) throw e;
-    throw new ModelCallFailed(`${key} (${req.purpose}, for ${req.subject}): ${(e as Error).message}`.slice(0, 2000));
+    // (A limit stops the run: nothing was answered, and the call is made again when the run is resumed.)
+    if (e instanceof SpendingLimitReached) throw e;
+    // (One already in these words is a recorded failure, served again by a resumed run: the same words go in its log.)
+    const failed = e instanceof ModelCallFailed ? e : new ModelCallFailed(`${key} (${req.purpose}, for ${req.subject}): ${(e as Error).message}`.slice(0, 2000));
+    // Recorded as a transcript is, without an answer: what was sent (the system prompt by its hash), and the error.
+    await io.annotate({
+      annotation: "model_call_failed", subject: req.subject,
+      data: {
+        purpose: req.purpose, ...(req.ref ? { ref: req.ref } : {}), t: io.now(), provider: adapter.provider, model: adapter.model, system_sha256: sha256(req.system),
+        turn: req.messages.length, input: req.messages.at(-1)?.content ?? "", error: failed.message,
+      },
+    });
+    throw failed;
   } finally {
     if (io.budget) io.budget.reservedMicroUsd = (io.budget.reservedMicroUsd ?? 0) - worst;
   }

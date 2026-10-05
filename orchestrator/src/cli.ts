@@ -10,6 +10,10 @@
 //     the whole batch: each run gets the per-run limit or what's left, whichever is less.
 //     With --model, --translator-model runs the translator on its own model (e.g. a smaller one); without, it only
 //     prices the cost projection.
+//   oikos run ... [--overwrite]: runs are never overwritten: a run into a folder that already holds its log refuses to
+//     start (choose another --out, or resume it). --overwrite replaces it, for tests' own folders; never the default,
+//     and never a log that holds a real model's answers.
+//   oikos resume <log.jsonl | log.jsonl.zst | DIR>: go on with a run that stopped (a folder: its one run that did).
 //   oikos measure <DIR> [QUERY...] [--sql "select ..."] [--list]
 //   oikos diff <BASELINE> <CHANGE> [QUERY...]: every measure of two batches compared (beyond seed noise: flagged)
 //   oikos health <DIR> [--profile NAME]: the batch's measures against its profile's calibration targets
@@ -42,13 +46,13 @@
 //
 // A DIR is a batch folder (its measure/ is used) or a folder of logs (exported to DIR/measure first).
 
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, queries, query, runQuery, table } from "@oikos/measure";
-import { loadWorld, runBatch, runOne } from "./batch";
+import { loadWorld, resumeCommand, runBatch, runOne, type StopSignal } from "./batch";
 import { MockAdapter, mockPolicies, PRICES } from "@oikos/participants/llm";
 import { costReport } from "./cost";
-import { isLog } from "./logs";
+import { currentLogs } from "./logs";
 import { kernelBinary } from "./kernel";
 import { chooseModel } from "./models";
 
@@ -60,21 +64,41 @@ const flag = (name: string, dflt?: string) => {
 const flags = (name: string) => rest.flatMap((x, i) => (x === `--${name}` && rest[i + 1] !== undefined ? [rest[i + 1]!] : []));
 const has = (name: string) => rest.includes(`--${name}`);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
   if (existsSync(join(dir, "runs")) && existsSync(join(dir, "participants"))) return dir; // already a measurement folder
   const m = join(dir, "measure");
   if (!existsSync(m)) {
-    const logs = readdirSync(dir).filter(isLog).map((f) => join(dir, f));
+    const logs = currentLogs(dir); // (each run once: not what a resumed run left behind)
     if (!logs.length) throw new Error(`${dir}: no measurement tables and no logs`);
     await exportLogs(logs, m);
   }
   return m;
 }
 
-const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl> | story <log.jsonl> [participant]";
+/**
+ * Asked to stop (a TERM signal, as `scripts/mini stop` sends): a run stops before its next moment, its log closed, to be
+ * resumed; a batch passes it on, starts no more seeds, and reports. If the run can't get there in time (a model call
+ * still out after OIKOS_STOP_GRACE_SECONDS, 120 by default), the process ends as it is: its log resumes all the same.
+ */
+function stopOnSignal(): StopSignal {
+  const stop: StopSignal = {};
+  for (const signal of ["SIGTERM", "SIGINT"] as const) process.on(signal, () => {
+    // (Asked twice from the keyboard: at once, as it is. A second TERM is the batch passing on what `mini stop` also sent.)
+    if (stop.requested && signal === "SIGINT") process.exit(130);
+    if (stop.requested) return;
+    stop.requested = `a ${signal.slice(3)} signal`;
+    console.error(`asked to stop (${signal}): stopping before the next moment, and closing the log`);
+    stop.onRequest?.();
+    const grace = Number(process.env.OIKOS_STOP_GRACE_SECONDS);
+    if (cmd !== "run") setTimeout(() => process.exit(143), (Number.isFinite(grace) && grace > 0 ? grace : 120) * 1000).unref();
+  });
+  return stop;
+}
+
+const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -84,11 +108,21 @@ try {
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
       recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
       batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), consultAvoid: flag("consult-avoid"),
+      overwrite: has("overwrite"), stop: stopOnSignal(),
     });
     if (r.measureDir) {
       console.log(`\n${table(await runQuery(r.measureDir, "overview"))}`);
       console.log(`\n${r.costText}`);
       console.log(`\nMeasure with: oikos measure ${r.out} --list`);
+    }
+    if (r.stopped.length) {
+      console.log(`\n${r.stopped.length} run${r.stopped.length === 1 ? "" : "s"} STOPPED before the end and can be resumed (logs kept plain, measured as far as they got):`);
+      for (const x of r.stopped) console.log(`  seed ${x.seed}, at day ${Math.floor(x.t / 86_400)}: ${x.why}\n    ${x.resume}`);
+    }
+    if (r.problems.length) {
+      console.log(`\nAfter the runs, something failed (the runs and batch.json are there):`);
+      for (const x of r.problems) console.log(`  ${x}`);
+      process.exitCode = 1;
     }
     if (r.failed.length) {
       console.log(`\n${r.failed.length} run${r.failed.length === 1 ? "" : "s"} didn't finish (diagnosis beside each log, <run>.failure.json):`);
@@ -98,12 +132,14 @@ try {
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: flags("set"),
       model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), logDetail: flag("log"), consult: has("consult"), consultAvoid: flag("consult-avoid") });
+      recordObservations: flag("record-observations"), logDetail: flag("log"), consult: has("consult"), consultAvoid: flag("consult-avoid"), overwrite: has("overwrite"), stop: stopOnSignal() });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
-    const r = await runOne({ resume: positional()[0]!, until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
-      model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
+    const o = { until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
+      model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") };
+    const r = await runOne({ resume: positional()[0]!, ...o, stop: stopOnSignal() });
     console.log(`${r.runId}: resumed to ${(r.t / (365 * 86_400)).toFixed(2)} years; the stopped run's files are kept as ${r.runId}.stopped-<n>.*; ${r.logPath}`);
+    if (r.stopped) console.log(`${r.runId}: STOPPED again at day ${Math.floor(r.t / 86_400)}, not finished: ${r.stopped.why}\n  resume it with: ${resumeCommand(r.logPath, o)}`);
   } else if (cmd === "measure" && positional()[0]) {
     const dir = await measureDir(positional()[0]!);
     if (has("list")) for (const q of queries()) console.log(`${q.name.padEnd(22)} ${q.description}`);

@@ -2,62 +2,143 @@
 # Drive the run server (a Mac that's always on) from anywhere with SSH to it: a cloud session, a laptop.
 #   OIKOS_MINI=user@host   where it is (required)          OIKOS_MINI_DIR=oikos   the repo there, under its home
 #
-#   scripts/mini sync                      pull main there, install, rebuild the engine
+#   scripts/mini sync [--force]            pull main there, install, rebuild the engine (refused while a run is in
+#                                          progress there: its seeds would run on two engines; --force does it anyway)
 #   scripts/mini test [fast|all|<filter>]  run tests there (default: fast)
 #   scripts/mini run <name> <oikos run arguments...>
 #                                          start a run there, detached, into runs/<name>; it keeps the machine awake
 #                                          until it ends (a name already used is refused: runs are never overwritten)
-#   scripts/mini resume <name>             resume a stopped run (the model unreachable, a usage limit)
+#   scripts/mini resume <name> [run id] [oikos resume arguments...]
+#                                          resume a stopped run (the model unreachable, a usage limit, a stop): the
+#                                          one run in runs/<name> that stopped short, or the one named
 #   scripts/mini status [name]             what's running; for a run, how far it is and how it ended
 #   scripts/mini story <name> [participant]   what a model seat did, day by day
-#   scripts/mini stop <name>               stop a run (its log is kept)
+#   scripts/mini stop <name>               stop a run: its own processes only (by its recorded pid), asked to stop so
+#                                          that each closes its log; it can be resumed
 #   scripts/mini sh <command...>           anything else, in the repo there
+#
+# (OIKOS_MINI_LOCAL=<folder>: for testing this script itself, the commands run in that folder on this machine, no SSH.)
 set -euo pipefail
-: "${OIKOS_MINI:?set OIKOS_MINI=user@host (the run server)}"
+[ -n "${OIKOS_MINI_LOCAL:-}" ] || : "${OIKOS_MINI:?set OIKOS_MINI=user@host (the run server)}"
 DIR="${OIKOS_MINI_DIR:-oikos}"
 # A login shell there, and the places the tools are installed whatever its profile says (Homebrew keeps its rustup, so
 # cargo, out of its usual folder).
 TOOLS='export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.cargo/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/bin:$PATH"'
-remote() { ssh -o BatchMode=yes "$OIKOS_MINI" "bash -lc $(printf '%q' "$TOOLS; cd $DIR && $1")"; }
-q() { printf '%q ' "$@"; }
+remote() {
+  if [ -n "${OIKOS_MINI_LOCAL:-}" ]; then (cd "$OIKOS_MINI_LOCAL" && bash -c "$1")
+  else ssh -o BatchMode=yes "$OIKOS_MINI" "bash -lc $(printf '%q' "$TOOLS; cd $DIR && $1")"; fi
+}
+q() { [ $# -eq 0 ] || printf '%q ' "$@"; }  # (no arguments: nothing, not an empty one)
+# A run's name is a folder under runs/ (it may have folders in it: codex/pilot9), and nothing else.
+named() {
+  case "$1" in ""|/*|*..*|*[!A-Za-z0-9._/-]*) echo "not a run's name: '$1' (letters, digits, . _ - and /)" >&2; exit 2 ;; esac
+  printf '%s' "$1"
+}
+
+# What the commands below share, there. A run is a bun process running this repo's command (run, run-one or resume).
+HELPERS='
+RUN_PATTERN="orchestrator/src/cli\.ts (run|run-one|resume)( |$)"
+# Is this pid alive, and a run (not some other process that has since been given its number)?
+is_run() { kill -0 "$1" 2>/dev/null && ps -o command= -p "$1" 2>/dev/null | grep -Eq "$RUN_PATTERN"; }
+# Every run in progress on the machine, one pid a line.
+running_runs() { for p in $(pgrep -f "$RUN_PATTERN" || true); do case "$(ps -o comm= -p "$p" 2>/dev/null)" in *bun) echo "$p" ;; esac; done; }
+# Everything a process started, and what those started: its own descendants, and no one else.
+descendants() { local c; for c in $(pgrep -P "$1" || true); do echo "$c"; descendants "$c"; done; }
+# When a process began (with its pid, that is the process: a pid alone may be handed to another later).
+began() { ps -o lstart= -p "$1" 2>/dev/null | tr -s " " | sed "s/^ //; s/ \$//"; }
+'
 
 cmd="${1:-status}"; shift || true
 case "$cmd" in
-  sync)   remote "git pull --ff-only && bun install && bun run kernel 2>&1 | tail -2 && git log --oneline -1" ;;
+  sync)   force="${1:-}"
+          remote "$HELPERS"'
+                  force='"$(q "$force")"'
+                  going=$(running_runs)
+                  if [ -n "$going" ] && [ "$force" != "--force" ]; then
+                    echo "a run is in progress here (pid $(echo $going | tr "\n" " ")): not rebuilding the engine under it."
+                    echo "Wait for it, or stop it (scripts/mini stop <name>), or: scripts/mini sync --force"
+                    exit 1
+                  fi
+                  git pull --ff-only && bun install && bun run kernel 2>&1 | tail -2 && git log --oneline -1' ;;
   test)   case "${1:-fast}" in
             fast) remote "bun run test:fast 2>&1 | tail -15" ;;
             all)  remote "bun run test:all 2>&1 | grep -E '^FAIL|^== | pass, ' ; true" ;;
             *)    remote "bun scripts/test.ts $(q "$@") 2>&1 | tail -30" ;;
           esac ;;
-  run)    name="${1:?a name for the run}"; shift
+  run)    name="$(named "${1:?a name for the run}")"; shift
           remote "[ ! -e runs/$name ] || { echo 'runs/$name exists: pick another name (runs are never overwritten)'; exit 1; }
                   mkdir -p runs/$name
                   nohup bun orchestrator/src/cli.ts run $(q "$@") --out runs/$name > runs/$name/console.txt 2>&1 &
                   pid=\$!; echo \$pid > runs/$name/pid
                   nohup caffeinate -i -w \$pid > /dev/null 2>&1 &
-                  sleep 5; echo started runs/$name, pid \$pid; tail -2 runs/$name/console.txt" ;;
-  resume) name="${1:?the name of the run}"; shift
-          remote "log=\$(ls runs/$name/*.jsonl* | grep -v anchors | grep -v stopped | head -1)
-                  nohup bun orchestrator/src/cli.ts resume \$log $(q "$@") >> runs/$name/console.txt 2>&1 &
-                  pid=\$!; echo \$pid > runs/$name/pid
-                  nohup caffeinate -i -w \$pid > /dev/null 2>&1 &
-                  sleep 5; echo resumed runs/$name, pid \$pid; tail -2 runs/$name/console.txt" ;;
+                  sleep ${OIKOS_MINI_SETTLE:-5}; echo started runs/$name, pid \$pid; tail -2 runs/$name/console.txt" ;;
+  resume) name="$(named "${1:?the name of the run}")"; shift
+          # Which run: the one named (its plain log, or its compressed one if that is all there is: the command writes it
+          # out plain, and keeps it), or the folder, and the command finds the one run in it that stopped short. Never a
+          # log a resume left behind (<run>.stopped-<n>).
+          run=""; case "${1:-}" in ""|--*) ;; *) run="$(named "$1")"; shift ;; esac
+          remote "$HELPERS"'
+                  name='"$(q "$name")"'; run='"$(q "$run")"'
+                  [ -d "runs/$name" ] || { echo "runs/$name: no such run"; exit 1; }
+                  if [ -f "runs/$name/pid" ] && is_run "$(cat "runs/$name/pid")"; then echo "runs/$name is still running (pid $(cat "runs/$name/pid")): stop it first, or wait"; exit 1; fi
+                  what="runs/$name"
+                  if [ -n "$run" ]; then
+                    case "$run" in *.stopped-*) echo "$run is what a resume left behind, not a run to resume"; exit 1 ;; esac
+                    if [ -f "runs/$name/$run.jsonl" ]; then what="runs/$name/$run.jsonl"
+                    elif [ -f "runs/$name/$run.jsonl.zst" ]; then what="runs/$name/$run.jsonl.zst"
+                    else echo "runs/$name has no log for $run"; exit 1; fi
+                  fi
+                  nohup bun orchestrator/src/cli.ts resume "$what" '"$(q "$@")"' >> "runs/$name/console.txt" 2>&1 &
+                  pid=$!; echo $pid > "runs/$name/pid"
+                  nohup caffeinate -i -w $pid > /dev/null 2>&1 &
+                  sleep '"${OIKOS_MINI_SETTLE:-5}"'; echo "resumed $what, pid $pid"; tail -2 "runs/$name/console.txt"' ;;
   status) if [ -z "${1:-}" ]; then
             remote "git log --oneline -1; echo; echo running:; pgrep -fl 'cli.ts (run|run-one|resume)' | cut -c1-160 || echo '  nothing'; echo; echo latest runs:; ls -t runs | head -8"
           else
-            name="$1"
+            name="$(named "$1")"
             remote "if [ -f runs/$name/pid ] && kill -0 \$(cat runs/$name/pid) 2>/dev/null; then echo running; else echo not running; fi
-                    log=\$(ls runs/$name/*.jsonl 2>/dev/null | grep -v anchors | head -1)
+                    log=\$(ls runs/$name/*.jsonl 2>/dev/null | grep -v anchors | grep -v '\\.stopped-' | grep -v translator-corpus | head -1)
                     if [ -n \"\$log\" ]; then
                       t=\$(tail -c 2000 \$log | grep -o '\"t\":[0-9]*' | tail -1 | cut -d: -f2); echo \"simulated day \$((t / 86400))\"
                       echo \"model calls: \$(grep -c '\"annotation\":\"usage\"' \$log)\"
                     fi
                     echo; tail -12 runs/$name/console.txt" ;
           fi ;;
-  story)  name="${1:?the name of the run}"; who="${2:-}"
-          remote "log=\$(ls runs/$name/*.jsonl* | grep -v anchors | grep -v stopped | head -1); bun orchestrator/src/cli.ts story \$log $who" ;;
-  stop)   name="${1:?the name of the run}"
-          remote "pkill -f \"out runs/$name\" && echo stopped runs/$name || echo 'not running'; pkill -f 'codex exec' || true" ;;
+  story)  name="$(named "${1:?the name of the run}")"; who="${2:-}"
+          remote "log=\$(ls runs/$name/*.jsonl* | grep -v anchors | grep -v '\\.stopped-' | grep -v translator-corpus | grep -v '\\.partial\$' | head -1); bun orchestrator/src/cli.ts story \$log $(q "$who")" ;;
+  stop)   name="$(named "${1:?the name of the run}")"
+          # By the run's recorded pid, and that process's own descendants: never by matching names (pilot1 is not
+          # pilot10), and never another run's model calls. The run's processes are asked to stop (TERM): each stops
+          # before its next moment and closes its log. What they leave behind after that (a model call still out) is
+          # ended too. Nothing is killed outright: what won't go is reported.
+          remote "$HELPERS"'
+                  name='"$(q "$name")"'; wait_s='"$(q "${OIKOS_MINI_STOP_WAIT:-150}")"'
+                  [ -f "runs/$name/pid" ] || { echo "runs/$name has no recorded pid (not started with scripts/mini run): nothing stopped"; exit 1; }
+                  pid=$(cat "runs/$name/pid")
+                  case "$pid" in ""|*[!0-9]*) echo "runs/$name/pid does not hold a pid: nothing stopped"; exit 1 ;; esac
+                  if ! is_run "$pid"; then echo "not running"; exit 0; fi
+                  # The run and everything under it. Its runs (the batch, each seed) are asked to stop; whatever else it
+                  # started is noted with when it began, to be ended afterwards if it is still there.
+                  runs=""; others=""
+                  for p in $pid $(descendants "$pid"); do
+                    if is_run "$p"; then runs="$runs $p"; else others="$others$p $(began "$p")
+"; fi
+                  done
+                  kill -TERM $runs 2>/dev/null || true
+                  echo "asked to stop: runs/$name (pid$runs); waiting for the log to be closed"
+                  i=0
+                  while [ "$i" -lt "$wait_s" ]; do
+                    left=""; for p in $runs; do if kill -0 "$p" 2>/dev/null; then left="$left $p"; fi; done
+                    [ -z "$left" ] && break
+                    sleep 1; i=$((i + 1))
+                  done
+                  # What the run started and left (a model call still out, say): its own, checked to be the same processes.
+                  printf "%s" "$others" | while read -r p when; do
+                    if [ -n "$when" ] && [ "$(began "$p")" = "$when" ]; then kill -TERM "$p" 2>/dev/null && echo "ended what it left: pid $p"; fi
+                  done
+                  left=""; for p in $runs; do if kill -0 "$p" 2>/dev/null; then left="$left $p"; fi; done
+                  if [ -n "$left" ]; then echo "still going after $wait_s s (pid$left): finishing up (measuring), or stuck. Look again: scripts/mini status $name"
+                  else echo "stopped runs/$name; resume it with: scripts/mini resume $name"; fi' ;;
   sh)     remote "$*" ;;
-  *)      sed -n '2,17p' "$0"; exit 1 ;;
+  *)      sed -n '2,20p' "$0"; exit 1 ;;
 esac

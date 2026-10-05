@@ -142,6 +142,8 @@ There's no mandate and no approval queue: approvals are people acting on records
 
 Hash-chained JSONL, written only by the kernel. **Commands** (`act`, `advance`, `observe`, `look`, `opt_out`) are the only replay inputs; they name the participant and its capacity. Events, checkpoints and the end entry are regenerated on replay and compared byte for byte. Annotations (usage and cost, transcripts, drafts, sign-offs) are carried through verbatim. Witness anchors go in a separate file.
 
+A model call that fails (after its adapter's own time limits and retries) is recorded as a `model_call_failed` annotation (added 2026-10-05), where its transcript would have been: `subject`, and `data` with `purpose`, `ref` (if the call had one), `t`, `provider`, `model`, `system_sha256`, `turn` and `input` as a transcript has them, and `error` (the failure, in words). It has no output, and no usage annotation goes with it. The run went on, so the failure is part of what happened: a resumed run is served it as a failure at the same point.
+
 **Events** (one exact shape each):
 - `action_applied`, `action_refused`;
 - `transfer`, which names the participant that executed it;

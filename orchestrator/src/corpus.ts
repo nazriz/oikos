@@ -7,9 +7,8 @@
 // Logs from real-model runs are the only source of this data and can't be made again: keep them (never delete a
 // language-model run's log).
 
-import { readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
-import { isLog, logLines, runOf } from "./logs";
+import { statSync } from "node:fs";
+import { currentLogs, logLines, runOf } from "./logs";
 
 export interface CorpusExample {
   run: string;
@@ -41,10 +40,11 @@ export interface CorpusExample {
   executed?: { seq: number; applied: boolean; refusal?: unknown };
 }
 
-/** The logs in a folder (a run's, or a batch's), or one log. */
+/** The logs in a folder (a run's, or a batch's), each run once (its current log: what a resumed run left behind,
+ * `<run>.stopped-<n>.jsonl`, holds the same answers again, and is read only when named), or one log. */
 export function logsIn(path: string): string[] {
   if (!statSync(path).isDirectory()) return [path];
-  return readdirSync(path).filter(isLog).sort().map((f) => join(path, f));
+  return currentLogs(path);
 }
 
 /** The translator corpus of one log. */

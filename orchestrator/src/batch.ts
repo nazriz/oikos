@@ -11,14 +11,14 @@
 // (measure/, DuckDB over Parquet); and the cost report (cost.txt, cost.json).
 
 import { availableParallelism } from "node:os";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
 import { chooseModel } from "./models";
 import { KernelDied, kernelBinary } from "./kernel";
-import { compressLog } from "./logs";
-import { recordedCalls, prepareResume, Serving } from "./resume";
+import { clearForFreshRun, compressLog, isLog, isStoppedLog, logsOf, realModelIn } from "./logs";
+import { logToResume, recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
 import type { LlmAdapter } from "@oikos/participants/llm";
 import { stallMs, Watchdog } from "./watchdog";
@@ -72,13 +72,14 @@ export async function loadModules(file?: string): Promise<RunOptions["modules"]>
 
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). */
-export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
+export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   let consult = !!o.consult;
   // What an audit found unstable (its report's avoid list), left out of the sparse mind.
   let consultAvoid: string[] | undefined = o.consultAvoid ? (JSON.parse(await Bun.file(o.consultAvoid).text()).avoid as string[]) : undefined;
   if (o.resume) {
-    const r = prepareResume(o.resume);
+    // (A compressed log is written out plain first, and kept; a folder names its one run that stopped short.)
+    const r = prepareResume(await logToResume(o.resume));
     ({ config, runId, outDir: out, stoppedLog } = r);
     consult = r.consult;
     consultAvoid = r.consultAvoid;
@@ -89,7 +90,8 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
     if (o.logDetail) config.log = { ...config.log, detail: o.logDetail };
     runId = runIdFor(o.world!, o.seed!);
     out = o.out ?? "runs";
-    for (const f of [`${runId}.jsonl`, `${runId}.jsonl.zst`, `${runId}.anchors.jsonl`, `${runId}.summary.json`, `${runId}.failure.json`]) rmSync(join(out, f), { force: true });
+    // Runs are never overwritten: a folder that already holds this run's log refuses a fresh one (logs.ts).
+    await clearForFreshRun(out, runId, o.overwrite);
   }
   // A real model (or the mock, by default): its adapter, price and the run's spending limit.
   const real = o.model ? chooseModel(o.model, { budgetUsd: o.budgetUsd, baseUrl: o.baseUrl }) : undefined;
@@ -104,7 +106,7 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(o.recordObservations ? { recordObservations: recordWho(o.recordObservations) } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(o.recordObservations ? { recordObservations: recordWho(o.recordObservations) } : {}),
       ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
       ...(serving ? { resumedFrom: { log: basename(stoppedLog!), serving } } : {}) });
@@ -122,10 +124,32 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
   return rec;
 }
 
+/** A request to stop from outside (a TERM signal: cli.ts). A run stops before its next moment, its log closed, to be
+ * resumed; a batch starts no more seeds, and passes the request on to those under way. */
+export interface StopSignal {
+  requested?: string;
+  /** Set by whatever is running, to be told at once. */
+  onRequest?: () => void;
+}
+
+/** The command that resumes a run that stopped, with the models and limit it ran with. */
+export function resumeCommand(logPath: string, o: { model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; modules?: string } = {}): string {
+  return ["oikos", "resume", logPath, ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(o.budgetUsd !== undefined ? ["--budget", String(o.budgetUsd)] : []),
+    ...(o.baseUrl ? ["--base-url", o.baseUrl] : []), ...(o.modules ? ["--modules", resolve(o.modules)] : [])].join(" ");
+}
+
 export interface BatchOptions {
   world: string;
   seeds: number;
   out?: string;
+  /**
+   * Run again into a folder that already holds these runs, replacing them. Never the default: runs are never
+   * overwritten, and a batch into a folder that holds its runs' logs (or a batch's measures) refuses to start. For
+   * tests, which run again into their own folders. Even so, nothing replaces a log that holds a real model's answers.
+   */
+  overwrite?: boolean;
+  /** A request to stop from outside (cli.ts sets it on a TERM signal). */
+  stop?: StopSignal;
   parallel?: number;
   until?: number;
   sets?: string[];
@@ -169,6 +193,10 @@ export interface BatchResult {
   runs: RunRecord[];
   /** Seeds that didn't finish (D59), with what went wrong: the others are measured and reported as usual. */
   failed: { seed: number; reason: string; diagnosis?: object }[];
+  /** Runs (among `runs`) that stopped before they were meant to, to be resumed: why, and the command that resumes each. */
+  stopped: { seed: number; runId: string; t: number; why: string; by: string; resume: string }[];
+  /** What went wrong after the runs, measuring or compressing them (the runs themselves, and batch.json, are there). */
+  problems: string[];
   measureDir?: string;
   costText?: string;
 }
@@ -189,6 +217,20 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const out = resolve(o.out ?? join("runs", basename(o.world).replace(/\.(json|ya?ml)$/, "")));
   mkdirSync(out, { recursive: true });
   const seeds = Array.from({ length: o.seeds }, (_, i) => Number(config.seed) + i);
+  // Runs are never overwritten: a folder that already holds any of these runs, or a batch's measures, refuses another
+  // (before anything is started, so that no seed runs while another is refused). `overwrite` is the deliberate
+  // exception, and even then nothing in the folder that holds a real model's answers may be replaced.
+  const measureDir = join(out, "measure");
+  if (!o.overwrite) {
+    const there = seeds.flatMap((seed) => logsOf(out, runIdFor(o.world, seed)));
+    if (there.length) throw new Error(`${there[0]} exists${there.length > 1 ? ` (and ${there.length - 1} more of this batch's logs)` : ""}: these runs are already in ${out}, and runs are never overwritten. Choose another --out, or resume a run that stopped (oikos resume ${there.find((l) => !isStoppedLog(l)) ?? there[0]}).`);
+    if (o.measure !== false && existsSync(measureDir)) throw new Error(`${measureDir} exists: ${out} already holds a batch's measures, which this batch would replace. Choose another --out.`);
+  } else {
+    for (const f of readdirSync(out).filter((f) => isLog(f) || isStoppedLog(f))) {
+      const real = await realModelIn(join(out, f));
+      if (real) throw new Error(`${join(out, f)} holds a real model's answers (${real}): nothing in its folder is overwritten, whatever was asked. Choose another --out.`);
+    }
+  }
   const parallel = Math.max(1, Math.min(seeds.length, o.parallel ?? Math.floor(availableParallelism() / 2)));
   const started = new Date();
   log(`${seeds.length} run${seeds.length === 1 ? "" : "s"} of ${o.world}${sets.length ? ` (${sets.join(", ")})` : ""}, ${parallel} at a time, into ${out}`);
@@ -196,7 +238,15 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   // Each seed in its own process: the kernel and the participants of one run never share a process with another's.
   const runs: RunRecord[] = [];
   const failed: BatchResult["failed"] = [];
+  const stopped: BatchResult["stopped"] = [];
   const queue = [...seeds];
+  // Asked to stop (a TERM signal): no more seeds are started, and those under way are asked to stop in their turn (each
+  // closes its log, and is reported below with the command that resumes it).
+  const children = new Set<{ kill(signal?: NodeJS.Signals | number): void }>();
+  if (o.stop) o.stop.onRequest = () => {
+    for (const seed of queue.splice(0)) failed.push({ seed, reason: `not started: the batch was asked to stop (${o.stop!.requested ?? "a signal"})` });
+    for (const c of children) c.kill("SIGTERM");
+  };
   const worker = async () => {
     for (let seed = queue.shift(); seed !== undefined; seed = queue.shift()) {
       // This run's spending limit: the per-run limit, or what's left of the batch's, whichever is less.
@@ -215,9 +265,11 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       }
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
         ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
-        ...(o.modules ? ["--modules", resolve(o.modules)] : [])];
+        ...(o.modules ? ["--modules", resolve(o.modules)] : []), ...(o.overwrite ? ["--overwrite"] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: { ...process.env } }); // (the environment as it is now)
+      children.add(p);
       const [code, err] = await Promise.all([p.exited, new Response(p.stderr).text()]);
+      children.delete(p);
       // Freed: the limit held for it; counted: what it spent (a run that failed may have spent up to its limit).
       if (batchLimit !== undefined) {
         batchHeld -= held;
@@ -244,7 +296,13 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       }
       const rec = JSON.parse(readFileSync(join(out, `${runIdFor(o.world, seed)}.summary.json`), "utf8")) as RunRecord;
       runs.push(rec);
-      log(`  seed ${seed}: ${(rec.t / (365 * 86_400)).toFixed(2)} years, ${rec.commands.toLocaleString("en-US")} commands, ${rec.refused} refused, ${(rec.wallMs / 1000).toFixed(0)} s; final state ${rec.stateHash.slice(0, 16)}`);
+      if (rec.stopped) {
+        // It didn't get to its end: said plainly, with why and how to go on. (It's measured with the rest, as far as it got.)
+        const resume = resumeCommand(rec.logPath, { ...o, budgetUsd: limitUsd });
+        stopped.push({ seed, runId: rec.runId, t: rec.t, why: rec.stopped.why, by: rec.stopped.by, resume });
+        log(`  seed ${seed}: STOPPED at ${(rec.t / (365 * 86_400)).toFixed(2)} years (day ${Math.floor(rec.t / 86_400)}), not finished: ${rec.stopped.why}`);
+        log(`    resume it with: ${resume}${rec.stopped.by === "SpendingLimitReached" ? "  (with a higher --budget: it stopped at this one)" : ""}`);
+      } else log(`  seed ${seed}: ${(rec.t / (365 * 86_400)).toFixed(2)} years, ${rec.commands.toLocaleString("en-US")} commands, ${rec.refused} refused, ${(rec.wallMs / 1000).toFixed(0)} s; final state ${rec.stateHash.slice(0, 16)}`);
       for (const w of healthWarnings(rec)) log(`    ! ${w}`);
     }
   };
@@ -252,9 +310,34 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   runs.sort((a, b) => a.seed - b.seed);
 
   failed.sort((a, b) => a.seed - b.seed);
-  const result: BatchResult = { out, runs, failed };
-  if (o.measure !== false && runs.length) {
-    const measureDir = join(out, "measure");
+  stopped.sort((a, b) => a.seed - b.seed);
+  const problems: string[] = [];
+  const result: BatchResult = { out, runs, failed, stopped, problems };
+  // What ran is written down before anything else is done with it, and again at the end: if measuring or compressing
+  // fails, the batch's runs still have their manifest, and it says what went wrong.
+  const recipes = new Map<string, string>();
+  const manifest = () => writeFileSync(join(out, "batch.json"), JSON.stringify({
+    world: o.world, sets, ...(spec ? { spec, generator } : {}), config_seed: config.seed, seeds, parallel, until: o.until ?? null,
+    ...(batchLimit !== undefined ? { spending: { limit_microusd: batchLimit, spent_microusd: batchSpent } } : {}),
+    orchestrator: ORCHESTRATOR_VERSION, measure: o.measure !== false ? MEASURE_VERSION : null,
+    started: started.toISOString(), finished: new Date().toISOString(), wall_ms: Date.now() - started.getTime(),
+    runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, log: r.logPath || null, anchors: r.logPath ? r.anchorsPath : null, ...(recipes.has(r.runId) ? { recipe: recipes.get(r.runId) } : {}), state_hash: r.stateHash, t: r.t,
+      end: r.end, ...(r.stopped ? { stopped: { ...r.stopped, resume: stopped.find((x) => x.runId === r.runId)?.resume } } : {}),
+      commands: r.commands, refused: r.refused, wakes: r.wakes, wall_ms: r.wallMs, health: r.health, warnings: healthWarnings(r) })),
+    failed,
+    ...(problems.length ? { problems } : {}),
+  }, null, 2));
+  manifest();
+  const step = async (what: string, fn: () => Promise<void>) => {
+    try {
+      await fn();
+    } catch (e) {
+      problems.push(`${what}: ${(e as Error).message}`);
+      log(`  ! ${what} failed: ${(e as Error).message}`);
+    }
+  };
+  if (o.measure !== false && runs.length) await step("measuring the runs", async () => {
+    // (Only ever a folder this batch may replace: checked before any run started.)
     rmSync(measureDir, { recursive: true, force: true });
     await exportLogs(runs.map((r) => r.logPath), measureDir);
     const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
@@ -262,10 +345,9 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     writeFileSync(join(out, "cost.json"), JSON.stringify({ ...cost, text: undefined }, null, 2));
     result.measureDir = measureDir;
     result.costText = cost.text;
-  }
+  });
   // Only the measures kept, if asked and the runs can be regenerated; else compressed once measured, if asked (about a
   // seventh the size; everything that reads logs reads these too).
-  const recipes = new Map<string, string>();
   if (o.keep === "measures") {
     const why = !result.measureDir ? "they weren't measured" : cannotRegenerate(config, o);
     if (why) log(`  ! keeping the logs: ${why}`);
@@ -281,16 +363,11 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       r.logPath = "";
     }
   }
-  if (o.compress) for (const r of runs) if (r.logPath) r.logPath = await compressLog(r.logPath);
-  const finished = new Date();
-  writeFileSync(join(out, "batch.json"), JSON.stringify({
-    world: o.world, sets, ...(spec ? { spec, generator } : {}), config_seed: config.seed, seeds, parallel, until: o.until ?? null,
-    ...(batchLimit !== undefined ? { spending: { limit_microusd: batchLimit, spent_microusd: batchSpent } } : {}),
-    orchestrator: ORCHESTRATOR_VERSION, measure: o.measure !== false ? MEASURE_VERSION : null,
-    started: started.toISOString(), finished: finished.toISOString(), wall_ms: finished.getTime() - started.getTime(),
-    runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, log: r.logPath || null, anchors: r.logPath ? r.anchorsPath : null, ...(recipes.has(r.runId) ? { recipe: recipes.get(r.runId) } : {}), state_hash: r.stateHash, t: r.t, commands: r.commands, refused: r.refused, wakes: r.wakes, wall_ms: r.wallMs, health: r.health, warnings: healthWarnings(r) })),
-    failed,
-  }, null, 2));
+  // (A run that stopped to be resumed stays as it is, plain: it isn't finished, and its resume command names this file.)
+  if (o.compress) for (const r of runs) if (r.logPath && !r.stopped) await step(`compressing ${r.logPath}`, async () => {
+    r.logPath = await compressLog(r.logPath);
+  });
+  manifest();
   return result;
 }
 
