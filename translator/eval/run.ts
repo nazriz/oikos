@@ -12,6 +12,8 @@ import { CASES, type Case } from "./cases";
 import { leaks } from "./held-out";
 
 export { heldOutPath, leaks, loadHeldOut } from "./held-out";
+// The real requests (the pilots' seats, word for word), run and scored by shape: the third group.
+export { evaluateReal, passesReal, realKnowledge, realReportText, shapeOf, PILOT_CASES, GAPS, type RealCase, type RealReport, type RealResult } from "./pilot-run";
 
 /** The test town's money: its profile's (the cases' amounts are written in it). */
 export const TEST_CURRENCY: Currency = PROFILE.values.currency;
