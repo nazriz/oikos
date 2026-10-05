@@ -216,6 +216,7 @@ fn leave_spaces(s: &Statics, st: &mut State, sid: &str, who: Option<&str>, only:
         }
     }
     for (space, body) in &left {
+        st.left_space(sid, body);
         st.record_departure(space, body, reason);
         events.push(Timed::new(t, EventBody::Vacated { occupant: body.clone(), space: space.clone(), by: by.map(String::from), reason }));
     }
@@ -1636,7 +1637,7 @@ impl<'a> Exec<'a> {
                     self.st.touch_structure(&other);
                 }
                 settle(self.s, self.st, &sid);
-                self.st.occupancy.entry(sid.clone()).or_default().entry(space.clone()).or_default().insert(who.clone());
+                self.st.enter(&sid, &space, &who);
                 self.st.touch_structure(&sid);
                 self.st.moved(&who);
                 self.emit(EventBody::Occupied { occupant: who, space, by: self.participant.into() });

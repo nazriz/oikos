@@ -194,6 +194,7 @@ impl World {
             cells,
             structures: crate::state::Map::new(),
             occupancy: crate::state::Map::new(),
+            whereabouts: Default::default(),
             departures: crate::state::Map::new(),
             records: crate::state::Map::new(),
             marks: Default::default(),
@@ -274,7 +275,7 @@ impl World {
         }
         for o in &w.occupancy {
             let (sid, _) = crate::config::split_space(&o.space).expect("validated");
-            st.occupancy.entry(sid.to_string()).or_default().entry(o.space.clone()).or_default().insert(o.occupant.clone());
+            st.enter(sid, &o.space, &o.occupant);
         }
         for r in &w.records {
             st.store(r.clone());

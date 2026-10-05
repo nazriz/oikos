@@ -43,6 +43,11 @@ pub struct State {
     pub structures: Map<Id, Structure>,
     /// structure -> space -> the bodies in it
     pub occupancy: Map<Id, BTreeMap<Id, BTreeSet<Id>>>,
+    /// body -> the structures it's in (in any space), in id order: derived from `occupancy` and kept with it (`enter`,
+    /// `left_space`), never serialised, so the state and its hash are unchanged. For finding where someone is without
+    /// looking through every building (`structures_of`).
+    #[serde(skip)]
+    pub whereabouts: Map<Id, BTreeSet<Id>>,
     /// space -> its last few departures (who left, why, when): what those who can see who's there also see.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub departures: Map<Id, Vec<Departure>>,
@@ -663,7 +668,34 @@ impl State {
 
     /// Structures a body is in (in any space).
     pub fn structures_of(&self, person: &str) -> Vec<Id> {
+        let found: Vec<Id> = self.whereabouts.get(person).map(|s| s.iter().cloned().collect()).unwrap_or_default();
+        debug_assert_eq!(found, self.structures_of_by_scan(person), "whereabouts out of step with occupancy for {person}");
+        found
+    }
+
+    /// The same, by looking through every building: what `whereabouts` must always agree with (checked in debug
+    /// builds, so by every kernel test that moves anyone, and by a test of its own).
+    pub fn structures_of_by_scan(&self, person: &str) -> Vec<Id> {
         self.occupancy.iter().filter(|(_, spaces)| spaces.values().any(|b| b.contains(person))).map(|(s, _)| s.clone()).collect()
+    }
+
+    /// Put a body into a space of a structure (the only way into `occupancy`, so `whereabouts` keeps step).
+    pub fn enter(&mut self, sid: &str, space: &str, body: &str) {
+        self.occupancy.entry(sid.to_string()).or_default().entry(space.to_string()).or_default().insert(body.to_string());
+        self.whereabouts.entry(body.to_string()).or_default().insert(sid.to_string());
+    }
+
+    /// A body has been taken out of a space of a structure: if it's in no other space of it, it's no longer there.
+    pub fn left_space(&mut self, sid: &str, body: &str) {
+        if self.occupancy.get(sid).is_some_and(|m| m.values().any(|b| b.contains(body))) {
+            return;
+        }
+        if let Some(set) = self.whereabouts.get_mut(body) {
+            set.remove(sid);
+            if set.is_empty() {
+                self.whereabouts.remove(body);
+            }
+        }
     }
 
     /// The body of a person, if it is one.

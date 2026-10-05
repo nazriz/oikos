@@ -398,6 +398,12 @@ fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
                 prop_assert!(after.body(b).is_some_and(|x| x.alive && x.present), "{} is in a space without being alive and in the world", b);
             }
         }
+        // Where each body is, as kept with the state (the lookup), is what looking through every building finds: for
+        // every body that is somewhere or was, and nobody is kept who is nowhere.
+        for (b, _) in after.entities.iter().filter(|(_, e)| e.body.is_some()) {
+            prop_assert_eq!(after.whereabouts.get(b).map(|s| s.iter().cloned().collect::<Vec<_>>()).unwrap_or_default(), after.structures_of_by_scan(b), "the lookup of where {} is disagrees with the buildings", b);
+        }
+        prop_assert!(after.whereabouts.values().all(|s| !s.is_empty()), "the lookup keeps a body that is nowhere");
 
         // 2. A refused action changes nothing (beyond minting its action id and queuing its outcome).
         if let Some(EventBody::ActionRefused { code, .. }) = resp.events.first().map(|e| &e.body) {
