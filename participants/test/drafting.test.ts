@@ -12,6 +12,11 @@ import { Book, breaches, draftLaw, figureWords, type LawSchedule } from "../src/
 import { councilClerk, financeOfficer, mayorCode, ratesOfficer, taxClerk } from "../src/behaviour/government";
 import { planningOfficer } from "../src/behaviour/institutions";
 import { Randomness } from "../src/rng";
+import { inCurrency } from "../src/money";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+
+// (Amounts are worded in a world's own money: this test's is the profile's.)
+inCurrency(PROFILE.values.currency);
 
 const DAY = 86_400;
 const ctx = (participant: string, params: object, position?: string): any => ({ participant, entity: "city", position, rng: (k: string) => new Randomness(1n).stream([k]), world: { tickSeconds: 3600, runEnd: 800 * DAY }, params });
