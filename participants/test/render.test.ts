@@ -56,12 +56,12 @@ test("a language-model participant with on-request reports can look at them, in 
 test("a language-model participant can look things up in an on-request report: what to find, newest first", async () => {
   const { createLlmParticipant } = await import("../src/llm/participant");
   const { MockAdapter } = await import("../src/llm/adapter");
-  const input = { report: "files", find: [{ field: "kind", value: "petition" }, { field: "data.employer", op: "=", value: "works" }, { field: "id; drop table", value: "x" }], limit: 5 };
+  const input = { report: "files", find: [{ field: "kind", value: "petition" }, { field: "data.employer", op: "=", value: "works" }], limit: 5 };
   const adapter = new MockAdapter("mock", { participant: () => [{ type: "tool_use", id: "1", name: "look", input }] });
   const participant = createLlmParticipant({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["files", "The town's files"]]), onRequest: ["files"], cadenceDays: 7, draftText: () => "" },
     { adapter, annotate: async () => {}, now: () => 0 });
   const a = await participant.step(obs({}), { world: { config: {}, currency: PROFILE.values.currency } } as any);
-  // (A field the participant API doesn't know is left out, not passed on.)
+  // (Something to find that can't be read is said, not left out: llm-participant.test.ts.)
   expect(a).toEqual({ type: "look", looks: [{ channel: "files", query: { where: [{ field: "kind", op: "=", value: "petition" }, { field: "data.employer", op: "=", value: "works" }], order: { field: "at", desc: true }, limit: 5 } }] });
 });
 
@@ -160,4 +160,166 @@ test("a law's rule is shown to whoever reads it, and that acts are checked again
   const report = renderObservation(obs, { standing: new Set(), titles: new Map() });
   expect(report).toContain("Offices and others check what they do against it.");
   for (const shown of [onFile, report]) expect(shown).not.toContain("block.");
+});
+
+test("everything that comes back from an act is told: what it made, what a survey estimated, what an investigation found, and any part with no words of its own yet", async () => {
+  const { outcomeLines } = await import("../src/llm/render");
+  const api = JSON.parse(await Bun.file(new URL("../../contracts/participant-api.schema.json", import.meta.url)).text());
+  const done = { action: "act.9", t: 0, status: "applied", created: { new_lease: "rec.12" },
+    surveyed: { of: "river_trout", cells: { "cell.1.2": 14, "cell.1.3": 0 } },
+    investigated: { from: "shop-1", at: "shop-1/store.1", kind: "goods", taken: true, taker: "c0042" } };
+  const refused = { action: "act.10", t: 0, status: "refused", refusal: { code: "insufficient_funds", block: 2, detail: "block 2: acc-city holds 100 cents" } };
+  // (Between them they carry every part the participant API lets an outcome have: a part added there is added here.)
+  expect(new Set([...Object.keys(done), ...Object.keys(refused)])).toEqual(new Set(Object.keys(api.$defs.Outcome.properties)));
+  expect(new Set(Object.keys(refused.refusal))).toEqual(new Set(Object.keys(api.$defs.Outcome.properties.refusal.properties)));
+
+  const text = renderObservation(obs({}, { outcomes: [done] }), { lastAction: "What you confirmed" });
+  expect(text).toContain("Done: what you confirmed.");
+  expect(text).toContain("It made: rec.12 (new lease).");
+  expect(text).toContain("What the survey of river trout found, place by place (estimates): cell.1.2: 14; cell.1.3: 0. In all: 14.");
+  expect(text).toContain("What the investigation into goods taken from shop-1 at shop-1/store.1 found: it was taken, by c0042.");
+  const no = renderObservation(obs({}, { outcomes: [refused] }), { lastAction: "What you confirmed" });
+  expect(no).toContain("What you confirmed couldn't be done: the account doesn't have enough money (item 3).");
+  // The act's own number and the engine's wording of why not are the platform's: never shown (principle 14).
+  for (const shown of [text, no]) for (const machinery of ["act.9", "act.10", "acc-city holds", "block", "applied", "refus"]) expect(shown).not.toContain(machinery);
+
+  // An investigation that found nothing taken, or not who; a survey of one place; another day's outcome is dated.
+  const line = (o: object) => outcomeLines({ action: "a", t: 0, status: "applied", ...o } as any, "What you did", 0).join("\n");
+  expect(line({ investigated: { from: "shop-1", at: "s", kind: "goods", taken: false, taker: null } })).toContain("found: nothing of the kind was found to have been taken there.");
+  expect(line({ investigated: { from: "shop-1", at: "s", kind: "goods", taken: true, taker: null } })).toContain("found: it was taken, but who took it wasn't found.");
+  expect(line({ surveyed: { of: "water", cells: { "cell.0.0": 1200 } } })).toContain("(estimates): cell.0.0: 1,200.");
+  expect(outcomeLines({ action: "a", t: 0, status: "applied" }, "What you did", 3 * 86_400)[0]).toBe("Done (year 1, day 1): what you did.");
+  // A part an outcome doesn't have today (in it, in a finding, or in why not) is told by its name, not dropped.
+  expect(line({ weighed: { tonnes: 4, at: "weighbridge" } })).toContain("Weighed: tonnes: 4; at: weighbridge.");
+  expect(line({ investigated: { from: "x", at: "y", kind: "goods", taken: true, taker: "c1", seen_by: "c2" } })).toContain("by c1. Seen by: c2.");
+  expect(line({ surveyed: { of: "water", cells: {}, margin: 5 } })).toContain("Margin: 5.");
+  expect(outcomeLines({ action: "a", t: 0, status: "refused", refusal: { code: "too_far", nearest: "cell.4.4" } } as any, "What you did", 0)[0]).toBe("What you did couldn't be done: they're too far away. Nearest: cell.4.4.");
+});
+
+const variable = (value: number, per_day: number, max = 100_000) => ({ value, as_of_day: 0, per_day, min: 0, max });
+const house = (i: number, variables?: object, spaces = 1): any => ({ structure: `house-${i}`, type: "large_house", at: `cell.${i}.0`, w: 1, h: 1, complete: true, ...(variables ? { variables } : {}),
+  spaces: Array.from({ length: spaces }, (_, n) => ({ space: `house-${i}/dwelling.${n + 1}`, kind: "dwelling", capacity: 4, count: n === 0 ? 2 : 0 })) });
+const sites = (structures: any[], open: any[] = []) => ({ kind: "sites", as_of: 0, cells: [...structures.map((s, i) => ({ cell: s.at, x: i, y: 0, structure: s })), ...open] });
+
+test("a building's state is told, whatever the world calls it: how much today and which way it's going", () => {
+  // Seen on day 0, read on day 10: the value has moved on by its daily change, within its bounds.
+  const text = renderObservation(obs({ near: sites([house(1, { rubbish_awaiting_collection: variable(500, 300), damp: variable(40, -10), "roof-wear": variable(99_990, 5), cracks: variable(7, 0) }), house(2)],
+    [{ cell: "cell.9.9", x: 9, y: 9, terrain: "wetland", seen: ["grey_heron"] }]) }, { t: 10 * 86_400 }));
+  expect(text).toContain("- large house house-1, at cell.1.0: cracks 7, steady; damp 0, as low as it goes; roof-wear 100,000, as high as it goes; rubbish awaiting collection 3,500, rising 300 a day");
+  expect(text).toContain("- large house house-2, at cell.2.0\n");
+  expect(text).toContain("(How far each runs: cracks from 0 to 100,000; damp from 0 to 100,000; roof-wear from 0 to 100,000; rubbish awaiting collection from 0 to 100,000.)");
+  expect(text).toContain("Seen living there: grey heron (on 1 cell).");
+  // Being demolished is said.
+  expect(renderObservation(obs({ near: sites([{ ...house(3), coming_down: true }]) }))).toContain("house-3, at cell.3.0, being demolished");
+});
+
+test("a town too big to list building by building: for each measure, how many it's above zero or rising at, the worst few by name, and how to see the rest", () => {
+  const town = sites([...Array.from({ length: 40 }, (_, i) => house(i, { waste: variable(i < 12 ? i * 1000 : 0, i < 30 ? 500 : 0) })), { ...house(99), type: "park", variables: { wear: variable(0, 137) }, spaces: [] }]);
+  const plain = renderObservation(obs({ "mayor/town": town }), { titles: new Map([["mayor/town", "Survey of the town"]]) });
+  expect(plain).toContain("Buildings: 40 large house, 1 park.");
+  // (Day 0: eleven homes hold some; thirty are filling.)
+  expect(plain).toContain("Waste: above zero at 11 of 40 buildings, rising at 30. Highest: large house house-11 11,000 (rising 500 a day); large house house-10 10,000 (rising 500 a day); large house house-9 9,000 (rising 500 a day); large house house-8 8,000 (rising 500 a day); large house house-7 7,000 (rising 500 a day); and 6 more above zero.");
+  expect(plain).toContain("Wear: above zero at 0 of 1 buildings, rising at 1.");
+  expect(plain).not.toContain("look at");
+  // A seat that can look into the survey is told how to see the rest.
+  const o = { titles: new Map([["mayor/town", "Survey of the town"]]), lookable: new Set(["mayor/town"]) };
+  expect(renderObservation(obs({ "mayor/town": town }), o)).toContain('(To see any building, room or piece of ground in full, name it (or a kind of building); to see every building where one of these is above zero or rising, name the measure: look at "Survey of the town" (mayor/town).)');
+
+  // Having looked, by measure: every building it's above zero or rising at, the highest first, each in full.
+  const byMeasure = renderObservation(obs({ "mayor/town": town }), { ...o, looked: new Map([["mayor/town", { measure: "Waste", limit: 50 }]]) });
+  expect(byMeasure).toContain("## Survey of the town: what you looked at\nWaste is above zero or rising at 30 buildings, the highest first:\n- large house house-11, at cell.11.0: waste 11,000, rising 500 a day\n  - house-11/dwelling.1, a dwelling: 2 people (room for 4)");
+  expect(byMeasure.match(/^- large house/gm)!.length).toBe(30);
+  expect(byMeasure).not.toContain("house-35"); // (nothing there, and none coming)
+  // More than asked for at once: counted, never dropped without a word.
+  expect(renderObservation(obs({ "mayor/town": town }), { ...o, looked: new Map([["mayor/town", { measure: "waste", limit: 20 }]]) })).toContain("(10 more not listed: ask for more at once, or name the ones you want.)");
+  // By name: a building, a room in one, the ground one stands on, a kind of building, open ground; and what isn't there.
+  const open = [{ cell: "cell.0.9", x: 0, y: 9, terrain: "wetland", seen: ["grey_heron"] }];
+  const named = renderObservation(obs({ "mayor/town": sites(town.cells.map((c: any) => c.structure), open) }), { ...o, looked: new Map([["mayor/town", { named: ["house-3", "house-5/dwelling.1", "cell.7.0", "Park", "cell.0.9", "the moon"] }]]) });
+  for (const id of ["house-3", "house-5", "house-7", "house-99"]) expect(named).toContain(` ${id}, at `);
+  expect(named.match(/^- /gm)!.length).toBe(5);
+  expect(named).toContain("- open ground cell.0.9, wetland; seen living there: grey heron");
+  expect(named).toContain("Nothing is known here by this name: the moon.");
+  expect(renderObservation(obs({ "mayor/town": town }), { ...o, looked: new Map([["mayor/town", { measure: "noise" }]]) })).toContain('Nothing is kept of the buildings here under "noise".');
+});
+
+test("a building with many rooms, looked at: every room, who's there and who has gone", () => {
+  const flats = { ...house(1, undefined, 12), type: "apartments", built_by: "builder" };
+  flats.spaces[3] = { ...flats.spaces[3]!, count: 1, occupants: ["ada-p"], left: [{ occupant: "c7", reason: "removed", at: 86_400 }] };
+  const o = { lookable: new Set(["near"]) };
+  const usual = renderObservation(obs({ near: sites([flats]) }, { entity: "ada-p" }), o);
+  expect(usual).toContain("12 dwellings: 2 in use, 3 people; yours: house-1/dwelling.4");
+  expect(usual).toContain('(To see every room of a building, name it: look at "Near" (near).)');
+  const looked = renderObservation(obs({ near: sites([flats]) }, { entity: "ada-p" }), { ...o, looked: new Map([["near", { named: ["house-1"] }]]) });
+  expect(looked).toContain("- apartments house-1, at cell.1.0, built by builder");
+  expect(looked).toContain("  - house-1/dwelling.4, a dwelling: 1 person (room for 4): you; gone from it: c7 (was removed, year 1, day 2)");
+  expect(looked.match(/^  - /gm)!.length).toBe(12);
+});
+
+test("where a list of papers is cut, the seat is told how to see the rest; what it looks up is whole, one by one, and nothing found is said", () => {
+  const claims = Array.from({ length: 30 }, (_, i) => ({ id: `t${i}`, record: "claim", author: "genesis", at: 0, visible_to: "public", position: "right", holder: "city", about: { kind: "ownership", object: `p${i}` } }));
+  const long = { id: "m1", record: "statement", kind: "minutes", author: "clerk", at: 0, visible_to: "public", text: "x".repeat(1500), data: { note: "y".repeat(600) } };
+  const o = { titles: new Map([["mine", "Filings"]]), lookable: new Set(["mine"]) };
+  const hint = '(Not everything here is set out in full. To see the rest, say what to find: look at "Filings" (mine).)';
+  expect(renderObservation(obs({ mine: { kind: "records", records: claims } }), o)).toContain(`and 18 more\n${hint}`);
+  expect(renderObservation(obs({ mine: { kind: "records", records: [long] } }), o)).toContain(`…)\n${hint}`);
+  const many = Array.from({ length: 45 }, (_, i) => ({ ...long, id: `n${i}`, text: "Short.", data: undefined }));
+  expect(renderObservation(obs({ mine: { kind: "records", records: many } }), o)).toContain("(5 earlier items not listed.)");
+  expect(renderObservation(obs({ mine: { kind: "records", records: many } }), o)).toContain(hint);
+  // Nothing cut: no hint. A report it can't look into: the count, as before, and no promise.
+  expect(renderObservation(obs({ mine: { kind: "records", records: many.slice(0, 3) } }), o)).not.toContain("look at");
+  expect(renderObservation(obs({ mine: { kind: "records", records: claims } }), { titles: o.titles })).not.toContain("look at");
+
+  // What it looked up: every claim by itself, long text whole.
+  const found = renderObservation(obs({ mine: { kind: "records", search: true, records: [...claims, long] } }), { ...o, looked: new Map([["mine", { limit: 50 }]]) });
+  expect(found).toContain("## Filings: what you looked up (31 found)");
+  expect(found).toContain("- [t29] city has a right: kind: ownership; object: p29");
+  expect(found).toContain("x".repeat(1500));
+  expect(found).toContain("y".repeat(600));
+  expect(found).not.toContain("…");
+  expect(found).not.toContain("There may be more");
+  expect(renderObservation(obs({ mine: { kind: "records", search: true, records: claims.slice(0, 20) } }), { ...o, looked: new Map([["mine", { limit: 20 }]]) })).toContain("(There may be more: at most 20 were asked for. Ask for more at once, or say more closely what to find.)");
+  expect(renderObservation(obs({ mine: { kind: "records", search: true, records: [] } }), o)).toContain("## Filings: what you looked up (0 found)\nNothing found.");
+  // A look that brought nothing new, or at a report that's no longer its own: said.
+  expect(renderObservation(obs({ mine: { kind: "records", records: [] } }), { ...o, looked: new Map([["mine", {}]]) })).toContain("## Filings\nNothing new there since you last looked.");
+  expect(renderObservation(obs({}), { ...o, looked: new Map([["mine", {}]]) })).toContain("## Filings\nNothing could be seen there.");
+  // What was looked up whole doesn't leave the next report whole: a long text is cut again, with its mark.
+  expect(renderObservation(obs({ mine: { kind: "records", records: [long] } }), o)).toContain("…");
+});
+
+test("who's who, looked into: people, organisations and posts by id or by part of a name; money in and out says what the rest came to", () => {
+  const who = { kind: "directory", entities: [{ entity: "city", kind: "town", name: "Millbrook" }, { entity: "c0001", kind: "person", name: "Ada Lovelace", participant: "ada" }, { entity: "c0002", kind: "person", name: "Bo Diddley" }],
+    positions: [{ position: "mayor", entity: "city", title: "Mayor", role: "mayor", holder: "ada" }, { position: "clerk", entity: "city", title: "Town clerk", role: "clerk" }] };
+  const o = { lookable: new Set(["who"]) };
+  expect(renderObservation(obs({ who }), o)).toContain('People: 2.\n(To find a person, an organisation or a post, name them (an id, or a name or part of one): look at "Who" (who).)');
+  const found = renderObservation(obs({ who }), { ...o, looked: new Map([["who", { named: ["lovelace", "clerk"] }]]) });
+  expect(found).toContain("## Who: who you looked for\n- Ada Lovelace (c0001), a person\n- post: Mayor (mayor), for city: Ada Lovelace (c0001)\n- post: Town clerk (clerk), for city: vacant");
+  expect(found).not.toContain("Bo Diddley");
+  expect(renderObservation(obs({ who }), { ...o, looked: new Map([["who", { named: ["zed"] }]]) })).toContain("No one and nothing found by that name.");
+
+  const transactions = Array.from({ length: 11 }, (_, i) => ({ t: 0, from: `acc-c${i}`, to: "acc-city", amount: String((i + 1) * 100), currency: "USD", by: "bank" }));
+  const text = renderObservation(obs({ books: { kind: "accounts", accounts: [{ account: "acc-city", holder: "city", custodian: "bank", currency: "USD", balance: "0" }], transactions } }));
+  expect(text).toContain("Received $66.00 since you last looked: acc-c10 $11.00,");
+  expect(text).toContain(", and 3 more ($6.00 between them).");
+});
+
+test("a body's own state, where it is and its family are told; an agreement says how it stands", () => {
+  const text = renderObservation(obs({ mine: { kind: "records", records: [{ id: "lease-1", record: "agreement", author: "landlord", at: 0, visible_to: ["c1"], terms: { template: "lease", parties: ["landlord", "c1"], commitments: [{ who: "c1", does: { outcome: { money: { to: "acc-l", amount: 85000, for: "rent" } } }, every: 2592000 }] } }] } }, {
+    t: 86_400 * 365 * 3, readings: { "lease-1": { of: "agreement", status: "in_force", ends_at: 86_400 * 365 * 4, obligations: [{ commitment: 0, next_due: 86_400 * 365 * 3 + 86_400, arrears: "170000" }], reader: "terms 1" } },
+    body: { born_at: -86_400 * 365 * 30, present: true, alive: true, in: "house-1/dwelling.1", variables: { years_of_skill: 1200 }, parents: ["c8"], children: [{ person: "c9", born_at: 0, alive: true }],
+      conditions: [{ id: "cnd.1", kind: "injury", severity: "severe", since: 0, until: 86_400 * 365 * 4, treated: true }] } }));
+  expect(text).toContain("You are 33 years old. You are in house-1/dwelling.1.");
+  expect(text).toContain("it should pass by year 5, day 1 (it has been treated).");
+  expect(text).toContain("About you: years of skill 1,200.");
+  expect(text).toContain("Your parents: c8.");
+  expect(text).toContain("Your children: c9 (3 years old).");
+  expect(text).toContain("(rent) (year 1, day 1). As it stands: in force; ends year 5, day 1; commitment 1 next due year 4, day 2, $1,700.00 owing");
+  expect(text).not.toContain("terms 1");
+});
+
+test("why something couldn't be done is said from inside the world", async () => {
+  const { refusalText } = await import("../src/llm/words");
+  expect(refusalText("not_modelled")).toBe("that doesn't happen here");
+  expect(refusalText("cap_exceeded")).toBe("the limit on that has been reached");
+  const log = JSON.parse(await Bun.file(new URL("../../contracts/log.schema.json", import.meta.url)).text());
+  for (const code of log.$defs.RefusalCode.enum as string[]) expect(refusalText(code)).not.toMatch(/\bworld\b|simulat|platform/i);
 });

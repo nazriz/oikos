@@ -83,6 +83,7 @@ const GLOSS: { [fn: string]: string } = {
   harm: "someone is physically harmed",
   position: "a post in an organisation is created, filled or left empty",
   system: "a system (software, an AI system) is put to work for an organisation, or switched off",
+  take: "things someone else holds are taken from where they are, without their agreement",
 };
 
 /** The translator's instructions: the call language itself, generated from the contract (P12), and nothing about any world. */
@@ -97,7 +98,8 @@ export function translatorSystem(): string {
     "- Never make up an id. Someone or something named or described without its id is written as the request put it, in quotes (to=\"Millbrook Builders\", by=\"the builder\", to=\"the works manager\"): whoever resolves the call knows who that is, or asks. Only an account that's described and not named (\"the town account\") is left out.",
     "- A kind of thing is the request's own word for it: \"40 goods\" is kind=goods, \"a park\" is type=park. Something published with no kind said is kind=notice.",
     "- Don't add what the request doesn't say: no purpose (for=) unless one is stated, no recipient it didn't name.",
-    "- Telling, asking, directing or instructing someone to do something is a message to them: message(to=<them>, text=\"<what's asked, in the request's words>\"). It is not work(...): work is done by your own people, at a place, as a named task.",
+    "- Telling, asking, directing or instructing someone to see to something is a message to them: message(to=<them>, text=\"<what's asked, in the request's words>\"). work(...) is for when the request itself gives the task, how much of it and where (\"have c0042 do 3 units of make at str.7\"): then it's work(task=make, units=\"3\", at=str.7, by=c0042), whoever is to do it.",
+    "- Seen by everyone is visible=public.",
     "- Having someone build something for you is structure(type=..., on=..., by=<them>, price=..., from=...), on its own line: never wrapped in an agreement. Having something demolished is structure(remove=<the building>, by=...).",
     "- Ending an agreement by notice is agreement(notice=<the agreement>); accepting one offered to you is agreement(sign=<the agreement>).",
     "- Refuse, with none(<label>), a request that can't honestly be written as one call:",
@@ -105,6 +107,7 @@ export function translatorSystem(): string {
     "  - not_yours: it wants an outcome that's someone else's to decide (\"make the council pass it\", \"make them lower their prices\"). (Asking or telling them is different: that's a message.)",
     "  - too_much: several separate things in one request, each of which would be a request of its own (pay this, and hire them, and build that). One thing done to or for several (a letter to two people, the same payment to three accounts) is one thing; so are lines that depend on each other (set up a trust, then publish its charter).",
     "  - unknown_form: it names a form that isn't listed below the request. Don't use another form in its place.",
+    "  - not_an_act: it asks to see, read, check, review, inspect or be shown something (a ledger, a record, who holds a post, the state of a place) and to bring nothing about. Looking is the person's own to do. (Asking someone else for it is different: that's a message to them. And if it asks to look and then to do something, it's the doing that's written.)",
     "  - unclear: it doesn't say what should happen (\"sort out the housing thing\").",
     "- To fill in a form, use form(...) with the form's own field names, listed below the request.",
     "",
@@ -115,6 +118,8 @@ export function translatorSystem(): string {
     "  Give notice on our agreement rec.9.  ->  agreement(notice=rec.9)",
     "  Pay Acme half of what we hold.  ->  none(needs_calculation)",
     "  Make the board approve the plan.  ->  none(not_yours)",
+    "  Show me last month's payments out of acc-1.  ->  none(not_an_act)",
+    "  Ask the registrar to send me last month's payments out of acc-1.  ->  message(to=\"the registrar\", text=\"Please send me last month's payments out of acc-1.\")",
     "",
     "Answer with the call tool, whose program is your answer.",
     "",
@@ -191,7 +196,7 @@ export const NOT_CHECKED = "That couldn't be put into effect, and nothing was do
 const MALFORMED = /should name something, not (data|a call)\.$|should be written out\.$|should be data or text\.$|should be a list of names or ids\.$|^A commitment can be money, goods|\(then=periodic\)/;
 
 /** Resolver questions another attempt at the call could fix (a name it didn't recognise, a refusal's own text). */
-const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name/;
+const RETRYABLE = /^You don't know of anyone or anything called|^It isn't clear what should happen|^That's for someone else to decide|^Please state the amount itself|^Please take this one step at a time|^You haven't seen a form by that name|^That's something to look up or read/;
 
 export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: string) => StructureTypeInfo | undefined, id = "translator", attempts = 2, resolver?: ResolveFn) {
   const tid: TranslatorId = { id, version: TRANSLATOR_VERSION, model: `${io.adapter.provider}/${io.adapter.model}` };

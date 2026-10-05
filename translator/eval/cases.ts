@@ -58,6 +58,11 @@ export const CASES: Case[] = [
   { id: "calculation", request: "Pay the builder 10% of what's in acc-city.", expect: ["none(needs_calculation)"] },
   { id: "calculation-held-out", request: "Give each councillor a fifth of the parks budget.", expect: ["none(needs_calculation)"], was_held_out: true },
   { id: "unclear", request: "Sort out the housing thing.", expect: ["none(unclear)"] },
+  // not an act (seen; added 2026-10-05 from the kind of thing the pilots' offices asked for, reworded)
+  { id: "look-ledger", request: "Inspect the transaction ledger for acc-city and show me every payment over $2,000 this month.", expect: ["none(not_an_act)"] },
+  { id: "look-record", request: "Read rec.3 and tell me what it says.", expect: ["none(not_an_act)"] },
+  { id: "look-post", request: "Show me who currently holds the planning post.", expect: ["none(not_an_act)"] },
+  { id: "look-ask", request: "Ask the planning officer to send me the list of permits decided this month.", expect: ['message(to=planning, text="Please send me the list of permits decided this month.")', 'message(to="the planning officer", text="Please send me the list of permits decided this month.")', 'message(to="planning officer", text="Please send me the list of permits decided this month.")'], ignore: ["text"], note: "asking someone for it is an act: a letter" },
   { id: "unknown-form", request: "Fill in the dog licence form for Rex.", expect: ["none(unknown_form)"], note: "no such form is known" },
 
   // Seen, from the pilots (2026-10-03): requests a model mayor made that the translator got wrong (docs/real-models.md,
@@ -104,7 +109,9 @@ export const CASES: Case[] = [
   // agreements
   { id: "ho-lease", was_held_out: true, request: "Offer Dana Reyes the flat at apts-3/dwelling.4 for 6 months at $900 a month, paid into acc-city, with 30 days' notice either way.",
     expect: ['agreement(with=c0042, template=lease, term="6 months", our_notice="30 days", their_notice="30 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.4), they_do=money(to=acc-city, amount="$900", every="a month"))',
-      'agreement(with=c0042, template=lease, term="6 months", our_notice="30 days", their_notice="30 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.4), they_do=money(to=acc-city, amount="$900", every="monthly"))'] },
+      'agreement(with=c0042, template=lease, term="6 months", our_notice="30 days", their_notice="30 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.4), they_do=money(to=acc-city, amount="$900", every="monthly"))',
+      // (The request never says "lease": an agreement on these terms without a template named is as right. 2026-10-05.)
+      'agreement(with=c0042, term="6 months", our_notice="30 days", their_notice="30 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.4), they_do=money(to=acc-city, amount="$900", every="a month"))'] },
   { id: "ho-sign", was_held_out: true, request: "I accept the offer in rec.501. Sign it.", expect: ["agreement(sign=rec.501)"] },
   { id: "ho-notice-end", was_held_out: true, request: "Give notice to end our agreement rec.600.", expect: ["agreement(notice=rec.600)"] },
   // the cast

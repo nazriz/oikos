@@ -34,6 +34,7 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
   too_much: "Please take this one step at a time.",
   unclear: "It isn't clear what should happen. Could you say it more plainly?",
   unknown_form: "You haven't seen a form by that name.",
+  not_an_act: "That's something to look up or read, not something to do. Look at your reports and papers, or write to whoever keeps it.",
 };
 
 class Ask extends Error {}
@@ -558,8 +559,20 @@ class Resolver {
   }
 
   private form(c: Call, bind?: string): Block[] {
-    const to = this.need(c, "to", "Which office's form?");
-    const name = this.need(c, "form", "Which form?");
+    // The form, by its name as written: its own name or record id, or the same in ordinary words ("permit
+    // application", "the event permit form"). One nobody has seen is said to be that before anything else is asked
+    // (asked "which office's form?" about a form that doesn't exist, a participant can only guess). Known, and its
+    // office not said: it goes where it says it goes, if that's one place.
+    const raw = this.raw(c, "form");
+    const written = raw && "id" in raw ? raw.id : raw && "text" in raw ? raw.text : undefined;
+    if (written === undefined) throw new Ask("Which form?");
+    const plain = written.trim().toLowerCase().replace(/^the\s+/, "").replace(/[\s-]+/g, "_");
+    const spellings = [written, plain, plain.replace(/_form$/, "")];
+    const known = this.k.forms.filter((x) => spellings.includes(x.data?.form) || x.id === written);
+    if (!known.length) throw new Ask(LABEL_TEXT.unknown_form);
+    const name: string = known.some((x) => x.id === written) ? written : known[0]!.data.form;
+    const goes = [...new Set(known.map((x) => x.in_position ?? x.speaks_for ?? x.author))].sort();
+    const to = this.has(c, "to") ? this.need(c, "to", "Which office's form?") : goes.length === 1 ? goes[0]! : (() => { throw new Ask("Which office's form?"); })();
     const f = this.k.form(to, name);
     if (!f) {
       // Known by name but not from that office: say where it goes, rather than that it's unknown.
