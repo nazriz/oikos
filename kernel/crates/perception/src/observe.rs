@@ -271,7 +271,7 @@ fn placed_ok(st: &State, rec: &Record, me: &str, area: Option<&Scope>) -> bool {
 #[derive(Debug)]
 enum Scope {
     Everywhere,
-    Cells(BTreeSet<Id>),
+    Cells(std::sync::Arc<BTreeSet<Id>>),
 }
 
 impl Scope {
@@ -370,6 +370,12 @@ pub struct RecordIndex {
     accounts: Option<AccountsByEntity>,
     /// entity -> (its `moved` stamp, the footprints of the buildings it's in then).
     places: BTreeMap<Id, (u64, Vec<Rect>)>,
+    /// entity -> how near -> (its `moved` stamp, the cells within that of where it is then): worked out from `places`,
+    /// once for each place it's in, not at every look.
+    near: BTreeMap<Id, BTreeMap<i64, (u64, std::sync::Arc<BTreeSet<Id>>)>>,
+    /// place -> its cells, and a channel's list of cells -> the same as a set: the same for the whole run.
+    place_cells: BTreeMap<Id, std::sync::Arc<BTreeSet<Id>>>,
+    listed_cells: BTreeMap<Vec<Id>, std::sync::Arc<BTreeSet<Id>>>,
 }
 
 /// entity -> accounts it holds or keeps, for the account set identified by
@@ -487,9 +493,19 @@ impl RecordIndex {
     fn scope(&mut self, s: &Statics, st: &State, area: &Area, me: &str) -> Scope {
         match area {
             Area::All(_) => Scope::Everywhere,
-            Area::Cells(cs) => Scope::Cells(cs.iter().cloned().collect()),
+            Area::Cells(cs) => {
+                if let Some(cells) = self.listed_cells.get(cs) {
+                    return Scope::Cells(cells.clone());
+                }
+                let cells: std::sync::Arc<BTreeSet<Id>> = std::sync::Arc::new(cs.iter().cloned().collect());
+                self.listed_cells.insert(cs.clone(), cells.clone());
+                Scope::Cells(cells)
+            }
             Area::Near(n) => {
                 let moved = st.entities.get(me).map_or(0, |e| e.moved);
+                if let Some((_, cells)) = self.near.get(me).and_then(|by| by.get(&n.near)).filter(|(m, _)| *m == moved) {
+                    return Scope::Cells(cells.clone());
+                }
                 if self.places.get(me).is_none_or(|(m, _)| *m != moved) {
                     self.places.insert(me.to_string(), (moved, crate::geo::body_rects(s, st, me)));
                 }
@@ -504,10 +520,15 @@ impl RecordIndex {
                         }
                     }
                 }
+                let cells = std::sync::Arc::new(cells);
+                self.near.entry(me.to_string()).or_default().insert(n.near, (moved, cells.clone()));
                 Scope::Cells(cells)
             }
             // A place's cells: where its area meets a detailed place (never walking a summarised area cell by cell).
             Area::Place(p) => {
+                if let Some(cells) = self.place_cells.get(&p.place) {
+                    return Scope::Cells(cells.clone());
+                }
                 let mut cells = BTreeSet::new();
                 if let Some(a) = s.config.world.places.iter().find(|x| x.id == p.place).map(|x| x.area) {
                     for d in &s.detailed {
@@ -520,6 +541,8 @@ impl RecordIndex {
                         }
                     }
                 }
+                let cells = std::sync::Arc::new(cells);
+                self.place_cells.insert(p.place.clone(), cells.clone());
                 Scope::Cells(cells)
             }
         }
@@ -814,7 +837,26 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                     ChannelData::Sites {
                         as_of: st.t,
                         cells: match scope.as_ref().unwrap() {
-                            Scope::Everywhere => st.cells.keys().filter_map(site).collect(),
+                            // (Every cell: read as they're walked, not looked up again one by one.)
+                            Scope::Everywhere => st.cells.iter().filter(|(_, c)| changed(c.changed)).map(|(id, _)| site_cell(s, st, id, &me, names)).collect(),
+                            // A scope that's much of the ground (a whole place) is walked beside the state's cells,
+                            // both being in id order: the same cells in the same order as looking each one up.
+                            Scope::Cells(ps) if ps.len() * 8 > st.cells.len() => {
+                                let mut wanted = ps.iter().peekable();
+                                let mut cells = vec![];
+                                for (id, c) in st.cells.iter() {
+                                    while wanted.peek().is_some_and(|w| *w < id) {
+                                        wanted.next();
+                                    }
+                                    if wanted.peek().is_none() {
+                                        break;
+                                    }
+                                    if wanted.peek().is_some_and(|w| *w == id) && changed(c.changed) {
+                                        cells.push(site_cell(s, st, id, &me, names));
+                                    }
+                                }
+                                cells
+                            }
                             Scope::Cells(ps) => ps.iter().filter_map(site).collect(),
                         },
                         whole,
