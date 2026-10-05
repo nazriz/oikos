@@ -40,6 +40,8 @@ pub struct Knowledge {
     pub participant_person: Vec<(String, String)>,
     /// position -> the organisation it acts for.
     pub positions: BTreeMap<String, String>,
+    /// position -> what it's called, as the participant has been told: (its title, its role), either possibly empty.
+    pub position_words: BTreeMap<String, (String, String)>,
     pub held: BTreeSet<String>,
     pub structures: BTreeMap<String, StructureFact>,
     pub cells: BTreeMap<String, CellFact>,
@@ -69,6 +71,7 @@ impl Knowledge {
         for p in obs["positions"].as_array().into_iter().flatten() {
             if let (Some(pos), Some(ent)) = (s(&p["position"]), s(&p["entity"])) {
                 self.positions.insert(pos.into(), ent.into());
+                self.position_words.insert(pos.into(), (s(&p["title"]).unwrap_or_default().into(), s(&p["role"]).unwrap_or_default().into()));
                 self.held.insert(pos.into());
             }
         }
@@ -117,6 +120,7 @@ impl Knowledge {
                     for p in ch["positions"].as_array().into_iter().flatten() {
                         if let (Some(pos), Some(ent)) = (s(&p["position"]), s(&p["entity"])) {
                             self.positions.insert(pos.into(), ent.into());
+                            self.position_words.insert(pos.into(), (s(&p["title"]).unwrap_or_default().into(), s(&p["role"]).unwrap_or_default().into()));
                         }
                     }
                 }
@@ -195,17 +199,52 @@ impl Knowledge {
     }
 
     /// Entities with a name, as written (case aside).
+    /// What a name the participant wrote refers to: the ids it could mean (one, if it's clear). In order, the first
+    /// that finds anything: someone or something called that; an id written out ("works" for the post works; pilot 8:
+    /// a letter to "works" came back "you don't know of anyone called works"); a post by its title or its role ("the
+    /// works manager", "planning officer"). Tried as written, then without a leading "the" (translator/src/knowledge.ts
+    /// is the same, word for word).
     pub fn by_name(&self, name: &str) -> Vec<String> {
-        let n = name.trim().to_lowercase();
-        let mut v: Vec<String> = self.names.iter().filter(|(_, x)| x.to_lowercase() == n).map(|(k, _)| k.clone()).collect();
-        v.sort();
-        // (An id written in quotes is that id: "works" for the post works. Pilot 8: a letter to "works" came back
-        // "you don't know of anyone called works".)
-        let id = name.trim();
-        if v.is_empty() && (self.names.iter().any(|(k, _)| k == id) || self.positions.contains_key(id) || self.participant_person.iter().any(|(k, _)| k == id)) {
-            v.push(id.to_string());
+        let written = name.trim().to_string();
+        let lower = written.to_lowercase();
+        let bare = match lower.strip_prefix("the") {
+            Some(rest) if rest.starts_with(char::is_whitespace) => rest.trim_start().to_string(),
+            _ => lower.clone(),
+        };
+        // ("the planning job", "the works office": the post, said with the word for a post.)
+        let mut post = bare.clone();
+        for word in ["job", "post", "position", "office"] {
+            if let Some(rest) = bare.strip_suffix(word) {
+                if rest.ends_with(char::is_whitespace) {
+                    post = rest.trim_end().to_string();
+                    break;
+                }
+            }
         }
-        v
+        for (n, id) in [(lower.clone(), written), (bare.clone(), bare), (post.clone(), post)] {
+            let mut called: Vec<String> = self.names.iter().filter(|(_, x)| x.to_lowercase() == n).map(|(k, _)| k.clone()).collect();
+            called.sort();
+            if !called.is_empty() {
+                return called;
+            }
+            if self.names.iter().any(|(k, _)| *k == id) || self.positions.contains_key(&id) || self.participant_person.iter().any(|(k, _)| *k == id) {
+                return vec![id];
+            }
+            // (A map in key order: sorted already.)
+            let posts: Vec<String> = self
+                .position_words
+                .iter()
+                .filter(|(_, (title, role))| {
+                    let role = role.to_lowercase();
+                    (!title.is_empty() && title.to_lowercase() == n) || (!role.is_empty() && (role == n || role.replace('_', " ") == n))
+                })
+                .map(|(k, _)| k.clone())
+                .collect();
+            if !posts.is_empty() {
+                return posts;
+            }
+        }
+        Vec::new()
     }
 
     pub fn name(&self, id: &str) -> String {
@@ -245,5 +284,32 @@ impl Knowledge {
             }
         }
         best
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn a_name_as_written_then_a_description() {
+        let mut k = Knowledge::default();
+        k.absorb(&json!({ "entity": "city", "t": 0, "positions": [], "channels": { "who": { "kind": "directory",
+            "entities": [{ "entity": "builder", "name": "Millbrook Builders" }, { "entity": "bank", "name": "Millbrook Bank" }],
+            "positions": [{ "position": "planning", "entity": "city", "role": "planning_officer", "title": "Planning Officer" },
+                          { "position": "works", "entity": "city", "role": "works_manager" },
+                          { "position": "clerk-a", "entity": "city", "role": "clerk" }, { "position": "clerk-b", "entity": "city", "role": "clerk" }] } } }));
+        assert_eq!(k.by_name("Millbrook Builders"), vec!["builder"]);
+        assert_eq!(k.by_name("works"), vec!["works"]);
+        assert_eq!(k.by_name("the builder"), vec!["builder"]);
+        assert_eq!(k.by_name("The Bank"), vec!["bank"]);
+        assert_eq!(k.by_name("the planning officer"), vec!["planning"]);
+        assert_eq!(k.by_name("works manager"), vec!["works"]);
+        assert_eq!(k.by_name("the clerk"), vec!["clerk-a", "clerk-b"]); // two of them: the participant is asked which
+        assert_eq!(k.by_name("the planning job"), vec!["planning"]);
+        assert_eq!(k.by_name("works office"), vec!["works"]);
+        assert!(k.by_name("the theatre").is_empty());
+        assert!(k.by_name("thebuilder").is_empty());
     }
 }

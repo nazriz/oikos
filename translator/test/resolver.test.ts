@@ -241,3 +241,28 @@ test("an id written in quotes is that id (a letter to \"planning\", the post)", 
   expect(quoted).toEqual(bare);
   expect(resolve(calls.parseProgram('message(to="nobody at all", text="Hello.")'), fixture(), () => undefined, "mayor").ok).toBe(false);
 });
+
+test("a name as written, then a description: the builder, the bank, a post by its title or role", () => {
+  const k = new Knowledge();
+  k.absorb({ participant: "mayor-system", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: { who: { kind: "directory",
+    entities: [{ entity: "builder", kind: "firm", name: "Millbrook Builders" }, { entity: "bank", kind: "bank", name: "Millbrook Bank" }],
+    positions: [{ position: "planning", entity: "city", role: "planning_officer", title: "Planning Officer" }, { position: "works", entity: "city", role: "works_manager" },
+      { position: "clerk-a", entity: "city", role: "clerk" }, { position: "clerk-b", entity: "city", role: "clerk" }] } } } as any);
+  // (The engine's resolver has the same cases, word for word: kernel/crates/resolver/src/knowledge.rs.)
+  expect(k.byName("Millbrook Builders")).toEqual(["builder"]);
+  expect(k.byName("works")).toEqual(["works"]);
+  expect(k.byName("the builder")).toEqual(["builder"]);
+  expect(k.byName("The Bank")).toEqual(["bank"]);
+  expect(k.byName("the planning officer")).toEqual(["planning"]);
+  expect(k.byName("works manager")).toEqual(["works"]);
+  expect(k.byName("the clerk")).toEqual(["clerk-a", "clerk-b"]);
+  expect(k.byName("the planning job")).toEqual(["planning"]);
+  expect(k.byName("works office")).toEqual(["works"]);
+  expect(k.byName("the theatre")).toEqual([]);
+  expect(k.byName("thebuilder")).toEqual([]);
+  // In a call: a letter to "the builder" goes to the builder; to "the clerk", it's asked which.
+  const r = resolve(calls.parseProgram('message(to="the builder", text="When can you start?")'), k, () => undefined, undefined);
+  expect(r.ok && r.blocks).toEqual([{ block: "message", to: ["builder"], text: "When can you start?" }]);
+  const two = resolve(calls.parseProgram('message(to="the clerk", text="Hello.")'), k, () => undefined, undefined);
+  expect(!two.ok && two.questions[0]).toContain("Which one?");
+});

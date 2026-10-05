@@ -5,7 +5,7 @@
 
 import { calls, canonical as canonicalJson } from "@oikos/participants";
 import { PRICES, type Budget, type LlmAdapter, type LlmIO, type Price } from "@oikos/participants/llm";
-import { createTranslator, Knowledge, resolve } from "../src/index";
+import { createTranslator, Knowledge, LABEL_TEXT, resolve } from "../src/index";
 import { translatorSystem } from "../src/index";
 import { CASES, type Case } from "./cases";
 import { leaks } from "./held-out";
@@ -114,7 +114,22 @@ export function passes(c: Case, got: string): boolean {
     return c.expect.map(strip).includes(strip(got));
   }
   const acts = actsOf(got);
-  return c.expect.map(canonical).includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e) === acts));
+  return c.expect.map(canonical).includes(canonical(got)) || (acts !== undefined && c.expect.some((e) => actsOf(e) === acts)) || sameRefusal(c, got);
+}
+
+/** Where a refusal is wanted: a call that the resolver answers with that same refusal's words comes to the same thing
+ * for the participant (a form it doesn't know, written as `form(…)`, comes back "You haven't seen a form by that
+ * name" either way). Only the refusal's own words count: any other question isn't the refusal. */
+function sameRefusal(c: Case, got: string): boolean {
+  try {
+    const r = resolve(calls.parseProgram(got), fixture(), () => undefined, "mayor");
+    return !r.ok && r.questions.length === 1 && c.expect.some((e) => {
+      const p = calls.parseProgram(e);
+      return "none" in p && r.questions[0] === LABEL_TEXT[p.none];
+    });
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -29,6 +29,8 @@ export class Knowledge {
   readonly participantPerson = new Map<string, string>();
   /** position -> the organisation it acts for. */
   readonly positions = new Map<string, string>();
+  /** What each post is called, as the participant has been told: its title and its role. */
+  readonly positionWords = new Map<string, { title?: string; role?: string }>();
   /** Positions the participant has held (the observation lists those it holds now). */
   readonly held = new Set<string>();
   readonly structures = new Map<string, StructureFact>();
@@ -49,6 +51,7 @@ export class Knowledge {
     this.t = obs.t;
     for (const p of obs.positions ?? []) {
       this.positions.set(p.position, p.entity);
+      this.positionWords.set(p.position, { ...(p.title ? { title: p.title } : {}), ...(p.role ? { role: p.role } : {}) });
       this.held.add(p.position);
     }
     for (const ch of Object.values(obs.channels)) {
@@ -72,7 +75,10 @@ export class Knowledge {
           this.names.set(e.entity, e.name);
           if (e.participant) this.participantPerson.set(e.participant, e.entity);
         }
-        for (const p of ch.positions) this.positions.set(p.position, p.entity);
+        for (const p of ch.positions) {
+          this.positions.set(p.position, p.entity);
+          this.positionWords.set(p.position, { ...(p.title ? { title: p.title } : {}), ...(p.role ? { role: p.role } : {}) });
+        }
       } else if (ch.kind === "records") {
         for (const r of ch.records) this.add(r);
       }
@@ -125,13 +131,27 @@ export class Knowledge {
     return this.accounts.has(id) || [...this.stated.values()].some((s) => s.has(id));
   }
 
-  /** An entity id for a name the participant wrote, if exactly one matches. */
+  /**
+   * What a name the participant wrote refers to: the ids it could mean (one, if it's clear). In order, the first that
+   * finds anything: someone or something called that; an id written out ("works" for the post works); a post by its
+   * title or its role ("the works manager", "planning officer"). Tried as written, then without a leading "the", then
+   * without a closing "job", "post", "position" or "office":
+   * people say "the builder" and "the bank" of the one they know (2026-10-05: the strongest model, told to leave out
+   * what's only described, wrote `to="the builder"`, and nothing knew who that was).
+   */
   byName(name: string): string[] {
-    const n = name.trim().toLowerCase();
-    const found = [...this.names].filter(([, v]) => v.toLowerCase() === n).map(([k]) => k).sort();
-    // (An id written in quotes is that id: "works" for the post works.)
-    const id = name.trim();
-    return found.length || !(this.names.has(id) || this.positions.has(id) || this.participantPerson.has(id)) ? found : [id];
+    const written = name.trim();
+    const bare = written.toLowerCase().replace(/^the\s+/, "");
+    // ("the planning job", "the works office": the post, said with the word for a post.)
+    const post = bare.replace(/\s+(job|post|position|office)$/, "");
+    for (const [n, id] of [[written.toLowerCase(), written], [bare, bare], [post, post]] as const) {
+      const called = [...this.names].filter(([, v]) => v.toLowerCase() === n).map(([k]) => k).sort();
+      if (called.length) return called;
+      if (this.names.has(id) || this.positions.has(id) || this.participantPerson.has(id)) return [id];
+      const posts = [...this.positionWords].filter(([, w]) => w.title?.toLowerCase() === n || w.role?.toLowerCase() === n || w.role?.toLowerCase().replace(/_/g, " ") === n).map(([k]) => k).sort();
+      if (posts.length) return posts;
+    }
+    return [];
   }
 
   name(id: string): string {

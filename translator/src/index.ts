@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.5.1";
+export const TRANSLATOR_VERSION = "0.6.0";
 
 export interface TranslatorId {
   id: string;
@@ -94,14 +94,16 @@ export function translatorSystem(): string {
     "You translate one plain-language request into the call language below. You don't judge it, improve it or complete it: write exactly what was asked, with exactly the inputs given.",
     "- Copy ids exactly as written (lot-00-00, apts-3/dwelling.2, acc-city, rec.412). Copy names, amounts and durations as quoted text, exactly as written; never calculate anything.",
     "- If something the request needs isn't there, leave that argument out: whoever resolves the call will ask. A request that's plain but leaves a detail out is not unclear.",
-    "- Never make up an id. Something named without its id is written by the name the request used, in quotes (\"Millbrook Builders\"); something only described (\"the town account\") is left out.",
+    "- Never make up an id. Someone or something named or described without its id is written as the request put it, in quotes (to=\"Millbrook Builders\", by=\"the builder\", to=\"the works manager\"): whoever resolves the call knows who that is, or asks. Only an account that's described and not named (\"the town account\") is left out.",
+    "- A kind of thing is the request's own word for it: \"40 goods\" is kind=goods, \"a park\" is type=park. Something published with no kind said is kind=notice.",
+    "- Don't add what the request doesn't say: no purpose (for=) unless one is stated, no recipient it didn't name.",
     "- Telling, asking, directing or instructing someone to do something is a message to them: message(to=<them>, text=\"<what's asked, in the request's words>\"). It is not work(...): work is done by your own people, at a place, as a named task.",
     "- Having someone build something for you is structure(type=..., on=..., by=<them>, price=..., from=...), on its own line: never wrapped in an agreement. Having something demolished is structure(remove=<the building>, by=...).",
     "- Ending an agreement by notice is agreement(notice=<the agreement>); accepting one offered to you is agreement(sign=<the agreement>).",
     "- Refuse, with none(<label>), a request that can't honestly be written as one call:",
     "  - needs_calculation: the amount isn't stated but must be worked out (a share, a percentage, \"whatever's left\", \"a fifth each\"). Never write money(...) without the amount.",
     "  - not_yours: it wants an outcome that's someone else's to decide (\"make the council pass it\", \"make them lower their prices\"). (Asking or telling them is different: that's a message.)",
-    "  - too_much: several separate things in one request.",
+    "  - too_much: several separate things in one request, each of which would be a request of its own (pay this, and hire them, and build that). One thing done to or for several (a letter to two people, the same payment to three accounts) is one thing; so are lines that depend on each other (set up a trust, then publish its charter).",
     "  - unknown_form: it names a form that isn't listed below the request. Don't use another form in its place.",
     "  - unclear: it doesn't say what should happen (\"sort out the housing thing\").",
     "- To fill in a form, use form(...) with the form's own field names, listed below the request.",
