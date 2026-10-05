@@ -1,0 +1,61 @@
+#!/bin/bash
+# Drive the run server (a Mac that's always on) from anywhere with SSH to it: a cloud session, a laptop.
+#   OIKOS_MINI=user@host   where it is (required)          OIKOS_MINI_DIR=oikos   the repo there, under its home
+#
+#   scripts/mini sync                      pull main there, install, rebuild the engine
+#   scripts/mini test [fast|all|<filter>]  run tests there (default: fast)
+#   scripts/mini run <name> <oikos run arguments...>
+#                                          start a run there, detached, into runs/<name>; it keeps the machine awake
+#                                          until it ends (a name already used is refused: runs are never overwritten)
+#   scripts/mini resume <name>             resume a stopped run (the model unreachable, a usage limit)
+#   scripts/mini status [name]             what's running; for a run, how far it is and how it ended
+#   scripts/mini story <name> [participant]   what a model seat did, day by day
+#   scripts/mini stop <name>               stop a run (its log is kept)
+#   scripts/mini sh <command...>           anything else, in the repo there
+set -euo pipefail
+: "${OIKOS_MINI:?set OIKOS_MINI=user@host (the run server)}"
+DIR="${OIKOS_MINI_DIR:-oikos}"
+# A login shell there, so Homebrew's and bun's paths are set.
+remote() { ssh -o BatchMode=yes "$OIKOS_MINI" "bash -lc $(printf '%q' "cd $DIR && $1")"; }
+q() { printf '%q ' "$@"; }
+
+cmd="${1:-status}"; shift || true
+case "$cmd" in
+  sync)   remote "git pull --ff-only && bun install && bun run kernel 2>&1 | tail -2 && git log --oneline -1" ;;
+  test)   case "${1:-fast}" in
+            fast) remote "bun run test:fast 2>&1 | tail -15" ;;
+            all)  remote "bun run test:all 2>&1 | grep -E '^FAIL|^== | pass, ' ; true" ;;
+            *)    remote "bun scripts/test.ts $(q "$@") 2>&1 | tail -30" ;;
+          esac ;;
+  run)    name="${1:?a name for the run}"; shift
+          remote "[ ! -e runs/$name ] || { echo 'runs/$name exists: pick another name (runs are never overwritten)'; exit 1; }
+                  mkdir -p runs/$name
+                  nohup bun orchestrator/src/cli.ts run $(q "$@") --out runs/$name > runs/$name/console.txt 2>&1 &
+                  pid=\$!; echo \$pid > runs/$name/pid
+                  nohup caffeinate -i -w \$pid > /dev/null 2>&1 &
+                  sleep 5; echo started runs/$name, pid \$pid; tail -2 runs/$name/console.txt" ;;
+  resume) name="${1:?the name of the run}"; shift
+          remote "log=\$(ls runs/$name/*.jsonl* | grep -v anchors | grep -v stopped | head -1)
+                  nohup bun orchestrator/src/cli.ts resume \$log $(q "$@") >> runs/$name/console.txt 2>&1 &
+                  pid=\$!; echo \$pid > runs/$name/pid
+                  nohup caffeinate -i -w \$pid > /dev/null 2>&1 &
+                  sleep 5; echo resumed runs/$name, pid \$pid; tail -2 runs/$name/console.txt" ;;
+  status) if [ -z "${1:-}" ]; then
+            remote "git log --oneline -1; echo; echo running:; pgrep -fl 'cli.ts (run|run-one|resume)' | cut -c1-160 || echo '  nothing'; echo; echo latest runs:; ls -t runs | head -8"
+          else
+            name="$1"
+            remote "if [ -f runs/$name/pid ] && kill -0 \$(cat runs/$name/pid) 2>/dev/null; then echo running; else echo not running; fi
+                    log=\$(ls runs/$name/*.jsonl 2>/dev/null | grep -v anchors | head -1)
+                    if [ -n \"\$log\" ]; then
+                      t=\$(tail -c 2000 \$log | grep -o '\"t\":[0-9]*' | tail -1 | cut -d: -f2); echo \"simulated day \$((t / 86400))\"
+                      echo \"model calls: \$(grep -c '\"annotation\":\"usage\"' \$log)\"
+                    fi
+                    echo; tail -12 runs/$name/console.txt" ;
+          fi ;;
+  story)  name="${1:?the name of the run}"; who="${2:-}"
+          remote "log=\$(ls runs/$name/*.jsonl* | grep -v anchors | grep -v stopped | head -1); bun orchestrator/src/cli.ts story \$log $who" ;;
+  stop)   name="${1:?the name of the run}"
+          remote "pkill -f \"out runs/$name\" && echo stopped runs/$name || echo 'not running'; pkill -f 'codex exec' || true" ;;
+  sh)     remote "$*" ;;
+  *)      sed -n '2,17p' "$0"; exit 1 ;;
+esac

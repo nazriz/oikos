@@ -27,3 +27,21 @@ Rust (kernel) · TypeScript on **Bun, not Node** (participants, translator, orch
 
 ## Partnership
 Naz values honest pushback over agreement. Have opinions, flag trade-offs, and say when something is a bad idea.
+
+## Working agreements (Naz's, gathered over the project; they hold in every session, wherever it runs)
+- **Document as you go:** each change's reasoning, and what would make us revisit it, goes in `docs/decisions.md` with the change.
+- **No laws in the kernel:** the kernel is physics and a generic rule mechanism; every law is config data.
+- **Simulate the real world, not a game:** institutions do the work. Ask who actually does this, how, and at what cost; no mechanics that block or carry things out by themselves.
+- **Calibrate mechanisms, not outcomes:** fix measures and mechanism bugs; change behaviour only with a real-world basis. A bad outcome that emerges isn't a bug. Checkpoint with Naz when it turns into whack-a-mole.
+- **Parity checks: record, don't chase.** Small differences get a note with a likely cause; keep building.
+- **Cite the ideas we use** in `docs/research/references.md`, with where they're used; mark the unverified "(to confirm)".
+- **The platform is invisible to seats:** participants see the world's terms only; the kernel, translator and resolver have no in-world identity.
+- **Models:** the mock as long as possible. Real-model runs go through the Codex CLI on Naz's subscription until the translator is trained and the platform is mature; paid APIs need his go-ahead. The driver seat is `gpt-6.1-sol`, simple narrow work (the translator) `gpt-6-luna`, never `gpt-6-astra`; always name the model.
+- **Model runs are training data:** never delete one; keep every run's log. Translator training data is mostly generated (from code participants' calls, requests written in several styles by several models, not one steward's voice); real pilot requests are for style and the test; the held-out test cases stay out of all of it.
+- **Never commit with failing tests.** `bun run test:fast` after a change, `bun run test:all` before a merge.
+- **Nothing references the project's old name** (renamed Oikos, 2026-10-05).
+
+## Where things run
+- The repo is `nazriz/oikos` (private). Code changes: edit, push, then `scripts/mini sync` on the run server.
+- Runs and the whole test suite belong on the run server (an always-on Mac), driven with `scripts/mini` (set `OIKOS_MINI=user@host`). Run logs live there, in `runs/`, and nowhere in git.
+- Start here in a new session: `docs/handover.md`.
