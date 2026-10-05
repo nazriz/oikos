@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.35.1",
+  version: "0.35.2",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -2224,7 +2224,9 @@ export const citizen: BehaviourModule = {
           const rooms = minBedrooms(obs.t);
           const roomy = rooms > 0 ? [{ field: "data.bedrooms", op: ">=" as const, value: rooms }] : [];
           // Told about a building? Look there first: what's on offer in it now.
-          if (looking === null && lookedAt !== obs.t && acc && leads.length && (needHome || !job)) {
+          // (Only someone who wants what a building might offer: a home, or work. Someone out of work and not looking
+          // for any, retired say, used to ask to look at nothing, which is refused: found in the stress run of 2026-10-06.)
+          if (looking === null && lookedAt !== obs.t && acc && leads.length && (needHome || (!job && !retired && p.in_labour_force))) {
             const lead = leads.pop()!;
             const looks: LookRequest[] = [];
             if (needHome) looks.push({ channel: "homes", query: { standing: true, where: [{ field: "data.structure", op: "=", value: lead }, { field: "data.rent", op: "<=", value: budget }, ...roomy], limit: p.search_limit } });
