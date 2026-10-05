@@ -34,20 +34,21 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
   been run from scratch since).
 
 ## What's in flight
-- **Pilot 8b stopped itself on day 39** (Codex calls timing out; the laptop). Its log is kept. Rerun it on the mini as
-  the first run there, as pilot 9, detached and kept awake (what `scripts/mini run` does; on the mini itself, the same
-  with `nohup` and `caffeinate -i -w <pid>`): `bun orchestrator/src/cli.ts run worlds/town-1000.yaml --seeds 1 --set
-  mayor=llm --set model_seats=planning,finance --model codex/gpt-6.1-sol --translator-model codex/gpt-6-luna --until
-  31536000 --out runs/pilot-9`.
-- **Check first** whether gpt-6.1-sol simply takes longer than the Codex adapter's 180 seconds on a big answer
-  (`participants/src/llm/codex.ts`): that may be part of why 8b's calls timed out.
+- **Pilot 9 is running on the mini** (started 2026-10-05 19:45, detached, with `caffeinate`): the three-seat year, mayor,
+  planning and finance on codex/gpt-6.1-sol, translator on codex/gpt-6-luna, into `runs/pilot-9` (its pid in
+  `runs/pilot-9/pid`, its console in `runs/pilot-9/nohup.out`). If it has stopped by itself (model unreachable, usage
+  limit), keep the log, say why, and `oikos resume` it; don't start over. Don't rebuild the kernel or edit the source it
+  uses while it runs.
+- **Pilot 8b stopped itself on day 39** (Codex calls timing out; the laptop). Its log is kept. The adapter's 180 seconds
+  wasn't why: gpt-6.1-sol answers 8b's largest requests in 28 to 56 seconds on the mini (docs/decisions.md).
 
 ## Waiting on Naz
 1. **The translator's pass mark.** Suggested: on wrong drafts (at most 1 in 30 held out), not on percent right.
    gpt-6-luna today: 21/26 seen, 18/29 held out, 3 wrong drafts.
 2. **Calibration.** Six of fifteen health measures were off after the expansion (docs/decisions.md, "Open"). Since then
-   a kernel fix (bodies ran no risk until their first birthday in the world) changed every run's deaths and illness:
-   measure again before anything else. Mechanisms first, not rates.
+   a kernel fix (bodies ran no risk until their first birthday in the world) changed every run's deaths and illness.
+   Measured again 2026-10-05: four of fifteen off (unemployment, group participation, religious affiliation, demand
+   unmet at 16.7%). Mechanisms first, not rates; nothing has been changed.
 3. **The works manager as a model seat:** suggested after one clean year with three seats, alone, for 90 days.
 
 ## Found recently, worth keeping in mind
