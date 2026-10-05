@@ -7,12 +7,20 @@ A run never hangs silently or carries on against something broken. What happens 
 | What goes wrong | Kind | What happens |
 |---|---|---|
 | A behaviour module throws | Deterministic | Logged as a `participant_error` note (the error's name and message, and how many in a row); the participant waits this wake; the run goes on. After **3 in a row** it's retired (`participant_retired`): its stand-in carries on if the world names one (`on_opt_out`), otherwise it stops acting. The run summary counts them. |
-| A model call fails after its retries (every call has a time limit, 180 s by default, and retries with backoff) | Deterministic once logged | `ModelCallFailed`: the participant waits this wake (a `participant_error` note). A translator call that fails becomes "That couldn't be drafted just now." A debrief that fails is skipped (`debrief_skipped`). |
+| A model call fails after its retries (every call has a time limit, 180 s by default, and retries with backoff) | Deterministic once logged | `ModelCallFailed`: the call is logged as a `model_call_failed` annotation (what was sent, and the error), and the participant waits this wake (a `participant_error` note). A translator call that fails becomes "That couldn't be drafted just now." A debrief that fails is skipped (`debrief_skipped`). A resumed run is served the failure as the same failure. |
+| The model can't be reached (3 calls in a row fail, with none answered between), or a provider's usage limit is reached | Timing | The run stops there, saying so, its log closed ("aborted"), to be resumed. Nobody is retired, and nobody is debriefed (`debriefs_deferred`): for those in it the run isn't over. |
+| The run is asked to stop (`scripts/mini stop`, a TERM signal, Ctrl-C) | Timing | It stops before its next moment and closes its log, as above. A batch passes the request on to its seeds and starts no more. If a model call is still out after `OIKOS_STOP_GRACE_SECONDS` (120), the process ends as it is: the log resumes all the same. |
 | Participants wake each other without end at one moment | Deterministic | `RunStuck` after 1,000 rounds of wakes at one moment: the run stops with a diagnosis. |
 | Nothing makes progress (a module stuck in a loop, a kernel that stalls, a call that never returns despite its limit) | Timing | A watchdog thread sees the run's breadcrumbs stop. A model call in flight keeps them moving every 10 s for up to 20 minutes, beyond every adapter's own limits, so a slow but healthy call isn't taken for a stall. After `OIKOS_STALL_SECONDS` (default 300), it writes `<run>.failure.json` beside the log, saying what the run was doing, for whom, and when, and ends the process. Time the machine spends asleep doesn't count: a gap between the watchdog's ticks far longer than a tick means everything was frozen, the run included, so a laptop closed overnight pauses a run rather than failing it. |
 | The kernel process dies | Timing | `KernelDied` at once, with its exit code, never mistaken for an off-contract request. `<run>.failure.json` says so. |
 | One seed of a batch fails | Either | The other seeds finish and are measured. The CLI lists the failed seeds with their diagnoses, and exits 1. |
-| The spending limit is reached | By design | The run stops, says why, and debriefs from the 5% kept back. |
+| The spending limit is reached | By design | The run stops, says why, and debriefs from the 5% kept back. It can be resumed with a higher limit. |
+
+**A run that stopped is never shown as one that finished.** `oikos run` prints `seed N: STOPPED at ... not finished: <why>` and, under it, the exact command that resumes it; the run's summary and `batch.json` carry how it ended (`end`) and why it stopped (`stopped`). It's measured as far as it got, and its log is left plain. (The command still exits 0 if the only trouble was runs that stopped: 1 is for runs that failed, or a batch that couldn't be measured or compressed, which `batch.json` records under `problems`.)
+
+## Logs are never overwritten
+
+A model's answers can't be made again. So a fresh run refuses to start where its log already is: `oikos run` and `run-one` stop with the log's name ("choose another --out, or resume it") if the folder holds that run's log, plain or compressed, or one a resume left behind; a batch checks every seed, and the folder's `measure/`, before it starts any. `--overwrite` replaces a run, for tests' own folders; it's never the default, and it never replaces a log in which any model call came from a real provider (anything but the mock), nor anything in a folder that holds one.
 
 ## Signs of trouble that don't stop a run
 
@@ -32,10 +40,13 @@ A run that finishes can still have gone wrong quietly. This session found two su
 oikos resume runs/codex/pilot7/town.seed1.jsonl --model codex/gpt-6-sol --translator-model codex/gpt-6-luna --budget 5
 ```
 
+A compressed log (`.jsonl.zst`) can be named too: it's written out plain first, and kept. So can the folder, if just one run in it stopped short (no summary, or a summary that says it stopped). On the run server: `scripts/mini resume <name> [run id] [--model ...]`.
+
 This runs the world again from the log's own config: not the world file, which may have changed since. Every model call is served its recorded response, in order, checked against the recording (the same system prompt and the same last message).
 - **Up to where it stopped,** the resumed run reproduces the old one exactly and makes **no new model calls**. From there it goes on with the live model.
+- **A call that failed is served as the same failure** (the log's `model_call_failed` annotation), so the participant waits the same wake again and the run takes the same path. The exception is the round the run stopped in: its stop note counts the calls that failed there (`failed_calls_to_ask_again`), and those are asked again, or a run stopped because the model couldn't be reached would stop at the same place.
 - **If the code changed in between** and a request differs from its recording, serving stops there and every later call is live. The log's closing `resumed_from` note says how many calls were served, and where serving stopped if it did.
-- **The old files are kept** as `<run>.stopped-<n>.*`.
+- **The old files are kept** as `<run>.stopped-<n>.*`. They're history: `corpus`, `dataset`, `measure` and `cost` on a folder take each run once, its current log, and read a stopped log only when it's named (its answers are in the resumed log too).
 
 ## Your own modules
 
@@ -48,7 +59,8 @@ This runs the world again from the log's own config: not the world file, which m
 - **Resume re-runs from the start** (about 100 seconds a simulated year for the 1,000-person town). Checkpoints, which would need every module's state saved, wait until runs are long enough to need them (docs/decisions.md).
 - **Logs from before contracts v0.5** (the pilots of 2026-09-28) can't be resumed: the v0.5 kernel won't load their config.
 - **Logs from contracts 0.5** (before 2026-09-29's typed commitments) replay and resume with a 0.5 kernel (kernel 0.5.x, before 0.6.0): the 0.6 kernel won't load their config.
-- **Resume is tested with the mock model** (including a log cut off mid-line), not yet against a real one.
+- **Resume is tested with the mock model** (including a log cut off mid-line, a failed call, and a run stopped with the model out of reach), not yet against a real one.
+- **A program that calls `runWorld` itself** isn't kept from writing over a log: the refusal is in `run`, `run-one` and the batch.
 - **Resource growth over very long runs** (log size, memory) isn't addressed yet.
 
 ## Speed and log size (2026-09-29)
@@ -71,7 +83,7 @@ Where a run's time goes: each run's `<run>.summary.json` has a `profile`: each b
 
 **Log size.** A 5-year run of the 1,000-person town wrote about 2.5 GB. Two flags, for `oikos run`:
 - **`--log lean`** keeps what replay needs and leaves out the rest: no observation hashes (a replay then checks the state through the chain and the checkpoints, not each observation), and no written reasoning from code participants (a model's is always kept). About 30% smaller, and a little faster. The world's config says so (`log.detail`), so a lean log replays as lean. For quick test runs; **full (the default) when the data matters**, and always for model runs.
-- **Compressed by default** (`--no-compress` to keep plain; before, `--compress` asked for it): each log is compressed once the batch is measured (`<run>.jsonl.zst`, zstd): about a seventh the size, checked to read back whole before the plain log goes. Measurement, `dataset`, `corpus`, `story` and `replay` all read compressed logs. **Needs Bun 1.4 or later:** Bun 1.3's zstd stream stalled after 64 MB, so reading back a 5-year run's log (2.3 GB, 326 MB compressed) hung at 0% CPU, and so would any reader of it; 1.4.2 reads it back in about 4 seconds. A test reads back a compressed log over 100 MB line by line.
+- **Compressed by default** (`--no-compress` to keep plain; before, `--compress` asked for it): each log is compressed once the batch is measured (`<run>.jsonl.zst`, zstd): about a seventh the size, checked to read back the same (by hash) and to be on the disk before the plain log goes. A run that stopped to be resumed is left plain. Measurement, `dataset`, `corpus`, `story` and `replay` all read compressed logs. **Needs Bun 1.4 or later:** Bun 1.3's zstd stream stalled after 64 MB, so reading back a 5-year run's log (2.3 GB, 326 MB compressed) hung at 0% CPU, and so would any reader of it; 1.4.2 reads it back in about 4 seconds. A test reads back a compressed log over 100 MB line by line.
 - **`--keep measures`** (for test runs): once measured, a run keeps its measurement tables, its summary and a recipe (`<run>.recipe.json`: the `run-one` command, the commit, the kernel's version, the final state hash), not its log. Running the command at the commit regenerates the log exactly, and the hash says so. About 150 MB for three 5-year runs' tables together, against 1 GB of compressed logs. Refused (the log is kept, and it says why) for a run with a language-model participant (a model's answers can't be regenerated, and they're training data), with uncommitted changes, or with modules from outside the repository.
 - **A more compact log** (dropping what replay regenerates) is proposed in docs/design/compact-logs.md: it changes the log contract.
 

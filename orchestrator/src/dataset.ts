@@ -46,7 +46,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
   let entries = 0;
   let lastHash = "";
   let lastT = 0;
-  let stopped: string | undefined;
+  let end: { reason: string; detail?: string } | undefined; // the log's end entry, if it has one
   const run = () => header?.run_id ?? runOf(logPath);
   const systems = new Map<string, string>();
   const translations = new Map<string, CorpusExample>();
@@ -83,11 +83,11 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
       header = b;
       continue;
     }
+    if (e.kind === "end") end = { reason: String(b.reason), ...(b.detail ? { detail: String(b.detail) } : {}) };
     if (actions && e.seq !== undefined && e.kind !== "event") flushActions(e.seq);
     if (e.kind === "annotation") {
       const a = b.annotation;
       if (a === "orchestrator") orch = b.data ?? {};
-      else if (a === "note" && b.data?.stopped) stopped = String(b.data.stopped);
       else if (a === "usage") pendingUsage.set(b.subject, { input: b.input_tokens, output: b.output_tokens, cost_microusd: b.cost_microusd });
       else if (a === "transcript") {
         const d = b.data ?? {};
@@ -186,7 +186,9 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
     log: { file: basename(logPath), entries, last_hash: lastHash },
     versions: { contracts: header?.contracts, kernel: header?.kernel ?? {}, orchestrator: orch.version ?? "", ...(orch.modules ? { modules: orch.modules } : {}), ...(orch.llm?.translator ? { translator: orch.llm.translator } : {}) },
     seats: { models: orch.llm?.participants ?? {}, ...(orch.llm?.prices ? { prices: orch.llm.prices } : {}) },
-    end: { t: lastT, reason: stopped ?? "completed" },
+    // How the log itself says it ended: completed, or aborted or error with why (a run cut short, or stopped at a
+    // limit); a log with no end entry is a run that was killed, or is still going.
+    end: { t: lastT, reason: !end ? "unfinished: the log has no end entry" : end.detail ? `${end.reason}: ${end.detail}` : end.reason },
     files,
   };
   await Bun.write(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);

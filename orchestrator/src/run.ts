@@ -76,6 +76,14 @@ export interface RunOptions {
   /** Truth audits (docs/design/rebuild.md 8.2): each code module's beliefs, when a wake is done, checked against the
    * terms' readings; divergences recorded as `audit` annotations. For tests and calibration runs. */
   audit?: boolean;
+  /** Asked to stop from outside (`scripts/mini stop`, a TERM signal: batch.ts): set `requested` to why, and the run stops
+   * before its next moment, between rounds, as it does at a usage limit: its log closed, to be resumed. */
+  stop?: { requested?: string };
+}
+
+/** The run was asked to stop from outside. It stops as it does at a usage limit: cleanly, to be resumed. */
+export class StopRequested extends SpendingLimitReached {
+  override name = "StopRequested";
 }
 
 /** More than this many cohorts at one simulated moment means participants are waking each other without end: the run
@@ -97,6 +105,12 @@ export const MAX_FAILURES_IN_A_ROW = 3;
 
 export interface RunSummary {
   runId: string;
+  /** How the log ends: "completed" (the world's whole run length), or "aborted" with why (cut short with `until`, or
+   * stopped: below). */
+  end: { reason: "completed" | "aborted"; detail?: string };
+  /** The run stopped before it was meant to (a usage limit, the model out of reach, the spending limit, a request to
+   * stop): why, in words, and by what (the error's name). Resume it: `oikos resume <log>`. */
+  stopped?: { why: string; by: string };
   logPath: string;
   anchorsPath: string;
   stateHash: string;
@@ -281,9 +295,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   // A round's translations are made at once (each a model call or two): what each one records is kept with it, and
   // written when its request is carried out, in the cohort's order, as if they had been made one after another.
   const translating = new AsyncLocalStorage<object[]>();
+  // Model calls that failed in the round under way. If the run stops in this round (the model out of reach, a limit),
+  // its stop note says how many: a resume asks those again rather than serve them as failures (resume.ts).
+  let roundFailures = 0;
   const io: LlmIO = {
     adapter: watched(o.adapter ?? new MockAdapter("mock", mockPolicies(brains))),
     annotate: async (annotation) => {
+      if ((annotation as { annotation?: unknown }).annotation === "model_call_failed") roundFailures++;
       const mine = translating.getStore();
       if (mine) mine.push(annotation);
       else if (holding) {
@@ -752,7 +770,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const pre = translated.get(u.key) ?? (await translateFor(u, action, as));
       translated.delete(u.key);
       const { draftId, tr } = pre;
-      for (const annotation of pre.notes) await k.request({ op: "annotate", annotation });
+      // (Emptied as they're written, so that a run stopping later doesn't write them again.)
+      for (const annotation of pre.notes.splice(0)) await k.request({ op: "annotate", annotation });
       // Earlier attempts the translator retried (its own, not the participant's): kept on record.
       for (const [i, x] of (tr.retries ?? []).entries())
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
@@ -789,9 +808,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   /** A request's translation: its draft id, what came of it, and what the model calls recorded on the way. */
   type Translated = { draftId: string; tr: Awaited<ReturnType<typeof translator.translate>>; notes: object[] };
   const translated = new Map<string, Translated>();
+  // What translations recorded (usage, transcripts) that never reached the log because the run stopped first: one that
+  // stopped it part-way, and those made beside it. Written as the run stops: every answer a model gave is kept.
+  const unwritten: { key: string; notes: object[] }[] = [];
   async function translateFor(u: Unit, action: { text: string }, as: string | undefined): Promise<Translated> {
     const draftId = `draft.${u.participant}.${++u.llm!.drafted}`;
     const notes: object[] = [];
+    unwritten.push({ key: u.key, notes });
     const tr = await translating.run(notes, async () => {
       try {
         return await translator.translate({ draftId, participant: u.participant, as, proposal: action.text, knowledge: u.knowledge });
@@ -809,8 +832,18 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const thinkingCosts = cfg.orchestration.thinking_time === "costs_world_time";
   const rates = cfg.orchestration.thinking ?? {};
   let stopped: string | undefined; // why the run stopped early, if it did (a spending limit)
+  let stoppedBy: string | undefined; // (the error's name)
+  let lastPause = performance.now();
   try {
     for (;;) {
+      // (With the engine in this process nothing here waits on anything outside it, so a signal would go unheard until
+      // the run ended: a few times a second the run lets the process hear one. Only when it stops depends on this,
+      // never what it does: asked to stop or not, each moment is the same.)
+      if (o.stop && performance.now() - lastPause > 200) {
+        await new Promise<void>((done) => setImmediate(done));
+        lastPause = performance.now();
+      }
+      if (o.stop?.requested) throw new StopRequested(`the run was asked to stop (${o.stop.requested}): it stops here; resume it with oikos resume <log>`);
       // What's next is the engine's (kernel/src/schedule.rs): time moving on, or everyone waking at this moment, in key
       // order (D58 §4.8), each with why it woke and how long since its last wake (contracts 0.7).
       mark({ doing: "scheduling" });
@@ -845,6 +878,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       let rounds = 0;
       while (awake.length) {
         // Acting always moves time on, so rounds at one moment are only looking, drafting and asking: many means a loop.
+        roundFailures = 0;
+        unwritten.length = 0;
         if (++rounds > MAX_COHORTS_PER_MOMENT)
           throw new RunStuck(`participants went on without acting at t=${t} (${MAX_COHORTS_PER_MOMENT} rounds in one moment): ${awake[0]!.u.key} among them`);
         const looking: { u: Unit; n: number; obs: Observation }[] = [];
@@ -935,12 +970,20 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           else await k.request({ op: "finished", key: x.u.key, ...(x.u.waitUntil !== undefined ? { until: x.u.waitUntil } : {}) });
         }
         awake = next;
+        roundFailures = 0;
+        unwritten.length = 0;
       }
     }
   } catch (e) {
     if (!(e instanceof SpendingLimitReached)) throw e;
     stopped = e.message;
-    await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { stopped: stopped } } });
+    stoppedBy = e.name;
+    // What the round's translations recorded and hadn't yet written (in key order, as a round's are): no answer a model
+    // gave is dropped because the run stopped before its request was carried out.
+    for (const x of [...unwritten].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))) for (const annotation of x.notes.splice(0)) await k.request({ op: "annotate", annotation });
+    // (How many calls failed in the round it stopped in: a resume asks those again, rather than serve them as failures
+    // and stop at the same place: resume.ts.)
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { stopped: stopped, by: stoppedBy, ...(roundFailures ? { failed_calls_to_ask_again: roundFailures } : {}) } } });
     log(`${o.runId}: ${stopped}`);
   }
   if (!stopped && until > t) {
@@ -948,7 +991,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     t = until;
   }
   // Debriefs (VISION §15.3), those who opted out included: they may use the 5% of the spending limit kept back for them.
-  for (const d of debriefs.values()) if (d.part.framing?.debrief) {
+  // A run that stops to be resumed (a usage limit, the model out of reach, a request to stop) hasn't ended for those in
+  // it: they aren't debriefed as if it had, and the model isn't asked while it can't answer. They're debriefed when the
+  // resumed run ends. (At the spending limit the run is over unless someone raises it: they're debriefed, as designed.)
+  const toBeResumed = stoppedBy !== undefined && stoppedBy !== "SpendingLimitReached";
+  if (toBeResumed && [...debriefs.values()].some((d) => d.part.framing?.debrief)) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { debriefs_deferred: "the run stopped to be resumed: its participants are debriefed when it ends" } } });
+  if (!toBeResumed) for (const d of debriefs.values()) if (d.part.framing?.debrief) {
     try {
       await d.controller.debrief(debriefText(d.part));
     } catch (e) {
@@ -964,7 +1012,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   if (!o.kernel) await k.close();
   log(`${o.runId}: ${commands} commands, ${refused} refused, ${wakes} wakes, t=${t}${participantErrors ? `; ${participantErrors} failures to decide, recovered (see the log's participant_error notes)` : ""}`);
   if (resolverDiffCount) await Bun.write(join(o.outDir, `${o.runId}.resolver-diffs.json`), JSON.stringify(resolverDiffs, null, 1));
-  return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId, logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
+  return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId,
+    end: { reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) }, ...(stopped ? { stopped: { why: stopped, by: stoppedBy! } } : {}), logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
     health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
     profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) },
     ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}) };

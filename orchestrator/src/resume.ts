@@ -6,11 +6,18 @@
 // exactly, and costs nothing new; from there it goes on with the live model. If a request ever differs from its
 // recording (the code changed in between, say), serving stops and every later call goes to the live model, and the
 // log says from where.
+//
+// A call that failed and was recovered in place (its participant waited that wake) is part of what happened: the log
+// records it (a model_call_failed annotation), and the resumed run is served it as a failure at the same point. The
+// exception is the round the run stopped in: a run that stopped because the model couldn't be reached would stop there
+// again if it were served those failures, so its stop note says how many calls failed in that round, and those are
+// asked again.
 
-import { closeSync, existsSync, openSync, readSync, renameSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readSync, renameSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { canonical } from "@oikos/participants";
-import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "@oikos/participants/llm";
+import { ModelCallFailed, type ContentBlock, type LlmAdapter, type LlmRequest, type LlmResponse } from "@oikos/participants/llm";
+import { currentLogs, decompressLog, runOf } from "./logs";
 
 interface Recorded {
   systemSha256: string;
@@ -21,6 +28,8 @@ interface Recorded {
   estimated?: boolean;
   provider: string;
   model: string;
+  /** The call failed (a model_call_failed annotation): the error, in the words the log has. */
+  failed?: string;
 }
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
@@ -57,6 +66,8 @@ export function eachLine(path: string, fn: (line: string) => boolean | void): vo
 export function recordedCalls(logPath: string): Map<string, Recorded[]> {
   const calls = new Map<string, Recorded[]>();
   const usage = new Map<string, any[]>(); // a call's usage, waiting for its transcript (same subject)
+  const failures: { key: string; r: Recorded }[] = []; // the calls that failed, in the log's order
+  let askAgain = 0; // how many of the last of them the run's stop note says to ask again
   let cut = false;
   eachLine(logPath, (line) => {
     if (cut || !line.trim() || !line.includes('"kind":"annotation"')) return;
@@ -69,6 +80,13 @@ export function recordedCalls(logPath: string): Map<string, Recorded[]> {
     }
     const a = e.body;
     if (a.annotation === "usage") usage.set(a.subject, [...(usage.get(a.subject) ?? []), a]);
+    if (a.annotation === "note" && a.subject === "orchestrator" && a.data?.stopped) askAgain = Number(a.data.failed_calls_to_ask_again ?? 0);
+    if (a.annotation === "model_call_failed") {
+      const key = `${a.subject}|${a.data.purpose}${a.data.ref ? `|${a.data.ref}` : ""}`;
+      const r: Recorded = { systemSha256: a.data.system_sha256, input: a.data.input, output: [], usage: { input_tokens: 0, output_tokens: 0 }, provider: a.data.provider, model: a.data.model, failed: String(a.data.error) };
+      calls.set(key, [...(calls.get(key) ?? []), r]);
+      failures.push({ key, r });
+    }
     if (a.annotation === "transcript") {
       const u = usage.get(a.subject)?.shift();
       if (!u) return;
@@ -82,6 +100,8 @@ export function recordedCalls(logPath: string): Map<string, Recorded[]> {
       }]);
     }
   });
+  // The failures of the round the run stopped in aren't served: the model is asked again (see the top of this file).
+  for (const { key, r } of askAgain > 0 ? failures.slice(-askAgain) : []) calls.set(key, calls.get(key)!.filter((x) => x !== r));
   return calls;
 }
 
@@ -89,6 +109,8 @@ export function recordedCalls(logPath: string): Map<string, Recorded[]> {
  * out), every call goes to the live adapter. Shared by the participants' and the translator's adapters. */
 export class Serving {
   served = 0;
+  /** Of those served, the calls that had failed, served as the same failures. */
+  servedFailures = 0;
   /** Where serving stopped because a request differed from its recording, if it did. */
   diverged?: { subject: string; purpose: string; call: number };
   private next = new Map<string, number>();
@@ -108,6 +130,10 @@ export class Serving {
           if (matches) {
             this.next.set(key, i + 1);
             this.served++;
+            if (r.failed !== undefined) {
+              this.servedFailures++;
+              throw new ModelCallFailed(r.failed);
+            }
             return { content: r.output, usage: r.usage, ...(r.estimated ? { estimated: true } : {}) };
           }
           this.diverged = { subject: req.subject, purpose: req.purpose, call: i + 1 };
@@ -116,6 +142,30 @@ export class Serving {
       },
     };
   }
+}
+
+/**
+ * The log to resume, from what was named: a plain log; a compressed one (written out plain beside itself, and kept: the
+ * resume then moves both aside as the stopped run's); or a folder, if just one run in it stopped short (no summary: it
+ * was killed or failed; or a summary that says it stopped).
+ */
+export async function logToResume(path: string): Promise<string> {
+  if (!existsSync(path)) throw new Error(`${path}: no such log or folder`);
+  if (statSync(path).isDirectory()) {
+    const stoppedShort = currentLogs(path).filter((log) => {
+      const summary = join(path, `${runOf(log)}.summary.json`);
+      if (!existsSync(summary)) return true;
+      try {
+        return !!JSON.parse(readFileSync(summary, "utf8")).stopped;
+      } catch {
+        return true;
+      }
+    });
+    if (stoppedShort.length !== 1)
+      throw new Error(stoppedShort.length ? `${path}: ${stoppedShort.length} runs stopped short; name the one to resume:\n${stoppedShort.map((l) => `  oikos resume ${l}`).join("\n")}` : `${path}: no run here stopped short (nothing to resume)`);
+    path = stoppedShort[0]!;
+  }
+  return decompressLog(path);
 }
 
 /** A log's run id and config (the header), and where its files are. The old files are kept, renamed
@@ -138,10 +188,11 @@ export function prepareResume(logPath: string): { runId: string; config: any; ou
   const outDir = dirname(logPath);
   if (basename(logPath) !== `${runId}.jsonl`) throw new Error(`${logPath}: expected the log to be named ${runId}.jsonl`);
   let n = 1;
-  while (existsSync(join(outDir, `${runId}.stopped-${n}.jsonl`))) n++;
+  while (existsSync(join(outDir, `${runId}.stopped-${n}.jsonl`)) || existsSync(join(outDir, `${runId}.stopped-${n}.jsonl.zst`))) n++;
   const stoppedLog = join(outDir, `${runId}.stopped-${n}.jsonl`);
   renameSync(logPath, stoppedLog);
-  for (const ext of ["anchors.jsonl", "failure.json", "summary.json"]) {
+  // (With it: a compressed copy of the same log, if the batch had made one, its anchors, and what was said of how it ended.)
+  for (const ext of ["jsonl.zst", "anchors.jsonl", "failure.json", "summary.json"]) {
     const f = join(outDir, `${runId}.${ext}`);
     if (existsSync(f)) renameSync(f, join(outDir, `${runId}.stopped-${n}.${ext}`));
   }
