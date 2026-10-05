@@ -14,11 +14,29 @@ fn kernel_source_has_no_nondeterminism() {
         ("thread_rng", "all randomness flows through rng::Randomness"),
         ("rand::", "all randomness flows through rng::Randomness"),
     ];
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    // The kernel's own source and every crate's, all the way down (most of the kernel lives in crates/).
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut dirs = vec![root.join("src")];
+    let mut crates: Vec<_> = std::fs::read_dir(root.join("crates")).unwrap().map(|e| e.unwrap().path().join("src")).filter(|p| p.is_dir()).collect();
+    crates.sort();
+    assert!(crates.len() >= 10, "the crates weren't found under {}", root.join("crates").display());
+    dirs.extend(crates);
+    let mut files = vec![];
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|x| x == "rs") {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    assert!(files.iter().any(|f| f.ends_with("crates/world/src/exec.rs")), "the crates' source wasn't read");
     let mut violations = vec![];
-    for entry in std::fs::read_dir(&src).unwrap() {
-        let path = entry.unwrap().path();
-        let text = std::fs::read_to_string(&path).unwrap();
+    for path in &files {
+        let text = std::fs::read_to_string(path).unwrap();
         for (n, line) in text.lines().enumerate() {
             let code = line.split("//").next().unwrap();
             for (word, why) in forbidden {
@@ -29,7 +47,7 @@ fn kernel_source_has_no_nondeterminism() {
                     boundary(before) && (word.ends_with("::") || boundary(after))
                 });
                 if hit {
-                    violations.push(format!("{}:{}: {word} ({why})", path.file_name().unwrap().to_string_lossy(), n + 1));
+                    violations.push(format!("{}:{}: {word} ({why})", path.strip_prefix(root).unwrap().display(), n + 1));
                 }
             }
         }
