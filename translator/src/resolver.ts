@@ -39,6 +39,23 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
 
 class Ask extends Error {}
 
+/** Words as a label (a statement's kind, an organisation's, a post's role, an agreement's template): lower case,
+ * letters and digits kept, anything else one underscore between them, starting with a letter, at most 64 characters.
+ * A label already written as one comes back unchanged. What a model writes as "supplementary evidence statement" is
+ * the label supplementary_evidence_statement, and never reaches the log as something the contract refuses. */
+export function asLabel(s: string): string {
+  let out = "";
+  let gap = false;
+  for (const ch of s.trim().toLowerCase()) {
+    if ((ch >= "a" && ch <= "z") || (out && ((ch >= "0" && ch <= "9") || ch === "_"))) {
+      if (gap && !out.endsWith("_") && ch !== "_") out += "_";
+      gap = false;
+      out += ch;
+    } else if (out) gap = true;
+  }
+  return out.slice(0, 64);
+}
+
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
 export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string): Resolution {
@@ -112,6 +129,11 @@ class Resolver {
     const x = this.id(c, key);
     if (x === undefined) throw new Ask(question);
     return x;
+  }
+  /** A label argument, as a label (asLabel); absent or empty: undefined. */
+  private label(c: Call, key: string): string | undefined {
+    const s = this.str(c, key);
+    return s === undefined ? undefined : asLabel(s) || undefined;
   }
   private str(c: Call, key: string): string | undefined {
     const v = this.raw(c, key);
@@ -427,7 +449,7 @@ class Resolver {
     const channels = this.json(c, "channels");
     const module = this.json(c, "role_module");
     const first = position ? { title: position, ...(channels !== undefined ? { channels } : {}), ...(module !== undefined ? { role_module: module } : {}) } : undefined;
-    return [{ block: "create_entity", kind: this.str(c, "kind")!, name: this.str(c, "name")!, ...(first ? { first_position: first } : {}), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) }];
+    return [{ block: "create_entity", kind: this.label(c, "kind")!, name: this.str(c, "name")!, ...(first ? { first_position: first } : {}), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   /** Coming into the world (a newcomer, or someone returning: done at the boundary) or leaving it. */
@@ -464,7 +486,7 @@ class Resolver {
     if (!title) throw new Ask("What is the new position called?");
     const channels = this.json(c, "channels");
     const module = this.json(c, "role_module");
-    return [{ block: "create_position", title, ...(this.str(c, "role") ? { role: this.str(c, "role") } : {}), ...(channels !== undefined ? { channels } : {}), ...(module !== undefined ? { role_module: module } : {}), ...(bind ? { ref: bind } : {}) }];
+    return [{ block: "create_position", title, ...(this.label(c, "role") ? { role: this.label(c, "role") } : {}), ...(channels !== undefined ? { channels } : {}), ...(module !== undefined ? { role_module: module } : {}), ...(bind ? { ref: bind } : {}) }];
   }
 
   private system(c: Call, bind?: string): Block[] {
@@ -528,7 +550,7 @@ class Resolver {
       {
         block: "propose_agreement", ref, speaks_for: me, ...(this.id(c, "basis") ? { basis: this.id(c, "basis") } : {}),
         ...(this.visible(c) ? { visible_to: this.visible(c) } : {}),
-        terms: { ...(this.str(c, "template") ? { template: this.str(c, "template") } : {}), parties: [me, other], commitments, ...(term ? { term } : {}), ...(then ? { then } : {}), ...(termination.length ? { termination } : {}), ...(text ? { text } : {}) },
+        terms: { ...(this.label(c, "template") ? { template: this.label(c, "template") } : {}), parties: [me, other], commitments, ...(term ? { term } : {}), ...(then ? { then } : {}), ...(termination.length ? { termination } : {}), ...(text ? { text } : {}) },
       },
       { block: "sign_agreement", agreement: `$${ref}`, as: me },
     ];
@@ -538,7 +560,7 @@ class Resolver {
     const common = { ...this.speaksFor(c), ...(this.id(c, "basis") ? { basis: this.id(c, "basis") } : {}), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) };
     const withdraw = this.id(c, "withdraw");
     if (withdraw) return [{ block: "withdraw", record: withdraw, ...(this.str(c, "text") ? { text: this.str(c, "text") } : {}), ...common }];
-    const kind = this.str(c, "kind");
+    const kind = this.label(c, "kind");
     const text = this.str(c, "text");
     if (!kind) throw new Ask("What kind of statement is it (a notice, a law, a report, …)?");
     if (!text) throw new Ask("What should it say?");

@@ -27,7 +27,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { calls, canonical, DECISIONS, inCurrency, paramErrors, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
-import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution } from "@oikos/translator";
+import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution, NOT_CHECKED } from "@oikos/translator";
 import { Kernel } from "./kernel";
 import { divergences } from "./truth";
 import type { Watchdog } from "./watchdog";
@@ -787,7 +787,15 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
         return true;
       }
-      await k.request({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
+      // A draft the log won't take (something in it breaks the contract: a kind that isn't a label, an id that isn't
+      // one) is a failed translation, told to the participant as one, and never the end of the run. Pilot 9 stopped on
+      // day 63 on such a draft (2026-10-06): what a model wrote reached the log unchecked, and the refusal was fatal.
+      const drafted = await k.tryRequest({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
+      if (drafted === null) {
+        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: NOT_CHECKED, call: tr.draft.call, invalid: ["the draft breaks the contract and couldn't be recorded"] } } });
+        u.notices.push({ t, text: NOT_CHECKED, re: draftId });
+        return true;
+      }
       const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
       const onlyWords = tr.draft.blocks.every((b) => b.block === "message");
       if (confirm === "never" || (confirm === "consequential" && onlyWords)) await submit(u, pending, "accept", `confirmation: ${confirm}`);

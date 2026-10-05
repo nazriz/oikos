@@ -611,7 +611,7 @@ impl Resolver<'_> {
         let channels = Self::json_(c, "channels")?;
         let module = Self::json_(c, "role_module")?;
         let first = position.map(|p| obj(vec![("title", some(p)), ("channels", channels), ("role_module", module)]));
-        let kind = Self::str_(c, "kind")?;
+        let kind = Self::str_(c, "kind")?.map(|k| as_label(&k)).filter(|k| !k.is_empty());
         let name = Self::str_(c, "name")?;
         let vis = self.visible(c)?;
         Ok(vec![obj(vec![("block", some("create_entity")), ("kind", kind.map(Json::from)), ("name", name.map(Json::from)), ("first_position", first), ("visible_to", vis), ("ref", bind.map(Json::from))])])
@@ -667,7 +667,7 @@ impl Resolver<'_> {
         let Some(title) = Self::str_(c, "title")?.filter(|t| !t.is_empty()) else { return ask("What is the new position called?") };
         let channels = Self::json_(c, "channels")?;
         let module = Self::json_(c, "role_module")?;
-        let role = Self::str_(c, "role")?.filter(|r| !r.is_empty());
+        let role = Self::str_(c, "role")?.map(|r| as_label(&r)).filter(|r| !r.is_empty());
         Ok(vec![obj(vec![("block", some("create_position")), ("title", some(title)), ("role", role.map(Json::from)), ("channels", channels), ("role_module", module), ("ref", bind.map(Json::from))])])
     }
 
@@ -789,7 +789,7 @@ impl Resolver<'_> {
         let r = bind.map(String::from).unwrap_or_else(|| self.fresh("offer"));
         let basis = self.id(c, "basis")?;
         let vis = self.visible(c)?;
-        let template = Self::str_(c, "template")?.filter(|t| !t.is_empty());
+        let template = Self::str_(c, "template")?.map(|t| as_label(&t)).filter(|t| !t.is_empty());
         let terms = obj(vec![
             ("template", template.map(Json::from)),
             ("parties", some(json!([me, other]))),
@@ -813,7 +813,7 @@ impl Resolver<'_> {
             v.extend(common);
             return Ok(vec![obj(v)]);
         }
-        let kind = Self::str_(c, "kind")?.filter(|k| !k.is_empty());
+        let kind = Self::str_(c, "kind")?.map(|k| as_label(&k)).filter(|k| !k.is_empty());
         let text = Self::str_(c, "text")?.filter(|t| !t.is_empty());
         let Some(kind) = kind else { return ask("What kind of statement is it (a notice, a law, a report, …)?") };
         let Some(text) = text else { return ask("What should it say?") };
@@ -972,8 +972,38 @@ fn nearest_days(seconds: i64) -> i64 {
     seconds.signum() * (seconds.unsigned_abs() / 86_400 + u64::from(seconds.unsigned_abs() % 86_400 >= 43_200)) as i64
 }
 
+/// Words as a label (a statement's kind, an organisation's, a post's role, an agreement's template): lower case,
+/// letters and digits kept, anything else one underscore between them, starting with a letter, at most 64 characters.
+/// A label already written as one comes back unchanged (translator/src/resolver.ts `asLabel` is the same).
+pub fn as_label(s: &str) -> String {
+    let mut out = String::new();
+    let mut gap = false;
+    for ch in s.trim().chars().flat_map(char::to_lowercase) {
+        if ch.is_ascii_lowercase() || (!out.is_empty() && (ch.is_ascii_digit() || ch == '_')) {
+            if gap && !out.ends_with('_') && ch != '_' {
+                out.push('_');
+            }
+            gap = false;
+            out.push(ch);
+        } else if !out.is_empty() {
+            gap = true;
+        }
+    }
+    out.truncate(64);
+    out
+}
+
 #[cfg(test)]
 mod tests {
+    use super::as_label;
+
+    #[test]
+    fn words_as_a_label() {
+        for (written, label) in [("notice", "notice"), ("permit_application", "permit_application"), ("supplementary evidence statement", "supplementary_evidence_statement"), ("  Rent-Increase  Notice ", "rent_increase_notice"), ("2nd reading", "nd_reading"), ("works_manager", "works_manager"), ("—", "")] {
+            assert_eq!(as_label(written), label, "{written}");
+        }
+    }
+
     use super::nearest_days;
 
     #[test]

@@ -7,7 +7,7 @@ import BLOCKS from "../../contracts/blocks.schema.json";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
-import { resolve, type StructureTypeInfo } from "../src/resolver";
+import { asLabel, resolve, type StructureTypeInfo } from "../src/resolver";
 
 /** The town's money: its profile's (the platform has none of its own). */
 const TOWN_MONEY: Currency = PROFILE.values.currency;
@@ -316,4 +316,13 @@ test("a form by its name in ordinary words; one nobody has seen is said to be th
     const r = run2(p);
     expect(!r.ok && r.questions).toEqual(["You haven't seen a form by that name."]);
   }
+});
+
+test("a label written as ordinary words is that label (a kind, a role, a template), in the acts and so in the log", () => {
+  // (The engine's resolver has the same cases: kernel/crates/resolver/src/resolve.rs.)
+  for (const [written, label] of [["notice", "notice"], ["permit_application", "permit_application"], ["supplementary evidence statement", "supplementary_evidence_statement"], ["  Rent-Increase  Notice ", "rent_increase_notice"], ["2nd reading", "nd_reading"], ["works_manager", "works_manager"], ["—", ""]] as const) expect(asLabel(written)).toBe(label);
+  const r = resolve(calls.parseProgram('statement(kind="supplementary evidence statement", text="Filed.")'), town(), () => undefined, "mayor");
+  expect(r.ok && r.blocks[0]).toMatchObject({ block: "publish", kind: "supplementary_evidence_statement" });
+  const e = resolve(calls.parseProgram('entity(kind="Land Trust", name="River Land Trust")'), town(), () => undefined, "mayor");
+  expect(e.ok && e.blocks[0]).toMatchObject({ block: "create_entity", kind: "land_trust" });
 });
