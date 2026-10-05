@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter, LlmRequest } from "@oikos/participants/llm";
 import { CASES } from "../eval/cases";
-import { amountForms, askable, builtRefusals, copies, durationForms, generate, goldFromCases, goldFromLog, goldText, literals, mustAppear, refusalBriefs, sameProgram, sampler, shapeOf, surfaceVariant, type Example } from "../train/data";
+import { amountForms, askable, builtRefusals, copies, durationForms, generate, goldFromCases, goldFromLog, goldText, literals, mustAppear, needed, refusalBriefs, spansIn, sameProgram, sampler, shapeOf, surfaceVariant, type Example } from "../train/data";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
 const header = JSON.stringify({ kind: "header", body: { config: { world: { entities: [{ id: "builder", name: "Millbrook Builders" }, { id: "city", name: "Millbrook" }] }, positions: [{ id: "works", title: "Works Manager" }] } } });
@@ -183,4 +183,21 @@ test("what a gold program is kept as, what a request must carry word for word, a
   // Twenty workers named, or a paragraph of terms, isn't a request for a sentence or two.
   expect(askable(calls.parseProgram(`work(task=make, units="3", at=str.1, by=${JSON.stringify(Array.from({ length: 20 }, (_, i) => `c00${i}`))})`))).toBe(false);
   expect(askable(calls.parseProgram(`agreement(with=c0042, terms="${"x".repeat(200)}")`))).toBe(false);
+});
+
+test("what a request must carry: ids and copied text exactly, a catalogue word as a word, a yes-or-no not at all; and where each is", () => {
+  const program = 'structure(type=park, on=lot-00, by=builder, price="$9k", from=acc-city)';
+  expect(needed(calls.parseProgram(program)).map((n) => `${n.arg}=${n.value}${n.exact ? "!" : ""}`).sort()).toEqual(["by=builder", "from=acc-city!", "on=lot-00!", "price=$9k!", "type=park"]);
+  expect(copies("Have builder put up a Park on lot-00 for $9k, paid from acc-city.", program)).toBe(true);
+  expect(copies("Have builder put up some parkland on lot-00 for $9k, paid from acc-city.", program)).toBe(false); // "park" isn't a word of it
+  expect(copies("Have them put up a park on lot-00 for $9k, paid from acc-city.", program)).toBe(false); // who builds isn't said
+  // A word nobody said can't be pointed at: "made" is not "make".
+  expect(copies("Have c0013 get 15 units made at str.2.", 'work(task=make, units="15", at=str.2, by=c0013)')).toBe(false);
+  expect(copies("Have c0013 make 15 at str.2.", 'work(task=make, units="15", at=str.2, by=c0013)')).toBe(true);
+  // A form named in two words; someone leaving, without the word "yes".
+  expect(copies("Lodge a permit application with planning for lot-01.", "form(to=planning, form=permit_application, lot=lot-01)")).toBe(true);
+  expect(copies("c0193 is moving out of apts-2.", "occupancy(in=apts-2, leave=yes, who=c0193)")).toBe(true);
+  const request = "Pay acc-b $500 from acc-city for the kerb.";
+  const spans = spansIn(request, 'money(to=acc-b, amount="$500", from=acc-city, for="the kerb")');
+  expect(spans.map((x) => `${x.arg}: ${request.slice(...x.at)}`).sort()).toEqual(["amount: $500", "for: the kerb", "from: acc-city", "to: acc-b"]);
 });

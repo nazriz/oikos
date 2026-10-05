@@ -42,6 +42,9 @@ export interface Example {
   kind: "positive" | "refusal";
   shape: string;
   style?: string;
+  /** Where each value the program takes from the request is in it: the argument, the value, and [start, end) in
+   * characters (what a model that points at spans is trained on). */
+  spans?: { arg: string; value: string; at: [number, number] }[];
   /** Who wrote the request, and who translated it back (absent: built mechanically, or not yet verified). */
   written_by?: string;
   verified_by?: string;
@@ -105,24 +108,53 @@ export function goldText(p: calls.Program): string {
   return calls.programText({ lines: t.lines.map((l) => ({ ...l, call: call(l.call) })) });
 }
 
+/** Arguments whose bare value is a yes-or-no kind of choice the request implies without saying the word (someone
+ * "is leaving": `leave=yes`; "is permitted to": `position=liberty`): never looked for in the request. */
+const IMPLIED = new Set(["leave", "then", "position", "sex", "visible"]);
+
+/** What a request has to carry of its program, each with how it must appear. */
+export interface Needed { value: string; arg: string; exact: boolean }
+
 /**
- * The literals a request has to carry word for word: copied text (amounts, names, a letter's words) and anything
- * that reads as an id (acc-city, rec.412, c0042, apts-3/dwelling.2). A bare word (`yes`, `lease`, `park`, `make`) is a
- * choice among options, said however the request says it, and whether it was understood is the round trip's to find.
+ * What a request has to carry of its program for a model that copies and chooses (design §16.10) to learn from it:
+ *  - exactly, character for character: copied text (amounts, durations, names, a letter's words) and anything that
+ *    reads as an id (acc-city, rec.412, c0042, apts-3/dwelling.2);
+ *  - as a word of the request: a bare word naming something in the world's catalogue or a record's kind (`park`,
+ *    `make`, `lease`, `notice`, `permit_application`: in any case, with spaces for underscores), so the model points
+ *    at it and never has to guess a word nobody said;
+ *  - not at all: a yes-or-no kind of choice the wording implies (IMPLIED).
  */
-export function mustAppear(p: calls.Program): string[] {
+export function needed(p: calls.Program): Needed[] {
   if ("none" in p) return [];
   const bound = new Set(p.lines.map((l) => l.bind).filter(Boolean));
-  const out: string[] = [];
-  const idLike = (s: string) => /[0-9._\/-]/.test(s);
-  const value = (v: calls.Value) => {
-    if ("id" in v) !bound.has(v.id) && idLike(v.id) && out.push(v.id);
-    else if ("text" in v) out.push(v.text);
-    else if ("json" in v) (Array.isArray(v.json) ? v.json : []).forEach((x) => typeof x === "string" && idLike(x) && out.push(x));
-    else if ("call" in v) Object.values(v.call.args).forEach(value);
+  const out: Needed[] = [];
+  const idLike = (s: string) => /[0-9.\/-]/.test(s); // (not an underscore: a form or a kind named in two words is a word)
+  const value = (arg: string, v: calls.Value) => {
+    if ("id" in v) {
+      if (bound.has(v.id) || IMPLIED.has(arg)) return;
+      out.push({ value: v.id, arg, exact: idLike(v.id) });
+    } else if ("text" in v) out.push({ value: v.text, arg, exact: true });
+    else if ("json" in v) (Array.isArray(v.json) ? v.json : []).forEach((x) => typeof x === "string" && out.push({ value: x, arg, exact: idLike(x) }));
+    else if ("call" in v) Object.entries(v.call.args).forEach(([k, x]) => value(`${arg}.${k}`, x));
   };
-  for (const l of p.lines) Object.values(l.call.args).forEach(value);
-  return [...new Set(out)];
+  for (const l of p.lines) Object.entries(l.call.args).forEach(([k, v]) => value(k, v));
+  return out;
+}
+
+/** Where a needed value is in a request: [start, end) in characters, or undefined if it isn't there. */
+export function spanOf(request: string, n: Needed): [number, number] | undefined {
+  if (n.exact) {
+    const at = request.indexOf(n.value);
+    return at < 0 ? undefined : [at, at + n.value.length];
+  }
+  // A word of the request, in any case, underscores as spaces, not inside a longer word.
+  const m = new RegExp(`(?<![A-Za-z0-9])${n.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/_/g, "[ _-]")}(?![A-Za-z0-9])`, "i").exec(request);
+  return m ? [m.index, m.index + m[0].length] : undefined;
+}
+
+/** The values a request has to carry exactly (ids and copied text): see `needed`. */
+export function mustAppear(p: calls.Program): string[] {
+  return [...new Set(needed(p).filter((n) => n.exact).map((n) => n.value))];
 }
 
 /** The names a world's config gives its ids (entities, people, positions): for writing "Millbrook Builders" where the call says `builder`. */
@@ -291,7 +323,7 @@ export function writerSystem(): string {
     "Write a request that means exactly that call: everything the call says, and nothing it doesn't.",
     "- Every id and every quoted value in the call must appear in your request exactly as written, character for character (the id acc-city as acc-city; the amount \"$1,200\" as $1,200; a quoted text word for word). Don't reformat amounts or durations, and don't replace an id with a description.",
     "- Don't mention the call, its function names or its argument names, and don't use a function's name as your verb where nobody would (not \"structure a park\": have one built); say it as a person would.",
-    "- Everything the call says must be in the request, including who it's to or for: a call's bare words (a kind, a task, yes or no) said in ordinary words, its ids and quoted values exactly.",
+    "- Everything the call says must be in the request, including who it's to or for. Its ids and quoted values appear exactly. A bare word that names a kind of thing (park, lease, notice, make, goods, a form's name) appears as that same word, in a sentence where a person would use it (an underscore may be a space: permit_application as \"permit application\"); don't swap it for another word or another form of it (\"make\", not \"made\" or \"manufacture\"). Only a plain yes or no (someone leaving, something permitted) is left to how you say it.",
     "- Don't add details the call doesn't have (no dates, reasons that change what's asked, extra recipients).",
     "Answer with the request only.",
   ].join("\n");
@@ -309,9 +341,17 @@ export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: strin
   return text ? text.replace(/^["“]|["”]$/g, "").trim() : undefined;
 }
 
-/** Whether a request carries every literal of its program, exactly (the translator copies; it never composes). */
+/** Where each needed value of a program is in a request (for an example's `spans`). */
+export function spansIn(request: string, program: string): { arg: string; value: string; at: [number, number] }[] {
+  return needed(calls.parseProgram(program)).flatMap((n) => {
+    const at = spanOf(request, n);
+    return at ? [{ arg: n.arg, value: n.value, at }] : [];
+  });
+}
+
+/** Whether a request carries everything its program takes from it (the translator copies and chooses; it never composes). */
 export function copies(request: string, program: string): boolean {
-  return mustAppear(calls.parseProgram(program)).every((l) => request.includes(l));
+  return needed(calls.parseProgram(program)).every((n) => spanOf(request, n) !== undefined);
 }
 
 /** A program with the same meaning counts as the same: compared in canonical form (eval/run.ts). */
@@ -522,7 +562,7 @@ export async function generate(gold: Gold[], o: {
         }
         verified = o.back.model;
       }
-      positives.push({ id: exampleId(request, g.program), request, forms: [], program: g.program, kind: "positive", shape: g.shape, style, written_by: model, ...(verified ? { verified_by: verified } : {}), source: g.source });
+      positives.push({ id: exampleId(request, g.program), request, forms: [], program: g.program, kind: "positive", shape: g.shape, style, spans: spansIn(request, g.program), written_by: model, ...(verified ? { verified_by: verified } : {}), source: g.source });
     }
     if (stopped) break;
     if (o.log && (gi + 1) % 25 === 0) o.log(`${gi + 1}/${gold.length} programs; ${positives.length} examples kept`);
