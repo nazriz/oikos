@@ -51,12 +51,18 @@ impl ActTimes {
     }
 }
 
+/// A lane that has never been used: free now, whenever now is. The lowest integer the contracts allow (canonical JSON
+/// takes integers within ±(2^53 − 1) only, and the timelines are part of the hashed state), so it's below every time a
+/// world can have and means what the smallest 64-bit integer meant here until 2026-10-05, which made a state with an
+/// unused lane in it impossible to hash or checkpoint.
+pub const FREE: i64 = -9_007_199_254_740_991;
+
 /// An actor's timeline: when each of its lanes is next free. Empty: free now.
 /// Places an act ready to start at `ready` (after any thinking) and taking `seconds` on the lane that frees first
 /// (the lowest-numbered, of those free at the same time): returns when it starts and when it's done.
 pub fn place(lanes: &mut Vec<i64>, count: usize, ready: i64, seconds: i64) -> (i64, i64) {
     let count = count.max(1);
-    lanes.resize(count.max(lanes.len()), i64::MIN);
+    lanes.resize(count.max(lanes.len()), FREE);
     lanes.truncate(count);
     let (i, free) = lanes.iter().copied().enumerate().min_by_key(|&(i, f)| (f, i)).expect("at least one lane");
     let start = ready.max(free);
@@ -99,5 +105,23 @@ mod tests {
         assert_eq!(place(&mut tl, 2, 0, 10), (10, 20)); // both lanes busy until 10
         // Fewer lanes than before: the rest are dropped.
         assert_eq!(place(&mut tl, 1, 0, 5), (20, 25));
+    }
+
+    #[test]
+    fn an_unused_lane_is_free_now_and_within_the_contracts_integers() {
+        const MAX_SAFE: i64 = 9_007_199_254_740_991;
+        let mut tl = vec![];
+        assert_eq!(place(&mut tl, 3, 100, 10), (100, 110));
+        assert_eq!(tl, vec![110, FREE, FREE]);
+        assert!(tl.iter().all(|t| (-MAX_SAFE..=MAX_SAFE).contains(t)));
+        // An unused lane before a used one, the lowest-numbered first; then the lane that frees first.
+        assert_eq!(place(&mut tl, 3, 50, 100), (50, 150));
+        assert_eq!(tl, vec![110, 150, FREE]);
+        assert_eq!(place(&mut tl, 3, 0, 5), (0, 5));
+        assert_eq!(tl, vec![110, 150, 5]);
+        assert_eq!(place(&mut tl, 3, 0, 5), (5, 10));
+        // More lanes than before: the new ones are free now.
+        assert_eq!(place(&mut tl, 4, 7, 1), (7, 8));
+        assert_eq!(tl, vec![110, 150, 10, 8]);
     }
 }
