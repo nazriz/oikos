@@ -893,7 +893,7 @@ export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: strin
   });
   usage?.(res.usage);
   const text = res.content.filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text").map((b) => b.text).join(" ").trim();
-  return text ? text.replace(/^["“]|["”]$/g, "").trim() : undefined;
+  return text ? unwrapped(text) : undefined;
 }
 
 /** Why a written request reads as the call and not as a person, each a reason a request is dropped for (and counted). */
@@ -901,6 +901,20 @@ export type Unnatural = "quotes" | "variable_named" | "argument_named" | "zero_w
 export const UNNATURAL: Unnatural[] = ["quotes", "variable_named", "argument_named", "zero_wait"];
 
 /** Whether a text's quotes are closed: straight ones in pairs, curly ones opened and closed. */
+/** A written request without quotation marks put around the whole of it (a model's habit). Only a pair around
+ * everything is taken off: a request that ENDS in quoted words keeps their closing mark (until 2026-10-06 the last
+ * mark was always taken, and every such request then failed the check for an unclosed quote). */
+export function unwrapped(text: string): string {
+  const t = text.trim();
+  if (!/^["“]/.test(t) || !/["”]$/.test(t)) return t;
+  const inner = t.slice(1, -1);
+  const first = inner.search(/["“”]/);
+  // Around everything: nothing quoted inside, or what's quoted inside opens after a space or a colon (so the first
+  // mark of all isn't closed by it) and is closed again.
+  const around = first < 0 || (/[\s:(]/.test(inner[first - 1] ?? "") && (inner.match(/["“”]/g) ?? []).length % 2 === 0);
+  return around ? inner.trim() : t;
+}
+
 export function quotesBalanced(text: string): boolean {
   return (text.match(/"/g) ?? []).length % 2 === 0 && (text.match(/“/g) ?? []).length === (text.match(/”/g) ?? []).length;
 }
@@ -1239,7 +1253,7 @@ export async function writeRefusal(adapter: LlmAdapter, b: RefusalBrief, style: 
   });
   usage?.(res.usage);
   const text = res.content.filter((x): x is Extract<typeof x, { type: "text" }> => x.type === "text").map((x) => x.text).join(" ").trim();
-  return text ? text.replace(/^["“]|["”]$/g, "").trim() : undefined;
+  return text ? unwrapped(text) : undefined;
 }
 
 /** A request that wasn't kept, and why: for looking at what the writers and the round trip get wrong. `checked_by`:

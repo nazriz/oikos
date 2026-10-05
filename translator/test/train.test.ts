@@ -1108,3 +1108,11 @@ test("the model that checks a request is never the one that wrote it: several wr
   const one = await generate(gold, { writers: [w("a")], back: checker("stand-in/c"), perGold: 1, styles: ["terse"] });
   expect(one.examples.filter((e) => e.kind === "positive").every((e) => e.verified_by === "stand-in/c")).toBe(true);
 });
+
+test("marks around the whole of a request come off; a request that ends in quoted words keeps their closing mark", () => {
+  expect(unwrapped('"Pay acc-1 the fee."')).toBe("Pay acc-1 the fee.");
+  expect(unwrapped('Tell c7180: "Work starts tomorrow."')).toBe('Tell c7180: "Work starts tomorrow."');
+  expect(unwrapped('"Tell c7180: "Work starts tomorrow.""')).toBe('Tell c7180: "Work starts tomorrow."');
+  expect(unwrapped('"Hello." Then tell them "Goodbye."')).toBe('"Hello." Then tell them "Goodbye."');
+  expect(quotesBalanced(unwrapped('Tell c7180: "Work starts tomorrow."'))).toBe(true);
+});
