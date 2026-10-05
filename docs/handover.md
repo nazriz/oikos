@@ -33,7 +33,17 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
 - Setting up another machine: `scripts/setup-mini.sh` (it has been corrected for what the mini's setup found; it hasn't
   been run from scratch since).
 
-## What's in flight (2026-10-06, early morning)
+## What's in flight (2026-10-06, 09:00)
+- **The Codex subscription's usage limit was reached at 08:38 on 2026-10-06; it says "try again at Oct 10th, 2026
+  8:38 AM"** (or buy credits at chatgpt.com/codex/settings/usage: Naz's call). Until then nothing can run on
+  gpt-6.1-sol or gpt-6-luna. Two things stopped on it, both cleanly:
+  - **Pilot 9, on day 175** (0.48 years). Its log is whole (`runs/pilot-9/town-1000.seed1.jsonl`); resume it when the
+    limit resets, from the worktree `pilot9-fix` as below.
+  - **The training data, in part 13 of 24.** Parts 1 to 12 are whole (about 595 examples each); `part-13` holds what
+    was written before the stop (145) and is redone by `make.ts` when it runs again. The parts still to write are
+    being written by other models through files (`oikos translator-data --briefs`, `translator-data-write`), so the
+    set's voices are gpt-6.1-sol for about half and Claude models for the rest.
+  - What follows in this section was written before the stop.
 - **The translator's training data is being written**: `runs/translator-data-2026-10-06/` on the mini, 24 parts
   (`part-NN/examples.jsonl`, `manifest.json`, `rejects.jsonl`), by `make.ts` there (its pid in `pid`, its console in
   `make.log`), codex/gpt-6.1-sol writing, six calls at a time, about 20 minutes a part. It skips parts already
