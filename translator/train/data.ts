@@ -40,7 +40,7 @@ const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("h
 
 /** A form as someone knows of it: its name, the office it goes to, and its fields in the order it lists them. */
 export interface FormField { type: string; required?: boolean; options?: string[] }
-export interface FormSpec { form: string; to: string; fields: { [name: string]: FormField } }
+export interface FormSpec { form: string; to: string; fields: { [name: string]: FormField }; /** Its record's id, where the form is a real one (a generated form's is made from its office and name). */ id?: string }
 
 /** The types of field a form can have, as the resolver reads them (translator/src/resolver.ts, `form`): the first
  * seven each have a reading of their own; any other type's value is an id, and these are the ones worlds use. */
@@ -48,9 +48,12 @@ export const FIELD_TYPES = ["amount", "duration", "count", "text", "choice", "sp
 
 /** A form as the translator is shown it: one line, exactly as `translatorContext()` writes it (translator/src/index.ts;
  * a test holds the two together). */
+/** The id of a form's record, as these generated forms have it (the translator is shown it beside the name). */
+export const formId = (f: FormSpec): string => f.id ?? `form-${f.to}-${f.form}`.replace(/_/g, "-");
+
 export function formLine(f: FormSpec): string {
   const field = ([k, v]: [string, FormField]) => `${k} (${v.type === "choice" && v.options?.length ? `one of ${v.options.join(" | ")}` : v.type}${v.required ? ", required" : ""})`;
-  return `- ${f.form}, to=${f.to}: fields ${Object.entries(f.fields).map(field).join(", ")}`;
+  return `- ${f.form}, to=${f.to}, id ${formId(f)}: fields ${Object.entries(f.fields).map(field).join(", ")}`;
 }
 
 /**
@@ -61,7 +64,7 @@ export function knowing(forms: FormSpec[], currency: Currency): Knowledge {
   const k = new Knowledge(currency);
   if (forms.length) k.absorb({
     participant: "someone", t: 0, status: "active", entity: "someone", outcomes: [], inbox: [], drafts: [],
-    channels: { known: { kind: "records", records: forms.map((f, i) => ({ id: `form.${i + 1}`, record: "statement", author: f.to, in_position: f.to, at: 0, visible_to: "public", kind: "form", text: `${f.form.replace(/_/g, " ")}.`, data: { form: f.form, submit_as: f.form, submit_to: [f.to], fields: f.fields } })) } },
+    channels: { known: { kind: "records", records: forms.map((f) => ({ id: formId(f), record: "statement", author: f.to, in_position: f.to, at: 0, visible_to: "public", kind: "form", text: `${f.form.replace(/_/g, " ")}.`, data: { form: f.form, submit_as: f.form, submit_to: [f.to], fields: f.fields } })) } },
   } as any);
   return k;
 }
@@ -290,7 +293,7 @@ export function formsIn(config: unknown): FormSpec[] {
     else if (v && typeof v === "object") {
       const to = v.in_position ?? v.speaks_for ?? v.author;
       if (typeof v.data?.form === "string" && v.data.fields && typeof v.data.fields === "object" && typeof to === "string") {
-        out.push({ form: v.data.form, to, fields: Object.fromEntries(Object.entries(v.data.fields as { [k: string]: any }).map(([k, f]) => [k, { type: String(f.type), ...(f.required ? { required: true } : {}), ...(Array.isArray(f.options) ? { options: f.options.map(String) } : {}) }])) });
+        out.push({ ...(typeof v.id === "string" ? { id: v.id } : {}), form: v.data.form, to, fields: Object.fromEntries(Object.entries(v.data.fields as { [k: string]: any }).map(([k, f]) => [k, { type: String(f.type), ...(f.required ? { required: true } : {}), ...(Array.isArray(f.options) ? { options: f.options.map(String) } : {}) }])) });
       } else Object.values(v).forEach(walk);
     }
   };
@@ -501,7 +504,7 @@ export function surfaceVariant(g: Gold, rand: () => number, cur: Currency | unde
  * or never calls (a trust set up, a claim recorded, a post created) are there. Never from held-out cases. Their
  * amounts are in the test town's money, and a form filled in carries the form the test's mayor knows of. */
 export function goldFromCases(cases: Case[]): Gold[] {
-  const known: FormSpec[] = fixture().forms.map((f) => ({ form: String(f.data?.form), to: String((f as any).in_position ?? (f as any).speaks_for ?? f.author), fields: (f.data?.fields ?? {}) as FormSpec["fields"] }));
+  const known: FormSpec[] = fixture().forms.map((f) => ({ id: f.id, form: String(f.data?.form), to: String((f as any).in_position ?? (f as any).speaks_for ?? f.author), fields: (f.data?.fields ?? {}) as FormSpec["fields"] }));
   return cases.filter((c) => !c.held_out && !c.expect[0]!.startsWith("none(")).filter((c) => askable(calls.parseProgram(c.expect[0]!))).map((c) => {
     const program = goldText(calls.parseProgram(c.expect[0]!));
     const own = known.filter((f) => f.form === formOf(program)?.form);

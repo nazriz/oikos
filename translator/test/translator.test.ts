@@ -59,7 +59,7 @@ test("the translator is shown where each form goes (the `to` to write) and a cho
     forms: { kind: "records", records: [{ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form", text: "Council proposal.",
       data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: { proposal: { type: "text", required: true }, kind: { type: "choice", required: true, options: ["law", "budget", "other"] }, parks: { type: "amount" } } } }] } } } as any);
   expect(translatorContext({ draftId: "d1", participant: "mayor-system", proposal: "Table the budget.", knowledge: k }))
-    .toContain("- council_proposal, to=city: fields proposal (text, required), kind (one of law | budget | other, required), parks (amount)");
+    .toContain("- council_proposal, to=city, id form-council-proposal: fields proposal (text, required), kind (one of law | budget | other, required), parks (amount)");
 });
 
 test("a request the translator can't turn into a working call is tried once more, with what went wrong", async () => {

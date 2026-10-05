@@ -34,8 +34,8 @@ test("the translator is shown the forms the seat knew, worded as the pilots' log
   expect(shown()).toBe("Request: Do it.");
   expect(shown("wide")).toBe([
     "Request: Do it.", "", "Forms this person knows of:",
-    "- council_proposal, to=city: fields affects (one of tenants | development | neither), environment (amount), kind (one of law | budget | other, required), parks (amount), proposal (text, required), roads (amount), services (amount), staff (amount)",
-    "- permit_application, to=city: fields lot (lot, required), notes (text), structure_type (structure_type, required)",
+    "- council_proposal, to=city, id form-council-proposal: fields affects (one of tenants | development | neither), environment (amount), kind (one of law | budget | other, required), parks (amount), proposal (text, required), roads (amount), services (amount), staff (amount)",
+    "- permit_application, to=city, id form-permit: fields lot (lot, required), notes (text), structure_type (structure_type, required)",
   ].join("\n"));
   expect(shown("narrow")).toContain("kind (one of law | budget | other, required), parks (amount), proposal (text, required), services (amount), staff (amount)\n");
   expect(Object.keys(FORMS)).toEqual(["narrow", "wide"]);

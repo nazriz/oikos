@@ -357,7 +357,7 @@ test("invented forms: every type of field the resolver reads, two to seven field
     const context = translatorContext({ draftId: "d", participant: "someone", proposal: "x", knowledge: knowing(set, CURRENCIES[0]!) });
     expect(context.split("\n").slice(3).sort()).toEqual(set.map(formLine).sort());
   }
-  expect(formLine({ form: "permit_application", to: "planning", fields: { lot: { type: "lot", required: true }, kind: { type: "choice", options: ["new", "renewal"] } } })).toBe("- permit_application, to=planning: fields lot (lot, required), kind (one of new | renewal)");
+  expect(formLine({ form: "permit_application", to: "planning", fields: { lot: { type: "lot", required: true }, kind: { type: "choice", options: ["new", "renewal"] } } })).toBe("- permit_application, to=planning, id form-planning-permit-application: fields lot (lot, required), kind (one of new | renewal)");
 });
 
 test("invented forms filled in: every required field, some of the others, with and without the office, beside other forms or alone; the resolver takes each", () => {
@@ -647,7 +647,7 @@ test("gold from the seen cases: a form filled in carries the form the test's may
   const gold = goldFromCases(CASES);
   const forms = gold.filter((g) => functionOf(g) === "form");
   expect(forms.length).toBeGreaterThan(0);
-  for (const g of forms) expect(g.forms!.map(formLine)).toEqual(["- permit_application, to=planning: fields lot (lot, required), structure_type (structure_type, required), notes (text)"]);
+  for (const g of forms) expect(g.forms!.map(formLine)).toEqual(["- permit_application, to=planning, id form-permit: fields lot (lot, required), structure_type (structure_type, required), notes (text)"]);
   expect(gold.every((g) => g.origin === "case" && g.currency === TEST_CURRENCY)).toBe(true);
 });
 
@@ -660,7 +660,7 @@ test("gold from a log carries its world's money and, for a form filled in, the f
   const gold = await goldFromLog([header2, act('form(form=stall_permit, fee="¥4,000", site=lot-01-02)'), act('money(to=acc-1, amount="¥500")')], { seed: 2 });
   expect(gold.map((g) => g.currency?.code)).toEqual(["YUN", "YUN"]);
   const form = gold.find((g) => g.shape.startsWith("form("))!;
-  expect(form.forms!.map(formLine)).toContain("- stall_permit, to=markets: fields fee (amount, required), site (lot)");
+  expect(form.forms!.map(formLine)).toContain("- stall_permit, to=markets, id form-stall: fields fee (amount, required), site (lot)");
   expect(form.forms!.every((f) => ["stall_permit", "noise_complaint"].includes(f.form))).toBe(true);
   // Its other surface is written in that world's money.
   const rand = sampler(1);

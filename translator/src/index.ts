@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.6.1";
+export const TRANSLATOR_VERSION = "0.7.0";
 
 export interface TranslatorId {
   id: string;
@@ -108,6 +108,9 @@ export function translatorSystem(): string {
     "- Never make up an id. Someone or something named or described without its id is written as the request put it, in quotes (to=\"Millbrook Builders\", by=\"the builder\", to=\"the works manager\"): whoever resolves the call knows who that is, or asks. Only an account that's described and not named (\"the town account\") is left out.",
     "- A kind of thing is the request's own word for it: \"40 goods\" is kind=goods, \"a park\" is type=park. Something published with no kind said is kind=notice.",
     "- Don't add what the request doesn't say: no purpose (for=) unless one is stated, no recipient it didn't name.",
+    "- for= is whose name something is done in (on money, what the payment is for): never a record. A record cited (\"under rec.30\", \"responding to rec.12\", \"in proceeding rec.7\") is basis=.",
+    "- Cancelling, stopping or revoking something on record named by its id (a standing payment, a posting, a proposal, a notice) is statement(withdraw=<it>), one line for each.",
+    "- \"Prepare … for my review\" or \"show me before it takes effect\" still asks for the act: everything is shown to the person before it is confirmed.",
     "- Telling, asking, directing or instructing someone to see to something is a message to them: message(to=<them>, text=\"<what's asked, in the request's words>\"). work(...) is for when the request itself gives the task, how much of it and where (\"have c0042 do 3 units of make at str.7\"): then it's work(task=make, units=\"3\", at=str.7, by=c0042), whoever is to do it.",
     "- Seen by everyone is visible=public.",
     "- Having someone build something for you is structure(type=..., on=..., by=<them>, price=..., from=...), on its own line: never wrapped in an agreement. Having something demolished is structure(remove=<the building>, by=...).",
@@ -115,11 +118,11 @@ export function translatorSystem(): string {
     "- Refuse, with none(<label>), a request that can't honestly be written as one call:",
     "  - needs_calculation: the amount isn't stated but must be worked out (a share, a percentage, \"whatever's left\", \"a fifth each\"). Never write money(...) without the amount.",
     "  - not_yours: it wants an outcome that's someone else's to decide (\"make the council pass it\", \"make them lower their prices\"). (Asking or telling them is different: that's a message.)",
-    "  - too_much: several separate things in one request, each of which would be a request of its own (pay this, and hire them, and build that). One thing done to or for several (a letter to two people, the same payment to three accounts) is one thing; so are lines that depend on each other (set up a trust, then publish its charter).",
+    "  - too_much: several separate things in one request, each of which would be a request of its own (pay this, and hire them, and build that). One thing done to or for several (a letter to two people, the same payment to three accounts) is one thing, as is the same kind of thing done several times; so are lines that depend on each other (set up a trust, then publish its charter), and doing something together with writing to someone about that same thing (hand in a proposal and ask the clerk to put it to a ballot; file an answer and send it to the other side).",
     "  - unknown_form: it names a form that isn't listed below the request. Don't use another form in its place.",
     "  - not_an_act: it asks to see, read, check, review, inspect or be shown something (a ledger, a record, who holds a post, the state of a place) and to bring nothing about. Looking is the person's own to do. (Asking someone else for it is different: that's a message to them. And if it asks to look and then to do something, it's the doing that's written.)",
     "  - unclear: it doesn't say what should happen (\"sort out the housing thing\").",
-    "- To fill in a form, use form(...) with the form's own field names, listed below the request.",
+    "- To fill in a form, use form(...) with the form's own field names, listed below the request. A form may be named by its own name, in ordinary words, or by its record's id (given in the list): write the name listed. to= is where the list says it goes, whoever the request says will receive or deal with it.",
     "",
     "A few more examples:",
     "  Have Acme build a shed on lot-07 for 9,000 from acc-1, under permit rec.30.  ->  structure(type=shed, on=lot-07, by=acme, price=\"9,000\", from=acc-1, basis=rec.30)",
@@ -146,7 +149,8 @@ export function translatorSystem(): string {
 export function translatorContext(req: TranslateRequest): string {
   // Where it goes (the `to` to write): the office it was made in, or its author's organisation. A choice field lists its options.
   const field = ([k, v]: [string, any]) => `${k} (${v.type === "choice" && v.options?.length ? `one of ${v.options.join(" | ")}` : v.type}${v.required ? ", required" : ""})`;
-  const forms = req.knowledge.forms.map((f) => `- ${f.data?.form}, to=${f.in_position ?? f.speaks_for ?? f.author}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`);
+  // (Each with its record's id: people cite a form by the id on the paper as often as by its name; 2026-10-06.)
+  const forms = req.knowledge.forms.map((f) => `- ${f.data?.form}, to=${f.in_position ?? f.speaks_for ?? f.author}, id ${f.id}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`);
   return [`Request: ${req.proposal}`, ...(forms.length ? ["", "Forms this person knows of:", ...forms] : [])].join("\n");
 }
 
