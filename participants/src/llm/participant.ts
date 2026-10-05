@@ -11,6 +11,7 @@
 
 import type { Observation, ParticipantAction } from "../contracts";
 import type { ParticipantContext } from "../module";
+import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { renderObservation, renderStanding, type Looked } from "./render";
@@ -353,6 +354,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
 
   return {
     async step(obs, ctx) {
+      inCurrency(ctx.world.currency);
       const standing = renderStanding(obs, standingIds);
       if (standing) standingText = standing;
       const body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}) });

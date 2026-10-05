@@ -13,12 +13,16 @@ import { ruleWords } from "@oikos/participants/llm";
 import type { Knowledge } from "./knowledge";
 
 const DAY = 86_400;
-const $ = formatMoney;
 const span = (s: number) => (s % (365 * DAY) === 0 ? `${s / (365 * DAY)} year${s === 365 * DAY ? "" : "s"}` : s % DAY === 0 ? `${s / DAY} day${s === DAY ? "" : "s"}` : `${s} seconds`);
 
 export class Preview {
   /** `me`: the entity it acts for (its person, or the organisation of the position it acts in). */
   constructor(private k: Knowledge, private me = k.entity) {}
+
+  /** An amount as the world writes its money. */
+  private sum(amount: string | number): string {
+    return formatMoney(amount, this.k.currency);
+  }
 
   private who(id: string | undefined): string {
     if (!id) return "someone";
@@ -56,7 +60,7 @@ export class Preview {
     const rep = every ? ` every ${span(every)}` : "";
     // (Whatever a sentence leaves out of its outcome follows it in brackets, by name.)
     const more = (x: any, said: string[]) => this.also(x, said, " (").replace(/\.$/, ")");
-    if (o?.money) return `pay ${$(o.money.amount)}${o.money.from ? ` from ${this.acct(o.money.from)}` : ""} to ${this.who(o.money.to)}${rep}${o.money.for ? `, for ${o.money.for}` : ""}${o.money.settles ? `, settling ${o.money.settles}` : ""}${more(o.money, ["amount", "from", "to", "for", "settles"])}`;
+    if (o?.money) return `pay ${this.sum(o.money.amount)}${o.money.from ? ` from ${this.acct(o.money.from)}` : ""} to ${this.who(o.money.to)}${rep}${o.money.for ? `, for ${o.money.for}` : ""}${o.money.settles ? `, settling ${o.money.settles}` : ""}${more(o.money, ["amount", "from", "to", "for", "settles"])}`;
     if (o?.goods) return `deliver ${o.goods.quantity} ${o.goods.kind}${o.goods.from ? ` from ${o.goods.from}` : ""} to ${this.who(o.goods.to)} at ${o.goods.at}${rep}${more(o.goods, ["quantity", "kind", "from", "to", "at"])}`;
     if (o?.structure) return `${o.structure.remove ? `demolish ${o.structure.remove}` : `build a ${o.structure.type} on ${o.structure.on}`}${rep}${more(o.structure, o.structure.remove ? ["remove"] : ["type", "on"])}`;
     if (o?.occupancy) return `${o.occupancy.leave ? `have ${this.who(o.occupancy.who)} leave ${o.occupancy.in}` : `let ${this.who(o.occupancy.who)} live or be in ${o.occupancy.in}`}${rep}${more(o.occupancy, ["who", "in", "leave"])}`;
@@ -103,7 +107,7 @@ export class Preview {
       case "give_notice":
         return [`You will give notice on agreement ${b.agreement} for ${this.who(b.as)}${b.text ? `: "${b.text}"` : ""}.`, ["agreement", "as", "text"]];
       case "transfer":
-        return [`You will move ${$(b.amount)} from ${this.acct(b.from)} to ${this.acct(b.to)}${b.memo ? `, for ${b.memo}` : ""}${b.settles ? `, settling ${b.settles}` : ""}${b.per_instruction ? `, as ${b.per_instruction} asked` : ""}.`, ["amount", "from", "to", "memo", "settles", "per_instruction"]];
+        return [`You will move ${this.sum(b.amount)} from ${this.acct(b.from)} to ${this.acct(b.to)}${b.memo ? `, for ${b.memo}` : ""}${b.settles ? `, settling ${b.settles}` : ""}${b.per_instruction ? `, as ${b.per_instruction} asked` : ""}.`, ["amount", "from", "to", "memo", "settles", "per_instruction"]];
       case "open_account":
         return [`You will open an account for ${this.who(b.holder)}, kept by you.`, ["holder"]];
       case "close_account":
@@ -127,7 +131,7 @@ export class Preview {
         return [`You will set up a new ${b.kind} called "${b.name}"${named(b)}${this.seenBy(b.visible_to)}${p ? `, with you as its ${p.title ?? "first officer"}${this.also(p, ["title", "ref"], " (").replace(/\.$/, ")")}` : ""}.`, ["kind", "name", "first_position", "speaks_for", "visible_to"]];
       }
       case "arrive":
-        return [b.person ? `You will let ${this.who(b.person)} back into the world.` : `You will let a newcomer, ${b.name}, into the world${b.carrying ? `, carrying ${$(b.carrying)}` : ""}.`, b.person ? ["person"] : ["name", "carrying"]];
+        return [b.person ? `You will let ${this.who(b.person)} back into the world.` : `You will let a newcomer, ${b.name}, into the world${b.carrying ? `, carrying ${this.sum(b.carrying)}` : ""}.`, b.person ? ["person"] : ["name", "carrying"]];
       case "leave":
         return [!b.person || this.k.entityOf(b.person) === this.k.entity ? "You will leave the world." : `You will remove ${this.who(b.person)} from the world.`, b.person && this.k.entityOf(b.person) !== this.k.entity ? ["person"] : []];
       case "birth":

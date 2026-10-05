@@ -76,10 +76,10 @@
     "dues": {
       "schema": {
         "type": "integer",
-        "description": "cents a month (the world's profile)"
+        "description": "a month, in the smallest unit (the world's profile)"
       },
       "default": 0,
-      "source": "cents a month (the world's profile)"
+      "source": "a month, in the smallest unit (the world's profile)"
     },
     "dues_account": {
       "schema": {

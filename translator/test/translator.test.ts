@@ -1,11 +1,12 @@
 import { expect, test } from "bun:test";
 import { MockAdapter } from "@oikos/participants/llm";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, NOT_CHECKED, NOT_PUT, translatorContext, translatorSystem } from "../src/index";
 
 const law = { id: "law-planning", record: "statement", author: "genesis", at: 0, visible_to: "public", kind: "law", text: "No building without a permit.",
   adico: { deontic: "must_not" }, formal: { language: "cel", condition: "block.block == 'construct' && !holds_liberty(actor, 'build', block.lot)" } } as any;
 function knows(): Knowledge {
-  const k = new Knowledge();
+  const k = new Knowledge(PROFILE.values.currency);
   k.absorb({ participant: "mayor-system", as: "mayor", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: {
     a: { kind: "accounts", transactions: [], accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance: 100 }] },
     land: { kind: "sites", as_of: 0, cells: [{ cell: "cell.0.0", x: 0, y: 0 }, { cell: "cell.1.0", x: 1, y: 0 }] },

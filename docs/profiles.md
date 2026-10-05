@@ -30,6 +30,7 @@ A town spec names its profile (`profile: au-vic-2026`); a spec can override a fi
 
 - **`orchestrator/test/generality.test.ts`:**
   - platform code (kernel, participants, orchestrator, translator, measure, the generator, contracts) must not name a place, its statistics offices, agencies, payments or currency;
+  - platform code (kernel, participants, orchestrator, translator, measure) must not write a currency's sign or its words: a world's money is written as its config says (`world.currencies`: its sign, its words, its decimal places), which a profile supplies. The test lists what it leaves alone, and why;
   - every figure in every profile must have a source;
   - a town must generate from every profile, taking its figures from it;
   - platform code must not name any of a generated world's entities, accounts or buildings: a module is told whom it deals with (its parameters), and `need()` fails at once if a world doesn't say.
@@ -38,7 +39,9 @@ A town spec names its profile (`profile: au-vic-2026`); a spec can override a fi
 
 ## Known exceptions (to fix)
 
-- **Money is displayed with "$"**, and the call language writes amounts in dollars ("$12.50"): a world in another currency would still see dollar signs. Fixing it touches the call language (a contract), so it's held for Naz.
+- **The translator's prompt gives its worked examples in one currency** ("$9,000"; translator/src/index.ts), and the training data's other ways of writing an amount are that currency's (translator/train/data.ts): a world in another currency would be translated from examples in the wrong one. To write from the world's currency, once the prompt has settled.
+- **The finance officer's module still has a default for the payment its procedure needs approval over** (`approval_over`); the generated town now gives it from the profile, but the default should go.
+- **Names:** the helper that words an amount is still called `usd`, and an amount in the smallest unit `cents`, across the behaviour modules. They write whatever the world's currency is; the names are one place's.
 - **Some rules were modelled on one country's institutions:**
   - the Age Pension's age window, as the support payments' eligibility;
   - Victoria's rules in the example legal code.

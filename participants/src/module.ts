@@ -14,6 +14,7 @@
 //     participant has observed and drawn.
 
 import type { Block, Observation, ParticipantAction } from "./contracts";
+import type { Currency } from "./money";
 import type { Rng } from "./rng";
 
 /** A question for the sparse mind: a thing, in words, its options, and the person asking (docs/design/ai-citizens.md 4). */
@@ -38,6 +39,8 @@ export type Consult = (q: ConsultQuestion, subject: string) => Promise<ConsultAn
 export interface WorldInfo {
   tickSeconds: number;
   runEnd: number;
+  /** How the world's money is written (its config's first currency): what amounts in words are read and written in. */
+  currency: Currency;
 }
 
 /**

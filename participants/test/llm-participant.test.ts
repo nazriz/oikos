@@ -3,6 +3,7 @@
 // working day, with what came in between shown at the next.
 
 import { expect, test } from "bun:test";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
 import { ModelCallFailed } from "../src/llm/call";
@@ -33,7 +34,7 @@ function harness(answers: (ContentBlock[] | "fail")[], extra: Partial<LlmPartici
 const shown = (r: LlmRequest) => { const c = r.messages.at(-1)!.content; return typeof c === "string" ? c : c.map((b: any) => b.content ?? b.text ?? "").join("\n"); };
 const resultsOf = (r: LlmRequest) => Object.fromEntries((r.messages.at(-1)!.content as any[]).filter((b) => b.type === "tool_result").map((b) => [b.tool_use_id, b.content]));
 const use = (id: string, name: string, input: object): ContentBlock => ({ type: "tool_use", id, name, input });
-const ctx = {} as any;
+const ctx = { world: { currency: PROFILE.values.currency } } as any;
 
 test("several actions from one answer are carried out in turn, with one call, and their results come back together", async () => {
   const { p, calls } = harness([[

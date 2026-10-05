@@ -4,6 +4,7 @@
 // these tables convert it, deterministically.
 
 import { canonical } from "./canon";
+import { currencyNow, type Currency } from "./money";
 import CALLS_SCHEMA from "../../contracts/calls.schema.json";
 
 export const FUNCTIONS = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take"] as const;
@@ -225,8 +226,13 @@ export const text = (s: string) => ({ text: s });
  * program written and the program read from its text are the same. */
 export const json = (v: unknown) => ({ json: v === undefined ? v : JSON.parse(JSON.stringify(v)) });
 export const v = (name: string) => ({ var: name });
-/** Cents as a canonical amount text the parser reads back exactly: 123456 → "$1,234.56". */
-export const dollars = (cents: number) => text(`$${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`);
+/** An amount (in the smallest unit) as a canonical text the parser reads back exactly, in the money of the world now
+ * being stepped (money.ts): its sign or code, the whole units ungrouped, and its decimals. */
+export const amountText = (n: number) => {
+  const cur = currencyNow();
+  const per = 10 ** cur.minor_units;
+  return text(`${cur.symbol ?? `${cur.code} `}${Math.floor(n / per)}${cur.minor_units > 0 ? `.${String(n % per).padStart(cur.minor_units, "0")}` : ""}`);
+};
 /** Seconds as a duration text: whole days where possible. */
 export const secs = (s: number) => text(s % 86_400 === 0 ? `${s / 86_400} days` : `${s} seconds`);
 
@@ -251,23 +257,72 @@ export const PARSED = Symbol.for("oikos.call-program");
 
 export class UnitError extends Error {}
 
-/** "$500", "$1,234.56", "60k", "$1.5k", "$2m", "500 dollars", "250 cents" → integer cents. No arithmetic on anything but the digits written. */
-/** An amount as written ("$1.5k", "250 cents", "$3 trillion") in cents, exact, as the contracts write it: a decimal string (D58). */
-export function parseAmount(s: string): string {
-  const t = s.trim().toLowerCase().replace(/\s+/g, " ");
-  const m = /^\$?\s?([0-9][0-9,]*)(?:\.([0-9]{1,3}))?\s?(k|m|b|t|thousand|million|billion|trillion)?\s?(dollars?|bucks|cents?)?$/.exec(t);
-  if (!m) throw new UnitError(`not an amount: ${s}`);
-  const whole = m[1]!;
+const MULTIPLIERS: [string, bigint][] = [["thousand", 1_000n], ["million", 1_000_000n], ["billion", 1_000_000_000n], ["trillion", 1_000_000_000_000n], ["k", 1_000n], ["m", 1_000_000n], ["b", 1_000_000_000n], ["t", 1_000_000_000_000n]];
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+const isDigit = (c: string | undefined) => c !== undefined && c >= "0" && c <= "9";
+
+/**
+ * An amount as written, in the currency's smallest unit, exact, as the contracts write it (a decimal string, D58): its
+ * sign or code, digits (grouped or not, with decimals), a multiplier (k, m, b, t, thousand ... trillion), then a word
+ * for its unit or its smallest unit, or its code. Bare digits are whole units. Nothing finer than the smallest unit,
+ * and no arithmetic on anything but the digits written. (The kernel's resolver reads the same, step for step:
+ * `parse_amount`.)
+ */
+export function parseAmount(s: string, cur: Currency): string {
+  const err = () => new UnitError(`not an amount: ${s}`);
+  const t = s.trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
+  const code = cur.code.toLowerCase();
+  const symbol = cur.symbol?.toLowerCase();
+  const minor = cur.minor_units;
+  const after = (x: string, prefix: string) => (x.startsWith(prefix) ? x.slice(prefix.length) : undefined);
+  const space = (x: string) => after(x, " ") ?? x;
+  let rest = (symbol !== undefined ? after(t, symbol) : undefined) ?? after(t, code) ?? t;
+  rest = space(rest);
+  let end = 0;
+  while (end < rest.length && (isDigit(rest[end]) || rest[end] === ",")) end++;
+  const whole = rest.slice(0, end);
+  if (!isDigit(whole[0])) throw err();
+  rest = rest.slice(end);
+  let frac = "";
+  if (rest.startsWith(".")) {
+    let n = 0;
+    while (isDigit(rest[1 + n])) n++;
+    if (n === 0 || n > Math.max(minor, 3)) throw err();
+    frac = rest.slice(1, 1 + n);
+    rest = rest.slice(1 + n);
+  }
+  rest = space(rest);
+  const isUnit = (w: string) => w === code || (cur.unit_words ?? []).some((u) => u.toLowerCase() === w);
+  const isMinor = (w: string) => (cur.minor_words ?? []).some((u) => u.toLowerCase() === w);
+  let mult = 1n;
+  let hasMult = false;
+  for (const [w, m] of MULTIPLIERS) {
+    const r = after(rest, w);
+    if (r === undefined) continue;
+    // (A multiplier only when a unit's word or the end follows.)
+    const r2 = space(r);
+    if (r2 === "" || isUnit(r2) || isMinor(r2)) {
+      mult = m;
+      hasMult = true;
+      rest = r;
+      break;
+    }
+  }
+  rest = space(rest);
+  let inMinor = false;
+  if (rest !== "" && !isUnit(rest)) {
+    if (!isMinor(rest)) throw err();
+    inMinor = true;
+  }
   if (whole.includes(",") && !/^[0-9]{1,3}(,[0-9]{3})*$/.test(whole)) throw new UnitError(`badly grouped digits: ${s}`);
-  const mult = ({ k: 1_000n, thousand: 1_000n, m: 1_000_000n, million: 1_000_000n, b: 1_000_000_000n, billion: 1_000_000_000n, t: 1_000_000_000_000n, trillion: 1_000_000_000_000n } as Record<string, bigint>)[m[3] ?? ""] ?? 1n;
-  const cents = m[4]?.startsWith("cent");
-  if (cents && (m[2] || m[3])) throw new UnitError(`not an amount: ${s}`);
-  const frac = m[2] ?? "";
-  if (frac.length === 3 && mult === 1n) throw new UnitError(`more than two decimals: ${s}`);
-  const unitsPerDollar = cents ? 1n : 100n;
-  const scaled = (BigInt(whole.replace(/,/g, "")) * 1000n + BigInt((frac + "000").slice(0, 3))) * mult * unitsPerDollar;
-  if (scaled % 1000n !== 0n) throw new UnitError(`fraction of a cent: ${s}`);
-  const n = scaled / 1000n;
+  if (inMinor && (frac !== "" || hasMult)) throw err();
+  if (frac.length > minor && mult === 1n) throw new UnitError(minor === 0 ? `this money has no decimals: ${s}` : `more than ${NUMBER_WORDS[minor] ?? "that many"} decimals: ${s}`);
+  const perUnit = inMinor ? 1n : 10n ** BigInt(minor);
+  // The decimals, carried exactly: what's written, times the multiplier, must come to whole smallest units.
+  const fracScaled = BigInt(frac || "0") * mult * perUnit;
+  const fracDiv = 10n ** BigInt(frac.length);
+  if (fracScaled % fracDiv !== 0n) throw new UnitError(cur.minor_words?.length ? `fraction of a ${cur.minor_words[0]}: ${s}` : `fraction of the smallest unit: ${s}`);
+  const n = BigInt(whole.replace(/,/g, "")) * mult * perUnit + fracScaled / fracDiv;
   if (n.toString().length > 38) throw new UnitError(`too large: ${s}`);
   return n.toString();
 }

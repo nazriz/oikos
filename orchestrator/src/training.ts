@@ -13,7 +13,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { callModel, PRICES, type Budget, type LlmAdapter, type LlmIO, type Price, type Usage } from "@oikos/participants/llm";
 import { createTranslator, Knowledge } from "@oikos/translator";
-import { loadHeldOut } from "@oikos/translator/eval";
+import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
 import { generate, goldFromCases, goldFromLog, sampler, surfaceVariant, type Gold } from "../../translator/train/data";
 import { logsIn } from "./corpus";
@@ -70,7 +70,8 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     log(`writing requests for ${gold.length} of them`);
   }
   // Translating back: the translator as runs use it (its prompt, its tool, its parser), on the second model, one
-  // attempt (a second attempt is for a seat's sake; here a miss is a miss), knowing nothing of any world.
+  // attempt (a second attempt is for a seat's sake; here a miss is a miss), knowing nothing of any world but how its
+  // money is written (the test town's: the gold programs' amounts are in it).
   // Every call, a writer's included, goes through the same door as a run's (callModel): a model without a recorded
   // price isn't used, a spending limit is kept to, and what was spent is counted.
   let costMicroUsd = 0;
@@ -91,7 +92,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     return {
       model: `${o.back!.adapter.provider}/${o.back!.adapter.model}`,
       translate: async (request: string) => {
-        const r = await t.translate({ draftId: `data.${++n}`, participant: "someone", proposal: request, knowledge: new Knowledge() });
+        const r = await t.translate({ draftId: `data.${++n}`, participant: "someone", proposal: request, knowledge: new Knowledge(TEST_CURRENCY) });
         return r.ok ? r.draft.call : r.call;
       },
     };

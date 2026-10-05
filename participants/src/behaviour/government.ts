@@ -5,7 +5,7 @@
 // after counting a ballot; money moves because the finance officer instructed
 // the bank, and the bank checked its signatory list.
 
-import { cents } from "../money";
+import { cents, smallestNow } from "../money";
 import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
@@ -23,7 +23,7 @@ const YEAR = 365 * DAY;
  * when the budget allows, applies for planning permission for a park and,
  * once granted, commissions the builder; approves the invoices it
  * commissioned (the payments procedure needs the mayor's written approval
- * over $50k); turns a petition into a proposal once its organiser's
+ * over a set amount); turns a petition into a proposal once its organiser's
  * published count shows enough people have signed, with probability `responsiveness_bps`. A rejected budget is
  * tabled again every 45 days until one is adopted.
  */
@@ -84,7 +84,7 @@ export const mayorCode: BehaviourModule = {
           tabledYear = thisYear;
           lastTabled = t;
           const lines = { parks: p.park_budget, ...(p.road_budget ? { roads: p.road_budget } : {}), ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
-          steps.push(because(newYear ? "A new year: tabling the town's budget." : "No budget adopted for this year yet: tabling it again.", say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: ${Object.entries(lines).map(([k, v]) => `${k} ${v} cents`).join(", ")}.`, { to: [me],
+          steps.push(because(newYear ? "A new year: tabling the town's budget." : "No budget adopted for this year yet: tabling it again.", say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: ${Object.entries(lines).map(([k, v]) => `${k} ${smallestNow(v)}`).join(", ")}.`, { to: [me],
             data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines } }, tags: ["budget"] } })));
         }
         // A park a year, if the adopted budget has room and there's a city lot free:
@@ -139,9 +139,9 @@ export const mayorCode: BehaviourModule = {
           const type = app.data?.structure_type === p.road_type ? p.road_type : p.park_type;
           const cost = type === p.road_type ? roadPrice : price;
           if (!cost) continue;
-          steps.push(because(`The ${type}'s permit was granted: commissioning the builder.`, [type, C.call("structure", { type, on: site, by: p.builder, price: C.dollars(cost), from, basis: d.id })]));
+          steps.push(because(`The ${type}'s permit was granted: commissioning the builder.`, [type, C.call("structure", { type, on: site, by: p.builder, price: C.amountText(cost), from, basis: d.id })]));
         }
-        // Approve invoices for work we commissioned (the payments procedure requires it over $50k).
+        // Approve invoices for work we commissioned (the payments procedure requires it over a set amount).
         for (const inv of book.open("invoice")) {
           if (handled.has(inv.id) || acted.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           handled.add(inv.id);
@@ -509,7 +509,7 @@ export const taxClerk: BehaviourModule = {
           const fine = Math.floor((a.amount * penalty) / 10_000);
           steps.push(because(`Tax still unpaid after ${p.grace_days} days: recording the law's penalty (${penalty / 100}%) and writing to the payer.`,
             record("right", me, { kind: "tax_penalty", amount: fine }, { against: a.payer, basis: id }),
-            message([a.payer], `Tax of ${a.amount} cents on report ${id} is overdue; a penalty of ${fine} cents has been recorded.`, id),
+            message([a.payer], `Tax of ${smallestNow(a.amount)} on report ${id} is overdue; a penalty of ${smallestNow(fine)} has been recorded.`, id),
           ));
         }
         steps.push(...letters.answer(() => {
@@ -527,7 +527,7 @@ export const taxClerk: BehaviourModule = {
 
 /**
  * city.rates_officer: administers the rating law (docs/behaviour/public-finance.md). From the latest valuation of each
- * property, it reckons a year's rates at the law's rate in the dollar, and every instalment period sends each owner a
+ * property, it reckons a year's rates at the law's rate on its value, and every instalment period sends each owner a
  * notice for their share, recording it as the town's claim against them (payable into the town's account, by the due
  * date). What's still unpaid after the due date draws the law's penalty interest, monthly, recorded as a claim too,
  * with a letter. A payment settles a claim when it names it.

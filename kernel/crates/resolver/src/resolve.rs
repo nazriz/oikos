@@ -177,10 +177,17 @@ impl Resolver<'_> {
             Some(_) => ask(format!("{key} should be written out.")),
         }
     }
-    fn amount(c: &Call, key: &str) -> R<Option<String>> {
+    /// The world's money, as the seat's knowledge has it (how amounts are written and read).
+    fn currency(&self) -> R<&calls::Currency> {
+        match &self.k.currency {
+            Some(c) => Ok(c),
+            None => ask("Amounts of money can't be read here: how this world's money is written isn't known."),
+        }
+    }
+    fn amount(&self, c: &Call, key: &str) -> R<Option<String>> {
         match Self::str_(c, key)? {
             None => Ok(None),
-            Some(s) => unit(calls::parse_amount(&s)).map(Some),
+            Some(s) => unit(calls::parse_amount(&s, self.currency()?)).map(Some),
         }
     }
     fn seconds(c: &Call, key: &str) -> R<Option<i64>> {
@@ -383,7 +390,7 @@ impl Resolver<'_> {
 
     /// The money outcome of a call, for requests and commitments.
     fn money_outcome(&self, c: &Call, from: Option<String>, commitment: bool) -> R<Json> {
-        let Some(amount) = Self::amount(c, "amount")? else { return ask("How much?") };
+        let Some(amount) = self.amount(c, "amount")? else { return ask("How much?") };
         let to = self.payee(&self.need(c, "to", "Paid to whom?")?, commitment)?;
         let purpose = Self::str_(c, "for")?.filter(|p| !p.is_empty());
         let settles = self.id(c, "settles")?;
@@ -419,7 +426,7 @@ impl Resolver<'_> {
         // Someone else keeps it: the only physical option is to ask them. They decide.
         let text = format!(
             "Please pay {} from {from} to {to}{}{}.",
-            calls::format_money(&amount),
+            calls::format_money(&amount, self.currency()?),
             every.map(|e| format!(" every {} days", nearest_days(e))).unwrap_or_default(),
             purpose.as_ref().map(|p| format!(", for {p}")).unwrap_or_default()
         );
@@ -497,11 +504,11 @@ impl Resolver<'_> {
         }
         // Someone else builds: offer them an agreement, signed on its side. They decide.
         let builder = self.k.entity_of(&by);
-        let Some(price) = Self::amount(c, "price")? else { return ask(format!("For what price should {} {place}?", self.k.name(&builder))) };
+        let Some(price) = self.amount(c, "price")? else { return ask(format!("For what price should {} {place}?", self.k.name(&builder))) };
         let from = self.payer(c, "the payment")?;
         let r = bind.map(String::from).unwrap_or_else(|| self.fresh("offer"));
         let what = match &remove { Some(rm) => json!({ "remove": rm }), None => json!({ "type": type_, "on": on }) };
-        let text = format!("{} will {place}; {} pays {} from {from}.", self.k.name(&builder), self.k.name(&self.me), calls::format_money(&price));
+        let text = format!("{} will {place}; {} pays {} from {from}.", self.k.name(&builder), self.k.name(&self.me), calls::format_money(&price, self.currency()?));
         Ok(vec![
             obj(vec![
                 ("block", some("propose_agreement")),
@@ -627,7 +634,7 @@ impl Resolver<'_> {
             return ask("Who is coming: someone returning (who), or a newcomer (their name, age and template)?");
         };
         let Some(age) = Self::seconds(c, "age")? else { return ask(format!("How old is {name}?")) };
-        let carrying = Self::amount(c, "carrying")?;
+        let carrying = self.amount(c, "carrying")?;
         // (A newcomer's body variables: a JSON object, as given.)
         let variables = Self::json_(c, "variables")?;
         let sex = Self::str_(c, "sex")?.filter(|x| !x.is_empty());
@@ -917,7 +924,7 @@ impl Resolver<'_> {
                 continue;
             }
             let x: Option<Json> = match t["type"].as_str().unwrap_or_default() {
-                "amount" => Self::amount(c, field)?.map(Json::from),
+                "amount" => self.amount(c, field)?.map(Json::from),
                 "duration" => Self::seconds(c, field)?.map(Json::from),
                 "count" => Some(json!(unit(calls::parse_count(&Self::str_(c, field)?.unwrap_or_default()))?)),
                 "text" | "structure_type" => Self::str_(c, field)?.map(Json::from),

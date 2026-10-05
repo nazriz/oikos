@@ -5,7 +5,7 @@
 import * as C from "../calls";
 import type { Assertion, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { cents, formatMoney } from "../money";
+import { cents, moneyNow } from "../money";
 import { evaluate } from "../law";
 
 export const DAY = 86_400;
@@ -402,13 +402,13 @@ export class Letters {
   }
 }
 
-/** Dollars, for reasons: 123456 -> "$1,234.56". */
-export const usd = formatMoney;
+/** An amount in words, for reasons and letters, as the world writes its money (money.ts). */
+export const usd = moneyNow;
 
 /** Money to an account: a one-off or repeating payment. */
 export function pay(to: string, amount: number, o: { from?: string; for?: string; settles?: string; every?: number; first?: number; basis?: string; per_request?: string } = {}): C.Call {
   return C.call("money", {
-    to, amount: C.dollars(amount), from: o.from, for: o.for ? C.text(o.for) : undefined, settles: o.settles,
+    to, amount: C.amountText(amount), from: o.from, for: o.for ? C.text(o.for) : undefined, settles: o.settles,
     every: o.every ? C.secs(o.every) : undefined, first: o.first !== undefined ? C.secs(o.first) : undefined, basis: o.basis, per_request: o.per_request,
   });
 }

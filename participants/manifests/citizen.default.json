@@ -574,7 +574,7 @@
     "wealth_effect_bps_per_year": {
       "schema": {
         "type": "integer",
-        "description": "consumption a year per dollar of wealth"
+        "description": "consumption a year per unit of wealth"
       },
       "default": 300,
       "source": "placeholder"

@@ -4,7 +4,7 @@
 // agreements, a survey of the town. No blocks, records, channels or refusal
 // codes. Deterministic: the same observation always reads the same.
 
-import { cents, formatMoney } from "../money";
+import { cents, moneyNow } from "../money";
 import type { Body, Observation, Outcome, Reading, Record, SiteCell, SiteStructure, Transaction, VariableView } from "../contracts";
 import { channels } from "../contracts";
 import { refusalText } from "./words";
@@ -13,7 +13,7 @@ const DAY = 86_400;
 const YEAR = 365 * DAY;
 
 /** Money as people write it (money.ts). */
-export const money = formatMoney;
+export const money = moneyNow;
 
 export function when(t: number): string {
   return `year ${Math.floor(t / YEAR) + 1}, day ${Math.floor((t % YEAR) / DAY) + 1}`;

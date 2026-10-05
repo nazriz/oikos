@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter, LlmRequest } from "@oikos/participants/llm";
 import { CASES } from "../eval/cases";
+import { TEST_CURRENCY } from "../eval/run";
 import { amountForms, askable, builtRefusals, copies, durationForms, generate, goldFromCases, goldFromLog, goldText, literals, mustAppear, needed, refusalBriefs, spansIn, sameProgram, sampler, shapeOf, surfaceVariant, type Example } from "../train/data";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
@@ -131,7 +132,7 @@ test("the same program on another surface: a name for an id, an amount or a time
     seenForms.add(v.program);
     const p = calls.parseProgram(v.program) as any;
     // The same act: the same cents, the same payee (by id, or by the name the resolver looks up), the same shape.
-    expect(calls.parseAmount(p.lines[0].call.args.amount.text)).toBe("50000");
+    expect(calls.parseAmount(p.lines[0].call.args.amount.text, TEST_CURRENCY)).toBe("50000");
     expect([{ id: "builder" }, { text: "Millbrook Builders" }]).toContainEqual(p.lines[0].call.args.to);
     expect(shapeOf(p)).toBe(gold!.shape);
   }

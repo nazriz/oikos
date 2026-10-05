@@ -51,6 +51,9 @@ pub struct Knowledge {
     pub forms: BTreeMap<String, Value>,
     pub entity: String,
     pub t: i64,
+    /// How the world's money is written (its config's first currency): how the resolver reads and writes amounts.
+    /// Absent (a seat nothing has been said to about the world's money): amounts can't be read.
+    pub currency: Option<crate::calls::Currency>,
 }
 
 fn set_ordered(v: &mut Vec<(String, String)>, k: &str, val: &str) {
@@ -65,6 +68,11 @@ fn s(v: &Value) -> Option<&str> {
 }
 
 impl Knowledge {
+    /// A seat that knows nothing yet, in a world whose money is written this way.
+    pub fn new(currency: Option<crate::calls::Currency>) -> Self {
+        Knowledge { currency, ..Default::default() }
+    }
+
     pub fn absorb(&mut self, obs: &Value) {
         self.entity = s(&obs["entity"]).unwrap_or_default().to_string();
         self.t = obs["t"].as_i64().unwrap_or(self.t);

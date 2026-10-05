@@ -857,6 +857,12 @@
     }
   },
   "$defs": {
+    "CurrencyWord": {
+      "description": "A currency's sign or a word for it: no spaces, digits, '.' or ',' (an amount's digits can't be confused with it).",
+      "type": "string",
+      "pattern": "^[^\\s0-9.,]+$",
+      "maxLength": 32
+    },
     "StructureType": {
       "type": "object",
       "required": [
@@ -1043,6 +1049,26 @@
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 8
+              },
+              "symbol": {
+                "description": "The sign people write before an amount in it. Absent: amounts are written with its code. Presentation only: how amounts in words are read and shown.",
+                "$ref": "#/$defs/CurrencyWord"
+              },
+              "unit_words": {
+                "description": "The words people write after an amount for its unit, singular and plural, in lower case. None: only its sign or code is read.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/$defs/CurrencyWord"
+                }
+              },
+              "minor_words": {
+                "description": "The words for its smallest unit, where that has a name (a currency with minor_units 0 has none); the first is the singular. An amount written with one is a whole number of smallest units.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/$defs/CurrencyWord"
+                }
               }
             }
           }

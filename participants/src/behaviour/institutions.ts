@@ -5,7 +5,7 @@
 // and applies them to what it can see, because that is its job, and
 // (depending on its parameters) it may do the job well, badly, or not at all.
 
-import { amount, cents } from "../money";
+import { amount, cents, smallestNow } from "../money";
 import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { channels } from "../contracts";
@@ -361,7 +361,7 @@ export const builder: BehaviourModule = {
         const inYard = new Map<string, number>();
         const stock = (k: string) => inYard.get(k) ?? held(obs, p.yard, k);
         for (const w of [...waiting]) {
-          const invoice = w.price ? [say("invoice", `Invoice: ${w.price} cents for ${w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}`}.`, { to: [w.client], basis: w.agreement, data: { outcome: { money: { to: acc.account, amount: w.price, for: w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}` } }, agreement: w.agreement } })] : [];
+          const invoice = w.price ? [say("invoice", `Invoice: ${smallestNow(w.price)} for ${w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}`}.`, { to: [w.client], basis: w.agreement, data: { outcome: { money: { to: acc.account, amount: w.price, for: w.remove ? `demolishing ${w.remove}` : `building a ${w.type} on ${w.on}` } }, agreement: w.agreement } })] : [];
           if (w.remove) {
             // We need to know what it is (how long it takes to bring down): once we've seen it, we start.
             const type = typeOf.get(w.remove);

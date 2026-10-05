@@ -1,6 +1,6 @@
 //! Money (contracts v0.5, D58): exact integers in the smallest unit of an account's currency, 128-bit in the kernel
-//! and decimal strings on the wire, so a world's amounts are never limited by JSON's 2^53 (about $90 trillion in
-//! cents, less than a year of the world's output). Every amount's unit is its account's currency; the kernel never
+//! and decimal strings on the wire, so a world's amounts are never limited by JSON's 2^53 (about 90 trillion units of a
+//! currency with two decimal places, less than a year of the world's output). Every amount's unit is its account's currency; the kernel never
 //! converts between currencies (an exchange is a trade: two transfers in one action).
 
 use serde::{Deserialize, Deserializer, Serializer};

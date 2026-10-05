@@ -15,6 +15,7 @@
 import { parseProgram, programText } from "../calls";
 import { slice, type ParticipantAction } from "../contracts";
 import type { Controller, ParticipantContext } from "../module";
+import { inCurrency } from "../money";
 import type { ContentBlock, LlmRequest, MockPolicy } from "./adapter";
 
 export const MOCK_VERSION = "0.3.0";
@@ -55,9 +56,11 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     queues.set(id, q);
     // What it was shown while away from its desk (office hours), first: the brain reads every observation, in order.
     for (const m of (req.context.missed ?? []) as typeof obs[]) {
+      inCurrency(brain.ctx.world.currency);
       const x = (await brain.controller.step(slice(m, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
       if (x.type === "call" || x.type === "message") q.push(x);
     }
+    inCurrency(brain.ctx.world.currency);
     const a = (await brain.controller.step(slice(obs, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
     if (a.type === "call" || a.type === "message") q.push(a);
     if (a.type === "opt_out") return [tool("opt_out", { statement: a.statement })];

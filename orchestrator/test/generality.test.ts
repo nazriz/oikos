@@ -41,6 +41,104 @@ test("platform code names no place: its figures and rules come from profiles and
   expect(found).toEqual([]);
 });
 
+// ---- no currency in the code: a world's money is written as its config says (world.currencies: its sign, its words,
+// its decimal places), so the code that runs for any world writes no currency's sign and none of its words.
+
+/** Where the rule holds: what resolves, words and measures a world. (The generator and the contracts' own documents
+ * are covered by the rule above; a profile is where a currency belongs.) */
+const MONEY_CODE = ["kernel/src", "kernel/crates", "participants/src", "translator/src", "orchestrator/src", "measure/src", "measure/queries", "measure/probe.ts"];
+
+/** A currency's sign, written as money: before a digit, before a value set into a text, escaped in a pattern, or alone
+ * as a text. (In Rust, also before a value set into a format string.) */
+const SIGN = [/\$(?=[0-9])/, /\$\$\{/, /(?<!\\)\\\$/, /["'`]\$["'`]/];
+const SIGN_RS = [...SIGN, /\$\{/];
+/** A currency's words, anywhere: in what's written, in a name, in a comment. */
+const UNIT_WORD = /dollar|\bbucks?\b/i;
+/** The word for a currency's smallest unit, in a text the code writes or matches (see the exemptions for the rest). */
+const MINOR_WORD = /\bcents?\b/i;
+
+/**
+ * What the rule leaves alone, each for a reason:
+ * - the block language's own reference sign: a block names something made earlier in the same action as `$name`
+ *   (contracts/blocks.schema.json), which is no currency's;
+ * - a pattern's replacement naming what it matched (`"$1"`);
+ * - what a model run costs whoever runs it: providers bill in US dollars, and that's the operator's money, not the
+ *   world's (spending limits, the cost report);
+ * - the translator's prompt, whose worked examples are written in one currency (translator/src/index.ts): to fix, by
+ *   writing them in the world's (held while the prompt is being changed and a model trained on it);
+ * - Rust's unit tests, which sit in the files they test (everything from `#[cfg(test)]` on);
+ * - the name `cents` for an amount in the smallest unit (money.ts `cents()`, and variables and comments that follow
+ *   it): a name the code uses for "the smallest unit" whatever the currency, about 160 lines across every module.
+ *   The rule reads the word only in texts the code writes or matches, where it would reach a world.
+ */
+const EXEMPT: { file: RegExp; line: RegExp }[] = [
+  { file: /^kernel\/crates\/(world|resolver)\/src\/|^translator\/src\/(resolver|preview)\.ts$/, line: /(starts_with|strip_prefix|startsWith)\((["'])\$\2\)|`\$\$\{(ref|v\.var|b\.ref)\}`|format!\("\$\{\w+\}( is (not bound|bound twice)[^"]*)?"\)/ },
+  { file: /./, line: /"\$[1-9] ?"\)/ },
+  { file: /^orchestrator\/src\/(cost|batch|models|cli)\.ts$|^participants\/src\/llm\/call\.ts$/, line: /usd|budget|spending limit|model calls/i },
+  { file: /^translator\/src\/index\.ts$/, line: /^\s*" .* -> {2}\w+\(/ },
+];
+
+/** The texts a line of code writes or matches (its quoted parts, and those inside the values set into them, without
+ * the values themselves); nothing of a comment. */
+function texts(line: string): string {
+  if (/^\s*(\/\/|\/?\*)/.test(line)) return "";
+  const out: string[] = [];
+  // Code from `i` to the end of the line, or to the brace that closes a value set into a text: returns where it stopped.
+  const code = (i: number, inValue: boolean): number => {
+    for (let depth = 0; i < line.length; i++) {
+      const c = line[i]!;
+      if (c === "/" && line[i + 1] === "/" && !inValue) return line.length;
+      if (c === "{") depth++;
+      else if (c === "}") { if (inValue && depth === 0) return i; depth--; }
+      else if (c === '"' || c === "'" || c === "`") i = text(i + 1, c);
+    }
+    return i;
+  };
+  // A text from `i` to its closing quote: returns where that is.
+  const text = (i: number, quote: string): number => {
+    let s = "";
+    for (; i < line.length && line[i] !== quote; i++) {
+      if (line[i] === "\\") s += line[++i] ?? "";
+      else if (quote === "`" && line[i] === "$" && line[i + 1] === "{") { i = code(i + 2, true); s += " "; }
+      else s += line[i];
+    }
+    out.push(s);
+    return i;
+  };
+  code(0, false);
+  return out.join("\n");
+}
+
+/** What of a currency a line of platform code holds, if anything. */
+function currencyIn(file: string, line: string): string | undefined {
+  if (EXEMPT.some((e) => e.file.test(file) && e.line.test(line))) return undefined;
+  if ((file.endsWith(".rs") ? SIGN_RS : SIGN).some((r) => r.test(line))) return "a currency's sign";
+  if (UNIT_WORD.test(line)) return "a currency's word";
+  if (MINOR_WORD.test(texts(line))) return "a word for a currency's smallest unit";
+  return undefined;
+}
+
+test("platform code writes no currency: no sign and no words but those the world's config gives", () => {
+  // (The rule catches what it's for, and leaves what it should.)
+  for (const line of ['return `$${whole}.${frac}`;', 'if (s.startsWith("$")) s = s.slice(1);', "const m = /^\\$(\\d+)/.exec(s);", 'out.push_str(&format!("${grouped}"));', "// about $90 trillion", 'case "dollars": return 100n;',
+    "const perDollar = 100n;", "say(`Dues: ${p.dues} cents a month.`)", 'const minor = unit === "cent";']) expect(currencyIn(line.includes("format!") ? "kernel/crates/x/src/y.rs" : "participants/src/x.ts", line)).toBeDefined();
+  for (const line of ["const n = cents(a.balance); // in cents", "return `${symbol}${whole}`;", 'sql("select $run")', "const total = `${a} of ${b}`;"]) expect(currencyIn("participants/src/x.ts", line)).toBeUndefined();
+  expect(currencyIn("translator/src/resolver.ts", '{ block: "sign_agreement", agreement: `$${ref}`, as: me }')).toBeUndefined();
+  expect(currencyIn("participants/src/behaviour/x.ts", "text: `pays $${ref}`")).toBeDefined();
+
+  const found: string[] = [];
+  for (const dir of MONEY_CODE) for (const f of statSync(join(root, dir)).isDirectory() ? files(join(root, dir)) : [join(root, dir)]) {
+    if (f.endsWith(".json")) continue;
+    const file = relative(root, f);
+    const code = f.endsWith(".rs") ? readFileSync(f, "utf8").split(/^#\[cfg\(test\)\]$/m)[0]! : readFileSync(f, "utf8");
+    code.split("\n").forEach((line, i) => {
+      const what = currencyIn(file, line);
+      if (what) found.push(`${file}:${i + 1}: ${what} in ${line.trim().slice(0, 120)}`);
+    });
+  }
+  expect(found).toEqual([]);
+});
+
 /** Every leaf value's dotted path in `values`. */
 function leaves(v: unknown, path = ""): string[] {
   if (v && typeof v === "object" && !Array.isArray(v)) return Object.entries(v).flatMap(([k, x]) => leaves(x, path ? `${path}.${k}` : k));

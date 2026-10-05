@@ -25,7 +25,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { calls, canonical, DECISIONS, paramErrors, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
+import { calls, canonical, DECISIONS, inCurrency, paramErrors, modules as builtin, Randomness, slice, View, type BehaviourModule, type Controller, type Currency, type DecisionRecord, type LookRequest, type Observation, type ParticipantAction, type ParticipantContext } from "@oikos/participants";
 import { CONSULT_VERSION, createConsult, createLlmParticipant, LLM_PARTICIPANT_VERSION, MOCK_VERSION, MockAdapter, mockPolicies, PRICES, ModelCallFailed, ModelUnreachable, SpendingLimitReached, type Budget, type LlmAdapter, type LlmController, type LlmIO, type MockBrain, type Price } from "@oikos/participants/llm";
 import { createTranslator, draftText, Knowledge, RESOLVER, resolve, TRANSLATOR_VERSION, type Draft, type Resolution } from "@oikos/translator";
 import { Kernel } from "./kernel";
@@ -247,6 +247,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   const tick: number = cfg.clock.tick_seconds;
   const runEnd = ceilTo(cfg.clock.run_seconds, tick);
   const until = Math.min(o.until ?? runEnd, runEnd);
+  // How this world's money is written (its first currency: the one accounts are in unless they say otherwise): what
+  // amounts in words are read and written in, by the resolver and by the participants' own wording.
+  const currency: Currency = cfg.world.currencies[0];
+  inCurrency(currency);
   const randomness = new Randomness(BigInt(cfg.seed));
   mkdirSync(o.outDir, { recursive: true });
   const logPath = join(o.outDir, `${o.runId}.jsonl`);
@@ -348,7 +352,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     entity,
     ...(cap === "self" ? {} : { position: cap }),
     rng: (purpose) => randomness.stream(["participant", pid, cap, String(Math.floor(t / tick) * tick), purpose]),
-    world: { tickSeconds: tick, runEnd },
+    world: { tickSeconds: tick, runEnd, currency },
     ...(consult ? { consult } : {}),
     // Keys sorted: the log keeps the config in canonical form, so a resumed run must see its parameters exactly as the
     // original did, whatever order the world's author wrote them in.
@@ -386,10 +390,11 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (wrong.length) throw new Error(`participant ${p.id}${cap !== "self" ? ` (as ${cap})` : ""}: ${wrong.join("; ")} (its manifest: participants/manifests/${impl}.json)`);
     await hashSource(module);
     const ctx = ctxFor(p.id, cap, entity, params);
+    inCurrency(currency);
     return {
       key: `${p.id}|${cap}`, participant: p.id, capacity: cap, entity, module, controller: module.create(ctx), ctx,
       cadence: ceilTo(module.cadence(ctx), tick), firstWake: wakeAt ?? ceilTo(module.firstWake?.(ctx) ?? 0, tick), wokeFor: "start", since: 0,
-      knowledge: new Knowledge(), view: new View(), notices: [],
+      knowledge: new Knowledge(currency), view: new View(), notices: [],
     };
   };
 
@@ -435,7 +440,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       key: p.id, participant: p.id, entity, module, controller: controller as unknown as Controller, ctx,
       llm: { controller, config: p, drafts: [], drafted: 0 },
       cadence: ceilTo(cadence, tick), firstWake: wakeAt ?? 0, wokeFor: "start", since: 0,
-      knowledge: new Knowledge(), view: new View(new Set(standingIds)), notices: [],
+      knowledge: new Knowledge(currency), view: new View(new Set(standingIds)), notices: [],
     };
   };
 
@@ -899,6 +904,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         const decided = await Promise.allSettled(looking.map((x) => Promise.resolve().then(() => {
           mark({ doing: "deciding", participant: x.u.key });
           const s0 = performance.now();
+          inCurrency(currency); // (said before each step: another world's run may share this process)
           const r = x.u.controller.step(x.obs, x.u.ctx);
           const pm = (profModules[x.u.module.name] ??= { ms: 0, steps: 0 });
           pm.ms += performance.now() - s0;

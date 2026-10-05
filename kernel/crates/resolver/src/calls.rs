@@ -362,12 +362,49 @@ pub fn program_text(p: &Program) -> String {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnitError(pub String);
 
-/// An amount as written ("$1.5k", "250 cents", "$3 trillion") in cents, exact, as a decimal string.
-pub fn parse_amount(s: &str) -> Result<String, UnitError> {
+/// How a world's money is written (its config's `world.currencies` entry): the sign or code before an amount, the
+/// words after it, and how many decimal places its smallest unit is. The platform has none of its own: every amount
+/// in words is read and written in a currency the world declares.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Currency {
+    pub code: String,
+    pub minor_units: u8,
+    pub symbol: Option<String>,
+    pub unit_words: Vec<String>,
+    pub minor_words: Vec<String>,
+}
+
+impl Currency {
+    /// A currency as a world's config declares it.
+    pub fn from_config(v: &serde_json::Value) -> Option<Currency> {
+        let words = |k: &str| v[k].as_array().into_iter().flatten().filter_map(|w| w.as_str().map(String::from)).collect();
+        Some(Currency {
+            code: v["code"].as_str()?.to_string(),
+            minor_units: u8::try_from(v["minor_units"].as_u64()?).ok()?,
+            symbol: v["symbol"].as_str().map(String::from),
+            unit_words: words("unit_words"),
+            minor_words: words("minor_words"),
+        })
+    }
+}
+
+const NUMBER_WORDS: [&str; 9] = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+
+/// An amount as written, in the currency's smallest unit, exact, as a decimal string: its sign or code, digits (grouped
+/// or not, with decimals), a multiplier (k, m, b, t, thousand ... trillion), then a word for its unit or its smallest
+/// unit, or its code. Bare digits are whole units. Nothing finer than the smallest unit, and no arithmetic on anything
+/// but the digits written. (participants/src/calls.ts `parseAmount` is the same, step for step.)
+pub fn parse_amount(s: &str, cur: &Currency) -> Result<String, UnitError> {
     let err = || UnitError(format!("not an amount: {s}"));
     let t = s.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
+    let code = cur.code.to_lowercase();
+    let symbol = cur.symbol.as_ref().map(|x| x.to_lowercase());
+    let minor = usize::from(cur.minor_units);
     let mut rest = t.as_str();
-    rest = rest.strip_prefix('$').unwrap_or(rest);
+    rest = match symbol.as_deref().and_then(|x| rest.strip_prefix(x)) {
+        Some(r) => r,
+        None => rest.strip_prefix(code.as_str()).unwrap_or(rest),
+    };
     rest = rest.strip_prefix(' ').unwrap_or(rest);
     let digits_end = rest.find(|c: char| !(c.is_ascii_digit() || c == ',')).unwrap_or(rest.len());
     let whole = &rest[..digits_end];
@@ -378,21 +415,23 @@ pub fn parse_amount(s: &str) -> Result<String, UnitError> {
     let mut frac = "";
     if let Some(r) = rest.strip_prefix('.') {
         let n = r.find(|c: char| !c.is_ascii_digit()).unwrap_or(r.len());
-        if n == 0 || n > 3 {
+        if n == 0 || n > minor.max(3) {
             return Err(err());
         }
         frac = &r[..n];
         rest = &r[n..];
     }
     rest = rest.strip_prefix(' ').unwrap_or(rest);
+    let is_unit = |w: &str| w == code || cur.unit_words.iter().any(|u| u.to_lowercase() == w);
+    let is_minor = |w: &str| cur.minor_words.iter().any(|u| u.to_lowercase() == w);
     let mults: [(&str, u128); 8] = [("thousand", 1_000), ("million", 1_000_000), ("billion", 1_000_000_000), ("trillion", 1_000_000_000_000), ("k", 1_000), ("m", 1_000_000), ("b", 1_000_000_000), ("t", 1_000_000_000_000)];
     let mut mult: u128 = 1;
     let mut has_mult = false;
     for (w, m) in mults {
         if let Some(r) = rest.strip_prefix(w) {
-            // (A single letter only when a unit word or the end follows, as the pattern reads it.)
+            // (A multiplier only when a unit's word or the end follows.)
             let r2 = r.strip_prefix(' ').unwrap_or(r);
-            if r2.is_empty() || ["dollars", "dollar", "bucks", "cents", "cent"].iter().any(|u| r2 == *u) {
+            if r2.is_empty() || is_unit(r2) || is_minor(r2) {
                 mult = m;
                 has_mult = true;
                 rest = r;
@@ -401,10 +440,10 @@ pub fn parse_amount(s: &str) -> Result<String, UnitError> {
         }
     }
     rest = rest.strip_prefix(' ').unwrap_or(rest);
-    let cents = match rest {
+    let in_minor = match rest {
         "" => false,
-        "dollars" | "dollar" | "bucks" => false,
-        "cents" | "cent" => true,
+        w if is_unit(w) => false,
+        w if is_minor(w) => true,
         _ => return Err(err()),
     };
     if whole.contains(',') {
@@ -414,20 +453,34 @@ pub fn parse_amount(s: &str) -> Result<String, UnitError> {
             return Err(UnitError(format!("badly grouped digits: {s}")));
         }
     }
-    if cents && (!frac.is_empty() || has_mult) {
+    if in_minor && (!frac.is_empty() || has_mult) {
         return Err(err());
     }
-    if frac.len() == 3 && mult == 1 {
-        return Err(UnitError(format!("more than two decimals: {s}")));
+    if frac.len() > minor && mult == 1 {
+        return Err(UnitError(match minor {
+            0 => format!("this money has no decimals: {s}"),
+            n => format!("more than {} decimals: {s}", NUMBER_WORDS.get(n).copied().unwrap_or("that many")),
+        }));
     }
-    let units_per_dollar: u128 = if cents { 1 } else { 100 };
-    let whole_n: u128 = whole.replace(',', "").parse().map_err(|_| UnitError(format!("too large: {s}")))?;
-    let frac_n: u128 = format!("{frac}000")[..3].parse().unwrap_or(0);
-    let scaled = whole_n.checked_mul(1000).and_then(|x| x.checked_add(frac_n)).and_then(|x| x.checked_mul(mult)).and_then(|x| x.checked_mul(units_per_dollar)).ok_or_else(|| UnitError(format!("too large: {s}")))?;
-    if scaled % 1000 != 0 {
-        return Err(UnitError(format!("fraction of a cent: {s}")));
+    let large = || UnitError(format!("too large: {s}"));
+    let per_unit: u128 = if in_minor { 1 } else { 10u128.pow(u32::from(cur.minor_units)) };
+    let whole_n: u128 = whole.replace(',', "").parse().map_err(|_| large())?;
+    // The decimals, carried exactly: what's written, times the multiplier, must come to whole smallest units.
+    let frac_n: u128 = if frac.is_empty() { 0 } else { frac.parse().map_err(|_| err())? };
+    let frac_scaled = frac_n * mult * per_unit;
+    let frac_div = 10u128.pow(frac.len() as u32);
+    if frac_scaled % frac_div != 0 {
+        return Err(UnitError(match cur.minor_words.first() {
+            Some(w) => format!("fraction of a {w}: {s}"),
+            None => format!("fraction of the smallest unit: {s}"),
+        }));
     }
-    Ok((scaled / 1000).to_string())
+    let n = whole_n.checked_mul(mult).and_then(|x| x.checked_mul(per_unit)).and_then(|x| x.checked_add(frac_scaled / frac_div)).ok_or_else(large)?;
+    let out = n.to_string();
+    if out.len() > 38 {
+        return Err(large());
+    }
+    Ok(out)
 }
 
 const DAY: i64 = 86_400;
@@ -518,31 +571,52 @@ pub fn parse_count(s: &str) -> Result<i64, UnitError> {
     }
 }
 
-/// Cents as money text: "$1,234.56".
-pub fn format_money(cents: &str) -> String {
-    let (neg, digits) = match cents.strip_prefix('-') {
+/// An amount in the currency's smallest unit as people write it: its sign (or its code and a space), the whole units
+/// grouped in threes, and its decimals.
+pub fn format_money(amount: &str, cur: &Currency) -> String {
+    let (neg, digits) = match amount.strip_prefix('-') {
         Some(d) => (true, d),
-        None => (false, cents),
+        None => (false, amount),
     };
     let digits = digits.trim_start_matches('0');
     let digits = if digits.is_empty() { "0" } else { digits };
-    let (whole, frac) = if digits.len() > 2 { digits.split_at(digits.len() - 2) } else { ("0", digits) };
-    let mut grouped = String::new();
+    let minor = usize::from(cur.minor_units);
+    let (whole, frac) = if digits.len() > minor { digits.split_at(digits.len() - minor) } else { ("0", digits) };
+    let mut out = String::from(if neg { "-" } else { "" });
+    match &cur.symbol {
+        Some(x) => out.push_str(x),
+        None => {
+            out.push_str(&cur.code);
+            out.push(' ');
+        }
+    }
     for (i, c) in whole.chars().enumerate() {
         if i > 0 && (whole.len() - i) % 3 == 0 {
-            grouped.push(',');
+            out.push(',');
         }
-        grouped.push(c);
+        out.push(c);
     }
-    format!("{}${grouped}.{frac:0>2}", if neg { "-" } else { "" })
+    if minor > 0 {
+        out.push_str(&format!(".{frac:0>minor$}"));
+    }
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// A currency as a test's world declares it (the platform has none of its own).
+    fn currency(code: &str, minor_units: u8, symbol: Option<&str>, unit_words: &[&str], minor_words: &[&str]) -> Currency {
+        let own = |w: &[&str]| w.iter().map(|x| x.to_string()).collect();
+        Currency { code: code.into(), minor_units, symbol: symbol.map(String::from), unit_words: own(unit_words), minor_words: own(minor_words) }
+    }
+
     #[test]
     fn amounts_durations_counts_and_money() {
+        let cur = currency("TWN", 2, Some("$"), &["dollar", "dollars", "bucks"], &["cent", "cents"]);
+        let parse_amount = |s: &str| super::parse_amount(s, &cur);
+        let format_money = |s: &str| super::format_money(s, &cur);
         assert_eq!(parse_amount("$1,234.56").unwrap(), "123456");
         assert_eq!(parse_amount("$1.5k").unwrap(), "150000");
         assert_eq!(parse_amount("250 cents").unwrap(), "250");
@@ -553,6 +627,12 @@ mod tests {
         assert!(parse_amount("1,23").is_err());
         assert!(parse_amount("$1.234").is_err());
         assert!(parse_amount("ten dollars").is_err());
+        assert_eq!(parse_amount("$1.234").unwrap_err().0, "more than two decimals: $1.234");
+        assert_eq!(parse_amount("twn 500").unwrap(), "50000");
+        assert_eq!(parse_amount("1.5 cents").unwrap_err().0, "not an amount: 1.5 cents");
+        assert_eq!(parse_amount("$90,071,992,547,409.93").unwrap(), "9007199254740993");
+        assert_eq!(parse_amount(&format!("${}", "9".repeat(36))).unwrap(), format!("{}00", "9".repeat(36)));
+        assert_eq!(parse_amount(&format!("${}", "9".repeat(37))).unwrap_err().0, format!("too large: ${}", "9".repeat(37)));
         assert_eq!(parse_duration("30 days").unwrap(), 30 * DAY);
         assert_eq!(parse_duration("every 3 months").unwrap(), 90 * DAY);
         assert_eq!(parse_duration("monthly").unwrap(), 30 * DAY);
@@ -564,6 +644,72 @@ mod tests {
         assert_eq!(format_money("123456"), "$1,234.56");
         assert_eq!(format_money("5"), "$0.05");
         assert_eq!(format_money("100000000"), "$1,000,000.00");
+        assert_eq!(format_money("-5"), "-$0.05");
+    }
+
+    #[test]
+    fn money_in_a_currency_with_no_smaller_unit() {
+        let cur = currency("JPY", 0, Some("¥"), &["yen"], &[]);
+        let parse = |s: &str| parse_amount(s, &cur);
+        assert_eq!(parse("500").unwrap(), "500");
+        assert_eq!(parse("¥500").unwrap(), "500");
+        assert_eq!(parse("¥1,234,567").unwrap(), "1234567");
+        assert_eq!(parse("1.5k yen").unwrap(), "1500");
+        assert_eq!(parse("¥2m").unwrap(), "2000000");
+        assert_eq!(parse("JPY 500").unwrap(), "500");
+        assert_eq!(parse("500 jpy").unwrap(), "500");
+        assert_eq!(parse("¥500.5").unwrap_err().0, "this money has no decimals: ¥500.5");
+        assert_eq!(parse("¥500.00").unwrap_err().0, "this money has no decimals: ¥500.00");
+        assert!(parse("$500").is_err()); // another world's sign
+        assert!(parse("500 dollars").is_err());
+        assert!(parse("500 cents").is_err());
+        assert_eq!(format_money("500", &cur), "¥500");
+        assert_eq!(format_money("1234567", &cur), "¥1,234,567");
+        assert_eq!(format_money("0", &cur), "¥0");
+        assert_eq!(format_money("-50000", &cur), "-¥50,000");
+    }
+
+    #[test]
+    fn money_in_a_currency_with_three_decimals() {
+        let cur = currency("KWD", 3, Some("KD"), &["dinar", "dinars"], &["fils"]);
+        let parse = |s: &str| parse_amount(s, &cur);
+        assert_eq!(parse("500").unwrap(), "500000");
+        assert_eq!(parse("KD 1.234").unwrap(), "1234");
+        assert_eq!(parse("kd1,000.5").unwrap(), "1000500");
+        assert_eq!(parse("2 dinars").unwrap(), "2000");
+        assert_eq!(parse("250 fils").unwrap(), "250");
+        assert_eq!(parse("1.5k").unwrap(), "1500000");
+        assert_eq!(parse("1.2345").unwrap_err().0, "not an amount: 1.2345");
+        assert!(parse("1.5 fils").is_err());
+        assert!(parse("2k fils").is_err());
+        assert_eq!(format_money("1234", &cur), "KD1.234");
+        assert_eq!(format_money("5", &cur), "KD0.005");
+        assert_eq!(format_money("1234567890", &cur), "KD1,234,567.890");
+    }
+
+    #[test]
+    fn money_in_a_currency_with_only_a_code() {
+        let cur = currency("XYZ", 2, None, &[], &[]);
+        let parse = |s: &str| parse_amount(s, &cur);
+        assert_eq!(parse("XYZ 500").unwrap(), "50000");
+        assert_eq!(parse("xyz500").unwrap(), "50000");
+        assert_eq!(parse("500 XYZ").unwrap(), "50000");
+        assert_eq!(parse("500").unwrap(), "50000");
+        assert_eq!(parse("XYZ 1,234.56").unwrap(), "123456");
+        assert_eq!(parse("3m xyz").unwrap(), "300000000");
+        assert!(parse("$500").is_err());
+        assert!(parse("500 dollars").is_err());
+        assert_eq!(format_money("50000", &cur), "XYZ 500.00");
+        assert_eq!(format_money("-123456", &cur), "-XYZ 1,234.56");
+        // (What's written is read back as it was.)
+        for n in ["0", "5", "50000", "123456789"] {
+            assert_eq!(parse(&format_money(n, &cur)).unwrap(), n);
+        }
+        // More decimal places than three: read to the currency's own.
+        let fine = currency("FIN", 8, None, &[], &[]);
+        assert_eq!(parse_amount("FIN 0.00000001", &fine).unwrap(), "1");
+        assert_eq!(parse_amount("1.5", &fine).unwrap(), "150000000");
+        assert_eq!(format_money("150000001", &fine), "FIN 1.50000001");
     }
 
     #[test]

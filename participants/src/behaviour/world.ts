@@ -609,7 +609,7 @@ export const migration: BehaviourModule = {
             const templateOf = (j: number) => (j === d.leaseholder || !p.template_outside_lf || r.below(10_000) < p.participation_bps ? p.template : p.template_outside_lf);
             const blocks = d.members.map((m, j) => C.call("presence", {
               name: C.text(`m${++arrivals}`), age: C.text(`${m.age * 365 + m.day} days`), sex: m.sex, template: templateOf(j),
-              ...(m.age >= 18 ? { carrying: C.dollars(savingsOf(m.age, r)) } : {}),
+              ...(m.age >= 18 ? { carrying: C.amountText(savingsOf(m.age, r)) } : {}),
               ...(p.schooling ? { variables: C.json({ [p.schooling.variable]: yearsOfSchooling(m.age, p.schooling, (n) => r.below(n)) * p.schooling.per_year }) } : {}),
             }));
             todo.push(because(`A household moves here: the town's expected wage (${usd(Math.floor(mean))} a month x a ${Math.round(chance * 100)}% chance of a job) beats ${usd(p.outside_monthly_income)} elsewhere.`, ...blocks.map((b, j) => [refs[j]!, b] as [string, C.Call])));

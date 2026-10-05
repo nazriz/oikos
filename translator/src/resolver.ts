@@ -39,7 +39,6 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
 
 class Ask extends Error {}
 
-const $ = formatMoney;
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
 export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string): Resolution {
@@ -70,6 +69,11 @@ class Resolver {
   private n = 0;
   constructor(private k: Knowledge, program: { lines: calls.Line[] }, private readonly me: string) {
     for (const l of program.lines) if (l.bind) this.refs.add(l.bind);
+  }
+
+  /** An amount as the world writes its money. */
+  private sum(amount: string | number): string {
+    return formatMoney(amount, this.k.currency);
   }
 
   private fresh(stem: string): string {
@@ -118,7 +122,7 @@ class Resolver {
   }
   private amount(c: Call, key: string): string | undefined {
     const s = this.str(c, key);
-    return s === undefined ? undefined : calls.parseAmount(s);
+    return s === undefined ? undefined : calls.parseAmount(s, this.k.currency);
   }
   private seconds(c: Call, key: string): number | undefined {
     const s = this.str(c, key);
@@ -295,7 +299,7 @@ class Resolver {
     // Someone else keeps it: the only physical option is to ask them. They decide.
     return [{
       block: "publish", kind: "request", speaks_for: this.me, addressed_to: [keeper], visible_to: [this.me, keeper],
-      text: `Please pay ${$(out.amount)} from ${from} to ${out.to}${every ? ` every ${Math.round(every / 86_400)} days` : ""}${out.for ? `, for ${out.for}` : ""}.`,
+      text: `Please pay ${this.sum(out.amount)} from ${from} to ${out.to}${every ? ` every ${Math.round(every / 86_400)} days` : ""}${out.for ? `, for ${out.for}` : ""}.`,
       data: { outcome: { money: { from, ...out } }, ...(every ? { every } : {}), ...(first !== undefined ? { first } : {}) },
       ...(this.id(c, "basis") ? { basis: this.id(c, "basis") } : {}), ...(bind ? { ref: bind } : {}),
     }];
@@ -350,7 +354,7 @@ class Resolver {
             { who: builder, does: { outcome: { structure: remove ? { remove } : { type, on } } } },
             { who: this.me, does: { outcome: { money: { from, to: builder, amount: price } } } },
           ],
-          text: `${this.k.name(builder)} will ${place}; ${this.k.name(this.me)} pays ${$(price)} from ${from}.`,
+          text: `${this.k.name(builder)} will ${place}; ${this.k.name(this.me)} pays ${this.sum(price)} from ${from}.`,
         },
       },
       { block: "sign_agreement", agreement: `$${ref}`, as: this.me },
