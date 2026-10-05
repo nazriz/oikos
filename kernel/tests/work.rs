@@ -145,3 +145,34 @@ fn demolition_takes_labour_and_nobody_moves_in_meanwhile() {
     // What was held there stays held there (alice's goods), to be moved out.
     assert_eq!(run.kernel().state().holding("alice", "s-house", "goods"), 10);
 }
+
+/// A holding stays within the range of a quantity: what work would make, or a taking would bring, beyond it is refused
+/// in the ordinary way, and nothing changes. (Until 2026-10-05 these sums weren't checked: a holding could pass the
+/// range, or overflow, which stops a test build and wrapped in a release one.)
+#[test]
+fn a_holding_at_the_top_of_its_range_refuses_more_from_work_or_a_taking() {
+    use oikos_kernel::money::MAX_MONEY;
+    let mut w = world(&default_params());
+    let holdings = w["world"]["holdings"].as_array_mut().unwrap();
+    // The developer's goods in the shop: room for one more unit's worth (5), and no more. Bob's, kept at alice's house:
+    // room for 2.
+    holdings.iter_mut().find(|h| h["holder"] == "devco" && h["kind"] == "goods").unwrap()["quantity"] = json!((MAX_MONEY - 9).to_string());
+    holdings.push(json!({"kind": "goods", "holder": "bob", "at": "s-house", "quantity": (MAX_MONEY - 2).to_string()}));
+    let mut run = Run::start(w, "work", Vec::new(), None).unwrap();
+    let held = |run: &Run<Vec<u8>>, who: &str, at: &str, kind: &str| run.kernel().state().holding(who, at, kind);
+    make(&mut run, 1, &["carol"]).unwrap();
+    assert_eq!(held(&run, "devco", "s-shop", "goods"), MAX_MONEY - 4);
+    assert_eq!(make(&mut run, 1, &["carol"]), Err(RefusalCode::Overflow));
+    // Refused whole: nothing made, nothing used, none of carol's time spent (she can still work the rest of her day).
+    assert_eq!((held(&run, "devco", "s-shop", "goods"), held(&run, "devco", "s-shop", "materials")), (MAX_MONEY - 4, 1000 - 10));
+    // A taking: bob, at alice's, takes 3 of her goods and would hold more than a quantity can be; 2 fit.
+    act(&mut run, "bob-self", None, json!([{"block": "occupy", "space": "s-house/dwelling.1"}])).unwrap();
+    let take = |n: u32| json!([{"block": "take", "kind": "goods", "quantity": n.to_string(), "from": "alice", "at": "s-house"}]);
+    assert_eq!(act(&mut run, "bob-self", None, take(3)), Err(RefusalCode::Overflow));
+    assert_eq!((held(&run, "alice", "s-house", "goods"), held(&run, "bob", "s-house", "goods")), (10, MAX_MONEY - 2));
+    act(&mut run, "bob-self", None, take(2)).unwrap();
+    assert_eq!((held(&run, "alice", "s-house", "goods"), held(&run, "bob", "s-house", "goods")), (8, MAX_MONEY));
+    // The state still hashes, and the run replays.
+    run.finish("completed", None).unwrap();
+    oikos_kernel::replay(&run.into_log(), None).unwrap();
+}

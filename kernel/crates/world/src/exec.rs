@@ -947,10 +947,13 @@ impl<'a> Exec<'a> {
         let c = self.st.stamp();
         if let Some(x) = &spec {
             for (k, per) in &x.consumes {
-                self.add_holding(&me, &at, k, -(per * units as i128), c);
+                let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an input"))?;
+                self.add_holding(&me, &at, k, -q, c)?;
             }
             for (k, per) in &x.produces {
-                self.add_holding(&me, &at, k, per * units as i128, c);
+                // (Refused if what's made would take the holding beyond the range of a quantity.)
+                let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
+                self.add_holding(&me, &at, k, q, c)?;
             }
             if !x.changes.is_empty() && bodies.is_none() {
                 settle(self.s, self.st, &target);
@@ -1098,11 +1101,22 @@ impl<'a> Exec<'a> {
         serde_json::json!({ "of": sv.of, "cells": found })
     }
 
-    /// Add to (or take from) a holding, stamping the change.
-    fn add_holding(&mut self, holder: &str, at: &str, kind: &str, by: Money, stamp: u64) {
+    /// Add to (or take from) a holding, stamping the change. Refused, as any amount out of range is, if the holding
+    /// would go beyond the range of a quantity either way (an edge's may be negative, D31; whether anyone else's may
+    /// go below nothing is the caller's check): the sum is never left to overflow, which a test build would stop at
+    /// and a release build once wrapped past.
+    fn add_holding(&mut self, holder: &str, at: &str, kind: &str, by: Money, stamp: u64) -> R<()> {
         let key = crate::state::holding_key(holder, at, kind);
-        let q = self.st.holdings.get(&key).map_or(0, |s| s.quantity) + by;
+        let q = self
+            .st
+            .holdings
+            .get(&key)
+            .map_or(0, |s| s.quantity)
+            .checked_add(by)
+            .filter(|q| (-MAX_MONEY..=MAX_MONEY).contains(q))
+            .ok_or_else(|| refuse(RefusalCode::Overflow, format!("{holder}'s holding of {kind} at {at} would go beyond the range of a quantity")))?;
         self.st.holdings.insert(key, crate::state::Holding { kind: kind.into(), holder: holder.into(), at: at.into(), quantity: q, changed: stamp });
+        Ok(())
     }
 
     fn account(&self, id: &str) -> R<&Account> {
@@ -1366,8 +1380,9 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::InsufficientQuantity, format!("{from} has {have} {kind} at {at}")));
                 }
                 let c = self.st.stamp();
-                self.add_holding(&from, &at, kind, -*quantity, c);
-                self.add_holding(&me, &at, kind, *quantity, c);
+                // (Refused if the taker's holding there would go beyond the range of a quantity.)
+                self.add_holding(&from, &at, kind, -*quantity, c)?;
+                self.add_holding(&me, &at, kind, *quantity, c)?;
                 let t = self.now();
                 self.st.takings.push(crate::state::Taking { t, by: me.clone(), from: from.clone(), kind: kind.clone(), at: at.clone() });
                 self.emit(EventBody::Taken { by: me, from, kind: kind.clone(), quantity: *quantity, at });
@@ -1407,8 +1422,8 @@ impl<'a> Exec<'a> {
                 }
                 if !(me == to && from_at == to_at) {
                     let c = self.st.stamp();
-                    self.add_holding(&me, &from_at, kind, -*quantity, c);
-                    self.add_holding(&to, &to_at, kind, *quantity, c);
+                    self.add_holding(&me, &from_at, kind, -*quantity, c)?;
+                    self.add_holding(&to, &to_at, kind, *quantity, c)?;
                 }
                 self.emit(EventBody::GoodsMoved { kind: kind.clone(), quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into() });
                 Ok(())
@@ -1490,7 +1505,7 @@ impl<'a> Exec<'a> {
                 let c = self.st.stamp();
                 if let Some(yard) = &yard {
                     for (kind, q) in &ty.materials {
-                        self.add_holding(&me, yard, kind, -*q, c);
+                        self.add_holding(&me, yard, kind, -*q, c)?;
                     }
                 }
                 let id = self.st.mint("str");
