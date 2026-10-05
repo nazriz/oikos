@@ -222,7 +222,7 @@ For each decision a citizen makes, a `decision` annotation records:
 - the features and each option's score or attraction;
 - the choice.
 
-It's on by default for runs that train citizen models, and off (lean) for quick tests. `terrarium dataset` exports it: the training set for a small citizen model, and the baseline against which that model is compared.
+It's on by default for runs that train citizen models, and off (lean) for quick tests. `oikos dataset` exports it: the training set for a small citizen model, and the baseline against which that model is compared.
 
 ## 8. Building it
 
@@ -322,7 +322,7 @@ It's on by default for runs that train citizen models, and off (lean) for quick 
   - **Remembered by kind,** for the run only. A kind is the thing, plus what they value most, what they lack most, whether they earn, how long their savings would last, and whether they live alone: relative bins, no place's figures. Someone of the same kind asking at the same moment shares the call.
   - **Logged in full** through the run's model I/O (usage and transcript), as a participant's own call (purpose `participant`), marked `ref: consult/<kind>`. A resumed run serves it from the log, and reads back that it was on.
   - **Tested on the mock:** judgements follow from the kind and option, so runs replay to the hash. 120 days of the small town: 12 kinds asked, 2 decisions made with an answer.
-  - **The robustness audit** (`terrarium consult-audit <world> [--model ...]`; orchestrator/src/audit.ts):
+  - **The robustness audit** (`oikos consult-audit <world> [--model ...]`; orchestrator/src/audit.ts):
     - It asks the world's own questions for a sample of kinds of person drawn from its profile, four ways: as runs put them, reworded, with the options in the other order, and with the needs' bins shifted. Then it asks other people of each kind afresh (the fidelity check).
     - A kind is unstable if its answer swings more than 2 points of 10 or flips which option is preferred. Unstable kinds are listed; if most kinds of a thing are unstable, so is the thing.
     - `run --consult --consult-avoid <report>` leaves them out: those decisions are made on the facts. The list is recorded in the run's note, and resume keeps it.

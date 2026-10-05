@@ -245,7 +245,7 @@ export function programOf(...lines: (Call | [string, Call])[]): Program {
  * uses it rather than reading its text back, which it would read as exactly this. Not part of the action (a symbol:
  * never serialised); the text is what the participant said.
  */
-export const PARSED = Symbol.for("terrarium.call-program");
+export const PARSED = Symbol.for("oikos.call-program");
 
 // ---------------------------------------------------------------- unit tables
 

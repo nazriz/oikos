@@ -5,9 +5,9 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
-import { createConsult, kindOf, MockAdapter, mockPolicies, PRICES, readJudgements } from "@terrarium/participants/llm";
-import type { ConsultQuestion } from "@terrarium/participants";
+import { generate } from "@oikos/worlds/generator/generate";
+import { createConsult, kindOf, MockAdapter, mockPolicies, PRICES, readJudgements } from "@oikos/participants/llm";
+import type { ConsultQuestion } from "@oikos/participants";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");

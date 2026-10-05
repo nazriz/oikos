@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { calls } from "@terrarium/participants";
-import { MockAdapter } from "@terrarium/participants/llm";
+import { calls } from "@oikos/participants";
+import { MockAdapter } from "@oikos/participants/llm";
 import { CASES } from "../eval/cases";
 import { evaluate, reportText } from "../eval/run";
 

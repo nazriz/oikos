@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate, rentIncreaseLaw } from "@terrarium/worlds/generator/generate";
+import { generate, rentIncreaseLaw } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");

@@ -5,13 +5,13 @@ import { expect, test } from "bun:test";
 import Ajv2020 from "ajv/dist/2020";
 import { readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { generate } from "@oikos/worlds/generator/generate";
 import { exportDataset } from "../src/dataset";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
-const NS = "urn:terrarium:contracts:0.8";
+const NS = "urn:oikos:contracts:0.8";
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
 const ajv = new Ajv2020({ strict: true, strictRequired: false, allErrors: true });

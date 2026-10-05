@@ -8,11 +8,11 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
-use terrarium_kernel::events::{EventBody, RefusalCode};
-use terrarium_kernel::observe::{ChannelData, Observation};
-use terrarium_kernel::run::{Response, Run};
-use terrarium_kernel::state::{ConditionKind, DeathCause, ParticipantStatus};
-use terrarium_kernel::Command;
+use oikos_kernel::events::{EventBody, RefusalCode};
+use oikos_kernel::observe::{ChannelData, Observation};
+use oikos_kernel::run::{Response, Run};
+use oikos_kernel::state::{ConditionKind, DeathCause, ParticipantStatus};
+use oikos_kernel::Command;
 
 const DAY: i64 = 86_400;
 
@@ -82,7 +82,7 @@ fn someone_arrives_from_outside_carrying_their_money_and_can_leave_and_come_back
     // She moves in, then leaves the world: out of her home, still owning her money.
     assert_eq!(refusal(&act(&mut run, &par, None, json!([{"block": "occupy", "space": "s-flats/dwelling.2"}]))), None);
     let r = act(&mut run, &par, None, json!([{"block": "leave"}]));
-    assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::Vacated { reason: terrarium_kernel::events::VacateReason::Departed, .. })));
+    assert!(r.events.iter().any(|e| matches!(&e.body, EventBody::Vacated { reason: oikos_kernel::events::VacateReason::Departed, .. })));
     let st = run.kernel().state();
     assert!(!st.body(&dana).unwrap().present);
     assert!(st.accounts.contains_key(&acc.0));
@@ -192,11 +192,12 @@ fn count<F: Fn(&EventBody) -> bool>(run: &mut Run<Vec<u8>>, to: i64, f: F) -> us
 
 #[test]
 fn deaths_follow_the_life_table() {
-    // 10% a year from other causes: drawn on the birthday at the end of year one, each death falls within
-    // the year after it. So by the end of year two, about 100 of 1,000 have died (sd about 9.5).
+    // 10% a year from other causes, from the start (each body's first draw is as it enters the world, for what's left of
+    // its year of age; here a whole year, as everyone's birthday is at the start). So by the end of year two, about 190 of
+    // 1,000 have died (sd about 12).
     let mut run = many(1000, json!({"year": YEAR, "other_causes": {"by_age": [{"from": 0, "bps": 1000}]}}), false);
     let died = count(&mut run, 2 * YEAR - TICK, |e| matches!(e, EventBody::PersonDied { died_of: DeathCause::Other, .. }));
-    assert!((70..=130).contains(&died), "{died} deaths, expected about 100");
+    assert!((150..=230).contains(&died), "{died} deaths, expected about 190");
     // The dead occupy nothing, and their participants have ended... (these bodies have none)
     let st = run.kernel().state();
     assert!(st.entities.values().filter_map(|e| e.body.as_ref()).filter(|b| !b.alive).count() >= died);
@@ -208,11 +209,11 @@ fn illness_follows_its_table_and_can_kill() {
         "severity": [{"label": "minor", "share_bps": 5000, "days": [1, 3], "fatal_bps": 0}, {"label": "grave", "share_bps": 5000, "days": [2, 4], "fatal_bps": 5000}]}});
     let mut run = many(1000, life, false);
     let ill = count(&mut run, 2 * YEAR - TICK, |e| matches!(e, EventBody::ConditionBegan { kind: ConditionKind::Illness, .. }));
-    // One birthday's draw: about 20% fall ill within the year after it (sd about 12.6).
-    assert!((160..=240).contains(&ill), "{ill} illnesses, expected about 200");
+    // Two years' draws, of those alive at each: about 20% a year fall ill (about 380 in all).
+    assert!((320..=440).contains(&ill), "{ill} illnesses, expected about 380");
     let died = run.kernel().state().entities.values().filter_map(|e| e.body.as_ref()).filter(|b| !b.alive).count();
-    // Half the illnesses are grave, and half of those kill: about 50.
-    assert!((25..=80).contains(&died), "{died} deaths from illness, expected about 50");
+    // Half the illnesses are grave, and half of those kill: about 95.
+    assert!((60..=130).contains(&died), "{died} deaths from illness, expected about 95");
 }
 
 #[test]
@@ -224,8 +225,9 @@ fn a_dangerous_place_injures_the_people_in_it() {
     let a = count(&mut safe, 2 * YEAR - TICK, hurt);
     let b = count(&mut mine, 2 * YEAR - TICK, hurt);
     // 1% a year anywhere; in the mine, 1% + 30%.
-    assert!(a <= 30, "{a} injured at home, expected about 10");
-    assert!((250..=370).contains(&b), "{b} injured in the mine, expected about 310");
+    // (Two years of it, from the start.)
+    assert!(a <= 45, "{a} injured at home, expected about 20");
+    assert!((540..=700).contains(&b), "{b} injured in the mine, expected about 620");
 }
 
 #[test]
@@ -337,9 +339,9 @@ fn picked_traits_follow_their_weights() {
 fn a_pick_needs_positive_integer_weights() {
     for bad in [json!({"pick": {}}), json!({"pick": {"a": 0}}), json!({"pick": {"a": -1}}), json!({"pick": {"a": 1.5}}), json!({"pick": [1, 2]})] {
         let t = Some(json!({ "x": bad }));
-        assert!(terrarium_kernel::config::check_traits("t", &t).is_err(), "{t:?}");
+        assert!(oikos_kernel::config::check_traits("t", &t).is_err(), "{t:?}");
     }
-    assert!(terrarium_kernel::config::check_traits("t", &Some(json!({"x": {"pick": {"a": 0, "b": 3}}}))).is_ok());
+    assert!(oikos_kernel::config::check_traits("t", &Some(json!({"x": {"pick": {"a": 0, "b": 3}}}))).is_ok());
 }
 
 /// The test town, with bodies that have a sex (Alice and Carol female, Bob male) and newborns' sex drawn.
@@ -398,7 +400,7 @@ fn newborns_sex_follows_the_worlds_ratio() {
     let st = run.kernel().state();
     let kids = &st.body("alice").unwrap().children;
     assert_eq!(kids.len(), 1_500);
-    let female = kids.iter().filter(|k| st.body(k).unwrap().sex == Some(terrarium_kernel::state::Sex::Female)).count();
+    let female = kids.iter().filter(|k| st.body(k).unwrap().sex == Some(oikos_kernel::state::Sex::Female)).count();
     assert!((652..=809).contains(&female), "{female} of 1500 born female");
 }
 
@@ -424,7 +426,7 @@ fn those_who_share_a_space_see_who_left_it_and_why() {
         .expect("she sees her home");
     let left = space.left.as_ref().expect("in her own home she sees who left");
     let last = left.last().unwrap();
-    assert_eq!((last.occupant.as_str(), last.reason), ("bob", terrarium_kernel::events::VacateReason::Departed));
+    assert_eq!((last.occupant.as_str(), last.reason), ("bob", oikos_kernel::events::VacateReason::Departed));
     // Carol, who doesn't live there, sees how full it is, not who left.
     let o = observe(&mut run, "carol-self");
     for c in o.channels.values() {
@@ -437,3 +439,4 @@ fn those_who_share_a_space_see_who_left_it_and_why() {
         }
     }
 }
+

@@ -39,9 +39,9 @@ export class Watchdog {
   }
 }
 
-/** How long a run may go without progress before it's stopped: TERRARIUM_STALL_SECONDS, or 5 minutes (longer than any
+/** How long a run may go without progress before it's stopped: OIKOS_STALL_SECONDS, or 5 minutes (longer than any
  * one model call is allowed: those time out and retry on their own). */
 export function stallMs(): number {
-  const s = Number(process.env.TERRARIUM_STALL_SECONDS);
+  const s = Number(process.env.OIKOS_STALL_SECONDS);
   return Number.isFinite(s) && s > 0 ? s * 1000 : 300_000;
 }

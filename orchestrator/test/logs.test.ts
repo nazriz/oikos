@@ -4,7 +4,7 @@
 import { expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { generate } from "@oikos/worlds/generator/generate";
 import { exportDataset } from "../src/dataset";
 import { kernelBinary } from "../src/kernel";
 import { compressLog, logLines, readLog } from "../src/logs";

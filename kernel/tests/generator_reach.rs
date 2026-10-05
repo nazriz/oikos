@@ -11,8 +11,8 @@ use common::*;
 use proptest::strategy::{Strategy, ValueTree};
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use std::collections::BTreeMap;
-use terrarium_kernel::events::EventBody;
-use terrarium_kernel::run::Run;
+use oikos_kernel::events::EventBody;
+use oikos_kernel::run::Run;
 
 #[test]
 fn random_operations_reach_the_interesting_states() {

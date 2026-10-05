@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@terrarium/measure",
+      "name": "@oikos/measure",
       "dependencies": {
         "@duckdb/node-api": "^1.5.5-r.5",
       },

@@ -1,5 +1,5 @@
 use super::*;
-use terrarium_contracts::config::{Catalogue, LandCoverCfg, SuccessionCfg};
+use oikos_contracts::config::{Catalogue, LandCoverCfg, SuccessionCfg};
 
 fn cat(json: serde_json::Value) -> Catalogue {
     let mut base = serde_json::json!({ "structure_types": [] });

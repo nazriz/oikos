@@ -25,7 +25,7 @@ Three options in the world config's `log`, each off by default, each keeping rep
 1. **`chain: "hash"`**: lines keep `hash` and drop `prev`. A reader checks the chain by recomputing each line's hash
    from the previous line's, as replay already does. About 14% smaller. The anchors file is unchanged.
 2. **`events: "derived"`**: the log keeps commands, annotations, checkpoints and the end; events aren't written. They
-   are what the kernel does with the commands, so `terrarium-kernel replay --emit` writes the full log again, byte for
+   are what the kernel does with the commands, so `oikos-kernel replay --emit` writes the full log again, byte for
    byte (the checkpoints' state hashes say so). Measurement would run on the full log, emitted to a temporary file (or
    streamed). About 47% smaller; the cost is a replay's time (the kernel alone: about 25 s a simulated year) whenever
    the events are wanted.

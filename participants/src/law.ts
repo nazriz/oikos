@@ -5,7 +5,7 @@
 // formal condition has no power; an institution chooses to apply it.
 //
 // The reader is Rust (kernel/crates/law), built to WebAssembly and loaded here
-// synchronously (`bun run kernel` builds it). TERRARIUM_LAW=ts reads with
+// synchronously (`bun run kernel` builds it). OIKOS_LAW=ts reads with
 // @bufbuild/cel instead, and =shadow reads both ways and compares (under test,
 // a difference is an error), while the Rust reader is checked against it.
 
@@ -14,9 +14,9 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Record } from "./contracts";
 
-const LAW_MODE = (process.env.TERRARIUM_LAW ?? "engine") as "engine" | "ts" | "shadow";
+const LAW_MODE = (process.env.OIKOS_LAW ?? "engine") as "engine" | "ts" | "shadow";
 const CRATE = join(import.meta.dir, "../../kernel/crates/law");
-const MODULE = process.env.TERRARIUM_LAW_MODULE ?? join(import.meta.dir, "../../kernel/target/wasm32-unknown-unknown/release/terrarium_law.wasm");
+const MODULE = process.env.OIKOS_LAW_MODULE ?? join(import.meta.dir, "../../kernel/target/wasm32-unknown-unknown/release/oikos_law.wasm");
 
 /** The crate's source fingerprint, as its build.rs computes it: FNV-1a over each file's path and bytes, in path order. */
 function sourceFingerprint(): string | undefined {
@@ -61,7 +61,7 @@ function rust(q: object): any {
   return out;
 }
 
-/** Law reads compared both ways (TERRARIUM_LAW=shadow), and where they differed. */
+/** Law reads compared both ways (OIKOS_LAW=shadow), and where they differed. */
 export const lawShadow = { checked: 0, differed: 0, last: [] as { condition: string; ts: string; rust: string }[] };
 
 const OPERATORS = new Set([

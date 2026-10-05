@@ -107,7 +107,7 @@ export class CodexCliAdapter implements LlmAdapter {
   }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
-    const dir = mkdtempSync(join(tmpdir(), "terrarium-codex-"));
+    const dir = mkdtempSync(join(tmpdir(), "oikos-codex-"));
     try {
       const schema = join(dir, "schema.json");
       const last = join(dir, "answer.json");
@@ -121,7 +121,7 @@ export class CodexCliAdapter implements LlmAdapter {
         r = await this.run(args, codexPrompt(req), dir, timeoutMs);
         // (Its error output only when it failed: a warning on a good answer isn't a limit.)
         const limited = !r.timedOut && [...(r.code !== 0 ? [r.stderr] : []), ...r.stdout.split("\n").filter((l) => /"type":"(error|turn\.failed)"/.test(l))].find((s) => LIMITED.test(s));
-        if (limited) throw new UsageLimitReached(`the Codex subscription's usage limit was reached (${limited.trim().slice(0, 300)}): the run stops here; resume it once the limit resets (terrarium resume <log>)`);
+        if (limited) throw new UsageLimitReached(`the Codex subscription's usage limit was reached (${limited.trim().slice(0, 300)}): the run stops here; resume it once the limit resets (oikos resume <log>)`);
         if (r.code === 0 && !r.timedOut) break;
         const why = r.timedOut ? `no answer within ${Math.round(timeoutMs / 1000)} s` : `exit ${r.code}: ${r.stderr.slice(0, 500)}`;
         if (n >= attempts) throw new Error(`codex exec failed after ${n} attempts (${why})`);

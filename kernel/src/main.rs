@@ -1,16 +1,16 @@
-//! terrarium-kernel CLI.
+//! oikos-kernel CLI.
 //!
-//!   terrarium-kernel serve                         NDJSON protocol on stdin/stdout
-//!   terrarium-kernel verify <log> [--anchors <f>]  check the hash chain (and witness)
-//!   terrarium-kernel replay <log> [--anchors <f>]  replay and require a byte-identical log
-//!   terrarium-kernel version
+//!   oikos-kernel serve                         NDJSON protocol on stdin/stdout
+//!   oikos-kernel verify <log> [--anchors <f>]  check the hash chain (and witness)
+//!   oikos-kernel replay <log> [--anchors <f>]  replay and require a byte-identical log
+//!   oikos-kernel version
 
 use std::process::ExitCode;
 
 /// A faster allocator for the kernel binary (the kernel allocates heavily; no result depends on the allocator).
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-use terrarium_kernel::{log, protocol, run};
+use oikos_kernel::{log, protocol, run};
 
 fn read(path: &str) -> Result<Vec<u8>, String> {
     std::fs::read(path).map_err(|e| format!("{path}: {e}"))
@@ -50,10 +50,10 @@ fn main() -> ExitCode {
             Ok(())
         })(),
         Some("version") => {
-            println!("terrarium-kernel {} ({}) source {}", run::KERNEL_VERSION, run::KERNEL_BUILD, run::KERNEL_SOURCE);
+            println!("oikos-kernel {} ({}) source {}", run::KERNEL_VERSION, run::KERNEL_BUILD, run::KERNEL_SOURCE);
             Ok(())
         }
-        _ => Err("usage: terrarium-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | version".into()),
+        _ => Err("usage: oikos-kernel serve | verify <log> [--anchors <file>] | replay <log> [--anchors <file>] | version".into()),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

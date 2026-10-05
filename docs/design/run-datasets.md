@@ -8,7 +8,7 @@ A run's log is its complete record: hash-chained, replayable, the truth of what 
 
 ## Layout
 
-`terrarium dataset <DIR|log.jsonl> [--out DIR] [--actions]` writes, for each log, a folder `<run>.dataset/`:
+`oikos dataset <DIR|log.jsonl> [--out DIR] [--actions]` writes, for each log, a folder `<run>.dataset/`:
 
 | File | One line per | Always |
 |---|---|---|
@@ -33,7 +33,7 @@ It says what made the data, so it's usable a year from now:
 
 ### `translations.jsonl`
 
-One line per translation, as `terrarium corpus` makes it now (docs/measurement.md):
+One line per translation, as `oikos corpus` makes it now (docs/measurement.md):
 - the proposal;
 - the translator's exchange, turn by turn (what it was shown, what it said);
 - retries;

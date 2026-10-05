@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { generate } from "@oikos/worlds/generator/generate";
 import { corpusOf } from "../src/corpus";
 import { runWorld } from "../src/run";
 

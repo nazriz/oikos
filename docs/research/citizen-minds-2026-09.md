@@ -46,7 +46,7 @@ followed Naz's question, "is there more we can do?"
     - the scores are compiled offline into lookup tables that run at 0.54 µs a decision, for 196,608 residents validated against census data.
     - Its gaps: the compilation's fidelity isn't validated, and novel situations get a hard-coded fallback. It never asks the teacher again.
 - **Civilisation-scale demos.** [Project Sid](https://arxiv.org/pdf/2411.00114) runs 10–1,000+ agents with concurrent cognitive modules and one bottleneck decision. Its agents developed roles and changed collective rules, *and transmitted culture and religion*.
-- **Different design choices from ours.** [Concordia](https://github.com/google-deepmind/concordia) (DeepMind) has a model "game master" adjudicate the world. Terrarium deliberately doesn't: the kernel is physics, and no model adjudicates.
+- **Different design choices from ours.** [Concordia](https://github.com/google-deepmind/concordia) (DeepMind) has a model "game master" adjudicate the world. Oikos deliberately doesn't: the kernel is physics, and no model adjudicates.
 
 ### From an expensive mind to a cheap one
 
@@ -59,7 +59,7 @@ followed Naz's question, "is there more we can do?"
 ### Learning new rules and institutions
 
 - **Inferring norms by watching** ([Savarimuthu et al.](https://www.jasss.org/13/4/3.html); a [review](https://pmc.ncbi.nlm.nih.gov/articles/PMC12979424/)) works when norms are broken and punished. It's hard when people mostly comply.
-  - Our advantage: a construct in Terrarium is a *record*: an offer, a practice, a law in institutional grammar. So citizens needn't infer its shape; they can read it, if they come to know of it.
+  - Our advantage: a construct in Oikos is a *record*: an offer, a practice, a law in institutional grammar. So citizens needn't infer its shape; they can read it, if they come to know of it.
 - **Model agents learn rules from context** and norms emerge among them ([social learning and norms](https://arxiv.org/abs/2510.14401)). But an institution's *structure* strongly shapes outcomes ([When Agents Evolve, Institutions Follow](https://arxiv.org/abs/2604.27691): 57-point gaps between designs).
 
 ### Religion in agent-based models

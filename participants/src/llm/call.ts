@@ -20,7 +20,7 @@ export class SpendingLimitReached extends Error {
 }
 
 /** A provider's usage limit reached (a subscription's, per few hours): no call can be made for a while. The run stops as
- * it does at a spending limit, cleanly and saying why, to be resumed later (`terrarium resume <log>`): every answer
+ * it does at a spending limit, cleanly and saying why, to be resumed later (`oikos resume <log>`): every answer
  * up to the stop is served from its log. */
 export class UsageLimitReached extends SpendingLimitReached {
   override name = "UsageLimitReached";

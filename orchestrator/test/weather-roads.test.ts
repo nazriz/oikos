@@ -7,10 +7,10 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
-import { drawWeather } from "@terrarium/worlds/generator/weather";
-import { loadProfile } from "@terrarium/worlds/generator/profile";
-import { Randomness } from "@terrarium/participants";
+import { generate } from "@oikos/worlds/generator/generate";
+import { drawWeather } from "@oikos/worlds/generator/weather";
+import { loadProfile } from "@oikos/worlds/generator/profile";
+import { Randomness } from "@oikos/participants";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");

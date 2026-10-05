@@ -27,9 +27,9 @@
 Two batches of `worlds/town-1000.yaml` (1,000 citizens, 875 homes, 840 jobs, two years, five seeds each):
 
 ```bash
-terrarium run worlds/town-1000.yaml --seeds 5 --out runs/m3-control
-terrarium run worlds/town-1000.yaml --seeds 5 --set mayor=llm --out runs/m3-llm-mayor
-terrarium measure runs/m3-control town/economy town/word-of-mouth refusals
+oikos run worlds/town-1000.yaml --seeds 5 --out runs/m3-control
+oikos run worlds/town-1000.yaml --seeds 5 --set mayor=llm --out runs/m3-llm-mayor
+oikos measure runs/m3-control town/economy town/word-of-mouth refusals
 ```
 
 - **The control batch** is all code, including a code mayor.
@@ -48,11 +48,11 @@ Every figure below comes from the measurement tables (docs/measurement.md), and 
 | Role-limited perception channels | Done, and extended: changes (D42), attention (D43), position (D44) | contracts v0.3 |
 | Configurable framing, recorded in the run config | Done, with disclosure, reason and debrief | world config `framing` |
 | Opt-out: the mayor can decline or resign, recorded | Done: decline a draft, opt out (with an optional stand-in), or step down as an act in the world | D36, VISION §15 |
-| Batch runs across seeds, with results | Done (D46) | `terrarium run --seeds`, `measure/` |
+| Batch runs across seeds, with results | Done (D46) | `oikos run --seeds`, `measure/` |
 
 | V0.md, definition of done | Status |
 |---|---|
-| 1. `terrarium run … --seeds 5`: multi-year towns with an LLM mayor (and an LLM developer), headless, with a cost report | Done on the mock. The developer is Stage 4. |
+| 1. `oikos run … --seeds 5`: multi-year towns with an LLM mayor (and an LLM developer), headless, with a cost report | Done on the mock. The developer is Stage 4. |
 | 2. Replay is byte-identical and the hash chain verifies | Done: every test run, and a full-size 723,227-entry log in 34 s |
 | 3. The renderer | Stage 3 |
 | 4. All invariant tests pass | Yes. Kernel (physics oracle, money conservation, replay, perception, attention, position, statements have no power), contracts (111), TypeScript (163). |

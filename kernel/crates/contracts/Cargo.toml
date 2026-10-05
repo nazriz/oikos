@@ -1,13 +1,13 @@
 [package]
-name = "terrarium-contracts"
+name = "oikos-contracts"
 version = "0.7.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "Terrarium's contract types (blocks, records, world config, events) and the compiled schemas"
+description = "Oikos's contract types (blocks, records, world config, events) and the compiled schemas"
 rust-version = "1.85"
 
 [dependencies]
-terrarium-core = { path = "../core" }
+oikos-core = { path = "../core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 jsonschema = { workspace = true }

@@ -1,4 +1,4 @@
-{ "dataset": "terrarium-run-dataset", "version": "0.1.0", "run": "town.seed1", "world": { "name": "Millbrook", "seed": 1 },
+{ "dataset": "oikos-run-dataset", "version": "0.1.0", "run": "town.seed1", "world": { "name": "Millbrook", "seed": 1 },
   "config_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "initial_state_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "log": { "file": "town.seed1.jsonl", "entries": 1000, "last_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
   "versions": { "contracts": "0.8", "kernel": { "version": "0.5.0" }, "orchestrator": "0.7.0" }, "seats": { "models": {} },
   "end": { "t": 86400, "reason": "completed" }, "files": { "decisions.jsonl": { "rows": 0, "synthetic": 0 } } }

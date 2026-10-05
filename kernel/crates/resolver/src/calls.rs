@@ -302,13 +302,13 @@ fn value_text(v: &Value) -> String {
     match v {
         Value::Id(x) | Value::Var(x) => x.clone(),
         Value::Text(t) => quote(t),
-        Value::Json(j) => String::from_utf8(terrarium_canonical(j)).unwrap_or_default(),
+        Value::Json(j) => String::from_utf8(oikos_canonical(j)).unwrap_or_default(),
         Value::Call(c) => call_text(c),
     }
 }
 
 /// Canonical JSON (keys sorted), as the call language writes data.
-fn terrarium_canonical(v: &Json) -> Vec<u8> {
+fn oikos_canonical(v: &Json) -> Vec<u8> {
     fn w(v: &Json, out: &mut String) {
         match v {
             Json::Object(m) => {

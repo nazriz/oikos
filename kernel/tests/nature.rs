@@ -7,10 +7,10 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
-use terrarium_kernel::events::{EventBody, RefusalCode};
-use terrarium_kernel::observe::ChannelData;
-use terrarium_kernel::run::Run;
-use terrarium_kernel::Command;
+use oikos_kernel::events::{EventBody, RefusalCode};
+use oikos_kernel::observe::ChannelData;
+use oikos_kernel::run::Run;
+use oikos_kernel::Command;
 
 const DAY: i64 = 86_400;
 

@@ -1,4 +1,4 @@
-# `citizen.default` (v0.34.0): the AI citizen in code
+# `citizen.default` (v0.35.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -147,4 +147,4 @@ Unless a source is named above, a figure is a placeholder, to calibrate.
 - The other social moves: help, snub, gossip, reputation.
 - Goals with sub-goals; learning which methods work.
 - Memory that compresses and forgets, and misremembering.
-- The sparse mind on a real model: its robustness audit (`terrarium consult-audit`) is built and tested on the mock, not yet run on one.
+- The sparse mind on a real model: its robustness audit (`oikos consult-audit`) is built and tested on the mock, not yet run on one.

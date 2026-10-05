@@ -1,5 +1,5 @@
 # The generated town at Stage 2's scale: the same as town.yaml, five times over.
-# `terrarium run worlds/town-1000.yaml --seeds 5` (add `--set mayor=llm` for the language-model mayor)
+# `oikos run worlds/town-1000.yaml --seeds 5` (add `--set mayor=llm` for the language-model mayor)
 generate: town
 name: Millbrook
 seed: 1

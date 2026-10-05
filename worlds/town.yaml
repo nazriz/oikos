@@ -1,5 +1,5 @@
 # A small generated town (M1): the all-code control world.
-# `terrarium run worlds/town.yaml --seeds 5`
+# `oikos run worlds/town.yaml --seeds 5`
 generate: town
 name: Millbrook
 seed: 1

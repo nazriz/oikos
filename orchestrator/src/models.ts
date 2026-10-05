@@ -6,7 +6,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { AnthropicAdapter, CodexCliAdapter, OpenAICompatibleAdapter, type Budget, type LlmAdapter, type Price } from "@terrarium/participants/llm";
+import { AnthropicAdapter, CodexCliAdapter, OpenAICompatibleAdapter, type Budget, type LlmAdapter, type Price } from "@oikos/participants/llm";
 
 /** Providers whose calls cost nothing per call: local models (your compute), and the Codex CLI on a ChatGPT subscription (flat rate; its usage limits apply). */
 export const LOCAL_PROVIDERS = ["ollama", "local", "codex"];

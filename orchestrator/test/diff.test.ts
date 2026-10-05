@@ -4,14 +4,14 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { diff, exportLogs, health } from "@terrarium/measure";
+import { diff, exportLogs, health } from "@oikos/measure";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 
 test("the diff finds nothing between a batch and itself, and lists every measure it compared", async () => {
-  const { generate } = await import("@terrarium/worlds/generator/generate");
+  const { generate } = await import("@oikos/worlds/generator/generate");
   const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
   const out = join(root, "runs", "test-diff");
   rmSync(out, { recursive: true, force: true });

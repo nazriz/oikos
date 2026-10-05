@@ -24,7 +24,7 @@ A procedurally generated town runs headless for 1–2 simulated years:
 
 | Piece | What it does |
 |---|---|
-| `orchestrator/` (Bun) | Runs the kernel as a subprocess (NDJSON). Schedules seats PettingZoo-AEC style: whose wake time or news comes first on the world clock. Binds seat identity. Implements `wait`, the thinking-time dial and max actions per wake. Records usage and cost. Provides `terrarium run` / `terrarium replay`, batch runs across seeds, and a cost report. |
+| `orchestrator/` (Bun) | Runs the kernel as a subprocess (NDJSON). Schedules seats PettingZoo-AEC style: whose wake time or news comes first on the world clock. Binds seat identity. Implements `wait`, the thinking-time dial and max actions per wake. Records usage and cost. Provides `oikos run` / `oikos replay`, batch runs across seeds, and a cost report. |
 | `seats/` (Bun) | The seat runtime and **behaviour-module interface** (observation in, SeatAction out); **deterministic randomness** (the kernel's keyed streams, ported and checked against the Rust vectors); the **CEL law helper** (`formal` conditions, D27); **LLM adapters**: one frontier API (Anthropic) and one open-weight model through an OpenAI-compatible endpoint (V0.md requires both) |
 | `translator/` (Bun) | Plain language → blocks → draft. The draft includes the kernel's dry-run check, CEL-based "this looks unlawful" warnings, and a **deterministic English re-rendering** of the blocks for sign-off (so the translator's own summary can't mislead). Also translation-failure logging, and a versioned prompt with its hash. |
 | Kernel additions | A `wake_hints` protocol op (which seats have new messages or records), so the scheduler knows whom to wake. Transport only, not a contract. |
@@ -56,7 +56,7 @@ Each module's doc gives: the rule in plain words; its source; its parameters and
 
 1. **M1: an all-code town, running.** Orchestrator, seat runtime, deterministic randomness, the generator, the example legal code, and first versions of every behaviour module. **No LLM.** This is also VISION's all-code control group, the baseline every AI experiment is compared against. It costs nothing to run.
 2. **M2: the LLM mayor.** Adapters (Anthropic plus open-weight), observation → prompt rendering, the translator and sign-off loop, framing, resignation, debrief, usage and cost annotations. *Built against the mock adapter (D34, docs/design/m2-llm-participants.md); real adapters deferred.*
-3. **M3: batches and the cost report.** `terrarium run worlds/town.yaml --seeds 5`. Then run 1–2 simulated years across seeds. *Built (D46): batches in parallel, DuckDB-over-Parquet measurement and the cost report; five-seed, two-year, 1,000-citizen batches run in about 2 minutes (docs/measurement.md).*
+3. **M3: batches and the cost report.** `oikos run worlds/town.yaml --seeds 5`. Then run 1–2 simulated years across seeds. *Built (D46): batches in parallel, DuckDB-over-Parquet measurement and the cost report; five-seed, two-year, 1,000-citizen batches run in about 2 minutes (docs/measurement.md).*
 4. **Checkpoint with Naz.** V0.md's questions, plus two new ones: did the mayor manage to govern *through* institutions? Did institutions behave plausibly (follow, bend or ignore procedure)? And revise contracts before Stages 3–4.
 
 Work stays designed-not-built (D24), so institutions act without time cost in Stage 2.

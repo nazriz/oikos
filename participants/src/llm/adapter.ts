@@ -3,7 +3,7 @@
 // onto it). Participants, the translator and debriefs all call models through this,
 // so swapping a provider, or the mock, changes nothing else.
 //
-// The mock adapter is how Terrarium is built and tested before any real model
+// The mock adapter is how Oikos is built and tested before any real model
 // is called (docs/design/m2-llm-participants.md). It is deterministic, costs nothing,
 // and answers through a policy function that may read the request's structured
 // `context`, which real adapters ignore: a mock can't read prose, so it is

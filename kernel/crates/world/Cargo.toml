@@ -1,5 +1,5 @@
 [package]
-name = "terrarium-world"
+name = "oikos-world"
 version = "0.7.0"
 edition = "2021"
 license = "Apache-2.0"
@@ -7,11 +7,11 @@ description = "The world: its state, physics and records. The only writer (docs/
 rust-version = "1.85"
 
 [dependencies]
-terrarium-core = { path = "../core" }
-terrarium-contracts = { path = "../contracts" }
-terrarium-terms = { path = "../terms" }
-terrarium-time = { path = "../time" }
-terrarium-nature = { path = "../nature" }
+oikos-core = { path = "../core" }
+oikos-contracts = { path = "../contracts" }
+oikos-terms = { path = "../terms" }
+oikos-time = { path = "../time" }
+oikos-nature = { path = "../nature" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

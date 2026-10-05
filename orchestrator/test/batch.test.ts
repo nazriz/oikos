@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { query, runQuery } from "@terrarium/measure";
+import { query, runQuery } from "@oikos/measure";
 import { recipeArgs, runBatch, runOne, setPath } from "../src/batch";
 import { costReport } from "../src/cost";
 import { kernelBinary } from "../src/kernel";

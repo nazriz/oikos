@@ -3,7 +3,7 @@
 // UTF-16 order, and the kernel's string escaping. Used for draft hashes,
 // which the proposer signs. Tested against lines the kernel wrote.
 
-export const DOMAIN_DRAFT = "terrarium.draft.v1\n";
+export const DOMAIN_DRAFT = "oikos.draft.v1\n";
 
 function writeString(s: string): string {
   let out = '"';

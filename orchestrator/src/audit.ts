@@ -1,14 +1,14 @@
 // The sparse mind's robustness audit (docs/design/ai-citizens.md 4): before its answers are used with a real model,
 // check that they don't hang on how the question is worded or how the person is binned, and that a kind's remembered
 // answer stands for the other people of that kind. Answers that swing are reported, and a run can be told not to use
-// them (`terrarium run ... --consult --consult-avoid <report.json>`).
+// them (`oikos run ... --consult --consult-avoid <report.json>`).
 //
 // The questions are a world's own: the things its citizens ask about (CONSULT_THINGS: joining its union, founding its
 // kinds of venture), and people drawn from its profile's values, with needs and means varied, money in units of the
 // world's own essentials. Every call is recorded (usage and transcript) beside the report: model answers are data.
 
-import { CONSULT_THINGS, drawPerson, NEEDS, Randomness, type ConsultQuestion, type PopulationValues } from "@terrarium/participants";
-import { askOnce, kindOf, WORDINGS, type Budget, type LlmAdapter, type LlmIO, type Price } from "@terrarium/participants/llm";
+import { CONSULT_THINGS, drawPerson, NEEDS, Randomness, type ConsultQuestion, type PopulationValues } from "@oikos/participants";
+import { askOnce, kindOf, WORDINGS, type Budget, type LlmAdapter, type LlmIO, type Price } from "@oikos/participants/llm";
 
 export const AUDIT_VERSION = "0.1.0";
 

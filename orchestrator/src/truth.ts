@@ -3,7 +3,7 @@
 // (the log's `audit` annotation), never acted on. It catches stale private copies of the world: a register that
 // missed a change, an end worked out by hand.
 
-import type { Belief } from "@terrarium/participants";
+import type { Belief } from "@oikos/participants";
 import type { Kernel } from "./kernel";
 
 export interface Divergence { belief: Belief; expected: unknown; found: unknown }

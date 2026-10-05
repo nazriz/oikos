@@ -9,8 +9,8 @@
 
 import { closeSync, existsSync, openSync, readSync, renameSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { canonical } from "@terrarium/participants";
-import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "@terrarium/participants/llm";
+import { canonical } from "@oikos/participants";
+import type { ContentBlock, LlmAdapter, LlmRequest, LlmResponse } from "@oikos/participants/llm";
 
 interface Recorded {
   systemSha256: string;

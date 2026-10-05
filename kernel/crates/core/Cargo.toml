@@ -1,9 +1,9 @@
 [package]
-name = "terrarium-core"
+name = "oikos-core"
 version = "0.7.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "Terrarium's shared core: canonical JSON and hashing, money, keyed randomness"
+description = "Oikos's shared core: canonical JSON and hashing, money, keyed randomness"
 rust-version = "1.85"
 
 [dependencies]

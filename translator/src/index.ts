@@ -12,8 +12,8 @@
 //
 // The model is anything behind an LlmAdapter: the mock during development.
 
-import { calls, canonical, DOMAIN_DRAFT, evaluate, hashWithDomain, standingClaims, type Block } from "@terrarium/participants";
-import { callModel, refusalText, type LlmIO, type LlmMessage, type ToolSpec } from "@terrarium/participants/llm";
+import { calls, canonical, DOMAIN_DRAFT, evaluate, hashWithDomain, standingClaims, type Block } from "@oikos/participants";
+import { callModel, refusalText, type LlmIO, type LlmMessage, type ToolSpec } from "@oikos/participants/llm";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Knowledge } from "./knowledge";

@@ -34,9 +34,9 @@ fn validator(reference: &str) -> jsonschema::Validator {
 pub fn contracts() -> &'static Contracts {
     static C: OnceLock<Contracts> = OnceLock::new();
     C.get_or_init(|| Contracts {
-        config: validator("urn:terrarium:contracts:0.8:world-config"),
-        command: validator("urn:terrarium:contracts:0.8:log#/$defs/Command"),
-        annotation: validator("urn:terrarium:contracts:0.8:log#/$defs/Annotation"),
+        config: validator("urn:oikos:contracts:0.8:world-config"),
+        command: validator("urn:oikos:contracts:0.8:log#/$defs/Command"),
+        annotation: validator("urn:oikos:contracts:0.8:log#/$defs/Annotation"),
     })
 }
 

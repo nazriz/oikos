@@ -1,18 +1,18 @@
 {
-  "name": "@terrarium/orchestrator",
+  "name": "@oikos/orchestrator",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
   "description": "Runs worlds: drives the kernel, schedules seats on the world clock, records usage and cost, batch runs.",
   "bin": {
-    "terrarium": "./src/cli.ts"
+    "oikos": "./src/cli.ts"
   },
   "dependencies": {
-    "@terrarium/participants": "workspace:*",
-    "@terrarium/worlds": "workspace:*",
-    "@terrarium/translator": "workspace:*",
-    "@terrarium/measure": "workspace:*"
+    "@oikos/participants": "workspace:*",
+    "@oikos/worlds": "workspace:*",
+    "@oikos/translator": "workspace:*",
+    "@oikos/measure": "workspace:*"
   },
   "devDependencies": {
     "ajv": "^8.17.1"

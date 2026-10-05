@@ -1,4 +1,4 @@
-# terrarium-kernel (v0.2)
+# oikos-kernel (v0.2)
 
 **Physics, plus a place to keep records.** The kernel refuses only what is physically impossible. Laws, ownership, permits, agreements, procedures, debts and votes are records it stores with their authors and never judges. When a law is enforced or a payment made, it's because some seat chose to act (D18–D22).
 

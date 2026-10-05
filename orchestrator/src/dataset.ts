@@ -177,7 +177,7 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
 
   const config = header?.config ?? {};
   const manifest = {
-    dataset: "terrarium-run-dataset",
+    dataset: "oikos-run-dataset",
     version: DATASET_VERSION,
     run: run(),
     world: { name: config.meta?.name ?? run(), ...(config.meta?.description ? { description: config.meta.description } : {}), ...(Number.isInteger(config.seed) ? { seed: config.seed } : {}) },

@@ -12,7 +12,7 @@ const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
 
 async function measure(name: string, perturb?: { extraWakesBps: number; seed: number }) {
-  const { generate } = await import("@terrarium/worlds/generator/generate");
+  const { generate } = await import("@oikos/worlds/generator/generate");
   const out = join(root, "runs", `test-invariance-${name}`);
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config: generate({ ...spec, citizens: 200 }), runId: name, outDir: out, until: 120 * DAY, perturb });

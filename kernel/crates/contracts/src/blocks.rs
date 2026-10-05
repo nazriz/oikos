@@ -22,8 +22,8 @@ pub enum Block {
     Transfer {
         from: IdOrRef,
         to: IdOrRef,
-        #[serde(with = "terrarium_core::money::amount")]
-        amount: terrarium_core::money::Money,
+        #[serde(with = "oikos_core::money::amount")]
+        amount: oikos_core::money::Money,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         settles: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -35,8 +35,8 @@ pub enum Block {
     /// delivery, a handover, a shipment out of the world to an edge). Phase B.
     MoveGoods {
         kind: Id,
-        #[serde(with = "terrarium_core::money::amount")]
-        quantity: terrarium_core::money::Money,
+        #[serde(with = "oikos_core::money::amount")]
+        quantity: oikos_core::money::Money,
         /// Where the goods are now (a structure, or for an edge, itself).
         from_at: IdOrRef,
         to: IdOrRef,
@@ -46,8 +46,8 @@ pub enum Block {
     /// Taking goods another holds at a structure where the taker is, without their consent (world-expansion 7.3).
     Take {
         kind: Id,
-        #[serde(with = "terrarium_core::money::amount")]
-        quantity: terrarium_core::money::Money,
+        #[serde(with = "oikos_core::money::amount")]
+        quantity: oikos_core::money::Money,
         from: IdOrRef,
         at: IdOrRef,
     },
@@ -120,8 +120,8 @@ pub enum Block {
         born_at: Option<i64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         template: Option<Id>,
-        #[serde(default, with = "terrarium_core::money::opt_amount", skip_serializing_if = "Option::is_none")]
-        carrying: Option<terrarium_core::money::Money>,
+        #[serde(default, with = "oikos_core::money::opt_amount", skip_serializing_if = "Option::is_none")]
+        carrying: Option<oikos_core::money::Money>,
         /// A newcomer's biological sex, where the world models it.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         sex: Option<crate::vocab::Sex>,

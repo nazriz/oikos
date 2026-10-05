@@ -4,8 +4,8 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
-import { PROFILE_DIR, type Profile } from "@terrarium/worlds/generator/profile";
+import { generate } from "@oikos/worlds/generator/generate";
+import { PROFILE_DIR, type Profile } from "@oikos/worlds/generator/profile";
 
 const root = join(import.meta.dir, "../..");
 

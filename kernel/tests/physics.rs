@@ -7,11 +7,11 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
-use terrarium_kernel::blocks::RecordBody;
-use terrarium_kernel::events::{EventBody, RefusalCode, VacateReason};
-use terrarium_kernel::observe::ChannelData;
-use terrarium_kernel::run::{Response, Run};
-use terrarium_kernel::Command;
+use oikos_kernel::blocks::RecordBody;
+use oikos_kernel::events::{EventBody, RefusalCode, VacateReason};
+use oikos_kernel::observe::ChannelData;
+use oikos_kernel::run::{Response, Run};
+use oikos_kernel::Command;
 
 const DAY: i64 = 86_400;
 
@@ -135,7 +135,7 @@ fn the_river_scenario_an_illegal_building_goes_up_because_physics_allows_it() {
     // The inspector patrols the river every 14 days. Their first observation was at t=0...
     let first = run.command(&Command::Observe { participant: "inspector-system".into(), only: None }).unwrap().observation.unwrap();
     // A look delivers what changed since the last look through the channel; a channel that isn't due is absent.
-    let saw = |o: &terrarium_kernel::observe::Observation| match o.channels.get("inspector/river-patrol") {
+    let saw = |o: &oikos_kernel::observe::Observation| match o.channels.get("inspector/river-patrol") {
         Some(ChannelData::Sites { cells, .. }) => cells.iter().find(|p| p.cell == "cell.2.1").is_some_and(|p| p.structure.is_some()),
         None => false,
         _ => unreachable!(),
@@ -283,7 +283,7 @@ fn visibility_decides_who_perceives_what() {
     let rec = &run.kernel().state().records[&vote].record;
     assert_eq!(
         rec.visible_to,
-        terrarium_kernel::blocks::Visibility::only(["alice".to_string(), "city".to_string()]),
+        oikos_kernel::blocks::Visibility::only(["alice".to_string(), "city".to_string()]),
         "voter and the ballot's runner"
     );
     assert!(sees(&mut run, "alice-self", &vote));

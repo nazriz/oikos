@@ -1,5 +1,5 @@
 [package]
-name = "terrarium-napi"
+name = "oikos-napi"
 version = "0.7.0"
 edition = "2021"
 license = "Apache-2.0"
@@ -10,7 +10,7 @@ rust-version = "1.85"
 crate-type = ["cdylib"]
 
 [dependencies]
-terrarium-kernel = { path = "../.." }
+oikos-kernel = { path = "../.." }
 napi = { version = "3", default-features = false, features = ["napi4"] }
 napi-derive = "3"
 mimalloc = { version = "0.1", default-features = false }

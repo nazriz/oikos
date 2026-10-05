@@ -19,12 +19,12 @@ pub struct Statics {
     pub currency: String,
     pub tick: i64,
     /// How long each act takes its actor (the world's `orchestration.act_time`).
-    pub act_times: terrarium_time::ActTimes,
+    pub act_times: oikos_time::ActTimes,
     /// The detailed places' areas: where cells exist (D58).
     pub detailed: Vec<crate::config::PlaceRect>,
     pub randomness: Randomness,
     /// Nature's ground (its cells, neighbours and flow layer), when the world has nature.
-    pub nature: Option<terrarium_nature::Ground>,
+    pub nature: Option<oikos_nature::Ground>,
 }
 
 impl Statics {

@@ -77,7 +77,7 @@ It's facts only, with no stated truth and no power. Whether anyone believes it i
 | B12 | **Checkpoint snapshots** | log: checkpoint entries | World state plus scheduler state plus each code module's serialised state; resume from the latest |
 | B13 | **Compact logs** | log: header options | As docs/design/compact-logs.md proposes: `chain: "hash"`, `events: "derived"`, `call_text: "models"` |
 | B14 | **A `consult` purpose** | log: `usage.purpose` | Separates citizens' consultations of the sparse mind from seats' own model calls |
-| B15 | **Version** | all | URNs to `urn:terrarium:contracts:0.7:…`; the kernel refuses other versions; pre-0.7 logs replay with the tagged v0 binary |
+| B15 | **Version** | all | URNs to `urn:oikos:contracts:0.7:…`; the kernel refuses other versions; pre-0.7 logs replay with the tagged v0 binary |
 
 **Recommend yes to all.**
 

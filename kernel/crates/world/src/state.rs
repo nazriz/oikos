@@ -72,7 +72,7 @@ pub struct State {
     /// Nature (docs/design/world-expansion.md 2): fields, populations, extinctions, covers' succession. Changed once a
     /// day, so kept behind an `Arc`: an action's copy of the state shares it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nature: Option<Arc<terrarium_nature::NatureState>>,
+    pub nature: Option<Arc<oikos_nature::NatureState>>,
     /// The world's totals (catalogue `counters`: greenhouse gas), as work adds to them.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub totals: BTreeMap<Id, i64>,
@@ -307,17 +307,17 @@ fn is_zero_i64(x: &i64) -> bool {
 /// An agreement's signatures and notices (State::marks).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AgreementMarks {
-    pub signatures: Vec<terrarium_terms::Mark>,
-    pub notices: Vec<terrarium_terms::Mark>,
+    pub signatures: Vec<oikos_terms::Mark>,
+    pub notices: Vec<oikos_terms::Mark>,
 }
 
 impl State {
     /// The reading of an agreement by its terms, now (docs/design/rebuild.md section 7), if it's an agreement.
-    pub fn reading(&self, agreement: &str) -> Option<terrarium_terms::Reading> {
+    pub fn reading(&self, agreement: &str) -> Option<oikos_terms::Reading> {
         let stored = self.records.get(agreement)?;
         let crate::blocks::RecordBody::Agreement { terms } = &stored.record.body else { return None };
         let m = self.marks.get(agreement).cloned().unwrap_or_default();
-        Some(terrarium_terms::read(terms, &m.signatures, &m.notices, self.t))
+        Some(oikos_terms::read(terms, &m.signatures, &m.notices, self.t))
     }
 }
 
@@ -618,11 +618,11 @@ impl State {
             }
             crate::blocks::RecordBody::Signature { agreement, party } => {
                 let m = self.marks.entry(agreement.clone()).or_default();
-                m.signatures.push(terrarium_terms::Mark { party: party.clone(), at: record.at });
+                m.signatures.push(oikos_terms::Mark { party: party.clone(), at: record.at });
             }
             crate::blocks::RecordBody::Notice { agreement, party, .. } => {
                 let m = self.marks.entry(agreement.clone()).or_default();
-                m.notices.push(terrarium_terms::Mark { party: party.clone(), at: record.at });
+                m.notices.push(oikos_terms::Mark { party: party.clone(), at: record.at });
             }
             _ => {}
         }

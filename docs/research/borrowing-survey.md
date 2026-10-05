@@ -1,6 +1,6 @@
 # What to borrow: a survey of existing models
 
-*2026-09-25. Purpose: before redesigning contracts v0.2 around D18–D21 (the kernel is physics; laws have no power of their own; institutions are entities doing work; work is real), find established models to borrow from rather than invent. For each area: what we need, what exists, what we'd borrow, and where it sits in Terrarium's layers (physics / generic mechanism / construct as data).*
+*2026-09-25. Purpose: before redesigning contracts v0.2 around D18–D21 (the kernel is physics; laws have no power of their own; institutions are entities doing work; work is real), find established models to borrow from rather than invent. For each area: what we need, what exists, what we'd borrow, and where it sits in Oikos's layers (physics / generic mechanism / construct as data).*
 
 **What we borrow is models and published rules, not code.** Most of this work is written in Python, Java or NetLogo, and our kernel and seats are Rust and TypeScript. Where an implementation is open source (the housing model, JMAB), we'll read its source for the exact rules, and cite it.
 
@@ -50,7 +50,7 @@ Both show that the *computational* parts of law (how much tax is owed, who is el
 
 Hohfeld showed that "a right" is really one of four positions, each with a correlative:
 
-| Holder has | The other side has | Example in Terrarium |
+| Holder has | The other side has | Example in Oikos |
 |---|---|---|
 | **claim-right** | duty | a landlord's right to rent (the tenant's duty to pay); the city's right to tax owed |
 | **liberty** | no-right | a building permit (you are free to build; the council has no right to stop you) |
@@ -175,13 +175,13 @@ A microsimulation of urban development at the level of every parcel, household a
 
 ## 6. Precedent from LLM agent societies
 
-**Project Sid** (Altera, arXiv 2411.00114, 2024) ran 10–1,000+ LLM agents, including a taxation and constitutional-amendment experiment: a 20% tax, influencers for and against it, agents voting on amendments, and agents' tax contributions changing after the vote. Useful precedent that LLM agents respond to law and persuasion. Notably, amendments were drafted by a central "election manager" agent, a centralised shortcut Terrarium would model as a role within an institution.
+**Project Sid** (Altera, arXiv 2411.00114, 2024) ran 10–1,000+ LLM agents, including a taxation and constitutional-amendment experiment: a 20% tax, influencers for and against it, agents voting on amendments, and agents' tax contributions changing after the vote. Useful precedent that LLM agents respond to law and persuasion. Notably, amendments were drafted by a central "election manager" agent, a centralised shortcut Oikos would model as a role within an institution.
 
 ---
 
 ## What this means for the v0.2 design
 
-| Terrarium concept | Borrowed from | Layer |
+| Oikos concept | Borrowed from | Layer |
 |---|---|---|
 | Laws, procedures, norms as records (text + ADICO + optional CEL) | Institutional Grammar 2.0 | construct (data) |
 | Computable parts of law, used by code institutions | Rules as Code (OpenFisca, Catala) | construct (data) + code seats |

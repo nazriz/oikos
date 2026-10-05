@@ -8,8 +8,8 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { canonical, slice } from "@terrarium/participants";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { canonical, slice } from "@oikos/participants";
+import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");

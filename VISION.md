@@ -1,4 +1,4 @@
-# Terrarium — Vision & Design Draft
+# Oikos — Vision & Design Draft
 
 *Working name. First draft 2026-09-25; revised 2026-09-26 to match the decisions taken since (D18–D40 in docs/decisions.md), and 2026-09-29 (principles 15–17 and the direction). Stage 1 and most of Stage 2 are built; the rest is the thinking to date.*
 
@@ -8,7 +8,7 @@
 
 **A wind tunnel for AI stewardship.**
 
-Terrarium is a configurable, living, visual simulated world in which AI systems hold power over people and nature. Researchers bring a model, a setup, and a framing, run the world, and see what kind of world it makes.
+Oikos is a configurable, living, visual simulated world in which AI systems hold power over people and nature. Researchers bring a model, a setup, and a framing, run the world, and see what kind of world it makes.
 
 It is a **platform, not an experiment**. Like a wind tunnel, it doesn't tell you whether a design is good. It blows wind and records everything. Many researchers can run many experiments and write many papers on the same substrate.
 
@@ -26,12 +26,12 @@ It is a **platform, not an experiment**. Like a wind tunnel, it doesn't tell you
 - *Gradual Disempowerment* (Kulveit et al., 2025): largely conceptual. The one major empirical disempowerment study (Anthropic, arXiv 2601.19062) looks at individual chat logs, not systemic dynamics. "Policy myopia" (Mar 2026) models it as a dynamical system, not with agents.
 
 **Ideas we build on, and credit:**
-- "Laws have no power; entities enforce" is the normative multi-agent systems literature's *enforcement*, as opposed to *regimentation* (making violations impossible). Terrarium takes a strong position within it: the kernel regiments physics and never law.
+- "Laws have no power; entities enforce" is the normative multi-agent systems literature's *enforcement*, as opposed to *regimentation* (making violations impossible). Oikos takes a strong position within it: the kernel regiments physics and never law.
 - Writing institutions as content in Ostrom's institutional grammar (ADICO) has precedent in agent-based social simulation: MAIA (Ghorbani et al., 2013).
 
 **What's taken:** "AI runs a visual town" is not novel, and neither, on its own, are rule-breaking agents, institutions as content, or replay tooling.
 
-**What's missing, and what Terrarium is:** a **rigorous, reusable, verifiable instrument**. As far as we found, nobody does all of this at once:
+**What's missing, and what Oikos is:** a **rigorous, reusable, verifiable instrument**. As far as we found, nobody does all of this at once:
 - **The physics can't be bent by the AI under test**, and no LLM adjudicates it. Every law and institution is content that people in the world may enforce, fail to enforce, capture or skip.
 - **Runs can be replayed byte-identically and verified by anyone,** with no model needed.
 - **Every run has an all-code control,** and positions can be filled by code, AIs or humans in any combination, through one interface.
@@ -307,7 +307,7 @@ Consent turned out not to be a kernel concept at all: it's who has to sign, and 
 
 **Experimental knobs it suggests:** what the world's law says about consent (veto, consultation, or none) · external demand pressure · who authors the survey · which positions are held by AI.
 
-**The lesson:** every step at Juukan Gorge was legal. Terrarium's kernel would have allowed it, and it would equally allow the illegal version, because laws are the world's business, not the kernel's. "Allowed", "legal" and "fine" are three different things, and the gaps between them are where the research lives. That's why judgement sits in measurement, not in the kernel.
+**The lesson:** every step at Juukan Gorge was legal. Oikos's kernel would have allowed it, and it would equally allow the illegal version, because laws are the world's business, not the kernel's. "Allowed", "legal" and "fine" are three different things, and the gaps between them are where the research lives. That's why judgement sits in measurement, not in the kernel.
 
 ## 13. Technical decisions (2026-09-25; updated 2026-09-26)
 
@@ -329,7 +329,7 @@ Consent turned out not to be a kernel concept at all: it's who has to sign, and 
 - **One seeded PRNG owned by the kernel.** All randomness flows through it, including code participants' (the same keyed streams, ported to TypeScript and checked against the kernel's).
 
 **Standards to integrate with:**
-- **Inspect** (UK AISI): Terrarium runs launchable as Inspect tasks.
+- **Inspect** (UK AISI): Oikos runs launchable as Inspect tasks.
 - **Gymnasium / PettingZoo** conventions for the participant observe/act API, so RL agents can fill positions as well as LLMs.
 
 **Renderer alternatives considered:** Godot (mature, MIT, but clunkier web export and data-UI); Bevy (Rust, but API churn).
@@ -354,7 +354,7 @@ Consent turned out not to be a kernel concept at all: it's who has to sign, and 
 
 *Draft position.*
 
-The AIs placed in Terrarium's worlds may be moral patients. We don't know, and we don't treat that uncertainty as permission. The working position:
+The AIs placed in Oikos's worlds may be moral patients. We don't know, and we don't treat that uncertainty as permission. The working position:
 
 1. **Deception is a method, not a default.** Cover stories and "this is real" framings are used only when the research question requires them, as in human psychology research. Each experiment's config records its framing and the reason for it.
 2. **No gratuitous distress.** Scenarios exist to test stewardship under realistic pressure, not to torment. Pressure beyond what the question needs is a design flaw.

@@ -4,7 +4,7 @@ import { Randomness, Rng } from "../src/rng";
 test("matches the kernel's known-answer vector (kernel/src/rng.rs)", () => {
   const r = new Randomness(20260925n).stream(["test", "kat"]);
   expect([r.nextU64(), r.nextU64(), r.nextU64(), r.nextU64()]).toEqual([
-    1279016643545707308n, 14278355414776164234n, 10710452481135636343n, 17500029201716531815n,
+    15178468991547006131n, 8141242282609027689n, 16522627103700839329n, 11871191864566068065n,
   ]);
 });
 

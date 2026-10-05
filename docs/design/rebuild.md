@@ -1,7 +1,7 @@
 # The rebuild: an architecture that finds its own moles
 
 **Status:** agreed, 2026-09-30. The time model (section 6) and contracts 0.7 (docs/design/contracts-0.7.md) are signed off by Naz; the other decisions in section 15 are engineering calls within his principles, recorded in docs/decisions.md, open to his overruling.
-**Diagram:** [Terrarium Architecture](https://claude.ai/artifact/4EawWxSAjwTZbhGzh7u5qY) (the "Proposed" tab).
+**Diagram:** [Oikos Architecture](https://claude.ai/artifact/4EawWxSAjwTZbhGzh7u5qY) (the "Proposed" tab).
 
 ## Contents
 
@@ -309,7 +309,7 @@ This is section 7. It removes the class of bug instead of detecting it.
 
 Each measure has a threshold, and breaches are listed first.
 
-**Before/after diff:** `terrarium diff <baseline> <change>` compares every measure on the same seeds and flags moves beyond seed noise. The trip fix took refunds from 0.2% to 30%, and this would have flagged it in a one-year run.
+**Before/after diff:** `oikos diff <baseline> <change>` compares every measure on the same seeds and flags moves beyond seed noise. The trip fix took refunds from 0.2% to 30%, and this would have flagged it in a one-year run.
 
 **Where:** new SQL queries plus a small runner. Nightly on CI: 5 years, 3 seeds, diffed against the last accepted baseline.
 
@@ -422,9 +422,9 @@ Proposed together, for one sign-off:
 **Progress:**
 - **Reference** (2026-09-30): `v0-reference` tagged; reference runs in `runs/v0-reference/` (the 200- and 1,000-person towns, 3 seeds × 2 years) and `runs/c10-run5/` (1,000 people, 3 seeds × 5 years); work on the `rebuild` branch in a separate worktree.
 - **R1, first step** (2026-09-30): the kernel is now a workspace with three crates:
-  - `terrarium-core`: canonical JSON, money, randomness;
-  - `terrarium-contracts`: blocks, config, events, the compiled schemas, and the vocabularies they shared with the state;
-  - `terrarium-kernel`: re-exports them, so its code is unchanged.
+  - `oikos-core`: canonical JSON, money, randomness;
+  - `oikos-contracts`: blocks, config, events, the compiled schemas, and the vocabularies they shared with the state;
+  - `oikos-kernel`: re-exports them, so its code is unchanged.
 
   Gate:
   - all 83 kernel tests pass;
@@ -432,7 +432,7 @@ Proposed together, for one sign-off:
   - all 72 orchestrator and 38 participant tests pass.
 
   A 0.5 log (pilot 8) needs the 0.5 binary, as it always did.
-- **R1, second step** (2026-09-30): the engine in-process. The kernel's request handler is a `Session`, which both stdio and a native module (`terrarium-napi`, N-API) use; the orchestrator's `Kernel` runs in-process when the module is built (`TERRARIUM_ENGINE=stdio` for the subprocess).
+- **R1, second step** (2026-09-30): the engine in-process. The kernel's request handler is a `Session`, which both stdio and a native module (`oikos-napi`, N-API) use; the orchestrator's `Kernel` runs in-process when the module is built (`OIKOS_ENGINE=stdio` for the subprocess).
   - Gate: the same world's log and anchors are byte-identical either way (180 days, 1,000 people); all suites pass in-process (83 kernel, 72 orchestrator, 38 participant tests).
   - **Speed:** a year of the 1,000-person town takes 134 s over stdio and 123 s in-process, with the same final state. Only 8% faster: the engine's own work (about 82 s: validating every input against the schemas, canonical hashing, building observations, the log) is the cost, not the pipe. That's R2's to take on.
 
@@ -483,17 +483,17 @@ Proposed together, for one sign-off:
   - **Checked:** 60 days of the 1,000-person town ends in the identical state as under the old host (the same state hash, about 104,000 commands). The logs differ only in order within a moment: the old host ordered a cohort by (wake time, key), because it set news wakes at the time before an advance, and could split one moment into two cohorts. The engine wakes everyone due at a moment together, in key order, as D58 says.
   - **Gate:** kernel 97, TypeScript 281.
 - **R2, the resolver in the engine** (2026-09-30): `kernel/crates/resolver`, which holds the call language, what each seat knows, and the resolver. It's a port of `translator/src/{resolver,knowledge}.ts` and `participants/src/calls.ts`. The engine keeps each seat's knowledge from the observations it delivers, and resolves calls itself (the protocol's `resolve`): every code module's act, and a model seat's drafts.
-  - **Checked:** shadow mode (`TERRARIUM_RESOLVER=shadow`) resolves every call both ways. There were no differences in 26,920 calls over 60 days of the 1,000-person town, and none across the whole test suite, where a difference fails the test. The same final state.
+  - **Checked:** shadow mode (`OIKOS_RESOLVER=shadow`) resolves every call both ways. There were no differences in 26,920 calls over 60 days of the 1,000-person town, and none across the whole test suite, where a difference fails the test. The same final state.
   - **Still in TypeScript:** a model seat's draft preview and law warnings (they read the seat's knowledge there too). Their law warnings read with the Rust `law` reader now; what they read of the seat's knowledge is still TypeScript's.
 - **R2, invariance** (2026-09-30): the engine's scheduler can perturb a run for tests (`perturb`: seeded extra wakes, recorded in the log; never a research run). `orchestrator/test/invariance.test.ts` runs a 200-person town for 120 days as it is, and again with about 12% more wakes. Goods bought, orders, payments, factory output, shop service and waste collected must each stay within 10%. They do. The builder's building work moved about 20% on one seed, through different hires, and is left out as too lumpy to judge on one seed.
   - Not done from 6.6: shuffling acts done at the same second, splitting payments, and scaling act times. The last needs no mode: a world's `act_time` table is the knob.
 - **R2, parity step 2: configured act times** (2026-09-30). Generated worlds carry an `act_time` table (placeholders: minutes for people, a second for systems). A year of the 1,000-person town is within the rebuild's own spread on every town measure, with no warnings. Two module fixes came out of it: time-bound steps first, and planning again once a plan is done (docs/decisions.md).
 - **R2, the crates** (2026-09-30):
-  - `terrarium-world` holds the state, physics and records: the only writer;
-  - `terrarium-perception` builds observations, read-only (no `&mut State`);
+  - `oikos-world` holds the state, physics and records: the only writer;
+  - `oikos-perception` builds observations, read-only (no `&mut State`);
   - the root crate is the engine: the kernel interface, the log, the protocol and the schedule.
-  Observing is now perception building, then the world delivering (marking what was seen, handing over outcomes and messages). Public paths are unchanged (`terrarium_kernel::{state, observe, ...}`). The same final state over 60 days.
-- **R4, the diff** (2026-09-30): `terrarium diff <baseline> <change> [QUERY...]` compares every measure of two batches of the same world. With several seeds a side, a difference is judged against seed-to-seed spread and flagged beyond three standard errors; with one, the relative change is flagged beyond a tenth. On the parity batches (10 seeds each) it finds the known gatherings difference by itself (attendance z 4.7). It also finds first-quarter religious affiliation 1.4 points lower on the rebuild (z -4.2), part of the same difference.
+  Observing is now perception building, then the world delivering (marking what was seen, handing over outcomes and messages). Public paths are unchanged (`oikos_kernel::{state, observe, ...}`). The same final state over 60 days.
+- **R4, the diff** (2026-09-30): `oikos diff <baseline> <change> [QUERY...]` compares every measure of two batches of the same world. With several seeds a side, a difference is judged against seed-to-seed spread and flagged beyond three standard errors; with one, the relative change is flagged beyond a tenth. On the parity batches (10 seeds each) it finds the known gatherings difference by itself (attendance z 4.7). It also finds first-quarter religious affiliation 1.4 points lower on the rebuild (z -4.2), part of the same difference.
 - **R4, module manifests** (2026-09-30): every built-in module has a manifest (`participants/manifests/<name>.json`, valid against `contracts/module.schema.json`). They're written from the modules themselves by `participants/scripts/manifests.ts`:
   - the parameters and their defaults, as the module's `params` call has them, plus what it reads as it goes;
   - each figure's source, where the comment beside it cites one, or "placeholder";
@@ -502,11 +502,11 @@ Proposed together, for one sign-off:
   A test fails if a module changes without its manifest being written again. **At load,** a world giving a module a parameter it doesn't take, or of the wrong type, is refused, naming the participant, the module and the parameter. The first run found one: `builder_account`, given to landlords and read by nothing.
   - **The count:** 294 parameters in 28 modules; 38 with a cited source, the rest placeholders. The key figures come from the profile (sourced) in generated worlds, over these defaults.
   - **Not yet:** `perceives` (what each module relies on perceiving) is empty, and `state` is "none" (no module saves its state yet: checkpoints).
-- **R4, the health report** (2026-09-30): `terrarium health <DIR>` sets a batch's measures against its profile's calibration targets, each within a stated tolerance. Breaches come first, then demand that went unmet. Targets not yet measured are listed as such. The rebuild's 10-seed batch breaches on unemployment (1.5% against 4.6%), saving (-10% against 6.5%), group participation (60% against 50%) and unmet demand (8%). These are the calibration work queued for after the rebuild (the labour market; goods under shortage).
+- **R4, the health report** (2026-09-30): `oikos health <DIR>` sets a batch's measures against its profile's calibration targets, each within a stated tolerance. Breaches come first, then demand that went unmet. Targets not yet measured are listed as such. The rebuild's 10-seed batch breaches on unemployment (1.5% against 4.6%), saving (-10% against 6.5%), group participation (60% against 50%) and unmet demand (8%). These are the calibration work queued for after the rebuild (the labour market; goods under shortage).
 - **R5** (2026-09-30): the docs match the platform (VISION §4 and §8, reliability, measurement, the behaviour modules' rules). What stays in TypeScript is kept for a stated reason (docs/decisions.md).
 - **The `law` reader is Rust** (kernel/crates/law), built to WebAssembly for the TypeScript modules and checked against `@bufbuild/cel` in shadow (docs/decisions.md). It was deferred at first; Naz asked for it.
 - **Deferred, with reasons and when to revisit** (docs/decisions.md): checkpoints (resume by replay stays); compact logs (B13) and generated types (B1), both to confirm with Naz; the rest of the loop in the engine (the rounds of look, decide, act).
-- **Next:** merge `rebuild` into `main` (Naz's call), then calibration on the new platform: the labour market and goods under shortage, with `terrarium health` and `diff` watching.
+- **Next:** merge `rebuild` into `main` (Naz's call), then calibration on the new platform: the labour market and goods under shortage, with `oikos health` and `diff` watching.
 
 **After the rebuild,** on the new platform:
 1. The labour market (search frictions) and goods prices under shortage, calibrated with the health report watching every other measure.

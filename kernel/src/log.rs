@@ -1,7 +1,7 @@
 //! Hash-chained JSONL run log (contracts/log.schema.json).
 //!
 //! Each line is the canonical JSON of an entry. entry.hash = SHA-256 over
-//! "terrarium.log.v1\n" + canonical JSON of the entry without `hash`;
+//! "oikos.log.v1\n" + canonical JSON of the entry without `hash`;
 //! entry.prev = the previous entry's hash (64 zeros for the header). Every
 //! `anchor_every` entries, and at the end, the head is also written to a
 //! separate witness file.

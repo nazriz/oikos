@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@terrarium/cel-check",
+      "name": "@oikos/cel-check",
       "devDependencies": {
         "@bufbuild/cel": "0.6.1",
       },

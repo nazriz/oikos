@@ -11,8 +11,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { query } from "@terrarium/measure";
-import type { Price } from "@terrarium/participants/llm";
+import { query } from "@oikos/measure";
+import type { Price } from "@oikos/participants/llm";
 
 export interface PriceFile {
   source: string;

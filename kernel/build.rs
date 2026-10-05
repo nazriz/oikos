@@ -45,8 +45,8 @@ fn main() {
     let rev = git(&["rev-parse", "--short=12", "HEAD"]).unwrap_or_else(|| "unknown".into());
     let dirty = git(&["status", "--porcelain", "--", "."]).map(|s| !s.is_empty()).unwrap_or(false);
     let build = if dirty { format!("{rev}+dirty") } else { rev };
-    println!("cargo:rustc-env=TERRARIUM_BUILD={build}");
-    println!("cargo:rustc-env=TERRARIUM_SOURCE={}", fingerprint());
+    println!("cargo:rustc-env=OIKOS_BUILD={build}");
+    println!("cargo:rustc-env=OIKOS_SOURCE={}", fingerprint());
     println!("cargo:rerun-if-changed=../.git/HEAD");
     println!("cargo:rerun-if-changed=../.git/index");
     for p in ["src", "crates", "Cargo.toml", "Cargo.lock", "../contracts"] {

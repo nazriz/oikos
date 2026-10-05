@@ -2,8 +2,8 @@
 // (the same prompt, tool and parser), and the call it produces is compared, in canonical form, with the accepted
 // answers. Reported separately for seen and held-out cases, with what it cost.
 
-import { calls, canonical as canonicalJson } from "@terrarium/participants";
-import { PRICES, type Budget, type LlmAdapter, type LlmIO, type Price } from "@terrarium/participants/llm";
+import { calls, canonical as canonicalJson } from "@oikos/participants";
+import { PRICES, type Budget, type LlmAdapter, type LlmIO, type Price } from "@oikos/participants/llm";
 import { createTranslator, Knowledge, resolve } from "../src/index";
 import { CASES, type Case } from "./cases";
 

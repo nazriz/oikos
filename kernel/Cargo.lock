@@ -791,6 +791,123 @@ dependencies = [
 ]
 
 [[package]]
+name = "oikos-contracts"
+version = "0.7.0"
+dependencies = [
+ "jsonschema",
+ "oikos-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-core"
+version = "0.7.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "oikos-kernel"
+version = "0.7.0"
+dependencies = [
+ "imbl",
+ "jsonschema",
+ "mimalloc",
+ "oikos-contracts",
+ "oikos-core",
+ "oikos-perception",
+ "oikos-resolver",
+ "oikos-terms",
+ "oikos-time",
+ "oikos-world",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "oikos-law"
+version = "0.1.0"
+dependencies = [
+ "cel-parser",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-napi"
+version = "0.7.0"
+dependencies = [
+ "mimalloc",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "oikos-kernel",
+]
+
+[[package]]
+name = "oikos-nature"
+version = "0.1.0"
+dependencies = [
+ "oikos-contracts",
+ "oikos-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-perception"
+version = "0.7.0"
+dependencies = [
+ "oikos-terms",
+ "oikos-world",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-resolver"
+version = "0.7.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-terms"
+version = "0.7.0"
+dependencies = [
+ "oikos-contracts",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-time"
+version = "0.7.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "oikos-world"
+version = "0.7.0"
+dependencies = [
+ "imbl",
+ "oikos-contracts",
+ "oikos-core",
+ "oikos-nature",
+ "oikos-terms",
+ "oikos-time",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1219,123 +1336,6 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys",
-]
-
-[[package]]
-name = "terrarium-contracts"
-version = "0.7.0"
-dependencies = [
- "jsonschema",
- "serde",
- "serde_json",
- "terrarium-core",
-]
-
-[[package]]
-name = "terrarium-core"
-version = "0.7.0"
-dependencies = [
- "serde",
- "serde_json",
- "sha2",
-]
-
-[[package]]
-name = "terrarium-kernel"
-version = "0.7.0"
-dependencies = [
- "imbl",
- "jsonschema",
- "mimalloc",
- "proptest",
- "serde",
- "serde_json",
- "sha2",
- "terrarium-contracts",
- "terrarium-core",
- "terrarium-perception",
- "terrarium-resolver",
- "terrarium-terms",
- "terrarium-time",
- "terrarium-world",
-]
-
-[[package]]
-name = "terrarium-law"
-version = "0.1.0"
-dependencies = [
- "cel-parser",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "terrarium-napi"
-version = "0.7.0"
-dependencies = [
- "mimalloc",
- "napi",
- "napi-build",
- "napi-derive",
- "terrarium-kernel",
-]
-
-[[package]]
-name = "terrarium-nature"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "terrarium-contracts",
- "terrarium-core",
-]
-
-[[package]]
-name = "terrarium-perception"
-version = "0.7.0"
-dependencies = [
- "serde",
- "serde_json",
- "terrarium-terms",
- "terrarium-world",
-]
-
-[[package]]
-name = "terrarium-resolver"
-version = "0.7.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "terrarium-terms"
-version = "0.7.0"
-dependencies = [
- "serde",
- "serde_json",
- "terrarium-contracts",
-]
-
-[[package]]
-name = "terrarium-time"
-version = "0.7.0"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "terrarium-world"
-version = "0.7.0"
-dependencies = [
- "imbl",
- "serde",
- "serde_json",
- "sha2",
- "terrarium-contracts",
- "terrarium-core",
- "terrarium-nature",
- "terrarium-terms",
- "terrarium-time",
 ]
 
 [[package]]

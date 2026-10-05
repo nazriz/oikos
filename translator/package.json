@@ -1,5 +1,5 @@
 {
-  "name": "@terrarium/translator",
+  "name": "@oikos/translator",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "./eval": "./eval/run.ts"
   },
   "dependencies": {
-    "@terrarium/participants": "workspace:*",
+    "@oikos/participants": "workspace:*",
     "ajv": "^8.17.1"
   }
 }

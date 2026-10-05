@@ -23,12 +23,12 @@ use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
-use terrarium_kernel::blocks::Block;
-use terrarium_kernel::config::{cell_xy, footprint_cells, split_space};
-use terrarium_kernel::events::{EventBody, RefusalCode};
-use terrarium_kernel::run::Run;
-use terrarium_kernel::state::{ParticipantStatus, State};
-use terrarium_kernel::Command;
+use oikos_kernel::blocks::Block;
+use oikos_kernel::config::{cell_xy, footprint_cells, split_space};
+use oikos_kernel::events::{EventBody, RefusalCode};
+use oikos_kernel::run::Run;
+use oikos_kernel::state::{ParticipantStatus, State};
+use oikos_kernel::Command;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Mirror {
@@ -92,7 +92,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         Block::Transfer { from, to, amount, settles: None, per_instruction: None, .. } => {
             let (Some(f), Some(t)) = (st.accounts.get(from), st.accounts.get(to)) else { return Some(Err(RefusalCode::UnknownAccount)) };
             // v0.5 (D58): amounts are exact to 38 digits, and money moves only within one currency.
-            let max = terrarium_kernel::money::MAX_MONEY;
+            let max = oikos_kernel::money::MAX_MONEY;
             let above = || from != to && t.balance.checked_add(*amount).is_none_or(|x| x > max);
             if f.custodian != me {
                 Err(RefusalCode::NotCustodian)
@@ -218,7 +218,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
             if total > 0 {
                 let day = s.config.catalogue.working_day.unwrap();
                 let share = (total + performers.len() as i64 - 1) / performers.len() as i64;
-                let today = terrarium_kernel::exec::day_of(st.t);
+                let today = oikos_kernel::exec::day_of(st.t);
                 if performers.iter().any(|p| st.labour_used.get(p).filter(|(d, _)| *d == today).map_or(0, |(_, u)| *u) + share > day) {
                     return Some(Err(RefusalCode::NoTimeLeft));
                 }
@@ -240,7 +240,7 @@ fn predict(run: &Run<Vec<u8>>, participant: &str, position: Option<&str>, b: &Bl
         }
         Block::MoveGoods { kind, quantity, from_at, to, to_at } => {
             // Possession (phase B): the actor moves its own holding; an edge's may go negative.
-            let max = terrarium_kernel::money::MAX_MONEY;
+            let max = oikos_kernel::money::MAX_MONEY;
             if !s.config.catalogue.resources.iter().any(|r| &r.id == kind) {
                 Err(RefusalCode::UnknownResource)
             } else if !(1..=max).contains(quantity) {
@@ -320,7 +320,7 @@ fn check(ops: &[Op]) -> Result<BTreeMap<String, usize>, TestCaseError> {
                     for c in &cells {
                         prop_assert!(!m.structures.values().any(|(cs, _, _)| cs.contains(c)), "built on occupied ground {}", c);
                         let (x, y) = cell_xy(c).unwrap();
-                        let t = terrarium_kernel::config::terrain_at(&s.config.world.ground, x, y);
+                        let t = oikos_kernel::config::terrain_at(&s.config.world.ground, x, y);
                         let fits = match &ty.terrains { Some(ok) => t.is_some_and(|t| ok.iter().any(|o| o == t)), None => t.is_none() };
                         prop_assert!(fits, "a {} stood on {:?} terrain", structure_type, t);
                     }

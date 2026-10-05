@@ -1,4 +1,4 @@
-# Nature: the physics (kernel, `terrarium-nature`)
+# Nature: the physics (kernel, `oikos-nature`)
 
 **Source:** `kernel/crates/nature/src/lib.rs`, stepped a day at a time by the world (`kernel/crates/world/src/exec.rs`,
 `nature_day`). Contract: docs/design/world-expansion.md §2.4. The world gives every figure: covers, fields and species

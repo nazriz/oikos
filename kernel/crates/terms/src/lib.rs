@@ -7,7 +7,7 @@
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
 use serde::Serialize;
-use terrarium_contracts::blocks::AgreementTerms;
+use oikos_contracts::blocks::AgreementTerms;
 
 /// This reader's version, stated on every reading.
 pub const READER: &str = "terms-0.2.0";
@@ -79,7 +79,7 @@ pub fn read(terms: &AgreementTerms, signatures: &[Mark], notices: &[Mark], now: 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terrarium_contracts::blocks::{AgreementTerms, Termination};
+    use oikos_contracts::blocks::{AgreementTerms, Termination};
 
     const DAY: i64 = 86_400;
     fn terms(term: Option<i64>, clauses: &[(&str, i64)]) -> AgreementTerms {

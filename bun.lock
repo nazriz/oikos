@@ -3,62 +3,62 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "terrarium",
+      "name": "oikos",
       "devDependencies": {
         "@types/bun": "^1.4.2",
         "typescript": "^7.0.2",
       },
     },
     "contracts": {
-      "name": "@terrarium/contracts",
+      "name": "@oikos/contracts",
       "version": "0.1.0",
       "devDependencies": {
         "ajv": "^8.17.1",
       },
     },
     "measure": {
-      "name": "@terrarium/measure",
+      "name": "@oikos/measure",
       "version": "0.1.0",
       "dependencies": {
         "@duckdb/node-api": "^1.5.5-r.5",
       },
     },
     "orchestrator": {
-      "name": "@terrarium/orchestrator",
+      "name": "@oikos/orchestrator",
       "version": "0.1.0",
       "bin": {
-        "terrarium": "./src/cli.ts",
+        "oikos": "./src/cli.ts",
       },
       "dependencies": {
-        "@terrarium/measure": "workspace:*",
-        "@terrarium/participants": "workspace:*",
-        "@terrarium/translator": "workspace:*",
-        "@terrarium/worlds": "workspace:*",
+        "@oikos/measure": "workspace:*",
+        "@oikos/participants": "workspace:*",
+        "@oikos/translator": "workspace:*",
+        "@oikos/worlds": "workspace:*",
       },
       "devDependencies": {
         "ajv": "^8.17.1",
       },
     },
     "participants": {
-      "name": "@terrarium/participants",
+      "name": "@oikos/participants",
       "version": "0.1.0",
       "dependencies": {
         "@bufbuild/cel": "0.6.1",
       },
     },
     "translator": {
-      "name": "@terrarium/translator",
+      "name": "@oikos/translator",
       "version": "0.1.0",
       "dependencies": {
-        "@terrarium/participants": "workspace:*",
+        "@oikos/participants": "workspace:*",
         "ajv": "^8.17.1",
       },
     },
     "worlds": {
-      "name": "@terrarium/worlds",
+      "name": "@oikos/worlds",
       "version": "0.1.0",
       "dependencies": {
-        "@terrarium/participants": "workspace:*",
+        "@oikos/participants": "workspace:*",
       },
       "devDependencies": {
         "ajv": "^8.17.1",
@@ -94,17 +94,17 @@
 
     "@duckdb/node-bindings-win32-x64": ["@duckdb/node-bindings-win32-x64@1.5.5-r.5", "", { "os": "win32", "cpu": "x64" }, "sha512-mBGFn8netT/AAhK4TOG6Fw47+Db68CxCVtQ9qfxZc1kZAjds+aYrh17Fd/u5CbTDdxILsrcyuF8q9cUcm54kQA=="],
 
-    "@terrarium/contracts": ["@terrarium/contracts@workspace:contracts"],
+    "@oikos/contracts": ["@oikos/contracts@workspace:contracts"],
 
-    "@terrarium/measure": ["@terrarium/measure@workspace:measure"],
+    "@oikos/measure": ["@oikos/measure@workspace:measure"],
 
-    "@terrarium/orchestrator": ["@terrarium/orchestrator@workspace:orchestrator"],
+    "@oikos/orchestrator": ["@oikos/orchestrator@workspace:orchestrator"],
 
-    "@terrarium/participants": ["@terrarium/participants@workspace:participants"],
+    "@oikos/participants": ["@oikos/participants@workspace:participants"],
 
-    "@terrarium/translator": ["@terrarium/translator@workspace:translator"],
+    "@oikos/translator": ["@oikos/translator@workspace:translator"],
 
-    "@terrarium/worlds": ["@terrarium/worlds@workspace:worlds"],
+    "@oikos/worlds": ["@oikos/worlds@workspace:worlds"],
 
     "@types/bun": ["@types/bun@1.4.2", "", { "dependencies": { "bun-types": "1.4.2" } }, "sha512-GimotNn7+ZV0uVArItBbriZsR1oNf0+WTzPkdcFrzShI7k2norL0uzEaJT8T33dWr7O/c9ZDuAFQrctKCi72oQ=="],
 

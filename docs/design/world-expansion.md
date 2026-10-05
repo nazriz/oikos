@@ -35,7 +35,7 @@ changes (§9) need sign-off before each part is built. Scope: all three tiers fr
 
 ## 2. Nature (tier 1)
 
-### 2.1 Physics (kernel, Rust: a new crate `terrarium-nature`, stepped by `world`)
+### 2.1 Physics (kernel, Rust: a new crate `oikos-nature`, stepped by `world`)
 
 - **Land cover.** Each cell's `terrain` (already in the state) is its cover when unbuilt: a kind from the catalogue's
   `land_covers`. A structure covers its cells, and its type may declare a `cover` of its own (a park is grassland; a
@@ -416,7 +416,7 @@ tribunal decides.
 | # | Part | Rust | TypeScript | Done when |
 |---|---|---|---|---|
 | 1 | Contract revision (§1) | `terms` (periodic) | landlord, citizen, belief via `assertion` | Suite passes; soak clean |
-| 2 | Nature (§2) | `terrarium-nature`: covers, fields, populations, surveys, extinction | environment officer, planning, generator's landscape | A 5-year run where building on habitat measurably shrinks a species, and a survey sees it |
+| 2 | Nature (§2) | `oikos-nature`: covers, fields, populations, surveys, extinction | environment officer, planning, generator's landscape | A 5-year run where building on habitat measurably shrinks a species, and a survey sees it |
 | 3 | Elections and information (§3) | (none needed) | electoral office, newspaper, voting mind, candidates | A mayor voted out in some seeds, for reasons the logs show |
 | 4 | Services (§4) | body variables, `treat` and `teach` on bodies, fields in life physics | clinic, school, budget lines | Treatment shortens illness; schooling raises skill and pay |
 | 5 | Justice (§5) | (none needed) | tribunal, registrar, bailiff | A tenancy dispute and a wage claim decided and enforced |

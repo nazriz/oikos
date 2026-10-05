@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 /// The build's source fingerprint (build.rs): lets the TypeScript side refuse a stale WebAssembly module.
-pub const SOURCE: &str = env!("TERRARIUM_LAW_SOURCE");
+pub const SOURCE: &str = env!("OIKOS_LAW_SOURCE");
 
 /// The operators and functions a condition may use (the macros `has`, `all`, `exists`, `exists_one`, `map` and
 /// `filter` arrive expanded, as selections and comprehensions).

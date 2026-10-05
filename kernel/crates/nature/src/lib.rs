@@ -21,8 +21,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
-use terrarium_contracts::config::{Catalogue, FlowCfg, SpeciesCfg, COVER_BUILT, COVER_OPEN};
-use terrarium_core::rng::{Randomness, Rng};
+use oikos_contracts::config::{Catalogue, FlowCfg, SpeciesCfg, COVER_BUILT, COVER_OPEN};
+use oikos_core::rng::{Randomness, Rng};
 
 type Id = String;
 
@@ -211,11 +211,11 @@ fn succession(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureStat
     }
 }
 
-fn step_field(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&BTreeMap<Id, i64>>, day: i64) -> Vec<i64> {
+fn step_field(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, now: Option<&BTreeMap<Id, i64>>, day: i64) -> Vec<i64> {
     step_field_dense(f, ground, land, dense(now, ground, f.baseline), day)
 }
 
-fn step_field_dense(f: &terrarium_contracts::config::FieldCfg, ground: &Ground, land: &Land, mut v: Vec<i64>, day: i64) -> Vec<i64> {
+fn step_field_dense(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, mut v: Vec<i64>, day: i64) -> Vec<i64> {
     let n = ground.cells.len();
     // Sources (a cover's may be negative: soaking it up), scaled for the day (rain, drought).
     let scale = f.source_by_day.iter().rev().find(|s| s.from_day <= day).map_or(BPS, |s| s.bps);

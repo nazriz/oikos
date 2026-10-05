@@ -15,7 +15,7 @@ fn main() {
             h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
         }
     }
-    println!("cargo:rustc-env=TERRARIUM_LAW_SOURCE={h:016x}");
+    println!("cargo:rustc-env=OIKOS_LAW_SOURCE={h:016x}");
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=build.rs");

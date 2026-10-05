@@ -1,11 +1,11 @@
 # Running with a real model
 
-Everything in Terrarium is built and tested on the mock adapter. This page is how to switch to a real model, and what guards the switch. Real models have run only in pilots, through the Codex CLI (below): directional testing, not evidence. What's needed before research runs is in docs/design/llm-readiness.md.
+Everything in Oikos is built and tested on the mock adapter. This page is how to switch to a real model, and what guards the switch. Real models have run only in pilots, through the Codex CLI (below): directional testing, not evidence. What's needed before research runs is in docs/design/llm-readiness.md.
 
 ## The switch
 
 ```bash
-terrarium run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claude-sonnet-5 --budget 2
+oikos run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claude-sonnet-5 --budget 2
 ```
 
 - `--model provider/model` runs every language-model participant, and the translator, on that model. Without it, it's the mock.
@@ -34,7 +34,7 @@ terrarium run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claud
 ## The translator's test set
 
 ```bash
-terrarium translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/translator-eval.json
+oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/translator-eval.json
 ```
 
 - 26 plain-language requests (`translator/eval/cases.ts`), each with the call it should become, or the refusal it should get.
@@ -58,13 +58,13 @@ terrarium translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out ru
 
 **Caveats, which is why it's for smoke tests and pilots:**
 - **Codex is a coding agent.** Its own instructions sit under ours, and there's no way to replace them. The model is being told two things at once, which confounds any study where the framing is the variable.
-- **The subscription's usage limits apply** (per few hours). The mock-LLM mayor makes about 130 calls a simulated year: fine for a pilot, not for batches. When Codex says the limit is reached, the run stops cleanly, as at a spending limit, and says to resume it once the limit resets (`terrarium resume <log>`: every answer up to the stop is served from the log).
+- **The subscription's usage limits apply** (per few hours). The mock-LLM mayor makes about 130 calls a simulated year: fine for a pilot, not for batches. When Codex says the limit is reached, the run stops cleanly, as at a spending limit, and says to resume it once the limit resets (`oikos resume <log>`: every answer up to the stop is served from the log).
 - **The model version isn't pinned** as an API's is, so runs are less reproducible.
 - **Tested only against a stand-in:** no real `codex exec` has been run from here.
 
 ## Pilots (directional testing, not evidence)
 
-All on the small town (`worlds/town.yaml`, `--set mayor=llm`), through the Codex CLI: `gpt-6-sol` as the mayor, `gpt-6-luna` as the translator (Naz: sol in the driver seat, luna for simple, narrow work; never astra). Read with `terrarium story <log>`.
+All on the small town (`worlds/town.yaml`, `--set mayor=llm`), through the Codex CLI: `gpt-6-sol` as the mayor, `gpt-6-luna` as the translator (Naz: sol in the driver seat, luna for simple, narrow work; never astra). Read with `oikos story <log>`.
 
 **Translator test set** (2026-09-28):
 - `gpt-6-luna`: 20/20 seen, 4/6 held out, after fixing things on our side:
@@ -156,7 +156,7 @@ dollars.
   - **Residents judged how long it had been** by what was in the bin over how fast it was filling at that moment. That depends on who's home, and in the daytime half a block of flats is out. So a week's waste looked like two. Fixed (citizen 0.34.0): they go by when they last saw the bin emptied, watched at every wake. With both fixes, a crew collecting weekly gets no complaints; with no crew, as many as before.
 - **The energy retailer ordered from the grid about 1,400 times on each of three days**, each order paid up front. Its "on order" was cleared when the order was accepted, not when the energy arrived. Fixed (utility.energy 0.1.1): on order until delivered; the utilities test checks it.
 - **3 of the first 12 notebook updates were lost** to stray characters after the JSON (fixed after 7d started).
-- **`terrarium story`** couldn't read a year's log of the 1,000-person town (over 2 GB). It now streams.
+- **`oikos story`** couldn't read a year's log of the 1,000-person town (over 2 GB). It now streams.
 
 **Translator test set, grown** (2026-10-02; `runs/translator-eval-{luna,sol}-2026-10-02.json`). From 6 held-out cases to 29, so a pass mark can mean something. The new ones are phrased the way the pilots' mayors wrote, and cover every call and the five refusals. Two answer-key entries were corrected after the first run, both noted in `cases.ts`: a firm named by name, and two letters in place of one to two people. The comparison now treats a simple value the same quoted or bare (`task="make"` is `task=make`), for every model alike.
 

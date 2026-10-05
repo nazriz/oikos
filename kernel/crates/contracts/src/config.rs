@@ -11,7 +11,7 @@
 //! is a grid of cells, buildings have footprints and spaces, and lots are records.
 
 use crate::blocks::{Id, Record, RecordBody, GENESIS};
-use terrarium_core::canon;
+use oikos_core::canon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -270,11 +270,11 @@ pub struct TaskCfg {
     #[serde(default, rename = "in", skip_serializing_if = "Option::is_none")]
     pub in_space: Option<String>,
     /// Per unit: taken from the actor's holding at the structure.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "terrarium_core::money::amount_map")]
-    pub consumes: BTreeMap<Id, terrarium_core::money::Money>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "oikos_core::money::amount_map")]
+    pub consumes: BTreeMap<Id, oikos_core::money::Money>,
     /// Per unit: added to the actor's holding at the structure.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "terrarium_core::money::amount_map")]
-    pub produces: BTreeMap<Id, terrarium_core::money::Money>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "oikos_core::money::amount_map")]
+    pub produces: BTreeMap<Id, oikos_core::money::Money>,
     /// Per unit: added to state variables of the structure worked on (`on`, or the structure itself).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub changes: BTreeMap<Id, i64>,
@@ -389,8 +389,8 @@ pub struct HoldingCfg {
     pub kind: Id,
     pub holder: Id,
     pub at: Id,
-    #[serde(with = "terrarium_core::money::amount")]
-    pub quantity: terrarium_core::money::Money,
+    #[serde(with = "oikos_core::money::amount")]
+    pub quantity: oikos_core::money::Money,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -399,8 +399,8 @@ pub struct StructureType {
     pub id: Id,
     pub category: String,
     /// What it's made of (phase B): quantities of resource kinds, taken from the builder's holding when it's begun.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "terrarium_core::money::amount_map")]
-    pub materials: BTreeMap<Id, terrarium_core::money::Money>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty", with = "oikos_core::money::amount_map")]
+    pub materials: BTreeMap<Id, oikos_core::money::Money>,
     /// The least time it takes to build, whatever the crew (some processes take time).
     pub build_time: i64,
     /// Seconds of work (the task `build`, on it) before it's complete; 0: it completes when build_time has passed.
@@ -601,8 +601,8 @@ pub struct AccountCfg {
     /// Absent: the world's first currency.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub currency: Option<Id>,
-    #[serde(with = "terrarium_core::money::amount")]
-    pub balance: terrarium_core::money::Money,
+    #[serde(with = "oikos_core::money::amount")]
+    pub balance: oikos_core::money::Money,
 }
 
 /// A currency the world's money comes in: its code, and how many decimal places its smallest unit is
@@ -1378,7 +1378,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
     if currencies.len() != w.currencies.len() {
         return Err("a currency is declared twice".into());
     }
-    let mut totals: BTreeMap<&str, terrarium_core::money::Money> = BTreeMap::new();
+    let mut totals: BTreeMap<&str, oikos_core::money::Money> = BTreeMap::new();
     for a in &w.accounts {
         entity(&a.holder)?;
         entity(&a.custodian)?;
@@ -1390,7 +1390,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
             return Err(format!("account {} has a negative opening balance", a.id));
         }
         let t = totals.entry(cur).or_insert(0);
-        *t = t.checked_add(a.balance).filter(|x| x.abs() <= terrarium_core::money::MAX_MONEY).ok_or_else(|| format!("total money in {cur} out of range"))?;
+        *t = t.checked_add(a.balance).filter(|x| x.abs() <= oikos_core::money::MAX_MONEY).ok_or_else(|| format!("total money in {cur} out of range"))?;
     }
     for b in &w.boundaries {
         for cur in &currencies {
@@ -1526,7 +1526,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
         if !(structures.contains_key(st.at.as_str()) || (edge && st.at == st.holder)) {
             return Err(format!("{}'s holding of {} is at {}, which isn't a structure (or, for an edge, itself)", st.holder, st.kind, st.at));
         }
-        if !(0..=terrarium_core::money::MAX_MONEY).contains(&st.quantity) && !edge {
+        if !(0..=oikos_core::money::MAX_MONEY).contains(&st.quantity) && !edge {
             return Err(format!("{}'s holding of {} is out of range", st.holder, st.kind));
         }
         if !holding_keys.insert((st.holder.as_str(), st.at.as_str(), st.kind.as_str())) {

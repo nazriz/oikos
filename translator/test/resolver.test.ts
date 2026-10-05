@@ -2,7 +2,7 @@
 // worked examples (docs/design/translator-and-resolver.md §4).
 
 import { expect, test } from "bun:test";
-import { calls } from "@terrarium/participants";
+import { calls } from "@oikos/participants";
 import BLOCKS from "../../contracts/blocks.schema.json";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
@@ -234,7 +234,7 @@ test("goods and work (phase B): your own goods move from where you hold them; wo
 
 test("an id written in quotes is that id (a letter to \"planning\", the post)", () => {
   const { fixture } = require("../eval/run");
-  const { calls } = require("@terrarium/participants");
+  const { calls } = require("@oikos/participants");
   const quoted = resolve(calls.parseProgram('message(to="planning", text="Hello.")'), fixture(), () => undefined, "mayor");
   const bare = resolve(calls.parseProgram('message(to=planning, text="Hello.")'), fixture(), () => undefined, "mayor");
   expect(quoted.ok).toBe(true);

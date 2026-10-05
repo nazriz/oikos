@@ -13,14 +13,14 @@
 import { availableParallelism } from "node:os";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { exportLogs, MEASURE_VERSION } from "@terrarium/measure";
+import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
 import { chooseModel } from "./models";
 import { KernelDied, kernelBinary } from "./kernel";
 import { compressLog } from "./logs";
 import { recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
-import type { LlmAdapter } from "@terrarium/participants/llm";
+import type { LlmAdapter } from "@oikos/participants/llm";
 import { stallMs, Watchdog } from "./watchdog";
 
 /** A world file (JSON or YAML), with `--set path=value` overrides applied, generated if it's a spec. */
@@ -29,7 +29,7 @@ export async function loadWorld(path: string, sets: string[] = []): Promise<{ co
   const v = path.endsWith(".yaml") || path.endsWith(".yml") ? Bun.YAML.parse(text) : JSON.parse(text);
   for (const s of sets) setPath(v, s);
   if (v?.generate) {
-    const { generate, GENERATOR_VERSION } = await import("@terrarium/worlds/generator/generate");
+    const { generate, GENERATOR_VERSION } = await import("@oikos/worlds/generator/generate");
     return { config: generate(v), spec: v, generator: GENERATOR_VERSION };
   }
   return { config: v };
@@ -112,7 +112,7 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
     const err = e as Error;
     const reason = e instanceof KernelDied ? "kernel died" : e instanceof RunStuck ? "stuck" : "error";
     writeFileSync(diagnosisPath, JSON.stringify({ run_id: runId, reason, error: err.message, doing: watchdog.last, at: new Date().toISOString(),
-      what_next: "Fix the cause, then resume the run: `terrarium resume <log>` re-runs it with every model response served from this log." }, null, 2));
+      what_next: "Fix the cause, then resume the run: `oikos resume <log>` re-runs it with every model response served from this log." }, null, 2));
     throw e;
   } finally {
     watchdog.stop();
@@ -273,7 +273,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       const recipe = join(out, `${r.runId}.recipe.json`);
       writeFileSync(recipe, JSON.stringify({
         about: "This run's log wasn't kept (--keep measures). Running the command at the commit regenerates it exactly: the final state hash says so.",
-        command: ["terrarium", "run-one", ...recipeArgs(o, r.seed)],
+        command: ["oikos", "run-one", ...recipeArgs(o, r.seed)],
         commit: gitCommit(), kernel: kernelVersion(), orchestrator: ORCHESTRATOR_VERSION, state_hash: r.stateHash, commands: r.commands, t: r.t,
       }, null, 2));
       for (const f of [r.logPath, r.anchorsPath]) rmSync(f, { force: true });
@@ -294,7 +294,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   return result;
 }
 
-/** The arguments to `terrarium run-one` that regenerate a batch's run of a seed (with `--out` for where). */
+/** The arguments to `oikos run-one` that regenerate a batch's run of a seed (with `--out` for where). */
 export const recipeArgs = (o: BatchOptions, seed: number) => [o.world, "--seed", String(seed), ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...(o.sets ?? []).flatMap((s) => ["--set", s]),
   ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : [])];
 

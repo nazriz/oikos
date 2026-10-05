@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { generate } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -70,5 +70,5 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   expect(heldLease.some((who) => records.some((r) => r.data.leaseholder !== who && !r.data.members.some((m: any) => m.person === who)))).toBe(true);
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own) and moving into a home still being left.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code)).map((e) => e.code)).toEqual([]);
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "flooded"].includes(e.code)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
 }, 300_000);

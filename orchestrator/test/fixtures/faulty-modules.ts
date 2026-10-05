@@ -1,5 +1,5 @@
 // Deliberately faulty behaviour modules, for the reliability tests (D59), loaded with `--modules`.
-import type { BehaviourModule } from "@terrarium/participants";
+import type { BehaviourModule } from "@oikos/participants";
 
 const DAY = 86_400;
 

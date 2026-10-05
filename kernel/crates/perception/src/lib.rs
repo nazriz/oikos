@@ -7,4 +7,4 @@ mod observe;
 pub use observe::*;
 
 // (Where observe.rs has always found them.)
-pub(crate) use terrarium_world::{blocks, config, geo, money, state, statics};
+pub(crate) use oikos_world::{blocks, config, geo, money, state, statics};

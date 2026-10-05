@@ -4,9 +4,9 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@terrarium/worlds/generator/generate";
-import { createConsult, MockAdapter, mockPolicies, PRICES, type LlmAdapter, type LlmRequest } from "@terrarium/participants/llm";
-import { CONSULT_THINGS } from "@terrarium/participants";
+import { generate } from "@oikos/worlds/generator/generate";
+import { createConsult, MockAdapter, mockPolicies, PRICES, type LlmAdapter, type LlmRequest } from "@oikos/participants/llm";
+import { CONSULT_THINGS } from "@oikos/participants";
 import { consultAudit } from "../src/audit";
 import { runWorld } from "../src/run";
 

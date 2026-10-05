@@ -1,4 +1,4 @@
-// Can @bufbuild/cel evaluate Terrarium's `formal` conditions under our rules:
+// Can @bufbuild/cel evaluate Oikos's `formal` conditions under our rules:
 // integers only (exact, overflow is an error), custom functions, a static
 // allowlist, determinism, and failing safely on bad input?
 import { expect, test } from "bun:test";

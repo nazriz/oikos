@@ -1,4 +1,4 @@
-# Terrarium
+# Oikos
 
 A wind tunnel for AI stewardship: a configurable, living, visual simulated world where AI systems hold power over people and nature. It is an open-source research platform, not a single experiment.
 

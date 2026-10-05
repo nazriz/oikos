@@ -6,9 +6,9 @@ mod common;
 
 use common::*;
 use serde_json::json;
-use terrarium_kernel::observe::{ChannelData, Observation};
-use terrarium_kernel::run::Run;
-use terrarium_kernel::Command;
+use oikos_kernel::observe::{ChannelData, Observation};
+use oikos_kernel::run::Run;
+use oikos_kernel::Command;
 
 fn town() -> Run<Vec<u8>> {
     let mut c = riverbend();
@@ -20,7 +20,7 @@ fn town() -> Run<Vec<u8>> {
 fn post(run: &mut Run<Vec<u8>>, participant: &str, blocks: serde_json::Value) -> String {
     let r = run.done(&rb_act(participant, blocks)).unwrap();
     match &r.events[0].body {
-        terrarium_kernel::events::EventBody::ActionApplied { created: Some(c), .. } => c.values().next().unwrap().clone(),
+        oikos_kernel::events::EventBody::ActionApplied { created: Some(c), .. } => c.values().next().unwrap().clone(),
         other => panic!("{other:?}"),
     }
 }
@@ -82,7 +82,7 @@ fn a_search_filters_orders_and_limits_what_the_seat_may_see_now() {
 #[test]
 fn a_bad_look_is_refused_before_it_reaches_the_log() {
     let mut run = town();
-    let bad = |q: serde_json::Value| serde_json::from_value::<Vec<terrarium_kernel::config::LookRequest>>(json!([{"channel": "board", "query": q}])).unwrap();
+    let bad = |q: serde_json::Value| serde_json::from_value::<Vec<oikos_kernel::config::LookRequest>>(json!([{"channel": "board", "query": q}])).unwrap();
     assert!(run.command(&Command::Look { participant: "bob-self".into(), only: None, looks: bad(json!({"where": [{"field": "rent", "op": "=", "value": 1}]})) }).is_err());
     assert!(run.command(&Command::Look { participant: "bob-self".into(), only: None, looks: bad(json!({"limit": 1000})) }).is_err());
     let money = serde_json::from_value(json!([{"channel": "money", "query": {}}])).unwrap();

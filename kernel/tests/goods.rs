@@ -8,8 +8,8 @@ mod common;
 use common::*;
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
-use terrarium_kernel::events::EventBody;
-use terrarium_kernel::run::Run;
+use oikos_kernel::events::EventBody;
+use oikos_kernel::run::Run;
 
 fn check_run(ops: &[Op]) -> Result<usize, TestCaseError> {
     let mut run = Run::start(world(&default_params()), "goods", Vec::new(), None).unwrap();

@@ -13,8 +13,8 @@ use serde_json::json;
 use std::cell::RefCell;
 use std::io::Write;
 use std::rc::Rc;
-use terrarium_kernel::run::{replay, ReplayError, Run};
-use terrarium_kernel::Command;
+use oikos_kernel::run::{replay, ReplayError, Run};
+use oikos_kernel::Command;
 
 /// A Write that can be read back after being moved into a Run.
 #[derive(Clone, Default)]
@@ -81,18 +81,18 @@ fn replay_detects_a_kernel_that_behaves_differently() {
     let mut entries: Vec<serde_json::Value> = text.lines().map(|l| serde_json::from_str(l).unwrap()).collect();
     let i = entries.iter().position(|e| e["kind"] == "event" && e["body"]["event"] == "transfer").unwrap();
     entries[i]["body"]["amount"] = json!(501);
-    let mut prev = terrarium_kernel::canon::ZERO_HASH.to_string();
+    let mut prev = oikos_kernel::canon::ZERO_HASH.to_string();
     let mut forged = Vec::new();
     for e in &mut entries {
         e["prev"] = json!(prev);
-        let kind: terrarium_kernel::log::Kind = serde_json::from_value(e["kind"].clone()).unwrap();
-        let h = terrarium_kernel::log::entry_hash(e["seq"].as_u64().unwrap(), e["t"].as_i64().unwrap(), kind, &e["body"], &prev).unwrap();
+        let kind: oikos_kernel::log::Kind = serde_json::from_value(e["kind"].clone()).unwrap();
+        let h = oikos_kernel::log::entry_hash(e["seq"].as_u64().unwrap(), e["t"].as_i64().unwrap(), kind, &e["body"], &prev).unwrap();
         e["hash"] = json!(h);
         prev = h;
-        forged.extend(terrarium_kernel::canon::canonical_value(e).unwrap());
+        forged.extend(oikos_kernel::canon::canonical_value(e).unwrap());
         forged.push(b'\n');
     }
-    assert!(terrarium_kernel::log::verify(&forged, None).is_ok(), "the forged chain is internally consistent");
+    assert!(oikos_kernel::log::verify(&forged, None).is_ok(), "the forged chain is internally consistent");
     match replay(&forged, None) {
         Err(ReplayError::Diverged { line, .. }) => assert_eq!(line, i),
         other => panic!("expected divergence at line {}, got {other:?}", i + 1),
@@ -110,7 +110,7 @@ fn riverbend_replays_and_observations_are_reproducible() {
         Command::Observe { participant: "developer-system".into(), only: None },
     ] {
         if let Some(o) = run.done(&cmd).unwrap().observation {
-            observations.push(terrarium_kernel::canon::canonical(&o).unwrap());
+            observations.push(oikos_kernel::canon::canonical(&o).unwrap());
         }
     }
     run.finish("completed", None).unwrap();
@@ -127,7 +127,7 @@ fn riverbend_replays_and_observations_are_reproducible() {
         Command::Observe { participant: "developer-system".into(), only: None },
     ] {
         if let Some(o) = run2.done(&cmd).unwrap().observation {
-            again.push(terrarium_kernel::canon::canonical(&o).unwrap());
+            again.push(oikos_kernel::canon::canonical(&o).unwrap());
         }
     }
     assert_eq!(observations, again);

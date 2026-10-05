@@ -28,7 +28,7 @@ pub struct Session {
     sched: Option<crate::schedule::Scheduler>,
     /// What each seat knows (`<participant>|<capacity>`, or `<participant>` for all its capacities), from the
     /// observations delivered to it: the resolver's only source (P8).
-    knowledge: std::collections::BTreeMap<String, terrarium_resolver::Knowledge>,
+    knowledge: std::collections::BTreeMap<String, oikos_resolver::Knowledge>,
     /// The world's structure types (its catalogue), by id: what the resolver reads of a kind of building.
     types: std::collections::BTreeMap<String, Value>,
 }
@@ -125,13 +125,13 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
         "resolve" => {
             let participant = str_field("participant")?;
             let key = req["only"].as_str().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
-            let program = terrarium_resolver::calls::parse_program(str_field("program")?).map_err(|e| format!("the call doesn't parse: {}", e.0))?;
-            let empty = terrarium_resolver::Knowledge::default();
+            let program = oikos_resolver::calls::parse_program(str_field("program")?).map_err(|e| format!("the call doesn't parse: {}", e.0))?;
+            let empty = oikos_resolver::Knowledge::default();
             let k = knowledge.get(&key).unwrap_or(&empty);
             let type_of = |t: &str| types.get(t).cloned();
-            Ok(match terrarium_resolver::resolve(&program, k, &type_of, req["as"].as_str()) {
-                terrarium_resolver::Resolution::Blocks(blocks) => json!({ "ok": true, "blocks": blocks }),
-                terrarium_resolver::Resolution::Questions { questions, invalid } => {
+            Ok(match oikos_resolver::resolve(&program, k, &type_of, req["as"].as_str()) {
+                oikos_resolver::Resolution::Blocks(blocks) => json!({ "ok": true, "blocks": blocks }),
+                oikos_resolver::Resolution::Questions { questions, invalid } => {
                     let mut v = json!({ "ok": true, "questions": questions });
                     if !invalid.is_empty() {
                         v["invalid"] = json!(invalid);

@@ -157,8 +157,8 @@ pub enum EventBody {
     Transfer {
         from: Id,
         to: Id,
-        #[serde(with = "terrarium_core::money::amount")]
-        amount: terrarium_core::money::Money,
+        #[serde(with = "oikos_core::money::amount")]
+        amount: oikos_core::money::Money,
         currency: Id,
         by: Id,
         reason: TransferReason,
@@ -187,8 +187,8 @@ pub enum EventBody {
     },
     GoodsMoved {
         kind: Id,
-        #[serde(with = "terrarium_core::money::amount")]
-        quantity: terrarium_core::money::Money,
+        #[serde(with = "oikos_core::money::amount")]
+        quantity: oikos_core::money::Money,
         from: Id,
         from_at: Id,
         to: Id,
@@ -300,8 +300,8 @@ pub enum EventBody {
         by: Id,
         from: Id,
         kind: Id,
-        #[serde(with = "terrarium_core::money::amount")]
-        quantity: terrarium_core::money::Money,
+        #[serde(with = "oikos_core::money::amount")]
+        quantity: oikos_core::money::Money,
         at: Id,
     },
     /// A building flooded (a field passed its level): its occupants moved out.

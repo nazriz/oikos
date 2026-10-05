@@ -12,9 +12,9 @@ use common::*;
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use std::collections::BTreeMap;
-use terrarium_kernel::observe::{AccountItem, ChannelData, EntityItem, PositionItem, SiteCell};
-use terrarium_kernel::run::Run;
-use terrarium_kernel::Command;
+use oikos_kernel::observe::{AccountItem, ChannelData, EntityItem, PositionItem, SiteCell};
+use oikos_kernel::run::Run;
+use oikos_kernel::Command;
 
 #[derive(Default, Debug, PartialEq)]
 struct View {
@@ -139,7 +139,7 @@ fn a_closed_account_leaves_the_view() {
     };
     let r = act(&mut run, serde_json::json!([{"block": "open_account", "holder": "alice", "ref": "a"}]));
     let acc = match &r.events[0].body {
-        terrarium_kernel::events::EventBody::ActionApplied { created: Some(c), .. } => c["a"].clone(),
+        oikos_kernel::events::EventBody::ActionApplied { created: Some(c), .. } => c["a"].clone(),
         other => panic!("{other:?}"),
     };
     let mut view = View::default();

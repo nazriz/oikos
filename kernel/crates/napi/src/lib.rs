@@ -2,7 +2,7 @@
 //! with the same requests and replies as the stdio protocol (kernel/src/protocol.rs), without a subprocess or a pipe.
 
 use napi_derive::napi;
-use terrarium_kernel::protocol::Session;
+use oikos_kernel::protocol::Session;
 
 // The kernel allocates heavily (JSON values, canonical encoding): the same allocator as its binary. Results don't
 // depend on it.
@@ -38,12 +38,12 @@ impl KernelSession {
     /// The kernel's build, for the log header's provenance.
     #[napi]
     pub fn version() -> String {
-        terrarium_kernel::run::KERNEL_VERSION.to_string()
+        oikos_kernel::run::KERNEL_VERSION.to_string()
     }
 
     /// The fingerprint of the sources it was built from (kernel/build.rs), to match against the binary's.
     #[napi]
     pub fn source() -> String {
-        terrarium_kernel::run::KERNEL_SOURCE.to_string()
+        oikos_kernel::run::KERNEL_SOURCE.to_string()
     }
 }

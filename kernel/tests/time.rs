@@ -6,9 +6,9 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
-use terrarium_kernel::events::EventBody;
-use terrarium_kernel::kernel::Command;
-use terrarium_kernel::run::Run;
+use oikos_kernel::events::EventBody;
+use oikos_kernel::kernel::Command;
+use oikos_kernel::run::Run;
 
 fn act(participant: &str, position: Option<&str>, blocks: Value, thinking: Option<i64>) -> Command {
     Command::Act {

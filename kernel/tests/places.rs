@@ -6,11 +6,11 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
-use terrarium_kernel::blocks::Block;
-use terrarium_kernel::events::{EventBody, RefusalCode};
-use terrarium_kernel::observe::ChannelData;
-use terrarium_kernel::run::Run;
-use terrarium_kernel::Command;
+use oikos_kernel::blocks::Block;
+use oikos_kernel::events::{EventBody, RefusalCode};
+use oikos_kernel::observe::ChannelData;
+use oikos_kernel::run::Run;
+use oikos_kernel::Command;
 
 /// The test world, set on a 1000 x 1000 plane: a summarised region holding the (detailed) town, a detailed village
 /// far away across it, and summarised farmland. The mayor looks at each place.

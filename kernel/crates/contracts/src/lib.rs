@@ -1,4 +1,4 @@
-//! Terrarium's contract types (docs/design/rebuild.md section 4): blocks and records, the world config, events,
+//! Oikos's contract types (docs/design/rebuild.md section 4): blocks and records, the world config, events,
 //! and the compiled JSON Schemas every input is validated against. Types only: nothing here runs the world.
 
 #![forbid(unsafe_code)]

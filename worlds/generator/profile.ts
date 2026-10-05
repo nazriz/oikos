@@ -3,7 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { HouseholdSpec } from "@terrarium/participants";
+import type { HouseholdSpec } from "@oikos/participants";
 
 export interface Profile {
   id: string;

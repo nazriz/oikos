@@ -1,11 +1,11 @@
 // The kernel's randomness, ported exactly (kernel/src/rng.rs): one seed, keyed
 // streams. stream(key) derives an independent xoshiro256** stream from
-// SHA-256("terrarium.rng.v1\n" || seed_le || for each part: len_le || utf8).
+// SHA-256("oikos.rng.v1\n" || seed_le || for each part: len_le || utf8).
 // Code participants draw randomness only from here, so re-runs are reproducible
 // (D30). Checked against the Rust known-answer vectors in test/rng.test.ts.
 
 const MASK = (1n << 64n) - 1n;
-const DOMAIN = new TextEncoder().encode("terrarium.rng.v1\n");
+const DOMAIN = new TextEncoder().encode("oikos.rng.v1\n");
 
 function u64le(n: bigint): Uint8Array {
   const b = new Uint8Array(8);

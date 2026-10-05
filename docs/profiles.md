@@ -1,6 +1,6 @@
 # Profiles: where a place's figures live
 
-Terrarium is a general platform. **Its code is the same for every place and time.** Everything true of one place (its census shares, life tables, wages, rents, support payments, industry shares, currency) lives in a **profile**, with its source, and reaches a world through its generator.
+Oikos is a general platform. **Its code is the same for every place and time.** Everything true of one place (its census shares, life tables, wages, rents, support payments, industry shares, currency) lives in a **profile**, with its source, and reaches a world through its generator.
 
 ## The layers
 

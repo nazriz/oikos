@@ -36,7 +36,7 @@ self.onmessage = (e: MessageEvent) => {
       doing = "(unreadable)";
     }
     const diagnosis = { run_id: runId, reason: "stalled", stalled_for_ms: Date.now() - since, doing, at: new Date().toISOString(),
-      what_next: "Fix the cause, then resume the run: `terrarium resume <log>` re-runs it with every model response served from this log." };
+      what_next: "Fix the cause, then resume the run: `oikos resume <log>` re-runs it with every model response served from this log." };
     try {
       writeFileSync(diagnosisPath, JSON.stringify(diagnosis, null, 2));
     } catch {

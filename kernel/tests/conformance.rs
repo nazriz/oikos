@@ -10,11 +10,11 @@ use common::*;
 use proptest::prelude::*;
 use serde_json::{json, Value};
 use std::path::Path;
-use terrarium_kernel::blocks::Block;
-use terrarium_kernel::canon::canonical_value;
-use terrarium_kernel::events::Event;
-use terrarium_kernel::kernel::Command;
-use terrarium_kernel::run::{Header, Run};
+use oikos_kernel::blocks::Block;
+use oikos_kernel::canon::canonical_value;
+use oikos_kernel::events::Event;
+use oikos_kernel::kernel::Command;
+use oikos_kernel::run::{Header, Run};
 
 fn read_json(p: &Path) -> Value {
     serde_json::from_slice(&std::fs::read(p).unwrap()).unwrap_or_else(|e| panic!("{}: {e}", p.display()))
@@ -37,13 +37,13 @@ fn round_trips<T: serde::de::DeserializeOwned + serde::Serialize>(name: &str, v:
 #[test]
 fn contract_examples_round_trip_through_kernel_types() {
     for (name, v) in examples("world-config") {
-        terrarium_kernel::config::load(v).unwrap_or_else(|e| panic!("{name}: {e}"));
+        oikos_kernel::config::load(v).unwrap_or_else(|e| panic!("{name}: {e}"));
     }
     for (name, v) in examples("block") {
         round_trips::<Block>(&name, &v);
     }
     for (name, v) in examples("record") {
-        round_trips::<terrarium_kernel::blocks::Record>(&name, &v);
+        round_trips::<oikos_kernel::blocks::Record>(&name, &v);
     }
     for (name, v) in examples("participant-action") {
         if v["type"] == "act" {
@@ -51,7 +51,7 @@ fn contract_examples_round_trip_through_kernel_types() {
         }
     }
     for (name, v) in examples("log-entry") {
-        round_trips::<terrarium_kernel::log::Entry>(&name, &v);
+        round_trips::<oikos_kernel::log::Entry>(&name, &v);
         match v["kind"].as_str().unwrap() {
             "command" => round_trips::<Command>(&name, &v["body"]),
             "event" => round_trips::<Event>(&name, &v["body"]),
@@ -78,9 +78,9 @@ fn schemas() -> Schemas {
         opts.build(&root).unwrap()
     };
     Schemas {
-        entry: build(json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.8:log"})),
+        entry: build(json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:oikos:contracts:0.8:log"})),
         observation: build(
-            json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:terrarium:contracts:0.8:participant-api#/$defs/Observation"}),
+            json!({"$schema": "https://json-schema.org/draft/2020-12/schema", "$ref": "urn:oikos:contracts:0.8:participant-api#/$defs/Observation"}),
         ),
     }
 }

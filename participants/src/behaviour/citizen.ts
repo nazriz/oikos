@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.34.0",
+  version: "0.35.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -261,7 +261,7 @@ export const citizen: BehaviourModule = {
     // When we last saw the waste at home go down (a collection), and what it was then: how long it's been is what we go
     // by, not what's in the bin over how fast it's filling now (which depends on who's home at the moment: pilot 7d's
     // flats, judged in the daytime with half the building out, complained of a week's waste as two).
-    const binSeen = { structure: "", value: 0, emptiedAt: -1 };
+    const binSeen = { structure: "", value: 0, emptiedAt: -1, at: -1, view: undefined as { value: number; as_of_day: number; per_day: number; min: number; max: number } | undefined };
     // Moving to a better-paid job: the offer we've taken, to sign once our notice at the old one is worked out.
     let switching: { offer: string; wage: number } | null = null;
     let searchingWork = false; // this month's look for a better-paid job while employed
@@ -518,10 +518,18 @@ export const citizen: BehaviourModule = {
       for (const c of channels.cells(obs)) if (home && c.structure?.structure === home.structure) {
         homeSite = c.structure;
         // The bin at home, each time we see it: emptied if there's less in it than last time.
-        const now = variableToday(c.structure.variables?.[p.complain_about], obs.t) ?? 0;
-        if (binSeen.structure !== home.structure) Object.assign(binSeen, { structure: home.structure, value: now, emptiedAt: obs.t });
-        else if (now < binSeen.value) binSeen.emptiedAt = obs.t;
-        binSeen.value = now;
+        // (Emptied since we last looked, if there's well under what there would be had nobody come: less than last time
+        // misses it for a household that looks weekly, at the same point of each week's round. When, we reckon from
+        // what's in it now, no earlier than our last look.)
+        const view = c.structure.variables?.[p.complain_about];
+        const now = variableToday(view, obs.t) ?? 0;
+        if (binSeen.structure !== home.structure) Object.assign(binSeen, { structure: home.structure, emptiedAt: obs.t });
+        else if (binSeen.view && obs.t - binSeen.at >= DAY) {
+          const untouched = variableToday(binSeen.view, obs.t) ?? 0;
+          if (now < binSeen.value || now * 10 < untouched * 6)
+            binSeen.emptiedAt = Math.max(binSeen.at, obs.t - Math.floor((now * DAY) / Math.max(1, view?.per_day ?? 1)));
+        } else if (now < binSeen.value) binSeen.emptiedAt = obs.t;
+        Object.assign(binSeen, { value: now, at: obs.t, view });
       }
       if (pendingFirm && founded) {
         const id = obs.outcomes.flatMap((o) => (o.created?.firm ? [o.created.firm] : []))[0];
@@ -538,7 +546,8 @@ export const citizen: BehaviourModule = {
       for (const tx of channels.transactions(obs)) if (mine.has(tx.to) && !mine.has(tx.from)) {
         // (A home's price, paid us for one we're selling, and a mortgage's principal aren't income: they're the home's.)
         if (selling?.listing === "pending") selling.listing = book.open("property_for_sale").find((r) => r.speaks_for === me && r.data?.lot === selling!.lot)?.id ?? "pending";
-        const sale = selling?.listing ? book.open("property_purchase").find((r) => r.basis === selling!.listing && r.data?.account === tx.from) : undefined;
+        if (selling?.listing && selling.listing !== "pending" && !selling.listings.includes(selling.listing)) selling.listings.push(selling.listing);
+        const sale = selling?.listings.length ? book.open("property_purchase").find((r) => selling!.listings.includes(r.basis ?? "") && r.data?.account === tx.from) : undefined;
         if (sale && selling) {
           selling.buyer ??= sale.speaks_for;
           selling.buyerAccount ??= tx.from;
@@ -1815,7 +1824,7 @@ export const citizen: BehaviourModule = {
     };
 
     // ---- homes for sale (docs/behaviour/ownership.md) ----
-    type Selling = { lot: string; space?: string; structure: string; bedrooms?: number; price: number; asked: number; leaveAfter: boolean; listing?: string; buyer?: string; buyerAccount?: string; received: number; sold?: boolean; loan?: string };
+    type Selling = { lot: string; space?: string; structure: string; bedrooms?: number; price: number; asked: number; /** Every listing we've made of it (a buyer may answer one since replaced by a cheaper). */ listings: string[]; leaveAfter: boolean; listing?: string; buyer?: string; buyerAccount?: string; received: number; sold?: boolean; loan?: string };
     let selling: Selling | null = null;
     let buying: { listing: string; seller: string; account: string; price: number; lot: string; space: string; structure: string; stage: "applied" | "paid"; since: number; funded?: boolean } | null = null;
     let nextBuyChance = ctx.rng("buy-day").below(30) * DAY;
@@ -1839,7 +1848,7 @@ export const citizen: BehaviourModule = {
       const h = houseOn(obs, lot);
       const price = valuationOf(lot);
       if (!h?.space || !price) return false;
-      selling = { lot, space: h.space, structure: h.structure, bedrooms: p.market?.bedrooms_by_type[h.type], price, asked: price, leaveAfter, received: 0, loan: mortgageFor(h.space)?.id };
+      selling = { lot, space: h.space, structure: h.structure, bedrooms: p.market?.bedrooms_by_type[h.type], price, asked: price, listings: [], leaveAfter, received: 0, loan: mortgageFor(h.space)?.id };
       return true;
     };
     const market = (obs: Observation, t: number, steps: Step[]) => {
@@ -1861,6 +1870,7 @@ export const citizen: BehaviourModule = {
       // ---- selling: listed at the valuation; once paid in full, the title passed and the mortgage paid off ----
       const s = selling as Selling | null;
       if (s?.listing === "pending") s.listing = book.open("property_for_sale").find((r) => r.speaks_for === me && r.data?.lot === s.lot)?.id ?? "pending";
+      if (s?.listing && s.listing !== "pending" && !s.listings.includes(s.listing)) s.listings.push(s.listing);
       if (s && !s.listing) {
         s.listing = "pending";
         const st = because(`Selling ${s.structure} at its valuation, ${usd(s.price)}${s.leaveAfter ? ", to leave town once it's sold" : ""}.`,
@@ -1874,7 +1884,9 @@ export const citizen: BehaviourModule = {
         steps.push(because(`${s.structure} hasn't sold in ${m.relist_days} days at ${usd(was)}: taking it off, to list it for ${usd(s.price)}.`, withdraw(s.listing, "Relisting for less.")));
         s.listing = undefined;
       } else if (s?.listing && s.listing !== "pending" && !s.sold) {
-        const buy = s.buyer ? undefined : book.open("property_purchase").filter((r) => r.basis === s.listing && (r.addressed_to ?? []).includes(me)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))[0];
+        // (A purchase answering any listing we made of it: until 2026-10-05 only the current one, and a buyer whose
+        // mortgage came through as we relisted for less paid us, and got nothing.)
+        const buy = s.buyer ? undefined : book.open("property_purchase").filter((r) => s.listings.includes(r.basis ?? "") && (r.addressed_to ?? []).includes(me)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))[0];
         if (buy) {
           s.buyer = buy.speaks_for;
           s.buyerAccount = String(buy.data?.account);
@@ -1885,6 +1897,8 @@ export const citizen: BehaviourModule = {
           const title = titleOf(s.lot);
           steps.push(because(`${s.buyer} has paid ${usd(s.received)} for ${s.structure}: passing them the title.`,
             ...(title ? [C.call("claim", { transfer: title.id, to: s.buyer })] : []), withdraw(s.listing, "Sold."),
+            // (Paid at an earlier, higher price: the difference goes back.)
+            ...(s.received > s.price && s.buyerAccount ? [pay(s.buyerAccount, s.received - s.price, { from: acc.account, for: `The difference: ${s.structure} was down to ${usd(s.price)}.` })] : []),
             say("property_sold", `Sold: ${s.structure} to ${s.buyer} for ${usd(s.price)}.`, { visible: "public", basis: s.listing, data: { structure: s.structure, lot: s.lot, buyer: s.buyer, price: s.price } })));
           if (s.loan) steps.push(because("Sold: asking the bank what paying our mortgage off takes.",
             say("loan_payout_request", `What does paying off ${s.loan} take?`, { to: [p.bank], visible: [me, p.bank], data: { loan: s.loan } })));

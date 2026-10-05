@@ -141,14 +141,14 @@ impl World {
             boundary_accounts,
             currency: currency.clone(),
             tick: c.clock.tick_seconds,
-            act_times: terrarium_time::ActTimes::from_orchestration(&c.orchestration),
+            act_times: oikos_time::ActTimes::from_orchestration(&c.orchestration),
             randomness: Randomness::new(c.seed),
-            nature: terrarium_nature::configured(&c.catalogue).then(|| {
+            nature: oikos_nature::configured(&c.catalogue).then(|| {
                 let cells: BTreeSet<(Id, i64, i64)> = crate::config::detailed_rects(&w.places)
                     .iter()
                     .flat_map(|r| (r.y..r.y + r.h).flat_map(move |y| (r.x..r.x + r.w).map(move |x| (cell_id(x, y), x, y))))
                     .collect();
-                terrarium_nature::Ground::new(&cells.into_iter().collect::<Vec<_>>(), &w.flows)
+                oikos_nature::Ground::new(&cells.into_iter().collect::<Vec<_>>(), &w.flows)
             }),
             config: c.clone(),
         };
@@ -281,7 +281,7 @@ impl World {
         }
         // Nature at the start (docs/design/world-expansion.md 2), stepped each day from the next.
         if s.nature.is_some() {
-            let mut n = terrarium_nature::NatureState::default();
+            let mut n = oikos_nature::NatureState::default();
             for p in &w.populations {
                 *n.populations.entry(p.species.clone()).or_default().entry(p.cell.clone()).or_insert(0) += p.count;
             }
@@ -292,7 +292,7 @@ impl World {
             if w.nature_spin_up_days > 0 {
                 let ground = s.nature.as_ref().unwrap();
                 let land = crate::exec::nature_land(&s, &st, ground);
-                terrarium_nature::spin_up(&c.catalogue, ground, &land, &mut n, -w.nature_spin_up_days, w.nature_spin_up_days, &s.randomness);
+                oikos_nature::spin_up(&c.catalogue, ground, &land, &mut n, -w.nature_spin_up_days, w.nature_spin_up_days, &s.randomness);
                 n.day = 0;
             }
             st.nature = Some(Arc::new(n));
@@ -564,8 +564,8 @@ impl World {
         let t = self.state.t;
         let p = &self.state.participants[participant];
         let (actor, key, lanes) = match p.kind {
-            ParticipantKind::Person => (terrarium_time::Actor::Person, p.person.clone().unwrap_or_else(|| participant.into()), 1),
-            ParticipantKind::System => (terrarium_time::Actor::System, participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
+            ParticipantKind::Person => (oikos_time::Actor::Person, p.person.clone().unwrap_or_else(|| participant.into()), 1),
+            ParticipantKind::System => (oikos_time::Actor::System, participant.to_string(), p.def.lanes.unwrap_or(1) as usize),
         };
         // (Going somewhere takes the trip: the longest of the act's moves, from where each body is to the building it's
         // going to. Literal ids only: a body or space made in the act itself is going nowhere yet.)
@@ -584,7 +584,7 @@ impl World {
             .unwrap_or(0);
         let seconds = self.s.act_times.program(actor, blocks.iter().map(Block::name)) + trip;
         let mut timeline = self.state.timelines.get(&key).cloned().unwrap_or_default();
-        let (starts, done) = terrarium_time::place(&mut timeline, lanes, t + thinking, seconds);
+        let (starts, done) = oikos_time::place(&mut timeline, lanes, t + thinking, seconds);
         self.state.timelines.insert(key, timeline);
         let pos = position.map(String::from);
         self.state.schedule(done, crate::state::Sched::Act { action: action.clone(), participant: participant.into(), position: pos.clone(), blocks: blocks.to_vec() });

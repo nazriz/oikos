@@ -1,6 +1,6 @@
 # References: ideas we use, and where
 
-Every idea Terrarium takes from someone else's work goes here: what it is, the citation, and where we use it. Keep it
+Every idea Oikos takes from someone else's work goes here: what it is, the citation, and where we use it. Keep it
 current; it's what we cite from. Entries marked **(to confirm)** are cited from memory or a secondary source and need
 checking against the original before publication. Behaviour rules' own sources stay in docs/behaviour/ (each doc's
 sources); this list is for the architecture and design ideas.

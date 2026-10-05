@@ -40,7 +40,7 @@ pub struct Observation {
     /// Readings of the agreements this observation brings (an agreement, or a signature or notice on one), by their own
     /// terms (contracts 0.7; docs/design/rebuild.md section 7): beside the records, never in their place.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty", skip_deserializing)]
-    pub readings: BTreeMap<Id, terrarium_terms::Reading>,
+    pub readings: BTreeMap<Id, oikos_terms::Reading>,
 }
 
 /// A condition as its body knows it: what, how bad, since and until when, and whether it's been treated. Never
@@ -525,7 +525,7 @@ impl RecordIndex {
 }
 
 /// A field a search can use. Purely mechanical: names a place in a record, and never says what it means.
-pub use terrarium_world::kernel::known_field;
+pub use oikos_world::kernel::known_field;
 
 fn field(r: &Record, f: &str) -> Option<Value> {
     let path = |v: &Value, p: &str| p.split('.').try_fold(v, |v, k| v.get(k)).cloned();

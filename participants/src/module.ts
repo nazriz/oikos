@@ -96,7 +96,7 @@ export interface BehaviourModule {
  * process (a symbol: never part of the action, never serialised). The orchestrator records them as `decision`
  * annotations, for full logs.
  */
-export const DECISIONS = Symbol.for("terrarium.decisions");
+export const DECISIONS = Symbol.for("oikos.decisions");
 /** `state`: the mind's state behind it (contracts-0.7 A2): needs, satisfaction and certainty, and the strongest feeling,
  * beliefs held and goal pursued when there are any. */
 export interface DecisionRecord {

@@ -1,26 +1,26 @@
 // A client for the kernel's protocol (kernel/src/protocol.rs): one request in, one reply out. The engine runs
 // in-process through its native module (kernel/crates/napi; docs/design/rebuild.md section 5.1) when it's built, or as
-// a subprocess speaking the same requests over stdio (TERRARIUM_ENGINE=stdio, or no native module).
+// a subprocess speaking the same requests over stdio (OIKOS_ENGINE=stdio, or no native module).
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 export function kernelBinary(): string {
-  const env = process.env.TERRARIUM_KERNEL;
+  const env = process.env.OIKOS_KERNEL;
   if (env) return env;
   const root = join(import.meta.dir, "../..");
-  for (const p of ["kernel/target/release/terrarium-kernel", "kernel/target/debug/terrarium-kernel"]) {
+  for (const p of ["kernel/target/release/oikos-kernel", "kernel/target/debug/oikos-kernel"]) {
     if (existsSync(join(root, p))) return join(root, p);
   }
-  throw new Error("kernel binary not found: run `bun run kernel` (cargo build --release) or set TERRARIUM_KERNEL");
+  throw new Error("kernel binary not found: run `bun run kernel` (cargo build --release) or set OIKOS_KERNEL");
 }
 
 /** The engine's native module (kernel/crates/napi), if built: `bun run kernel` builds it with the binary. */
 export function engineModule(): string | undefined {
-  const env = process.env.TERRARIUM_ENGINE_MODULE;
+  const env = process.env.OIKOS_ENGINE_MODULE;
   if (env) return env;
   const root = join(import.meta.dir, "../..");
-  for (const dir of ["kernel/target/release", "kernel/target/debug"]) for (const f of ["libterrarium_napi.dylib", "libterrarium_napi.so", "terrarium_napi.dll"]) {
+  for (const dir of ["kernel/target/release", "kernel/target/debug"]) for (const f of ["liboikos_napi.dylib", "liboikos_napi.so", "oikos_napi.dll"]) {
     if (existsSync(join(root, dir, f))) return join(root, dir, f);
   }
   return undefined;
@@ -35,12 +35,12 @@ function loadNative(path: string) {
   if (!native) {
     const m = { exports: {} as any };
     process.dlopen(m, path);
-    const bin = process.env.TERRARIUM_ENGINE_MODULE ? undefined : join(path, "..", "terrarium-kernel");
+    const bin = process.env.OIKOS_ENGINE_MODULE ? undefined : join(path, "..", "oikos-kernel");
     if (bin && existsSync(bin)) {
       const theirs = /source (\w+)/.exec(Bun.spawnSync([bin, "version"]).stdout.toString())?.[1];
       const ours = m.exports.KernelSession.source?.();
       if (theirs !== ours)
-        throw new Error(`the engine's native module (source ${ours ?? "unknown"}) and the kernel binary beside it (source ${theirs ?? "unknown"}) were built from different sources: run \`bun run kernel\` (or TERRARIUM_ENGINE=stdio)`);
+        throw new Error(`the engine's native module (source ${ours ?? "unknown"}) and the kernel binary beside it (source ${theirs ?? "unknown"}) were built from different sources: run \`bun run kernel\` (or OIKOS_ENGINE=stdio)`);
     }
     native = m.exports;
   }
@@ -67,7 +67,7 @@ export class Kernel {
   readonly transport: "inprocess" | "stdio";
 
   constructor(binary?: string) {
-    const mod = binary === undefined && process.env.TERRARIUM_ENGINE !== "stdio" ? engineModule() : undefined;
+    const mod = binary === undefined && process.env.OIKOS_ENGINE !== "stdio" ? engineModule() : undefined;
     if (mod) {
       this.transport = "inprocess";
       this.session = new (loadNative(mod).KernelSession)();

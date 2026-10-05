@@ -1,5 +1,5 @@
 [package]
-name = "terrarium-perception"
+name = "oikos-perception"
 version = "0.7.0"
 edition = "2021"
 license = "Apache-2.0"
@@ -7,7 +7,7 @@ description = "Perception: what a participant perceives of the world through its
 rust-version = "1.85"
 
 [dependencies]
-terrarium-world = { path = "../world" }
-terrarium-terms = { path = "../terms" }
+oikos-world = { path = "../world" }
+oikos-terms = { path = "../terms" }
 serde = { workspace = true }
 serde_json = { workspace = true }

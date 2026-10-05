@@ -5,10 +5,10 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { canonical } from "@terrarium/participants";
-import { MockAdapter, type LlmRequest } from "@terrarium/participants/llm";
-import { draftHash } from "@terrarium/translator";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { canonical } from "@oikos/participants";
+import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
+import { draftHash } from "@oikos/translator";
+import { generate } from "@oikos/worlds/generator/generate";
 import { kernelBinary } from "../src/kernel";
 import { runWorld } from "../src/run";
 

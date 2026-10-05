@@ -14,7 +14,7 @@
 
 use sha2::{Digest, Sha256};
 
-const DOMAIN: &[u8] = b"terrarium.rng.v1\n";
+const DOMAIN: &[u8] = b"oikos.rng.v1\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Randomness {
@@ -106,7 +106,8 @@ mod tests {
         assert_eq!(got, KAT.to_vec(), "PRNG output changed: {got:?}");
     }
 
-    const KAT: [u64; 4] = [1279016643545707308, 14278355414776164234, 10710452481135636343, 17500029201716531815];
+    // (Changed once, on purpose, 2026-10-05: the project's rename changed the domain string the randomness starts from.)
+    const KAT: [u64; 4] = [15178468991547006131, 8141242282609027689, 16522627103700839329, 11871191864566068065];
 
     #[test]
     fn matches_reference_xoshiro256starstar() {

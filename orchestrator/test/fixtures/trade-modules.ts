@@ -1,5 +1,5 @@
 // A scripted exporter, for the trade tests: on given days it ships goods to the outside and invoices them.
-import { calls as C, type BehaviourModule } from "@terrarium/participants";
+import { calls as C, type BehaviourModule } from "@oikos/participants";
 
 const DAY = 86_400;
 

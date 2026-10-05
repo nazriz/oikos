@@ -5,8 +5,8 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { MockAdapter, OpenAICompatibleAdapter, type LlmAdapter, type LlmRequest } from "@terrarium/participants/llm";
-import { generate } from "@terrarium/worlds/generator/generate";
+import { MockAdapter, OpenAICompatibleAdapter, type LlmAdapter, type LlmRequest } from "@oikos/participants/llm";
+import { generate } from "@oikos/worlds/generator/generate";
 import { Kernel, KernelDied } from "../src/kernel";
 import { prepareResume, recordedCalls, Serving } from "../src/resume";
 import { runWorld } from "../src/run";
@@ -38,7 +38,7 @@ test("a run stuck in a module is stopped by its watchdog, with a diagnosis of wh
   writeFileSync(world, JSON.stringify(config));
   const t0 = Date.now();
   const p = Bun.spawn([process.execPath, join(root, "orchestrator/src/cli.ts"), "run", world, "--seeds", "1", "--out", d, "--no-measure", "--modules", join(import.meta.dir, "fixtures/faulty-modules.ts")],
-    { stdout: "pipe", stderr: "pipe", env: { ...process.env, TERRARIUM_STALL_SECONDS: "2" } });
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, OIKOS_STALL_SECONDS: "2" } });
   const [code, out] = await Promise.all([p.exited, new Response(p.stdout).text()]);
   expect(Date.now() - t0).toBeLessThan(60_000);
   expect(code).toBe(1);
@@ -55,7 +55,13 @@ test("a module that throws is recovered in place, recorded, retired after three 
   const b = await runWorld({ config, runId: "throws", outDir: dir("throw-b"), until: 30 * DAY, modules });
   const log = lines(a.logPath).map((l) => JSON.parse(l));
   const notes = log.filter((e) => e.kind === "annotation" && e.body.data?.participant_error);
-  expect(notes.map((n) => n.body.data.participant_error)).toEqual([1, 2, 3].map((n) => ({ unit, error: `Error: a bug at t=${(9 + n) * DAY}`, in_a_row: n })));
+  // (Three in a row, from day 10 on; the moment of each is its own wake's.)
+  expect(notes.map((n) => n.body.data.participant_error.in_a_row)).toEqual([1, 2, 3]);
+  for (const n of notes) {
+    expect(n.body.data.participant_error.unit).toBe(unit);
+    expect(n.body.data.participant_error.error).toMatch(/^Error: a bug at t=\d+$/);
+    expect(n.t).toBeGreaterThanOrEqual(10 * DAY);
+  }
   expect(a.participantErrors).toBe(3);
   // The third in a row retires it (no stand-in named): it acts no more.
   const retired = log.find((e) => e.kind === "annotation" && e.body.data?.participant_retired);

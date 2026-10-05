@@ -30,6 +30,14 @@ Seven warnings: five heatwaves and two heavy-rain spells; no flood (the spells w
 200 a heatwave makes about one extra person ill: too few to see, and real at this scale. A test makes a heatwave hot
 enough to see it.
 
+## Found 2026-10-05: heat had never worked
+
+The heat field was set to lose all of itself each day. The kernel adds a field's sources and then takes its decay, so
+the day's heat was gone as it came: no heatwave raised anyone's chance of illness in any run before this date
+(pilots 7d to 8b included). The test had passed by chance. Now half is lost a day: heat settles at its level within a
+couple of days of a heatwave starting and fades over a couple after. The line above about "one extra person ill" was
+an expectation, not a measurement.
+
 ## Leaves out (for now)
 
 - **Responses to warnings:** cooling centres, checking on the elderly, sandbagging, water restrictions ahead of a

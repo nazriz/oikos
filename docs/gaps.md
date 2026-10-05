@@ -2,7 +2,7 @@
 
 A living list. Pilots with a real model (docs/real-models.md) are for **finding** gaps: in the world, the platform, and the participant's tools. Gaps are collected here and triaged with Naz. Each one ends up **fixed**, **accepted** (a documented limit of the world), or **deferred**. We don't fix them one at a time mid-pilot; that tunes the world to one model (2026-09-28).
 
-**Signals to look for in a run:** `terrarium measure <dir> letters` (many letters to the same addressee, or letters that keep coming after answers); `language-participants` (requests that couldn't be translated); `translation_retry` notes; and `terrarium story <log>`.
+**Signals to look for in a run:** `oikos measure <dir> letters` (many letters to the same addressee, or letters that keep coming after answers); `language-participants` (requests that couldn't be translated); `translation_retry` notes; and `oikos story <log>`.
 
 ## Open: to triage
 

@@ -13,10 +13,10 @@ use serde_json::{json, Value};
 use std::io::Write;
 
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const KERNEL_BUILD: &str = env!("TERRARIUM_BUILD");
+pub const KERNEL_BUILD: &str = env!("OIKOS_BUILD");
 /// A fingerprint of the sources the engine was built from (build.rs): the binary and the native module agree on it
 /// when they were built from the same sources.
-pub const KERNEL_SOURCE: &str = env!("TERRARIUM_SOURCE");
+pub const KERNEL_SOURCE: &str = env!("OIKOS_SOURCE");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -12,7 +12,7 @@ const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 
 test("truth audits: modules' beliefs match the terms' readings, and none stays wrong for more than a week", async () => {
-  const { generate } = await import("@terrarium/worlds/generator/generate");
+  const { generate } = await import("@oikos/worlds/generator/generate");
   const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
   const out = join(import.meta.dir, "../../runs/test-truth");
   rmSync(out, { recursive: true, force: true });

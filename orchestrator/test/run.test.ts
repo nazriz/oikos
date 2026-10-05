@@ -58,7 +58,7 @@ test("the bank refuses an instruction from someone who isn't the account holder"
 }, 60_000);
 
 test("the generated town runs 60 days headless: people find homes and work, and the log replays", async () => {
-  const { generate } = await import("@terrarium/worlds/generator/generate");
+  const { generate } = await import("@oikos/worlds/generator/generate");
   const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
   const out = join(import.meta.dir, "../../runs/test-town");
   rmSync(out, { recursive: true, force: true });

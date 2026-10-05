@@ -1,27 +1,27 @@
 [package]
-name = "terrarium-kernel"
+name = "oikos-kernel"
 version = "0.7.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "Terrarium world kernel: physics and records, clock, hash-chained log, replay"
+description = "Oikos world kernel: physics and records, clock, hash-chained log, replay"
 rust-version = "1.85"
 
 [lib]
-name = "terrarium_kernel"
+name = "oikos_kernel"
 path = "src/lib.rs"
 
 [[bin]]
-name = "terrarium-kernel"
+name = "oikos-kernel"
 path = "src/main.rs"
 
 [dependencies]
-terrarium-core = { path = "crates/core" }
-terrarium-contracts = { path = "crates/contracts" }
-terrarium-terms = { path = "crates/terms" }
-terrarium-time = { path = "crates/time" }
-terrarium-resolver = { path = "crates/resolver" }
-terrarium-world = { path = "crates/world" }
-terrarium-perception = { path = "crates/perception" }
+oikos-core = { path = "crates/core" }
+oikos-contracts = { path = "crates/contracts" }
+oikos-terms = { path = "crates/terms" }
+oikos-time = { path = "crates/time" }
+oikos-resolver = { path = "crates/resolver" }
+oikos-world = { path = "crates/world" }
+oikos-perception = { path = "crates/perception" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

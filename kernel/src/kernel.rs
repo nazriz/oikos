@@ -1,5 +1,5 @@
-//! The engine's kernel (docs/design/rebuild.md section 4): the world (`terrarium-world`, the only writer) and what its
-//! participants perceive of it (`terrarium-perception`, read-only), together behind one command interface. An
+//! The engine's kernel (docs/design/rebuild.md section 4): the world (`oikos-world`, the only writer) and what its
+//! participants perceive of it (`oikos-perception`, read-only), together behind one command interface. An
 //! observation is built by perception from the world as it is, then delivered by the world (what was looked through
 //! is marked seen; outcomes and messages are handed over), and its hash goes in the log.
 
@@ -10,7 +10,7 @@ use crate::observe::{self, Observation, RecordIndex};
 use crate::state::State;
 use crate::statics::Statics;
 
-pub use terrarium_world::kernel::{Check, Command, ProtocolError};
+pub use oikos_world::kernel::{Check, Command, ProtocolError};
 
 #[derive(Debug, Clone, Default)]
 pub struct Output {
@@ -19,14 +19,14 @@ pub struct Output {
 }
 
 pub struct Kernel {
-    world: terrarium_world::World,
+    world: oikos_world::World,
     /// Perception's derived lookups; not part of the state.
     index: RecordIndex,
 }
 
 impl Kernel {
     pub fn new(loaded: &crate::config::LoadedConfig) -> Result<Kernel, String> {
-        Ok(Kernel { world: terrarium_world::World::new(loaded)?, index: Default::default() })
+        Ok(Kernel { world: oikos_world::World::new(loaded)?, index: Default::default() })
     }
 
     pub fn state(&self) -> &State {

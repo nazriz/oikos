@@ -6,10 +6,10 @@ mod common;
 
 use common::*;
 use serde_json::{json, Value};
-use terrarium_kernel::events::{EventBody, RefusalCode};
-use terrarium_kernel::observe::ChannelData;
-use terrarium_kernel::run::Run;
-use terrarium_kernel::Command;
+use oikos_kernel::events::{EventBody, RefusalCode};
+use oikos_kernel::observe::ChannelData;
+use oikos_kernel::run::Run;
+use oikos_kernel::Command;
 
 const DAY: i64 = 86_400;
 
@@ -72,7 +72,7 @@ fn wear_rises_by_the_day_and_with_occupants_and_mending_lowers_it_exactly() {
     let wear = |run: &Run<Vec<u8>>, sid: &str| {
         let st = run.kernel().state();
         let cfg = &run.kernel().statics().config.catalogue.variables[0];
-        terrarium_kernel::exec::variable_at(st, sid, cfg, st.t).unwrap()
+        oikos_kernel::exec::variable_at(st, sid, cfg, st.t).unwrap()
     };
     // The house (alice inside): 100 at the start, +1 a day and +2 per occupant a day: 3 a day.
     assert_eq!(wear(&run, "s-house"), 100);

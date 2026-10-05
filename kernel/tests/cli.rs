@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-const BIN: &str = env!("CARGO_BIN_EXE_terrarium-kernel");
+const BIN: &str = env!("CARGO_BIN_EXE_oikos-kernel");
 
 fn cli(args: &[&str]) -> (bool, String) {
     let out = Command::new(BIN).args(args).output().unwrap();
@@ -16,7 +16,7 @@ fn cli(args: &[&str]) -> (bool, String) {
 
 #[test]
 fn serve_then_verify_then_replay() {
-    let dir = std::env::temp_dir().join(format!("terrarium-cli-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("oikos-cli-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let log = dir.join("run.jsonl");
     let anchors = dir.join("run.anchors.jsonl");

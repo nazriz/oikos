@@ -1,4 +1,4 @@
-//! Canonical JSON (RFC 8785 / JCS restricted to Terrarium's contracts) and
+//! Canonical JSON (RFC 8785 / JCS restricted to Oikos's contracts) and
 //! domain-separated SHA-256.
 //!
 //! Contracts allow only integers within ±(2^53 − 1) and ASCII object keys, so
@@ -14,11 +14,11 @@ use std::fmt;
 
 pub const MAX_SAFE: i64 = 9_007_199_254_740_991;
 
-pub const DOMAIN_LOG: &str = "terrarium.log.v1\n";
-pub const DOMAIN_STATE: &str = "terrarium.state.v1\n";
-pub const DOMAIN_CONFIG: &str = "terrarium.config.v1\n";
-pub const DOMAIN_OBSERVATION: &str = "terrarium.observation.v1\n";
-pub const DOMAIN_DRAFT: &str = "terrarium.draft.v1\n";
+pub const DOMAIN_LOG: &str = "oikos.log.v1\n";
+pub const DOMAIN_STATE: &str = "oikos.state.v1\n";
+pub const DOMAIN_CONFIG: &str = "oikos.config.v1\n";
+pub const DOMAIN_OBSERVATION: &str = "oikos.observation.v1\n";
+pub const DOMAIN_DRAFT: &str = "oikos.draft.v1\n";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CanonError {

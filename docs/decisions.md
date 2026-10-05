@@ -182,7 +182,7 @@ Full detail, including every point settled in discussion: docs/design/translator
 
 See the design note, §16.
 
-**D40. Contracts bumped to v0.3 (draft).** *(Naz, 2026-09-26: "bump to v0.3".)* Following the versioning rule rather than amending in place again (as D31 and D37 did), v0.3 is opened now as a draft. It holds D37's additions today, and D36's contract changes when they're signed off; it's frozen then. Schema ids are `urn:terrarium:contracts:0.3`, and configs and log headers say `"0.3"`. A v0.2 log header is now an invalid example. v0.2 logs replay only on a v0.2 kernel build (D6).
+**D40. Contracts bumped to v0.3 (draft).** *(Naz, 2026-09-26: "bump to v0.3".)* Following the versioning rule rather than amending in place again (as D31 and D37 did), v0.3 is opened now as a draft. It holds D37's additions today, and D36's contract changes when they're signed off; it's frozen then. Schema ids are `urn:oikos:contracts:0.3`, and configs and log headers say `"0.3"`. A v0.2 log header is now an invalid example. v0.2 logs replay only on a v0.2 kernel build (D6).
 
 **D41. The translator, resolver and in-world seats are built.** *(Naz signed off the design, 2026-09-26: "signed off, go ahead and build it".)*
 - Contracts v0.3 (draft): the call language; outcomes, requests and forms; drafts and provenance with the call and resolver; `basis` on agreements; confirmation modes; `resign` renamed `opt_out` with `on_opt_out`.
@@ -256,7 +256,7 @@ See the design note, §16.
 
 **D46. M3: batch runs, measurement and the cost report.** *(Naz, 2026-09-27: "yes, go ahead with M3".)*
 - **Batches:**
-  - `terrarium run <world> --seeds N` runs each seed in its own process (with its own kernel), several in parallel.
+  - `oikos run <world> --seeds N` runs each seed in its own process (with its own kernel), several in parallel.
   - A test checks a batch run is identical to the same seed run alone. Seed 1 of the 1,000-citizen batch also has the same final state as the earlier standalone run.
   - Seeds vary randomness, not the world.
   - `--set path=value` overrides the world file.
@@ -403,7 +403,7 @@ See the design note, §16.
   - a run that would exceed the limit stops and says why;
   - 5% is kept back for debriefs.
   - No call is ever priced from a guess: a model needs a published price in prices.json.
-- **The translator's test set:** 26 cases, 6 held out; `terrarium translator-eval`. The adoption threshold is Naz's to set.
+- **The translator's test set:** 26 cases, 6 held out; `oikos translator-eval`. The adoption threshold is Naz's to set.
 - **The translator's glosses** now cover every call function (presence, birth, harm, position, system were missing).
 - **Guide:** docs/real-models.md.
 - **Revisit if:** providers' usage reports differ from what we record (reconcile against their dashboards on the first real run), or a run needs a separate model for the translator (`--translator-model` is only a cost projection today).
@@ -598,13 +598,13 @@ See the design note, §16.
 - **Why:** a two-year run hung at day 691 for eight minutes with no sign anything was wrong. The cause was the orchestrator's own bug (D58's same-moment rule). The real problem was that nothing noticed. A dead kernel would also have been misread as an off-contract request, and the run would have gone on against nothing.
 - **The split:** results must never depend on wall-clock timing. Deterministic failures (a module throws; a model call fails after its time limits and retries, which is then in the log) are recovered in place: recorded, and the participant waits. Timing failures (a stall, a dead kernel) stop the run cleanly, with a diagnosis, to be resumed once fixed.
 - **Built:**
-  - **Breadcrumbs and a watchdog thread** (`orchestrator/src/watchdog.ts`). It still works when the main thread is stuck in a synchronous loop. After `TERRARIUM_STALL_SECONDS` (default 300) without progress, it writes `<run>.failure.json` and ends the process.
+  - **Breadcrumbs and a watchdog thread** (`orchestrator/src/watchdog.ts`). It still works when the main thread is stuck in a synchronous loop. After `OIKOS_STALL_SECONDS` (default 300) without progress, it writes `<run>.failure.json` and ends the process.
   - **`KernelDied`**, distinct from a refused request.
   - **`RunStuck`** after 1,000 rounds of wakes at one moment.
   - **`ModelCallFailed`**: time limits (180 s) and retries on every adapter, including Codex's.
   - **Failed decisions and debriefs** are recorded and skipped.
   - **Batches** survive a failed seed.
-  - **`terrarium resume <log>`** re-runs from the log's own config, serving recorded model calls (checked against the recording) until the stop, then going on live. It costs no model quota for what was already done.
+  - **`oikos resume <log>`** re-runs from the log's own config, serving recorded model calls (checked against the recording) until the stop, then going on live. It costs no model quota for what was already done.
   - **`--modules FILE`** for researchers' own behaviour modules.
 - **Tests** (`orchestrator/test/reliability.test.ts`), fault injection:
   - a module stuck in a loop is stopped within seconds, with a diagnosis naming the participant and the time;
@@ -759,7 +759,7 @@ See the design note, §16.
 - **Phase C, stage C6: language-model runs are translator training data** (Naz, 2026-09-29: "for each LLM run we need to make sure we're storing/saving data so that it is usable for future training runs for the translator"). The log already kept nearly all of it. Closed the gaps:
   - a translator transcript now names the draft it was for (`data.ref`), so the exchange joins to the rest;
   - proposals, failure reasons and the model's raw answers are no longer cut at 8,000 characters;
-  - `terrarium corpus` exports one training example per translation (docs/measurement.md), marking the mock's as synthetic.
+  - `oikos corpus` exports one training example per translation (docs/measurement.md), marking the mock's as synthetic.
 
   Language-model runs are never deleted to free space. No contract change: the reference is inside the transcript's opaque data.
 
@@ -774,7 +774,7 @@ See the design note, §16.
 - **Run datasets** (docs/design/run-datasets.md; Naz, 2026-09-29, the first of three priorities: data for training, then speed, reliability and log size, then separation). Every run's data, derived from its log in one streaming pass: a manifest saying what made it (versions, seats, models, config and log hashes), system prompts, translations, model participants' decisions (what each was shown and answered, and what followed), and optionally code participants' acts and recorded observations. Deterministic: the same log, the same dataset. **For sign-off:** the format (`contracts/dataset.schema.json` 0.1.0), and the log contract's new `observation` annotation, written only when a run is asked to record observations (`--record-observations models|code|all|<ids>`). A recorded observation's channels are a list with their paths, since the log's free-form data doesn't allow a "/" in a key.
 - **Speed and log size** (docs/reliability.md; Naz's second priority). Profiling (a `profile` in each run's summary) showed the modules' decision time growing with history: they rescanned everything they'd ever seen. `Book` indexes (standing statements by kind, records by type), incremental order books, delivery notes and bank instructions, and a round's looks sent to the kernel together took the 540-day, 1,000-person run from 260 s to 154 s with the same outcome. Log flags: `--log lean` (no observation hashes, no code reasoning; world config `log.detail`, **a contract addition for sign-off**) and `--compress` (zstd after measuring, about 7x smaller). **Revisit:** the kernel's own time per act (about 0.3 ms: logging, hashing and serialising each entry) and advancing the clock (about 5 ms an hour, life's schedule) are what's left.
   - **The kernel's state grew for ever** (kernel 0.5.1): transfers were queued for every participant acting for an entity concerned, and those without an accounts channel never took their queue. Queued now only for those who'd see them; the schedule of future effects is a persistent map (it was a list copied on every act). Logs from 0.5.0 replay with 0.5.0: the state differs by those queues.
-  - **Health warnings** (docs/reliability.md): each run's summary counts wakes that ran out of actions with more to do (by module) and refusals by code; `terrarium run` prints a `!` line for anything worth a look. They caught shops' serving carried over into the next day (refused for want of hours); a day's work is now dropped at the day's end, its module told.
+  - **Health warnings** (docs/reliability.md): each run's summary counts wakes that ran out of actions with more to do (by module) and refusals by code; `oikos run` prints a `!` line for anything worth a look. They caught shops' serving carried over into the next day (refused for want of hours); a day's work is now dropped at the day's end, its module told.
   - **Also found:** a member on strike who'd taken another job went "back to work" at the new one; they now go back only to the workplace they left, if they still work there. And the rent and government tests leant on timing and on landlords' 50% compliance; they're steadied.
 
 - **Separation: modules name nobody** (Naz's third priority: "nothing baked into the world"). A sweep of the modules found defaults that named the generated town's entities (`"bank"`, `"builder"`, `"supplier"`, `"landfill"`, `"town-hall"`...) and a union joining rate read off a workplace's id prefix. A world that named things differently would have had its firms borrowing from, and paying, parties that aren't there, silently.
@@ -797,7 +797,7 @@ See the design note, §16.
     - **Each act copied tree nodes whole:** the state is copied for each act (to undo it if refused), and the first change to a map's node afterwards copied its 64 values. A participant's values include its queue of transactions, and the bank's holds a day's transfers, so every transfer deep-copied them. Accounts and participants are now behind `Arc` and the queue is a persistent list: a change copies only what it changes.
     - **Every monthly checkpoint re-encoded the whole history** to hash the state (by year 3, over a second each). Records never change once made, so their canonical bytes are kept between checkpoints (in the kernel, not the state) and the hash is streamed: the same bytes, so the same hash.
     - A 3-year, 1,000-person run: 273 s to 183 s (kernel 183 s to 103 s; 0.32 to 0.16 ms an act; 10.5 to 2.4 ms a clock advance). The kernel alone, replaying it: 166 s to 79 s. The kernel's memory in a live run peaked at 1.3 GB. **Revisit:** the modules are now a third of the time (citizens most of it); the bank runs out of actions in 5% of its wakes (carried to the next, a day late at worst).
-  - **Logs compressed by default** (`terrarium run`; `--no-compress` to keep plain): a 5-year run's log is 2.3 GB plain, 326 MB compressed, checked to read back whole first. Needs Bun 1.4 (above).
+  - **Logs compressed by default** (`oikos run`; `--no-compress` to keep plain): a 5-year run's log is 2.3 GB plain, 326 MB compressed, checked to read back whole first. Needs Bun 1.4 (above).
   - **Also found:** the rent test took a tenant's account to be `acc-<person>`; a newcomer's isn't. It now uses the account the rent order pays from.
 
 - **Log size and the platform's speed, continued** (Naz, 2026-09-29: "these log sizes seem absolutely ridiculous... maybe we need to enable more flags").
@@ -905,7 +905,7 @@ See the design note, §16.
   - **Before any real-model run:** the design's robustness audit and fidelity check; and Naz's go-ahead for paid calls (mock-first rule; Codex pilots are approved).
   - **Revisit if:** the kinds are too fine (every person asks) or too coarse (everyone alike); or answers swing with wording.
 
-- **The sparse mind's robustness audit** (docs/design/ai-citizens.md section 4 and "Progress"; orchestrator/src/audit.ts; `terrarium consult-audit`).
+- **The sparse mind's robustness audit** (docs/design/ai-citizens.md section 4 and "Progress"; orchestrator/src/audit.ts; `oikos consult-audit`).
   - **The four wordings:** the base, reworded, options reversed, and the needs' bins shifted. Plus a fidelity check: other people of a kind asked afresh, against the kind's answer.
   - **Unstable:** a swing over 2 points of 10, or a flipped preference. A run can leave unstable kinds (or whole things) out: `--consult-avoid`.
   - **Why these checks:** the design names them (after the audit paper's 76-point framing swings). The option-order check is added, a known position bias in models.
@@ -1019,7 +1019,7 @@ See the design note, §16.
 - **The `law` reader is Rust** (kernel/crates/law; revising the rebuild's deferral, at Naz's asking, 2026-09-30).
   - **What:** our own evaluator over `cel-parser`'s syntax tree, for the allowed subset (D27's allowlist, integers only, `holds_liberty` and `holds_right`). Built natively and to WebAssembly; `participants/src/law.ts` loads the module synchronously, so modules and the translator's warnings call it as before. `bun run kernel` builds it; a stale module is refused by its source fingerprint, as the native engine module is.
   - **Why our own evaluator, not `cel-interpreter`:** that crate is lax where a law reader must be strict. A missing field reads as null, `!` and `?:` take any truthy value, and `&&` doesn't absorb errors as CEL does. A missing field would quietly make a prohibition not match. Ours keeps CEL's semantics for the subset: a missing field is an error; `false && error` is false and `true || error` is true; comparisons take only their own types; integer arithmetic stops on overflow and division by zero.
-  - **Checked** against `@bufbuild/cel` in shadow across the whole suite (`TERRARIUM_LAW=shadow`; under test a difference is an error), as the resolver was: no differences, and none in a year of the 1,000-person town (only 80 law reads there, so also a one-off check of 54 tricky conditions on two acts, both ways). That check found two differences, both where `@bufbuild/cel` strays from the CEL spec and ours doesn't: `int('')` is 0 there (JavaScript's `BigInt('')`), an error here; `has()` of a field of a number is false there, an error here. No law the generator writes reaches either.
+  - **Checked** against `@bufbuild/cel` in shadow across the whole suite (`OIKOS_LAW=shadow`; under test a difference is an error), as the resolver was: no differences, and none in a year of the 1,000-person town (only 80 law reads there, so also a one-off check of 54 tricky conditions on two acts, both ways). That check found two differences, both where `@bufbuild/cel` strays from the CEL spec and ours doesn't: `int('')` is 0 there (JavaScript's `BigInt('')`), an error here; `has()` of a field of a number is false there, an error here. No law the generator writes reaches either.
   - **Faster, as it happens:** about 5 µs a read against about 230 µs, since each condition is parsed once.
   - **Two small changes of behaviour:** a condition that can't be parsed is now an error verdict, where it threw (a seat-written statute with a typo mustn't crash the institution reading it); and the parser's panics on some malformed input are caught as parse errors.
   - **Revisit if:** the subset grows (decimals, time), where the evaluator grows with it or a full implementation earns its place.
@@ -1035,7 +1035,7 @@ See the design note, §16.
     - **Revisit if:** a third language needs the types (Python seats), where generating them pays for itself.
 - **What stays in TypeScript, and why** (R5): the TypeScript resolver and knowledge stay for model seats' draft previews and law warnings, and for shadow checks. The random streams and canonical encoding stay because modules use them as they decide, kept identical to the engine's by tests. The stdio protocol stays for the replay tool and a host outside the process.
 
-- **Calibration, first pass after the rebuild** (2026-09-30; the 10-seed, one-year batch of the 1,000-person town against its profile's targets, `terrarium health`).
+- **Calibration, first pass after the rebuild** (2026-09-30; the 10-seed, one-year batch of the 1,000-person town against its profile's targets, `oikos health`).
   - **The saving breach was the measure's.** It took people's accounts by name (`acc-c%`), which caught the town's account (`acc-city`) too, and it counted what leavers take with them (about 90 departures a year, some with six-figure savings) as spending. Now: the export has an `accounts` table (who holds each account: the config's and those opened in the run), people's accounts are those people hold, and wealth moving with people leaving or arriving isn't income or spending, as the national accounts treat it. Saving on the same batch: -10.2% before, 5.7% after (target 6.5%).
   - **Households fell into arrears at the start, and left town for it.** The generator drew each tenancy's rent day and each member's rent-share day independently, so a leaseholder often owed rent before the shares came in. The bank doesn't retry a failed standing order, and citizens ignored its letter saying so. So 33 arrears notices a run at day 60, evictions at day 120, and after 90 days without a home, departures (about 120 people a year, 12% of the town, against 17 arrivals). Now: shares reach the leaseholder the day before the rent (generator 0.18.0), and a citizen pays rent the bank couldn't pay as soon as it can (citizen 0.21.0).
   - **Rent rises past a third of income sent tenants away.** At the first annual review about a third of renting households gave notice. Real renters mostly stay and pay, in rental stress. Now they stay while the rent is at most half of household income (`rent_bearable_share_bps`, a placeholder).
@@ -1079,7 +1079,7 @@ See the design note, §16.
   - **Revisit if:** a place's law lets a landlord end a periodic tenancy only for reasons: then the reasons are the landlord's to give, and a tribunal's to judge (§5).
 
 - **Nature: contract signed** (Naz, 2026-10-01: "nature's contract is signed off"; built on the `nature` branch, merged once the suite passes; docs/design/world-expansion.md §2; docs/behaviour/nature.md and environment.md).
-  - **In Rust:** the physics, in `terrarium-nature` (covers and their succession; fields that spread, decay and flow; populations; extinction; survey estimates). The world steps it daily, censuses it monthly, clears land on demolition, delivers surveys to the surveyor only, and shows conspicuous species to passers-by.
+  - **In Rust:** the physics, in `oikos-nature` (covers and their succession; fields that spread, decay and flow; populations; extinction; survey estimates). The world steps it daily, censuses it monthly, clears land on demolition, delivers surveys to the surveyor only, and shows conspicuous species to passers-by.
   - **In TypeScript:** the town's environment office (`city.environment`); planning applying a habitat law through the office's register; the generator's district around the town, from the profile's `nature`. The profile's species are the squirrel glider, the growling grass frog and the superb fairy-wren, with their densities and ranges sourced and their rates placeholders.
   - **Found by running it.** Each was a gap between the physics and how real populations behave, and is fixed in the physics, not tuned:
     - per-cell capacity can't hold a sparse animal, so crowding is felt over a home range, per 1,000 cells;
@@ -1235,7 +1235,7 @@ See the design note, §16.
   - **Waste:** every bin emptied however little is in it, and residents judge by when they last saw it emptied (citizen 0.34.0, city.works 0.2.2). A crew collecting weekly gets no complaints now (before: about 100 in 90 days in the 1,000-person town).
   - **Energy:** on order until delivered (utility.energy 0.1.1).
   - **The election test** no longer asks who wins. A negligent mayor loses support against a kept town with the same number standing; with many standing the vote splits and it held on in every variant tried, so whether it loses is an outcome. A mayor who doesn't stand again (city.mayor_code 0.9.0, `stands_again`) tests what a successor does.
-  - **Travel times cached** (kernel): 87% of the kernel's time went to working out the same trips (home to work, and back) every day. Now a trip is worked out once while the ground it crosses is unchanged (a counter bumped on every change of cover or building; derived state, never serialised or hashed). `TERRARIUM_CHECK_TRAVEL=1` recomputes every cached trip and asserts it matches: run on 20 days of the 1,000-person town, identical. 60 days took 98 s, against 132.
+  - **Travel times cached** (kernel): 87% of the kernel's time went to working out the same trips (home to work, and back) every day. Now a trip is worked out once while the ground it crosses is unchanged (a counter bumped on every change of cover or building; derived state, never serialised or hashed). `OIKOS_CHECK_TRAVEL=1` recomputes every cached trip and asserts it matches: run on 20 days of the 1,000-person town, identical. 60 days took 98 s, against 132.
   - **Revisit if:** something else starts affecting a cell's travel cost (wear slowing roads, floods): it must bump the counter.
   - **The energy loop mattered beyond energy:** with it fixed, the insolvency test's factory found customers among the town's shops and didn't fail (the test now takes the shops away too). The loop drained up to about $1M a day out of town on the days it ran: earlier calibration runs (C6) carried it. Worth rechecking the calibration measures.
 
@@ -1256,9 +1256,22 @@ See the design note, §16.
 - **An outage stops the run, and retires nobody** (2026-10-04; pilot 8; changes D59's rule for model calls).
   - **Was:** a model call that failed after its retries was recovered in place (the seat waits), and three failures in a row retired the participant, as for a module that throws.
   - **Found:** a network outage is three failures in a row for every model seat. Pilot 8 lost its mayor, planning and finance officers on day 74 and ran ten months without them.
-  - **Now:** a failed model call still makes its seat wait that wake, but doesn't count toward retiring it. Three model calls unanswered in a row, with none answered between, is the model out of reach: the run stops as at a usage limit, and `terrarium resume` picks it up (calls with no recorded answer are asked again).
+  - **Now:** a failed model call still makes its seat wait that wake, but doesn't count toward retiring it. Three model calls unanswered in a row, with none answered between, is the model out of reach: the run stops as at a usage limit, and `oikos resume` picks it up (calls with no recorded answer are asked again).
   - **A code module that throws** is still retired after three, as before: that failure is its own.
   - **Revisit if:** runs should wait out an outage themselves (retry for an hour before stopping), which matters once runs are left unattended for days.
+
+- **The project is Oikos** (2026-10-05; Naz). From οἶκος, the household: the root of both economy and ecology.
+  - **Renamed everywhere:** packages (`@oikos/...`), the Rust crates and the engine library, the command (`oikos run`), environment variables (`OIKOS_...`), the docs, and, on Naz's word that nothing should keep the old name, the contracts' id namespace (`urn:oikos:contracts:0.8`), the canary's wording (same GUID) and the hash and randomness domain strings.
+  - **What that costs:** every run's random draws differ from before the rename (the randomness starts from its domain string), so results aren't comparable draw for draw with earlier runs. Earlier logs keep the old strings and replay only on a build from before the rename.
+  - **Handles:** the repo is `nazriz/oikos`; `runoikos` was free on X and GitHub when checked (2026-10-05).
+
+- **What new random draws found** (2026-10-05). The rename changed the string the randomness starts from, so every test town played out differently, and four things that had passed by the luck of the old draws didn't:
+  - **Bodies ran no risk until their first birthday in the world** (kernel). Each body's yearly draws (death from other causes, illness, exposure to injury) were made at its birthday, for the year after: from the start of a run, an arrival or a birth until then, half a year on average, nothing could happen to it. Infants were safe for their whole first year. One-year runs had about half their deaths and illnesses. Now the first draws are made as a body enters the world, for what's left of its year of age (a year's chance, by that share), and belong to that moment (undone with it if the act is refused). The kernel's life tests, which had been written around the old timing, expect the table from the start.
+  - **Heat never made anyone ill.** The heat field lost all of itself each day, and the kernel takes a field's decay after adding its sources: gone as it came. Now half a day (docs/behaviour/weather.md).
+  - **A house paid for and not handed over.** A buyer's mortgage came through the day the seller relisted for less; the seller looked only for purchases answering its current listing, kept the money and the house, and went on cutting the price. Now a purchase answering any listing it made of the house counts, and what was paid above the current price goes back.
+  - **Residents who looked weekly never saw their bin emptied** (same point of each week's round, never less in it than last time). Now: emptied if there's well under what there would be had nobody come.
+  - **Tests changed, not behaviour:** the election test no longer compares how many complain (a kept town's one-person crew left, and six weeks passed before the next started); the reliability test doesn't pin the second a module wakes; a seasonal flood's refusals are allowed in the deaths test.
+  - **Worth knowing:** every earlier measurement of deaths, illness and injury in a run's first year is low by about half. Calibration against the life table should be redone.
 
 ## Open (to decide at the Stage 2 checkpoint or before)
 

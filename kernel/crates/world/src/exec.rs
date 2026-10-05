@@ -359,13 +359,75 @@ fn create_person(s: &Statics, st: &mut State, name: &str, born_at: i64, sex: Opt
     (id, events)
 }
 
-/// Schedule a body's next birthday (when the world has life physics).
+/// Schedule a body's yearly draws (when the world has life physics): now, for what's left of its year of age, and then
+/// at each birthday. (Until 2026-10-05 the first was at its next birthday: from the start of a run, an arrival or a
+/// birth until then, about half a year on average, a body could not fall ill, be hurt or die.)
 pub fn schedule_birthday(s: &Statics, st: &mut State, person: &str, born_at: i64) {
     let Some(life) = s.life() else { return };
-    let age = if st.t >= born_at { (st.t - born_at) / life.year } else { -1 };
-    let next = born_at + (age + 1) * life.year;
-    st.schedule(next.max(st.t), Sched::Birthday { person: person.into() });
+    let _ = life;
+    // (Made here, not scheduled: they belong to the moment the body enters the world, and are undone with it if the act
+    // that brought it is refused.)
+    if st.t >= born_at {
+        let t = st.t;
+        yearly_draws(s, st, person, t);
+    } else {
+        st.schedule(born_at, Sched::Birthday { person: person.into() });
+    }
 }
+
+/// A body's draws for the time to its next birthday (a whole year, at a birthday; what's left of one, as it enters the
+/// world): death from other causes, illness, exposure to injury; and its next birthday.
+fn yearly_draws(s: &Statics, st: &mut State, person: &str, t: i64) {
+    let person = person.to_string();
+    let (Some(life), Some(b)) = (s.life(), st.body(&person)) else { return };
+    if !b.alive {
+        return;
+    }
+    let born = b.born_at;
+    let age = (t - born) / life.year;
+    let a = age.to_string();
+    let year = life.year;
+    // The time these draws cover: to the next birthday (a whole year, at a birthday; what's left of one, for a
+    // body entering the world part-way through its year). A year's chance, over it, is that share of it.
+    let window = (born + (age + 1) * year - t).clamp(1, year);
+    let within = |p: i64, what: &str| uniform(s, &["life", &person, &a, what], 10_000 * year) < p.saturating_mul(window);
+    if let Some(oc) = &life.other_causes {
+        if within(oc.at(age) as i64, "other") {
+            let at = t + uniform(s, &["life", &person, &a, "other-when"], window);
+            st.schedule(at, Sched::Death { person: person.clone(), cause: DeathCause::Other, condition: None });
+        }
+    }
+    if let Some(ill) = life.illness.as_ref().filter(|ill| !ill.fields.is_empty()) {
+        // Illness that fields raise (pollution where the body is): a candidate drawn at the highest the fields
+        // could make it, kept, when it comes, at the rate where the body is then (thinning, as injuries).
+        let p = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age) as i64;
+        let most: i64 = ill.fields.iter().map(|f| f.bps_per_unit.max(0).saturating_mul(s.config.catalogue.fields.iter().find(|x| x.id == f.field).map_or(0, |x| x.max.max(0)))).fold(0i64, |a, b| a.saturating_add(b));
+        let max_bps = p.saturating_add(most).clamp(0, 10_000) as u32;
+        if max_bps > 0 && within(max_bps as i64, "ill") {
+            let at = t + uniform(s, &["life", &person, &a, "ill-when"], window);
+            st.schedule(at, Sched::IllnessExposure { person: person.clone(), max_bps, age });
+        }
+    } else if let Some(ill) = &life.illness {
+        let p = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age);
+        if within(p as i64, "ill") {
+            let onset = t + uniform(s, &["life", &person, &a, "ill-when"], window);
+            let (severity, duration, death) = draw_severity(s, &ill.severity, age, &["life", &person, &a, "ill-how"]);
+            st.schedule(onset, Sched::ConditionBegins {
+                person: person.clone(), kind: ConditionKind::Illness, severity, until: onset + duration, death_at: death.map(|d| onset + d),
+            });
+        }
+    }
+    if let Some(inj) = &life.injury {
+        let most = s.types.values().filter_map(|ty| ty.injury_bps).max().unwrap_or(0);
+        let max_bps = (inj.bps + most * 2).min(10_000);
+        if max_bps > 0 && within(max_bps as i64, "exposed") {
+            let at = t + uniform(s, &["life", &person, &a, "exposed-when"], window);
+            st.schedule(at, Sched::Exposure { person: person.clone(), max_bps });
+        }
+    }
+    st.schedule(born + (age + 1) * year, Sched::Birthday { person: person.clone() });
+}
+
 
 fn uniform(s: &Statics, key: &[&str], n: i64) -> i64 {
     s.randomness.stream(key).below(n.max(1) as u64) as i64
@@ -373,13 +435,13 @@ fn uniform(s: &Statics, key: &[&str], n: i64) -> i64 {
 
 /// The land as nature sees it today: each cell's cover, whether it's built on, and the building types with their corner
 /// there.
-pub fn nature_land(s: &Statics, st: &State, ground: &terrarium_nature::Ground) -> terrarium_nature::Land {
+pub fn nature_land(s: &Statics, st: &State, ground: &oikos_nature::Ground) -> oikos_nature::Land {
     let cat = &s.config.catalogue;
-    let mut land = terrarium_nature::Land::default();
+    let mut land = oikos_nature::Land::default();
     for id in &ground.cells {
         let c = &st.cells[id];
         let building = c.structure.as_ref().and_then(|x| st.structures.get(x));
-        land.cover.push(terrarium_nature::cover_of(cat, c.terrain.as_deref(), building.map(|b| s.types.get(&b.structure_type).and_then(|t| t.cover.as_deref()))));
+        land.cover.push(oikos_nature::cover_of(cat, c.terrain.as_deref(), building.map(|b| s.types.get(&b.structure_type).and_then(|t| t.cover.as_deref()))));
         land.built.push(building.is_some());
         land.anchored.push(building.filter(|b| &b.at == id && b.complete).map(|b| vec![b.structure_type.clone()]).unwrap_or_default());
     }
@@ -393,7 +455,7 @@ fn nature_day(s: &Statics, st: &mut State, day: i64) -> Vec<Timed> {
     let t = day * 86_400;
     let land = nature_land(s, st, ground);
     let mut n = (*now).clone();
-    let out = terrarium_nature::step_day(&s.config.catalogue, ground, &land, &mut n, day, &s.randomness);
+    let out = oikos_nature::step_day(&s.config.catalogue, ground, &land, &mut n, day, &s.randomness);
     let mut events = vec![];
     // Cells whose look changed: a cover that succeeded, or a conspicuous species come or gone (views deliver changes).
     let mut touched: BTreeSet<Id> = out.cover_changes.iter().map(|(c, _)| c.clone()).collect();
@@ -429,7 +491,7 @@ fn nature_day(s: &Statics, st: &mut State, day: i64) -> Vec<Timed> {
     }
     if day % 30 == 0 {
         let land = nature_land(s, st, ground);
-        let c = terrarium_nature::census(&s.config.catalogue, &n, &land);
+        let c = oikos_nature::census(&s.config.catalogue, &n, &land);
         events.push(Timed::new(t, EventBody::NatureCensus {
             species: c.species.into_iter().map(|(k, (count, cells))| (k, crate::events::CensusCount { count, cells })).collect(),
             covers: c.covers,
@@ -513,49 +575,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
             _ => vec![],
         },
         Sched::Birthday { person } => {
-            let (Some(life), Some(b)) = (s.life(), st.body(&person)) else { return vec![] };
-            if !b.alive {
-                return vec![];
-            }
-            let born = b.born_at;
-            let age = (t - born) / life.year;
-            let a = age.to_string();
-            let year = life.year;
-            if let Some(oc) = &life.other_causes {
-                if uniform(s, &["life", &person, &a, "other"], 10_000) < oc.at(age) as i64 {
-                    let at = t + uniform(s, &["life", &person, &a, "other-when"], year);
-                    st.schedule(at, Sched::Death { person: person.clone(), cause: DeathCause::Other, condition: None });
-                }
-            }
-            if let Some(ill) = life.illness.as_ref().filter(|ill| !ill.fields.is_empty()) {
-                // Illness that fields raise (pollution where the body is): a candidate drawn at the highest the fields
-                // could make it, kept, when it comes, at the rate where the body is then (thinning, as injuries).
-                let p = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age) as i64;
-                let most: i64 = ill.fields.iter().map(|f| f.bps_per_unit.max(0).saturating_mul(s.config.catalogue.fields.iter().find(|x| x.id == f.field).map_or(0, |x| x.max.max(0)))).fold(0i64, |a, b| a.saturating_add(b));
-                let max_bps = p.saturating_add(most).clamp(0, 10_000) as u32;
-                if max_bps > 0 && uniform(s, &["life", &person, &a, "ill"], 10_000) < max_bps as i64 {
-                    let at = t + uniform(s, &["life", &person, &a, "ill-when"], year);
-                    st.schedule(at, Sched::IllnessExposure { person: person.clone(), max_bps, age });
-                }
-            } else if let Some(ill) = &life.illness {
-                let p = crate::config::ByAge { by_age: ill.by_age.clone() }.at(age);
-                if uniform(s, &["life", &person, &a, "ill"], 10_000) < p as i64 {
-                    let onset = t + uniform(s, &["life", &person, &a, "ill-when"], year);
-                    let (severity, duration, death) = draw_severity(s, &ill.severity, age, &["life", &person, &a, "ill-how"]);
-                    st.schedule(onset, Sched::ConditionBegins {
-                        person: person.clone(), kind: ConditionKind::Illness, severity, until: onset + duration, death_at: death.map(|d| onset + d),
-                    });
-                }
-            }
-            if let Some(inj) = &life.injury {
-                let most = s.types.values().filter_map(|ty| ty.injury_bps).max().unwrap_or(0);
-                let max_bps = (inj.bps + most * 2).min(10_000);
-                if max_bps > 0 && uniform(s, &["life", &person, &a, "exposed"], 10_000) < max_bps as i64 {
-                    let at = t + uniform(s, &["life", &person, &a, "exposed-when"], year);
-                    st.schedule(at, Sched::Exposure { person: person.clone(), max_bps });
-                }
-            }
-            st.schedule(born + (age + 1) * year, Sched::Birthday { person });
+            yearly_draws(s, st, &person, t);
             vec![]
         }
         Sched::Exposure { person, max_bps } => {
@@ -1065,12 +1085,12 @@ impl<'a> Exec<'a> {
             let est = match species {
                 Some(sp) => {
                     let n = nature.and_then(|n| n.populations.get(&sp.id)).and_then(|m| m.get(cell)).copied().unwrap_or(0);
-                    terrarium_nature::survey_count(n, sp.detection_bps, &mut rng)
+                    oikos_nature::survey_count(n, sp.detection_bps, &mut rng)
                 }
                 None => {
                     let base = cat.fields.iter().find(|x| x.id == sv.of).map_or(0, |f| f.baseline);
                     let v = nature.and_then(|n| n.fields.get(&sv.of)).and_then(|m| m.get(cell)).copied().unwrap_or(base);
-                    terrarium_nature::survey_value(v, 9_000, &mut rng)
+                    oikos_nature::survey_value(v, 9_000, &mut rng)
                 }
             };
             found.insert(cell.clone(), Value::from(est));

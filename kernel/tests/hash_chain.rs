@@ -15,9 +15,9 @@ use serde_json::{json, Value};
 use std::cell::RefCell;
 use std::io::Write;
 use std::rc::Rc;
-use terrarium_kernel::canon::{self, ZERO_HASH};
-use terrarium_kernel::log::{entry_hash, verify, Kind};
-use terrarium_kernel::run::Run;
+use oikos_kernel::canon::{self, ZERO_HASH};
+use oikos_kernel::log::{entry_hash, verify, Kind};
+use oikos_kernel::run::Run;
 
 #[derive(Clone, Default)]
 struct Shared(Rc<RefCell<Vec<u8>>>);
@@ -40,7 +40,7 @@ fn sample_log() -> (Vec<u8>, Vec<u8>) {
     let mut run = Run::start(config, "chain", Vec::new(), Some(Box::new(anchors.clone()))).unwrap();
     let act = |participant: &str, blocks: Value| {
         let (participant, position) = rb(participant);
-        terrarium_kernel::Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: Some("because".into()), thinking: None }
+        oikos_kernel::Command::Act { participant, position, blocks: serde_json::from_value(blocks).unwrap(), provenance: json!({"via": "direct"}), reasoning: Some("because".into()), thinking: None }
     };
     run.done(&act(
         "bank-payments",
@@ -51,8 +51,8 @@ fn sample_log() -> (Vec<u8>, Vec<u8>) {
     run.done(&act("mayor", json!([{"block": "message", "to": ["developer"], "text": "hello \"there\"\n"}]))).unwrap();
     run.annotate(json!({"annotation": "note", "subject": "test", "data": {"x": [1, "y", null]}})).unwrap();
     for m in 1..=4 {
-        run.command(&terrarium_kernel::Command::Advance { to: m * MONTH }).unwrap();
-        run.command(&terrarium_kernel::Command::Observe { participant: "mayor-system".into(), only: None }).unwrap();
+        run.command(&oikos_kernel::Command::Advance { to: m * MONTH }).unwrap();
+        run.command(&oikos_kernel::Command::Observe { participant: "mayor-system".into(), only: None }).unwrap();
     }
     run.finish("completed", None).unwrap();
     let log = run.into_log();
@@ -183,7 +183,7 @@ fn checkpoints_follow_the_configured_cadence() {
     let every = run.kernel().statics().config.log.checkpoint_every;
     let mut expected = vec![];
     for to in [every / 2, every, every + 60, 3 * every + 60, 3 * every + 120] {
-        run.command(&terrarium_kernel::Command::Advance { to }).unwrap();
+        run.command(&oikos_kernel::Command::Advance { to }).unwrap();
         if [every, 3 * every + 60].contains(&to) {
             expected.push((to, run.kernel().state_hash().unwrap()));
         }

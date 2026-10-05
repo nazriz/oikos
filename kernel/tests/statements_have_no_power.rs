@@ -13,8 +13,8 @@ mod common;
 use common::*;
 use proptest::prelude::*;
 use serde_json::{json, Value};
-use terrarium_kernel::events::EventBody;
-use terrarium_kernel::run::Run;
+use oikos_kernel::events::EventBody;
+use oikos_kernel::run::Run;
 
 fn uniq(ids: &[&str]) -> Vec<String> {
     let set: std::collections::BTreeSet<String> = ids.iter().map(|s| s.to_string()).collect();
@@ -51,7 +51,7 @@ fn extra_record(i: usize, kind: u8, target: u8) -> Value {
     b
 }
 
-fn physical_and_outcomes(events: &[terrarium_kernel::events::Event]) -> Vec<Value> {
+fn physical_and_outcomes(events: &[oikos_kernel::events::Event]) -> Vec<Value> {
     // Everything except what participants perceive.
     events.iter().filter(|e| !matches!(e.body, EventBody::Observation { .. })).map(|e| serde_json::to_value(e).unwrap()).collect()
 }

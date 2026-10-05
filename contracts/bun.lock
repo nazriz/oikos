@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@terrarium/contracts",
+      "name": "@oikos/contracts",
       "devDependencies": {
         "ajv": "^8.17.1",
       },

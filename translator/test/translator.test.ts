@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { MockAdapter } from "@terrarium/participants/llm";
+import { MockAdapter } from "@oikos/participants/llm";
 import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, translatorContext, translatorSystem } from "../src/index";
 
 const law = { id: "law-planning", record: "statement", author: "genesis", at: 0, visible_to: "public", kind: "law", text: "No building without a permit.",

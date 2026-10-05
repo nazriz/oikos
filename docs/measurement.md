@@ -5,10 +5,10 @@ Measurement lives outside the world. The platform never judges outcomes: it writ
 ## Running a batch
 
 ```bash
-terrarium run worlds/town-1000.yaml --seeds 5 --set mayor=llm --out runs/llm-mayor
+oikos run worlds/town-1000.yaml --seeds 5 --set mayor=llm --out runs/llm-mayor
 ```
 
-(`terrarium` is `bun orchestrator/src/cli.ts`.)
+(`oikos` is `bun orchestrator/src/cli.ts`.)
 
 - **Seeds vary a run's randomness, not the world.** A generated world is built once from its spec, and each run gets it with its own seed. To get a different town, set the spec's `seed`: `--set seed=7`.
 - **Each seed runs in its own process**, with its own kernel, several at a time (`--parallel P`; the default is half the machine's cores). A run's result never depends on being in a batch: a test checks that a batch run's log and final state are identical to the same seed run alone.
@@ -19,7 +19,7 @@ A batch folder holds:
 
 | File | What it is |
 |---|---|
-| `<run>.jsonl`, `<run>.anchors.jsonl` | Each run's hash-chained log and its anchors. `terrarium replay` checks them. |
+| `<run>.jsonl`, `<run>.anchors.jsonl` | Each run's hash-chained log and its anchors. `oikos replay` checks them. |
 | `<run>.summary.json` | The run's counts and final state hash, and how long it took (wall-clock time is recorded here, never in the log). |
 | `batch.json` | What ran: the world file, the overrides, the generated spec and generator version, seeds, versions, timings, and each run's final state hash. |
 | `measure/` | The measurement tables (below). |
@@ -54,25 +54,25 @@ Every table has `run_id`, and every per-entry table also has `seq` and `t`.
 ## Queries
 
 ```bash
-terrarium measure runs/llm-mayor --list
-terrarium measure runs/llm-mayor town/economy town/word-of-mouth
-terrarium measure runs/llm-mayor --sql "select run_id, count(*) from acts where via = 'translator' group by all"
+oikos measure runs/llm-mayor --list
+oikos measure runs/llm-mayor town/economy town/word-of-mouth
+oikos measure runs/llm-mayor --sql "select run_id, count(*) from acts where via = 'translator' group by all"
 ```
 
 The standing queries live in `measure/queries/`, one SQL file each, with a one-line description on the first line. Add a file and it's listed.
 - **Generic:** `overview`, `activity`, `refusals`, `usage`, `why` (acts with a reason, and records citing a basis), `language-participants`, `cast` (people at the start, births, arrivals, departures, deaths by cause, illness, injury, harm, participants created, appointments).
 - **About the generated town:** `town/economy`, `town/word-of-mouth`, `town/households` (at the end of each run: households living together, apart or unhoused, and overcrowded by the occupancy standard, CNOS), `town/rent-stress` (rent against household income). Calibration targets and their sources: [calibration.md](calibration.md). These know the town's vocabulary (leases, `acc-city`, the citizens' own phrasing), which is fine: measurement is outside the world.
 
-From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@terrarium/measure`.
+From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@oikos/measure`.
 
 ## Health and diff
 
-- **`terrarium health <DIR> [--profile NAME]`:** the batch's measures against its profile's calibration targets (`targets` in worlds/profiles/), each within a tolerance stated in `measure/src/health.ts`, breaches first; targets nothing measures yet are listed as such; and the demand households went without.
-- **`terrarium diff <BASELINE> <CHANGE> [QUERY...]`:** every measure of two batches of the same world compared. With several seeds a side, a difference is flagged beyond three standard errors of the seed-to-seed spread; with one, beyond a tenth. The default measures are the town's calibration measures (`DIFF_QUERIES`).
+- **`oikos health <DIR> [--profile NAME]`:** the batch's measures against its profile's calibration targets (`targets` in worlds/profiles/), each within a tolerance stated in `measure/src/health.ts`, breaches first; targets nothing measures yet are listed as such; and the demand households went without.
+- **`oikos diff <BASELINE> <CHANGE> [QUERY...]`:** every measure of two batches of the same world compared. With several seeds a side, a difference is flagged beyond three standard errors of the seed-to-seed spread; with one, beyond a tenth. The default measures are the town's calibration measures (`DIFF_QUERIES`).
 
 ## The cost report
 
-Every model call leaves a usage annotation in the log: tokens, and the cost at the price of the model that actually answered. The report (`terrarium cost <dir>`, also written with every batch) shows two figures and never mixes them:
+Every model call leaves a usage annotation in the log: tokens, and the cost at the price of the model that actually answered. The report (`oikos cost <dir>`, also written with every batch) shows two figures and never mixes them:
 
 - **Recorded:** what was actually spent. On the mock adapter that's $0.00.
 - **Projected:** what the same calls would have cost if each had gone to its participant's configured model, at published prices (`orchestrator/prices.json`, with its source and the date it was retrieved). The translator's model isn't set by the world, so it's priced as the participants' model, or as `--translator-model`.
@@ -109,8 +109,8 @@ Two batches: `town-1000.yaml`, five seeds, two years each.
 
 Every run with language-model participants is also training data for the translator. The log keeps all of it: the participant's proposal; the translator's exchange, turn by turn (its transcripts carry the draft they were for, `data.ref`, and the system prompt is logged in full once, then by hash); the call it wrote, what that resolved to and the kernel's dry run (the `draft` annotation); retries and failures, with the model's raw answer (never cut short); the participant's decision (`signoff`); and, if it was carried out, whether the kernel applied it (the command's `provenance.draft` and its events).
 
-`terrarium corpus <DIR|log.jsonl> [--out FILE]` joins these into one JSON line per translation (`orchestrator/src/corpus.ts`), by default `DIR/translator-corpus.jsonl`. Examples from the mock are marked `synthetic`: only real models' are fit to train on. `orchestrator/test/corpus.test.ts` checks every translation reads back whole.
+`oikos corpus <DIR|log.jsonl> [--out FILE]` joins these into one JSON line per translation (`orchestrator/src/corpus.ts`), by default `DIR/translator-corpus.jsonl`. Examples from the mock are marked `synthetic`: only real models' are fit to train on. `orchestrator/test/corpus.test.ts` checks every translation reads back whole.
 
-`terrarium dataset` (docs/design/run-datasets.md) goes further: a versioned folder per run, with a manifest, the translations, the model participants' decisions, and optionally the code participants' acts and recorded observations.
+`oikos dataset` (docs/design/run-datasets.md) goes further: a versioned folder per run, with a manifest, the translations, the model participants' decisions, and optionally the code participants' acts and recorded observations.
 
 **Keep every real-model run.** Its log is the only source of this data, and a real model's answers can't be made again. Never delete a language-model run's folder (or its log) to free space.
