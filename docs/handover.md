@@ -10,7 +10,7 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
   for two full simulated years; three seats at once (mayor, planning, finance) for the first 59 and 39 days of two
   more. A model seat takes several actions an answer and keeps office hours; a round's translations run at once; any
   office can be handed to a model (`model_seats`).
-- **Tests:** 361, about 9 minutes in parallel (`bun run test:all`); 16 seconds for the quick tier (`bun run test:fast`).
+- **Tests:** 441, about 8 minutes in parallel (`bun run test:all`); 16 seconds for the quick tier (`bun run test:fast`).
 
 ## Where things run
 - **The run server is set up**: a Mac mini (always on, M4 Pro, 14 cores, 64 GB, about 620 GB free), host
@@ -33,45 +33,62 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
 - Setting up another machine: `scripts/setup-mini.sh` (it has been corrected for what the mini's setup found; it hasn't
   been run from scratch since).
 
-## What's in flight
-- **Pilot 9 is running on the mini** (started 2026-10-05 19:45, detached, with `caffeinate`): the three-seat year, mayor,
-  planning and finance on codex/gpt-6.1-sol, translator on codex/gpt-6-luna, into `runs/pilot-9` (its pid in
-  `runs/pilot-9/pid`, its console in `runs/pilot-9/nohup.out`). About five minutes a simulated day.
-  - **The mini's checkout (`~/oikos`) is still at a3d1531, on purpose,** and must stay there until pilot 9 ends: no
-    `git pull`, no kernel rebuild, no source edits there. Work goes on in a worktree
-    (`~/oikos/.claude/worktrees/translator-work`, its own kernel build) and is pushed from it.
-  - **Pilot 9 can only be resumed from that checkout.** The code on `main` since then shows a seat more (forms whole,
-    a law's rule), so its prompts differ and a resume on it would ask every call again. If it stops by itself: keep the
-    log, say why, and `bun orchestrator/src/cli.ts resume runs/pilot-9/town-1000.seed1.jsonl` from `~/oikos` as it is.
-    A resume after a failed model call diverges on that old code (fixed on `main`; it had no failed calls at day 14).
-  - Its laws bind nobody (below), so read what its seats did, not what their laws changed.
-- **The code audit of 2026-10-05 and its fixes** are in docs/decisions.md (five entries of that date). On `main`: runs
-  can't be overwritten, stopped runs say so and resume (failed calls included), opt-out is always honoured, a seat is
-  told what wasn't done, the kernel's guards cover `kernel/crates`, the preview shows every field of an act.
-- **Pilot 8b stopped itself on day 39** (Codex calls timing out; the laptop). Its log is kept. The adapter's 180 seconds
-  wasn't why: gpt-6.1-sol answers 8b's largest requests in 28 to 56 seconds on the mini (docs/decisions.md).
+## What's in flight (2026-10-06, early morning)
+- **The translator's training data is being written**: `runs/translator-data-2026-10-06/` on the mini, 24 parts
+  (`part-NN/examples.jsonl`, `manifest.json`, `rejects.jsonl`), by `make.ts` there (its pid in `pid`, its console in
+  `make.log`), codex/gpt-6.1-sol writing, six calls at a time, about 20 minutes a part. It skips parts already
+  written, so if it stops (a usage limit: the log says so), run `bun make.ts` there again.
+  - **It runs from the worktree `~/oikos/.claude/worktrees/dev`: don't edit source or rebuild there while it runs.**
+    Work in another worktree.
+  - **Still to do on each part:** the blind check. `oikos translator-data-check <part> --blind` writes the requests in
+    shuffled order; a reader of another model family (a Claude subagent given only the translator's prompt) writes its
+    answers; `oikos translator-data-check <part> --answers FILE --reader NAME` keeps what agrees by meaning.
+  - **Then:** the other voices (about 30% of the set from Claude models and gpt-6-luna, the same pipeline), one split
+    by gold program over all parts, and the choice of base model and where it trains (not made).
+- **Pilot 9 is running on the mini** (the three-seat year; started 2026-10-05 19:45). It stopped itself on day 63
+  (00:14) on a platform bug (a statement's kind written with spaces reached the log), and was resumed from its log at
+  00:37 from the worktree `~/oikos/.claude/worktrees/pilot9-fix`: the code it started on (a3d1531) with that one fix.
+  Its stopped log is `runs/pilot-9/town-1000.seed1.stopped-1.jsonl`. **It can only be resumed from that worktree**
+  (`bun orchestrator/src/cli.ts resume ~/oikos/runs/pilot-9/town-1000.seed1.jsonl --until 31536000 --model
+  codex/gpt-6.1-sol --translator-model codex/gpt-6-luna`): newer code shows a seat more, so its prompts differ and
+  every call would be asked again. Its laws bind nobody (that is fixed on `main`, not in it).
+- **The mini's own checkout (`~/oikos`) is still at a3d1531.** Nothing runs from it now; `main` is far ahead. Bring it
+  up to date (`git pull`, `bun install`, `bun run kernel`) when pilot 9 has ended, and remove the worktrees then.
+- **The readiness scorecard** (docs/decisions.md, 2026-10-05 and -06) is met on all ten lines: the suite passes (441);
+  gpt-6.1-sol gets 64 of 66 held-out cases, 63 of 64 seen and 175 of 180 real pilot requests; the data pipeline's
+  second trial was 98.9% right by an independent audit.
+- **A 20-day stress run on the new code** (three seats and the translator on gpt-6.1-sol) is kept as
+  `runs/stress-1-2026-10-06`: no errors, 94 seat calls where pilot 9 needed over 200.
 
 ## The translator (the priority: Naz, 2026-10-05, "before the citizens, the translator")
-- **The held-out test cases are outside the repository** (`~/oikos-private/translator/held-out.json`, 60 cases; the old
-  set had leaked into the prompt). **Never read that file while working on the prompt or on training data**, and never
-  quote it: `translator/eval/held-out.ts` says why. Results come by case id, outcome and shape only.
-- **Baseline on the clean set** (gpt-6-luna through Codex, translator 0.5.1): held out 44/60 right, 11 no draft, 5 wrong
-  drafts; seen 41/55, 3 wrong drafts. Ten of the sixteen held-out misses are refusals it didn't make.
-- **Training data:** `oikos translator-data <logs> --model … --back-model … --out DIR` (translator/train/data.ts; give `--model`
-  and `--back-model` more than once: a request is checked by a model that didn't write it) is
-  built and tested with stand-in models. No model has written anything yet: see "Waiting on Naz".
+- **The held-out test cases are outside the repository** (`~/oikos-private/translator/held-out.json`, 66 cases).
+  **Never read that file while working on the prompt or on training data**, and never quote it:
+  `translator/eval/held-out.ts` says why. Results come by case id, outcome and shape only. Changes to it are made by
+  a subagent that reports counts and ids.
+- **Three test groups:** the seen cases (`translator/eval/cases.ts`), the held-out ones, and the pilots' 180 real
+  requests (`translator/eval/pilot-cases.ts`; `oikos translator-eval --model … --real`).
+- **gpt-6.1-sol is the reference** (and translates well enough to use in runs); gpt-6-luna gets 44 of 60 held out.
+- **Seven refusals** now: `not_an_act` (a request to look, not to do) and `no_such_act` (clear, and nothing does it)
+  were added from what real seats asked.
 
 ## Waiting on Naz
-0. **From 2026-10-05, in order of how much waits on them:**
-   - **Who writes the training requests.** OpenAI's terms restrict using outputs to develop competing models, so Codex
-     as the writer needs his call; the other route is a local open model (Ollama is installed, not running, and would
-     share the machine with darkbloom). Then: the base model and where training runs.
-   - **Laws that bind:** the proposal in docs/design/ai-citizens.md 2e (the clerk drafts amendments to laws in force
-     from a form's figures; the translator can't write conditions). Councillors stay as they are until the citizens'
-     work; they get the AI citizen code at most, never a model (his word).
+0. **From 2026-10-05 and -06** (he gave standing permission to change whatever the readiness goal needed, contracts
+   included; these are what's left for him):
+   - **The base model for the trained translator, and where it trains.** The data serves either design in
+     docs/design/translator-and-resolver.md §16.10; nothing is chosen or installed.
+   - **gpt-6.1-sol as the translator in runs** until the trained one exists (his earlier word was gpt-6-luna for
+     narrow work; luna fails the test, sol passes it).
+   - **Refusing a half-sayable request whole** (the rule now) or doing the part that can be said.
+   - **Whether a town should own the laws built from figures** (they now speak for the town, so the council can amend
+     them).
    - **Where a second copy of the held-out cases lives** (one copy, on the mini).
-   - **Two investigations or surveys in one action:** only the last result reaches the actor; reporting both needs the
-     outcome's shape changed (a contract change, not made).
+   - **Contract additions made under his permission, to look over:** two refusal labels; a form's office optional in a
+     call; a currency's symbol and words; a failed model call in the log. Each is in contracts/README.md and
+     docs/decisions.md.
+   - **Not done, from the audit:** councillors still vote on a label (he said: the AI citizen code at most, after the
+     translator); the stdio kernel connection isn't safe for several requests at once (only the fallback transport);
+     a landlord's arrears count lifetime receipts against one lease's dues; `citizen.ts` and `exec.rs` are too large;
+     a plain repeal of a law doesn't reach those who follow it.
 1. **The translator's pass mark.** Suggested: on wrong drafts (at most 1 in 30 held out), not on percent right.
    gpt-6-luna on the clean set: 5 wrong drafts in 60 held out.
 2. **Calibration.** Six of fifteen health measures were off after the expansion (docs/decisions.md, "Open"). Since then
