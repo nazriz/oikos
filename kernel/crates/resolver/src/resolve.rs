@@ -419,7 +419,7 @@ impl Resolver<'_> {
         let text = format!(
             "Please pay {} from {from} to {to}{}{}.",
             calls::format_money(&amount),
-            every.map(|e| format!(" every {} days", ((e as f64) / 86_400.0).round() as i64)).unwrap_or_default(),
+            every.map(|e| format!(" every {} days", nearest_days(e))).unwrap_or_default(),
             purpose.as_ref().map(|p| format!(", for {p}")).unwrap_or_default()
         );
         let mut money = out.clone();
@@ -905,5 +905,29 @@ impl Resolver<'_> {
             ("data", some(Json::Object(data))),
             ("ref", bind.map(Json::from)),
         ])])
+    }
+}
+
+/// Seconds as whole days, to the nearest (half a day and over rounds up; a negative span mirrors it). Exact integers:
+/// no floating point anywhere results depend on it (until 2026-10-05 this was a float division, rounded; the same
+/// answers).
+fn nearest_days(seconds: i64) -> i64 {
+    seconds.signum() * (seconds.unsigned_abs() / 86_400 + u64::from(seconds.unsigned_abs() % 86_400 >= 43_200)) as i64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::nearest_days;
+
+    #[test]
+    fn seconds_round_to_the_nearest_day_half_up() {
+        const DAY: i64 = 86_400;
+        for (seconds, days) in [(0, 0), (1, 0), (43_199, 0), (43_200, 1), (DAY - 1, 1), (DAY, 1), (DAY + 43_199, 1), (DAY + 43_200, 2), (3600, 0), (7 * DAY, 7), (14 * DAY, 14), (30 * DAY, 30), (90 * DAY, 90), (365 * DAY, 365)] {
+            assert_eq!(nearest_days(seconds), days, "{seconds} s");
+            assert_eq!(nearest_days(-seconds), -days, "-{seconds} s");
+        }
+        // (No overflow at the ends of the range.)
+        assert_eq!(nearest_days(i64::MAX), i64::MAX / DAY + 1);
+        assert_eq!(nearest_days(i64::MIN), i64::MIN / DAY - 1);
     }
 }

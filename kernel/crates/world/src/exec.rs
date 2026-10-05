@@ -179,29 +179,55 @@ pub fn init_variables(s: &Statics, ty: &str, t: i64) -> std::collections::BTreeM
     vars_for(s, ty).map(|v| (v.id.clone(), (v.initial, day_of(t)))).collect()
 }
 
+/// Bodies leave a structure's spaces: the one way out, whatever the cause (leaving, being removed, dying, crossing out
+/// of the world, a flood, a demolition), so that no cause can miss a step. `who` alone leaves, or (None) everyone there;
+/// from the space `only`, or (None) from every space of the structure. If anyone does: the structure's variables are
+/// settled first (its occupancy is about to change), the bodies are taken out, each departure is recorded for those
+/// who can see who's there, and a `Vacated` event is added for each. Returns who left where (space, body), spaces in
+/// order and the bodies of each in order.
+///
+/// The stamps are the caller's, as each has always made them (the structure touched, the bodies moved: their order
+/// is part of the state, so it's kept).
+#[allow(clippy::too_many_arguments)]
+fn leave_spaces(s: &Statics, st: &mut State, sid: &str, who: Option<&str>, only: Option<&str>, reason: VacateReason, by: Option<&str>, events: &mut Vec<Timed>) -> Vec<(Id, Id)> {
+    let t = st.t;
+    let leaves = |space: &Id, bodies: &BTreeSet<Id>| only.is_none_or(|o| o == space) && who.map_or(!bodies.is_empty(), |w| bodies.contains(w));
+    if !st.occupancy.get(sid).is_some_and(|m| m.iter().any(|(space, bodies)| leaves(space, bodies))) {
+        return vec![];
+    }
+    settle(s, st, sid);
+    let mut left: Vec<(Id, Id)> = vec![];
+    if let Some(m) = st.occupancy.get_mut(sid) {
+        for (space, bodies) in m.iter_mut() {
+            if !leaves(space, bodies) {
+                continue;
+            }
+            match who {
+                Some(w) => {
+                    bodies.remove(w);
+                    left.push((space.clone(), w.to_string()));
+                }
+                None => left.extend(std::mem::take(bodies).into_iter().map(|b| (space.clone(), b))),
+            }
+        }
+        m.retain(|_, b| !b.is_empty());
+        if m.is_empty() {
+            st.occupancy.remove(sid);
+        }
+    }
+    for (space, body) in &left {
+        st.record_departure(space, body, reason);
+        events.push(Timed::new(t, EventBody::Vacated { occupant: body.clone(), space: space.clone(), by: by.map(String::from), reason }));
+    }
+    left
+}
+
 /// Take a body out of every space it's in.
 fn vacate_all(s: &Statics, st: &mut State, person: &str, reason: VacateReason, by: Option<&str>) -> Vec<Timed> {
-    let t = st.t;
     let mut events = vec![];
     for sid in st.structures_of(person) {
-        settle(s, st, &sid);
-        let mut spaces: Vec<Id> = vec![];
-        if let Some(m) = st.occupancy.get_mut(&sid) {
-            for (space, bodies) in m.iter_mut() {
-                if bodies.remove(person) {
-                    spaces.push(space.clone());
-                }
-            }
-            m.retain(|_, b| !b.is_empty());
-            if m.is_empty() {
-                st.occupancy.remove(&sid);
-            }
-        }
+        leave_spaces(s, st, &sid, Some(person), None, reason, by, &mut events);
         st.touch_structure(&sid);
-        for space in spaces {
-            st.record_departure(&space, person, reason);
-            events.push(Timed::new(t, EventBody::Vacated { occupant: person.into(), space, by: by.map(String::from), reason }));
-        }
     }
     if !events.is_empty() {
         st.moved(person);
@@ -518,15 +544,10 @@ fn floods(s: &Statics, st: &mut State, t: i64) -> Vec<Timed> {
             if !was {
                 st.flooded.insert(sid.clone());
                 events.push(Timed::new(t, EventBody::Flooded { structure: sid.clone(), level }));
+                // (Settled as it floods, whether or not anyone is inside: its wear is about to rise.)
                 settle(s, st, &sid);
-                if let Some(m) = st.occupancy.remove(&sid) {
-                    for (space, bodies) in m {
-                        for b in bodies {
-                            st.record_departure(&space, &b, VacateReason::Flooded);
-                            st.moved(&b);
-                            events.push(Timed::new(t, EventBody::Vacated { occupant: b, space: space.clone(), by: None, reason: VacateReason::Flooded }));
-                        }
-                    }
+                for (_, b) in leave_spaces(s, st, &sid, None, None, VacateReason::Flooded, None, &mut events) {
+                    st.moved(&b);
                 }
                 st.touch_structure(&sid);
             }
@@ -757,6 +778,9 @@ impl<'a> Exec<'a> {
     /// A structure comes down: off the ground, and gone (what was held there stays held there, to be moved out).
     fn bring_down(&mut self, sid: &str) {
         let Some(x) = self.st.structures.remove(sid) else { return };
+        // (If it was under water, it isn't any more: there's nothing there. Until 2026-10-05 its id stayed among the
+        // flooded for good, since only standing structures are looked at when the water goes down.)
+        self.st.flooded.remove(sid);
         self.st.ground.changed();
         let c = self.st.stamp();
         let cleared = self.st.nature.is_some().then(|| self.s.config.catalogue.cleared_cover.clone()).flatten();
@@ -776,7 +800,7 @@ impl<'a> Exec<'a> {
     /// that they're there, alive, and have time left today; that the inputs are held there; that what's worked on can
     /// be. Who works for whom is content (D20).
     #[allow(clippy::too_many_arguments)]
-    fn work(&mut self, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>, survey: Option<&crate::blocks::Survey>, investigate: Option<&crate::blocks::Investigate>) -> R<()> {
+    fn work(&mut self, index: usize, task: &str, units: u64, at: &str, performers: &[String], on: &Option<String>, survey: Option<&crate::blocks::Survey>, investigate: Option<&crate::blocks::Investigate>) -> R<()> {
         use crate::config::{TASK_BUILD, TASK_DEMOLISH};
         let (at, on) = (self.r(at)?, self.ro(on)?);
         let builtin = task == TASK_BUILD || task == TASK_DEMOLISH;
@@ -947,10 +971,13 @@ impl<'a> Exec<'a> {
         let c = self.st.stamp();
         if let Some(x) = &spec {
             for (k, per) in &x.consumes {
-                self.add_holding(&me, &at, k, -(per * units as i128), c);
+                let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an input"))?;
+                self.add_holding(&me, &at, k, -q, c)?;
             }
             for (k, per) in &x.produces {
-                self.add_holding(&me, &at, k, per * units as i128, c);
+                // (Refused if what's made would take the holding beyond the range of a quantity.)
+                let q = need(per).ok_or_else(|| refuse(RefusalCode::Overflow, "too much of an output"))?;
+                self.add_holding(&me, &at, k, q, c)?;
             }
             if !x.changes.is_empty() && bodies.is_none() {
                 settle(self.s, self.st, &target);
@@ -991,14 +1018,17 @@ impl<'a> Exec<'a> {
             }
         }
         if let Some(sv) = survey {
-            self.surveyed = Some(self.survey_estimates(sv));
+            self.surveyed = Some(self.survey_estimates(sv, index));
         }
         // What it finds: the latest such taking, and who did it, with the task's chance (to the actor only).
         if let Some(iv) = investigate {
             let (from, at) = (self.r(&iv.from)?, self.r(&iv.at)?);
             let found = self.st.takings.iter().rev().find(|x| x.from == from && x.at == at && x.kind == iv.kind).cloned();
             let chance = spec.as_ref().map_or(0, |x| x.detection_bps);
-            let mut rng = self.s.randomness.stream(&["investigate", self.action]);
+            // (Keyed by the block as well as the action, as harm is: two investigations in one action draw
+            // independently. Until 2026-10-05 they shared the action's one draw.)
+            let idx = index.to_string();
+            let mut rng = self.s.randomness.stream(&["investigate", self.action, &idx]);
             let taker = found.as_ref().filter(|_| rng.below(10_000) < chance as u64).map(|x| x.by.clone());
             self.investigated = Some(serde_json::json!({ "from": from, "at": at, "kind": iv.kind, "taken": found.is_some(), "taker": taker }));
         }
@@ -1074,11 +1104,13 @@ impl<'a> Exec<'a> {
 
     /// What a survey finds: for a species, each one in the cell found with its detection chance; for a field, the value
     /// with an error of up to (10,000 - detection) basis points (the survey task's own figure isn't needed: the species'
-    /// or, for a field, 9,000). Drawn from the action's keyed randomness.
-    fn survey_estimates(&self, sv: &crate::blocks::Survey) -> Value {
+    /// or, for a field, 9,000). Drawn from the action's keyed randomness, by the block (two surveys of the same thing in
+    /// one action draw independently; until 2026-10-05 they shared the action's draws).
+    fn survey_estimates(&self, sv: &crate::blocks::Survey, index: usize) -> Value {
         let cat = &self.s.config.catalogue;
         let nature = self.st.nature.as_deref();
-        let mut rng = self.s.randomness.stream(&["survey", self.action, &sv.of]);
+        let idx = index.to_string();
+        let mut rng = self.s.randomness.stream(&["survey", self.action, &idx, &sv.of]);
         let species = cat.species.iter().find(|x| x.id == sv.of);
         let mut found = serde_json::Map::new();
         for cell in &sv.cells {
@@ -1098,11 +1130,22 @@ impl<'a> Exec<'a> {
         serde_json::json!({ "of": sv.of, "cells": found })
     }
 
-    /// Add to (or take from) a holding, stamping the change.
-    fn add_holding(&mut self, holder: &str, at: &str, kind: &str, by: Money, stamp: u64) {
+    /// Add to (or take from) a holding, stamping the change. Refused, as any amount out of range is, if the holding
+    /// would go beyond the range of a quantity either way (an edge's may be negative, D31; whether anyone else's may
+    /// go below nothing is the caller's check): the sum is never left to overflow, which a test build would stop at
+    /// and a release build once wrapped past.
+    fn add_holding(&mut self, holder: &str, at: &str, kind: &str, by: Money, stamp: u64) -> R<()> {
         let key = crate::state::holding_key(holder, at, kind);
-        let q = self.st.holdings.get(&key).map_or(0, |s| s.quantity) + by;
+        let q = self
+            .st
+            .holdings
+            .get(&key)
+            .map_or(0, |s| s.quantity)
+            .checked_add(by)
+            .filter(|q| (-MAX_MONEY..=MAX_MONEY).contains(q))
+            .ok_or_else(|| refuse(RefusalCode::Overflow, format!("{holder}'s holding of {kind} at {at} would go beyond the range of a quantity")))?;
         self.st.holdings.insert(key, crate::state::Holding { kind: kind.into(), holder: holder.into(), at: at.into(), quantity: q, changed: stamp });
+        Ok(())
     }
 
     fn account(&self, id: &str) -> R<&Account> {
@@ -1366,8 +1409,9 @@ impl<'a> Exec<'a> {
                     return Err(refuse(RefusalCode::InsufficientQuantity, format!("{from} has {have} {kind} at {at}")));
                 }
                 let c = self.st.stamp();
-                self.add_holding(&from, &at, kind, -*quantity, c);
-                self.add_holding(&me, &at, kind, *quantity, c);
+                // (Refused if the taker's holding there would go beyond the range of a quantity.)
+                self.add_holding(&from, &at, kind, -*quantity, c)?;
+                self.add_holding(&me, &at, kind, *quantity, c)?;
                 let t = self.now();
                 self.st.takings.push(crate::state::Taking { t, by: me.clone(), from: from.clone(), kind: kind.clone(), at: at.clone() });
                 self.emit(EventBody::Taken { by: me, from, kind: kind.clone(), quantity: *quantity, at });
@@ -1407,8 +1451,8 @@ impl<'a> Exec<'a> {
                 }
                 if !(me == to && from_at == to_at) {
                     let c = self.st.stamp();
-                    self.add_holding(&me, &from_at, kind, -*quantity, c);
-                    self.add_holding(&to, &to_at, kind, *quantity, c);
+                    self.add_holding(&me, &from_at, kind, -*quantity, c)?;
+                    self.add_holding(&to, &to_at, kind, *quantity, c)?;
                 }
                 self.emit(EventBody::GoodsMoved { kind: kind.clone(), quantity: *quantity, from: me, from_at, to, to_at, by: self.participant.into() });
                 Ok(())
@@ -1490,7 +1534,7 @@ impl<'a> Exec<'a> {
                 let c = self.st.stamp();
                 if let Some(yard) = &yard {
                     for (kind, q) in &ty.materials {
-                        self.add_holding(&me, yard, kind, -*q, c);
+                        self.add_holding(&me, yard, kind, -*q, c)?;
                     }
                 }
                 let id = self.st.mint("str");
@@ -1532,12 +1576,11 @@ impl<'a> Exec<'a> {
                 if x.demolition.is_some() {
                     return Err(refuse(RefusalCode::ComingDown, format!("{sid} is already being demolished")));
                 }
-                // Its occupants leave at once. Then it comes down: now, or once its demolition labour is done (phase B).
-                for (space, bodies) in self.st.occupancy.remove(&sid).unwrap_or_default() {
-                    for occupant in bodies {
-                        self.st.moved(&occupant);
-                        self.emit(EventBody::Vacated { occupant, space: space.clone(), by: Some(self.participant.into()), reason: VacateReason::Demolition });
-                    }
+                // Its occupants leave at once (as anyone leaves a space: its variables settled first, each departure
+                // recorded; until 2026-10-05 a demolition did neither). Then it comes down: now, or once its demolition
+                // labour is done (phase B).
+                for (_, occupant) in leave_spaces(self.s, self.st, &sid, None, None, VacateReason::Demolition, Some(self.participant), &mut self.events) {
+                    self.st.moved(&occupant);
                 }
                 if self.s.types[&x.structure_type].demolition_labour > 0 {
                     self.st.structures.get_mut(&sid).unwrap().demolition = Some(0);
@@ -1549,7 +1592,7 @@ impl<'a> Exec<'a> {
                 Ok(())
             }
 
-            Block::Work { task, units, at, performers, on, survey, investigate } => self.work(task, *units, at, performers, on, survey.as_ref(), investigate.as_ref()),
+            Block::Work { task, units, at, performers, on, survey, investigate } => self.work(index, task, *units, at, performers, on, survey.as_ref(), investigate.as_ref()),
 
             Block::Occupy { space, who } => {
                 let space = self.r(space)?;
@@ -1581,24 +1624,8 @@ impl<'a> Exec<'a> {
                 let sid = sid.to_string();
                 // A body is in one place at a time: coming here, it leaves wherever else it was.
                 for other in self.st.structures_of(&who) {
-                    settle(self.s, self.st, &other);
-                    let mut left = vec![];
-                    if let Some(m) = self.st.occupancy.get_mut(&other) {
-                        for (sp, bodies) in m.iter_mut() {
-                            if bodies.remove(&who) {
-                                left.push(sp.clone());
-                            }
-                        }
-                        m.retain(|_, b| !b.is_empty());
-                        if m.is_empty() {
-                            self.st.occupancy.remove(&other);
-                        }
-                    }
+                    leave_spaces(self.s, self.st, &other, Some(&who), None, VacateReason::Left, Some(self.participant), &mut self.events);
                     self.st.touch_structure(&other);
-                    for sp in left {
-                        self.st.record_departure(&sp, &who, VacateReason::Left);
-                        self.emit(EventBody::Vacated { occupant: who.clone(), space: sp, by: Some(self.participant.into()), reason: VacateReason::Left });
-                    }
                 }
                 settle(self.s, self.st, &sid);
                 self.st.occupancy.entry(sid.clone()).or_default().entry(space.clone()).or_default().insert(who.clone());
@@ -1612,29 +1639,15 @@ impl<'a> Exec<'a> {
                 let (occupant, from) = (self.r(occupant)?, self.r(from)?);
                 self.entity_exists(&occupant)?;
                 let sid = split_space(&from).map_or(from.as_str(), |(s, _)| s).to_string();
-                settle(self.s, self.st, &sid);
-                let mut left = vec![];
-                if let Some(m) = self.st.occupancy.get_mut(&sid) {
-                    for (space, bodies) in m.iter_mut() {
-                        if (space == &from || sid == from) && bodies.remove(&occupant) {
-                            left.push(space.clone());
-                        }
-                    }
-                    m.retain(|_, b| !b.is_empty());
-                    if m.is_empty() {
-                        self.st.occupancy.remove(&sid);
-                    }
-                }
+                // From the space named, or (a structure named) from every space of it.
+                let only = (sid != from).then_some(from.as_str());
+                let reason = if occupant == self.entity { VacateReason::Left } else { VacateReason::Removed };
+                let left = leave_spaces(self.s, self.st, &sid, Some(&occupant), only, reason, Some(self.participant), &mut self.events);
                 if left.is_empty() {
                     return Err(refuse(RefusalCode::NotPresent, format!("{occupant} is not in {from}")));
                 }
                 self.st.touch_structure(&sid);
                 self.st.moved(&occupant);
-                let reason = if occupant == self.entity { VacateReason::Left } else { VacateReason::Removed };
-                for space in left {
-                    self.st.record_departure(&space, &occupant, reason);
-                    self.emit(EventBody::Vacated { occupant: occupant.clone(), space, by: Some(self.participant.into()), reason });
-                }
                 Ok(())
             }
 

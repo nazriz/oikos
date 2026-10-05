@@ -53,3 +53,9 @@ proptest = "1"
 
 [profile.test]
 opt-level = 1
+
+# Integer overflow stops a release build as it stops a test build (it wrapped, silently): the same log can't replay to a
+# different world by the build that reads it. Arithmetic that could overflow on a participant's input is checked where
+# it's done, and refused in the ordinary way.
+[profile.release]
+overflow-checks = true

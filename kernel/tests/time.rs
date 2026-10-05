@@ -84,3 +84,53 @@ fn a_system_carries_out_as_many_at_once_as_it_has_lanes() {
     run.command(&Command::Advance { to: 2 }).unwrap();
     assert_eq!(balance(&run, "acc-alice"), before + 3);
 }
+
+/// A system part-way through its lanes (it has acted fewer times than it has lanes): the lanes it hasn't used are free
+/// now, and the state says so in numbers the contracts allow, so it can be hashed and checkpointed. (Until 2026-10-05
+/// an unused lane was the smallest 64-bit integer, which canonical JSON refuses.)
+#[test]
+fn a_system_part_way_through_its_lanes_can_be_hashed_and_checkpointed() {
+    let mut config = riverbend();
+    for p in config["participants"].as_array_mut().unwrap() {
+        if p["id"] == "bank-payments-system" {
+            p["lanes"] = json!(3);
+        }
+    }
+    let mut run = Run::start(config, "time", Vec::new(), None).unwrap();
+    let a = act("bank-payments-system", Some("bank-payments"), pay(1), None);
+    assert_eq!(begun(&mut run, &a), (0, 1));
+    // One lane used of three.
+    run.kernel().state_hash().expect("the state hashes with lanes unused");
+    for lane in run.kernel().state().timelines.values().flatten() {
+        assert!((-oikos_kernel::canon::MAX_SAFE..=oikos_kernel::canon::MAX_SAFE).contains(lane), "a lane's time {lane} is outside the contracts' integers");
+    }
+    run.command(&Command::Advance { to: 1 }).unwrap();
+    assert_eq!(begun(&mut run, &a), (1, 2));
+    run.kernel().state_hash().expect("the state hashes with two lanes used of three");
+    // The lane choice is as before: an unused lane first, then the one that frees first.
+    assert_eq!(begun(&mut run, &a), (1, 2));
+    assert_eq!(begun(&mut run, &a), (1, 2));
+    assert_eq!(begun(&mut run, &a), (2, 3));
+    // A checkpoint (a finished run records the state's hash) and a replay to the same state.
+    run.finish("completed", None).expect("the run finishes with its state hashed");
+    oikos_kernel::replay(&run.into_log(), None).expect("the log replays to the same state");
+}
+
+/// The same, checkpointed and finished while lanes are still unused.
+#[test]
+fn a_run_ends_and_replays_with_lanes_unused() {
+    let mut config = riverbend();
+    for p in config["participants"].as_array_mut().unwrap() {
+        if p["id"] == "bank-payments-system" {
+            p["lanes"] = json!(4);
+        }
+    }
+    let mut run = Run::start(config, "time", Vec::new(), None).unwrap();
+    let a = act("bank-payments-system", Some("bank-payments"), pay(1), None);
+    assert_eq!(begun(&mut run, &a), (0, 1));
+    assert_eq!(begun(&mut run, &a), (0, 1));
+    // Far enough for the run's own checkpoints to be written on the way.
+    run.command(&Command::Advance { to: 40 * 86_400 }).expect("time advances past a checkpoint with lanes unused");
+    run.finish("completed", None).expect("the run finishes with lanes unused");
+    oikos_kernel::replay(&run.into_log(), None).expect("the log replays to the same state");
+}

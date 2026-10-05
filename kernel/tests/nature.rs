@@ -229,3 +229,54 @@ fn a_building_floods_above_its_level_and_recedes() {
     assert!(ev.iter().any(|e| matches!(e, EventBody::FloodReceded { structure } if structure == "s-shop")));
     act(&mut run, "carol-self", None, json!([{"block": "occupy", "space": "s-shop/workplace.1"}])).unwrap();
 }
+
+/// A flooded building that comes down isn't flooded any more: there's nothing there. (Until 2026-10-05 its id stayed
+/// among the flooded for good: only standing structures are looked at when the water goes down.)
+#[test]
+fn a_flooded_building_brought_down_is_no_longer_among_the_flooded() {
+    let mut w = nature_world();
+    for t in w["catalogue"]["structure_types"].as_array_mut().unwrap() {
+        if t["id"] == "shop" {
+            t["floods"] = json!({"field": "pollution", "above": 30, "wear_per_day": 100});
+        }
+    }
+    let mut run = start(&w);
+    let ev = advance(&mut run, 5 * DAY);
+    assert!(ev.iter().any(|e| matches!(e, EventBody::Flooded { structure, .. } if structure == "s-shop")));
+    assert!(run.kernel().state().flooded.contains("s-shop"));
+    let ev = act(&mut run, "developer-system", Some("developer"), json!([{"block": "demolish", "structure": "s-shop"}])).unwrap();
+    assert!(ev.iter().any(|e| matches!(e, EventBody::StructureDemolished { structure, .. } if structure == "s-shop")));
+    let st = run.kernel().state();
+    assert!(!st.structures.contains_key("s-shop"));
+    assert!(st.flooded.is_empty(), "still among the flooded: {:?}", st.flooded);
+    // Nothing recedes later from where nothing stands, and the run replays.
+    let ev = advance(&mut run, 40 * DAY);
+    assert!(!ev.iter().any(|e| matches!(e, EventBody::FloodReceded { .. })));
+    run.finish("completed", None).unwrap();
+    oikos_kernel::replay(&run.into_log(), None).unwrap();
+}
+
+/// Two surveys of the same thing in one action are two looks, each with its own draws: keyed by the block as well as
+/// the action. (Until 2026-10-05 they shared the action's draws, so the second found exactly what the first did.)
+#[test]
+fn two_surveys_in_one_action_draw_independently() {
+    let mut run = start(&nature_world());
+    advance(&mut run, 60 * DAY + 3600);
+    let cells = ["cell.2.1", "cell.2.2"];
+    let counts: Vec<i64> = cells.iter().map(|c| run.kernel().state().nature.as_ref().unwrap().populations["frog"].get(*c).copied().unwrap_or(0)).collect();
+    assert!(counts.iter().sum::<i64>() >= 20, "enough frogs for two looks to differ: {counts:?}");
+    let look = json!({"block": "work", "task": "survey", "units": 2, "at": "s-shop", "performers": ["carol"], "survey": {"of": "frog", "cells": cells}});
+    act(&mut run, "developer-system", Some("developer"), json!([look.clone(), look])).unwrap();
+    let o = run.command(&Command::Observe { participant: "developer-system".into(), only: Some("developer".into()) }).unwrap().observation.unwrap();
+    let outcome = o.outcomes.iter().find(|x| x.surveyed.is_some()).unwrap();
+    // What each block's own draws find (a frog is found with the species' chance, 5,000 in 10,000; cell by cell).
+    let by_block = |index: &str| -> Vec<i64> {
+        let mut rng = run.kernel().statics().randomness.stream(&["survey", &outcome.action, index, "frog"]);
+        counts.iter().map(|n| (0..*n).filter(|_| rng.below(10_000) < 5_000).count() as i64).collect()
+    };
+    let (first, second) = (by_block("0"), by_block("1"));
+    assert_ne!(first, second, "the two looks find different things");
+    // The outcome carries the action's last survey: the second block's.
+    let found = outcome.surveyed.clone().unwrap();
+    assert_eq!(cells.iter().map(|c| found["cells"][*c].as_i64().unwrap()).collect::<Vec<_>>(), second);
+}

@@ -215,23 +215,35 @@ fn step_field(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Lan
     step_field_dense(f, ground, land, dense(now, ground, f.baseline), day)
 }
 
+/// `bps` basis points of `x`, toward zero: exactly `x * bps / BPS`, worked in 128 bits. A field's values and its sources
+/// are any integers the contracts allow (within ±(2^53 − 1)) and its rates at most 10,000 basis points (1,000,000 for a
+/// day's scale), so the product can pass 64 bits, where a test build would stop and a release build once wrapped; in
+/// 128 it can't (under 2^64 x 2^20), and the share is no larger than what it's a share of (or 100 times it, for a
+/// scale), which fits. The same answer wherever the 64-bit product fitted.
+fn share(x: i64, bps: i64) -> i64 {
+    (x as i128 * bps as i128 / BPS as i128).clamp(i64::MIN as i128, i64::MAX as i128) as i64
+}
+
 fn step_field_dense(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land: &Land, mut v: Vec<i64>, day: i64) -> Vec<i64> {
     let n = ground.cells.len();
     // Sources (a cover's may be negative: soaking it up), scaled for the day (rain, drought).
     let scale = f.source_by_day.iter().rev().find(|s| s.from_day <= day).map_or(BPS, |s| s.bps);
     for i in 0..n {
+        // (Sums here and below saturate: each term is within a few times 2^53, so only a world with hundreds of cells
+        // of the largest values the contracts allow all moving into one could reach 64 bits, and it's held to the
+        // field's bounds at the end of the day either way.)
         let mut add = f.from_covers.get(&land.cover[i]).copied().unwrap_or(0);
         for ty in &land.anchored[i] {
-            add += f.from_structures.get(ty).copied().unwrap_or(0);
+            add = add.saturating_add(f.from_structures.get(ty).copied().unwrap_or(0));
         }
-        v[i] += if add > 0 { add.saturating_mul(scale) / BPS } else { add };
+        v[i] = v[i].saturating_add(if add > 0 { add.saturating_mul(scale) / BPS } else { add });
     }
     // Decay toward the baseline (at least one step while it's away from it).
     if f.decay_bps_per_day > 0 {
         for x in v.iter_mut() {
-            let gap = f.baseline - *x;
-            let d = gap * f.decay_bps_per_day / BPS;
-            *x += if d == 0 && gap != 0 { gap.signum() } else { d };
+            let gap = f.baseline.saturating_sub(*x);
+            let d = share(gap, f.decay_bps_per_day);
+            *x = x.saturating_add(if d == 0 && gap != 0 { gap.signum() } else { d });
         }
     }
     // Diffusion: each cell sends a share of what it has above the baseline, evenly to its neighbours.
@@ -239,17 +251,18 @@ fn step_field_dense(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land
         let mut next = v.clone();
         for i in 0..n {
             let nb = &ground.neighbours[i];
-            let excess = v[i] - f.baseline;
+            let excess = v[i].saturating_sub(f.baseline);
             if nb.is_empty() || excess <= 0 {
                 continue;
             }
-            let each = excess * f.diffusion_bps_per_day / BPS / nb.len() as i64;
+            let each = share(excess, f.diffusion_bps_per_day) / nb.len() as i64;
             if each == 0 {
                 continue;
             }
-            next[i] -= each * nb.len() as i64;
+            // (`each` times the neighbours is at most the excess.)
+            next[i] = next[i].saturating_sub(each * nb.len() as i64);
             for &j in nb {
-                next[j] += each;
+                next[j] = next[j].saturating_add(each);
             }
         }
         v = next;
@@ -258,14 +271,14 @@ fn step_field_dense(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land
     if f.flow_bps_per_day > 0 {
         let mut next = v.clone();
         for i in 0..n {
-            let excess = v[i] - f.baseline;
+            let excess = v[i].saturating_sub(f.baseline);
             if excess <= 0 {
                 continue;
             }
             let Some(j) = ground.downstream[i] else { continue };
-            let moved = excess * f.flow_bps_per_day / BPS;
-            next[i] -= moved;
-            next[j] += moved;
+            let moved = share(excess, f.flow_bps_per_day);
+            next[i] = next[i].saturating_sub(moved);
+            next[j] = next[j].saturating_add(moved);
         }
         v = next;
     }
@@ -274,17 +287,17 @@ fn step_field_dense(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land
         let mut next = v.clone();
         for i in 0..n {
             let nb = &ground.neighbours[i];
-            let excess = v[i] - level;
+            let excess = v[i].saturating_sub(level);
             if nb.is_empty() || excess <= 0 {
                 continue;
             }
-            let each = excess * f.spill_bps_per_day / BPS / nb.len() as i64;
+            let each = share(excess, f.spill_bps_per_day) / nb.len() as i64;
             if each == 0 {
                 continue;
             }
-            next[i] -= each * nb.len() as i64;
+            next[i] = next[i].saturating_sub(each * nb.len() as i64);
             for &j in nb {
-                next[j] += each;
+                next[j] = next[j].saturating_add(each);
             }
         }
         v = next;

@@ -238,3 +238,30 @@ fn a_spin_up_is_exactly_the_days_stepped_one_by_one() {
     assert_eq!((one.fields, one.populations, one.extinct), (fast.fields, fast.populations, fast.extinct));
 }
 
+/// A field at the ends of the range the contracts allow steps without overflow, and exactly: the products of a value
+/// and a rate pass 64 bits there (a test build stopped; a release build wrapped, to a different world).
+#[test]
+fn a_field_at_the_ends_of_the_contracts_range_steps_exactly() {
+    const MAX_SAFE: i64 = 9_007_199_254_740_991;
+    let g = row(3, &[FlowCfg { from: "cell.0.0".into(), to: "cell.1.0".into() }, FlowCfg { from: "cell.1.0".into(), to: "cell.2.0".into() }]);
+    let l = land(&["grass", "grass", "grass"]);
+    let field = |extra: serde_json::Value| {
+        let mut f = serde_json::json!({ "id": "water", "min": -MAX_SAFE, "max": MAX_SAFE, "baseline": -MAX_SAFE });
+        f.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        cat(serde_json::json!({ "land_covers": [{ "id": "grass" }], "fields": [f] })).fields[0].clone()
+    };
+    let full = vec![MAX_SAFE, -MAX_SAFE, -MAX_SAFE];
+    // All of what's above the baseline decays in a day: back to the baseline.
+    assert_eq!(step_field_dense(&field(serde_json::json!({ "decay_bps_per_day": 10000 })), &g, &l, full.clone(), 0), vec![-MAX_SAFE; 3]);
+    // Half of it: exactly half of twice the largest integer.
+    assert_eq!(step_field_dense(&field(serde_json::json!({ "decay_bps_per_day": 5000 })), &g, &l, full.clone(), 0), vec![0, -MAX_SAFE, -MAX_SAFE]);
+    // All of it carried downstream, spread to the one neighbour, or spilt over a level there.
+    assert_eq!(step_field_dense(&field(serde_json::json!({ "flow_bps_per_day": 10000 })), &g, &l, full.clone(), 0), vec![-MAX_SAFE, MAX_SAFE, -MAX_SAFE]);
+    assert_eq!(step_field_dense(&field(serde_json::json!({ "diffusion_bps_per_day": 10000 })), &g, &l, full.clone(), 0), vec![-MAX_SAFE, MAX_SAFE, -MAX_SAFE]);
+    assert_eq!(step_field_dense(&field(serde_json::json!({ "spills_above": -MAX_SAFE, "spill_bps_per_day": 10000 })), &g, &l, full, 0), vec![-MAX_SAFE, MAX_SAFE, -MAX_SAFE]);
+    // Ordinary values are as they were: 3 of 1,000 above a baseline of 0 decays by 30%, moves on by 25%.
+    let f = field(serde_json::json!({ "min": 0, "max": 100000, "baseline": 0, "decay_bps_per_day": 3000, "flow_bps_per_day": 2500 }));
+    assert_eq!(step_field_dense(&f, &g, &l, vec![1000, 0, 0], 0), vec![525, 175, 0]);
+    assert_eq!(share(-7, 5000), -3);
+    assert_eq!(share(7, 5000), 3);
+}
