@@ -17,12 +17,16 @@ test("the real requests are well formed: ids, sources, answers in the call langu
     expect(x.request.length).toBeGreaterThan(10);
     expect(x.from.run).toMatch(/^runs\//);
     expect(x.expect.length).toBeGreaterThan(0);
-    for (const e of x.expect) if (e !== "none(*)") expect(() => calls.parseProgram(e)).not.toThrow();
+    // Every answer is in the call language: "any refusal" is nobody's answer now that a label says "no call does this".
+    for (const e of x.expect) expect(() => calls.parseProgram(e)).not.toThrow();
+    expect([x.id, new Set(x.expect).size]).toEqual([x.id, x.expect.length]);
     if (x.gap) expect(Object.keys(GAPS)).toContain(x.gap);
-    // "Any refusal" is the answer only where nothing can say it.
-    if (x.expect.includes("none(*)")) expect(x.gap).toBeDefined();
+    // What nothing can say is refused as that (or has a half that can be said, or a reading that can).
+    const said = x.expect.some((e) => !e.startsWith("none("));
+    if (x.gap && !said) expect([x.id, x.expect.includes("none(no_such_act)")]).toEqual([x.id, true]);
+    if (x.expect.includes("none(no_such_act)")) expect([x.id, x.gap !== undefined]).toEqual([x.id, true]);
     // Each accepted answer is right by the scoring's own lights, and no accepted program is a refusal in disguise.
-    for (const e of x.expect) if (e !== "none(*)") expect([x.id, passesReal(x, e)]).toEqual([x.id, true]);
+    for (const e of x.expect) expect([x.id, passesReal(x, e)]).toEqual([x.id, true]);
   }
   // Seen cases, all of them: nothing here is held out, and none repeats a fixture case's request.
   const seen = new Set(CASES.map((x) => x.request));
@@ -85,8 +89,14 @@ test("scoring by shape: a form is the same by its name or its record's id, and s
   expect(passesReal(f, 'form(to=city, form=council_proposal, kind="law", affects="tenants", proposal="A landlord must…")')).toBe(true);
   expect(passesReal(f, 'form(form=form-council-proposal, kind=law, affects=tenants, proposal="A landlord must…")')).toBe(true);
   expect(passesReal(f, 'form(form="council proposal", kind=law, affects=tenants, proposal="A landlord must…")')).toBe(true);
-  // To someone the form doesn't go to: in a run this comes back "it goes to city".
-  expect(passesReal(f, 'form(to=council-clerk, form=council_proposal, kind=law, affects=tenants, proposal="x")')).toBe(false);
+  // `to` on a form isn't compared: the office it goes to, or whoever there deals with it, described or by id, is the
+  // same act, and which names come to that office is the town's knowledge, which these cases don't have.
+  expect(passesReal(f, 'form(to=council-clerk, form=council_proposal, kind=law, affects=tenants, proposal="x")')).toBe(true);
+  expect(passesReal(f, 'form(to="the council clerk", form=council_proposal, kind=law, affects=tenants, proposal="x")')).toBe(true);
+  expect(passesReal(c(['form(to=city, form=council_proposal, kind=law, affects=tenants, proposal="…")'], { forms: "wide" }), 'form(form=council_proposal, kind=law, affects=tenants, proposal="x")')).toBe(true);
+  // One name, though: a form handed to two places is something else. And only a form's `to` is let off.
+  expect(passesReal(f, 'form(to=["city","council-clerk"], form=council_proposal, kind=law, affects=tenants, proposal="x")')).toBe(false);
+  expect(passesReal(c(['message(to=city, text="…")']), 'message(to=council-clerk, text="x")')).toBe(false);
   expect(passesReal(f, 'form(form=council_proposal, kind=budget, affects=tenants, proposal="x")')).toBe(false);
   expect(passesReal(f, 'form(form=council_proposal, kind=law, affects=tenants, proposal="x", staff="$1")')).toBe(false);
   expect(passesReal(f, 'form(form=permit_application, kind=law, affects=tenants, proposal="x")')).toBe(false);
@@ -107,7 +117,7 @@ test("scoring by shape: lines in any order, a letter to several as several lette
   expect(passesReal(lease, 'agreement(with=c0042, term="12 months", they_do=money(to=acc-city, amount="$900", every="monthly"))')).toBe(false);
 });
 
-test("scoring by shape: a refusal is its label, or a call that comes to it; any refusal only where the case says so", () => {
+test("scoring by shape: a refusal is its label, or a call that comes to it; no refusal stands in for another", () => {
   const look = c(["none(not_an_act)"]);
   expect(passesReal(look, "none(not_an_act)")).toBe(true);
   expect(passesReal(look, "none(unclear)")).toBe(false);
@@ -116,11 +126,13 @@ test("scoring by shape: a refusal is its label, or a call that comes to it; any 
   const form = c(["none(unknown_form)"]);
   expect(passesReal(form, 'form(form=dog_licence, name="Rex")')).toBe(true);
   expect(passesReal(c(["none(unknown_form)"], { forms: "wide" }), 'form(form=council_proposal, kind=law, proposal="x")')).toBe(false);
-  // Nothing can say it: any refusal is right, and so is whatever else the case accepts; a draft isn't.
-  const gap = c(["none(*)", 'message(to=bank, text="…")']);
-  for (const l of calls.LABELS) expect(passesReal(gap, `none(${l})`)).toBe(true);
+  // Nothing can say it: the refusal that says so is right, and so is whatever else the case accepts; another refusal
+  // isn't, and nor is a draft.
+  const gap = c(["none(no_such_act)", 'message(to=bank, text="…")']);
+  for (const l of calls.LABELS) expect([l, passesReal(gap, `none(${l})`)]).toEqual([l, l === "no_such_act"]);
   expect(passesReal(gap, 'message(to="bank", text="Hold the six payments.")')).toBe(true);
   expect(passesReal(gap, "system(retire=job-c0003-wages)")).toBe(false);
+  expect(passesReal(gap, "none(*)")).toBe(false);
   expect(passesReal(c(["statement(withdraw=rec.9)"]), "none(too_much)")).toBe(false);
 });
 
@@ -136,14 +148,14 @@ test("the harness: each real request goes through the translator once, with its 
     { id: "a", from: { run: "runs/x", seat: "mayor", day: 1, draft: "d1" }, pilot: "applied", forms: "wide", request: "Submit a law proposal on form-council-proposal: no dogs.", expect: ['form(form=council_proposal, kind=law, proposal="…")'] },
     { id: "b", from: { run: "runs/x", seat: "finance", day: 2, draft: "d2" }, pilot: "failed", request: "Show me the ledger for [acc-city].", expect: ["none(not_an_act)"] },
     { id: "c", from: { run: "runs/x", seat: "mayor", day: 3, draft: "d3" }, pilot: "declined", request: "Direct the works manager [works] to send a crew.", expect: ['message(to=works, text="…")'] },
-    { id: "d", from: { run: "runs/x", seat: "finance", day: 4, draft: "d4" }, pilot: "failed", request: "Pause the standing payment job-1 until I say.", expect: ["none(*)"], gap: "pause" },
+    { id: "d", from: { run: "runs/x", seat: "finance", day: 4, draft: "d4" }, pilot: "failed", request: "Pause the standing payment job-1 until I say.", expect: ["none(no_such_act)"], gap: "pause" },
     { id: "e", from: { run: "runs/x", seat: "mayor", day: 5, draft: "d5" }, pilot: "failed", request: "Read rec.5.", expect: ["none(not_an_act)"] },
   ];
   const answers: { [request: string]: string | undefined } = {
     [cases[0]!.request]: 'form(to=city, form=form-council-proposal, kind=law, proposal="No dogs.")',
     [cases[1]!.request]: "none(unclear)", // the wrong refusal: no draft
     [cases[2]!.request]: 'work(task="send a crew", at=works)', // a program that isn't the answer: a wrong draft
-    [cases[3]!.request]: "none(unknown_form)",
+    [cases[3]!.request]: "none(no_such_act)",
     [cases[4]!.request]: undefined, // nothing came back
   };
   const asked: { forms: boolean; attempt: number }[] = [];

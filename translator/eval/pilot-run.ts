@@ -8,7 +8,8 @@
 //     that id; "$500" is "$500.00" is "50000 cents"; "14 days" is "a fortnight");
 //   - free text isn't compared: "…" in the accepted answer is any text, and the case's `ignore` lists arguments that
 //     may be there or not;
-//   - a refusal is that label, or a call the resolver answers with that label's own words; "none(*)" is any refusal.
+//   - a refusal is that label, or a call the resolver answers with that label's own words;
+//   - a form's `to` isn't compared (callSig says why).
 // The translator is shown the forms the seat knew, as it was in the run, and nothing else of that town.
 
 import { calls, canonical as canonicalJson, type Currency } from "@oikos/participants";
@@ -70,21 +71,20 @@ function formName(name: string, c: Shown): string {
   return f ? f.data!.form : words;
 }
 
-/** Where a form goes when nothing says: with `to` left out the resolver fills it in, so naming it changes nothing. */
-function formGoesTo(call: calls.Call, c: Shown): string | undefined {
-  const v = call.args.form;
-  if (!v || "call" in v || "json" in v) return undefined;
-  const name = formName(unbracketed(written(v)), c);
-  const f = known(c).find((x) => x.data?.form === name) as any;
-  return f ? f.in_position ?? f.speaks_for ?? f.author : undefined;
-}
+/**
+ * A form's `to` isn't compared. By the rules it is optional when the form goes to one place, and, given, it is the
+ * office the form goes to or a description that resolves to it ("the council clerk", for a form the clerk's
+ * organisation takes in): all the same act. Which descriptions resolve to that office is the town's knowledge, and
+ * these cases come without their town, so `to` on a form is accepted absent or as any one name. (More than one, or
+ * anything that isn't a name, is still a different answer.) *What this gives up:* a `to` that names someone the form
+ * doesn't go to passes here; in a run the resolver answers "it goes to …" and the call is tried again.
+ */
+const oneName = (v: calls.Value) => !("call" in v) && !("json" in v);
 
 function callSig(call: calls.Call, c: Compared): Sig {
-  const goes = call.fn === "form" ? formGoesTo(call, c) : undefined;
   const args = Object.entries(call.args)
-    .filter(([k]) => !c.ignore?.includes(k))
-    .map(([k, v]) => [k, valueSig(call.fn, k, v, c)] as const)
-    .filter(([k, s]) => !(call.fn === "form" && k === "to" && goes !== undefined && s === `text:${plain(goes)}`));
+    .filter(([k, v]) => !c.ignore?.includes(k) && !(call.fn === "form" && k === "to" && oneName(v)))
+    .map(([k, v]) => [k, valueSig(call.fn, k, v, c)] as const);
   return { fn: call.fn, args: Object.fromEntries(args) };
 }
 
@@ -129,7 +129,6 @@ export function passesReal(c: Pick<RealCase, "expect" | "forms" | "ignore">, got
   const g = shapeOf(got, c);
   if (g === undefined) return false;
   return c.expect.some((e) => {
-    if (e === "none(*)") return !Array.isArray(g) || refusalOf(got, c) !== undefined;
     const w = shapeOf(e, c);
     if (w === undefined) return false;
     if (!Array.isArray(w)) return Array.isArray(g) ? refusalOf(got, c) === w.none : g.none === w.none;

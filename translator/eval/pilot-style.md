@@ -26,14 +26,14 @@ For whoever generates the translator's training data. From the 194 requests the 
 
 **How clauses stack.** One sentence says the act; the rest qualify it. Late requests carry three to eight sentences after the first:
 - what it rests on: "responding to petitions rec.1127 and rec.1179", "whose proposal [rec.1641] was withdrawn in [rec.2685]";
-- a second thing for someone else: "Ask the council clerk [council-clerk] to put it to the councillors' 14-day ballot." (a third of the form requests);
+- a second thing for someone else: "Ask the council clerk [council-clerk] to put it to the councillors' 14-day ballot." (a third of the form requests); or the same with nobody named, "Put it to the councillors' 14-day ballot.", which is no letter to anyone (six requests);
 - what must stay as it is: "Preserve the instructions and their history, employment contracts, earned entitlements and accruals." (a third of late requests);
 - what it must not do: "Do not reverse completed transfers, recover employees' money, terminate employment or create replacement payments.", "This submission authorises no payment." (half of late requests; none early);
 - what it wants to see first: "Show the exact proposed hold and its scope for confirmation.", "Present the actual process controls to be changed in the preview; withdrawal of a posting alone does not implement this request." (a fifth of late requests);
 - what to do if it can't be done: "If a reversible pause is unavailable, report that limitation rather than substituting permanent cancellation."
 - Several acts in one request are numbered or sequenced: "Take these actions in order: (1) … (2) … (3) …", "1. Ask the electoral commissioner [electoral] to …".
 
-**What they ask for** (of 180 distinct requests). To read or inspect something, a third: a ledger, a petition, replies, who holds a post. A form filled in, a quarter. A direction to another office ("Direct the works manager [works] to …"), a sixth. Something withdrawn, a tenth. A standing arrangement paused or a practice stopped, a tenth: nothing in the call language says these. Payments, buildings, agreements: a handful.
+**What they ask for** (of 180 distinct requests). To read or inspect something, a third: a ledger, a petition, replies, who holds a post. A form filled in, a quarter. A direction to another office ("Direct the works manager [works] to …"), a sixth. Something withdrawn, a tenth. A standing arrangement paused or a practice stopped, a tenth, and going somewhere to see, one in twenty: nothing in the call language says these (`none(no_such_act)`), and they often come with something that can be said ("Withdraw posting [rec.15866]. Suspend the automatic creation of further vacancies …"), which is still refused whole. A withdrawal with a pause given as its reason ("Withdraw … pending verification") is a withdrawal. Payments, buildings, agreements: a handful.
 
 **A seat rewords after a failure,** and the retries are a style of their own: shorter, one act, plainer ("Show me the result of council ballot [rec.1760]." after a 260-character version failed), or longer and defensive, naming what went wrong last time ("a letter to the bank does not implement this action").
 

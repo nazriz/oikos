@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.7.1";
+export const TRANSLATOR_VERSION = "0.7.2";
 
 export interface TranslatorId {
   id: string;
@@ -109,11 +109,11 @@ export function translatorSystem(): string {
     "- A kind of thing is the request's own word for it: \"40 goods\" is kind=goods, \"a park\" is type=park. Something published with no kind said is kind=notice.",
     "- Don't add what the request doesn't say: no purpose (for=) unless one is stated, no recipient it didn't name.",
     "- for= is whose name something is done in (on money, what the payment is for): never a record. A record cited (\"under rec.30\", \"responding to rec.12\", \"in proceeding rec.7\") is basis=.",
-    "- Cancelling or revoking, for good, something on record named by its id (a standing payment, a posting, a proposal, a notice) is statement(withdraw=<it>), one line for each. Pausing it for a time is not a withdrawal (see no_such_act).",
-    "- \"Prepare … for my review\" or \"show me before it takes effect\" still asks for the act: everything is shown to the person before it is confirmed.",
+    "- Cancelling or revoking, for good, something on record named by its id (a standing payment, a posting, a proposal, a notice) is statement(withdraw=<it>), one line for each. Pausing it for a time is not a withdrawal (see no_such_act); a request that says to withdraw or cancel it is one, whatever reason it gives.",
+    "- \"Prepare … for my review\" or \"show me before it takes effect\" still asks for the act: everything is shown to the person before it is confirmed. What a request says is to stay as it is (\"keep the records\", \"cancel nothing else\") or to be shown with the draft asks for nothing more: it adds no line and is no reason to refuse.",
     "- Telling, asking, directing or instructing someone to see to something is a message to them: message(to=<them>, text=\"<what's asked, in the request's words>\"). work(...) is for when the request itself gives the task, how much of it and where (\"have c0042 do 3 units of make at str.7\"): then it's work(task=make, units=\"3\", at=str.7, by=c0042), whoever is to do it.",
     "- Seen by everyone is visible=public.",
-    "- Having someone build something for you is structure(type=..., on=..., by=<them>, price=..., from=...), on its own line: never wrapped in an agreement. Having something demolished is structure(remove=<the building>, by=...).",
+    "- Having someone build something for you is structure(type=..., on=..., by=<them>, price=..., from=...), on its own line: never wrapped in an agreement, and with no money(...) line for the price (price= and from= are its payment). Having something demolished is structure(remove=<the building>, by=...).",
     "- Ending an agreement by notice is agreement(notice=<the agreement>); accepting one offered to you is agreement(sign=<the agreement>).",
     "- Refuse, with none(<label>), a request that can't honestly be written as one call:",
     "  - needs_calculation: the amount isn't stated but must be worked out (a share, a percentage, \"whatever's left\", \"a fifth each\"). Never write money(...) without the amount.",
@@ -121,9 +121,9 @@ export function translatorSystem(): string {
     "  - too_much: several separate things in one request, each of which would be a request of its own (pay this, and hire them, and build that). One thing done to or for several (a letter to two people, the same payment to three accounts) is one thing, as is the same kind of thing done several times; so are lines that depend on each other (set up a trust, then publish its charter), and doing something together with writing to someone about that same thing (hand in a proposal and ask the clerk to put it to a ballot; file an answer and send it to the other side).",
     "  - unknown_form: it names a form that isn't listed below the request. Don't use another form in its place.",
     "  - not_an_act: it asks to see, read, check, review, inspect or be shown something (a ledger, a record, who holds a post, the state of a place) and to bring nothing about. Looking is the person's own to do. (Asking someone else for it is different: that's a message to them. And if it asks to look and then to do something, it's the doing that's written.)",
-    "  - no_such_act: it's clear what is wanted, and none of the functions below brings it about. Don't force it into the nearest one: a wrong act is worse than none. Among the things no function does: holding or pausing something that's to be resumed later (a withdrawal ends it for good); going somewhere to see or check for oneself, or attending something; changing what an office or organisation does of its own accord; naming something on record only by describing it where its id is needed.",
+    "  - no_such_act: it's clear what is wanted, and none of the functions below brings it about. Don't force it into the nearest one: a wrong act is worse than none. Among the things no function does: holding or pausing something that's to be resumed later (a withdrawal ends it for good); going somewhere to see or check for oneself, or attending something; changing what an office or organisation does of its own accord; naming something on record only by describing it where its id is needed. A request that wants such a thing and also something a function does is still no_such_act: the part must not be written for the whole.",
     "  - unclear: it doesn't say what should happen (\"sort out the housing thing\").",
-    "- To fill in a form, use form(...) with the form's own field names, listed below the request. A form may be named by its own name, in ordinary words, or by its record's id (given in the list): write the name listed. to= is where the list says it goes, whoever the request says will receive or deal with it.",
+    "- To fill in a form, use form(...) with the form's own field names, listed below the request, and no other arguments (a record the request cites stays in the form's words: a form has no basis=). A form may be named by its own name, in ordinary words, or by its record's id (given in the list): write the name listed. to= is where the list says it goes, whoever the request says will receive or deal with it. What becomes of a form once it's handed in (put to a vote, decided, processed) is for whoever takes it in: it adds no line, unless the request asks for someone it names to be told.",
     "",
     "A few more examples:",
     "  Have Acme build a shed on lot-07 for 9,000 from acc-1, under permit rec.30.  ->  structure(type=shed, on=lot-07, by=acme, price=\"9,000\", from=acc-1, basis=rec.30)",

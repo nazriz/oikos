@@ -1104,6 +1104,32 @@ const LOOKS = ["what is recorded about", "the history of", "the current state of
 const LOOKED_AT = ["the ledger", "the register of posts", "last month's payments", "the minutes", "the list of open ballots", "the land registry", "the permits granted this year"];
 /** What a vague request is vaguely about. */
 const VAGUE = ["the roads", "housing", "the budget", "the staff", "the complaints", "the river", "the invoices", "the park", "rents", "the waste", "the school", "that letter"];
+/** How a standing arrangement is to be held without being ended. */
+const HELD = ["paused", "suspended", "put on hold", "held back", "frozen"];
+const UNTIL = ["until the speaker says to resume it", "for a month, and then carried on as before", "while something is being checked, and released afterwards", "for the time being, to be taken up again later"];
+/** What an office or organisation carries on by itself, nobody asking each time. */
+const ROUTINES = [
+  "advertising a post again whenever one falls vacant", "signing renewals as they come in", "sending reminders on a fixed day", "paying bills on the day they arrive",
+  "the hours it keeps its counter open", "the order in which it takes up what comes in", "how often it makes its rounds", "issuing a receipt for everything handed in",
+];
+/** The arguments that say where: a place a body could go to. */
+const WHERE = ["at", "on", "in", "from_at", "taken_at", "materials_at"];
+const ID = /^[a-z0-9][a-z0-9._\/-]*$/;
+
+/** The places a program names (by id), in its calls and the calls inside them. */
+function placesIn(p: calls.Program): string[] {
+  if ("none" in p) return [];
+  const out: string[] = [];
+  const walk = (c: calls.Call) => {
+    for (const [k, v] of Object.entries(c.args)) {
+      if ("call" in v) walk(v.call);
+      else if (WHERE.includes(k) && "id" in v) out.push(v.id);
+    }
+  };
+  const bound = new Set(p.lines.map((l) => l.bind));
+  p.lines.forEach((l) => walk(l.call));
+  return out.filter((x) => !bound.has(x));
+}
 
 /** What a refusal's writer is told: the situation, and what the request must and mustn't do. */
 export interface RefusalBrief { label: calls.Label; brief: string; mustCopy: string[]; source: string; gold?: string }
@@ -1116,7 +1142,11 @@ export interface RefusalBrief { label: calls.Label; brief: string; mustCopy: str
  *  - not_yours: an outcome that's another party's to decide, wanted as a fact rather than asked for;
  *  - unclear: something should be done about a subject, with nothing said of what;
  *  - not_an_act: something to be seen, read or checked (something a gold program names, or a register), and nothing
- *    to be brought about.
+ *    to be brought about;
+ *  - no_such_act: something plainly wanted that no function brings about, of three kinds in turn: a standing
+ *    arrangement from the gold programs (a payment made every so often) to be held for a time and resumed, not ended;
+ *    a place a gold program names to be gone to and checked in person; a routine of the speaker's own office to be
+ *    changed. (From the pilots' real requests, a fifth of which were of these kinds: eval/pilot-cases.ts, GAPS.)
  */
 export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): RefusalBrief[] {
   const rand = sampler(seed);
@@ -1124,6 +1154,27 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
   const out: RefusalBrief[] = [];
   const payments = gold.filter((g) => /^money\(/.test(g.shape) && !g.program.includes("\n"));
   const parties = [...new Set(gold.flatMap((g) => Object.entries(g.names).map(([id, name]) => `${name} (${id})`)))];
+  const standing = payments.filter((g) => /[(,]every[,)]/.test(g.shape));
+  const places = [...new Set(gold.flatMap((g) => placesIn(calls.parseProgram(g.program))))].sort();
+  /** No function does it: the three kinds in turn, each falling back on the routine (which needs nothing of the gold). */
+  const noSuchAct = (i: number): RefusalBrief => {
+    if (i % 3 === 0 && standing.length) {
+      const g = choose(standing);
+      // What the request must carry: the ids that say which arrangement (not its amount, its interval or its purpose,
+      // which a request to hold it may or may not repeat).
+      const p = calls.parseProgram(g.program) as { lines: calls.Line[] };
+      const ids = new Set(Object.values(p.lines[0]!.call.args).flatMap((v) => ("id" in v ? [v.id] : [])));
+      return { label: "no_such_act", mustCopy: mustAppear(p).filter((x) => ids.has(x)), source: g.source, gold: g.family ?? g.program,
+        brief: `This arrangement already stands and keeps repeating: ${g.program}\nThe speaker wants it ${choose(HELD)} ${choose(UNTIL)}: kept exactly as it is, not ended, cancelled or withdrawn, and not replaced by a new one. It is not a request to write to or ask anyone: the speaker wants the hold itself.` };
+    }
+    if (i % 3 === 1 && places.length) {
+      const place = choose(places);
+      return { label: "no_such_act", mustCopy: [place], source: "brief",
+        brief: `The speaker wants to go to ${place} in person, see for themselves how things stand there, and note what they find. It is not a request to read a record or a report, nor to ask or send anyone else: the speaker is to go and look.` };
+    }
+    return { label: "no_such_act", mustCopy: [], source: "brief",
+      brief: `The speaker wants a routine of their own office or organisation changed, stopped or started from now on: ${choose(ROUTINES)}. It is something the office carries on by itself, without anyone asking each time. It is not a request to write to anyone, to publish a rule or a notice, or to undo anything already done, and it names no record.` };
+  };
   for (let i = 0; i < perLabel; i++) {
     if (payments.length) {
       const g = choose(payments);
@@ -1140,10 +1191,11 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
     }
     out.push({ label: "unclear", mustCopy: [], source: "brief",
       brief: `The speaker wants something done about ${choose(VAGUE)} and doesn't say what: no act, no amount, no one to write to. A sentence or two that could mean many different things.` });
-    const named = gold.length ? mustAppear(calls.parseProgram(choose(gold).program)).filter((x) => /^[a-z0-9][a-z0-9._\/-]*$/.test(x)) : [];
+    const named = gold.length ? mustAppear(calls.parseProgram(choose(gold).program)).filter((x) => ID.test(x)) : [];
     const subject = named.length && rand() < 0.75 ? choose(named) : undefined;
     out.push({ label: "not_an_act", mustCopy: subject ? [subject] : [], source: "brief",
       brief: `The speaker wants to see, read, check or be shown something, and to bring nothing about: ${subject ? `${choose(LOOKS)} ${subject}` : choose(LOOKED_AT)}. It is for the speaker's own eyes: not a request to ask or tell anyone else, and nothing is to be changed, sent or recorded.` });
+    out.push(noSuchAct(i));
   }
   return out;
 }
