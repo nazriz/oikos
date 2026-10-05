@@ -14,15 +14,15 @@
 //                   (needs_calculation).
 //
 // Nothing here reads the held-out cases; the finished data is checked against them for shared wording before it is
-// used (eval/held-out.ts), and a set that shares any is refused.
+// used (eval/held-out.ts), and any request that shares some is dropped.
 //
 // The sampling is seeded (a generator of its own: this is tooling, not a world, and takes nothing from a run's
 // randomness), so the same logs and seed give the same programs to write requests for.
 
 import { calls, canonical as canonicalJson } from "@oikos/participants";
 import type { LlmAdapter, Usage } from "@oikos/participants/llm";
-import { canonical } from "../eval/run";
-import { leaks } from "../eval/held-out";
+import { canonical, tidy } from "../eval/run";
+import { sharesWording } from "../eval/held-out";
 import type { Case } from "../eval/cases";
 
 export const DATA_VERSION = "0.1.0";
@@ -89,9 +89,40 @@ export function literals(p: calls.Program): string[] {
  */
 export function askable(p: calls.Program, maxLines = 3): boolean {
   if ("none" in p || p.lines.length > maxLines) return false;
+  // (A sentence or two holds a short text, a handful of names, and about ten things to get right.)
   const ok = (c: calls.Call): boolean => Object.entries(c.args).every(([k, v]) =>
-    k !== "per_request" && ("json" in v ? Array.isArray(v.json) && v.json.every((x) => typeof x === "string") : "call" in v ? ok(v.call) : !("text" in v) || v.text.length <= 400));
-  return p.lines.every((l) => ok(l.call));
+    k !== "per_request" && ("json" in v ? Array.isArray(v.json) && v.json.length <= 4 && v.json.every((x) => typeof x === "string") : "call" in v ? ok(v.call) : !("text" in v) || v.text.length <= 160));
+  return p.lines.every((l) => ok(l.call)) && literals(p).length <= 10;
+}
+
+/** A gold program as it's kept: tidied (eval/run.ts), and a payment's purpose without a full stop a sentence would
+ * swallow ("for rent." asked for in a sentence is "for rent"). */
+export function goldText(p: calls.Program): string {
+  const t = tidy(p);
+  if ("none" in t) return calls.programText(t);
+  const value = (k: string, v: calls.Value): calls.Value => ("call" in v ? { call: call(v.call) } : "text" in v && k === "for" ? { text: v.text.replace(/[.\s]+$/, "") || v.text } : v);
+  const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(k, v)])) });
+  return calls.programText({ lines: t.lines.map((l) => ({ ...l, call: call(l.call) })) });
+}
+
+/**
+ * The literals a request has to carry word for word: copied text (amounts, names, a letter's words) and anything
+ * that reads as an id (acc-city, rec.412, c0042, apts-3/dwelling.2). A bare word (`yes`, `lease`, `park`, `make`) is a
+ * choice among options, said however the request says it, and whether it was understood is the round trip's to find.
+ */
+export function mustAppear(p: calls.Program): string[] {
+  if ("none" in p) return [];
+  const bound = new Set(p.lines.map((l) => l.bind).filter(Boolean));
+  const out: string[] = [];
+  const idLike = (s: string) => /[0-9._\/-]/.test(s);
+  const value = (v: calls.Value) => {
+    if ("id" in v) !bound.has(v.id) && idLike(v.id) && out.push(v.id);
+    else if ("text" in v) out.push(v.text);
+    else if ("json" in v) (Array.isArray(v.json) ? v.json : []).forEach((x) => typeof x === "string" && idLike(x) && out.push(x));
+    else if ("call" in v) Object.values(v.call.args).forEach(value);
+  };
+  for (const l of p.lines) Object.values(l.call.args).forEach(value);
+  return [...new Set(out)];
 }
 
 /** The names a world's config gives its ids (entities, people, positions): for writing "Millbrook Builders" where the call says `builder`. */
@@ -143,8 +174,8 @@ export async function goldFromLog(lines: AsyncIterable<string> | Iterable<string
       continue;
     }
     if (!askable(p) || calls.contractErrors(p).length) continue;
-    const shape = shapeOf(p);
-    const program = calls.programText(p);
+    const program = goldText(p);
+    const shape = shapeOf(calls.parseProgram(program));
     const k = kept.get(shape) ?? kept.set(shape, { programs: [], seen: 0 }).get(shape)!;
     if (k.programs.includes(program)) continue;
     // Reservoir sampling: each different program of a shape is as likely to be kept as any other.
@@ -237,8 +268,8 @@ export function surfaceVariant(g: Gold, rand: () => number): Gold {
  * or never calls (a trust set up, a claim recorded, a post created) are there. Never from held-out cases. */
 export function goldFromCases(cases: Case[]): Gold[] {
   return cases.filter((c) => !c.held_out && !c.expect[0]!.startsWith("none(")).map((c) => {
-    const p = calls.parseProgram(c.expect[0]!);
-    return { program: calls.programText(p), shape: shapeOf(p), names: {}, source: `case ${c.id}` };
+    const program = goldText(calls.parseProgram(c.expect[0]!));
+    return { program, shape: shapeOf(calls.parseProgram(program)), names: {}, source: `case ${c.id}` };
   });
 }
 
@@ -259,7 +290,8 @@ export function writerSystem(): string {
     "You're given what should happen, as a call in a small formal language (function(argument=value, …); an id is a bare word like acc-city or rec.412; quoted text is copied text), and a style.",
     "Write a request that means exactly that call: everything the call says, and nothing it doesn't.",
     "- Every id and every quoted value in the call must appear in your request exactly as written, character for character (the id acc-city as acc-city; the amount \"$1,200\" as $1,200; a quoted text word for word). Don't reformat amounts or durations, and don't replace an id with a description.",
-    "- Don't mention the call, its function names or its argument names; say it as a person would.",
+    "- Don't mention the call, its function names or its argument names, and don't use a function's name as your verb where nobody would (not \"structure a park\": have one built); say it as a person would.",
+    "- Everything the call says must be in the request, including who it's to or for: a call's bare words (a kind, a task, yes or no) said in ordinary words, its ids and quoted values exactly.",
     "- Don't add details the call doesn't have (no dates, reasons that change what's asked, extra recipients).",
     "Answer with the request only.",
   ].join("\n");
@@ -279,7 +311,7 @@ export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: strin
 
 /** Whether a request carries every literal of its program, exactly (the translator copies; it never composes). */
 export function copies(request: string, program: string): boolean {
-  return literals(calls.parseProgram(program)).every((l) => request.includes(l));
+  return mustAppear(calls.parseProgram(program)).every((l) => request.includes(l));
 }
 
 /** A program with the same meaning counts as the same: compared in canonical form (eval/run.ts). */
@@ -350,7 +382,7 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
       const p = calls.parseProgram(g.program) as { lines: calls.Line[] };
       const { amount: _, ...rest } = p.lines[0]!.call.args;
       const without = calls.programText({ lines: [{ call: { fn: "money", args: rest } }] });
-      out.push({ label: "needs_calculation", mustCopy: literals(calls.parseProgram(without)), source: g.source,
+      out.push({ label: "needs_calculation", mustCopy: mustAppear(calls.parseProgram(without)), source: g.source,
         brief: `A payment like this one, but with no amount stated: ${without}\nInstead of an amount, the request says what the amount should be worked out from: ${choose(WORKED_OUT)}. It must not contain the resulting figure.` });
     }
     if (parties.length) {
@@ -386,13 +418,16 @@ export async function writeRefusal(adapter: LlmAdapter, b: RefusalBrief, style: 
   return text ? text.replace(/^["“]|["”]$/g, "").trim() : undefined;
 }
 
+/** A request that wasn't kept, and why: for looking at what the writers and the round trip get wrong. */
+export interface Reject { request: string; program: string; why: "not_copied" | "round_trip"; got?: string; written_by: string; style: string }
+
 export interface Manifest {
   version: string;
   examples: number;
   by_kind: { [k: string]: number };
   by_shape: { [shape: string]: number };
   writers: { [model: string]: number };
-  dropped: { not_copied: number; round_trip: number; duplicate: number; failed: number };
+  dropped: { not_copied: number; round_trip: number; duplicate: number; failed: number; shares_held_out_wording: number };
   /** Why writing stopped before every program had its requests, if it did (a spending or usage limit, a model out of
    * reach): what was written until then is kept. */
   stopped?: string;
@@ -406,7 +441,7 @@ export interface Manifest {
  * `writers`: the models that write requests, taken in turn, each asked for the styles in turn.
  * `back`: translates a request to a program through the real translator (a different model from the writer's is the
  * point); absent, examples are kept unverified and marked so.
- * `heldOut`: the held-out cases, if this machine has them: any shared wording stops the data being returned.
+ * `heldOut`: the held-out cases, if this machine has them: a request sharing wording with one is dropped.
  */
 export async function generate(gold: Gold[], o: {
   writers: LlmAdapter[];
@@ -418,7 +453,7 @@ export async function generate(gold: Gold[], o: {
   heldOut?: Case[];
   seed?: number;
   log?: (s: string) => void;
-}): Promise<{ examples: Example[]; manifest: Manifest }> {
+}): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[] }> {
   const styles = o.styles ?? Object.keys(STYLES);
   const perGold = o.perGold ?? 3;
   const usage: { [model: string]: Usage } = {};
@@ -427,7 +462,8 @@ export async function generate(gold: Gold[], o: {
     t.input_tokens += u.input_tokens + (u.cache_read_tokens ?? 0);
     t.output_tokens += u.output_tokens;
   };
-  const dropped = { not_copied: 0, round_trip: 0, duplicate: 0, failed: 0 };
+  const dropped = { not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0 };
+  const rejects: Reject[] = [];
   // A limit reached, or a model out of reach, ends the writing with what there is; any other failed call loses one request.
   let stopped: string | undefined;
   const attempt = async <T>(f: () => Promise<T>): Promise<T | undefined> => {
@@ -451,6 +487,7 @@ export async function generate(gold: Gold[], o: {
       if (!request) continue;
       if (!copies(request, g.program)) {
         dropped.not_copied++;
+        rejects.push({ request, program: g.program, why: "not_copied", written_by: model, style });
         continue;
       }
       const key = request.toLowerCase().replace(/\s+/g, " ");
@@ -466,6 +503,7 @@ export async function generate(gold: Gold[], o: {
         if (stopped || dropped.failed > failed) continue;
         if (got === undefined || !sameProgram(got, g.program)) {
           dropped.round_trip++;
+          rejects.push({ request, program: g.program, why: "round_trip", ...(got !== undefined ? { got } : {}), written_by: model, style });
           continue;
         }
         verified = o.back.model;
@@ -488,6 +526,7 @@ export async function generate(gold: Gold[], o: {
     const program = `none(${b.label})`;
     if (!b.mustCopy.every((l) => request.includes(l))) {
       dropped.not_copied++;
+      rejects.push({ request, program, why: "not_copied", written_by: model, style });
       continue;
     }
     const key = request.toLowerCase().replace(/\s+/g, " ");
@@ -503,17 +542,19 @@ export async function generate(gold: Gold[], o: {
       if (stopped || dropped.failed > failed) continue;
       if (got === undefined || !sameProgram(got, program)) {
         dropped.round_trip++;
+        rejects.push({ request, program, why: "round_trip", ...(got !== undefined ? { got } : {}), written_by: model, style });
         continue;
       }
       verified = o.back.model;
     }
     written.push({ id: exampleId(request, program), request, forms: [], program, kind: "refusal", shape: program, style, written_by: model, ...(verified ? { verified_by: verified } : {}), source: `written: ${b.source}` });
   }
-  const examples = [...positives, ...written, ...builtRefusals(positives, o.seed ?? 1)];
-  if (o.heldOut?.length) {
-    const shared = leaks(o.heldOut, [{ name: "the training data", text: examples.map((e) => e.request).join("\n") }]);
-    if (shared.length) throw new Error(`the training data shares wording with ${new Set(shared.map((s) => s.id)).size} held-out case(s) (${[...new Set(shared.map((s) => s.id))].join(", ")}): not usable as it is`);
-  }
+  // Nothing that shares wording with a held-out case is kept: each such request is dropped (and counted), so the
+  // test stays a test of requests the model hasn't seen the like of.
+  const shares = o.heldOut?.length ? sharesWording(o.heldOut) : () => false;
+  const clean = (e: Example) => !shares(e.request) || (dropped.shares_held_out_wording++, false);
+  const kept = positives.filter(clean);
+  const examples = [...kept, ...written.filter(clean), ...builtRefusals(kept, o.seed ?? 1).filter(clean)];
   const count = (key: (e: Example) => string | undefined) => {
     const out: { [k: string]: number } = {};
     for (const e of examples) {
@@ -526,5 +567,5 @@ export async function generate(gold: Gold[], o: {
     version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), writers: count((e) => e.written_by), dropped, ...(stopped ? { stopped } : {}), usage,
     sha256: sha256(examples.map((e) => canonicalJson(e)).join("\n")),
   };
-  return { examples, manifest };
+  return { examples, manifest, rejects };
 }

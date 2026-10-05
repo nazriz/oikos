@@ -97,13 +97,14 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     };
   })();
   const heldOut = loadHeldOut();
-  const { examples, manifest } = await generate(gold, {
+  const { examples, manifest, rejects } = await generate(gold, {
     writers: o.writers.map(guarded), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
     ...(back ? { back } : {}), ...(heldOut ? { heldOut } : {}), seed: o.seed ?? 1, log,
   });
   if (back) manifest.usage[`${back.model} (translating back)`] = backUsage;
   mkdirSync(o.out, { recursive: true });
   writeFileSync(join(o.out, "examples.jsonl"), examples.map((e) => JSON.stringify(e)).join("\n") + (examples.length ? "\n" : ""));
+  writeFileSync(join(o.out, "rejects.jsonl"), rejects.map((e) => JSON.stringify(e)).join("\n") + (rejects.length ? "\n" : ""));
   writeFileSync(join(o.out, "manifest.json"), JSON.stringify({ ...manifest, sources: o.sources, gold_programs: gold.length, seed: o.seed ?? 1, checked_against_held_out: !!heldOut, cost_microusd: costMicroUsd }, null, 2) + "\n");
   return { examples: examples.length, out: o.out, ...(manifest.stopped ? { stopped: manifest.stopped } : {}) };
 }

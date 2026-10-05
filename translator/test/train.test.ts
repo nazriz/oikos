@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter, LlmRequest } from "@oikos/participants/llm";
 import { CASES } from "../eval/cases";
-import { amountForms, askable, builtRefusals, copies, durationForms, generate, goldFromCases, goldFromLog, literals, refusalBriefs, sameProgram, sampler, shapeOf, surfaceVariant, type Example } from "../train/data";
+import { amountForms, askable, builtRefusals, copies, durationForms, generate, goldFromCases, goldFromLog, goldText, literals, mustAppear, refusalBriefs, sameProgram, sampler, shapeOf, surfaceVariant, type Example } from "../train/data";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
 const header = JSON.stringify({ kind: "header", body: { config: { world: { entities: [{ id: "builder", name: "Millbrook Builders" }, { id: "city", name: "Millbrook" }] }, positions: [{ id: "works", title: "Works Manager" }] } } });
@@ -38,7 +38,7 @@ test("gold programs: the calls code wrote, askable ones only, each different pro
     'message(text="Start on Monday.", to=["builder","works"])',
     'money(amount="$500", for="the kerb", from=acc-city, to=builder)',
     'money(amount="$750", for="the drain", from=acc-city, to=builder)',
-    't = entity(kind=trust, name="River Land Trust")\nstatement(for=t, kind=charter, text="It holds land.")',
+    'v1 = entity(kind=trust, name="River Land Trust")\nstatement(for=v1, kind=charter, text="It holds land.")',
   ]);
   expect(gold[0]!.names).toEqual({ builder: "Millbrook Builders", works: "Works Manager" });
   expect(gold[1]!.shape).toBe("money(amount,for,from,to)");
@@ -76,7 +76,7 @@ test("a request is kept only if it carries every literal exactly, and only if it
     back: { model: "stand-in/back", translate: async (request) => (request.includes("the drain") ? "none(unclear)" : byRequest.get(request)) },
   });
   // Four programs, two requests each: writer b loses both payments' amounts; the drain payment from writer a fails the round trip.
-  expect(r.manifest.dropped).toEqual({ not_copied: 2, round_trip: 3, duplicate: 0, failed: 0 });
+  expect(r.manifest.dropped).toEqual({ not_copied: 2, round_trip: 3, duplicate: 0, failed: 0, shares_held_out_wording: 0 });
   expect(r.examples.filter((e) => e.kind === "positive").map((e) => [e.shape, e.written_by, e.verified_by])).toEqual([
     ["message(text,to)", "stand-in/a", "stand-in/back"],
     ["money(amount,for,from,to)", "stand-in/a", "stand-in/back"],
@@ -101,10 +101,14 @@ test("refusals that can be built are: several requests run together, and a form 
   expect(builtRefusals(positives, 3, 0.1)).toEqual(built); // the same seed, the same refusals
 });
 
-test("training data that shares wording with a held-out case is refused", async () => {
+test("a request that shares wording with a held-out case is dropped, and counted", async () => {
   const gold = await goldFromLog(LOG);
   const heldOut = [{ id: "x-1", request: `Would you ${saying(gold[1]!.program, "plain").slice(8)}`, expect: ["none(unclear)"] }];
-  await expect(generate(gold, { writers: [writer("a", saying)], perGold: 1, styles: ["plain"], heldOut })).rejects.toThrow("shares wording with 1 held-out case(s) (x-1)");
+  const all = await generate(gold, { writers: [writer("a", saying)], perGold: 1, styles: ["plain"] });
+  const r = await generate(gold, { writers: [writer("a", saying)], perGold: 1, styles: ["plain"], heldOut });
+  expect(r.manifest.dropped.shares_held_out_wording).toBe(1);
+  expect(r.examples.length).toBe(all.examples.length - 1);
+  expect(r.examples.some((e) => e.program === gold[1]!.program)).toBe(false);
 });
 
 test("the same program on another surface: a name for an id, an amount or a time written another way, meaning the same", async () => {
@@ -145,7 +149,7 @@ test("refusals that have to be worded: the label comes from how the brief is bui
   // The payment without its amount: who, from where and what for are still to be copied; no figure is given.
   expect(calc.brief).toContain("money(for=");
   expect(calc.brief).not.toContain("amount=");
-  expect(calc.mustCopy).toEqual(expect.arrayContaining(["acc-city", "builder"]));
+  expect(calc.mustCopy).toEqual(expect.arrayContaining(["acc-city"])); // (and the purpose, quoted; `builder`, a bare word, is the round trip's to check)
   expect(refusalBriefs(gold, 2, 9)).toEqual(briefs);
   // A writer that words each brief; the model translating back refuses with the right label, except for vague ones.
   const wording: LlmAdapter = { provider: "stand-in", model: "w", complete: async (req) => {
@@ -162,4 +166,17 @@ test("refusals that have to be worded: the label comes from how the brief is bui
   expect(refusals.filter((x) => x === "none(needs_calculation)").length).toBe(2);
   expect(refusals.filter((x) => x === "none(not_yours)").length).toBe(2);
   expect(refusals).not.toContain("none(unclear)"); // the second model made something of them: not kept
+});
+
+test("what a gold program is kept as, what a request must carry word for word, and what's too much to ask in a sentence", () => {
+  // A name nothing uses is dropped; a payment's purpose loses the full stop a sentence would swallow.
+  expect(goldText(calls.parseProgram('park = structure(type=park, on=lot-00, by=builder, price="$97500.00", from=acc-city)'))).toBe('structure(by=builder, from=acc-city, on=lot-00, price="$97500.00", type=park)');
+  expect(goldText(calls.parseProgram('money(to=acc.44, amount="$1200.90", for="pension support.")'))).toBe('money(amount="$1200.90", for="pension support", to=acc.44)');
+  // Ids and quoted text, word for word; a bare word (yes, park, builder) however the request says it.
+  expect(mustAppear(calls.parseProgram("presence(leave=yes, who=ent.2)"))).toEqual(["ent.2"]);
+  expect(copies("ent.2 is leaving town for good.", "presence(leave=yes, who=ent.2)")).toBe(true);
+  expect(mustAppear(calls.parseProgram('structure(type=park, on=lot-00, by=builder, price="$9k")'))).toEqual(["lot-00", "$9k"].sort((a, b) => (a === "$9k" ? 1 : -1)) && expect.arrayContaining(["lot-00", "$9k"]));
+  // Twenty workers named, or a paragraph of terms, isn't a request for a sentence or two.
+  expect(askable(calls.parseProgram(`work(task=make, units="3", at=str.1, by=${JSON.stringify(Array.from({ length: 20 }, (_, i) => `c00${i}`))})`))).toBe(false);
+  expect(askable(calls.parseProgram(`agreement(with=c0042, terms="${"x".repeat(200)}")`))).toBe(false);
 });

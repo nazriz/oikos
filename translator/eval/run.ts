@@ -84,12 +84,18 @@ function renamed(p: calls.Program): calls.Program {
   const value = (v: calls.Value): calls.Value =>
     "var" in v ? { var: names.get(v.var) ?? v.var } : "id" in v && names.has(v.id) ? { id: names.get(v.id)! } : "call" in v ? { call: call(v.call) } : v;
   const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(v)])) });
-  return { lines: p.lines.map((l) => {
+  // A name no later line uses is no part of the answer either (`park = structure(…)` alone is `structure(…)`).
+  const mentions = (v: calls.Value, name: string): boolean => ("var" in v ? v.var === name : "id" in v ? v.id === name : "call" in v ? Object.values(v.call.args).some((x) => mentions(x, name)) : false);
+  const usedLater = (name: string, after: number) => p.lines.slice(after + 1).some((l) => Object.values(l.call.args).some((x) => mentions(x, name)));
+  return { lines: p.lines.map((l, i) => {
     const c = call(l.call); // (a line can't refer to the name it binds itself)
-    if (l.bind) names.set(l.bind, `v${names.size + 1}`);
-    return l.bind ? { bind: names.get(l.bind)!, call: c } : { call: c };
+    if (l.bind && usedLater(l.bind, i)) names.set(l.bind, `v${names.size + 1}`);
+    return l.bind && names.has(l.bind) ? { bind: names.get(l.bind)!, call: c } : { call: c };
   }) };
 }
+
+/** A program as its writer might equally have written it: names bound in order, none bound that nothing uses. */
+export const tidy = (p: calls.Program): calls.Program => renamed(p);
 
 /** What a program comes to: the acts it resolves to for the test mayor (or undefined if it doesn't resolve). */
 const actsOf = (program: string): string | undefined => {

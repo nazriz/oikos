@@ -53,3 +53,10 @@ export function leaks(heldOut: Case[], texts: { name: string; text: string }[], 
   }
   return out;
 }
+
+/** Whether a text shares a run of `n` consecutive words with any held-out case's request: for dropping such texts
+ * from training data one by one. */
+export function sharesWording(heldOut: Case[], n = 5): (text: string) => boolean {
+  const theirs = new Set(heldOut.flatMap((c) => [...runs(c.request, n)]));
+  return (text) => [...runs(text, n)].some((r) => theirs.has(r));
+}
