@@ -14,7 +14,7 @@ export const APPLICATION_KINDS = ["rent_increase", "debt", "charge"] as const;
 
 export const member: BehaviourModule = {
   name: "tribunal.member",
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/justice.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),

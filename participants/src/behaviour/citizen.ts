@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.35.0",
+  version: "0.35.1",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -206,6 +206,9 @@ export const citizen: BehaviourModule = {
       petition_start_bps: 300, // chance per wake that an aggrieved renter starts a petition, if none is open
       petition_willing_bps: 4400, // share of people who sign petitions at all (AES 2016: 44% had signed a written petition in the last five years)
       petition_days: 180, // how long an organiser keeps a petition open
+      // The schedule of the world's law on ending a tenancy, if it has one made from figures: a tenants' petition then
+      // names it and the notice it asks for, so that whoever answers can put that part as an amendment of the law.
+      tenancy_schedule: "",
       threshold_mean_bps: 2500, // personal thresholds (share of the population already signed) are
       threshold_sd_bps: 1000, //   roughly normal with this mean and spread (Granovetter 1978)
       population: 200,
@@ -1679,7 +1682,9 @@ export const citizen: BehaviourModule = {
       if (willing && aggrieved && open.length === 0 && ctx.rng(`petition-${t}`).below(10_000) < p.petition_start_bps) {
         steps.push(because(`Aggrieved (${noticed ? "our landlord gave us notice" : `rent is ${Math.round(burden / 100)}% of household income`}) and no tenants' petition is open: starting one.`, say("petition", "Petition: landlords must give 90 days' notice, and may not raise rent by more than 5% a year.", { data: { demand: {
           kind: "law", text: "A landlord must give at least 90 days' notice to end a tenancy, and may not raise the rent by more than 5% in any 12 months.",
-          adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"] } } })));
+          adico: { attribute: "landlords", deontic: "must_not", aim: "end a tenancy on less than 90 days' notice, or raise rent by more than 5% a year" }, tags: ["tenant_protection"],
+          // (The notice it asks for, as a figure of the law on ending a tenancy. The cap on rises is in no law's figures.)
+          ...(p.tenancy_schedule ? { amend: { schedule: p.tenancy_schedule, figures: { notice: 90 * DAY } } } : {}) } } })));
         return;
       }
       for (const pet of open) {

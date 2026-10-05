@@ -6,8 +6,9 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, drawSavings, Randomness, withholding, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw } from "@oikos/participants";
+import { adultAgeBands, drawHousehold, drawSavings, Randomness, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule } from "@oikos/participants";
 import law from "../law/basic.json";
+import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
 import { landscape } from "./nature";
 import { drawWeather } from "./weather";
@@ -167,25 +168,47 @@ export function townLife(P: Profile, care?: { treated_bps: number; fatal_kept_bp
 /** How many bodies a home with this many bedrooms could physically hold: generous (what's suitable is content). */
 const capacityFor = (bedrooms: number) => 2 * bedrooms + 2;
 
+/** The law schedules a world is given (worlds/law/schedules.json): how each law made from figures is written from them. */
+const SCHEDULES = schedules.records as unknown as { id: string; data: LawSchedule }[];
+const scheduleOf = (id: string): LawSchedule => {
+  const r = SCHEDULES.find((x) => x.id === id);
+  if (!r) throw new Error(`no law schedule ${id}`);
+  return r.data;
+};
+
+/** A law of the town's written from figures by its schedule (its words, its breakdown, its rule), carrying the figures. */
+function scheduledLaw(schedule: string, id: string, values: { [figure: string]: number }, at = 0): any {
+  return { id, record: "statement", author: "genesis", at, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter", ...draftLaw(schedule, scheduleOf(schedule), values) };
+}
+
 /**
  * The law on rent increases, from its figures: a prohibition with a formal condition on the notice itself (when it
  * takes effect, and when the rent last changed, as a notice of rent increase states). Landlords read it as any
  * participant reads a law (docs/design/ai-citizens.md 2e), so a lawmaker who changes it changes what they do.
  */
 export function rentIncreaseLaw(reviewMonths: number, noticeDays: number, id = "law-rent-increases", at = 0): any {
-  return { id, record: "statement", author: "genesis", at, visible_to: "public", speaks_for: "outside", kind: "law",
-    text: `A residential rent may be increased no more than once every ${reviewMonths} months, and only with at least ${noticeDays} days' written notice to the tenant. Or else: the increase is invalid.`,
-    adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent", condition: `more than once in ${reviewMonths} months, or with less than ${noticeDays} days' written notice`, or_else: "the increase is invalid" },
-    formal: { language: "cel", condition: `block.block == 'publish' && block.kind == 'rent_increase' && (block.data.from - now < ${noticeDays * DAY} || block.data.from - block.data.last_from < ${reviewMonths * MONTH})` } };
+  return scheduledLaw("schedule-rent-increases", id, { review: reviewMonths * MONTH, notice: noticeDays * DAY }, at);
 }
 
 /** The law on industrial action, from its figures: a prohibition on a notice of action that the ballot it states, or
  * the notice it gives, doesn't meet. */
 export function industrialActionLaw(turnoutBps: number, passBps: number, noticeDays: number, id = "law-industrial-action", at = 0): any {
-  return { id, record: "statement", author: "genesis", at, visible_to: "public", speaks_for: "outside", kind: "law",
-    text: `Industrial action is protected only if a ballot of the members concerned approves it, with at least ${turnoutBps / 100}% of them voting and more than ${passBps / 100}% of the votes yes, and the employer has at least ${noticeDays} days' written notice.`,
-    adico: { attribute: "unions", deontic: "must_not", aim: "take industrial action", condition: `without an approving ballot (${turnoutBps / 100}% voting, more than ${passBps / 100}% yes) and ${noticeDays} days' notice`, or_else: "the action is unprotected" },
-    formal: { language: "cel", condition: `block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < ${noticeDays * DAY} || block.data.voted * 10000 < ${turnoutBps} * block.data.eligible || block.data.yes * 10000 <= ${passBps} * block.data.voted)` } };
+  return scheduledLaw("schedule-industrial-action", id, { turnout: turnoutBps, majority: passBps, notice: noticeDays * DAY }, at);
+}
+
+/**
+ * The form the council's clerk publishes for amending a law made from figures: the law's figures as its fields, each
+ * optional (an amendment changes the figures given and keeps the rest), and whom the change mainly bears on, as the
+ * general proposal form asks. Written from the schedule alone, whatever the law.
+ */
+export function amendmentForm(schedule: { id: string; data: LawSchedule }): any {
+  const s = schedule.data;
+  const name = s.form ?? `amend_${schedule.id.replace(/^schedule-/, "").replace(/-/g, "_")}`;
+  return { id: `form-${name.replace(/_/g, "-")}`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
+    text: `Amendment of ${s.title}: the figures to change (${Object.values(s.figures).map((f) => f.label ?? f.unit).join("; ")}); a figure left out stays as it is. The council clerk puts it to a ballot of the councillors and, if it passes, publishes the amended law in place of the one in force.`,
+    data: { form: name, amends: schedule.id, submit_as: "proposal", submit_to: ["city"], fields: {
+      ...Object.fromEntries(Object.entries(s.figures).map(([k, f]) => [k, { type: f.type, description: f.description ?? `${f.label ?? k}, in ${f.unit}.`, unit: f.unit, ...(f.per_unit ? { per_unit: f.per_unit } : {}) }])),
+      affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." } } } };
 }
 
 export function generate(spec: TownSpec): any {
@@ -808,7 +831,8 @@ export function generate(spec: TownSpec): any {
     adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, or_else: `interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year` },
     data: { tax: "rates", rate_ppm: ratePpm, instalments: V.public_finance.rates_instalments, due_days: V.public_finance.rates_due_days, penalty_interest_bps: V.public_finance.rates_penalty_interest_bps } });
   // Laws on rent increases and on industrial action, from the profile: records the landlords and the union (and
-  // employers) read, and lawmakers can change, never module parameters (docs/profiles.md).
+  // employers) read, and lawmakers can change, never module parameters (docs/profiles.md). Each is written from its
+  // figures by a schedule and carries them; they're the town's own, so its council can amend them.
   records.push(rentIncreaseLaw(V.tenancy.rent_review_months, V.tenancy.rent_increase_notice_days));
   const IA = V.industrial_action;
   records.push(industrialActionLaw(IA.ballot_turnout_bps, IA.ballot_pass_bps, IA.notice_days));
@@ -906,7 +930,9 @@ export function generate(spec: TownSpec): any {
   };
   office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"]), priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
     // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
-    budget_lines: budgetLines }));
+    budget_lines: budgetLines,
+    // The procedure its approval rule comes from (a record): withdrawn, the rule goes with it.
+    procedure: "proc-payments" }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
   const hallCell = structures.find((x) => x.id === "town-hall")!.at;
   office("works", "city", "Works manager", "works_manager", [mine("works-business"), civic("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
@@ -1002,7 +1028,7 @@ export function generate(spec: TownSpec): any {
     // (And of land: to pass a deceased's titles to their heirs, as the succession law says.)
     { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "titles", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }], code("city.registry"));
   office("child-protection", "city", "Child protection officer", "child_protection", [deaths, civic("requests", ["care_request"])], code("city.child_protection"));
-  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["proposal", "ballot", "ballot_result", "budget", "law"]), votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
+  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["proposal", "ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
   [-80, -40, 0, 40, 80].forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
   // The town tells its bank who may instruct payments from its account: the finance officer (the position, whoever holds it).
   records.push({ id: "signatories-city", record: "statement", author: "genesis", at: 0, visible_to: ["city", "bank"], speaks_for: "city", kind: "signatories", addressed_to: ["bank"],
@@ -1012,13 +1038,17 @@ export function generate(spec: TownSpec): any {
     adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay an invoice", condition: "outside the adopted budget, or over $50,000 without the mayor's written approval" } });
   // The council clerk publishes how to put something to the council: anyone may, on this form.
   records.push({ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
-    text: "Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for 14 days.",
+    text: "Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for 14 days. A law proposed here stands as its words: no rule is set down with it for acts to be checked against. To change a figure in a law in force (a notice period, how often, a threshold), use that law's amendment form.",
     data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: {
       proposal: { type: "text", required: true, description: "What's proposed, in full: the law's words, or what the budget is for." },
       kind: { type: "choice", required: true, options: ["law", "budget", "other"], description: "A law, a budget, or something else." },
       affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." },
       // A budget's lines, one field each (the finance office's brief says what each pays for).
       ...Object.fromEntries(Object.keys(budgetLines).map((k) => [k, { type: "amount", description: `For a budget: the ${k} line.` }])) } } });
+  // Laws made from figures: the clerk's schedules (how each is written from its figures: world content), and for each
+  // a form to amend it, its figures as the fields. The clerk writes the amended law by the same schedule
+  // (docs/behaviour/government.md), so whoever reads the law in force reads its amendment the same way.
+  for (const s of SCHEDULES) records.push(s, amendmentForm(s));
   // The planning office publishes the form it expects applications on (docs/design/translator-and-resolver.md §9.3).
   records.push({ id: "form-permit", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
     text: "Planning permit application: the lot and the kind of building.",
@@ -1099,6 +1129,8 @@ export function generate(spec: TownSpec): any {
     ...(JU ? { tribunal: { entity: "tribunal", challenge_bps: JU.challenge_bps, apply_bps: JU.apply_bps, apply_after_days: JU.apply_after_days } } : {}),
     ...(E ? { electoral_town: "city", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 } } : {}),
     union: "union", union_join_bps: V.unions.membership_bps,
+    // The schedule of the law a tenants' petition asks to have amended (the law on ending a tenancy, if this world has it).
+    ...(records.some((r) => r.kind === "law" && r.data?.schedule === "schedule-tenancy") ? { tenancy_schedule: "schedule-tenancy" } : {}),
     participation_bps: V.labour_force_participation_bps, child_template_outside_lf: "child-outside-lf",
     values: { values: V.values }, // (people's values, for their minds: docs/design/ai-citizens.md 3a)
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,

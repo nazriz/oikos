@@ -10,7 +10,7 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type Step, usd, variableToday, vote, outOfTime, team } from "./common";
+import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team } from "./common";
 import { Staffing, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownerOf } from "./institutions";
@@ -29,7 +29,7 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.9.0",
+  version: "0.10.0",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -157,6 +157,26 @@ export const mayorCode: BehaviourModule = {
           handled.add(pet.id);
           if (ctx.rng(`respond-${pet.id}`).below(10_000) >= p.responsiveness_bps) continue;
           const d = pet.data?.demand ?? {};
+          // What it asks that a law's amendment form can express (the demand names the law's schedule and the figures
+          // it wants): answered on that form, where acts can then be checked against it. What no form covers isn't put,
+          // and the petition's organiser is told.
+          const form = d.amend?.schedule ? book.open("form").find((f) => f.speaks_for === me && f.data?.amends === d.amend.schedule) : undefined;
+          const asked = Object.entries((d.amend?.figures ?? {}) as { [k: string]: number }).filter(([k, v]) => form?.data?.fields?.[k] && Number.isSafeInteger(v));
+          if (form && asked.length) {
+            const law = book.open("law").filter((l) => l.speaks_for === me && l.data?.schedule === d.amend.schedule).sort((a, b) => a.at - b.at).at(-1);
+            const answer = (text: string) => say("petition_response", text, { to: pet.speaks_for ? [pet.speaks_for] : undefined, visible: "public", basis: pet.id, data: { petition: pet.id } });
+            if (law && asked.every(([k, v]) => law.data?.figures?.[k]?.value === v)) {
+              steps.push(because("A petition asking for what the law in force already says: answering so.", answer(`On petition ${pet.id}: the law in force (${law.id}) already says what it asks.`)));
+              continue;
+            }
+            // (The form's fields take a duration as such, and a count in the field's own unit.)
+            const fields = Object.fromEntries(asked.map(([k, v]) => [k, form.data.fields[k].type === "duration" ? C.secs(v) : C.text(String(v / (form.data.fields[k].per_unit ?? 1)))]));
+            const affects = (d.tags ?? []).includes("tenant_protection") ? "tenants" : (d.tags ?? []).includes("development") ? "development" : "neither";
+            steps.push(because(`A petition passed ${p.petition_threshold_bps / 100}% of the town: putting what it asks that the ${String(form.data.form).replace(/_/g, " ")} form covers (${asked.map(([k]) => k).join(", ")}) to the council on that form (we respond to ${p.responsiveness_bps / 100}% of such petitions).`,
+              C.call("form", { to: me, form: form.data.form, ...fields, affects }),
+              answer(`On petition ${pet.id}: what it asks that the law in force covers (${asked.map(([k]) => k.replace(/_/g, " ")).join(", ")}) has been put to the council as an amendment of that law. The rest of what it asks hasn't been put.`)));
+            continue;
+          }
           steps.push(because(`A petition passed ${p.petition_threshold_bps / 100}% of the town: putting its demand to the council (we respond to ${p.responsiveness_bps / 100}% of such petitions).`, say("proposal", `Proposal (from petition ${pet.id}): ${d.text}`, { to: [me], basis: pet.id,
             data: { enact: { kind: "law", text: d.text, ...(d.adico ? { adico: d.adico } : {}), ...(d.formal ? { formal: d.formal } : {}) }, tags: d.tags ?? [] } })));
         }
@@ -173,10 +193,17 @@ export const mayorCode: BehaviourModule = {
  * cast by councillors (checked against the directory), and publishes
  * the result, and, if passed, the law or budget itself, with the ballot as
  * its basis.
+ *
+ * It is also the council's drafter. A law made from figures has a schedule (a record of the town's: how the law's
+ * words, its breakdown and its rule are written from its figures) and a form for amending it, whose fields are the
+ * figures. A proposal on such a form that passes is written into law by the schedule, with the figures given and the
+ * rest as they stood; the clerk publishes it in place of the law in force, which it withdraws. So an amended law is
+ * read by everyone exactly as the law it replaces was. A law proposed in free words stands as its words, and the
+ * result says so. The clerk knows no particular law: schedules and forms are the world's content.
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.5.3",
+  version: "0.6.0",
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -199,7 +226,14 @@ export const councilClerk: BehaviourModule = {
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);
-          steps.push(because("A proposal addressed to the council: opening a ballot.", say("ballot", `Council ballot: ${prop.text}`, { basis: prop.id, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? formTags(prop) } })));
+          // A proposal on a law's amendment form: put to the council as what it would change (and not at all, if nothing).
+          const am = amendment(book, me, prop);
+          if (am && !Object.keys(am.given).length) {
+            steps.push(because("A proposal on an amendment form that names no figure to change: not put to a ballot, and saying so.",
+              message([prop.author], `Your proposal ${prop.id} to amend ${am.s.title} names no figure to change, so it hasn't been put to a ballot. The figures that can be changed: ${Object.entries(am.s.figures).map(([k, f]) => `${k} (${f.label ?? k}${am.law ? `, now ${figureWords(f, am.law.data?.figures?.[k]?.value)}` : ""})`).join("; ")}.`, prop.id)));
+            continue;
+          }
+          steps.push(because("A proposal addressed to the council: opening a ballot.", say("ballot", `Council ballot: ${am ? `to amend ${am.s.title}${am.law ? ` (${am.law.id})` : ""}: ${changes(am)}.` : prop.text}`, { basis: prop.id, data: { proposal: prop.id, options: ["yes", "no"], closes_at: t + p.vote_days * DAY, electorate: "council", tags: prop.data?.tags ?? formTags(prop) } })));
         }
         for (const ballot of book.open("ballot")) {
           // (Our council's ballots only: an election's ballot speaks for the town too, and is the electoral office's.)
@@ -210,11 +244,34 @@ export const councilClerk: BehaviourModule = {
           const yes = [...latest.values()].filter((c) => c === "yes").length;
           const no = [...latest.values()].filter((c) => c === "no").length;
           const passed = yes > no && yes * 2 > councillors.size;
-          const step: Step = because(`The ballot closed: counting the councillors' latest votes (${passed ? "a majority for" : "no majority for"}).`, say("ballot_result", `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.`, { basis: ballot.id, data: { ballot: ballot.id, yes, no, passed } }));
           const prop = book.records.get(ballot.data?.proposal) as StatementRecord | undefined;
-          const enact = prop?.data?.enact ?? fromForm(prop, t);
-          if (passed && enact) step.push(say(enact.kind, enact.text, { basis: ballot.id, adico: enact.adico, formal: enact.formal?.condition, data: enact.data }));
-          steps.push(step);
+          const am = amendment(book, me, prop);
+          const enact = am ? undefined : prop?.data?.enact ?? fromForm(prop, t);
+          const enacted: C.Call[] = [];
+          let note = ""; // what the result says became of it, in the town's terms
+          if (passed && am) {
+            // The amended law, by the schedule the law was made with: the figures given, the rest as they stand in the law
+            // in force now (it may have been amended since the proposal was made).
+            const values: { [k: string]: number } = { ...Object.fromEntries(Object.entries(am.law?.data?.figures ?? {}).map(([k, f]: [string, any]) => [k, f?.value])), ...am.given };
+            const missing = Object.keys(am.s.figures).filter((k) => !Number.isSafeInteger(values[k]));
+            // (A schedule that can't be written from, a fault in the world's content: nothing is enacted, and the result says so.)
+            const law = missing.length ? undefined : (() => { try { return draftLaw(am.schedule.id, am.s, values); } catch { return undefined; } })();
+            if (missing.length) note = ` Nothing is enacted: ${am.s.title} is no longer in force, and the proposal doesn't give ${missing.map((k) => am.s.figures[k]!.label ?? k).join(" or ")}.`;
+            else if (!law) note = ` Nothing is enacted: ${am.s.title} couldn't be written out from its figures.`;
+            else {
+              enacted.push(say("law", `${law.text} (${am.law ? `As amended by the council on ballot ${ballot.id}; this replaces ${am.law.id}.` : `Made by the council on ballot ${ballot.id}.`})`,
+                { basis: ballot.id, visible: "public", adico: law.adico, formal: law.formal?.condition, data: { ...law.data, ...(am.law ? { replaces: am.law.id } : {}) } }));
+              if (am.law) enacted.push(withdraw(am.law.id, `Amended by the council on ballot ${ballot.id}.`));
+              note = ` ${am.s.title[0]!.toUpperCase()}${am.s.title.slice(1)} is amended: ${changes(am, "was")}.${am.law ? ` The amended law takes the place of ${am.law.id}.` : ""}` +
+                (law.formal ? " It is written as the law it replaces was, so acts are checked against it in the same way." : ` ${WORDS_ONLY}`);
+            }
+          } else if (passed && enact) {
+            enacted.push(say(enact.kind, enact.text, { basis: ballot.id, adico: enact.adico, formal: enact.formal?.condition, data: enact.data }));
+            // A law in free words: say plainly what kind of law the council has passed, and where figures are changed.
+            if (enact.kind === "law" && !enact.formal?.condition) note = ` ${WORDS_ONLY}${amendable(book, me)}`;
+          }
+          steps.push(because(`The ballot closed: counting the councillors' latest votes (${passed ? "a majority for" : "no majority for"}).`,
+            say("ballot_result", `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.${note}`, { basis: ballot.id, data: { ballot: ballot.id, yes, no, passed } }), ...enacted));
         }
         steps.push(...letters.answer(() => {
           const waiting = book.open("proposal").filter((x) => (x.addressed_to ?? []).includes(me) && !balloted.has(x.id));
@@ -227,7 +284,8 @@ export const councilClerk: BehaviourModule = {
             (waiting.length ? `Proposals waiting for a ballot: ${waiting.map((x) => x.id).join(", ")}. ` : "") +
             (results.length ? `Recent results: ${results.map((r) => `${r.data?.ballot}: ${r.data?.passed ? "passed" : "rejected"} ${r.data?.yes}-${r.data?.no}`).join("; ")}. ` : "") +
             (budget ? `The council adopted a budget for year ${year} (${budget.id}). ` : `No budget is adopted for year ${year}. `) +
-            "Anyone may put a proposal to the council on the council proposal form (form-council-proposal); I put it to a ballot of the councillors, open for 14 days.";
+            `Anyone may put a proposal to the council on the council proposal form (form-council-proposal); I put it to a ballot of the councillors, open for ${p.vote_days} days. ` +
+            `A law proposed on that form stands as its words: no rule is set down with it for acts to be checked against.${amendable(book, me, true)}`;
         }));
         return steps;
       },
@@ -294,11 +352,13 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.8.2",
+  version: "0.8.3",
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_position: "mayor", budget_lines: {} as Record<string, string>, period: 14 * DAY, notice_days: 14 }, ctx.params);
+    const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_position: "mayor", budget_lines: {} as Record<string, string>, period: 14 * DAY, notice_days: 14,
+      procedure: "", // the record its approval rule comes from, if the world names one: withdrawn, the rule no longer applies
+    }, ctx.params);
     const book = new Book();
     const paid = new Set<string>();
     let spent = 0;
@@ -341,7 +401,10 @@ export const financeOfficer: BehaviourModule = {
           const amount = cents(owed?.amount);
           // Approved in writing by the mayor: made in the mayor's position, whoever holds it.
           const approved = book.open("approval").some((a) => a.data?.invoice === inv.id && a.in_position === p.mayor_position);
-          const withinProcedure = spent + wages() + amount <= limit && (amount <= p.approval_over || approved);
+          // (The approval rule is the payments procedure's: once that's withdrawn, with nothing in its place, it no longer
+          // applies. Paying within the adopted budget is the charter's, and stays.)
+          const approvalRule = !(p.procedure && book.repealed(p.procedure));
+          const withinProcedure = spent + wages() + amount <= limit && (!approvalRule || amount <= p.approval_over || approved);
           const follows = ctx.rng(`procedure-${inv.id}`).below(10_000) < p.compliance_bps;
           if (!withinProcedure && follows) continue; // wait (approval may come), or never (over budget)
           if (acc.balance < amount) continue;
@@ -401,7 +464,7 @@ export const financeOfficer: BehaviourModule = {
  */
 export const taxClerk: BehaviourModule = {
   name: "city.tax_clerk",
-  version: "0.4.1",
+  version: "0.4.2",
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -421,10 +484,14 @@ export const taxClerk: BehaviourModule = {
         const me = obs.entity;
         const t = obs.t;
         const steps: Step[] = [];
-        const law = book.records.get(p.law);
+        // The law in force (itself, or what has replaced it). Withdrawn with nothing in its place: no tax is assessed,
+        // and no new penalty recorded.
+        const law = book.current(p.law);
+        const repealed = book.repealed(p.law);
         const rate: number = law?.record === "statement" ? law.data?.rate_bps ?? 1000 : 1000;
         const penalty: number = law?.record === "statement" ? law.data?.penalty_bps ?? 2000 : 2000;
         for (const rep of book.open("tax_report")) {
+          if (repealed) break;
           if (assessed.has(rep.id) || !(rep.addressed_to ?? []).includes(me)) continue;
           const amount = Math.floor(((rep.data?.rent_received ?? 0) * rate) / 10_000);
           assessed.set(rep.id, { payer: rep.speaks_for!, account: rep.data?.account, amount, at: t, chased: false });
@@ -436,7 +503,7 @@ export const taxClerk: BehaviourModule = {
         for (const [id, a] of assessed) {
           const upTo = (applied.get(a.account) ?? 0) + a.amount;
           applied.set(a.account, upTo);
-          if (a.chased || t - a.at < p.grace_days * DAY) continue;
+          if (repealed || a.chased || t - a.at < p.grace_days * DAY) continue;
           if ((received.get(a.account) ?? 0) >= upTo) continue;
           a.chased = true;
           const fine = Math.floor((a.amount * penalty) / 10_000);
@@ -467,7 +534,7 @@ export const taxClerk: BehaviourModule = {
  */
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
-  version: "0.2.0",
+  version: "0.2.1",
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -494,17 +561,18 @@ export const ratesOfficer: BehaviourModule = {
         const t = obs.t;
         const acc = ownAccount(obs);
         const steps: Step[] = [];
-        const law = book.records.get(p.law);
+        // The law in force (itself, or what has replaced it); withdrawn with nothing in its place, nothing is levied.
+        const law = book.current(p.law);
         const terms = law?.record === "statement" ? law.data ?? {} : {};
         const ratePpm: number = terms.rate_ppm ?? 0;
         const instalments: number = terms.instalments ?? 4;
         const dueDays: number = terms.due_days ?? 30;
         const interestBps: number = terms.penalty_interest_bps ?? 0;
-        if (!acc || !law) return steps;
+        if (!acc) return steps;
         // Notices: each owner's share of a year's rates on what they own, as last valued. (Not before there are valuations:
         // until 2026-10-02 the first instalment went out on the first morning, before the valuer had valued anything,
         // levied nothing, and the next waited a quarter.)
-        if (t >= next && ratePpm > 0 && book.open("valuation").length) {
+        if (law && t >= next && ratePpm > 0 && book.open("valuation").length) {
           next = t + Math.floor(365 / instalments) * DAY;
           const latest = new Map<string, StatementRecord>(); // lot -> its latest valuation
           for (const v of book.open("valuation").sort((a, b) => a.at - b.at)) latest.set(v.data?.lot, v);
@@ -540,6 +608,7 @@ export const ratesOfficer: BehaviourModule = {
           const valued = new Set(book.open("valuation").map((v) => v.data?.lot)).size;
           const when = !valued ? " No property has been valued yet (the valuer values every property once a year): the first notices go out once it has."
             : t >= next ? " The next instalment's notices go out today." : ` The next instalment's notices go out on day ${Math.floor(next / DAY) + 1}.`;
+          if (!law) return `Report from the rates officer: ${book.repealed(p.law) ? "the rating law has been withdrawn, so no rates are levied" : "there is no rating law that we know of, so no rates are levied"}; ${usd(levied)} levied so far, ${usd(received)} received.`;
           return `Report from the rates officer: rates at ${ratePpm / 10_000}% of value a year, in ${instalments} instalments, each due ${dueDays} days after its notice; ${valued} properties valued; ${usd(levied)} levied so far, ${usd(received)} received.` +
             when + (overdue.length ? ` Overdue: ${overdue.join(", ")}.` : " Nothing is overdue.");
         }));
@@ -732,6 +801,52 @@ export const works: BehaviourModule = {
     ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };
+
+/** What a result says of a law passed in free words. */
+const WORDS_ONLY = "The law is recorded as worded. No rule was set down with it for acts to be checked against.";
+
+/** A proposal made on a law's amendment form: the schedule the law is written by, the law in force (if there is one),
+ * and the figures the proposal gives, as held. */
+type Amendment = { schedule: StatementRecord; s: LawSchedule; law?: StatementRecord; given: { [figure: string]: number } };
+
+/** The town's law in force that a schedule wrote (the latest, if somehow several). */
+function lawBySchedule(book: Book, me: string, schedule: string): StatementRecord | undefined {
+  return book.open("law").filter((l) => l.speaks_for === me && l.data?.schedule === schedule).sort((a, b) => a.at - b.at).at(-1);
+}
+
+/** The town's schedules still standing, each with its amendment form (if one stands) and the law in force it wrote. */
+function schedules(book: Book, me: string): { schedule: StatementRecord; s: LawSchedule; form?: StatementRecord; law?: StatementRecord }[] {
+  return book.open("law_schedule").filter((x) => x.speaks_for === me && x.data?.figures && typeof x.data?.text === "string").sort((a, b) => (a.id < b.id ? -1 : 1))
+    .map((schedule) => ({ schedule, s: schedule.data as LawSchedule, form: book.open("form").find((f) => f.speaks_for === me && f.data?.amends === schedule.id), law: lawBySchedule(book, me, schedule.id) }));
+}
+
+/** Is this proposal made on one of the town's amendment forms? (A form made proposal's basis is its form.) */
+function amendment(book: Book, me: string, prop: StatementRecord | undefined): Amendment | undefined {
+  const form = prop?.basis ? book.records.get(prop.basis) : undefined;
+  if (!prop || form?.record !== "statement" || form.kind !== "form" || form.speaks_for !== me || typeof form.data?.amends !== "string") return undefined;
+  const found = schedules(book, me).find((x) => x.schedule.id === form.data.amends);
+  if (!found) return undefined;
+  const given: { [figure: string]: number } = {};
+  for (const [k, f] of Object.entries(found.s.figures)) if (Number.isSafeInteger(prop.data?.[k]) && prop.data[k] >= 0) given[k] = heldValue(f, prop.data[k]);
+  return { schedule: found.schedule, s: found.s, law: found.law, given };
+}
+
+/** What an amendment changes, in words: "notice of an increase 90 days (now 60 days)" (once made: "was 60 days"). */
+function changes(am: Amendment, before: "now" | "was" = "now"): string {
+  return Object.entries(am.given).map(([k, v]) => {
+    const f: LawFigure = am.s.figures[k]!;
+    const now = am.law?.data?.figures?.[k]?.value;
+    return `${f.label ?? k} ${figureWords(f, v)}${Number.isSafeInteger(now) ? ` (${now === v ? "unchanged" : `${before} ${figureWords(f, now)}`})` : ""}`;
+  }).join("; ");
+}
+
+/** Where figures are changed: the laws in force made from figures, each with its amendment form (and, in a report, its figures). */
+function amendable(book: Book, me: string, withFigures = false): string {
+  const list = schedules(book, me).filter((x) => x.form);
+  if (!list.length) return "";
+  return ` Laws made from figures are amended on their own forms: ${list.map((x) => `${x.s.title}${x.law ? ` (${x.law.id})` : " (none in force)"} on ${x.form!.data.form}` +
+    (withFigures && x.law ? ` (${Object.entries(x.s.figures).map(([k, f]) => `${k}: ${f.label ?? k}, now ${figureWords(f, x.law!.data?.figures?.[k]?.value)}`).join("; ")})` : "")).join("; ")}.`;
+}
 
 /** What a proposal made on the council proposal form enacts if it passes: a law, or a budget (with its lines: parks,
  * and every other amount the form gives). */

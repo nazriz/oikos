@@ -1,0 +1,89 @@
+{
+  "description": "Law schedules: EXAMPLE CONTENT, not a default (D18). A schedule says how a law whose substance is a few figures is written from them: the figures (their types and units), and the law's words, its Institutional Grammar breakdown and, where acts can be checked against it, its rule (a formal CEL condition), with {figure} standing for a figure as worded and {figure:unit} for the number as held. A world's opening laws are written from these with a place's figures (from its profile), and a council's clerk writes an amended law the same way, from the figures on the law's amendment form (docs/behaviour/government.md). A schedule holds no place's figures.",
+  "records": [
+    {
+      "id": "schedule-rent-increases",
+      "record": "statement",
+      "author": "genesis",
+      "at": 0,
+      "visible_to": ["city"],
+      "speaks_for": "city",
+      "kind": "law_schedule",
+      "basis": "law-charter",
+      "text": "How the law on rent increases is written from its figures: the least time between increases, and the notice of one.",
+      "data": {
+        "title": "the law on rent increases",
+        "form": "amend_rent_increases",
+        "figures": {
+          "review": { "type": "duration", "unit": "months", "label": "least time between increases", "description": "The least time between one increase of a tenancy's rent and the next (for example: 12 months)." },
+          "notice": { "type": "duration", "unit": "days", "label": "notice of an increase", "description": "The least written notice a tenant must have of an increase (for example: 60 days)." }
+        },
+        "text": "A residential rent may be increased no more than once every {review}, and only on written notice to the tenant of at least {notice}. Or else: the increase is invalid.",
+        "adico": {
+          "attribute": "landlords",
+          "deontic": "must_not",
+          "aim": "increase a tenancy's rent",
+          "condition": "more than once in {review}, or on written notice of less than {notice}",
+          "or_else": "the increase is invalid"
+        },
+        "formal": "block.block == 'publish' && block.kind == 'rent_increase' && (block.data.from - now < {notice:seconds} || block.data.from - block.data.last_from < {review:seconds})"
+      }
+    },
+    {
+      "id": "schedule-industrial-action",
+      "record": "statement",
+      "author": "genesis",
+      "at": 0,
+      "visible_to": ["city"],
+      "speaks_for": "city",
+      "kind": "law_schedule",
+      "basis": "law-charter",
+      "text": "How the law on industrial action is written from its figures: the turnout and the majority a ballot needs, and the notice an employer must have.",
+      "data": {
+        "title": "the law on industrial action",
+        "form": "amend_industrial_action",
+        "figures": {
+          "turnout": { "type": "count", "unit": "percent", "held_in": "basis points", "per_unit": 100, "label": "turnout a ballot needs", "description": "The least share of the members concerned who must vote, in percent, as a whole number (for example: 50)." },
+          "majority": { "type": "count", "unit": "percent", "held_in": "basis points", "per_unit": 100, "label": "share of the votes that must be exceeded", "description": "The share of the votes cast that the yes votes must exceed, in percent, as a whole number (for example: 50)." },
+          "notice": { "type": "duration", "unit": "days", "label": "notice to the employer", "description": "The least written notice the employer must have of the action (for example: 3 days)." }
+        },
+        "text": "Industrial action is protected only if a ballot of the members concerned approves it, with at least {turnout}% of them voting and more than {majority}% of the votes yes, and the employer has written notice of at least {notice}.",
+        "adico": {
+          "attribute": "unions",
+          "deontic": "must_not",
+          "aim": "take industrial action",
+          "condition": "without an approving ballot ({turnout}% voting, more than {majority}% yes) and written notice of at least {notice}",
+          "or_else": "the action is unprotected"
+        },
+        "formal": "block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < {notice:seconds} || block.data.voted * 10000 < {turnout:basis_points} * block.data.eligible || block.data.yes * 10000 <= {majority:basis_points} * block.data.voted)"
+      }
+    },
+    {
+      "id": "schedule-tenancy",
+      "record": "statement",
+      "author": "genesis",
+      "at": 0,
+      "visible_to": ["city"],
+      "speaks_for": "city",
+      "kind": "law_schedule",
+      "basis": "law-charter",
+      "text": "How the law on ending a tenancy is written from its figures: the notice a landlord must give, and the notice a tenant may leave on.",
+      "data": {
+        "title": "the law on ending a tenancy",
+        "form": "amend_tenancy",
+        "figures": {
+          "notice": { "type": "duration", "unit": "days", "label": "a landlord's notice to end a tenancy", "description": "The least written notice a landlord must give to end a tenancy (for example: 60 days)." },
+          "tenant_notice": { "type": "duration", "unit": "days", "label": "a tenant's notice to leave", "description": "The notice a tenant may leave on (for example: 30 days)." }
+        },
+        "text": "A landlord may end a tenancy only by giving written notice of at least {notice}, and may not remove a tenant before the notice has run out. A tenant may leave on notice of {tenant_notice}. Or else: the removal is unlawful and the tenant may return.",
+        "adico": {
+          "attribute": "landlords",
+          "deontic": "must_not",
+          "aim": "remove a tenant",
+          "condition": "before written notice of at least {notice} has run out",
+          "or_else": "the removal is unlawful; the tenant may return"
+        }
+      }
+    }
+  ]
+}
