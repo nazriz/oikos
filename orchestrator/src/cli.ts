@@ -38,6 +38,10 @@
 //   oikos translator-eval --model provider/model [--budget DOLLARS] [--base-url URL] [--out FILE]
 //     The translator's test set (translator/eval/cases.ts, and the held-out cases where this machine has them) on a real
 //     model: seen and held-out pass rates, and cost.
+//   oikos translator-data <LOG|DIR>... --model provider/model [--model ...] [--back-model provider/model] --out DIR
+//         [--per-shape N] [--per-gold N] [--refusals N] [--limit N] [--seed N]
+//     Training data for the local translation model: requests written by the models given for the calls code
+//     participants made in those logs, each checked (training.ts).
 //   oikos replay <log.jsonl> [--anchors <anchors.jsonl>]      (the kernel's own replay)
 //   oikos story <log.jsonl> [participant]                     (what a language-model participant did, day by day)
 //
@@ -151,6 +155,16 @@ try {
     console.log(reportText(r));
     if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(publicReport(r), null, 2));
     if (heldOut) await Bun.write(join(heldOutPath(), "..", "results", `${r.model.replace(/[^a-z0-9.-]+/gi, "-")}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`), JSON.stringify(r, null, 2));
+  } else if (cmd === "translator-data" && positional()[0] && flags("model").length && flag("out")) {
+    // Training data for the local translation model, from runs' logs (training.ts).
+    const { trainingData } = await import("./training");
+    const pick = (name: string) => chooseModel(name, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
+    const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    const r = await trainingData({
+      sources: positional(), writers: flags("model").map(pick), ...(flag("back-model") ? { back: pick(flag("back-model")!) } : {}), out: flag("out")!,
+      perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), limit: num("limit"), seed: num("seed"), log: console.log,
+    });
+    console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);
   } else if (cmd === "dataset" && positional()[0]) {
     // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
     const { logsIn } = await import("./corpus");

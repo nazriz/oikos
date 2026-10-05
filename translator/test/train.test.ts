@@ -76,7 +76,7 @@ test("a request is kept only if it carries every literal exactly, and only if it
     back: { model: "stand-in/back", translate: async (request) => (request.includes("the drain") ? "none(unclear)" : byRequest.get(request)) },
   });
   // Four programs, two requests each: writer b loses both payments' amounts; the drain payment from writer a fails the round trip.
-  expect(r.manifest.dropped).toEqual({ not_copied: 2, round_trip: 3, duplicate: 0 });
+  expect(r.manifest.dropped).toEqual({ not_copied: 2, round_trip: 3, duplicate: 0, failed: 0 });
   expect(r.examples.filter((e) => e.kind === "positive").map((e) => [e.shape, e.written_by, e.verified_by])).toEqual([
     ["message(text,to)", "stand-in/a", "stand-in/back"],
     ["money(amount,for,from,to)", "stand-in/a", "stand-in/back"],

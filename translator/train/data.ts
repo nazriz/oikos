@@ -392,7 +392,10 @@ export interface Manifest {
   by_kind: { [k: string]: number };
   by_shape: { [shape: string]: number };
   writers: { [model: string]: number };
-  dropped: { not_copied: number; round_trip: number; duplicate: number };
+  dropped: { not_copied: number; round_trip: number; duplicate: number; failed: number };
+  /** Why writing stopped before every program had its requests, if it did (a spending or usage limit, a model out of
+   * reach): what was written until then is kept. */
+  stopped?: string;
   usage: { [model: string]: Usage };
   /** SHA-256 of the examples file: recorded with any model trained on it (§16.4). */
   sha256: string;
@@ -424,16 +427,27 @@ export async function generate(gold: Gold[], o: {
     t.input_tokens += u.input_tokens + (u.cache_read_tokens ?? 0);
     t.output_tokens += u.output_tokens;
   };
-  const dropped = { not_copied: 0, round_trip: 0, duplicate: 0 };
+  const dropped = { not_copied: 0, round_trip: 0, duplicate: 0, failed: 0 };
+  // A limit reached, or a model out of reach, ends the writing with what there is; any other failed call loses one request.
+  let stopped: string | undefined;
+  const attempt = async <T>(f: () => Promise<T>): Promise<T | undefined> => {
+    try {
+      return await f();
+    } catch (e) {
+      if (["SpendingLimitReached", "UsageLimitReached", "ModelUnreachable"].includes((e as Error).name)) stopped = `${(e as Error).name}: ${(e as Error).message}`.slice(0, 500);
+      else dropped.failed++;
+      return undefined;
+    }
+  };
   const seen = new Set<string>();
   const positives: Example[] = [];
   let turn = 0;
   for (const [gi, g] of gold.entries()) {
-    for (let i = 0; i < perGold; i++, turn++) {
+    for (let i = 0; i < perGold && !stopped; i++, turn++) {
       const writer = o.writers[turn % o.writers.length]!;
       const style = styles[turn % styles.length]!;
       const model = `${writer.provider}/${writer.model}`;
-      const request = await writeRequest(writer, g, style, add(model));
+      const request = await attempt(() => writeRequest(writer, g, style, add(model)));
       if (!request) continue;
       if (!copies(request, g.program)) {
         dropped.not_copied++;
@@ -447,7 +461,9 @@ export async function generate(gold: Gold[], o: {
       seen.add(key);
       let verified: string | undefined;
       if (o.back) {
-        const got = await o.back.translate(request, []);
+        const failed = dropped.failed;
+        const got = await attempt(() => o.back!.translate(request, []));
+        if (stopped || dropped.failed > failed) continue;
         if (got === undefined || !sameProgram(got, g.program)) {
           dropped.round_trip++;
           continue;
@@ -456,16 +472,18 @@ export async function generate(gold: Gold[], o: {
       }
       positives.push({ id: exampleId(request, g.program), request, forms: [], program: g.program, kind: "positive", shape: g.shape, style, written_by: model, ...(verified ? { verified_by: verified } : {}), source: g.source });
     }
+    if (stopped) break;
     if (o.log && (gi + 1) % 25 === 0) o.log(`${gi + 1}/${gold.length} programs; ${positives.length} examples kept`);
   }
   // Refusals that have to be worded: each brief to a writer in turn, kept if it carries what it must and (with a second
   // model) comes back refused with the same label.
   const written: Example[] = [];
   for (const b of o.refusalsPerLabel ? refusalBriefs(gold, o.refusalsPerLabel, o.seed ?? 1) : []) {
+    if (stopped) break;
     const writer = o.writers[turn % o.writers.length]!;
     const style = styles[turn++ % styles.length]!;
     const model = `${writer.provider}/${writer.model}`;
-    const request = await writeRefusal(writer, b, style, add(model));
+    const request = await attempt(() => writeRefusal(writer, b, style, add(model)));
     if (!request) continue;
     const program = `none(${b.label})`;
     if (!b.mustCopy.every((l) => request.includes(l))) {
@@ -480,7 +498,9 @@ export async function generate(gold: Gold[], o: {
     seen.add(key);
     let verified: string | undefined;
     if (o.back) {
-      const got = await o.back.translate(request, []);
+      const failed = dropped.failed;
+      const got = await attempt(() => o.back!.translate(request, []));
+      if (stopped || dropped.failed > failed) continue;
       if (got === undefined || !sameProgram(got, program)) {
         dropped.round_trip++;
         continue;
@@ -503,7 +523,7 @@ export async function generate(gold: Gold[], o: {
     return Object.fromEntries(Object.entries(out).sort());
   };
   const manifest: Manifest = {
-    version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), writers: count((e) => e.written_by), dropped, usage,
+    version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), writers: count((e) => e.written_by), dropped, ...(stopped ? { stopped } : {}), usage,
     sha256: sha256(examples.map((e) => canonicalJson(e)).join("\n")),
   };
   return { examples, manifest };
