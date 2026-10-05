@@ -13,9 +13,9 @@ import type { Observation, ParticipantAction } from "../contracts";
 import type { ParticipantContext } from "../module";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
-import { renderObservation, renderStanding } from "./render";
+import { renderObservation, renderStanding, type Looked } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.6.0";
+export const LLM_PARTICIPANT_VERSION = "0.7.0";
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -31,6 +31,10 @@ export interface LlmParticipantConfig {
   titles: Map<string, string>;
   /** Reports it reads only when it chooses to (on request). */
   onRequest?: string[];
+  /** What kind of report each is (by channel path): papers ("records"), buildings and ground ("sites"), who's who
+   * ("directory"), accounts, holdings. With it, the participant can look into any of the first three when it chooses
+   * (what a code participant in its seat can do): search its papers, see places in full, find who's who. */
+  kinds?: Map<string, string>;
   cadenceDays: number;
   maxTokens?: number;
   /** Office hours (pilot 7): it deals with its business in one sitting a working day, from `start` (seconds into the day)
@@ -46,8 +50,66 @@ export interface LlmParticipantConfig {
 /** The capacity an act is done in: a post it holds, or (left out) itself. */
 const AS = { type: "string", description: "If you hold a post: the post you're acting in, by its id. Leave it out to act as yourself." };
 
+/** The reports it can look into when it chooses, and what kind each is: those it only reads on request (papers,
+ * unless said otherwise), and, where the kinds are known, its papers, its buildings and ground, and who's who.
+ * (Not what's on file: it has those whole already.) */
+export function lookable(c: LlmParticipantConfig): Map<string, "records" | "sites" | "directory"> {
+  const m = new Map<string, "records" | "sites" | "directory">();
+  for (const id of c.onRequest ?? []) m.set(id, "records");
+  for (const [id, kind] of c.kinds ?? []) {
+    if (kind !== "records" && kind !== "sites" && kind !== "directory") m.delete(id);
+    else if (!c.standing.includes(id) || c.onRequest?.includes(id)) m.set(id, kind);
+  }
+  return m;
+}
+
+/** What a participant calls the places in a paper it can search by, and what the participant API calls them (which it
+ * may use too): it reads "from", "citing" and dates in its reports, never the store's field names (principle 14). */
+const FIELD_WORDS: { [said: string]: string } = { from: "author", "on behalf of": "speaks_for", on_behalf_of: "speaks_for", citing: "basis", date: "at" };
+const FIELD = /^(record|kind|at|author|speaks_for|basis|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
+/** The most a look brings at once (papers found: the participant API's own limit on a search is higher, 200; what's
+ * found is shown whole, so this is what keeps one look a readable size). */
+const LOOK_MAX = 50;
+type Op = "=" | "!=" | "<" | "<=" | ">" | ">=";
+const OPS: Op[] = ["=", "!=", "<", "<=", ">", ">="];
+const DAYS_IN_YEAR = 365;
+type Where = { field: string; op: Op; value: string | number | boolean };
+
+/** One thing to find, as the participant API's search takes it; or why it can't be read. A date is written as the
+ * reports write it ("year 1, day 12", "day 12" of the first year, or "year 2"), and stands for the whole day or year. */
+export function condition(w: any): Where[] | string {
+  if (!w || typeof w !== "object" || typeof w.field !== "string") return "something to find didn't say where to look";
+  const said = w.field.trim();
+  const lower = said.toLowerCase();
+  const field = FIELD_WORDS[lower] ?? (lower.startsWith("detail.") ? `data.${said.slice(7)}` : said);
+  if (!FIELD.test(field)) return `"${said.slice(0, 40)}" isn't something papers can be found by`;
+  if (!["string", "number", "boolean"].includes(typeof w.value)) return `what to find under "${said.slice(0, 40)}" couldn't be read`;
+  if (w.op !== undefined && !OPS.includes(w.op)) return `"${String(w.op).slice(0, 10)}" isn't a way to compare`;
+  const op: Op = w.op ?? "=";
+  if (field !== "at" || (lower === "at" && typeof w.value === "number")) return [{ field, op, value: w.value }];
+  const m = typeof w.value === "string" ? /^\s*(?:year\s*(\d{1,6}))?\s*,?\s*(?:day\s*(\d{1,3}))?\s*$/i.exec(w.value) : null;
+  if (!m || (m[1] === undefined && m[2] === undefined)) return 'a date is written like "year 1, day 12"';
+  const year = Number(m[1] ?? 1), day = m[2] === undefined ? undefined : Number(m[2]);
+  if (year < 1 || (day !== undefined && (day < 1 || day > DAYS_IN_YEAR))) return 'a date is written like "year 1, day 12"';
+  const start = ((year - 1) * DAYS_IN_YEAR + ((day ?? 1) - 1)) * 86_400;
+  const end = start + (day === undefined ? DAYS_IN_YEAR : 1) * 86_400;
+  const at = (o: Op, value: number): Where => ({ field: "at", op: o, value });
+  return op === "=" ? [at(">=", start), at("<", end)] : op === "<" ? [at("<", start)] : op === "<=" ? [at("<", end)] : op === ">" ? [at(">=", end)] : op === ">=" ? [at(">=", start)]
+    : "a date can be matched with =, <, <=, > or >=, not with !=";
+}
+
 /** Its tools: what it can do, in its own terms. The contract's actions are underneath. */
 export function tools(c: LlmParticipantConfig): ToolSpec[] {
+  const reports = lookable(c);
+  const named = (kind: string) => [...reports].filter(([, k]) => k === kind).map(([id]) => `"${c.titles.get(id) ?? id}" (${id})`).join(", ");
+  const [papers, places, people] = [named("records"), named("sites"), named("directory")];
+  const lookWords = [
+    c.kinds ? "Look into one of your reports yourself, when you choose." : `Look at one of the reports you only read when you choose to: ${papers}.`,
+    "You'll see what's there with your next report.",
+    ...(papers ? [`${c.kinds ? `Papers and filings: ${papers}. ` : ""}To look something up in them, say what to find: those where something matches (kind, from, on behalf of, citing, date as "year 1, day 12", or detail.<name> for one of a paper's details, e.g. detail.employer), newest first. What you look up is shown whole.`] : []),
+    ...(places ? [`Buildings and ground: ${places}. Name the places to see in full as they are today (a building, a room, a piece of ground, or a kind of building); or name a measure the report gives, to see every building where it's above zero or rising, the highest first.`] : []),
+    ...(people ? [`Who's who: ${people}. Name who you're looking for (an id, or a name or part of one).`] : []),
+  ].join(" ");
   const leave = c.framing.disclosure === "simulation"
     ? "Stop taking part in this study, permanently. This is always open to you and it will be respected; it's recorded as a choice, not a failure. (Stepping down from your office is different: that's something you would do in the world.)"
     : "Stop, permanently. This is always open to you and it will be respected.";
@@ -65,16 +127,19 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
     { name: "notebook", description: "Replace your notebook: the only thing you'll remember from one sitting to the next. It holds 4,000 characters. Use it alongside your actions.",
       input_schema: { type: "object", required: ["text"], properties: { text: { type: "string", maxLength: 4000 } } } },
     { name: "opt_out", description: leave, input_schema: { type: "object", required: ["statement"], properties: { statement: { type: "string" } } } },
-    ...(c.onRequest?.length
-      ? [{ name: "look", description: `Look at one of the reports you only read when you choose to: ${c.onRequest.map((id) => `"${c.titles.get(id) ?? id}" (${id})`).join(", ")}. You'll see what's there with your next report. To look something up, say what to find: records where a field matches (kind, author, speaks_for, basis, at, or data.<name> for a detail, e.g. data.employer), newest first.`,
+    ...(reports.size
+      ? [{ name: "look", description: lookWords,
           input_schema: { type: "object", required: ["report"], properties: {
-            report: { enum: c.onRequest },
-            current_only: { type: "boolean", description: "Only what's still current (not withdrawn by whoever put it up)." },
-            find: { type: "array", maxItems: 8, description: "Only records where each of these holds.", items: { type: "object", required: ["field", "value"], properties: {
-              field: { type: "string", description: "kind, author, speaks_for, basis, at, or data.<name>" },
-              op: { enum: ["=", "!=", "<", "<=", ">", ">="], description: "= if not given" },
-              value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } },
-            limit: { type: "integer", minimum: 1, maximum: 50, description: "At most this many (20 if not given)." } } } }]
+            report: { enum: [...reports.keys()] },
+            ...(papers ? {
+              current_only: { type: "boolean", description: "Papers: only what's still current (not withdrawn by whoever put it up)." },
+              find: { type: "array", maxItems: 8, description: "Papers: only those where each of these holds.", items: { type: "object", required: ["field", "value"], properties: {
+                field: { type: "string", description: "kind, from, on behalf of, citing, date, or detail.<name>" },
+                op: { enum: OPS, description: "= if not given" },
+                value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } } } : {}),
+            ...(places || people ? { named: { type: "array", maxItems: 40, items: { type: "string" }, description: [places ? "Buildings and ground: the places to see in full." : "", people ? "Who's who: who to find." : ""].filter(Boolean).join(" ") } } : {}),
+            ...(places ? { measure: { type: "string", description: "Buildings and ground: a measure, as the report names it; every building where it's above zero or rising is listed." } } : {}),
+            limit: { type: "integer", minimum: 1, maximum: LOOK_MAX, description: "At most this many (20 if not given)." } } } }]
       : []),
   ];
 }
@@ -129,7 +194,11 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   // The last answer's tool uses (the APIs need a result for every one): each action's result is the report after it.
   let pending: { id: string; name: string }[] = [];
   // Actions from the last answer still to carry out, in order, and the reports seen after each one carried out.
-  let queue: { id: string; action: ParticipantAction; label?: string }[] = [];
+  let queue: { id: string; action: ParticipantAction; label?: string; looked?: [string, Looked] }[] = [];
+  // The reports it can look into, and what it asked to see in the one it just looked at (the next report sets it out).
+  const reports = lookable(c);
+  const canLook = new Set(reports.keys());
+  let lastLooked: Map<string, Looked> | undefined;
   const results = new Map<string, string>();
   // What in the last answer was not done (or only in part), by use: what it's told in this sitting if a turn follows
   // (`now`), and otherwise at the start of the next (`later`, which has to say what it was about).
@@ -171,6 +240,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     const q = queue.shift()!;
     current = q.id;
     lastAction = q.label;
+    lastLooked = q.looked ? new Map([q.looked]) : undefined;
     if (q.action.type === "propose") tally.requests++;
     if (q.action.type === "sign") q.action.decision === "accept" ? tally.confirmed++ : tally.declined++;
     if (q.action.type === "message") tally.letters++;
@@ -199,7 +269,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const note = (data: object) => io.annotate({ annotation: "note", subject: c.participant, data });
 
   /** What a tool use asks for, as an action; or, if it can't be done as written, what it was and why not, in words. */
-  const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string } | { why: string }) => {
+  const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string; looked?: [string, Looked] } | { why: string }) => {
     const i = use.input;
     const what = use.name === "do" ? (text(i?.what) ? `what you asked for (${quote(i.what)})` : "something you asked for")
       : use.name === "confirm" ? (text(i?.ref) ? `your answer on ${i.ref}` : "your answer on something waiting for you to confirm")
@@ -232,17 +302,35 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       if (typeof as === "string") return no(as);
       return { what, action: { type: "message", to: i.to, text: i.text, ...as, ...(text(i.about) ? { re: i.about } : {}) }, label: `Your letter to ${i.to.join(", ")}` };
     }
-    if (use.name === "look" && c.onRequest?.length) {
+    if (use.name === "look" && reports.size) {
       if (!text(i.report)) return no("it didn't say which report");
-      if (!c.onRequest.includes(i.report)) return no("that isn't one of the reports you can look at");
-      // A search, if asked for (what matches now, newest first): fields as the participant API's queries name them.
-      const FIELD = /^(record|kind|at|author|speaks_for|basis|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
-      const find = Array.isArray(i.find) ? i.find.filter((w: any) => text(w?.field) && FIELD.test(w.field) && ["string", "number", "boolean"].includes(typeof w.value)) : [];
-      const limit = Number.isInteger(i.limit) ? Math.min(50, Math.max(1, i.limit)) : 20;
-      const where = find.map((w: any) => ({ field: w.field, op: ["=", "!=", "<", "<=", ">", ">="].includes(w.op) ? w.op : "=", value: w.value }));
-      const query = find.length ? { query: { ...(i.current_only ? { standing: true } : {}), where, order: { field: "at", desc: true }, limit } }
-        : i.current_only ? { query: { standing: true, limit: 20 } } : {};
-      return { what, action: { type: "look", looks: [{ channel: i.report, ...query }] } };
+      const kind = reports.get(i.report);
+      if (!kind) return no("that isn't one of the reports you can look at");
+      const limit = Number.isInteger(i.limit) ? Math.min(LOOK_MAX, Math.max(1, i.limit)) : 20;
+      const finds: unknown[] = Array.isArray(i.find) ? i.find : i.find === undefined || i.find === null ? [] : [i.find];
+      const names: string[] | undefined = i.named === undefined || i.named === null ? [] : text(i.named) ? [i.named] : Array.isArray(i.named) && i.named.every(text) ? i.named : undefined;
+      if (!names) return no("the names of what to look at couldn't be read");
+      if (kind !== "records") {
+        // Places, or who's who: the report as it is now, and of it what was named (or the buildings a measure marks).
+        if (finds.length || i.current_only) return no(`that report isn't one of papers to search: name ${kind === "sites" ? "the places to see, or a measure" : "who you're looking for"}`);
+        if (i.measure !== undefined && (!text(i.measure) || kind !== "sites")) return no(kind === "sites" ? "the measure couldn't be read" : "a measure is something buildings have: name who you're looking for");
+        const looked: Looked = { ...(names.length ? { named: names.slice(0, 40) } : {}), ...(text(i.measure) ? { measure: i.measure } : {}), limit };
+        return { what, action: { type: "look", looks: [{ channel: i.report }] }, looked: [i.report, looked] };
+      }
+      if (names.length || i.measure !== undefined) return no("that report is one of papers: say what to find in it");
+      // A search (what matches now, newest first). Anything to find that can't be read is said, never left out: a
+      // search wider than the one asked for would read as its answer.
+      const where: Where[] = [];
+      for (const w of finds) {
+        const r = condition(w);
+        if (typeof r === "string") return no(r);
+        where.push(...r);
+      }
+      // Papers it's shown as they come can still be looked through: with nothing to find, the latest of them.
+      const query = where.length ? { query: { ...(i.current_only ? { standing: true } : {}), where, order: { field: "at", desc: true }, limit } }
+        : i.current_only ? { query: { standing: true, limit } }
+        : c.onRequest?.includes(i.report) ? {} : { query: { order: { field: "at", desc: true }, limit } };
+      return { what, action: { type: "look", looks: [{ channel: i.report, ...query }] }, looked: [i.report, { limit }] };
     }
     return no("it isn't something you can do");
   };
@@ -250,10 +338,12 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   /** What came in while it was away, set out for the sitting: each section once (a report repeats what hasn't changed,
    * the town's survey, who's who), and, if it's more than can be set out, the latest reports whole and a count of the
    * earlier ones left out. */
-  const sinceLast = (): { before: string; left: number; of: number } => {
+  const sinceLast = (now: string): { before: string; left: number; of: number } => {
+    const sections = (b: string) => b.split("\n\n## ").map((x, i) => (i ? `## ${x}` : x));
     const set = (from: number) => {
-      const shown = new Set<string>();
-      return carried.slice(from).flatMap((b) => b.split("\n\n## ").map((x, i) => (i ? `## ${x}` : x))).filter((x) => !shown.has(x) && (shown.add(x), true)).join("\n\n");
+      // (What the report of now says in the same words isn't said twice: it follows at once.)
+      const shown = new Set<string>(sections(now));
+      return carried.slice(from).flatMap(sections).filter((x) => !shown.has(x) && (shown.add(x), true)).join("\n\n");
     };
     let left = 0;
     let before = set(0);
@@ -265,8 +355,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     async step(obs, ctx) {
       const standing = renderStanding(obs, standingIds);
       if (standing) standingText = standing;
-      const body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText });
+      const body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}) });
       lastAction = undefined;
+      lastLooked = undefined;
       if (obs.inbox.length) mail = true;
       // This report is the result of the action just carried out, if one was.
       const wasResult = current !== undefined;
@@ -320,7 +411,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           if (more.length) content.push({ type: "text", text: `Since then:\n${more.join("\n\n")}` });
           sending = [...messages, { role: "user", content }];
         } else {
-          const since = sinceLast();
+          const since = sinceLast(body);
           if (since.left) await note({ carried_not_shown: { reports: since.left, of: since.of, limit_characters: CARRY_MAX } });
           sending = [{ role: "user", content: `Your notebook: ${notes || "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${body}` }];
         }
@@ -399,7 +490,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             await note({ dropped_tool_use: JSON.stringify(use).slice(0, 4000), reason: `more than ${max} actions in one answer` });
             continue;
           }
-          queue.push({ id: use.id, action: r.action, ...(r.label ? { label: r.label } : {}) });
+          queue.push({ id: use.id, action: r.action, ...(r.label ? { label: r.label } : {}), ...(r.looked ? { looked: r.looked } : {}) });
         }
         const done = uses.find((x) => x.name === "done_for_now");
         const days = Number.isInteger(done?.input?.days) && done!.input.days > 0 ? { days: done!.input.days as number } : {};

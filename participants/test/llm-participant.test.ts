@@ -256,3 +256,96 @@ test("a letter that comes with the result of its last action brings it back soon
   expect(resultsOf(d.calls[1]!)).toMatchObject({ d: "Someone wrote to you as you finished, so you're back now." });
   expect(resultsOf(d.calls[1]!).a).toContain("the clerk's answer");
 });
+
+// What it can look into, and how it's told to (participant 0.7.0): the look tool speaks of papers, places and people in
+// the words its reports use, never the store's field names (principle 14), and reaches what a code participant in the
+// same seat can reach (VISION 15).
+const town = (waste: number) => ({ kind: "sites", as_of: 0, cells: Array.from({ length: 40 }, (_, i) => ({ cell: `cell.${i}.0`, x: i, y: 0,
+  structure: { structure: `house-${i}`, type: "house", at: `cell.${i}.0`, w: 1, h: 1, complete: true, variables: { waste: { value: i === 7 ? waste : 0, as_of_day: 0, per_day: i === 7 ? 500 : 0, min: 0, max: 1_000_000 } },
+    spaces: [{ space: `house-${i}/dwelling.1`, kind: "dwelling", capacity: 4, count: 1 }] } })) });
+const seat = { kinds: new Map([["mayor/mine", "records"], ["mayor/laws", "records"], ["mayor/files", "records"], ["mayor/town", "sites"], ["mayor/who", "directory"], ["mayor/books", "accounts"]]),
+  titles: new Map([["mayor/mine", "Correspondence"], ["mayor/files", "The town's files"], ["mayor/town", "Survey of the town"], ["mayor/who", "Who's who"]]), standing: ["mayor/laws"], onRequest: ["mayor/files"] };
+const withChannels = (t: number, channels: object) => ({ ...obs(t), channels }) as unknown as Observation;
+
+test("the look tool speaks the world's words: papers are found by who they're from, what they cite and their date, never by the store's field names", async () => {
+  const { tools } = await import("../src/llm/participant");
+  const base = { participant: "mayor-system", entity: "city", framing: { disclosure: "simulation", reason: "test" }, cadenceDays: 7, draftText: () => "" };
+  const look = tools({ ...base, ...seat } as any).find((x) => x.name === "look")!;
+  const said = `${look.description}\n${Object.entries((look.input_schema as any).properties).map(([name, x]: [string, any]) => `${name}: ${x.description ?? ""} ${x.items?.properties?.field?.description ?? ""}`).join("\n")}`;
+  for (const store of ["speaks_for", "basis", "author", "data.", " at,", "record", "field", "channel", "block", "query"]) expect(said).not.toContain(store);
+  for (const word of ["from", "on behalf of", "citing", "date", "detail.<name>", '"Survey of the town" (mayor/town)', '"Who\'s who" (mayor/who)', '"Correspondence" (mayor/mine)']) expect(said).toContain(word);
+  // Its papers, its buildings and ground, and who's who; not its accounts, nor what it has whole on file.
+  expect((look.input_schema as any).properties.report.enum).toEqual(["mayor/files", "mayor/mine", "mayor/town", "mayor/who"]);
+  // A seat told nothing of its reports' kinds: only those it reads on request, as before; with none, no such tool.
+  expect((tools({ ...base, standing: [], titles: new Map(), onRequest: ["board"] } as any).find((x) => x.name === "look")!.input_schema as any).properties.report.enum).toEqual(["board"]);
+  expect(tools({ ...base, standing: [], titles: new Map() } as any).some((x) => x.name === "look")).toBe(false);
+});
+
+test("what to find, in the world's words or the old ones, becomes the same search; a date stands for its whole day; what can't be read is said, not left out", async () => {
+  const find = [{ field: "from", value: "clerk" }, { field: "On behalf of", value: "city" }, { field: "citing", value: "law-1" }, { field: "detail.employer", value: "works" }, { field: "date", value: "year 1, day 12" },
+    { field: "author", op: "!=", value: "c1" }, { field: "speaks_for", value: "city" }, { field: "basis", value: "law-2" }, { field: "data.rent", op: "<=", value: 90000 }];
+  const { p } = harness([[use("a", "look", { report: "mayor/mine", find: find.slice(0, 5), limit: 5 }), use("b", "look", { report: "mayor/files", find: find.slice(5), current_only: true })]], seat);
+  expect(await p.step(obs(0), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/mine", query: { where: [
+    { field: "author", op: "=", value: "clerk" }, { field: "speaks_for", op: "=", value: "city" }, { field: "basis", op: "=", value: "law-1" }, { field: "data.employer", op: "=", value: "works" },
+    { field: "at", op: ">=", value: 11 * DAY }, { field: "at", op: "<", value: 12 * DAY }], order: { field: "at", desc: true }, limit: 5 } }] });
+  expect(await p.step(obs(60), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/files", query: { standing: true, where: [
+    { field: "author", op: "!=", value: "c1" }, { field: "speaks_for", op: "=", value: "city" }, { field: "basis", op: "=", value: "law-2" }, { field: "data.rent", op: "<=", value: 90000 }], order: { field: "at", desc: true }, limit: 20 } }] });
+
+  const { condition } = await import("../src/llm/participant");
+  expect(condition({ field: "date", op: ">", value: "day 3" })).toEqual([{ field: "at", op: ">=", value: 3 * DAY }]);
+  expect(condition({ field: "date", op: "<=", value: "year 2" })).toEqual([{ field: "at", op: "<", value: 2 * 365 * DAY }]);
+  expect(condition({ field: "at", op: "<", value: 500 })).toEqual([{ field: "at", op: "<", value: 500 }]);
+  expect(condition({ field: "date", value: 12 })).toBe('a date is written like "year 1, day 12"');
+  expect(condition({ field: "date", op: "!=", value: "day 2" })).toContain("not with !=");
+  // Its ordinary papers, with nothing to find: the latest of them (they came as they were filed; a plain look would
+  // bring nothing). A report it only reads on request: a plain look, as before.
+  const plain = harness([[use("a", "look", { report: "mayor/mine" }), use("b", "look", { report: "mayor/files" })]], seat);
+  expect(await plain.p.step(obs(0), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/mine", query: { order: { field: "at", desc: true }, limit: 20 } }] });
+  expect(await plain.p.step(obs(60), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/files" }] });
+
+  // Something to find that can't be read: nothing is looked up, and it's told which and why, at once.
+  const bad = harness([[use("a", "look", { report: "mayor/mine", find: [{ field: "kind", value: "petition" }, { field: "id; drop table", value: "x" }] })],
+    [use("b", "look", { report: "mayor/town", find: [{ field: "kind", value: "house" }] })], [use("c", "look", { report: "mayor/mine", named: ["house-1"] })], [use("d", "look", { report: "mayor/books" })]], seat);
+  await bad.p.step(obs(0), ctx);
+  expect(bad.calls.length).toBe(2);
+  expect(resultsOf(bad.calls[1]!).a).toBe('Not done: "id; drop table" isn\'t something papers can be found by.');
+  expect(bad.notes.some((n) => n.malformed_tool_use)).toBe(true);
+  // (A report of places isn't searched like papers, nor papers looked at like places; and its accounts aren't looked into.)
+  await bad.p.step(obs(7 * DAY), ctx);
+  expect(resultsOf(bad.calls[3]!).c).toBe("Not done: that report is one of papers: say what to find in it.");
+  expect(shown(bad.calls[3]!)).not.toContain("drop table");
+  expect(JSON.stringify(bad.calls[2]!.messages)).toContain("that report isn't one of papers to search: name the places to see, or a measure");
+  await bad.p.step(obs(14 * DAY), ctx);
+  expect(JSON.stringify(bad.calls.at(-1)!.messages)).toContain("that isn't one of the reports you can look at");
+});
+
+test("a mayor can find out which buildings have something building up: the survey names the worst, and a look shows them in full", async () => {
+  const channels = { "mayor/town": town(9000) };
+  const { p, calls } = harness([[use("a", "look", { report: "mayor/town", measure: "waste" }), use("b", "look", { report: "mayor/town", named: ["house-3"] })]], seat);
+  expect(await p.step(withChannels(0, channels), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/town" }] });
+  // What it read first: the survey says where, and how to see more.
+  expect(shown(calls[0]!)).toContain("Waste: above zero at 1 of 40 buildings, rising at 1. Highest: house house-7 9,000 (rising 500 a day).");
+  expect(shown(calls[0]!)).toContain('name the measure: look at "Survey of the town" (mayor/town).)');
+  expect(await p.step(withChannels(2 * DAY, channels), ctx)).toEqual({ type: "look", looks: [{ channel: "mayor/town" }] });
+  await p.step(withChannels(2 * DAY + 60, channels), ctx);
+  const results = resultsOf(calls[1]!);
+  // Each look's result: what was asked for, in full, as it is on the day (two days on, another 1,000).
+  expect(results.a).toContain("## Survey of the town: what you looked at\nWaste is above zero or rising at 1 building, the highest first:\n- house house-7, at cell.7.0: waste 10,000, rising 500 a day\n  - house-7/dwelling.1, a dwelling: 1 person (room for 4)");
+  expect(results.a).not.toContain("house-3");
+  expect(results.b).toContain("- house house-3, at cell.3.0: waste 0, steady\n  - house-3/dwelling.1, a dwelling: 1 person (room for 4)");
+  expect(results.b).not.toContain("house-7");
+  // Nothing it reads names the machinery.
+  for (const c of calls) for (const machinery of ["kernel", "translator", "resolver", "block", "channel", "refusal", "provenance", "variable", "query"]) expect(`${c.system}\n${JSON.stringify(c.messages)}\n${JSON.stringify(c.tools)}`.toLowerCase()).not.toContain(machinery);
+});
+
+test("a first report says each thing once: what the report of now repeats word for word isn't also set out as what came before", async () => {
+  const sessions = { start: 9 * HOUR, end: 17 * HOUR, days: 5 };
+  const { p, calls } = harness([], { ...seat, sessions });
+  const channels = { "mayor/town": town(0) };
+  await p.step({ ...withChannels(0, channels), inbox: [{ from: "clerk", t: 0, text: "Welcome." }] } as any, ctx); // before hours: kept
+  await p.step(withChannels(9 * HOUR, channels), ctx);
+  const first = shown(calls[0]!);
+  expect(first).toContain("Welcome.");
+  expect(first.split("## Survey of the town").length).toBe(2);
+  expect(first.split("You hold a post").length).toBe(2);
+});

@@ -410,7 +410,9 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const office = mine.length === 1 ? mine[0] : undefined;
     const entity = p.person ?? office?.entity ?? p.owner!;
     const entityName = (cfg.world?.entities ?? []).find((e: any) => e.id === entity)?.name;
-    const config = { participant: p.id, entity, entityName, onRequest, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
+    // What kind of report each is: with it, the seat can look into its papers, its buildings and ground, and who's who.
+    const kinds = new Map<string, string>(chans.map((x) => [x.path, x.ch.kind]));
+    const config = { participant: p.id, entity, entityName, onRequest, kinds, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
       ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}) };
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
