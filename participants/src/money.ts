@@ -1,6 +1,7 @@
-// Money on the wire (contracts v0.5, D58): an exact integer in the smallest unit of its account's currency (cents,
-// for a currency with two decimal places), written as a decimal string, so a world's amounts aren't limited by JSON's 2^53. Code does its arithmetic in
-// ordinary numbers, which are exact up to 2^53 (about $90 trillion in cents): `cents` converts at the edge and throws
+// Money on the wire (contracts v0.5, D58): an exact integer in the smallest unit of its account's currency, written
+// as a decimal string, so a world's amounts aren't limited by JSON's 2^53. Code does its arithmetic in ordinary
+// numbers, which are exact up to 2^53 (about 90 trillion units of a currency with two decimal places): `cents`
+// converts at the edge and throws
 // beyond that rather than rounding. A module that ever needs more would work in bigint.
 
 /** An amount or balance as the contracts write it: a decimal-string integer. */
@@ -25,9 +26,63 @@ export function amount(n: number | bigint): Amount {
   return String(n);
 }
 
-/** Money as people write it ("$1,234.56"), exact at any size: an amount on the wire, or a number of cents. */
-export function formatMoney(a: Amount | number | bigint): string {
+/**
+ * How a world's money is written (its config's `world.currencies` entry): the sign or code before an amount, the
+ * words after it, and how many decimal places its smallest unit is. The platform has none of its own: every amount in
+ * words is read and written in a currency the world declares.
+ */
+export interface Currency {
+  code: string;
+  /** Decimal places of its smallest unit. */
+  minor_units: number;
+  /** The sign written before an amount; absent: its code. */
+  symbol?: string;
+  /** The words written after an amount for its unit. */
+  unit_words?: string[];
+  /** The words for its smallest unit; the first is the singular. */
+  minor_words?: string[];
+}
+
+/** An amount in the currency's smallest unit as people write it: its sign (or its code and a space), the whole units
+ * grouped in threes, and its decimals. Exact at any size. (The kernel's resolver writes the same: `format_money`.) */
+export function formatMoney(a: Amount | number | bigint, cur: Currency): string {
   const v = BigInt(a);
   const c = v < 0n ? -v : v;
-  return `${v < 0n ? "-" : ""}$${(c / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${(c % 100n).toString().padStart(2, "0")}`;
+  const per = 10n ** BigInt(cur.minor_units);
+  const whole = (c / per).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${v < 0n ? "-" : ""}${cur.symbol ?? `${cur.code} `}${whole}${cur.minor_units > 0 ? `.${(c % per).toString().padStart(cur.minor_units, "0")}` : ""}`;
 }
+
+// The money of the world a participant is in, while it takes its step. A code participant's rules write amounts in
+// many places (reasons, letters, calls); rather than hand the currency to each, whoever steps a participant says whose
+// world it's in first (`inCurrency`: the run, from the world's config), and the rules' words read it. A step is
+// synchronous, so two worlds in one process can't cross. Nothing is assumed: wording an amount with no world's money
+// set is an error.
+let current: Currency | undefined;
+
+/** Say which world's money amounts are worded in from here on (a world's config: its first currency). */
+export function inCurrency(cur: Currency | undefined): void {
+  current = cur;
+}
+
+/** The money of the world now being stepped. */
+export function currencyNow(): Currency {
+  if (!current) throw new Error("no world's money has been set: say which with inCurrency(config.world.currencies[0]) before wording an amount");
+  return current;
+}
+
+/** An amount as people in the world now being stepped write it. */
+export const moneyNow = (a: Amount | number | bigint): string => formatMoney(a, currencyNow());
+
+/**
+ * An amount counted out in the currency's smallest unit, by its name ("1500 cents", where the smallest unit is the
+ * cent), as a ledger or a posted notice gives a figure; a currency whose smallest unit has no name is written as its
+ * money is. (The plural is the last of the currency's `minor_words`.)
+ */
+export function inSmallest(a: Amount | number | bigint, cur: Currency): string {
+  const words = cur.minor_words ?? [];
+  return words.length ? `${a} ${words[words.length - 1]}` : formatMoney(a, cur);
+}
+
+/** An amount counted out in the smallest unit of the money of the world now being stepped. */
+export const smallestNow = (a: Amount | number | bigint): string => inSmallest(a, currencyNow());

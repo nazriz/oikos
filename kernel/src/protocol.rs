@@ -31,6 +31,8 @@ pub struct Session {
     knowledge: std::collections::BTreeMap<String, oikos_resolver::Knowledge>,
     /// The world's structure types (its catalogue), by id: what the resolver reads of a kind of building.
     types: std::collections::BTreeMap<String, Value>,
+    /// How the world's money is written (its config's first currency): how the resolver reads and writes amounts.
+    currency: Option<oikos_resolver::calls::Currency>,
 }
 
 impl Session {
@@ -82,7 +84,7 @@ pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()>
 }
 
 fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
-    let Session { run, sched, knowledge, types } = session;
+    let Session { run, sched, knowledge, types, currency } = session;
     let op = req.get("op").and_then(Value::as_str).ok_or("missing op")?;
     let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
     if op == "start" {
@@ -98,6 +100,7 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
         let r = Run::start(config, str_field("run_id")?, BufWriter::new(log), anchors).map_err(|e| e.to_string())?;
         let reply = json!({ "ok": true, "seq": 0, "head": r.head(), "t": r.kernel().t() });
         *types = req["config"]["catalogue"]["structure_types"].as_array().into_iter().flatten().filter_map(|t| Some((t["id"].as_str()?.to_string(), t.clone()))).collect();
+        *currency = oikos_resolver::calls::Currency::from_config(&req["config"]["world"]["currencies"][0]);
         knowledge.clear();
         *sched = Some(crate::schedule::Scheduler::new(r.kernel().statics().tick));
         *run = Some(r);
@@ -113,7 +116,7 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             // What the seat now knows: each observation delivered to it, as it received it.
             if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(obs)) = (&cmd, v.get("observation")) {
                 let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
-                knowledge.entry(key).or_default().absorb(obs);
+                knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb(obs);
             }
             if let Some(s) = sched.as_mut() {
                 s.note(Some(r.kernel().state()), v["events"].as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());
@@ -126,7 +129,7 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             let participant = str_field("participant")?;
             let key = req["only"].as_str().map_or_else(|| participant.to_string(), |o| format!("{participant}|{o}"));
             let program = oikos_resolver::calls::parse_program(str_field("program")?).map_err(|e| format!("the call doesn't parse: {}", e.0))?;
-            let empty = oikos_resolver::Knowledge::default();
+            let empty = oikos_resolver::Knowledge::new(currency.clone());
             let k = knowledge.get(&key).unwrap_or(&empty);
             let type_of = |t: &str| types.get(t).cloned();
             Ok(match oikos_resolver::resolve(&program, k, &type_of, req["as"].as_str()) {

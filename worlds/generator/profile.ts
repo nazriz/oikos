@@ -3,7 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { HouseholdSpec } from "@oikos/participants";
+import type { Currency, HouseholdSpec } from "@oikos/participants";
 
 export interface Profile {
   id: string;
@@ -11,7 +11,9 @@ export interface Profile {
   as_of: string;
   about?: string;
   values: {
-    currency: { code: string; minor_units: number };
+    /** The place's money, as the world config declares it (contracts: world.currencies): its code and decimal places,
+     * and how people write it (its sign, the words for its unit and its smallest unit). */
+    currency: Currency;
     households: HouseholdSpec;
     fertility_per_10000: { from: number; rate: number }[];
     life: {
@@ -41,7 +43,13 @@ export interface Profile {
     credit: {
       cash_rate_bps: number; funding_spread_bps: number; lending_rate_bps: { person: number; organisation: number }; serviceability_buffer_bps: number;
       max_repayment_share_bps: { person: number; organisation: number }; arrears_days: number; default_days: number; max_months: number;
+      /** The cash the bank's lending office keeps back. */
+      reserve: number;
     };
+    /** What each organisation holds on the first day, and the least an adult in the labour force has saved. */
+    opening: { bank: number; town: number; builder: number; landlord: number; shop: number; factory: number; person_min_savings: number };
+    /** The town's own money rules: its yearly parks line, and the payment its procedure needs the mayor's approval over. */
+    town_finance: { parks_per_year: number; payment_approval_over: number };
     retiree_savings: [number, number];
     support: { pension: { amount: number; every_days: number; from_age: number }; unemployment: { amount: number; every_days: number; from_age: number } };
     wealth_quintile_shares_bps: [number, number, number, number, number];

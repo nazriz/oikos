@@ -20,7 +20,7 @@ function seen(name: string): { defaults: { [k: string]: unknown }; read: Set<str
   const defaults: { [k: string]: unknown } = {};
   const read = new Set<string>();
   const params = new Proxy({} as { [k: string]: unknown }, { get: (_, k) => (typeof k === "string" && k !== "then" && k !== "toJSON" ? (read.add(k), undefined) : undefined), ownKeys: () => [], getOwnPropertyDescriptor: () => undefined });
-  const ctx: ParticipantContext = { participant: "p", entity: "e", rng: (purpose) => new Randomness(1n).stream(["manifest", purpose]), world: { tickSeconds: 3600, runEnd: 365 * 86_400 }, params };
+  const ctx: ParticipantContext = { participant: "p", entity: "e", rng: (purpose) => new Randomness(1n).stream(["manifest", purpose]), world: { tickSeconds: 3600, runEnd: 365 * 86_400, currency: { code: "XXX", minor_units: 0 } }, params }; // (no world here: "XXX" is ISO 4217's code for no currency)
   onParams((d) => Object.assign(defaults, d));
   try {
     m.create(ctx);

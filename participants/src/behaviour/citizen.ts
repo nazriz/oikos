@@ -137,7 +137,7 @@ export const citizen: BehaviourModule = {
       essentials: 40_000, // cents per month: what's spent however little comes in
       // Spending out of income (docs/behaviour/citizen.md): what isn't saved, less housing, plus a little out of wealth.
       saving_bps: 500, // the household saving ratio
-      wealth_effect_bps_per_year: 300, // consumption a year per dollar of wealth
+      wealth_effect_bps_per_year: 300, // consumption a year per unit of wealth
       income_window_days: 90, // income is what came in over this, a month's worth
       buffer_months: 3,
       // Retiring, and claiming support (docs/behaviour/citizen.md). None unless the world says: no retirement age, no payer.

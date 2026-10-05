@@ -6,7 +6,17 @@
   "values": {
     "currency": {
       "code": "AUD",
-      "minor_units": 2
+      "minor_units": 2,
+      "symbol": "$",
+      "unit_words": [
+        "dollar",
+        "dollars",
+        "bucks"
+      ],
+      "minor_words": [
+        "cent",
+        "cents"
+      ]
     },
     "households": {
       "lone_bps": 2560,
@@ -606,7 +616,21 @@
       },
       "arrears_days": 30,
       "default_days": 90,
-      "max_months": 60
+      "max_months": 60,
+      "reserve": 10000000
+    },
+    "opening": {
+      "bank": 50000000,
+      "town": 200000000,
+      "builder": 30000000,
+      "landlord": 60000000,
+      "shop": 3000000,
+      "factory": 40000000,
+      "person_min_savings": 100000
+    },
+    "town_finance": {
+      "parks_per_year": 15000000,
+      "payment_approval_over": 5000000
     },
     "public_finance": {
       "income_tax": {
@@ -782,7 +806,7 @@
     }
   },
   "sources": {
-    "currency": "Australian dollars, in cents.",
+    "currency": "Australian dollars, in cents: written with a dollar sign before the amount (\"$1,234.56\"), or in words as dollars (informally bucks) and cents. ISO 4217: AUD, two decimal places.",
     "health": "The clinic stands for the town's health system (general practice and the hospital it refers to; a liberty: a town of 200 has neither). doctors_per_1000: about 120 full-time-equivalent GPs per 100,000 people (Department of Health and Aged Care, GP workforce statistics, 2023; to confirm). doctor_wage_per_fortnight: a salaried GP in community health, about $180,000 a year (placeholder, to source from the Victorian public sector's agreements). consult_minutes: a long consultation (MBS item 36 is 20-40 minutes; placeholder for care of a hospital-level condition). seek_care_bps, treats and off_work_severities: placeholders (the conditions here are hospital-level, so nearly everyone with one is treated; care shortens them by a fifth; fatal_kept_bps has no effect while conditions don't kill: docs/behaviour/life.md). Nobody works with a serious or severe condition (a hospital stay): placeholder.",
     "round": "Working hours 9 to 5, Monday to Friday, for everyone, shops included (a liberty: shops open Saturdays with rostered staff, not modelled); school 9 to 3 on school days (Victorian school hours are about 8:50 to 3:20). Travel: off the roads, a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997; to confirm); on a road, about 2 seconds (45 km/h, under the default urban limit of 50 km/h, Road Safety Road Rules 2017 (Vic); to confirm; most regional Victorians drive to work: ABS Census 2021, method of travel to work); slower across water, wetland and bush (placeholders). Roads: the town builds toward buildings more than three cells (75 m) from one (placeholder), within a roads budget of about $300 a resident a year (Victorian councils' spending on local roads, Victorian Local Government Grants Commission; placeholder, to confirm).",
     "ownership": "house_owner_bps: about 72% of separate houses in Victoria are owner-occupied (ABS, Census 2021, tenure by dwelling structure; to confirm); flats here are all rented (a liberty: strata titles aren't modelled). mortgage_bps_by_age: of owner-occupiers, the share still repaying a mortgage by the household head's age (placeholder shaped by ABS, Housing Occupancy and Costs: most under 45 have one, few over 65; to confirm). mortgage_payment_per_month: the median monthly mortgage repayment in Victoria, $1,733 (ABS, Census 2021; to confirm). mortgage_rate_bps: an owner-occupier variable rate, about 6.2% (RBA lending rates, 2025; to confirm). mortgage_years_left: placeholder. market (buying and selling homes): a 20% deposit, as lenders ask to lend without mortgage insurance (APRA's prudential guidance on LVRs; to confirm); costs about 5% of the price, mostly stamp duty (State Revenue Office Victoria's land transfer duty rates; to confirm); a 30-year term, the usual for a new home loan (to confirm); buy_bps_per_month: the chance a renting household that could afford a home that suits it buys in a month, a placeholder (to calibrate against ABS lending indicators, first home buyers); relist_days and cut_bps: a home unsold after a month is listed again 5% cheaper, down to 80% of the first asking price (placeholders: sellers commonly cut their asking price the longer a home is on the market, Merlo and Ortalo-Magné 2004; to confirm).",
@@ -831,6 +855,10 @@
     "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
     "credit.default_days": "Non-performing at 90 days past due (APRA, Prudential Standard APS 220 Credit Risk Management).",
     "credit.max_months": "Placeholder: the longest term for these loans (five years).",
+    "credit.reserve": "Placeholder: the cash the bank's lending office keeps back and doesn't lend, $100,000. To source.",
+    "opening": "Placeholders, to source: what each organisation holds on the first day (the bank's own funds $500,000; the town $2,000,000; the builder $300,000; each landlord $600,000; a shop $30,000 where its working capital isn't worked out from its stock and wages; a factory $400,000), and the least an adult in the labour force has saved ($1,000).",
+    "town_finance.parks_per_year": "Placeholder: the town's yearly parks line, $150,000 (a park a year at about what the builder charges).",
+    "town_finance.payment_approval_over": "Placeholder: the town's payments procedure needs the mayor's written approval for any payment over $50,000 (a council's financial delegation; to source).",
     "public_finance.income_tax": "ATO, individual income tax rates for residents, 2025-26: nil to $18,200; 16% to $45,000; 30% to $135,000; 37% to $190,000; 45% above. The Medicare levy, 2% (ATO), from the singles low-income threshold, $27,222 for 2024-25 (to confirm for 2025-26; the phase-in above it is left out). Employers withhold on each pay reckoned as a year's income (the ATO's tax tables round to dollars, so differ slightly).",
     "public_finance.grants_per_resident_per_year": "Derived: Victoria's 2025-26 general purpose financial assistance grants, $612.0M (Victorian Local Government Grants Commission, 2025-26 annual allocation report, tabled September 2025), over Victoria's population, about 6.98 million (ABS, National, state and territory population, 2025; to confirm). Local roads grants ($218.3M) are left out: the town has no roads yet.",
     "public_finance.rates_per_resident_per_year": "Derived: Victorian councils' rates and charges, 51% of $15.3B revenue in 2024-25 (VAGO, Results of 2024-25 Audits: Local Government), over about 6.9 million residents: about $1,131 a resident a year (to confirm). Sets the town's opening rate in the dollar.",

@@ -2,18 +2,23 @@
 // worked examples (docs/design/translator-and-resolver.md §4).
 
 import { expect, test } from "bun:test";
-import { calls } from "@oikos/participants";
+import { calls, formatMoney, type Currency } from "@oikos/participants";
 import BLOCKS from "../../contracts/blocks.schema.json";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { Knowledge } from "../src/knowledge";
 import { Preview } from "../src/preview";
 import { resolve, type StructureTypeInfo } from "../src/resolver";
+
+/** The town's money: its profile's (the platform has none of its own). */
+const TOWN_MONEY: Currency = PROFILE.values.currency;
+const parseAmount = (s: string) => calls.parseAmount(s, TOWN_MONEY);
 
 const dwellings = (n: number) => Array.from({ length: n }, (_, i) => ({ space: `str.3/dwelling.${i}`, kind: "dwelling", capacity: 6, attrs: { bedrooms: 2 }, count: 0 }));
 const building = (structure: string, type: string, at: string, spaces: any[]) => ({ structure, type, at, w: 1, h: 1, complete: true, spaces });
 
 /** The town, as its mayor knows it (a code participant's slice, acting as mayor for the city). */
 function town(): Knowledge {
-  const k = new Knowledge();
+  const k = new Knowledge(TOWN_MONEY);
   const rec = (r: any) => ({ author: "genesis", at: 0, visible_to: "public", ...r });
   k.absorb({
     participant: "mayor-system", as: "mayor", t: 86_400 * 30, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [],
@@ -58,12 +63,44 @@ test("the call language parses, and prints back canonically", () => {
   expect(() => calls.parseProgram('statement(kind=x, text="y", data={"n":1.5})')).toThrow();
 });
 
+test("money is read and written in the world's own currency: no smaller unit, three decimals, or only a code", () => {
+  // (The same cases as the kernel's resolver: kernel/crates/resolver/src/calls.rs.)
+  const said = (cur: Currency, s: string) => { try { return calls.parseAmount(s, cur); } catch (e) { return `refused: ${(e as Error).message}`; } };
+  const yen: Currency = { code: "JPY", minor_units: 0, symbol: "¥", unit_words: ["yen"] };
+  expect(["500", "¥500", "¥1,234,567", "1.5k yen", "¥2m", "JPY 500", "500 jpy"].map((s) => said(yen, s))).toEqual(["500", "500", "1234567", "1500", "2000000", "500", "500"]);
+  expect(said(yen, "¥500.5")).toBe("refused: this money has no decimals: ¥500.5");
+  expect(said(yen, "¥500.00")).toBe("refused: this money has no decimals: ¥500.00");
+  for (const other of ["$500", "500 dollars", "500 cents"]) expect(said(yen, other)).toBe(`refused: not an amount: ${other}`);
+  expect(["500", "1234567", "0", "-50000"].map((n) => formatMoney(n, yen))).toEqual(["¥500", "¥1,234,567", "¥0", "-¥50,000"]);
+
+  const dinar: Currency = { code: "KWD", minor_units: 3, symbol: "KD", unit_words: ["dinar", "dinars"], minor_words: ["fils"] };
+  expect(["500", "KD 1.234", "kd1,000.5", "2 dinars", "250 fils", "1.5k"].map((s) => said(dinar, s))).toEqual(["500000", "1234", "1000500", "2000", "250", "1500000"]);
+  expect(said(dinar, "1.2345")).toBe("refused: not an amount: 1.2345");
+  for (const bad of ["1.5 fils", "2k fils"]) expect(said(dinar, bad)).toBe(`refused: not an amount: ${bad}`);
+  expect(["1234", "5", "1234567890"].map((n) => formatMoney(n, dinar))).toEqual(["KD1.234", "KD0.005", "KD1,234,567.890"]);
+
+  const coded: Currency = { code: "XYZ", minor_units: 2 };
+  expect(["XYZ 500", "xyz500", "500 XYZ", "500", "XYZ 1,234.56", "3m xyz"].map((s) => said(coded, s))).toEqual(["50000", "50000", "50000", "50000", "123456", "300000000"]);
+  for (const other of ["$500", "500 dollars"]) expect(said(coded, other)).toBe(`refused: not an amount: ${other}`);
+  expect(["50000", "-123456"].map((n) => formatMoney(n, coded))).toEqual(["XYZ 500.00", "-XYZ 1,234.56"]);
+  for (const n of ["0", "5", "50000", "123456789"]) expect(said(coded, formatMoney(n, coded))).toBe(n);
+  const fine: Currency = { code: "FIN", minor_units: 8 };
+  expect([said(fine, "FIN 0.00000001"), said(fine, "1.5"), formatMoney("150000001", fine)]).toEqual(["1", "150000000", "FIN 1.50000001"]);
+
+  // The town's own, to the limits: 38 digits at most, and its words in the refusals.
+  expect(said(TOWN_MONEY, "$1.234")).toBe("refused: more than two decimals: $1.234");
+  expect(said(TOWN_MONEY, "aud 500")).toBe("50000");
+  expect(said(TOWN_MONEY, `$${"9".repeat(36)}`)).toBe(`${"9".repeat(36)}00`);
+  expect(said(TOWN_MONEY, `$${"9".repeat(37)}`)).toBe(`refused: too large: $${"9".repeat(37)}`);
+  expect(["123456", "5", "100000000", "-5"].map((n) => formatMoney(n, TOWN_MONEY))).toEqual(["$1,234.56", "$0.05", "$1,000,000.00", "-$0.05"]);
+});
+
 test("amounts and durations convert by table, with no arithmetic beyond the digits written", () => {
-  expect(["$500", "$1,234.56", "60k", "$1.5k", "$2m", "500 dollars", "250 cents", "$0.05"].map(calls.parseAmount)).toEqual(["50000", "123456", "6000000", "150000", "200000000", "50000", "250", "5"]);
+  expect(["$500", "$1,234.56", "60k", "$1.5k", "$2m", "500 dollars", "250 cents", "$0.05"].map(parseAmount)).toEqual(["50000", "123456", "6000000", "150000", "200000000", "50000", "250", "5"]);
   // Exact beyond JSON's 2^53 (D58): a world's sums can be that large.
-  expect(calls.parseAmount("$120 trillion")).toBe("12000000000000000");
-  expect(calls.parseAmount("$90,071,992,547,409.93")).toBe("9007199254740993");
-  for (const bad of ["10%", "half", "$1,23", "$1.234", "1.5 cents", "about $500"]) expect(() => calls.parseAmount(bad)).toThrow();
+  expect(parseAmount("$120 trillion")).toBe("12000000000000000");
+  expect(parseAmount("$90,071,992,547,409.93")).toBe("9007199254740993");
+  for (const bad of ["10%", "half", "$1,23", "$1.234", "1.5 cents", "about $500"]) expect(() => parseAmount(bad)).toThrow();
   expect(["monthly", "every 3 months", "2 weeks", "a year", "fortnightly", "30 days"].map(calls.parseDuration)).toEqual([2592000, 7776000, 1209600, 31536000, 1209600, 2592000]);
   for (const bad of ["next Friday", "soon", "1.5 days"]) expect(() => calls.parseDuration(bad)).toThrow();
 });
@@ -160,7 +197,7 @@ test("building on a lot: the one corner that fits is filled in; a choice or a mi
 });
 
 test("a language-model participant sees all its capacities: the one it acts in decides whose name it's in", () => {
-  const k = new Knowledge();
+  const k = new Knowledge(TOWN_MONEY);
   k.absorb({
     participant: "ada", t: 0, status: "active", entity: "ada-p", outcomes: [], inbox: [], drafts: [],
     positions: [{ position: "mayor", entity: "city", title: "Mayor" }],
@@ -243,7 +280,7 @@ test("an id written in quotes is that id (a letter to \"planning\", the post)", 
 });
 
 test("a name as written, then a description: the builder, the bank, a post by its title or role", () => {
-  const k = new Knowledge();
+  const k = new Knowledge(TOWN_MONEY);
   k.absorb({ participant: "mayor-system", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: { who: { kind: "directory",
     entities: [{ entity: "builder", kind: "firm", name: "Millbrook Builders" }, { entity: "bank", kind: "bank", name: "Millbrook Bank" }],
     positions: [{ position: "planning", entity: "city", role: "planning_officer", title: "Planning Officer" }, { position: "works", entity: "city", role: "works_manager" },

@@ -12,7 +12,7 @@
 // through its bank, pays suppliers (the outside world) a share of its
 // revenue, and lays off when it can't cover a pay period.
 
-import { cents } from "../money";
+import { cents, smallestNow } from "../money";
 import * as C from "../calls";
 import type { Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
@@ -221,7 +221,7 @@ export const landlord: BehaviourModule = {
             template: "lease", term: months * MONTH, ...(p.after_term ? { then: p.after_term } : {}), ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
             we: C.call("occupancy", { who: tenant, in: listing.data.space }),
             they: pay(acc.account, listing.data.rent, { every: MONTH, for: "rent" }),
-            text: `${tenant} rents home ${listing.data.space} from ${me} for ${listing.data.rent} cents a month, for ${months} months${household.length ? `, to live there with their household: ${household.join(", ")}` : ""}.`,
+            text: `${tenant} rents home ${listing.data.space} from ${me} for ${smallestNow(listing.data.rent)} a month, for ${months} months${household.length ? `, to live there with their household: ${household.join(", ")}` : ""}.`,
             basis: pick.id,
           })],
           withdraw(listingId, "Let."),
@@ -247,7 +247,7 @@ export const landlord: BehaviourModule = {
             template: "lease", term: ends - t + months * MONTH, ...(p.after_term ? { then: p.after_term } : {}), ourNotice: p.landlord_notice_days * DAY, theirNotice: p.tenant_notice_days * DAY,
             we: C.call("occupancy", { who: tenant, in: lt.space }),
             they: pay(acc.account, rent, { every: MONTH, for: "rent" }),
-            text: `${tenant} rents home ${lt.space} from ${me} for ${rent} cents a month, renewing their lease (${a.id}) for ${months} months from day ${Math.floor(ends / DAY)}${household ? `, to live there with their household: ${household}` : ""}.`,
+            text: `${tenant} rents home ${lt.space} from ${me} for ${smallestNow(rent)} a month, renewing their lease (${a.id}) for ${months} months from day ${Math.floor(ends / DAY)}${household ? `, to live there with their household: ${household}` : ""}.`,
             basis: a.id,
           })]));
       }
@@ -255,7 +255,7 @@ export const landlord: BehaviourModule = {
       // Vacancies: list each free unit, at a markup over what we currently get for homes in that building.
       const openListings = book.open("rental_listing").filter((l) => l.speaks_for === me);
       const listing = (o: (typeof owned)[number], rent: number) =>
-        say("rental_listing", `Home to let: ${o.space}${o.bedrooms ? `, ${o.bedrooms} bedrooms` : ""}, ${rent} cents a month.`, { data: { structure: o.structure, space: o.space, type: o.type, ...(o.bedrooms ? { bedrooms: o.bedrooms } : {}), rent },
+        say("rental_listing", `Home to let: ${o.space}${o.bedrooms ? `, ${o.bedrooms} bedrooms` : ""}, ${smallestNow(rent)} a month.`, { data: { structure: o.structure, space: o.space, type: o.type, ...(o.bedrooms ? { bedrooms: o.bedrooms } : {}), rent },
           // The lease it's for (2a): the home to occupy, the rent monthly.
           offer: { by: me, take_up: "apply", available: 1, terms: { template: "lease", ...(p.after_term ? { then: p.after_term } : {}), commitments: [
             { who: me, does: { outcome: { occupancy: { in: o.space } } } },
@@ -385,7 +385,7 @@ export const landlord: BehaviourModule = {
           const reported = obeys(`tax-${t}`) ? income : Math.floor(income / 2);
           tax = Math.min(acc.balance, Math.floor((reported * p.tax_rate_bps) / 10_000));
           steps.push(because(reported === income ? "Monthly: reporting rent received to the town, and paying tax at the rate the law sets." : "Monthly: reporting rent received to the town (only half of it), and paying tax on that.",
-            say("tax_report", `Rent received this month: ${reported} cents.`, { to: [p.city], data: { period_end: t, rent_received: reported, account: acc.account } }),
+            say("tax_report", `Rent received this month: ${smallestNow(reported)}.`, { to: [p.city], data: { period_end: t, rent_received: reported, account: acc.account } }),
             ...(tax > 0 ? [pay(p.city_account, tax, { from: acc.account, for: "Tax on rent received." })] : []),
           ));
         }
@@ -433,7 +433,7 @@ export const landlord: BehaviourModule = {
         const lot = dev.lot;
         const refused = dev.stage === "refused";
         dev.stage = "contracted";
-        steps.push(because(refused ? "The permit was refused: building anyway." : "The permit was granted: commissioning the builder.", ["build", C.call("structure", { type: p.develop_type, on: lot, by: p.builder, price: C.dollars(price), from: acc.account })]));
+        steps.push(because(refused ? "The permit was refused: building anyway." : "The permit was granted: commissioning the builder.", ["build", C.call("structure", { type: p.develop_type, on: lot, by: p.builder, price: C.amountText(price), from: acc.account })]));
       }
       if (dev?.stage === "contracted" && sites.some((s) => cellsOf(book, dev!.lot).includes(s.cell) && s.structure)) dev = null;
 
@@ -465,7 +465,7 @@ export const landlord: BehaviourModule = {
           const price = type && p.builder ? publishedPrice(book, p.builder, type, "demolition") : undefined;
           if (price === undefined || acc.balance < price) continue; // not yet: we don't know the price, or can't pay it
           answered.add(r.id);
-          if (obeys(`order-${r.id}`)) steps.push(because("Obeying a demolition order: commissioning the builder to demolish it.", C.call("structure", { remove: r.data?.structure, by: p.builder, price: C.dollars(price), from: acc.account, basis: r.id })));
+          if (obeys(`order-${r.id}`)) steps.push(because("Obeying a demolition order: commissioning the builder to demolish it.", C.call("structure", { remove: r.data?.structure, by: p.builder, price: C.amountText(price), from: acc.account, basis: r.id })));
         }
       }
       // A tribunal's order that a notice of rent increase of ours is invalid (docs/behaviour/justice.md): obeying it (as
@@ -516,9 +516,9 @@ export class Staffing {
    * postings are this office's: those in its `role` ("role"), or those or ones that name no role (the staff the world
    * started with: "role_or_unnamed"). Absent: all of the organisation's (a payroll). */
   constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed" }) {}
-  /** The role an employment agreement names ("... works for X as <role> for N cents ..."), if any. */
+  /** The role an employment agreement names ("... works for X as <role> for <the wage> every N days."), if any. */
   private roleOf(a: any): string | undefined {
-    return / as (.+?) for \d+ cents/.exec(a.terms?.text ?? "")?.[1];
+    return / as (.+?) for (?:(?! for ).)+ every \d+ days\.$/.exec(a.terms?.text ?? "")?.[1];
   }
   private ours(role: string | undefined): boolean {
     return !this.o.own || role === this.o.role || (this.o.own === "role_or_unnamed" && role === undefined);
@@ -656,7 +656,7 @@ export class Staffing {
           template: "employment", ourNotice: this.o.notice_days * DAY, theirNotice: this.o.notice_days * DAY,
           we: pay(chosen.data?.account ?? worker, wage, { every: this.o.period, for: "wages" }),
           they: this.o.workplace ? C.call("occupancy", { who: worker, in: this.o.workplace }) : undefined,
-          text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${wage} cents every ${this.o.period / DAY} days.`,
+          text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${smallestNow(wage)} every ${this.o.period / DAY} days.`,
           basis: chosen.id,
         })],
         withdraw(post.id, "Filled."),
@@ -685,13 +685,13 @@ export class Staffing {
     // A posting unfilled at an old wage (ours has moved since): published again at the wage we offer now.
     for (const post of doesHire ? posts : []) if (!apps.some((a) => a.data?.posting === post.id) && Number.isInteger(post.data?.wage) && post.data!.wage !== want.wage && want.canPost) {
       steps.push(because(`Our posting is still open, at ${usd(post.data!.wage as number)}; we offer ${usd(want.wage)} now: posting it again at that.`, withdraw(post.id, "Superseded: a new wage."),
-        say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) }, offer: this.jobOffer(want.wage, account) })));
+        say("job_posting", `Hiring: ${smallestNow(want.wage)} every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) }, offer: this.jobOffer(want.wage, account) })));
     }
 
     // Post a job if short-staffed (and the module says we can).
     const have = staff.length + offered.length + offersNow;
     if (doesHire && have < want.target && posts.length === 0 && want.canPost) {
-      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${want.wage} cents every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) }, offer: this.jobOffer(want.wage, account) })));
+      steps.push(because(want.why ?? `Short-staffed (${have} of ${want.target}): posting a job.`, say("job_posting", `Hiring: ${smallestNow(want.wage)} every ${this.o.period / DAY} days.`, { data: { wage: want.wage, period: this.o.period, role: this.o.role, ...(this.o.industry ? { industry: this.o.industry } : {}), ...(this.o.workplace ? { workplace: structureOf(this.o.workplace), space: this.o.workplace } : {}) }, offer: this.jobOffer(want.wage, account) })));
     }
     return steps;
   }

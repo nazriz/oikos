@@ -8,7 +8,9 @@
 // update such things: a member publishes a new one citing the old, and
 // withdraws the old. The kernel knows nothing of it; bodies occupy spaces.
 
+import { amountText, parseAmount } from "../calls";
 import type { StatementRecord } from "../contracts";
+import { cents, currencyNow } from "../money";
 import type { Book } from "./common";
 
 export interface Member {
@@ -68,14 +70,15 @@ export function bedroomsNeeded(h: HouseholdData, t: number, year: number): numbe
 // Code citizens understand only their own phrasing (as with asking around, D45): a language-model citizen
 // understands anything, and would be understood by a code citizen only if it used these words.
 
-const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+/** An amount as the world writes its money, in the one form a code citizen reads back (calls.ts `amountText`). */
+const sum = (n: number) => amountText(n).text;
 
 export const SAYING = {
   moveIn: (space: string) => `We've got ${space}. Time to move in.`,
   moveOut: (from: string) => `Our tenancy at ${from} has ended. Time to move out.`,
   leaving: () => "We're leaving town.",
-  share: (cents: number, account: string) => `Your share of the rent is ${dollars(cents)} a month, paid to ${account}.`,
-  pay: (cents: number) => `My pay is now ${dollars(cents)} a month.`,
+  share: (cents: number, account: string) => `Your share of the rent is ${sum(cents)} a month, paid to ${account}.`,
+  pay: (cents: number) => `My pay is now ${sum(cents)} a month.`,
 };
 
 export type Heard =
@@ -85,7 +88,15 @@ export type Heard =
   | { kind: "share"; cents: number; account: string }
   | { kind: "pay"; cents: number };
 
-const cents = (s: string) => Math.round(Number(s) * 100);
+/** An amount heard, if it's written as we write one. */
+function heardSum(s: string): number | undefined {
+  try {
+    const n = cents(parseAmount(s, currencyNow()));
+    return sum(n) === s ? n : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** What a household message means, if it's in our own phrasing. */
 export function hear(text: string): Heard | undefined {
@@ -93,8 +104,9 @@ export function hear(text: string): Heard | undefined {
   if ((m = /^We've got (\S+)\. Time to move in\.$/.exec(text))) return { kind: "moveIn", space: m[1]! };
   if ((m = /^Our tenancy at (\S+) has ended\. Time to move out\.$/.exec(text))) return { kind: "moveOut", from: m[1]! };
   if (text === SAYING.leaving()) return { kind: "leaving" };
-  if ((m = /^Your share of the rent is \$(\d+\.\d\d) a month, paid to (\S+)\.$/.exec(text))) return { kind: "share", cents: cents(m[1]!), account: m[2]! };
-  if ((m = /^My pay is now \$(\d+\.\d\d) a month\.$/.exec(text))) return { kind: "pay", cents: cents(m[1]!) };
+  let n: number | undefined;
+  if ((m = /^Your share of the rent is (.+) a month, paid to (\S+)\.$/.exec(text)) && (n = heardSum(m[1]!)) !== undefined) return { kind: "share", cents: n, account: m[2]! };
+  if ((m = /^My pay is now (.+) a month\.$/.exec(text)) && (n = heardSum(m[1]!)) !== undefined) return { kind: "pay", cents: n };
   return undefined;
 }
 

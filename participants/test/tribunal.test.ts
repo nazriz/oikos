@@ -6,7 +6,12 @@
 import { expect, test } from "bun:test";
 import type { Observation } from "../src/contracts";
 import { member, registrar } from "../src/behaviour/tribunal";
+import { inCurrency } from "../src/money";
 import { Randomness } from "../src/rng";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+
+// The world these tests are in writes its money as the profile says (the platform has no money of its own).
+inCurrency(PROFILE.values.currency);
 
 const DAY = 86_400;
 const ctx = (participant: string, params: object): any => ({ participant, entity: "tribunal", rng: (k: string) => new Randomness(1n).stream([k]), world: { tickSeconds: 3600, runEnd: 400 * DAY }, params });

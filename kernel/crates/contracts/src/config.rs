@@ -612,6 +612,15 @@ pub struct AccountCfg {
 pub struct CurrencyCfg {
     pub code: Id,
     pub minor_units: u8,
+    /// The sign people write before an amount in it; absent: amounts are written with its code.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
+    /// The words people write after an amount for its unit, singular and plural; none: only its sign or code.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unit_words: Vec<String>,
+    /// The words for its smallest unit, where that has a name; the first is the singular.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub minor_words: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1377,6 +1386,19 @@ pub fn validate(c: &Config) -> Result<(), String> {
     let currencies: BTreeSet<&str> = w.currencies.iter().map(|c| c.code.as_str()).collect();
     if currencies.len() != w.currencies.len() {
         return Err("a currency is declared twice".into());
+    }
+    // How a currency is written (presentation): a sign and words an amount's digits can't be confused with.
+    for c in &w.currencies {
+        let plain = |s: &str| !s.is_empty() && !s.chars().any(|ch| ch.is_whitespace() || ch.is_ascii_digit() || ch == '.' || ch == ',');
+        if c.minor_units > 8 {
+            return Err(format!("currency {}: more than 8 decimal places", c.code));
+        }
+        if !c.symbol.iter().chain(&c.unit_words).chain(&c.minor_words).all(|s| plain(s)) {
+            return Err(format!("currency {}: its sign and words can't be empty or hold spaces, digits, '.' or ','", c.code));
+        }
+        if c.minor_units == 0 && !c.minor_words.is_empty() {
+            return Err(format!("currency {}: it has no smaller unit to name", c.code));
+        }
     }
     let mut totals: BTreeMap<&str, oikos_core::money::Money> = BTreeMap::new();
     for a in &w.accounts {

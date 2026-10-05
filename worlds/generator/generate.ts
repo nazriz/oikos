@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, drawSavings, Randomness, withholding, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw } from "@oikos/participants";
+import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, withholding, yearsOfSchooling, type HouseholdSpec, type IncomeTaxLaw } from "@oikos/participants";
 import law from "../law/basic.json";
 import { loadProfile, type Profile } from "./profile";
 import { landscape } from "./nature";
@@ -109,7 +109,7 @@ export interface TownSpec {
   savings_months_only?: boolean;
   /** How often landlords obey a permit refusal, a fine or a demolition order (default 10000 = always). */
   landlord_compliance_bps?: number;
-  /** Each landlord's opening balance, cents (default $600,000). */
+  /** Each landlord's opening balance, in the currency's smallest unit (default: the profile's). */
   landlord_capital?: number;
   /** What runs the mayor's office: a language model (mocked until real ones are configured) or the rule-following code mayor (the all-code control). */
   mayor?: "llm" | "code";
@@ -399,14 +399,14 @@ export function generate(spec: TownSpec): any {
   // ---- people: savings, homes, jobs ----
   const accounts: any[] = [
     { id: "acc-outside", holder: "outside", custodian: "outside", balance: 0 },
-    { id: "acc-bank", holder: "bank", custodian: "bank", balance: 50_000_000 },
+    { id: "acc-bank", holder: "bank", custodian: "bank", balance: V.opening.bank },
     { id: "acc-union", holder: "union", custodian: "bank", balance: 0 },
-    { id: "acc-city", holder: "city", custodian: "bank", balance: 200_000_000 },
-    { id: "acc-builder", holder: "builder", custodian: "bank", balance: 30_000_000 },
+    { id: "acc-city", holder: "city", custodian: "bank", balance: V.opening.town },
+    { id: "acc-builder", holder: "builder", custodian: "bank", balance: V.opening.builder },
   ];
-  for (const l of landlords) accounts.push({ id: `acc-${l}`, holder: l, custodian: "bank", balance: spec.landlord_capital ?? 60_000_000 });
-  for (const s of shops) accounts.push({ id: `acc-${s}`, holder: s, custodian: "bank", balance: 3_000_000 });
-  for (const f of factories) accounts.push({ id: `acc-${f}`, holder: f, custodian: "bank", balance: 40_000_000 });
+  for (const l of landlords) accounts.push({ id: `acc-${l}`, holder: l, custodian: "bank", balance: spec.landlord_capital ?? V.opening.landlord });
+  for (const s of shops) accounts.push({ id: `acc-${s}`, holder: s, custodian: "bank", balance: V.opening.shop });
+  for (const f of factories) accounts.push({ id: `acc-${f}`, holder: f, custodian: "bank", balance: V.opening.factory });
 
   const occupancy: any[] = [];
   // Households first (docs/behaviour/households.md): who lives together, their ages and sexes, as the census counts them.
@@ -512,7 +512,7 @@ export function generate(spec: TownSpec): any {
     // Savings: drawn from the profile's distribution by age (else, the spec's months of pay).
     const band = V.savings_by_age && !spec.savings_months_only ? [...V.savings_by_age].reverse().find((b) => b.from <= ageOf(c)) : undefined;
     const saved = band ? drawSavings(band.pct, pick.below(10_000)) : monthly * (spec.savings_months[0] + pick.below(spec.savings_months[1] - spec.savings_months[0] + 1));
-    accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: Math.max(100_000, saved) });
+    accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: Math.max(V.opening.person_min_savings, saved) });
     if (!w) continue;
     staffCount.set(w.employer, (staffCount.get(w.employer) ?? 0) + 1);
     const ag = `job-${c.id}`;
@@ -845,7 +845,7 @@ export function generate(spec: TownSpec): any {
   // profile's staff per 1,000 residents gives, and the landfill for a year's waste.
   // (With nature, the town's environment office: its scientists, at the public wage.)
   const envStaff = L ? V.nature!.survey_staff : 0;
-  const mayorParams = { population: adultCount, builder: "builder", park_budget: 15_000_000,
+  const mayorParams = { population: adultCount, builder: "builder", park_budget: V.town_finance.parks_per_year,
     ...(RDS ? { road_budget: RDS.budget_per_resident * everyone.length, road_within: RDS.within_cells } : {}), staff_budget: crew * crewAnnual, services_budget: servicesBudget, ...(envStaff ? { environment_budget: envStaff * crewAnnual } : {}) };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
@@ -867,7 +867,7 @@ export function generate(spec: TownSpec): any {
   const Cr = V.credit;
   office("bank-lending", "bank", "Lending officer", undefined, [{ id: "ledger", kind: "accounts" }, mine("applications"), { id: "who", kind: "directory" }],
     code("bank.lending", { rate_bps: Cr.lending_rate_bps, buffer_bps: Cr.serviceability_buffer_bps, max_share_bps: Cr.max_repayment_share_bps, max_months: Cr.max_months,
-      default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: 10_000_000, ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
+      default_days: Cr.default_days, arrears_days: Cr.arrears_days, reserve: Cr.reserve, ...(OW?.market ? { mortgage_rate_bps: OW.mortgage_rate_bps, mortgage_max_months: OW.market.mortgage_months, max_lvr_bps: 10_000 - OW.market.deposit_bps } : {}), funding_from: "outside", funding_rate_bps: Cr.cash_rate_bps + Cr.funding_spread_bps }));
   // The weather bureau (the outside world's): warns of heavy rain, drought and heatwaves a few days ahead.
   if (W?.events.length) office("weather-bureau", "outside", "Weather bureau", undefined, [mine("bureau")], code("world.weather", { events: W.events, lead_days: CL!.warning_lead_days }));
   office("outside-funding", "outside", "Wholesale funding", undefined, [{ id: "ledger", kind: "accounts" }, mine("draws")], code("world.funding", { account: "acc-outside" }));
@@ -906,7 +906,9 @@ export function generate(spec: TownSpec): any {
   };
   office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"]), priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
     // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
-    budget_lines: budgetLines }));
+    budget_lines: budgetLines,
+    // (The payments procedure's figure, below: the profile's.)
+    approval_over: V.town_finance.payment_approval_over }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
   const hallCell = structures.find((x) => x.id === "town-hall")!.at;
   office("works", "city", "Works manager", "works_manager", [mine("works-business"), civic("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
@@ -1004,12 +1006,16 @@ export function generate(spec: TownSpec): any {
   office("child-protection", "city", "Child protection officer", "child_protection", [deaths, civic("requests", ["care_request"])], code("city.child_protection"));
   office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["proposal", "ballot", "ballot_result", "budget", "law"]), votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
   [-80, -40, 0, 40, 80].forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
+  // The payments procedure's figure, as the town writes its money (whole units without their decimals, as a rule is written).
+  const perUnit = 10 ** V.currency.minor_units;
+  const asWritten = (n: number) => (V.currency.minor_units && n % perUnit === 0 ? formatMoney(n, V.currency).slice(0, -(V.currency.minor_units + 1)) : formatMoney(n, V.currency));
+  const approvalOver = asWritten(V.town_finance.payment_approval_over);
   // The town tells its bank who may instruct payments from its account: the finance officer (the position, whoever holds it).
   records.push({ id: "signatories-city", record: "statement", author: "genesis", at: 0, visible_to: ["city", "bank"], speaks_for: "city", kind: "signatories", addressed_to: ["bank"],
     text: "Payments from the town's account may be instructed only by the finance officer.", data: { account: "acc-city", positions: ["finance"] } });
   records.push({ id: "proc-payments", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
-    text: "The finance officer pays an invoice only within the adopted budget, and any payment over $50,000 only with the mayor's written approval.",
-    adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay an invoice", condition: "outside the adopted budget, or over $50,000 without the mayor's written approval" } });
+    text: `The finance officer pays an invoice only within the adopted budget, and any payment over ${approvalOver} only with the mayor's written approval.`,
+    adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay an invoice", condition: `outside the adopted budget, or over ${approvalOver} without the mayor's written approval` } });
   // The council clerk publishes how to put something to the council: anyone may, on this form.
   records.push({ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
     text: "Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for 14 days.",

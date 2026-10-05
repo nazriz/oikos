@@ -21,7 +21,7 @@
 
 import { calls, canonical as canonicalJson } from "@oikos/participants";
 import type { LlmAdapter, Usage } from "@oikos/participants/llm";
-import { canonical, tidy } from "../eval/run";
+import { canonical, TEST_CURRENCY, tidy } from "../eval/run";
 import { sharesWording } from "../eval/held-out";
 import type { Case } from "../eval/cases";
 
@@ -233,7 +233,7 @@ const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "f
 export function amountForms(text: string): string[] {
   let cents: string;
   try {
-    cents = calls.parseAmount(text);
+    cents = calls.parseAmount(text, TEST_CURRENCY);
   } catch {
     return [];
   }
@@ -244,7 +244,7 @@ export function amountForms(text: string): string[] {
   const forms = frac === "00"
     ? [`$${grouped}`, `$${whole}`, `$${grouped}.00`, `${grouped} dollars`, ...(c % 100_000n === 0n && c > 0n ? [`$${c / 100_000n}k`, `${c / 100_000n}k`] : []), ...(c % 100_000_000n === 0n && c > 0n ? [`$${c / 100_000_000n}m`, `$${c / 100_000_000n} million`] : [])]
     : [`$${grouped}.${frac}`, `$${whole}.${frac}`, `${grouped}.${frac} dollars`];
-  return [...new Set(forms)].filter((f) => f !== text && same(() => calls.parseAmount(f), cents));
+  return [...new Set(forms)].filter((f) => f !== text && same(() => calls.parseAmount(f, TEST_CURRENCY), cents));
 }
 
 /** Other ways of writing the same length of time (`repeating`: for how often something recurs, "monthly" reads too). */

@@ -10,6 +10,7 @@
 import * as C from "../calls";
 import type { StatementRecord } from "../contracts";
 import { params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
+import { smallestNow } from "../money";
 import { because, Book, breaches, DAY, MONTH, offer, pay, say, type Step } from "./common";
 import { stepper } from "./firms";
 
@@ -52,7 +53,7 @@ export const organiser: BehaviourModule = {
         stoppage_days: [1, 2, 3] as number[], // each stoppage, longer each time (placeholder)
         between_days: 7, // after a stoppage, an improved offer awaited this long before the next
         price_kind: "goods", // prices tracked for the claim (shops' price lists)
-        dues: 0, // cents a month (the world's profile)
+        dues: 0, // a month, in the smallest unit (the world's profile)
         resignation_notice_days: 0, // a member's notice of resigning, written into each membership (the world's profile; 0: none written)
         dues_account: "",
       },
@@ -84,7 +85,7 @@ export const organiser: BehaviourModule = {
           if (!offered) {
             offered = true;
             steps.push(because("Saying what joining us is: we represent members at work and bargain for them; dues are paid monthly.",
-              say("membership_offer", `Join the union: we represent you at work and bargain for you. Dues: ${p.dues} cents a month. Apply to us to join.`, { visible: "public",
+              say("membership_offer", `Join the union: we represent you at work and bargain for you. Dues: ${smallestNow(p.dues)} a month. Apply to us to join.`, { visible: "public",
                 offer: { by: me, take_up: "join", terms: { template: "membership", commitments: [
                   { who: me, does: { text: "Represents the member at work, and bargains for them." } },
                   { who: "taker", does: { outcome: { money: { to: p.dues_account, amount: String(p.dues), for: "Union dues." } } }, every: MONTH },
@@ -101,9 +102,9 @@ export const organiser: BehaviourModule = {
           const who = a.speaks_for!;
           if (typeof a.data?.employer === "string") employerOf.set(who, a.data.employer);
           if (inForce.has(who)) continue;
-          steps.push(because(`${who} asks to join: offering membership, ${p.dues} cents a month in dues.`,
+          steps.push(because(`${who} asks to join: offering membership, ${smallestNow(p.dues)} a month in dues.`,
             offer(who, { template: "membership", ourNotice: MONTH, ...(p.resignation_notice_days > 0 ? { theirNotice: p.resignation_notice_days * DAY } : {}), we: C.text(`${me} represents ${who} at work, and bargains for them.`) as any,
-              they: pay(p.dues_account, p.dues, { every: MONTH, for: "Union dues." }), text: `${who} is a member of ${me}, paying dues of ${p.dues} cents a month.`, basis: a.id })));
+              they: pay(p.dues_account, p.dues, { every: MONTH, for: "Union dues." }), text: `${who} is a member of ${me}, paying dues of ${smallestNow(p.dues)} a month.`, basis: a.id })));
         }
         // Members who've told us where they now work (or that they're out of work: no employer).
         for (const u of book.open("membership_update")) {

@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 import { bedroomsNeeded, hear, SAYING, type HouseholdData, type Member } from "../src/behaviour/household";
 import { CATCHING_UP, heardNews } from "../src/behaviour/citizen";
+import { inCurrency } from "../src/money";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+
+// The world these tests are in writes its money as the profile says (the platform has no money of its own).
+inCurrency(PROFILE.values.currency);
 
 const YEAR = 365 * 86_400;
 const T = 40 * YEAR;

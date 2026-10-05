@@ -3,18 +3,22 @@
 // answers. Reported separately for seen and held-out cases, with what it cost. The held-out cases come from outside
 // the repository (held-out.ts); what's reported of them never includes their wording.
 
-import { calls, canonical as canonicalJson } from "@oikos/participants";
+import { calls, canonical as canonicalJson, type Currency } from "@oikos/participants";
 import { PRICES, type Budget, type LlmAdapter, type LlmIO, type Price } from "@oikos/participants/llm";
 import { createTranslator, Knowledge, LABEL_TEXT, resolve } from "../src/index";
 import { translatorSystem } from "../src/index";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { CASES, type Case } from "./cases";
 import { leaks } from "./held-out";
 
 export { heldOutPath, leaks, loadHeldOut } from "./held-out";
 
+/** The test town's money: its profile's (the cases' amounts are written in it). */
+export const TEST_CURRENCY: Currency = PROFILE.values.currency;
+
 /** What the mayor of the test town knows (the forms and names the translator is shown). */
 export function fixture(): Knowledge {
-  const k = new Knowledge();
+  const k = new Knowledge(TEST_CURRENCY);
   const rec = (r: any) => ({ author: "genesis", at: 0, visible_to: "public", ...r });
   k.absorb({
     participant: "mayor-system", as: "mayor", t: 30 * 86_400, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [],

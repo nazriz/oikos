@@ -1,6 +1,11 @@
 import { expect, test } from "bun:test";
 import { money, outcomeWords, renderObservation, renderStanding, ruleWords, when } from "../src/llm/render";
 import { canonical } from "../src/canon";
+import { inCurrency } from "../src/money";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+
+// The world these tests are in writes its money as the profile says (the platform has no money of its own).
+inCurrency(PROFILE.values.currency);
 
 test("money and time read as a person would read them", () => {
   expect(money(123456789)).toBe("$1,234,567.89");
@@ -44,7 +49,7 @@ test("a language-model participant with on-request reports can look at them, in 
   const adapter = new MockAdapter("mock", { participant: () => [{ type: "tool_use", id: "1", name: "look", input: { report: "board", current_only: true } }] });
   const participant = createLlmParticipant({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["board", "Noticeboard"]]), onRequest: ["board"], cadenceDays: 7, draftText: () => "" },
     { adapter, annotate: async () => {}, now: () => 0 });
-  const a = await participant.step(obs({}), { world: { config: {} } } as any);
+  const a = await participant.step(obs({}), { world: { config: {}, currency: PROFILE.values.currency } } as any);
   expect(a).toEqual({ type: "look", looks: [{ channel: "board", query: { standing: true, limit: 20 } }] });
 });
 
@@ -55,7 +60,7 @@ test("a language-model participant can look things up in an on-request report: w
   const adapter = new MockAdapter("mock", { participant: () => [{ type: "tool_use", id: "1", name: "look", input }] });
   const participant = createLlmParticipant({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["files", "The town's files"]]), onRequest: ["files"], cadenceDays: 7, draftText: () => "" },
     { adapter, annotate: async () => {}, now: () => 0 });
-  const a = await participant.step(obs({}), { world: { config: {} } } as any);
+  const a = await participant.step(obs({}), { world: { config: {}, currency: PROFILE.values.currency } } as any);
   // (A field the participant API doesn't know is left out, not passed on.)
   expect(a).toEqual({ type: "look", looks: [{ channel: "files", query: { where: [{ field: "kind", op: "=", value: "petition" }, { field: "data.employer", op: "=", value: "works" }], order: { field: "at", desc: true }, limit: 5 } }] });
 });
@@ -100,7 +105,7 @@ test("done for now alongside an action: the action, then no call until the next 
   } });
   const participant = createLlmParticipant({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["board", "Noticeboard"]]), cadenceDays: 7, draftText: () => "" },
     { adapter, annotate: async () => {}, now: () => 0 });
-  const ctx = { world: { config: {} } } as any;
+  const ctx = { world: { config: {}, currency: PROFILE.values.currency } } as any;
   const first = await participant.step(obs({}), ctx);
   expect(first.type).toBe("message"); // the letter
   // The step after it: no model call, asleep for the 3 days asked.

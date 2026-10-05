@@ -2,7 +2,7 @@
 // The resolver fills gaps and turns names into ids only from this (P8): it
 // never looks at the world beyond what the participant has seen.
 
-import type { Observation, Record, SiteSpace, StatementRecord } from "@oikos/participants";
+import type { Currency, Observation, Record, SiteSpace, StatementRecord } from "@oikos/participants";
 
 export interface AccountFact {
   account: string;
@@ -18,6 +18,9 @@ export interface StructureFact {
 }
 
 export class Knowledge {
+  /** `currency`: how the world's money is written (its config's first currency): what the resolver reads and writes
+   * amounts in. The platform has none of its own. */
+  constructor(readonly currency: Currency) {}
   readonly withdrawn = new Set<string>();
   readonly accounts = new Map<string, AccountFact>(); // accounts the participant can see directly
   /** What the entity acted for holds, and where (phase B): `at|kind` -> quantity (a decimal-string integer). */
