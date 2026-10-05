@@ -41,6 +41,18 @@ impl std::error::Error for CanonError {}
 
 /// Rejects floats and unsafe integers anywhere in `v`.
 pub fn check_integers(v: &Value) -> Result<(), CanonError> {
+    /// The same check without saying where: nearly every value passes, and the path is only wanted for one that doesn't.
+    fn fine(v: &Value) -> bool {
+        match v {
+            Value::Number(n) => n.as_i64().is_some_and(|i| (-MAX_SAFE..=MAX_SAFE).contains(&i)),
+            Value::Array(a) => a.iter().all(fine),
+            Value::Object(m) => m.values().all(fine),
+            _ => true,
+        }
+    }
+    if fine(v) {
+        return Ok(());
+    }
     fn walk(v: &Value, path: &mut String) -> Result<(), CanonError> {
         match v {
             Value::Number(n) => {
@@ -97,7 +109,14 @@ pub fn write_value(v: &Value, out: &mut Vec<u8>) {
         Value::Null => out.extend_from_slice(b"null"),
         Value::Bool(true) => out.extend_from_slice(b"true"),
         Value::Bool(false) => out.extend_from_slice(b"false"),
-        Value::Number(n) => out.extend_from_slice(n.to_string().as_bytes()),
+        Value::Number(n) => match n.as_i64() {
+            // (An integer's digits, as `to_string` writes them, without making the string.)
+            Some(i) => {
+                use std::io::Write;
+                write!(out, "{i}").expect("writing to a Vec doesn't fail");
+            }
+            None => out.extend_from_slice(n.to_string().as_bytes()),
+        },
         Value::String(s) => write_string(s, out),
         Value::Array(a) => {
             out.push(b'[');
@@ -110,17 +129,36 @@ pub fn write_value(v: &Value, out: &mut Vec<u8>) {
             out.push(b']');
         }
         Value::Object(m) => {
-            let mut keys: Vec<&String> = m.keys().collect();
-            // JCS orders by UTF-16 code units; for ASCII keys that equals byte order.
-            keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
             out.push(b'{');
-            for (i, k) in keys.into_iter().enumerate() {
-                if i > 0 {
-                    out.push(b',');
+            // JCS orders by UTF-16 code units; for ASCII keys that equals byte order. Keys that are ASCII and already
+            // come in byte order (as serde_json's own map gives them) are in JCS order as they stand: checked each
+            // time, never assumed, so a dependency enabling `preserve_order` still can't change a hash.
+            let mut last: Option<&str> = None;
+            let in_order = m.keys().all(|k| {
+                let ok = k.is_ascii() && last.is_none_or(|l| l.as_bytes() < k.as_bytes());
+                last = Some(k);
+                ok
+            });
+            if in_order {
+                for (i, (k, x)) in m.iter().enumerate() {
+                    if i > 0 {
+                        out.push(b',');
+                    }
+                    write_string(k, out);
+                    out.push(b':');
+                    write_value(x, out);
                 }
-                write_string(k, out);
-                out.push(b':');
-                write_value(&m[k], out);
+            } else {
+                let mut keys: Vec<&String> = m.keys().collect();
+                keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
+                for (i, k) in keys.into_iter().enumerate() {
+                    if i > 0 {
+                        out.push(b',');
+                    }
+                    write_string(k, out);
+                    out.push(b':');
+                    write_value(&m[k], out);
+                }
             }
             out.push(b'}');
         }
@@ -129,22 +167,28 @@ pub fn write_value(v: &Value, out: &mut Vec<u8>) {
 
 pub fn write_string(s: &str, out: &mut Vec<u8>) {
     out.push(b'"');
-    for c in s.chars() {
-        match c {
-            '"' => out.extend_from_slice(b"\\\""),
-            '\\' => out.extend_from_slice(b"\\\\"),
-            '\u{08}' => out.extend_from_slice(b"\\b"),
-            '\u{0C}' => out.extend_from_slice(b"\\f"),
-            '\n' => out.extend_from_slice(b"\\n"),
-            '\r' => out.extend_from_slice(b"\\r"),
-            '\t' => out.extend_from_slice(b"\\t"),
-            c if (c as u32) < 0x20 => out.extend_from_slice(format!("\\u{:04x}", c as u32).as_bytes()),
-            c => {
-                let mut buf = [0u8; 4];
-                out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
-            }
+    // Everything that needs escaping is a single ASCII byte (never part of a longer UTF-8 sequence), so the stretches
+    // between them are copied as they stand.
+    let bytes = s.as_bytes();
+    let mut from = 0;
+    for (i, &b) in bytes.iter().enumerate() {
+        if b >= 0x20 && b != b'"' && b != b'\\' {
+            continue;
+        }
+        out.extend_from_slice(&bytes[from..i]);
+        from = i + 1;
+        match b {
+            b'"' => out.extend_from_slice(b"\\\""),
+            b'\\' => out.extend_from_slice(b"\\\\"),
+            0x08 => out.extend_from_slice(b"\\b"),
+            0x0C => out.extend_from_slice(b"\\f"),
+            b'\n' => out.extend_from_slice(b"\\n"),
+            b'\r' => out.extend_from_slice(b"\\r"),
+            b'\t' => out.extend_from_slice(b"\\t"),
+            b => out.extend_from_slice(format!("\\u{:04x}", b as u32).as_bytes()),
         }
     }
+    out.extend_from_slice(&bytes[from..]);
     out.push(b'"');
 }
 
@@ -187,6 +231,44 @@ mod tests {
     fn escapes_like_jcs() {
         let v = json!("a\"b\\c\n\t\u{01}é/");
         assert_eq!(String::from_utf8(canonical_value(&v).unwrap()).unwrap(), "\"a\\\"b\\\\c\\n\\t\\u0001é/\"");
+    }
+
+    #[test]
+    fn orders_keys_by_utf16_code_units() {
+        // In bytes U+FFFF sorts before U+10000; in UTF-16 code units (JCS's order) it sorts after.
+        let v = json!({"\u{ffff}": 1, "\u{10000}": 2, "a": 3, "B": 4});
+        assert_eq!(String::from_utf8(canonical_value(&v).unwrap()).unwrap(), "{\"B\":4,\"a\":3,\"\u{10000}\":2,\"\u{ffff}\":1}");
+    }
+
+    #[test]
+    fn writes_every_string_as_the_plain_rule_does() {
+        // The rule, a character at a time: what `write_string` must give for any text.
+        fn plain(s: &str) -> Vec<u8> {
+            let mut out = vec![b'"'];
+            for c in s.chars() {
+                match c {
+                    '"' => out.extend_from_slice(b"\\\""),
+                    '\\' => out.extend_from_slice(b"\\\\"),
+                    '\u{08}' => out.extend_from_slice(b"\\b"),
+                    '\u{0C}' => out.extend_from_slice(b"\\f"),
+                    '\n' => out.extend_from_slice(b"\\n"),
+                    '\r' => out.extend_from_slice(b"\\r"),
+                    '\t' => out.extend_from_slice(b"\\t"),
+                    c if (c as u32) < 0x20 => out.extend_from_slice(format!("\\u{:04x}", c as u32).as_bytes()),
+                    c => out.extend_from_slice(c.encode_utf8(&mut [0u8; 4]).as_bytes()),
+                }
+            }
+            out.push(b'"');
+            out
+        }
+        let every_low: String = (0u8..0x80).map(|b| b as char).collect();
+        for s in ["", "plain", "\"", "\\", "ends with \\", "\"starts", "é\"ü\\漢\u{1f600}\n", "\u{7f}\u{80}\u{2028}", every_low.as_str()] {
+            let mut out = vec![];
+            write_string(s, &mut out);
+            assert_eq!(out, plain(s), "{s:?}");
+        }
+        // Numbers are written as their digits.
+        assert_eq!(String::from_utf8(canonical_value(&json!([0, -1, 42, MAX_SAFE, -MAX_SAFE])).unwrap()).unwrap(), "[0,-1,42,9007199254740991,-9007199254740991]");
     }
 
     #[test]
