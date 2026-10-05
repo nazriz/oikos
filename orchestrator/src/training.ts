@@ -12,14 +12,15 @@
 // Every model call's tokens are counted in the manifest written with the data. The held-out test cases are never
 // read for this; if this machine has them, the finished data is checked against them and refused on any shared wording.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { calls } from "@oikos/participants";
 import { callModel, PRICES, type Budget, type LlmAdapter, type LlmIO, type Price, type Usage } from "@oikos/participants/llm";
 import { createTranslator, Knowledge } from "@oikos/translator";
 import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
-import { functionOf, generate, goldFromCases, goldFromLog, knowing, sampler, shuffled, split, surfaceVariant, type Back, type Gold } from "../../translator/train/data";
+import { blindRequests, checkAnswers, type BlindAnswer, type BlindReport } from "../../translator/train/blind";
+import { functionOf, generate, goldFromCases, goldFromLog, knowing, sampler, shuffled, split, surfaceVariant, type Back, type Example, type Gold } from "../../translator/train/data";
 import { piled, synthetic } from "../../translator/train/synthetic";
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
@@ -161,6 +162,43 @@ export async function balancedGold(sources: string[], o: { perShape?: number; se
   return { gold, report };
 }
 
+const jsonl = <T>(file: string): T[] => readFileSync(file, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l) as T);
+
+/**
+ * The requests of a data folder for a blind reader, written beside its examples as `blind.jsonl`: each a line of
+ * `{id, request, forms}`, in a seeded shuffled order (translator/train/blind.ts), so that where a request stands says
+ * nothing of what it is. (Writing the data writes it too; this is for a folder made before, or another order.)
+ */
+export function writeBlind(dir: string, seed = 1): { requests: number; out: string } {
+  const requests = blindRequests(jsonl<Example>(join(dir, "examples.jsonl")), seed);
+  const out = join(dir, "blind.jsonl");
+  writeFileSync(out, requests.map((e) => JSON.stringify(e)).join("\n") + (requests.length ? "\n" : ""));
+  return { requests: requests.length, out };
+}
+
+/**
+ * `oikos translator-data-check <DIR> --answers FILE [--reader NAME]`: a blind reader's answers against a data folder's
+ * examples. `answers`: a file of `{id, program}`, a line each (or one JSON list), written by a reader who saw only the
+ * requests and the forms (`blind.jsonl`). Compared by meaning; written beside the examples:
+ *   checked.jsonl     the examples the reader agreed on, each marked `verified_by` the reader;
+ *   disagreed.jsonl   the ones it answered otherwise, each with both programs (`program`, and the reader's `answer`);
+ * and the manifest gains `blind_check`: the reader, the counts, and the counts per function. The examples themselves
+ * are left as they were: what is trained on is for whoever reads the disagreements to decide.
+ */
+export function checkBlind(dir: string, answersFile: string, reader = "blind reader"): BlindReport {
+  const examples = jsonl<Example>(join(dir, "examples.jsonl"));
+  const text = readFileSync(answersFile, "utf8");
+  const answers: BlindAnswer[] = text.trimStart().startsWith("[") ? (JSON.parse(text) as BlindAnswer[]) : jsonl<BlindAnswer>(answersFile);
+  const r = checkAnswers(examples, answers, reader);
+  const lines = (xs: unknown[]) => xs.map((x) => JSON.stringify(x)).join("\n") + (xs.length ? "\n" : "");
+  writeFileSync(join(dir, "checked.jsonl"), lines(r.checked));
+  writeFileSync(join(dir, "disagreed.jsonl"), lines(r.disagreed));
+  const file = join(dir, "manifest.json");
+  const manifest = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { [k: string]: unknown }) : {};
+  writeFileSync(file, JSON.stringify({ ...manifest, blind_check: r.report }, null, 2) + "\n");
+  return r.report;
+}
+
 export async function trainingData(o: TrainingDataOptions): Promise<{ examples: number; out: string; stopped?: string }> {
   const log = o.log ?? (() => {});
   // (A model with no recorded price is refused before anything is asked of any of them.)
@@ -232,6 +270,8 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   // Training and validation, split by gold program (and by form): written beside the whole, with what went where.
   const parts = (o.validation ?? 0.15) > 0 ? split(examples, { validation: o.validation ?? 0.15, seed: o.seed ?? 1 }) : undefined;
   if (parts) for (const side of ["train", "validation"] as const) writeFileSync(join(o.out, `${side}.jsonl`), parts[side].map((e) => JSON.stringify(e)).join("\n") + (parts[side].length ? "\n" : ""));
+  // The requests alone, shuffled, for a reader who is to see nothing else (`translator-data-check`).
+  writeFileSync(join(o.out, "blind.jsonl"), blindRequests(examples, o.seed ?? 1).map((e) => JSON.stringify(e)).join("\n") + (examples.length ? "\n" : ""));
   writeFileSync(join(o.out, "manifest.json"), JSON.stringify({ ...manifest, sources: o.sources, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}), ...(parts ? { split: { validation_share: o.validation ?? 0.15, train: parts.train.length, validation: parts.validation.length, by_function: parts.report } } : {}), seed: o.seed ?? 1, checked_against_held_out: !!heldOut, cost_microusd: costMicroUsd }, null, 2) + "\n");
   return { examples: examples.length, out: o.out, ...(manifest.stopped ? { stopped: manifest.stopped } : {}) };
 }

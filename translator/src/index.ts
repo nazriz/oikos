@@ -20,7 +20,7 @@ import type { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
-export const TRANSLATOR_VERSION = "0.7.2";
+export const TRANSLATOR_VERSION = "0.7.3";
 
 export interface TranslatorId {
   id: string;
@@ -112,6 +112,10 @@ export function translatorSystem(): string {
     "- Cancelling or revoking, for good, something on record named by its id (a standing payment, a posting, a proposal, a notice) is statement(withdraw=<it>), one line for each. Pausing it for a time is not a withdrawal (see no_such_act); a request that says to withdraw or cancel it is one, whatever reason it gives.",
     "- \"Prepare … for my review\" or \"show me before it takes effect\" still asks for the act: everything is shown to the person before it is confirmed. What a request says is to stay as it is (\"keep the records\", \"cancel nothing else\") or to be shown with the draft asks for nothing more: it adds no line and is no reason to refuse.",
     "- Telling, asking, directing or instructing someone to see to something is a message to them: message(to=<them>, text=\"<what's asked, in the request's words>\"). work(...) is for when the request itself gives the task, how much of it and where (\"have c0042 do 3 units of make at str.7\"): then it's work(task=make, units=\"3\", at=str.7, by=c0042), whoever is to do it.",
+    "- Things moved or delivered: to= is who receives them (a person or an organisation), at= is the place they are delivered to (a building or a place) and from_at= the place they come from; a place named as where they go is at=, never to=, and with no one named to receive them they are your own (no to=).",
+    "- Work done by several people is one work(...) with by= as a list of them (by=[\"c0042\",\"c0043\"]), never a line for each of them: units= is the whole job.",
+    "- template= is the request's own word for the kind of newcomer, of child or of system (\"arrives as an apprentice\" is template=apprentice, \"we are having a baby\" is template=baby): the noun the request uses and never a word it didn't say, and left out if it uses none.",
+    "- every= is the request's own words for how often, copied whole (\"every 28 days\", \"monthly\", \"a month\").",
     "- Seen by everyone is visible=public.",
     "- Having someone build something for you is structure(type=..., on=..., by=<them>, price=..., from=...), on its own line: never wrapped in an agreement, and with no money(...) line for the price (price= and from= are its payment). Having something demolished is structure(remove=<the building>, by=...).",
     "- Ending an agreement by notice is agreement(notice=<the agreement>); accepting one offered to you is agreement(sign=<the agreement>).",
@@ -130,6 +134,8 @@ export function translatorSystem(): string {
     "  Get Acme to pull down str.4, paying 2k from acc-1.  ->  structure(remove=str.4, by=acme, price=\"2k\", from=acc-1)",
     "  Direct the clerk [clerk] to send me the minutes by Friday.  ->  message(to=clerk, text=\"Please send me the minutes by Friday.\")",
     "  Give notice on our agreement rec.9.  ->  agreement(notice=rec.9)",
+    "  Take 12 crates from str.3 over to str.5.  ->  goods(kind=crates, quantity=\"12\", from_at=str.3, at=str.5)",
+    "  c0042 and c0043 are to do 6 units of mend at str.7 between them.  ->  work(task=mend, units=\"6\", at=str.7, by=[\"c0042\",\"c0043\"])",
     "  Pay Acme half of what we hold.  ->  none(needs_calculation)",
     "  Make the board approve the plan.  ->  none(not_yours)",
     "  Show me last month's payments out of acc-1.  ->  none(not_an_act)",

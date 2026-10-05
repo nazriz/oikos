@@ -34,7 +34,7 @@
 // No structured data but a claim's slots is written (data.ts `JSON_OUT_OF_SCOPE`): the first model copies and chooses.
 
 import { calls, type Currency } from "@oikos/participants";
-import { amountWritings, askable, FIELD_TYPES, goldText, implausible, sampler, shapeOf, shuffled, type FormField, type FormSpec, type Gold } from "./data";
+import { amountWritings, askable, FIELD_TYPES, goldText, howOften, implausible, sampler, shapeOf, shuffled, type FormField, type FormSpec, type Gold } from "./data";
 
 /**
  * How invented worlds write their money: a sign before the amount or only a code; two decimal places, none, or three;
@@ -288,10 +288,10 @@ class Draw {
     const r = this.rand();
     return tx(r < 0.75 ? `${this.pick([2, 3, 6, 7, 10, 12, 14, 18, 21, 24, 28, 30, 45, 60, 90])} ${this.pick(["days", "weeks", "months", "days", "months"])}` : r < 0.9 ? this.pick(["a week", "a fortnight", "a month", "a year", "one year", "two years", "three months", "six weeks"]) : `${this.int(2, 10)} years`);
   }
-  /** How often something recurs, at intervals people use (nothing is paid "every 28 months"). */
+  /** How often something recurs, at intervals people use (nothing is paid "every 28 months"), one of the ways people
+   * say how often (data.ts `howOften`): never the bare length, "28 days", which is how long and not how often. */
   every(): V {
-    const r = this.rand();
-    return tx(r < 0.5 ? this.pick(["weekly", "fortnightly", "monthly", "quarterly", "yearly", "annually", "daily"]) : r < 0.75 ? `every ${this.pick(["2 days", "7 days", "10 days", "14 days", "28 days", "30 days", "90 days", "2 weeks", "3 weeks", "4 weeks", "6 weeks", "2 months", "3 months", "6 months"])}` : `${this.pick([7, 14, 28, 30, 90])} days`);
+    return tx(this.pick(howOften(this.pick(["1 day", "2 days", "7 days", "10 days", "14 days", "14 days", "28 days", "30 days", "30 days", "30 days", "90 days", "365 days", "3 weeks", "6 weeks", "2 months", "6 months"]))));
   }
   /** How long an agreement runs, and how much notice ends it: months and years, and days and weeks (a notice is
    * never longer than a term: data.ts `implausible` holds any program to that). */
@@ -347,6 +347,17 @@ type Lines = (calls.Call | [string, calls.Call])[];
 const nest = (fn: calls.Fn, args: Args): V => ({ call: call(fn, args) });
 
 /**
+ * Goods moved or delivered, the one way wherever they appear (by themselves, or as what one side of an agreement
+ * commits to): `to` is who receives them (nobody named: they stay the mover's own), `at` the place they are
+ * delivered to, `from_at` the place they come from, now and then. The second audit (2026-10-06) found a commitment's
+ * goods written "from [works-41] to [c2883]" for `at=works-41`: a commitment drew its own arguments, with no place
+ * of origin to say, and the writer made one of the destination.
+ */
+function delivery(d: Draw, to: V | undefined, every?: V): calls.Call {
+  return call("goods", { kind: d.word(GOODS), quantity: d.count(), to, at: d.structure(), from_at: d.maybe(0.4) ? d.structure() : undefined, every });
+}
+
+/**
  * What an agreement's two sides commit to, with a template that fits: an exchange people make. Someone pays, and
  * someone lets a place, delivers goods, lends, builds or keeps an account (the outcomes a commitment can be: money,
  * goods, occupancy, a building, an account). Never a random pair: "they build a bridge and we open an account, under
@@ -361,15 +372,17 @@ function deal(d: Draw, other: V): { template: string; we?: V; they?: V } {
   if (r < 0.2) return { template: d.pick(["lease", "tenancy", "licence"]), we: nest("occupancy", { who: other, in: d.inside() }), they: { call: rent() } };
   // They let us a place; we pay rent.
   if (r < 0.34) return { template: d.pick(["lease", "tenancy", "licence"]), we: { call: rent() }, they: nest("occupancy", { in: d.inside() }) };
-  // We supply them; they pay.
+  // We supply them; they pay. (Goods in a commitment are goods as they are by themselves, `delivery`: who receives
+  // them, the place they are delivered to and, now and then, the place they come from. A commitment names who
+  // receives them: the resolver asks otherwise.)
   if (r < 0.5) {
     const every = d.maybe(0.6) ? d.every() : undefined;
-    return { template: d.pick(["supply", "sale", "carriage"]), we: nest("goods", { kind: d.word(GOODS), quantity: d.count(), to: other, at: d.structure(), every }), they: { call: price(every) } };
+    return { template: d.pick(["supply", "sale", "carriage"]), we: { call: delivery(d, other, every) }, they: { call: price(every) } };
   }
   // They supply us; we pay.
   if (r < 0.64) {
     const every = d.maybe(0.6) ? d.every() : undefined;
-    return { template: d.pick(["supply", "sale", "carriage"]), we: { call: price(every) }, they: nest("goods", { kind: d.word(GOODS), quantity: d.count(), to: id(d.orgId()), at: d.structure(), every }) };
+    return { template: d.pick(["supply", "sale", "carriage"]), we: { call: price(every) }, they: { call: delivery(d, id(d.orgId()), every) } };
   }
   // We pay them for their work (the work itself is no commitment the call language has); or they pay us.
   if (r < 0.76) return { template: d.pick(["employment", "apprenticeship", "retainer", "service", "maintenance"]), we: nest("money", { to: d.maybe(0.5) ? other : d.account(), amount: d.amount(), every: d.every(), for: d.maybe(0.6) ? tx(d.pick(["wages", "the retainer", "the service", "upkeep"])) : undefined }) };
@@ -391,7 +404,7 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
     return [call("money", { to: d.maybe(0.6) ? d.account() : d.party(), amount: d.amount(), from: d.maybe(0.6) ? d.account() : undefined, every: every ? d.every() : undefined, first: every && d.maybe(0.25) ? d.duration() : undefined, for: d.maybe(0.55) ? d.purpose() : undefined, basis: d.maybe(0.15) ? d.record() : undefined, settles: d.maybe(0.12) ? d.rec() : undefined })];
   },
   // (No `for`: only a payment has a purpose, and nothing reads whose name goods move or work is done in.)
-  goods: (d) => [call("goods", { kind: d.word(GOODS), quantity: d.count(), to: d.maybe(0.6) ? d.party(["org", "person"]) : undefined, at: d.structure(), from_at: d.maybe(0.4) ? d.structure() : undefined })],
+  goods: (d) => [delivery(d, d.maybe(0.6) ? d.party(["org", "person"]) : undefined)],
   work: (d) => {
     const by = () => (d.maybe(0.7) ? d.person() : list(Array.from({ length: d.int(2, 4) }, () => d.personId())));
     const r = d.rand();
@@ -466,8 +479,10 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
     const sex = d.maybe(0.35) ? d.pick(["female", "male"]) : undefined;
     return [call("presence", { name: tx(d.personName(sex)), age: tx(`${d.int(...COMES_AGED[template]!)} years`), template: id(template), sex: sex ? id(sex) : undefined, carrying: d.maybe(0.6) ? d.pocket() : undefined })];
   },
-  // What the contract requires of a birth (a name, and what the child is recorded as), and the other parent if
-  // there is one: a person, by id, by name, or as the speaker would call them. Nothing else.
+  // What the contract requires of a birth (a name, and the template: the request's own word for the child, "a baby",
+  // "a child", which a writer says as people do, "we're having a baby", and never "recorded as an infant": the second
+  // audit, 2026-10-06, found that in 12 of 13), and the other parent if there is one: a person, by id, by name, or as
+  // the speaker would call them. Nothing else.
   birth: (d) => [call("birth", { name: tx(d.maybe(0.5) ? d.personName() : d.pick(FIRST)), template: d.word(CHILDREN), with: !d.maybe(0.6) ? undefined : d.maybe(0.7) ? id(d.personId()) : tx(d.maybe() ? d.personName() : d.pick(PARTNERS)) })],
   take: (d) => [call("take", { kind: d.word(GOODS), quantity: d.count(80), from: d.party(["org", "person"]), at: d.structure() })],
   harm: (d) => [call("harm", { who: d.person() })],
@@ -711,13 +726,13 @@ const ABOUT_A_PERSON: ((d: Draw, who: string) => calls.Call)[] = [
   (d, who) => call("occupancy", { who: id(who), in: d.inside() }),
   (d, who) => call("position", { appoint: post(d), to: id(who) }),
   (d, who) => call("work", { task: d.word(TASKS), units: d.count(40), at: d.structure(), by: id(who) }),
-  (d, who) => call("goods", { kind: d.word(GOODS), quantity: d.count(), to: id(who), at: d.structure() }),
+  (d, who) => delivery(d, id(who)),
   (d, who) => call("account", { holder: id(who), at: d.maybe(0.6) ? id(d.orgId()) : undefined }),
   (d, who) => call("claim", { position: d.word(["right", "liberty"]), holder: id(who), about: d.about() }),
 ];
 const ABOUT_AN_ORG: ((d: Draw, who: string) => calls.Call)[] = [
   (d, who) => call("money", { to: id(who), amount: d.amount(), from: d.maybe(0.6) ? d.account() : undefined, for: d.purpose() }),
-  (d, who) => call("goods", { kind: d.word(GOODS), quantity: d.count(), to: id(who), at: d.structure() }),
+  (d, who) => delivery(d, id(who)),
   (d, who) => call("account", { holder: id(who) }),
   (d, who) => (d.maybe(0.3) ? call("structure", { remove: d.structure(), by: id(who), price: d.amount() }) : call("structure", { type: d.word(STRUCTURE_TYPES), on: d.ground(), by: id(who), price: d.amount(), from: d.maybe(0.6) ? d.account() : undefined })),
   (d, who) => call("claim", { position: d.word(["right", "liberty"]), holder: id(who), about: d.about() }),

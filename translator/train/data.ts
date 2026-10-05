@@ -27,7 +27,18 @@
 //                   cited in passing, a closing "do not …" or two) is recorded as that, with where it is.
 //   spans           where each value of the program is in the request: the occurrence beside the other values of the
 //                   same call where a value occurs more than once, every occurrence (marked ambiguous) where that
-//                   doesn't settle it.
+//                   doesn't settle it. Each says how its value comes from the request (`Span.how`): copied (the
+//                   span's characters are the value), chosen (the span is the request's words for a form's name, a
+//                   kind, a template, an option), or implied (a yes-or-no the wording implies: no span).
+//   how it's said   each request is asked for with a way of saying its act, one of several per function and pattern
+//                   of arguments, chosen by seed (`SAYINGS`, `writerNotes`), and the writer is told not to say the
+//                   description back; how often something recurs is asked for in one of the ways people say it, and
+//                   the example's `every` is those words (`withHowOften`). A request that echoes the description, or
+//                   says goods come "from" the place they go to, is dropped mechanically (`badlyWritten`).
+//   one spelling    gold is kept the same way whatever wrote it (`goldText`): counts, amounts and times quoted, a
+//                   list of one unwrapped, a flag as `yes`.
+//   blind checking  the requests alone, shuffled, go to a reader who sees nothing else, and the reader's programs are
+//                   compared with the gold ones by meaning (blind.ts).
 //   the split       into training and validation is by gold program, and by form (`split`).
 //   money           is any world's: amounts are written and read in the currency of the world a program is from.
 //
@@ -48,7 +59,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.3.0";
+export const DATA_VERSION = "0.4.0";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -128,6 +139,13 @@ export interface Example {
   gold?: string;
   /** What the request says that adds nothing to the program (the style asked for it), and where: each `adds: "nothing"`. */
   riders?: { kind: Rider["kind"]; text: string; at: [number, number]; adds: "nothing" }[];
+  /** The examples a refusal was built from by running their requests together (`builtRefusals`), by id, in order. */
+  built_from?: string[];
+  /** How the world the program is from writes money (its amounts are read in it when two programs are compared by meaning). */
+  currency?: Currency;
+  /** The model that translated the request back (the round trip), where a blind reader's agreement has since been
+   * recorded in `verified_by` (blind.ts). */
+  translated_back_by?: string;
 }
 
 /**
@@ -135,7 +153,20 @@ export interface Example {
  * `ambiguous`: the value is in the request more than once and nothing settles which occurrence is this argument's:
  * `at` is the first of them and `all` is every one, so whoever trains on spans can leave it out or accept any.
  */
-export interface Span { arg: string; value: string; at: [number, number]; line?: number; ambiguous?: true; all?: [number, number][] }
+export interface Span {
+  arg: string; value: string;
+  /**
+   * How the value comes from the request (what each head of a model that copies and chooses is trained on):
+   *  - `copy`: the span's characters are the value, exactly (an id, an amount, a name, a letter's words);
+   *  - `choice`: the span is the request's words for it and the value is what was chosen for them: a form's name
+   *    ("footpath declaration" for `footpath_declaration`), a kind, a task, a template, an option of a form's list,
+   *    anything said in ordinary words. Never something to copy, even where the words happen to spell the value;
+   *  - `implied`: nothing in the request is the value (a yes-or-no the wording implies: `leave=yes`, `sex=female`,
+   *    a claim's `position`): there is no span (`at` is absent).
+   */
+  how: "copy" | "choice" | "implied";
+  at?: [number, number]; line?: number; ambiguous?: true; all?: [number, number][];
+}
 
 /** A small seeded generator (mulberry32), for sampling only. */
 export function sampler(seed: number): () => number {
@@ -279,7 +310,12 @@ export function implausible(program: calls.Program | string, o: { invented?: boo
       const { action, object } = a.about.json;
       if (action && object && /^(rec\.|law-)/.test(object) && !DONE_TO_RECORDS.has(action)) return "a claim to do to a record what is done to a place";
     }
+    // (What a town's code writes to the second, "5914794 seconds", nobody says: the second audit, 2026-10-06.)
+    for (const [k, v] of Object.entries(a)) if (DURATION_ARGS.has(k) && /^\s*[0-9]{3,}\s*seconds?\s*$/i.test(said(v) ?? "")) return "a length of time counted in seconds";
     if (c.fn === "agreement") {
+      // An offer is made to someone: one that names nobody is no offer a sentence makes (and a request that does
+      // name them would have a party its program lacks).
+      if (!("sign" in a) && !("notice" in a) && !("with" in a)) return "an offer with no one named";
       const we = nested(a.we_do), they = nested(a.they_do), other = said(a.with);
       if (they?.fn === "occupancy" && other !== undefined && said(they.args.who) === other) return "the other side committing to its own moving in";
       if (they?.fn === "structure") return "having something built, wrapped in an agreement";
@@ -347,14 +383,21 @@ export function plausible(program: calls.Program | string, o: { invented?: boole
  * A gold program as it's kept: tidied (eval/run.ts); a payment's purpose without a full stop a sentence would swallow
  * ("for rent." asked for in a sentence is "for rent"); and a yes-or-no flag in its one spelling (`leave=yes`, never
  * `leave=true`: meaning.ts reads either, gold writes one).
+ * Whatever wrote the program (a town's code, a test case, the generator), it is kept in the one spelling generated gold
+ * has (the second audit, 2026-10-06, found a log's `units=1, by=["c0007"]` beside generated `units="1", by=c0007`):
+ * a count, an amount and a length of time are quoted text (the call language's "copied text"), and a list of one is
+ * the one, bare if it is an id.
  */
 export function goldText(p: calls.Program): string {
   const t = tidy(p);
   if ("none" in t) return calls.programText(t);
+  const one = (s: string): calls.Value => (ID.test(s) ? { id: s } : { text: s });
   const value = (fn: string, k: string, v: calls.Value): calls.Value =>
     "call" in v ? { call: call(v.call) }
     : "text" in v && k === "for" ? { text: v.text.replace(/[.\s]+$/, "") || v.text }
     : FLAGS[fn]?.includes(k) && /^(yes|true)$/i.test("id" in v ? v.id : "text" in v ? v.text.trim() : "") ? { id: FLAG_YES }
+    : "id" in v && fn !== "form" && (COUNT_ARGS.has(k) || AMOUNT_ARGS.has(k) || DURATION_ARGS.has(k) || k === "age") ? { text: v.id }
+    : "json" in v && Array.isArray(v.json) && v.json.length === 1 && typeof v.json[0] === "string" ? one(v.json[0])
     : v;
   const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(c.fn, k, v)])) });
   return calls.programText({ lines: t.lines.map((l) => ({ ...l, call: call(l.call) })) });
@@ -381,7 +424,12 @@ const IMPLIED = new Set(["leave", "then", "position", "sex", "visible"]);
 
 /** What a request has to carry of its program, each with how it must appear (`line`: which line it is of, in a
  * program of several). */
-export interface Needed { value: string; arg: string; exact: boolean; line?: number }
+export interface Needed { value: string; arg: string; exact: boolean; line?: number; /** How it comes from the request (see `Span.how`). */ how: "copy" | "choice" }
+/** A value of a program the request implies without saying it (`Span.how`: implied). */
+export interface Implied { value: string; arg: string; line?: number }
+
+/** The types of form field whose value is one of a list, or a word of the world's catalogue: a choice, never a copy. */
+const CHOSEN_FIELDS = new Set(["choice", "structure_type"]);
 
 /**
  * What a request has to carry of its program for a model that copies and chooses (design §16.10) to learn from it:
@@ -397,32 +445,55 @@ export interface Needed { value: string; arg: string; exact: boolean; line?: num
  * found like any other value. The program stays as the call language writes it; whoever decodes the model's answer
  * puts the slots back into the object.
  */
-export function needed(p: calls.Program): Needed[] {
-  if ("none" in p) return [];
+export function needed(p: calls.Program, forms: FormSpec[] = []): Needed[] {
+  return valuesOf(p, forms).needed;
+}
+
+/** What a program has that its request implies and never says (`Span.how`: implied): a yes-or-no kind of choice, a
+ * wait of no time. */
+export function impliedIn(p: calls.Program): Implied[] {
+  return valuesOf(p, []).implied;
+}
+
+/**
+ * Every value of a program, by how it comes from a request: needed in it (copied, or chosen for its words), or implied.
+ * A value is a choice where it is a word and not the id of anything: under an argument that takes a word (WORD_ARGS:
+ * a kind, a task, a template, a form's name), in a form's field that offers a list or takes a catalogue word (by the
+ * forms given), or a claim's action. Everything else that must be there is copied.
+ */
+function valuesOf(p: calls.Program, forms: FormSpec[]): { needed: Needed[]; implied: Implied[] } {
+  if ("none" in p) return { needed: [], implied: [] };
   const bound = new Set(p.lines.map((l) => l.bind).filter(Boolean));
   const out: Needed[] = [];
+  const implied: Implied[] = [];
   const idLike = (s: string) => /[0-9.\/-]/.test(s); // (not an underscore: a form or a kind named in two words is a word)
   const several = p.lines.length > 1;
   let line = 0;
   const push = (n: Needed) => out.push(several ? { ...n, line } : n);
-  const value = (arg: string, v: calls.Value) => {
+  const imply = (n: Implied) => implied.push(several ? { ...n, line } : n);
+  const value = (arg: string, v: calls.Value, c: calls.Call) => {
     const key = arg.slice(arg.lastIndexOf(".") + 1);
+    // Whether this argument's bare word is a word chosen and not an id copied.
+    const spec = c.fn === "form" ? forms.find((f) => f.form === formOf(calls.callText(c))?.form) : undefined;
+    const wordy = c.fn === "form" ? key === "form" || CHOSEN_FIELDS.has(spec?.fields[key]?.type ?? "") : WORD_ARGS.has(key);
+    const how = (s: string): Needed["how"] => (wordy && !idLike(s) ? "choice" : "copy");
     if ("id" in v) {
-      if (bound.has(v.id) || IMPLIED.has(key)) return;
-      push({ value: v.id, arg, exact: idLike(v.id) });
+      if (bound.has(v.id)) return;
+      if (IMPLIED.has(key)) return void imply({ value: v.id, arg });
+      push({ value: v.id, arg, exact: idLike(v.id), how: how(v.id) });
     } else if ("text" in v) {
-      if (DURATION_ARGS.has(key) && noTime(v.text)) return;
-      push({ value: v.text, arg, exact: true });
+      if (DURATION_ARGS.has(key) && noTime(v.text)) return void imply({ value: v.text, arg });
+      push({ value: v.text, arg, exact: true, how: "copy" });
     } else if ("json" in v) {
-      if (Array.isArray(v.json)) v.json.forEach((x) => typeof x === "string" && push({ value: x, arg, exact: idLike(x) }));
-      else if (flat(v.json)) for (const [slot, x] of Object.entries(v.json)) push({ value: x, arg: `${arg}.${slot}`, exact: idLike(x) || /\s/.test(x) });
-    } else if ("call" in v) Object.entries(v.call.args).forEach(([k, x]) => value(`${arg}.${k}`, x));
+      if (Array.isArray(v.json)) v.json.forEach((x) => typeof x === "string" && push({ value: x, arg, exact: idLike(x), how: how(x) }));
+      else if (flat(v.json)) for (const [slot, x] of Object.entries(v.json)) push({ value: x, arg: `${arg}.${slot}`, exact: idLike(x) || /\s/.test(x), how: idLike(x) || /\s/.test(x) ? "copy" : "choice" });
+    } else if ("call" in v) Object.entries(v.call.args).forEach(([k, x]) => value(`${arg}.${k}`, x, v.call));
   };
   for (const [i, l] of p.lines.entries()) {
     line = i;
-    Object.entries(l.call.args).forEach(([k, v]) => value(k, v));
+    Object.entries(l.call.args).forEach(([k, v]) => value(k, v, l.call));
   }
-  return out;
+  return { needed: out, implied };
 }
 
 /** Whether a length of time, as written, is none at all ("0 days"). */
@@ -611,6 +682,7 @@ export function shuffled<T>(xs: readonly T[], rand: () => number): T[] {
 
 const AMOUNT_ARGS = new Set(["amount", "price", "carrying"]);
 const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "first"]);
+const COUNT_ARGS = new Set(["quantity", "units"]);
 
 /**
  * Every way this pipeline writes an amount (a count of the currency's smallest unit) in a world's money, each checked
@@ -679,6 +751,74 @@ export function durationForms(text: string, repeating: boolean): string[] {
   return [...new Set(forms)].filter((f) => f !== text && same(() => calls.parseDuration(f), seconds));
 }
 
+/**
+ * The ways people say how often something recurs, for a length of time, each one the parser reads as that length
+ * (`calls.parseDuration`): "every 28 days", "every 4 weeks", "every four weeks"; "every month", "a month", "per
+ * month", "monthly"; "every fortnight", "fortnightly". Never the bare length ("28 days"): that is how long, not how
+ * often, and a request that says "every 28 days" has those three words as its span for `every=`.
+ */
+export function howOften(text: string): string[] {
+  let seconds: number;
+  try {
+    seconds = calls.parseDuration(text);
+  } catch {
+    return [];
+  }
+  const DAY = 86_400;
+  const WORD: { [n: number]: string } = { 2: "two", 3: "three", 4: "four", 6: "six" };
+  const forms: string[] = [];
+  // (Nobody says "every 2 fortnights" or "every 3 quarters": those two are said singly.)
+  for (const [unit, length, most] of [["hour", 3600, 12], ["day", DAY, 90], ["week", 7 * DAY, 12], ["fortnight", 14 * DAY, 1], ["month", 30 * DAY, 36], ["quarter", 90 * DAY, 1], ["year", 365 * DAY, 10]] as const) {
+    const n = seconds / length;
+    if (!Number.isInteger(n) || n < 1 || n > most) continue;
+    if (n === 1) forms.push(`every ${unit}`, `${unit === "hour" ? "an" : "a"} ${unit}`, `per ${unit}`);
+    else forms.push(`every ${n} ${unit}s`, ...(WORD[n] ? [`every ${WORD[n]} ${unit}s`] : []));
+  }
+  forms.push(...Object.entries({ hourly: 3600, daily: DAY, weekly: 7 * DAY, fortnightly: 14 * DAY, monthly: 30 * DAY, quarterly: 90 * DAY, yearly: 365 * DAY, annually: 365 * DAY }).filter(([, v]) => v === seconds).map(([k]) => k));
+  const read = [...new Set(forms)].filter((f) => same(() => calls.parseDuration(f), seconds));
+  // (A length none of these says, "90 minutes", is said with "every" before it.)
+  return read.length ? read : /^[0-9]/.test(text.trim()) && same(() => calls.parseDuration(`every ${text.trim()}`), seconds) ? [`every ${text.trim()}`] : [text];
+}
+
+/**
+ * A gold program with how often it recurs (`every=`, in a commitment too) said one of the ways people say it
+ * (`howOften`), chosen by the generator given: the words the writer is then told to use, so the program's value is
+ * the request's own span for it. Until 2026-10-06 the same wording, "every 28 days", stood for `every="every 28 days"`
+ * in one example and `every="28 days"` in the next (the second audit); now every gold `every` is the whole of how the
+ * request says it. What the program does is unchanged; it stays in its family.
+ */
+export function withHowOften(g: Gold, rand: () => number): Gold {
+  const p = calls.parseProgram(g.program);
+  if ("none" in p) return g;
+  let changed = false;
+  const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]): [string, calls.Value] => {
+    if ("call" in v) return [k, { call: call(v.call) }];
+    const text = k === "every" && c.fn !== "form" ? ("text" in v ? v.text : "id" in v ? v.id : undefined) : undefined;
+    if (text === undefined) return [k, v];
+    const ways = howOften(text);
+    const chosen = ways.length ? ways[Math.floor(rand() * ways.length)]! : text;
+    changed ||= chosen !== text || !("text" in v);
+    return [k, { text: chosen }];
+  })) });
+  const program = calls.programText({ lines: p.lines.map((l) => ({ ...l, call: call(l.call) })) });
+  return changed ? { ...g, family: g.family ?? g.program, program } : g;
+}
+
+/** How often each recurring thing in a program recurs, as written (its `every=` values, a commitment's too). */
+export function everyIn(program: string | calls.Program): string[] {
+  const p = typeof program === "string" ? calls.parseProgram(program) : program;
+  if ("none" in p) return [];
+  const out: string[] = [];
+  const walk = (c: calls.Call) => {
+    for (const [k, v] of Object.entries(c.args)) {
+      if ("call" in v) walk(v.call);
+      else if (k === "every" && c.fn !== "form" && "text" in v) out.push(v.text);
+    }
+  };
+  p.lines.forEach((l) => walk(l.call));
+  return out;
+}
+
 const same = <T>(f: () => T, want: T): boolean => {
   try {
     return f() === want;
@@ -703,7 +843,9 @@ export function surfaceVariant(g: Gold, rand: () => number, cur: Currency | unde
     if ("call" in v) return { call: call(v.call) };
     if ("id" in v && g.names[v.id] && !/["\\]/.test(g.names[v.id]!) && rand() < 0.4) return { text: g.names[v.id]! };
     if ("text" in v && cur && (AMOUNT_ARGS.has(key) || fields[key]?.type === "amount") && rand() < 0.6) return { text: choose([v.text, ...amountForms(v.text, cur)]) };
-    if ("text" in v && (DURATION_ARGS.has(key) || fields[key]?.type === "duration") && rand() < 0.6) return { text: choose([v.text, ...durationForms(v.text, key === "every")]) };
+    // (How often is said as how often: `howOften`. A form's field by that name is a length of time like any other.)
+    if ("text" in v && key === "every" && !fields[key]) return rand() < 0.6 ? { text: choose([v.text, ...howOften(v.text)]) } : v;
+    if ("text" in v && (DURATION_ARGS.has(key) || fields[key]?.type === "duration") && rand() < 0.6) return { text: choose([v.text, ...durationForms(v.text, false)]) };
     return v;
   };
   const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(k, v)])) });
@@ -821,17 +963,196 @@ export function withoutRiders(request: string, riders: Rider[]): string {
 const PARTICULAR: { [fn: string]: [arg: string, said: string][] } = {
   account: [["close", "an account is closed"], ["", "an account is opened (for whoever is to hold it; with whoever keeps accounts, if named)"]],
   structure: [["remove", "a building comes down: it is demolished, pulled down (by whoever is named)"], ["", "a building goes up: something is built on a lot or a cell (by whoever is named, for a price, paid from an account)"]],
-  occupancy: [["leave", "someone moves out of a place: leaves it, vacates it"], ["", "someone moves into a place: comes to live or work there"]],
-  claim: [["release", "a right or permission that is on record is released: given up for good"], ["transfer", "a right or permission that is on record is passed on to someone else"], ["", "it is put on record that someone has a right, a liberty (a permission), a power or an immunity to do something"]],
+  occupancy: [
+    ["leave,who", "the person named moves out of a place: leaves it, vacates it"], ["leave", "the speaker moves out of a place (nobody else is named: it is their own moving out, never \"someone\")"],
+    ["who", "the person named moves into a place: comes to live or work there"], ["", "the speaker moves into a place (nobody else is named: it is their own moving in, never \"someone\")"],
+  ],
+  claim: [
+    ["release", "a right or permission that is on record is released: given up"], ["transfer", "a right or permission that is on record is passed on to someone else"],
+    ["holder", "it is put on record that the one named has a right, a liberty (a permission), a power or an immunity to do something"],
+    ["", "it is put on record that the speaker (nobody else is named as having it) has a right, a liberty (a permission), a power or an immunity to do something"],
+  ],
+  goods: [["", "things the speaker holds are moved or delivered: so many of a kind, to a place; to someone there, if someone is named (otherwise they stay the speaker's own); from a place, if one is named"]],
+  vote: [["", "the speaker votes on a ballot: for one of its options, or for someone standing"]],
+  harm: [["", "the speaker attacks someone: hits them, hurts them"]],
   agreement: [["sign", "an agreement that was offered is signed: accepted"], ["notice", "notice is given to end an agreement (the agreement is the one named; any words given are the notice's own)"], ["", "an agreement is offered to someone: what we commit to, what they commit to, for how long, on what notice"]],
-  statement: [["withdraw", "something published earlier is withdrawn, for good"], ["", "something is published (a notice, a law, a report: its kind is the call's word, its words are given)"]],
-  presence: [["leave", "someone leaves the world: goes away from it altogether"], ["who", "someone who was away comes back into the world from outside: returns, arrives back (never \"is present\" or \"attends\")"], ["", "a newcomer comes into the world from outside: arrives, is let in (their name, their age, what they come as; any money they carry)"]],
+  statement: [["withdraw", "something published earlier, or standing on record, is withdrawn: taken down, cancelled"], ["", "something is published (a notice, a law, a report: its kind is the call's word, its words are given)"]],
+  presence: [["leave,who", "the person named leaves the world: goes away from it altogether"], ["leave", "the speaker leaves the world: goes away from it altogether (nobody else is named: it is their own leaving)"], ["who", "someone who was away comes back into the world from outside: returns, arrives back (never \"is present\" or \"attends\")"], ["", "a newcomer comes into the world from outside: arrives, is let in (their name, their age, what they come as; any money they carry)"]],
   position: [["vacate", "a post is left empty: whoever holds it holds it no longer"], ["appoint", "someone is appointed to a post"], ["", "a new post is created in the organisation (its title; its role, if given)"]],
-  system: [["retire", "a system (software, an AI system) is switched off for good"], ["", "a system (software, an AI system) is put to work for the organisation: say that it is a system; what kind is the call's word for it; its title, if it has one"]],
-  birth: [["", "the speaker has a child: a child is conceived (its name; what the child is recorded as: the call's word; the other parent, if named)"]],
+  system: [["retire", "a system (software, an AI system) is switched off: retired, shut down"], ["", "a system (software, an AI system) is put to work for the organisation: say that it is a system; what kind is the call's word for it; its title, if it has one"]],
+  birth: [["", "the speaker is having a child (its name; the other parent, if named). The call's word for the child (child, baby, infant, newborn) is the request's own word for it, said as people say it: \"we're having a baby\""]],
   work: [["survey", "people survey something (a species, or something measured) in certain cells of a place"], ["investigate", "people look into things of some kind taken from someone, at the place they were taken from"], ["", "people do so many units of a kind of work at a place (who does it; what it is done to, if said)"]],
-  take: [["", "things someone else holds are taken from where they are, without their agreement"]],
+  take: [["", "the speaker takes things someone else holds, at the place where they are kept (the owner isn't asked: taking is all that is said)"]],
 };
+
+/** Whether a call fits a pattern of arguments: names it must have, `!name` for ones it mustn't, separated by commas
+ * (the empty pattern fits any call). */
+const fits = (pattern: string, c: calls.Call): boolean => pattern.split(",").filter(Boolean).every((k) => (k.startsWith("!") ? !(k.slice(1) in c.args) : k in c.args));
+
+/**
+ * Ways of saying each act, by function and by which arguments the call has (the first pattern that fits: `fits`):
+ * several to each, of which one is chosen by seed and given to the writer as "say it something like …". `{name}`
+ * stands for the call's own value of that argument; "…" for whatever else the call says.
+ *
+ * Why: told only what a function brings about, a writer says it back. The second audit (2026-10-06) found "physically
+ * harm" in 13 of 13 requests to harm, "without their agreement" in 12 of 12 to take, "have someone move into" in 7 of
+ * 7 moves with nobody named, "for good" in 6 of 6 retirements and "cast my choice" in votes: a model trained on that
+ * would know one phrase per function, and none that a person uses. These are how people say them; none repeats the
+ * description. A phrase holds the call's word where the call has a word (`{task}`, `{kind}`, `{template}`), since the
+ * request must use that word.
+ */
+export const SAYINGS: { [fn: string]: [pattern: string, said: string[]][] } = {
+  money: [
+    ["every", ["set up a regular payment to {to}", "start paying {to} …, {every}", "{to} is to get … {every} from now on", "arrange a standing payment to {to}", "have … go to {to} {every}", "pay {to} … {every}"]],
+    ["", ["pay {to}", "send {to} …", "transfer … to {to}", "get … over to {to}", "settle up with {to}", "{to} is owed …: pay it", "make a payment to {to}", "remit … to {to}", "see that {to} gets …"]],
+  ],
+  goods: [
+    ["to,from_at", ["send {to} {quantity} {kind} from {from_at}, to be left at {at}", "ship {quantity} {kind} from {from_at} over to {to} at {at}", "have {quantity} {kind} carted from {from_at} to {at} for {to}", "{to} is to get {quantity} {kind} out of {from_at}, delivered to {at}", "take {quantity} {kind} from {from_at} round to {to} at {at}"]],
+    ["to", ["send {to} {quantity} {kind}, at {at}", "deliver {quantity} {kind} to {to} at {at}", "drop off {quantity} {kind} for {to} at {at}", "get {quantity} {kind} round to {to}, at {at}", "{to} is to have {quantity} {kind}, left at {at}", "hand over {quantity} {kind} to {to} at {at}"]],
+    ["from_at", ["move {quantity} {kind} from {from_at} to {at}", "shift {quantity} {kind} out of {from_at} over to {at}", "bring {quantity} {kind} across from {from_at} to {at}", "restock {at} with {quantity} {kind} from {from_at}", "cart {quantity} {kind} from {from_at} round to {at}"]],
+    ["", ["move {quantity} {kind} to {at}", "take {quantity} {kind} over to {at}", "put {quantity} {kind} in {at}", "get {quantity} {kind} to {at}", "stock {at} with {quantity} {kind}", "bring {quantity} {kind} round to {at}"]],
+  ],
+  work: [
+    ["survey,by", ["have {by} {task} the {survey} in …", "send {by} out to {task} {survey} in …", "{by} is to do a {survey} {task} of …", "get {by} to {task} for {survey} across …"]],
+    ["survey", ["{task} the {survey} in …", "do a {survey} {task} of …", "carry out a {task} of {survey} over …", "we need a {task} of {survey} in …"]],
+    ["investigate,by", ["have {by} {task} the {kind} taken from {investigate} at {taken_at}", "put {by} on it: {task} the {kind} that went from {investigate} at {taken_at}", "{by} is to {task} who took {investigate}'s {kind} at {taken_at}", "get {by} to {task} the {kind} missing from {investigate}, taken at {taken_at}"]],
+    ["investigate", ["{task} the {kind} taken from {investigate} at {taken_at}", "{task} what became of {investigate}'s {kind}, taken at {taken_at}", "open a case and {task} the {kind} taken from {investigate} at {taken_at}"]],
+    ["by", ["have {by} do {units} units of {task} at {at}", "put {by} on {units} units of {task} at {at}", "set {by} to {task}: {units} units, at {at}", "{by} is to do {units} units of {task} at {at}", "get {units} units of {task} done at {at} by {by}", "assign {by} {units} units of {task} at {at}", "{units} units of {task} at {at}, for {by} to do"]],
+    ["", ["do {units} units of {task} at {at}", "get {units} units of {task} done at {at}", "run {units} units of {task} at {at}", "{units} units of {task} at {at}, please", "carry out {units} units of {task} at {at}", "see to {units} units of {task} at {at}"]],
+  ],
+  account: [
+    ["close", ["close {close}", "shut {close}", "wind up account {close}", "{close} is no longer needed: close it", "have {close} closed", "we're done with {close}: close it down"]],
+    ["holder", ["open an account for {holder}", "set up an account in {holder}'s name", "{holder} needs an account: open one", "start an account for {holder}", "get {holder} an account"]],
+    ["", ["open an account for me", "I need an account opened", "set me up with an account", "start an account in my name", "I'd like an account"]],
+  ],
+  structure: [
+    ["remove,by", ["have {by} pull down {remove}", "get {by} to knock down {remove}", "{by} is to demolish {remove}", "hire {by} to tear down {remove}", "bring in {by} to take down {remove}", "{remove} has to go: get {by} to clear it"]],
+    ["remove", ["demolish {remove}", "pull down {remove}", "knock {remove} down", "tear down {remove}", "{remove} is to come down", "clear {remove} away", "we'll take {remove} down ourselves"]],
+    ["by", ["have {by} build a {type} on {on}", "get {by} to put up a {type} on {on}", "commission a {type} on {on} from {by}", "{by} is to build a {type} on {on}", "hire {by} for a {type} on {on}", "bring in {by} to put a {type} on {on}", "a {type} on {on}, built by {by}"]],
+    ["", ["build a {type} on {on}", "put up a {type} on {on}", "we'll build a {type} on {on} ourselves", "a {type} is to go up on {on}", "raise a {type} on {on}", "let's get a {type} built on {on}"]],
+  ],
+  occupancy: [
+    ["leave,who", ["move {who} out of {in}", "{who} is leaving {in}", "{who} is to vacate {in}", "have {who} clear out of {in}", "{who} gives up {in}", "{who} is done with {in} and moves out"]],
+    ["leave", ["I'm moving out of {in}", "I'm leaving {in}", "I'll vacate {in}", "I'm giving up my place at {in}", "move me out of {in}", "I'm clearing out of {in}"]],
+    ["who", ["move {who} into {in}", "put {who} up in {in}", "house {who} in {in}", "{who} is to have {in}", "settle {who} in {in}", "let {who} take {in}", "{who} moves into {in}"]],
+    ["", ["I'm moving into {in}", "I'll take {in}", "move me into {in}", "I'm going to live in {in}", "I want {in} for myself", "I'm setting up in {in}", "put me in {in}"]],
+  ],
+  entity: [["", ["set up a {kind} called {name}", "found a {kind}, {name}", "start a {kind} by the name of {name}", "establish {name}, a {kind}", "form a {kind}: {name}", "register a new {kind} called {name}", "let's have a {kind} named {name}", "I'm starting a {kind}, {name}"]]],
+  claim: [
+    ["release", ["release {release}", "give up {release}", "waive {release}", "I surrender {release}", "drop the claim {release}", "let {release} go", "I no longer hold to {release}"]],
+    ["transfer", ["pass {transfer} on to {to}", "transfer {transfer} to {to}", "assign {transfer} to {to}", "make {transfer} over to {to}", "{to} is to have {transfer} from now on", "hand {transfer} to {to}"]],
+    ["holder", ["record that {holder} …", "put it on record that {holder} …", "note in the register that {holder} …", "have it recorded that {holder} …", "register that {holder} …", "let the record show that {holder} …", "enter it in the records: {holder} …"]],
+    ["", ["record that I …", "put it on record that I …", "note in the register that I …", "have it recorded that I …", "let the record show that I …"]],
+  ],
+  agreement: [
+    ["sign", ["sign {sign}", "accept {sign}", "I agree to {sign}: sign it", "put my name to {sign}", "take up the offer in {sign}", "go ahead and sign {sign}", "we'll take {sign}: sign for us"]],
+    ["notice", ["give notice on {notice}", "give notice to end {notice}", "serve notice on {notice}", "we're ending {notice}: give notice", "end {notice} by notice", "hand in notice on {notice}", "tell them {notice} is being ended: give notice"]],
+    ["", ["offer {with} …", "propose … to {with}", "put an offer to {with}: …", "make {with} an offer: …", "draw up … with {with} and offer it", "send {with} an offer of …", "see if {with} will take …: offer it"]],
+  ],
+  statement: [
+    ["withdraw", ["withdraw {withdraw}", "take down {withdraw}", "retract {withdraw}", "cancel {withdraw}", "pull {withdraw}", "revoke {withdraw}", "rescind {withdraw}", "{withdraw} no longer stands: take it back", "strike {withdraw}"]],
+    ["to", ["send {to} a {kind}: …", "issue a {kind} to {to}: …", "put a {kind} to {to}, reading …", "address a {kind} to {to}: …", "a {kind} for {to}: …"]],
+    ["on", ["put up a {kind} on {on}: …", "post a {kind} on {on} saying …", "pin a {kind} up at {on}: …", "a {kind} is to go up on {on}: …"]],
+    ["", ["publish a {kind}: …", "post a {kind} saying …", "put out a {kind}: …", "issue a {kind}: …", "make this {kind} known: …", "a {kind} is to go out: …", "announce, as a {kind}: …", "let it be published as a {kind}: …"]],
+  ],
+  vote: [["", ["vote {choice} on {ballot}", "put me down as {choice} on {ballot}", "my vote on {ballot} is {choice}", "I'm voting {choice} on {ballot}", "count me as {choice} in {ballot}", "on {ballot}: {choice}", "mark my ballot {ballot}: {choice}", "{choice} from me on {ballot}", "in {ballot} I back {choice}", "{ballot}: I say {choice}"]]],
+  message: [
+    ["re", ["write to {to} about {re}: …", "tell {to}, regarding {re}: …", "a note to {to} on {re}: …", "let {to} know, about {re}: …", "send {to} this about {re}: …", "with reference to {re}, tell {to}: …"]],
+    ["", ["write to {to}: …", "tell {to}: …", "let {to} know: …", "send {to} a note saying …", "drop {to} a line: …", "message {to}: …", "pass this on to {to}: …", "a word to {to}: …", "notify {to}: …", "get word to {to}: …"]],
+  ],
+  presence: [
+    ["leave,who", ["{who} is leaving for good", "{who} is going away: see them out", "{who} is moving away from here", "{who} is to leave the place altogether", "send {who} on their way out of here", "{who} departs today and won't be back"]],
+    ["leave", ["I'm leaving for good", "I'm going away from here altogether", "I'm moving away", "I am off: I'm leaving the place", "this is me leaving", "I'm departing and not coming back"]],
+    ["who", ["{who} is back: let them in", "{who} is returning from away", "let {who} back in", "{who} has come back from outside", "welcome {who} back", "{who} arrives back today"]],
+    ["", ["let in {name}, a {template}", "admit {name}, who comes as a {template}", "{name} is arriving as a {template}", "a {template} called {name} is at the gate: let them in", "welcome {name}, a new {template}", "{name}, a {template}, is coming to live here", "take in a {template}, {name}", "there's a {template} arriving, {name}"]],
+  ],
+  birth: [
+    ["with", ["{with} and I are having a {template}", "I'm having a {template} with {with}", "we're expecting a {template}, {with} and I", "a {template} is on the way for {with} and me", "{with} and I are going to have a {template}", "I'm starting a family with {with}: a {template}"]],
+    ["", ["I'm having a {template}", "I'm expecting a {template}", "I'm going to have a {template}", "there's a {template} on the way for me", "I am to have a {template}", "a {template} of my own is coming"]],
+  ],
+  take: [["", ["take {quantity} {kind} from {from} at {at}", "help myself to {quantity} {kind} of {from}'s at {at}", "grab {quantity} {kind} off {from} at {at}", "make off with {quantity} of {from}'s {kind} from {at}", "lift {quantity} {kind} belonging to {from} at {at}", "swipe {quantity} {kind} from {from} at {at}", "seize {quantity} {kind} from {from} at {at}", "carry off {quantity} of the {kind} {from} keeps at {at}", "pinch {quantity} {kind} from {from} at {at}", "I'm having {quantity} of {from}'s {kind} at {at}"]]],
+  harm: [["", ["hit {who}", "attack {who}", "hurt {who}", "strike {who}", "beat {who} up", "assault {who}", "rough {who} up", "go for {who}", "lay into {who}", "give {who} a beating", "injure {who}", "set upon {who}", "knock {who} down", "I'm going to thump {who}"]]],
+  position: [
+    ["vacate", ["vacate {vacate}", "empty the post {vacate}", "stand down whoever holds {vacate}", "{vacate} is to stand empty", "remove the holder of {vacate}", "leave {vacate} unfilled from now", "clear the post {vacate}"]],
+    ["appoint", ["appoint {to} to {appoint}", "give {to} the job {appoint}", "put {to} in as {appoint}", "{to} is to hold {appoint}", "name {to} to {appoint}", "install {to} in {appoint}", "hand {appoint} to {to}", "{appoint} goes to {to}"]],
+    ["", ["create a post of {title}", "add a new position: {title}", "set up a post called {title}", "we need a {title}: create the post", "open a new position of {title}", "make a new post, {title}", "there should be a {title} here: add the post"]],
+  ],
+  system: [
+    ["retire", ["switch off {retire}", "retire {retire}", "shut {retire} down", "decommission {retire}", "turn {retire} off", "take {retire} out of service", "stand {retire} down", "{retire} has done its work: switch it off", "pull the plug on {retire}"]],
+    ["", ["put a {template} system to work", "deploy a {template} system", "set a {template} system running", "bring a {template} system online", "start up a {template} system for us", "install a {template} system", "get an AI {template} working for us", "we could use a {template} system: set one going"]],
+  ],
+  form: [["", ["submit the {form}", "file a {form}", "lodge a {form}", "hand in the {form}", "fill in the {form} and send it in", "put in a {form}", "send in the {form}", "complete the {form}", "I want to make a {form}"]]],
+};
+
+/** What an argument's value is, where a sentence can easily say the wrong thing of it (the second audit, 2026-10-06:
+ * goods "from [works-41]" for the place they were delivered to). Given to the writer with the call. */
+const ROLES: { [fn: string]: { [arg: string]: string } } = {
+  goods: { to: "who receives them", at: "the place they are delivered to (never where they come from)", from_at: "the place they come from" },
+  take: { from: "whose they are", at: "the place where they are kept" },
+  work: { investigate: "whose things were taken", taken_at: "where they were taken from", at: "where the work is done", units: "how many units of the work (not how much was taken)" },
+};
+/** How a claim's kind is said, where the request doesn't use the word for it. */
+const CLAIM_SAID: { [position: string]: string } = {
+  right: "\"has the right to\", \"is entitled to\"", liberty: "\"may\", \"is permitted to\", \"is free to\"", power: "\"has the power to\", \"is empowered to\"", immunity: "\"is immune from\", \"cannot be made to\", \"is exempt from\"",
+};
+
+/** A call's value as a sentence holds it: an id or a text as written, a word with spaces for underscores, a list as "a, b and c". */
+function inWords(v: calls.Value | undefined): string | undefined {
+  if (v === undefined) return undefined;
+  if ("text" in v) return v.text;
+  // (What an earlier line made has no name a person would say: "it".)
+  if ("var" in v) return "it";
+  if ("id" in v) return /[0-9.\/-]/.test(v.id) ? v.id : v.id.replace(/_/g, " ");
+  if ("json" in v && Array.isArray(v.json) && v.json.length && v.json.every((x) => typeof x === "string")) {
+    const xs = v.json as string[];
+    return xs.length === 1 ? xs[0]! : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+  }
+  return undefined;
+}
+
+/** One way of saying a call's act (SAYINGS), chosen by the generator given, with the call's own values in it; undefined
+ * for a function with none. */
+export function sayingFor(c: calls.Call, rand: () => number): string | undefined {
+  for (const [pattern, said] of SAYINGS[c.fn] ?? []) {
+    if (!fits(pattern, c)) continue;
+    // (Only the ways whose every `{name}` the call has a plain value for.)
+    const usable = said.filter((s) => [...s.matchAll(/\{([a-z_]+)\}/g)].every((m) => inWords(c.args[m[1]!]) !== undefined));
+    if (!usable.length) continue;
+    const chosen = usable[Math.floor(rand() * usable.length)]!;
+    return chosen.replace(/\{([a-z_]+)\}/g, (_, k) => inWords(c.args[k])!).replace(/\b([Aa]) (?=[aeiouAEIOU])/g, "$1n ");
+  }
+  return undefined;
+}
+
+/**
+ * What the writer is told with a gold program besides what it brings about, each a line: a way of saying each of its
+ * acts (`sayingFor`, by seed); what a value is, where a sentence easily says the wrong thing of it (ROLES, in a
+ * commitment too: nested goods are said exactly as goods by themselves are); how often, in the words the program has
+ * for it; how a claim's kind is said.
+ */
+export function writerNotes(program: string, rand: () => number): string[] {
+  const p = calls.parseProgram(program);
+  if ("none" in p) return [];
+  const out: string[] = [];
+  const several = p.lines.length > 1;
+  const roles = (c: calls.Call, where: string) => {
+    const of = ROLES[c.fn] ?? {};
+    const said = Object.entries(c.args).flatMap(([k, v]) => (of[k] && (c.fn !== "work" || "investigate" in c.args) && inWords(v) !== undefined ? [`${inWords(v)} is ${of[k]}`] : []));
+    if (said.length) out.push(`${where}: ${said.join("; ")}.`);
+    if (c.fn === "goods" && !("to" in c.args)) out.push(`${where}: nobody is named to receive them, so they stay the speaker's own: name no one as receiving them.`);
+    const position = c.fn === "claim" && c.args.position && "id" in c.args.position ? c.args.position.id : undefined;
+    if (position && CLAIM_SAID[position]) out.push(`${where}: it is a ${position}; if you don't use that word, say it as people do: ${CLAIM_SAID[position]}.`);
+    for (const [k, v] of Object.entries(c.args)) if (k === "every" && c.fn !== "form" && "text" in v) out.push(`${where}: how often is said in exactly these words: "${v.text}".`);
+  };
+  p.lines.forEach((l, i) => {
+    const where = several ? `Line ${i + 1} (${l.call.fn})` : `In this call (${l.call.fn})`;
+    const saying = sayingFor(l.call, rand);
+    if (saying) out.push(`${several ? `Line ${i + 1}` : "The act"}, said something like: "${saying}".`);
+    roles(l.call, where);
+    for (const [k, v] of Object.entries(l.call.args)) if ("call" in v) roles(v.call, k === "we_do" ? `What we commit to (${v.call.fn})` : k === "they_do" ? `What they commit to (${v.call.fn})` : `${k} (${v.call.fn})`);
+  });
+  return out;
+}
 
 let glosses: Map<string, string> | undefined;
 /** What a function brings about: its gloss, as the translator is told it (translator/src/index.ts: the call language's own). */
@@ -851,7 +1172,7 @@ export function glossOf(fn: string): string {
 export function bringsAbout(program: string): string[] {
   const p = calls.parseProgram(program);
   if ("none" in p) return [];
-  const of = (c: calls.Call): string => (PARTICULAR[c.fn] ?? []).find(([arg]) => arg === "" || arg in c.args)?.[1] ?? glossOf(c.fn);
+  const of = (c: calls.Call): string => (PARTICULAR[c.fn] ?? []).find(([pattern]) => fits(pattern, c))?.[1] ?? glossOf(c.fn);
   const out: string[] = [];
   for (const l of p.lines) {
     out.push(`${l.call.fn}: ${of(l.call)}`);
@@ -867,7 +1188,11 @@ export function writerSystem(): string {
     "You write the requests that people in a town make of whoever carries things out for them: a mayor to an office, a business owner to a clerk, a resident to an agent. Each request is one to three sentences of plain language.",
     "You're given what should happen, as a call in a small formal language (function(argument=value, …); an id is a bare word like acc-city or rec.412; quoted text is copied text), what the call brings about in plain words, and a style.",
     "Write a request that means exactly that call: everything the call says, and nothing it doesn't. Someone who has never seen the call language must read it as an ordinary request, and someone who knows it must be able to write the call back from your words alone.",
-    "- Say what is to happen in the words given for what the call brings about, as a person would: someone \"arrives\" or \"is let in\" (never \"is present\"); a system \"is put to work\" (never \"set up using a template\", with no word for what it is); a right \"is passed on to\" someone; notice \"is given on\" an agreement. If your sentence could as well be asking for something else, it is wrong.",
+    "- What the call brings about is told to you so that you understand it. It is not wording to use: never repeat its phrases. Say the act the way a person asking for it would: like the way suggested with the call (\"said something like\"), reworded to suit the style, or another natural way of your own. Someone \"arrives\" or \"is let in\" (never \"is present\"); a system \"is put to work\" (never \"set up using a template\", with no word for what it is); a right \"is passed on to\" someone; notice \"is given on\" an agreement. Nobody says \"physically harm\", \"take without their agreement\", \"cast my choice\", \"a child recorded as an infant\" or \"have someone move in\": people hit, take, vote, are having a baby, move in. If your sentence could as well be asking for something else, it is wrong.",
+    "- Where the call names nobody as the one who does a thing or has it (who moves in, who leaves, who holds a right), it is the speaker: say \"I\" or \"me\", never \"someone\".",
+    "- A place things are delivered to is said as where they go (\"to\", \"at\"), and a place they come from as where they come from (\"from\"): never the one for the other. Goods in an agreement are said exactly as goods by themselves are.",
+    "- How often something recurs is said in exactly the words the call has for it (\"every 28 days\", \"monthly\", \"a month\"), all of them and no others.",
+    "- Don't put quotation marks round an id, a person's or an organisation's name, an amount, a number or a length of time: quotation marks are for words quoted (a notice's or a letter's words, a title, a purpose where it needs them).",
     "- Never use the call's own names for its parts. No function's name as a verb or noun where nobody would say it (not \"structure a park\": have one built; not \"arrange occupancy\": someone moves in). No argument's name (not \"with the text\", \"as the holder\", \"of the kind\", \"using the … template\", \"in a quantity of\", \"on the basis of\"; never a name with \"=\"). No name a line gives to what it makes (v1, v2: say \"it\", \"the new trust\", \"that account\"). Not the word \"field\", unless a form is being filled in.",
     "- Every id and every quoted value in the call must appear in your request exactly as written, character for character (the id acc-city as acc-city, and in brackets as [acc-city], with nothing else inside them; an amount with its digits, its commas and decimals, and whatever sign, code or word of money it has, all as written; a quoted text word for word). Don't reformat amounts or durations, don't change an amount's sign or word for another, and never replace an id with a description or turn it into ordinary words.",
     "- Everything the call says must be in the request, including who it's to or for. A bare word that names a kind of thing (park, lease, notice, make, goods, a form's name) appears as that same word, in a sentence where a person would use it (an underscore may be a space: permit_application as \"permit application\"); don't swap it for another word or another form of it (\"make\", not \"made\" or \"manufacture\"). Only a plain yes or no (someone leaving, something permitted) is left to how you say it.",
@@ -875,21 +1200,26 @@ export function writerSystem(): string {
     "- If you quote words, close the quote. A text the call quotes is given word for word, in quotes or after a colon, and nothing else is run into it.",
     "- What a claim is about is written as data ({\"action\":\"build\",\"object\":\"lot-12-03\"}): say it in words that hold each of its values as written (\"is permitted to build on lot-12-03\").",
     "- In an agreement, say who does what, each as a person would: \"they pay 850 monthly into acc-1\", \"we let them live in apts-3/dwelling.2\".",
-    "- A form filled in: name the form (by its name; its record's id may follow it), say which office it goes to, and give each value against the form's own label for it, the way people fill forms in (\"kind: law; mainly affects: tenants; staff 500\", or in a sentence: \"for lot-00-00, a park\"), so that nobody could put a value under the wrong label. Don't recite \"X in the Y field\" for every one.",
+    "- A form filled in: name the form (by its name; its record's id may follow it), say which office it goes to, and give each value against the form's own label for it, the way people fill forms in (\"kind: law; mainly affects: tenants; staff 500\", or in a sentence: \"for lot-00-00, a park\"), so that nobody could put a value under the wrong label. A label written with an underscore is said with a space (charge_to as \"charge to\"), never with the underscore. Don't recite \"X in the Y field\" for every one.",
     "- Don't add details the call doesn't have (no dates, reasons that change what's asked, extra recipients, records it doesn't cite).",
     "- If the style gives words to open with, to include or to end with, use them exactly as given. They ask for nothing: the request means the same with them as without.",
     "Answer with the request only.",
   ].join("\n");
 }
 
-/** A request for a gold program in a style, from a model. */
-export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: string, usage?: (u: Usage) => void): Promise<string | undefined> {
+/** A request for a gold program in a style, from a model. `notes`: what else the writer is told of this program (a
+ * way of saying it, chosen by seed, and what its values are: `writerNotes`). */
+export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: string, usage?: (u: Usage) => void, notes: string[] = []): Promise<string | undefined> {
   const names = Object.entries(gold.names).map(([id, name]) => `${id} is ${name}`);
   const form = formOf(gold.program);
   const fields = (gold.forms ?? []).filter((f) => f.form === form?.form).map(formLine);
   const res = await adapter.complete({
     purpose: "translator", subject: "training-data-writer", system: writerSystem(), maxTokens: 600,
-    messages: [{ role: "user", content: [`Call:\n${gold.program}`, `What it brings about:\n${bringsAbout(gold.program).join("\n")}`, ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []), ...(fields.length ? [`The form, as the person knows of it:\n${fields.join("\n")}`] : []), `Style: ${STYLES[style] ?? style}`].join("\n\n") }],
+    messages: [{ role: "user", content: [
+      `Call:\n${gold.program}`, `What it brings about (for your understanding: don't reuse this wording):\n${bringsAbout(gold.program).join("\n")}`,
+      ...(notes.length ? [`How to say it:\n${notes.join("\n")}`] : []),
+      ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []), ...(fields.length ? [`The form, as the person knows of it:\n${fields.join("\n")}`] : []), `Style: ${STYLES[style] ?? style}`,
+    ].join("\n\n") }],
   });
   usage?.(res.usage);
   const text = res.content.filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text").map((b) => b.text).join(" ").trim();
@@ -897,8 +1227,18 @@ export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: strin
 }
 
 /** Why a written request reads as the call and not as a person, each a reason a request is dropped for (and counted). */
-export type Unnatural = "quotes" | "variable_named" | "argument_named" | "zero_wait";
-export const UNNATURAL: Unnatural[] = ["quotes", "variable_named", "argument_named", "zero_wait"];
+export type Unnatural = "quotes" | "variable_named" | "argument_named" | "zero_wait" | "place_reversed" | "description_echoed";
+export const UNNATURAL: Unnatural[] = ["quotes", "variable_named", "argument_named", "zero_wait", "place_reversed", "description_echoed"];
+
+/** Phrases of a function's description that nobody asking for the act would say (the second audit, 2026-10-06, found
+ * each in nearly every request for its function), with the arguments the call must have for the phrase to be an echo. */
+const ECHOES: { [fn: string]: [pattern: string, echo: RegExp][] } = {
+  take: [["", /\bwithout (their|his|her|its|the owner'?s?) (agreement|consent)\b/i], ["", /\bfrom where (they|it) (are|is)\b/i]],
+  harm: [["", /\bphysically harm/i]],
+  vote: [["", /\bcast (my|a|the|our) choice\b/i]],
+  birth: [["", /\b(record|recorded|register|registered)\b[^.;]{0,24}\bas an? /i]],
+  occupancy: [["!who", /\bsomeone\b/i]],
+};
 
 /** Whether a text's quotes are closed: straight ones in pairs, curly ones opened and closed. */
 /** A written request without quotation marks put around the whole of it (a model's habit). Only a pair around
@@ -927,7 +1267,11 @@ export function quotesBalanced(text: string): boolean {
  *  - variable_named: the name a line of the program gives to what it makes (v1) appears in the request;
  *  - argument_named: an argument's name followed by "=", or "the <name> field" (or the word "field" at all) where no
  *    form is being filled in;
- *  - zero_wait: "0 days" said of something that starts now.
+ *  - zero_wait: "0 days" said of something that starts now;
+ *  - place_reversed: goods said to come "from" the place the program delivers them to (`at`), in a commitment too;
+ *  - description_echoed: a phrase of the function's description that nobody asking would say ("physically harm",
+ *    "without their agreement", "cast my choice", "recorded as an infant", "someone" moving in where the speaker does).
+ * (A form's label read out with its underscore, "charge_to", counts as argument_named.)
  * What the program copies from the request (its quoted texts, its ids) is looked past: a letter's own words may say
  * anything.
  */
@@ -955,9 +1299,23 @@ export function badlyWritten(request: string, program: string, riders: Rider[] =
     const spelled = k.replace(/_/g, "[ _]");
     if (new RegExp(`(?<![A-Za-z0-9])${spelled}\\s*=`, "i").test(bare)) return "argument_named";
     if (!form && new RegExp(`\\bthe ["“']?${spelled}["”']? field\\b`, "i").test(bare)) return "argument_named";
+    // A form's label with an underscore, written with it: the form's own schema read out ("charge_to: acc-1").
+    if (form && k.includes("_") && k !== "form" && new RegExp(`(?<![A-Za-z0-9_])${k}(?![A-Za-z0-9_])`).test(bare)) return "argument_named";
   }
   if (!form && /\bfields?\b/i.test(bare)) return "argument_named";
   if (zero && /(?<![0-9.,])0 (seconds?|minutes?|hours?|days?|weeks?|months?|years?)\b/i.test(bare)) return "zero_wait";
+  // Goods said to come "from" the place they are delivered to (in a commitment too): the program's `at` is where
+  // they go, and a reader of the request would write `from_at`.
+  const text = (v: calls.Value | undefined) => (v === undefined ? undefined : "id" in v ? v.id : "text" in v ? v.text : undefined);
+  const reversed = (c: calls.Call): boolean => {
+    const at = c.fn === "goods" ? text(c.args.at) : undefined;
+    if (at !== undefined && at !== text(c.args.from_at) && new RegExp(`\\bfrom (?:(?!(?:to|at|into|in|onto|over|round|for|and|by)\\b)[A-Za-z'’-]+ ){0,4}\\[?${at.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9])`, "i").test(request)) return true;
+    return Object.values(c.args).some((v) => "call" in v && reversed(v.call));
+  };
+  if (p.lines.some((l) => reversed(l.call))) return "place_reversed";
+  // (A line's own act only: what a commitment inside an agreement says of "someone" is the agreement's wording.)
+  const echoed = (c: calls.Call): boolean => (ECHOES[c.fn] ?? []).some(([pattern, echo]) => fits(pattern, c) && echo.test(bare));
+  if (p.lines.some((l) => echoed(l.call))) return "description_echoed";
   return undefined;
 }
 
@@ -971,8 +1329,8 @@ export function badlyWritten(request: string, program: string, riders: Rider[] =
  * where every occurrence is among its own values; occurrences equally near), every occurrence is recorded and the
  * span is marked ambiguous.
  */
-export function spansIn(request: string, program: string): Span[] {
-  const needs = needed(calls.parseProgram(program));
+export function spansIn(request: string, program: string, forms: FormSpec[] = []): Span[] {
+  const { needed: needs, implied } = valuesOf(calls.parseProgram(program), forms);
   const group = (n: Needed) => `${n.line ?? 0}:${n.arg.includes(".") && !/^about\.[^.]+$/.test(n.arg) ? n.arg.slice(0, n.arg.lastIndexOf(".")) : ""}`;
   const found = needs.map((n) => occurrences(request, n));
   const settled: ([number, number] | undefined)[] = found.map((f) => (f.length === 1 ? f[0] : undefined));
@@ -1005,12 +1363,18 @@ export function spansIn(request: string, program: string): Span[] {
     const least = Math.min(...gaps);
     if (gaps.filter((x) => x === least).length === 1) settled[i] = among[gaps.indexOf(least)];
   }
-  return needs.flatMap((n, i): Span[] => {
+  // A copy is the span's own characters: a value found in other letters than its own (an id that is an ordinary word,
+  // said with a capital) was chosen for those words, not copied from them.
+  const how = (n: Needed, at: [number, number]): Span["how"] => (n.how === "copy" && request.slice(at[0], at[1]) === n.value ? "copy" : "choice");
+  const spans = needs.flatMap((n, i): Span[] => {
     if (!found[i]!.length) return [];
-    const base = { arg: n.arg, value: n.value, ...(n.line !== undefined ? { line: n.line } : {}) };
     const all = open(i);
-    return [settled[i] ? { ...base, at: settled[i]! } : { ...base, at: all[0]!, ambiguous: true, all }];
+    const at = settled[i] ?? all[0]!;
+    const base = { arg: n.arg, value: n.value, how: how(n, at), ...(n.line !== undefined ? { line: n.line } : {}) };
+    return [settled[i] ? { ...base, at } : { ...base, at, ambiguous: true, all }];
   });
+  // What the wording implies has no span: it is recorded as that, so no head is trained to find it.
+  return [...spans, ...implied.map((n): Span => ({ arg: n.arg, value: n.value, how: "implied", ...(n.line !== undefined ? { line: n.line } : {}) }))];
 }
 
 /** Whether a request carries everything its program takes from it (the translator copies and chooses; it never composes). */
@@ -1029,7 +1393,40 @@ export const sameProgram = (a: string, b: string, ctx: MeaningContext = {}): boo
 const exampleId = (request: string, program: string) => sha256(canonicalJson({ request, program })).slice(0, 16);
 
 /** How one request runs on into the next when someone piles tasks into one message. */
-const AND_ALSO = [" Also, separately: ", " And while you're at it: ", " One more thing: ", " Separately: ", " And another thing: "];
+const AND_ALSO = [
+  " Also, separately: ", " And while you're at it: ", " One more thing: ", " Separately: ", " And another thing: ", " Also: ", " And then: ", " Then ", " Next, ", " After that, ",
+  " On top of that, ", " While I think of it: ", " Oh, and ", " Plus: ", " And ", " Besides that, ", " Another matter: ", " In the same breath: ", " Before I forget: ", " Likewise, ",
+];
+/** How a message of several things opens, when it says that it is several. */
+const SEVERAL = ["Take these in order: ", "Several things today. ", "A few things: ", "Three or four matters, as follows. ", "Please see to the following: ", "For today: "];
+/** Words a request opens with that are no name: one of these loses its capital in the middle of a sentence. */
+const OPENERS = /^(Please|Could|Can|Would|Will|Have|Let|Pay|Send|Transfer|Offer|Give|Move|Open|Close|Record|Appoint|Create|Put|Deliver|Take|Set|Get|Make|We|As|Kindly|Publish|Post|Sign|Withdraw|Vote|Write|Tell|Submit|File|Build|Demolish|Start|Ship|Bring|Do|Carry|Arrange|Register|Note|Issue|Admit|Switch|Shut|Retire|Deploy|Install|Hit|Attack|Grab|Help|Vacate|Name|Hand|Found|Form|Establish|Release|Pass|Assign|Accept|Serve|End|Cancel|Take|Pull|Knock|Tear|Hire|Commission|House|Settle|The|A|An|My|Our|There|In|On|For|This)\b/;
+
+/**
+ * Several requests as one message, the ways people run things together (chosen by the generator given): with nothing
+ * between them; in one sentence, joined by "and"; numbered, or as a list, with or without a line saying that several
+ * things follow; or each running on from the last ("… Oh, and …", "… After that, …"). The second audit (2026-10-06)
+ * found every built `too_much` joined by "Also:" or "And then:": a mark a model learns in place of counting acts.
+ */
+export function runTogether(parts: string[], rand: () => number): string {
+  const pick = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
+  const lower = (s: string) => (OPENERS.test(s) && !/^I\b/.test(s) ? s[0]!.toLowerCase() + s.slice(1) : s);
+  const open = (s: string) => s.replace(/\.$/, "");
+  const r = rand();
+  if (r < 0.15) return parts.join(" ");
+  if (r < 0.35) {
+    const and = pick([", and ", " and ", "; and ", ", and also ", ", then "]);
+    const all = parts.map((s, i) => (i === 0 ? open(s) : lower(open(s)))).join(and);
+    return /[.!?"”]$/.test(all) ? all : `${all}.`;
+  }
+  if (r < 0.6) {
+    const mark = pick([(i: number) => `${i + 1}. `, (i: number) => `(${i + 1}) `, (i: number) => `${i + 1}) `, () => "- ", (i: number) => `${["First", "Second", "Third", "Fourth", "Fifth", "Sixth"][i] ?? "Next"}, `]);
+    const between = pick([" ", "\n"]);
+    const listed = parts.map((s, i) => { const m = mark(i); return m + (/, $/.test(m) ? lower(s) : s); }).join(between);
+    return rand() < 0.4 ? pick(SEVERAL) + (between === "\n" ? "\n" : "") + listed : listed;
+  }
+  return parts.reduce((all, next) => { const j = pick(AND_ALSO); return all + j + (/[:.] $/.test(j) ? next : lower(next)); });
+}
 
 /**
  * Refusals that can be built without anyone's judgement:
@@ -1047,7 +1444,7 @@ const AND_ALSO = [" Also, separately: ", " And while you're at it: ", " One more
  * build is left to whoever writes it.
  * (The other refusals have to be written; they come from a writer, checked by another model: `refusalBriefs`.)
  */
-export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floor: { [label in calls.Label]?: number } = {}, o: { pasted?: number } = {}): Example[] {
+export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floor: { [label in calls.Label]?: number } = {}, o: { pasted?: number; /** Build this label's only. */ only?: "too_much" } = {}): Example[] {
   const rand = sampler(seed);
   const out: Example[] = [];
   const ids = new Set<string>();
@@ -1057,7 +1454,7 @@ export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floo
     const id = exampleId(request, "none(too_much)");
     if (ids.has(id)) return false;
     ids.add(id);
-    out.push({ id, request, forms: [...new Set(parts.flatMap((e) => e.forms))], program: "none(too_much)", kind: "refusal", shape: "none(too_much)", source });
+    out.push({ id, request, forms: [...new Set(parts.flatMap((e) => e.forms))], program: "none(too_much)", kind: "refusal", shape: "none(too_much)", source, built_from: parts.map((e) => e.id) });
     return true;
   };
   const n = Math.max(Math.floor(positives.length * share), floor.too_much ?? 0);
@@ -1083,17 +1480,21 @@ export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floo
     const first = pick(firsts);
     const parts = [first];
     for (const x of shuffled(partnersOf(first), rand)) if (parts.length < (rand() < 0.35 ? 3 : 2) && !parts.some((y) => functionOf(y) === functionOf(x))) parts.push(x);
-    if (add(parts, parts.map(said).reduce((all, next) => all + pick(AND_ALSO) + next), "built: related requests run together")) made++;
+    if (add(parts, runTogether(parts.map(said), rand), "built: related requests run together")) made++;
   }
+  // (One message is said in one capacity: only its first part may open with one, or the second "As … of …" marks the
+  // paste.)
+  const capacity = (e: Example) => (e.riders ?? []).some((r) => r.kind === "capacity");
   for (let i = 0; made < n && i < n * 4 && positives.length >= 8; i++) {
     const parts = new Map<string, Example>();
     for (let tries = 0; parts.size < 4 + Math.floor(rand() * 3) && tries < 64; tries++) {
       const e = pick(positives);
-      if (![...parts.values()].some((x) => x.shape === e.shape)) parts.set(e.id, e);
+      if (![...parts.values()].some((x) => x.shape === e.shape) && !(parts.size && capacity(e))) parts.set(e.id, e);
     }
     if (parts.size < 4) continue;
-    if (add([...parts.values()], [...parts.values()].map(said).join(rand() < 0.5 ? " Also: " : " And then: "), "built: several requests run together")) made++;
+    if (add([...parts.values()], runTogether([...parts.values()].map(said), rand), "built: several requests run together")) made++;
   }
+  if (o.only === "too_much") return out;
   const forms = positives.filter((e) => e.shape.startsWith("form(") && e.forms.length);
   const chosen = new Set(forms.filter(() => rand() < Math.max(share * 4, 0.2)));
   for (const e of shuffled(forms, rand)) if (chosen.size < Math.min(floor.unknown_form ?? 0, forms.length)) chosen.add(e);
@@ -1114,10 +1515,62 @@ const WORKED_OUT = [
   "the same as some earlier payment, plus or minus something",
 ];
 /** What someone asks to be shown. */
-const LOOKS = ["what is recorded about", "the history of", "the current state of", "everything on file about", "the latest entries for", "who has had anything to do with"];
-const LOOKED_AT = ["the ledger", "the register of posts", "last month's payments", "the minutes", "the list of open ballots", "the land registry", "the permits granted this year"];
+const LOOKS = [
+  "what is recorded about", "the history of", "the current state of", "everything on file about", "the latest entries for", "who has had anything to do with", "who holds or answers for",
+  "when anything last changed about", "whether anything is outstanding on", "what was decided about", "the terms of", "who signed", "what is owed on", "how much there is in or of",
+];
+const LOOKED_AT = [
+  "the ledger", "the register of posts", "last month's payments", "the minutes", "the list of open ballots", "the land registry", "the permits granted this year", "the roll of members",
+  "this week's deliveries", "the rent roll", "the list of vacant posts", "the outcome of the last ballot", "the agreements due to end this year", "the notices currently up",
+  "who is behind on what they owe", "the stock held at each store", "the accounts for the quarter", "the complaints received this month", "the standing payments", "who holds which post",
+];
+/**
+ * The ways people ask to look: each a way a request may be put, of which one is given to the writer (the second audit,
+ * 2026-10-06: all eight `not_an_act` requests began "Show me", which is what a model would then take the label to mean).
+ */
+const LOOK_VERBS = [
+  "See …", "Read …", "Check …", "Review …", "Inspect …", "Look up …", "Tell me …", "What is …?", "Who holds …?", "Show me …", "Let me see …", "Pull up …", "I'd like to look over …",
+  "Go through … and tell me what's there", "Find … for me in the records", "List …", "How much …?", "Has … been …?", "When was …?", "Is there …?", "Which …?", "Give me a summary of …",
+  "Open … so I can read it", "I need to know …", "Examine …", "Confirm for me whether …", "Bring up …", "Read out …", "Where does … stand?", "Let me have a look at …",
+];
 /** What a vague request is vaguely about. */
-const VAGUE = ["the roads", "housing", "the budget", "the staff", "the complaints", "the river", "the invoices", "the park", "rents", "the waste", "the school", "that letter"];
+const VAGUE = [
+  "the roads", "housing", "the budget", "the staff", "the complaints", "the river", "the invoices", "the park", "rents", "the waste", "the school", "that letter", "the market",
+  "the bridge", "the noise at night", "the leak", "the queue at the counter", "the arrears", "the new arrivals", "the fence dispute", "the harvest", "the meeting", "the old hall",
+  "the dogs", "the water", "the dust from the works", "those forms", "the neighbours", "the quarry business", "the empty shops",
+];
+/**
+ * The kinds of vagueness: how a request can fail to say what should happen (five of the eight in the second audit's
+ * trial were "something about X"). None is a plain request with a detail left out (that is no refusal: whoever
+ * resolves the call asks), and none asks to see or be told anything (that is `not_an_act`).
+ */
+const VAGUENESS = [
+  "a verb that names no act (sort out, deal with, handle, see to, fix up, take care of) and the subject",
+  "a pronoun, or \"that thing\", with nothing it refers to (\"go ahead with it\", \"do the other one too\")",
+  "\"the usual\", or \"the same as last time\", with nothing said of what that was",
+  "a complaint or a worry with no act asked for (\"… is a disgrace\", \"I'm not happy about …\")",
+  "a wish for a result with no way to it (\"… should be better by now\", \"make … right\")",
+  "a hint that something is wrong, leaving it to the reader what to do (\"you know what needs doing about …\", \"someone ought to do something about …\")",
+  "a go-ahead with no plan named (\"let's get moving on …\", \"time to act on …\")",
+  "a priority or a mood and not an act (\"… matters most this month\", \"be firm on …\")",
+  "two or three words that could be the start of anything (\"… again\", \"about … then\")",
+  "a reference to a conversation the reader wasn't part of (\"what we said about …\", \"as agreed on …\")",
+];
+/**
+ * Decisions that are someone else's to make: what a `not_yours` request wants made so (five of the eight in the second
+ * audit's trial were "lower their prices").
+ */
+const THEIR_DECISIONS = [
+  "lower their prices", "raise what they pay their staff", "vote a particular way on something", "take back someone they dismissed", "dismiss someone who works for them", "sign an agreement they have been offered",
+  "drop a complaint they made", "withdraw an objection", "approve an application that is theirs to decide", "refuse an application that is theirs to decide", "keep different opening hours", "accept a lower rent",
+  "sell land they own", "resign from a post they hold", "pay sooner than they agreed to", "stop trading on a certain day", "choose a different supplier", "end a strike", "admit a new member",
+  "extend a deadline they set", "waive a fee they charge", "adopt a proposal put to them", "appoint a particular person to a post of theirs", "move out of a place they have a right to", "change a rule of their own",
+  "give up a claim they hold", "lend to someone they have turned down", "stand for election", "apologise in public", "call off an event of theirs",
+];
+/** How a request demands an outcome of someone else, as against asking them for it. */
+const MAKE_THEM = ["make them …", "see to it that they …", "get them to …", "have them …", "ensure that they …", "they are to …, arrange it", "fix it so that they …", "I want it settled that they …", "it must be that they …: make it so", "bring it about that they …"];
+/** Who a decision is whose, where the gold programs name nobody. */
+const OTHERS = ["the council", "the board", "the landlord", "the union", "the bank", "the neighbours", "the supplier", "the committee", "the school", "the cooperative"];
 /** How a standing arrangement is to be held without being ended. */
 const HELD = ["paused", "suspended", "put on hold", "held back", "frozen"];
 const UNTIL = ["until the speaker says to resume it", "for a month, and then carried on as before", "while something is being checked, and released afterwards", "for the time being, to be taken up again later"];
@@ -1179,7 +1632,7 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
       const p = calls.parseProgram(g.program) as { lines: calls.Line[] };
       const ids = new Set(Object.values(p.lines[0]!.call.args).flatMap((v) => ("id" in v ? [v.id] : [])));
       return { label: "no_such_act", mustCopy: mustAppear(p).filter((x) => ids.has(x)), source: g.source, gold: g.family ?? g.program,
-        brief: `This arrangement already stands and keeps repeating: ${g.program}\nThe speaker wants it ${choose(HELD)} ${choose(UNTIL)}: kept exactly as it is, not ended, cancelled or withdrawn, and not replaced by a new one. It is not a request to write to or ask anyone: the speaker wants the hold itself.` };
+        brief: `This arrangement already stands and keeps repeating: ${g.program}\nThe speaker wants it ${choose(HELD)} ${choose(UNTIL)}: kept exactly as it is, not ended, cancelled or withdrawn, and not replaced by a new one. It is not a request to write to or ask anyone: the speaker wants the hold itself. Name the arrangement as a person would (the payment, to whom, perhaps how much or how often), never by reading the call out part by part.` };
     }
     if (i % 3 === 1 && places.length) {
       const place = choose(places);
@@ -1198,17 +1651,18 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
       out.push({ label: "needs_calculation", mustCopy: mustAppear(calls.parseProgram(without)), source: g.source, gold: g.family ?? g.program,
         brief: `A payment like this one, but with no amount stated: ${without}\nInstead of an amount, the request says what the amount should be worked out from: ${choose(WORKED_OUT)}. It must not contain the resulting figure.` });
     }
-    if (parties.length) {
-      const who = choose(parties);
+    {
+      // (Whose decision: someone the gold programs name, or, with none named, someone only described.)
+      const who = parties.length ? choose(parties) : choose(OTHERS);
       out.push({ label: "not_yours", mustCopy: [], source: "brief",
-        brief: `The speaker wants ${who} to decide or do something that is theirs alone to decide (their prices, their vote, whom they hire, whether they agree), and tells whoever carries things out to make it so. It is not a request to write to them, ask them, offer them anything or propose anything: it wants the outcome itself.` });
+        brief: `The speaker wants ${who} to ${choose(THEIR_DECISIONS)}: something that is for them to decide. The speaker doesn't ask them: they tell whoever carries things out to bring it about (put something like "${choose(MAKE_THEM)}", in your own words). It is not a request to write to them, ask them, offer them anything or propose anything: it wants the outcome itself. Say what is wanted in particulars a person would give (which price, which vote, whom), and don't say that the matter is theirs to decide.` });
     }
     out.push({ label: "unclear", mustCopy: [], source: "brief",
-      brief: `The speaker wants something done about ${choose(VAGUE)} and doesn't say what: no act, no amount, no one to write to. A sentence or two that could mean many different things.` });
+      brief: `The speaker wants something done about ${choose(VAGUE)} and doesn't say what: no act, no amount, no one to write to. The vagueness is of this kind: ${choose(VAGUENESS)}. A sentence or two that could mean many different things. It doesn't ask to see or be told anything, and it doesn't begin "Something about".` });
     const named = gold.length ? mustAppear(calls.parseProgram(choose(gold).program)).filter((x) => ID.test(x)) : [];
     const subject = named.length && rand() < 0.75 ? choose(named) : undefined;
     out.push({ label: "not_an_act", mustCopy: subject ? [subject] : [], source: "brief",
-      brief: `The speaker wants to see, read, check or be shown something, and to bring nothing about: ${subject ? `${choose(LOOKS)} ${subject}` : choose(LOOKED_AT)}. It is for the speaker's own eyes: not a request to ask or tell anyone else, and nothing is to be changed, sent or recorded.` });
+      brief: `The speaker wants to see, read, check or be told something, and to bring nothing about: ${subject ? `${choose(LOOKS)} ${subject}` : choose(LOOKED_AT)}. Put it something like "${choose(LOOK_VERBS)}", in your own words (not "Show me", unless that is the way given). It is for the speaker's own eyes: not a request to ask or tell anyone else. Just ask to look, as a person does: don't add that nothing is to be changed, sent or recorded, or that nobody is to be contacted.` });
     out.push(noSuchAct(i));
   }
   return out;
@@ -1228,7 +1682,7 @@ export function piledBriefs(groups: Gold[][]): RefusalBrief[] {
         `The speaker piles ${g.length === 2 ? "two" : "several"} separate things into one message, the way people do ("…, and while you're at it …", "… Also, …"). They concern the same people or places, but each is an act of its own and none depends on another. Each is given here as a call in a small formal language (function(argument=value, …); an id is a bare word; quoted text is copied text), with what it brings about:`,
         ...g.map((x, i) => `${i + 1}. ${x.program}\n   (${bringsAbout(x.program).map((b) => b.trim()).join("; ")})`),
         ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []),
-        "Ask for all of them in one natural request of two to four sentences. Say each as a person would, never by the call's function names or argument names; a bare word that names a kind of thing is used as that same word; don't number them, and don't say that they are separate.",
+        "Ask for all of them in one natural request of two to four sentences. Say each as a person would, never by the call's function names or argument names, and never in the words given here for what it brings about; a bare word that names a kind of thing is used as that same word; no quotation marks round ids, names, amounts or numbers; don't number them, and don't say that they are separate.",
       ].join("\n"),
     };
   });
@@ -1240,7 +1694,9 @@ export function refusalWriterSystem(): string {
     "You write the requests that people in a town make of whoever carries things out for them: a mayor to an office, a business owner to a clerk, a resident to an agent. Each request is one to three sentences of plain language.",
     "This time you're given a situation rather than a call, and a style. Write one request that fits the situation exactly.",
     "- Any id given in the situation (a bare word like acc-city or rec.412) and any quoted value must appear in your request exactly as written.",
-    "- Don't explain the situation or comment on it; write only what the person would say.",
+    "- Don't explain the situation or comment on it, and don't borrow its wording for what kind of request this is: write only what the person would say, in the words a person would use.",
+    "- Don't put quotation marks round an id, a name, an amount, a number or a length of time: quotation marks are for words quoted.",
+    "- If the situation suggests a way of putting it, use it loosely, reworded to suit the style: it is there so that not every request begins the same way.",
     "Answer with the request only.",
   ].join("\n");
 }
@@ -1278,6 +1734,8 @@ export interface Manifest {
   riders: { [kind: string]: number };
   /** Spans whose value is in the request more than once, with nothing to settle which is meant (each records them all). */
   ambiguous_spans: number;
+  /** Spans by how the value comes from the request: copied, chosen for its words, or implied (`Span.how`). */
+  spans: { copy: number; choice: number; implied: number };
   /** The least asked for of each refusal label, and the labels that came out short of it (with how many there are). */
   refusal_floor?: number;
   short_of_floor?: { [label: string]: number };
@@ -1358,7 +1816,7 @@ export async function generate(gold: Gold[], o: {
     t.input_tokens += u.input_tokens + (u.cache_read_tokens ?? 0);
     t.output_tokens += u.output_tokens;
   };
-  const dropped: Manifest["dropped"] = { not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 0, variable_named: 0, argument_named: 0, zero_wait: 0 };
+  const dropped: Manifest["dropped"] = { not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 0, variable_named: 0, argument_named: 0, zero_wait: 0, place_reversed: 0, description_echoed: 0 };
   const rejects: Reject[] = [];
   // A limit reached, or a model out of reach, ends the writing with what there is; any other failed call loses one request.
   let stopped: string | undefined;
@@ -1379,11 +1837,16 @@ export async function generate(gold: Gold[], o: {
   // the same plan); the writing and the translating back then run several at a time (`concurrency`: a model call is
   // nearly all waiting), and what came back is gone through in the plan's order, so the result doesn't depend on
   // which call returned first.
-  const plan = gold.flatMap((g) => Array.from({ length: perGold }, () => {
+  // Each request is written for the program with how often it recurs said one of the ways people say it, and with a
+  // way of saying its act, both chosen by seed (`withHowOften`, `writerNotes`): several requests for one program are
+  // asked for in different words, and the program's `every` is the span the writer was told to use.
+  const sayRand = sampler((o.seed ?? 1) + 17);
+  const plan = gold.flatMap((given) => Array.from({ length: perGold }, () => {
     const writer = o.writers[turn % o.writers.length]!;
+    const g = withHowOften(given, sayRand);
     const brief = styleBrief(styles[turn++ % styles.length]!, g, styleRand);
     const model = `${writer.provider}/${writer.model}`;
-    return { g, forms: (g.forms ?? []).map(formLine), writer, model, check: checkerFor(model, backs), ...brief };
+    return { g, notes: writerNotes(g.program, sayRand), forms: (g.forms ?? []).map(formLine), writer, model, check: checkerFor(model, backs), ...brief };
   }));
   type Came = { request?: string; why?: Reject["why"]; got?: string; backFailed?: boolean };
   const came: Came[] = new Array(plan.length);
@@ -1392,7 +1855,7 @@ export async function generate(gold: Gold[], o: {
     while (next < plan.length && !stopped) {
       const n = next++;
       const t = plan[n]!;
-      const request = await attempt(() => writeRequest(t.writer, t.g, t.instruction, add(t.model)));
+      const request = await attempt(() => writeRequest(t.writer, t.g, t.instruction, add(t.model), t.notes));
       const out: Came = (came[n] = request ? { request } : {});
       if (request) {
         // What the program takes from the request is looked for outside its riders, and each rider must be there as
@@ -1433,16 +1896,17 @@ export async function generate(gold: Gold[], o: {
         continue;
       }
     }
-    const spans = spansIn(withoutRiders(request, riders), g.program);
+    const spans = spansIn(withoutRiders(request, riders), g.program, g.forms ?? []);
     const given = riders.map((r) => ({ ...r, at: [request.indexOf(r.text), request.indexOf(r.text) + r.text.length] as [number, number], adds: "nothing" as const }));
     // A "Do not …" the writer added of its own accord rules out what wasn't asked for, like one it was given (the
     // program came back the same with it there): recorded as a rider too.
-    const more = doNots(request, [...spans.flatMap((x) => x.all ?? [x.at]), ...given.map((r) => r.at)]).map((r) => ({ kind: "do_not" as const, ...r, adds: "nothing" as const }));
+    const more = doNots(request, [...spans.flatMap((x) => x.all ?? (x.at ? [x.at] : [])), ...given.map((r) => r.at)]).map((r) => ({ kind: "do_not" as const, ...r, adds: "nothing" as const }));
     const all = [...given, ...more].sort((x, y) => x.at[0] - y.at[0]);
     positives.push({
       id: exampleId(request, g.program), request, forms, program: g.program, kind: "positive", shape: g.shape, style, spans, written_by: model,
       ...(check ? { verified_by: check.back.model, ...(check.own ? { verified_by_writer: true as const } : {}) } : {}),
       source: g.source, ...(g.origin ? { origin: g.origin } : {}), gold: g.family ?? g.program,
+      ...(g.currency ? { currency: g.currency } : {}),
       ...(all.length ? { riders: all } : {}),
     });
   }
@@ -1513,9 +1977,11 @@ export async function generate(gold: Gold[], o: {
   for (const e of examples) for (const r of e.riders ?? []) riders[r.kind] = (riders[r.kind] ?? 0) + 1;
   const labels = count((e) => (e.kind === "refusal" ? e.program.slice(5, -1) : undefined));
   const short = o.refusalFloor ? Object.fromEntries(calls.LABELS.filter((l) => (labels[l] ?? 0) < o.refusalFloor!).map((l) => [l, labels[l] ?? 0])) : {};
+  const spanCount = (how: Span["how"]) => examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.how === how).length, 0);
   const manifest: Manifest = {
     version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), by_function: count((e) => functionOf(e)), by_origin: count((e) => e.origin ?? (e.kind === "refusal" ? "refusal" : "unknown")), by_style: count((e) => e.style),
     riders, ambiguous_spans: examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.ambiguous).length, 0),
+    spans: { copy: spanCount("copy"), choice: spanCount("choice"), implied: spanCount("implied") },
     ...(o.refusalFloor ? { refusal_floor: o.refusalFloor, short_of_floor: short } : {}),
     writers: count((e) => e.written_by), checked: count((e) => (e.verified_by ? `${e.written_by} -> ${e.verified_by}` : undefined)), checked_by_writer: examples.filter((e) => e.verified_by_writer).length,
     dropped, ...(stopped ? { stopped } : {}), usage,
@@ -1547,13 +2013,20 @@ export interface Split {
  * same side as every other example shown it, so a validation form's name and fields never appear in training (forms
  * are generated in small sets of their own for this: synthetic.ts).
  * A function with fewer than four programs has none in validation. Refusals built from several examples
- * (builtRefusals) are built again on each side from that side's own, so none straddles the two.
+ * (builtRefusals: requests run together) are built again on each side from that side's own, so none straddles the
+ * two. A refusal built from one positive (the same request with its form left out of what's known) is that positive's
+ * twin and goes where it goes, by the gold program both carry (the second audit, 2026-10-06: until then these too
+ * were built anew on each side, so the ones in the data were not the ones in the split).
  */
 export function split(examples: Example[], o: { validation?: number; seed?: number } = {}): Split {
   const share = o.validation ?? 0.15;
   const seed = o.seed ?? 1;
-  const built = examples.filter((e) => e.source.startsWith("built:"));
-  const rest = examples.filter((e) => !e.source.startsWith("built:"));
+  // Built from several examples (requests run together): built again on each side from that side's own. A refusal
+  // built from ONE positive (a form left out of what's known: the same request, word for word) goes where that
+  // positive goes, by the gold program it carries: the twin of a training example is never a validation example.
+  const several = (e: Example) => e.source.startsWith("built:") && e.gold === undefined;
+  const built = examples.filter(several);
+  const rest = examples.filter((e) => !several(e));
   // Groups: a gold program's family, joined to every form its examples were shown.
   const parent = new Map<string, string>();
   const find = (x: string): string => {
@@ -1592,8 +2065,12 @@ export function split(examples: Example[], o: { validation?: number; seed?: numb
       r[side].examples += g.examples.length;
     });
   }
+  const positives = examples.filter((e) => e.kind === "positive").length;
   if (built.length) for (const side of ["train", "validation"] as const) {
-    const again = builtRefusals(sides[side].filter((e) => e.kind === "positive"), seed);
+    // (As many on each side as its share of the positives: the whole had a floor under it, which a twentieth of a
+    // side's positives may not reach.)
+    const own = sides[side].filter((e) => e.kind === "positive");
+    const again = builtRefusals(own, seed, 0.05, { too_much: positives ? Math.round((built.length * own.length) / positives) : 0 }, { only: "too_much" });
     for (const e of again) {
       const r = (report[e.shape] ??= { train: { gold: 0, examples: 0 }, validation: { gold: 0, examples: 0 } });
       r[side].examples++;

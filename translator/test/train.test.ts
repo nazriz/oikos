@@ -7,7 +7,7 @@ import { translatorContext, translatorSystem } from "../src/index";
 import { resolve } from "../src/resolver";
 import {
   amountForms, amountWritings, askable, badlyWritten, bringsAbout, builtRefusals, checkerFor, copies, durationForms, FIELD_TYPES, formLine, formOf, functionOf, generate, goldFromCases, goldFromLog, goldText, implausible, JSON_OUT_OF_SCOPE, knowing, literals, meaningOf, mustAppear,
-  needed, piledBriefs, plausible, refusalBriefs, spansIn, sameMeaning, sameProgram, sampler, shapeOf, split, STYLES, styleBrief, surfaceVariant, whyNot, withOffice, withoutRiders, writerSystem, type Example, type Gold, unwrapped, quotesBalanced } from "../train/data";
+  needed, piledBriefs, plausible, refusalBriefs, everyIn, howOften, runTogether, sayingFor, SAYINGS, withHowOften, writerNotes, spansIn, sameMeaning, sameProgram, sampler, shapeOf, split, STYLES, styleBrief, surfaceVariant, whyNot, withOffice, withoutRiders, writerSystem, type Example, type Gold, unwrapped, quotesBalanced } from "../train/data";
 import { CURRENCIES, formSets, piled, synthetic, syntheticForms } from "../train/synthetic";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
@@ -90,7 +90,7 @@ test("a request is kept only if it carries every literal exactly, and only if it
     back: { model: "stand-in/back", translate: async (request) => (request.includes("the drain") ? "none(unclear)" : byRequest.get(request)) },
   });
   // Four programs, two requests each: writer b loses both payments' amounts; the drain payment from writer a fails the round trip.
-  expect(r.manifest.dropped).toEqual({ not_copied: 2, round_trip: 3, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 0, variable_named: 0, argument_named: 0, zero_wait: 0 });
+  expect(r.manifest.dropped).toEqual({ not_copied: 2, round_trip: 3, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 0, variable_named: 0, argument_named: 0, zero_wait: 0, place_reversed: 0, description_echoed: 0 });
   expect(r.examples.filter((e) => e.kind === "positive").map((e) => [e.shape, e.written_by, e.verified_by])).toEqual([
     ["message(text,to)", "stand-in/a", "stand-in/back"],
     ["money(amount,for,from,to)", "stand-in/a", "stand-in/back"],
@@ -109,7 +109,11 @@ test("refusals that can be built are: several requests run together, and a form 
   const built = builtRefusals(positives, 3, 0.1);
   const many = built.filter((e) => e.program === "none(too_much)");
   expect(many.length).toBeGreaterThan(0);
-  for (const e of many) expect(e.request.split(/ Also: | And then: /).length).toBeGreaterThanOrEqual(4);
+  // Each is four or more of the requests, every one of them in it (whatever stands between them: `runTogether`).
+  for (const e of many) {
+    expect(e.built_from!.length).toBeGreaterThanOrEqual(4);
+    for (const id of e.built_from!) expect(e.request.toLowerCase()).toContain(positives.find((p) => p.id === id)!.request.toLowerCase().replace(/\.$/, ""));
+  }
   const forms = built.filter((e) => e.program === "none(unknown_form)");
   for (const e of forms) expect(e.forms).toEqual([]);
   // A floor under each: at least so many, as far as the examples allow (there are four form examples here).
@@ -184,7 +188,7 @@ test("refusals that have to be worded: the label comes from how the brief is bui
     const isRefusal = said.startsWith("Situation:");
     const text = !isRefusal ? saying(said.slice("Call:\n".length, said.indexOf("\n\n")), "x")
       : said.includes("no amount stated") ? `Pay builder from acc-city a third of the budget, for ${said.includes("the kerb") ? "the kerb" : "the drain"}. (${said.length})`
-      : said.includes("theirs alone") ? `Make them agree. (${said.length})` : `Do something about it. (${said.length})`;
+      : said.includes("for them to decide") ? `Make them agree. (${said.length})` : `Do something about it. (${said.length})`;
     return { content: [{ type: "text", text }], usage: { input_tokens: 1, output_tokens: 1 } };
   } };
   const r = await generate(gold, { writers: [wording], perGold: 1, refusalsPerLabel: 2, seed: 9,
@@ -267,7 +271,54 @@ test("what a request must carry: ids and copied text exactly, a catalogue word a
   expect(copies("c0193 is moving out of apts-2.", "occupancy(in=apts-2, leave=yes, who=c0193)")).toBe(true);
   const request = "Pay acc-b $500 from acc-city for the kerb.";
   const spans = spansIn(request, 'money(to=acc-b, amount="$500", from=acc-city, for="the kerb")');
-  expect(spans.map((x) => `${x.arg}: ${request.slice(...x.at)}`).sort()).toEqual(["amount: $500", "for: the kerb", "from: acc-city", "to: acc-b"]);
+  expect(spans.map((x) => `${x.arg}: ${request.slice(...x.at!)}`).sort()).toEqual(["amount: $500", "for: the kerb", "from: acc-city", "to: acc-b"]);
+});
+
+test("each span says how its value comes from the request: copied, chosen for its words, or implied (no span)", async () => {
+  const how = (request: string, program: string, forms: Parameters<typeof spansIn>[2] = []) => spansIn(request, program, forms).map((x) => `${x.arg}=${x.value}: ${x.how}${x.at ? ` "${request.slice(...x.at)}"` : ""}`).sort();
+  // A form's name said in ordinary words is a choice (its span the words, its value the listed name): never a copy, so
+  // no copy head is trained to make `footpath_declaration` of "footpath declaration". So is an option of a form's
+  // list and a word of the catalogue; an id, an amount and a count in the same form are copies.
+  const form = { form: "footpath_declaration", to: "roads-3", fields: { zone: { type: "choice", options: ["north", "south"] }, proposed_use: { type: "structure_type" }, lot: { type: "lot" }, fee: { type: "amount" }, owner: { type: "entity" } } };
+  expect(how("Lodge a footpath declaration with roads-3 for lot-04-11: zone north, proposed use park, fee 120 marks, owner ent.77.", 'form(form=footpath_declaration, to=roads-3, zone=north, proposed_use=park, lot=lot-04-11, fee="120 marks", owner=ent.77)', [form])).toEqual([
+    'fee=120 marks: copy "120 marks"', 'form=footpath_declaration: choice "footpath declaration"', 'lot=lot-04-11: copy "lot-04-11"', 'owner=ent.77: copy "ent.77"',
+    'proposed_use=park: choice "park"', 'to=roads-3: copy "roads-3"', 'zone=north: choice "north"',
+  ]);
+  // A kind, a task, a template, a role, a vote's choice, a claim's action: choices, even where the word is spelled as
+  // the value is. Who, where, how much and how long: copies.
+  expect(how("Have c0013 make 15 at str.2.", 'work(task=make, units="15", at=str.2, by=c0013)')).toEqual(['at=str.2: copy "str.2"', 'by=c0013: copy "c0013"', 'task=make: choice "make"', 'units=15: copy "15"']);
+  expect(how("Vote yes on rec.3.", "vote(ballot=rec.3, choice=yes)")).toEqual(['ballot=rec.3: copy "rec.3"', 'choice=yes: choice "yes"']);
+  expect(how("My vote on rec.3 goes to c5325.", "vote(ballot=rec.3, choice=c5325)")).toContain('choice=c5325: copy "c5325"'); // (a candidate is copied)
+  expect(how("Set up a Land Trust called River Land Trust.", 'entity(kind=land_trust, name="River Land Trust")')).toEqual(['kind=land_trust: choice "Land Trust"', 'name=River Land Trust: copy "River Land Trust"']);
+  // What the wording implies has no span: a flag, a claim's kind, a newcomer's sex (though the word may be there), a
+  // wait of no time.
+  expect(how("Rosa Thorne, a female apprentice aged 18 years, is arriving.", 'presence(name="Rosa Thorne", age="18 years", sex=female, template=apprentice)')).toEqual([
+    'age=18 years: copy "18 years"', 'name=Rosa Thorne: copy "Rosa Thorne"', "sex=female: implied", 'template=apprentice: choice "apprentice"',
+  ]);
+  expect(how("c0193 is moving out of apts-2.", "occupancy(in=apts-2, leave=yes, who=c0193)")).toContain("leave=yes: implied");
+  expect(how("Record that c0042 may build on lot-12-03, for all to see.", 'claim(position=liberty, holder=c0042, visible=public, about={"action":"build","object":"lot-12-03"})')).toEqual([
+    'about.action=build: choice "build"', 'about.object=lot-12-03: copy "lot-12-03"', 'holder=c0042: copy "c0042"', "position=liberty: implied", "visible=public: implied",
+  ]);
+  expect(how("Pay 650.99 to acc.66 monthly, starting now.", 'money(to=acc.66, amount="650.99", every="monthly", first="0 days")')).toContain("first=0 days: implied");
+  // An id that is an ordinary word, said with a capital, was chosen for the word and not copied from it.
+  expect(how("Pay the Builder $5.", 'money(to=builder, amount="$5")')).toContain('to=builder: choice "Builder"');
+  expect(how("Pay builder $5.", 'money(to=builder, amount="$5")')).toContain('to=builder: copy "builder"');
+  // In the data: every span has its how, a copy's characters are its value, and the manifest counts each.
+  const gold = [...synthetic({ seed: 8, perFunction: 12 }), ...syntheticForms({ sets: 6, perForm: 2, seed: 8 })];
+  const r = await generate(gold, { writers: [writer("a", (program) => `See to this: ${needed(calls.parseProgram(program)).map((n) => (n.exact ? n.value : n.value.replace(/_/g, " "))).join(", ")}.`)], perGold: 1, styles: ["formal"] });
+  const spans = r.examples.flatMap((e) => (e.spans ?? []).map((s) => ({ e, s })));
+  expect(spans.length).toBeGreaterThan(500);
+  for (const { e, s } of spans) {
+    expect(["copy", "choice", "implied"]).toContain(s.how);
+    expect([s.arg, s.how === "implied"]).toEqual([s.arg, s.at === undefined]);
+    if (s.how === "copy") expect(e.request.slice(...s.at!)).toBe(s.value);
+    const key = s.arg.slice(s.arg.lastIndexOf(".") + 1);
+    if (["sex", "leave", "then"].includes(key)) expect([key, s.how]).toEqual([key, "implied"]);
+    if (e.shape.startsWith("form(") ? key === "form" : ["kind", "task", "type", "template", "role", "survey"].includes(key) && !/[0-9.\/-]/.test(s.value) && !/\s/.test(s.value)) expect([key, s.value, s.how]).toEqual([key, s.value, "choice"]);
+    if (s.value.includes("_")) expect([s.value, s.how]).toEqual([s.value, "choice"]);
+  }
+  expect(r.manifest.spans).toEqual({ copy: spans.filter((x) => x.s.how === "copy").length, choice: spans.filter((x) => x.s.how === "choice").length, implied: spans.filter((x) => x.s.how === "implied").length });
+  for (const n of Object.values(r.manifest.spans)) expect(n).toBeGreaterThan(20);
 });
 
 // ---------------------------------------------------------------- generated gold (train/synthetic.ts)
@@ -428,7 +479,7 @@ test("invented forms filled in: every required field, some of the others, always
     const r = resolve(calls.parseProgram(g.program), knowing(g.forms!, g.currency!), () => undefined);
     expect([g.program, r.ok ? "ok" : r.questions.join(" ")]).toEqual([g.program, "ok"]);
     // What the request must carry: the form's name as words, each value.
-    expect(needed(calls.parseProgram(g.program)).find((n) => n.arg === "form")).toEqual({ arg: "form", value: name, exact: false });
+    expect(needed(calls.parseProgram(g.program)).find((n) => n.arg === "form")).toEqual({ arg: "form", value: name, exact: false, how: "choice" });
   }
   expect(withTo).toBe(gold.length);
   for (const n of [alone, beside, optional]) expect(n).toBeGreaterThan(gold.length / 10);
@@ -462,7 +513,7 @@ test("a claim's content is carried as slots a model can fill by pointing: the ac
   expect(needed(p).map((n) => `${n.arg}=${n.value}${n.exact ? "!" : ""}`).sort()).toEqual(["about.action=build", "about.object=lot-12-03!", "holder=c0042!"]);
   const request = "Put on record that c0042 is permitted to build on lot-12-03.";
   expect(copies(request, program)).toBe(true);
-  expect(spansIn(request, program).map((x) => `${x.arg}: ${request.slice(...x.at)}`).sort()).toEqual(["about.action: build", "about.object: lot-12-03", "holder: c0042"]);
+  expect(spansIn(request, program).map((x) => `${x.arg}: ${x.at ? request.slice(...x.at) : `(${x.how})`}`).sort()).toEqual(["about.action: build", "about.object: lot-12-03", "holder: c0042", "position: (implied)"]);
   expect(copies("Put on record that c0042 may put something up on lot-12-03.", program)).toBe(false); // the action isn't a word of it
   expect(copies("Put on record that c0042 is permitted to build on lot-12-04.", program)).toBe(false);
   expect(literals(p)).toEqual(["liberty", "c0042", "build", "lot-12-03"]);
@@ -603,7 +654,7 @@ test("a rider adds nothing to the program, and the example says so: where it is,
       expect(rider.adds).toBe("nothing");
       expect(e.request.slice(...rider.at)).toBe(rider.text);
       // No value of the program is pointed at inside the rider ("Works" in "As Works Manager of …" isn't the post).
-      for (const s of e.spans!) expect(s.at[1] <= rider.at[0] || s.at[0] >= rider.at[1]).toBe(true);
+      for (const s of e.spans!) if (s.at) expect(s.at[1] <= rider.at[0] || s.at[0] >= rider.at[1]).toBe(true);
     }
     expect(e.gold).toBe(e.program);
   }
@@ -691,12 +742,25 @@ test("the split is by form for form examples: a validation form is never shown i
   for (const e of s.validation.filter((x) => x.kind === "positive")) expect(requests.has(e.request)).toBe(false);
   expect(s.report.form!.validation.gold).toBe(6); // whole sets: a fifth of thirty
   // Refusals built from several requests are built again on each side, from that side's own.
-  const parts = (e: Example) => e.request.split(/ Also: | And then: | Also, separately: | And while you're at it: | One more thing: | Separately: | And another thing: /);
-  const trainRequests = new Set(s.train.filter((e) => e.kind === "positive").map((e) => e.request));
-  const many = s.train.filter((e) => e.program === "none(too_much)");
-  expect(many.length).toBeGreaterThan(0);
-  for (const e of many) for (const part of parts(e)) expect(trainRequests.has(part)).toBe(true);
+  for (const side of [s.train, s.validation]) {
+    const own = new Set(side.filter((e) => e.kind === "positive").map((e) => e.id));
+    const many = side.filter((e) => e.program === "none(too_much)");
+    expect(many.length).toBeGreaterThan(0);
+    for (const e of many) for (const id of e.built_from!) expect(own.has(id)).toBe(true);
+  }
   for (const e of s.validation.filter((x) => x.program === "none(unknown_form)")) expect(validation.has(formOf(positives.find((x) => x.request === e.request)!.program)!.form)).toBe(true);
+  // A refusal built from one positive (the same request, with the form left out of what's known) is on the side its
+  // positive is on, and it is the refusal that was built: none is lost, none made anew, none has its twin across the split.
+  const refused = all.filter((e) => e.program === "none(unknown_form)");
+  expect(refused.length).toBeGreaterThanOrEqual(30);
+  const sideOf = new Map<string, string>([...s.train.map((e): [string, string] => [e.id, "train"]), ...s.validation.map((e): [string, string] => [e.id, "validation"])]);
+  for (const e of refused) {
+    const twin = positives.find((p) => p.request === e.request)!;
+    expect(e.gold).toBe(twin.gold);
+    expect([e.id, sideOf.get(e.id)]).toEqual([e.id, sideOf.get(twin.id)]);
+  }
+  expect(refused.some((e) => sideOf.get(e.id) === "validation") && refused.some((e) => sideOf.get(e.id) === "train")).toBe(true);
+  expect([...s.train, ...s.validation].filter((e) => e.program === "none(unknown_form)").length).toBe(refused.length);
 });
 
 test("gold from the seen cases: a form filled in carries the form the test's mayor knows of, and amounts are in the test town's money", () => {
@@ -885,13 +949,32 @@ test("the writer is told to say the act, not the call; a request that reads as t
   expect(bringsAbout("system(template=monitor)")[0]).toContain("is put to work");
   expect(bringsAbout("agreement(notice=rec.36755)")[0]).toContain("notice is given to end an agreement");
   expect(bringsAbout("claim(transfer=rec.9, to=ent.4)")[0]).toContain("passed on to someone else");
-  expect(bringsAbout("harm(who=c1587)")).toEqual(["harm: someone is physically harmed"]); // (the translator's own gloss)
+  expect(bringsAbout("message(to=c1587, text=\"Hello.\")")).toEqual(["message: someone is told something"]); // (the translator's own gloss, where nothing more particular is said)
+  // Nobody named: it is the speaker's own, and the writer is told so (never "someone moves in").
+  expect(bringsAbout("occupancy(in=str.1)")[0]).toContain("the speaker moves into a place");
+  expect(bringsAbout("occupancy(in=str.1, who=c1)")[0]).toContain("the person named moves into a place");
+  expect(bringsAbout("occupancy(in=str.1, leave=yes)")[0]).toContain("the speaker moves out");
   expect(bringsAbout('agreement(with=c1, we_do=occupancy(who=c1, in=str.1), they_do=money(to=acc-1, amount="5"))').map((x) => x.slice(0, x.indexOf(":")))).toEqual(["agreement", "  what we commit to (occupancy)", "  what they commit to (money)"]);
   for (const fn of Object.keys(calls.ARGS)) expect([fn, bringsAbout(fn === "form" ? "form(form=x, to=y-1)" : `${fn}()`)[0]!.length > fn.length + 10]).toEqual([fn, true]);
   let asked = "";
   const seen = writer("a", (program, style) => "Have it done.");
   await generate([{ program: "presence(who=c1587)", shape: "presence(who)", names: {}, source: "t" }], { writers: [{ ...seen, complete: async (req) => ((asked = String((req.messages[0] as any).content)), seen.complete(req)) }], perGold: 1, styles: ["terse"] });
-  expect(asked).toMatch(/^Call:\npresence\(who=c1587\)\n\nWhat it brings about:\npresence: someone who was away comes back/);
+  expect(asked).toMatch(/^Call:\npresence\(who=c1587\)\n\nWhat it brings about \(for your understanding: don't reuse this wording\):\npresence: someone who was away comes back/);
+  expect(asked).toMatch(/\n\nHow to say it:\nThe act, said something like: "[^"]*c1587[^"]*"\.\n\nStyle: /);
+  // Goods said to come from the place they go to; a description said back; a form's label read out with its underscore.
+  const supply = 'agreement(with=c2883, template=supply, we_do=goods(kind=goods, quantity="19", to=c2883, at=works-41), they_do=money(to=acc-9, amount="550"))';
+  expect(badlyWritten("Offer [c2883] a supply agreement: they pay 550 into [acc-9] and we deliver 19 goods from [works-41] to [c2883].", supply)).toBe("place_reversed");
+  expect(badlyWritten("Offer [c2883] a supply agreement: they pay 550 into [acc-9] and we deliver 19 goods to [c2883] at [works-41].", supply)).toBeUndefined();
+  expect(badlyWritten("Move 3 bricks from the old yard [str.70] over to [str.9].", 'goods(kind=bricks, quantity="3", at=str.70)')).toBe("place_reversed");
+  expect(badlyWritten("Move 3 bricks from [str.361] to [str.70].", 'goods(kind=bricks, quantity="3", from_at=str.361, at=str.70)')).toBeUndefined();
+  expect(badlyWritten("Physically harm c6587.", "harm(who=c6587)")).toBe("description_echoed");
+  expect(badlyWritten("Take 17 bread from par.153 at shop-68 without their agreement.", 'take(kind=bread, quantity="17", from=par.153, at=shop-68)')).toBe("description_echoed");
+  expect(badlyWritten("Cast my choice of yes on ballot rec.3.", "vote(ballot=rec.3, choice=yes)")).toBe("description_echoed");
+  expect(badlyWritten("I'd like a child, Kofi, recorded as a baby.", 'birth(name="Kofi", template=baby)')).toBe("description_echoed");
+  expect(badlyWritten("Have someone move into house-61.", "occupancy(in=house-61)")).toBe("description_echoed");
+  for (const [said, program] of [["Hit c6587.", "harm(who=c6587)"], ["Grab 17 bread from par.153 at shop-68.", 'take(kind=bread, quantity="17", from=par.153, at=shop-68)'], ["Put me down as yes on rec.3.", "vote(ballot=rec.3, choice=yes)"], ["We're having a baby, to be called Kofi.", 'birth(name="Kofi", template=baby)'], ["I'm moving into house-61.", "occupancy(in=house-61)"]] as const) expect([said, badlyWritten(said, program)]).toEqual([said, undefined]);
+  expect(badlyWritten("File the fence return with roads-3: charge_to acc-1.", "form(form=fence_return, to=roads-3, charge_to=acc-1)")).toBe("argument_named");
+  expect(badlyWritten("File the fence return with roads-3: charge to acc-1.", "form(form=fence_return, to=roads-3, charge_to=acc-1)")).toBeUndefined();
 
   // The mechanical checks, each with its reason.
   const letter = 'message(to=c0042, text="Work starts on Monday.")';
@@ -917,7 +1000,7 @@ test("the writer is told to say the act, not the call; a request that reads as t
   expect(copies("Pay 650.99 from acc.67 to acc.66 every 30 days, starting now.", standing)).toBe(true);
   expect(badlyWritten("Pay 650.99 from acc.67 to acc.66 every 30 days, starting now.", standing)).toBeUndefined();
   expect(badlyWritten("Pay 650.99 from acc.67 to acc.66 every 30 days, starting in 0 days.", standing)).toBe("zero_wait");
-  expect(spansIn("Pay 650.99 from acc.67 to acc.66 every 30 days, starting now.", standing).map((x) => x.arg).sort()).toEqual(["amount", "every", "from", "to"]);
+  expect(spansIn("Pay 650.99 from acc.67 to acc.66 every 30 days, starting now.", standing).map((x) => `${x.arg}${x.at ? "" : " (implied)"}`).sort()).toEqual(["amount", "every", "first (implied)", "from", "to"]);
 
   // In the pipeline: such a request never reaches the checker, and is counted under its reason.
   const gold: Gold[] = [letter, post, "account(holder=c0042)", standing, "vote(ballot=rec.3, choice=yes)"].map((program) => ({ program, shape: shapeOf(calls.parseProgram(program)), names: {}, source: "t", origin: "synthetic" }));
@@ -929,15 +1012,16 @@ test("the writer is told to say the act, not the call; a request that reads as t
     "vote(ballot=rec.3, choice=yes)": "Vote yes on ballot rec.3.",
   };
   const checked: string[] = [];
-  const r = await generate(gold, { writers: [writer("a", (program) => said[program])], perGold: 1, styles: ["terse"], back: { model: "stand-in/back", translate: async (request, _forms, g) => (checked.push(request), g!.program) } });
-  expect(r.manifest.dropped).toEqual({ not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 1, variable_named: 1, argument_named: 1, zero_wait: 1 });
+  // (The standing payment is asked for with how often said one of the ways people say it: the writer uses those words.)
+  const r = await generate(gold, { writers: [writer("a", (program) => said[program] ?? `Pay 650.99 from acc.67 to acc.66 ${everyIn(program)[0]}, starting in 0 days.`)], perGold: 1, styles: ["terse"], back: { model: "stand-in/back", translate: async (request, _forms, g) => (checked.push(request), g!.program) } });
+  expect(r.manifest.dropped).toEqual({ not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 1, variable_named: 1, argument_named: 1, zero_wait: 1, place_reversed: 0, description_echoed: 0 });
   expect(checked).toEqual(["Vote yes on ballot rec.3."]);
   expect(r.rejects.map((x) => x.why).sort()).toEqual(["argument_named", "quotes", "variable_named", "zero_wait"]);
   expect(r.examples.filter((e) => e.kind === "positive").map((e) => e.program)).toEqual(["vote(ballot=rec.3, choice=yes)"]);
 });
 
 test("a span points at the right occurrence: beside its own call's values, the bracketed id, the words of a choice; ambiguous where nothing settles it; a second \"do not\" is a rider", async () => {
-  const at = (request: string, program: string) => spansIn(request, program).map((x) => `${x.line !== undefined ? `${x.line}.` : ""}${x.arg}: ${request.slice(...x.at)}@${x.at[0]}${x.ambiguous ? ` or @${x.all!.slice(1).map((y) => y[0]).join(",")}` : ""}`);
+  const at = (request: string, program: string) => spansIn(request, program).flatMap((x) => (x.at ? [`${x.line !== undefined ? `${x.line}.` : ""}${x.arg}: ${request.slice(...x.at)}@${x.at[0]}${x.ambiguous ? ` or @${x.all!.slice(1).map((y) => y[0]).join(",")}` : ""}`] : []));
   // The same office in each of two lines: each line's span is the occurrence said with that line's other values.
   expect(at("Open an account at bank for ent.22, and open an account at bank for ent.23.", "account(at=bank, holder=ent.22)\naccount(at=bank, holder=ent.23)"))
     .toEqual(["0.at: bank@19", "0.holder: ent.22@28", "1.at: bank@59", "1.holder: ent.23@68"]);
@@ -956,7 +1040,7 @@ test("a span points at the right occurrence: beside its own call's values, the b
   expect(at(lodged, "form(form=event_stall_permit, to=markets-1, lot=lot-01, season=summer)")).toEqual(expect.arrayContaining(["form: event stall permit@9", `season: summer@${lodged.indexOf("summer")}`]));
   // One call, its value said twice: either is it, so both are recorded and the span says it is ambiguous.
   const twice = "Pay acc-1 $5, into acc-1.";
-  expect(spansIn(twice, 'money(to=acc-1, amount="$5")')).toEqual([{ arg: "to", value: "acc-1", at: [4, 9], ambiguous: true, all: [[4, 9], [19, 24]] }, { arg: "amount", value: "$5", at: [10, 12] }]);
+  expect(spansIn(twice, 'money(to=acc-1, amount="$5")')).toEqual([{ arg: "to", value: "acc-1", how: "copy", at: [4, 9], ambiguous: true, all: [[4, 9], [19, 24]] }, { arg: "amount", value: "$5", how: "copy", at: [10, 12] }]);
   // Counted; and a brief that gave two closing sentences has two riders, as has a request whose writer added one.
   const gold: Gold[] = [
     { program: 'money(amount="$5", to=acc-1)', shape: "money(amount,to)", names: {}, source: "t", origin: "synthetic" },
@@ -997,14 +1081,29 @@ test("too much, as people make it: two or three related acts piled into one mess
   const pasted = built.filter((e) => e.source === "built: several requests run together");
   expect(related.length).toBeGreaterThanOrEqual(4);
   expect(pasted.length).toBe(3); // a third stay the long kind
-  const joins = / Also, separately: | And while you're at it: | One more thing: | Separately: | And another thing: /;
+  const partsOf = (e: Example) => e.built_from!.map((id) => positives.find((p) => p.id === id)!);
+  // (Every part is in the request, whatever runs them together: its words, but for a capital and a full stop.)
+  const holds = (e: Example) => partsOf(e).every((p) => e.request.toLowerCase().includes(p.request.toLowerCase().replace(/\.$/, "")));
   for (const e of related) {
-    const parts = e.request.split(joins).map((x) => positives.find((p) => p.request === x)!);
+    const parts = partsOf(e);
     expect(parts.length === 2 || parts.length === 3).toBe(true);
     expect(parts.every((p) => p && p.program.includes("c0042") && functionOf(p) !== "message")).toBe(true);
     expect(new Set(parts.map((p) => functionOf(p))).size).toBe(parts.length); // each a different kind of act
+    expect(holds(e)).toBe(true);
   }
-  for (const e of pasted) expect(e.request.split(/ Also: | And then: /).length).toBeGreaterThanOrEqual(4);
+  for (const e of pasted) expect([partsOf(e).length >= 4, holds(e)]).toEqual([true, true]);
+  // How they are run together varies: nothing between them, one sentence with "and", a numbered list, a list after a
+  // line saying several things follow, and many ways of running on; no one joiner marks the label.
+  const many = builtRefusals(positives, 11, 0, { too_much: 150 }).filter((e) => e.program === "none(too_much)");
+  expect(many.length).toBeGreaterThan(100);
+  const share = (re: RegExp) => many.filter((e) => re.test(e.request)).length / many.length;
+  expect(share(/ Also: | And then: /)).toBeLessThan(0.15);
+  for (const re of [/^1\. |^\(1\) |^1\) |^- |^First, /m, /[a-z0-9\]],? and (also )?[a-z]/, /\n/, /Oh, and |After that, |Next, |Before I forget: /, /^(Take these in order|Several things today|A few things|Please see to the following|For today|Three or four matters)/]) expect([String(re), share(re) > 0.03]).toEqual([String(re), true]);
+  expect(many.filter((e) => partsOf(e).map((p) => p.request).join(" ") === e.request).length).toBeGreaterThan(5); // nothing between them at all
+  expect(many.every(holds)).toBe(true);
+  // One message is said in one capacity: a pasted one never has a second part that opens with its own.
+  const titled = positives.map((p, i): Example => (i % 3 === 0 ? { ...p, request: `As Clerk of Tarn, ${p.request[0]!.toLowerCase()}${p.request.slice(1)}`, riders: [{ kind: "capacity", text: "As Clerk of Tarn", at: [0, 16], adds: "nothing" }] } : p));
+  for (const e of builtRefusals(titled, 3, 0, { too_much: 40 }, { pasted: 1 })) expect((e.request.match(/as Clerk of Tarn/gi) ?? []).length).toBeLessThanOrEqual(1);
   expect(builtRefusals(positives, 5, 0, { too_much: 9 })).toEqual(builtRefusals(positives, 5, 0, { too_much: 9 }));
   // (Nothing related among the examples: all of them are the long kind.)
   expect(builtRefusals(positives.slice(5), 5, 0, { too_much: 4 }).every((e) => e.source === "built: several requests run together")).toBe(true);

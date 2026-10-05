@@ -47,6 +47,12 @@
 //         [--per-shape N] [--per-gold N] [--refusals N] [--limit N] [--seed N]
 //     Training data for the local translation model: requests written by the models given for the calls code
 //     participants made in those logs, each checked (training.ts).
+//   oikos translator-data-check <DIR> --answers FILE [--reader NAME]
+//   oikos translator-data-check <DIR> --blind [--seed N]
+//     Blind checking of a data folder (translator/train/blind.ts). --blind writes its requests as DIR/blind.jsonl, in a
+//     shuffled order, for a reader who is to see nothing else. --answers takes that reader's answers ({id, program}, a
+//     line each), compares them with the gold programs by meaning, and writes DIR/checked.jsonl (the examples agreed
+//     on, marked verified by the reader), DIR/disagreed.jsonl (both programs) and the counts per function in the manifest.
 //   oikos replay <log.jsonl> [--anchors <anchors.jsonl>]      (the kernel's own replay)
 //   oikos story <log.jsonl> [participant]                     (what a language-model participant did, day by day)
 //
@@ -70,7 +76,7 @@ const flag = (name: string, dflt?: string) => {
 const flags = (name: string) => rest.flatMap((x, i) => (x === `--${name}` && rest[i + 1] !== undefined ? [rest[i + 1]!] : []));
 const has = (name: string) => rest.includes(`--${name}`);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
@@ -213,6 +219,19 @@ try {
       perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), limit: num("limit"), seed: num("seed"), log: console.log,
     });
     console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);
+  } else if (cmd === "translator-data-check" && positional()[0] && (flag("answers") || has("blind"))) {
+    // A blind reader's answers against a data folder's gold programs; or (--blind) the requests for such a reader.
+    const { checkBlind, writeBlind } = await import("./training");
+    const dir = positional()[0]!;
+    if (has("blind")) {
+      const w = writeBlind(dir, flag("seed") ? Number(flag("seed")) : 1);
+      console.log(`${w.requests} requests written to ${w.out}, in a shuffled order`);
+    }
+    if (flag("answers")) {
+      const r = checkBlind(dir, flag("answers")!, flag("reader") ?? "blind reader");
+      console.log(`${r.reader}: agreed on ${r.agreed} of ${r.examples}, disagreed on ${r.disagreed}, left ${r.unanswered} unanswered${r.unknown_ids ? `; ${r.unknown_ids} answers were for no example here` : ""} (checked.jsonl, disagreed.jsonl, manifest.json)`);
+      for (const [fn, n] of Object.entries(r.by_function)) if (n.disagreed || n.unanswered) console.log(`  ${fn}: ${n.agreed} agreed, ${n.disagreed} disagreed${n.unanswered ? `, ${n.unanswered} unanswered` : ""}`);
+    }
   } else if (cmd === "dataset" && positional()[0]) {
     // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
     const { logsIn } = await import("./corpus");

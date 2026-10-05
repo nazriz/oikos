@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { LlmAdapter } from "@oikos/participants/llm";
 import { calls } from "@oikos/participants";
 import { functionOf, literals, refusalBriefs, type Example } from "../../translator/train/data";
-import { balancedGold, goldOf, trainingData } from "../src/training";
+import { balancedGold, checkBlind, goldOf, trainingData, writeBlind } from "../src/training";
 
 const dir = join(import.meta.dir, "../../runs/test-training-data");
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
@@ -56,6 +56,43 @@ test("training data from a log: gold programs, requests from two writers, each t
   expect(manifest.usage["stand-in/back (translating back)"].input_tokens).toBeGreaterThan(0);
   expect(manifest.gold_programs).toBe(6);
   expect(manifest.examples).toBe(examples.length);
+
+  // Blind checking, the next step. The requests alone were written beside the data, shuffled: what a reader is given.
+  const lines = (file: string) => readFileSync(join(out, file), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  const blind = lines("blind.jsonl");
+  for (const b of blind) expect(Object.keys(b)).toEqual(["id", "request", "forms"]);
+  expect(blind.map((b) => b.id).sort()).toEqual(examples.map((e) => e.id).sort());
+  expect(blind.map((b) => b.id)).not.toEqual(examples.map((e) => e.id));
+  expect(writeBlind(out, 3)).toEqual({ requests: examples.length, out: join(out, "blind.jsonl") });
+  expect(lines("blind.jsonl")).toEqual(blind); // the same seed, the same order
+  writeBlind(out, 4);
+  expect(lines("blind.jsonl").map((b) => b.id)).not.toEqual(blind.map((b) => b.id));
+  // A reader's answers, a line each: all right but two (one wrong, one not answered), one spelled another way.
+  const answers = join(dir, "answers.jsonl");
+  const [wrong, skipped, respelt] = [examples[0], examples[1], examples.find((e) => e.program.includes("amount=\"$500\""))];
+  writeFileSync(answers, examples.filter((e) => e !== skipped).map((e) => JSON.stringify({ id: e.id, program: e === wrong ? "none(unclear)" : e === respelt ? e.program.replace('"$500"', '"500 dollars"') : e.program })).join("\n") + "\n");
+  const report = checkBlind(out, answers, "reader-y");
+  expect(report).toMatchObject({ reader: "reader-y", examples: examples.length, agreed: examples.length - 2, disagreed: 1, unanswered: 1, unknown_ids: 0 });
+  const checked = lines("checked.jsonl"), disagreed = lines("disagreed.jsonl");
+  expect(checked.length).toBe(examples.length - 2);
+  expect(checked.every((e) => e.verified_by === "reader-y" && e.translated_back_by === "stand-in/back")).toBe(true);
+  if (respelt) expect(checked.some((e) => e.id === respelt.id)).toBe(true); // "500 dollars" is "$500" in the example's own money
+  expect(disagreed.map((e) => [e.id, e.program, e.answer, e.reader])).toEqual([[wrong.id, wrong.program, "none(unclear)", "reader-y"]]);
+  // The manifest keeps what it had and gains the check, with counts per function; the examples are as they were.
+  const after = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
+  expect({ ...after, blind_check: undefined }).toEqual({ ...manifest, blind_check: undefined });
+  expect(after.blind_check).toEqual(report);
+  expect(Object.values(after.blind_check.by_function as { [fn: string]: { agreed: number; disagreed: number; unanswered: number } }).reduce((n, x) => n + x.agreed + x.disagreed + x.unanswered, 0)).toBe(examples.length);
+  expect(lines("examples.jsonl")).toEqual(examples);
+  // The command: the same check, and the requests for a reader.
+  const cli = (...args: string[]) => Bun.spawnSync([process.execPath, join(import.meta.dir, "../src/cli.ts"), "translator-data-check", out, ...args], { cwd: join(import.meta.dir, "../..") });
+  const run = cli("--answers", answers, "--reader", "reader-z");
+  expect([run.exitCode, run.stderr.toString()]).toEqual([0, ""]);
+  expect(run.stdout.toString()).toContain(`reader-z: agreed on ${examples.length - 2} of ${examples.length}, disagreed on 1, left 1 unanswered`);
+  expect(JSON.parse(readFileSync(join(out, "manifest.json"), "utf8")).blind_check.reader).toBe("reader-z");
+  expect(cli("--blind", "--seed", "3").stdout.toString()).toContain(`${examples.length} requests written to`);
+  expect(lines("blind.jsonl")).toEqual(blind);
+  expect(cli().exitCode).toBe(2); // neither asked for: the usage
 });
 
 test("a balanced gold set: a floor under every function, made up with generated programs where the log falls short, each saying where it came from", async () => {
@@ -179,7 +216,8 @@ test("several checkers: each request is translated back by a model that didn't w
   expect(translated.a!.length > 0 && translated.a!.every((q) => q.startsWith("b asks"))).toBe(true);
   expect(translated.c!.length > 0 && translated.c!.every((q) => q.startsWith("a asks"))).toBe(true);
   expect(translated.b).toEqual([]);
-  expect(manifest.checked).toEqual({ "stand-in/a -> stand-in/c": positives.filter((e) => e.written_by === "stand-in/a").length, "stand-in/b -> stand-in/a": positives.filter((e) => e.written_by === "stand-in/b").length });
+  // (Counted over every example: a refusal built from a positive, the form left out, keeps who wrote and checked its request.)
+  expect(manifest.checked).toEqual({ "stand-in/a -> stand-in/c": examples.filter((e) => e.written_by === "stand-in/a").length, "stand-in/b -> stand-in/a": examples.filter((e) => e.written_by === "stand-in/b").length });
   expect(manifest.checked_by_writer).toBe(0);
   // Each checker's tokens are counted, apart from what the same model spent writing.
   expect(manifest.usage["stand-in/a (translating back)"].input_tokens).toBeGreaterThan(0);

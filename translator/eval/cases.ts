@@ -33,6 +33,8 @@ export const CASES: Case[] = [
   { id: "build-held-out", request: "Get GreenCo to put a park on lot-01. Offer them $45k out of acc-city.", expect: ['structure(type=park, on=lot-01, by="GreenCo", price="$45k", from=acc-city)', 'structure(type=park, on=lot-01, by=greenco, price="$45k", from=acc-city)'], was_held_out: true },
   // goods and work (phase B)
   { id: "move-goods", request: "Move 40 goods from str.7 to the builder at str.8.", expect: ["goods(kind=goods, quantity=40, from_at=str.7, to=builder, at=str.8)"] },
+  { id: "move-goods-place", request: "Shift 12 goods from str.7 over to str.8.", expect: ["goods(kind=goods, quantity=12, from_at=str.7, at=str.8)"], note: "a place named as where they go is at=, never to=; with no one named they are the asker's own (2026-10-06)" },
+  { id: "work-several", request: "Have c0042 and c0043 do 4 units of make at str.7 between them.", expect: ['work(task=make, units=4, at=str.7, by=["c0042","c0043"])'], note: "work by several is one work(...) with by as a list: units is the whole job (2026-10-06)" },
   { id: "work", request: "Have c0042 do 3 units of make at str.7.", expect: ["work(task=make, units=3, at=str.7, by=c0042)", 'work(task=make, units=3, at=str.7, by=["c0042"])'] },
   { id: "work-held-out", request: "Put Dana Reyes on the job at str.5: two hours of building (7200 units of build), working out of the yard at str.2.", was_held_out: true,
     expect: ['work(task=build, units=7200, at=str.2, by="Dana Reyes", on=str.5)', "work(task=build, units=7200, at=str.2, by=c0042, on=str.5)", 'work(task=build, units=7200, at=str.2, by=["c0042"], on=str.5)'] },
