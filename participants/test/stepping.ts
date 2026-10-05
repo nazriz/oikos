@@ -102,6 +102,8 @@ export function person(citizen: { create: (ctx: any) => any }, params: object = 
   const born_at = -(o.age ?? 35) * YEAR;
   return {
     me, participant,
+    /** When they asked to be woken next, at the end of their last wake (undefined: at their usual cadence). */
+    until: undefined as number | undefined,
     async wake(t: number, w: Woken = {}): Promise<Said[]> {
       Object.assign(readings, w.readings ?? {});
       if (w.balance !== undefined) balance = w.balance;
@@ -113,12 +115,15 @@ export function person(citizen: { create: (ctx: any) => any }, params: object = 
         ...(w.street ? { street: { kind: "sites", as_of: t, cells: w.street } } : {}),
         ...(looked ? { petitions: board(w.petitions), homes: board(w.homes), jobs: board(w.jobs) } : {}),
       });
-      const body = { born_at, sex: o.sex ?? "male", present: true, alive: true, children: [], parents: [], conditions: [], variables: {}, ...(w.in ? { in: w.in } : {}) };
-      let obs: any = { t, entity: me, participant, woke_for: w.woke_for ?? "cadence", outcomes: [], inbox: w.inbox ?? [], readings: { ...readings }, body, channels: channels([...own, ...(w.records ?? [])], false, w.transactions ?? []) };
+      const body: { [k: string]: any; in?: string } = { born_at, sex: o.sex ?? "male", present: true, alive: true, children: [], parents: [], conditions: [], variables: {}, ...(w.in ? { in: w.in } : {}) };
+      let obs: any = { t, entity: me, participant, woke_for: w.woke_for ?? "cadence", outcomes: [], inbox: w.inbox ?? [], readings: { ...readings }, body: { ...body }, channels: channels([...own, ...(w.records ?? [])], false, w.transactions ?? []) };
       own = [];
       for (let i = 0; i < 200; i++) {
         const a: any = await m.step(obs, undefined);
-        if (a.type === "wait") break;
+        if (a.type === "wait") {
+          this.until = a.until;
+          break;
+        }
         if (a.type === "look") {
           obs = { ...obs, outcomes: [], inbox: [], channels: channels([], true) };
           continue;
@@ -134,8 +139,10 @@ export function person(citizen: { create: (ctx: any) => any }, params: object = 
           if (c.bind) created[c.bind] = id;
           if (c.fn === "money" && c.args.every) made.push(standingOrder(id, t, me, c.args.to, Number(parseAmount(c.args.amount, currencyNow())), { basis: c.args.basis, every: parseDuration(c.args.every), ...(c.args.first !== undefined ? { first: parseDuration(c.args.first) } : {}), for: c.args.for }));
           if (c.fn === "statement" && c.args.kind) made.push({ id, at: t, record: "statement", author: participant, speaks_for: me, visible_to: c.args.visible ?? "public", kind: c.args.kind, text: c.args.text, ...(c.args.data !== undefined ? { data: c.args.data } : {}), ...(c.args.to ? { addressed_to: c.args.to } : {}), ...(c.args.basis ? { basis: c.args.basis } : {}) });
+          // (Where their body is, as they move it: into a space, or out of the building they're in.)
+          if (c.fn === "occupancy" && (c.args.who ?? me) === me) body.in = c.args.leave ? (body.in?.startsWith(c.args.in) ? undefined : body.in) : c.args.in;
         }
-        obs = { ...obs, woke_for: "done", inbox: [], outcomes: [{ action: `act.${ids.n}.${i}`, t, status: refusal ? "refused" : "applied", ...(refusal ? { refusal: { code: refusal } } : {}), ...(Object.keys(created).length ? { created } : {}) }], channels: channels(made, false) };
+        obs = { ...obs, body: { ...body }, woke_for: "done", inbox: [], outcomes: [{ action: `act.${ids.n}.${i}`, t, status: refusal ? "refused" : "applied", ...(refusal ? { refusal: { code: refusal } } : {}), ...(Object.keys(created).length ? { created } : {}) }], channels: channels(made, false) };
       }
       return said;
     },
