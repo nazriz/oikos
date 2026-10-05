@@ -56,6 +56,10 @@ test("a program's shape, its literals, and what's askable", () => {
   expect(askable(calls.parseProgram('statement(kind=note, text="x", data={"a":1})'))).toBe(false);
   expect(askable(calls.parseProgram("vote(ballot=rec.3, choice=yes)"))).toBe(true);
   expect(sameProgram('vote(ballot=rec.3, choice="yes")', "vote(choice=yes, ballot=rec.3)")).toBe(true);
+  // What a payment is for, loosely; everything else exactly.
+  expect(sameProgram('money(to=acc-1, amount="$5", for="energy bill")', 'money(to=acc-1, amount="$5", for="the energy bill.")')).toBe(true);
+  expect(sameProgram('money(to=acc-1, amount="$5", for="energy bill")', 'money(to=acc-1, amount="$50", for="energy bill")')).toBe(false);
+  expect(sameProgram('message(to=works, text="Go.")', 'message(to=works, text="Go")')).toBe(false);
 });
 
 test("a request is kept only if it carries every literal exactly, and only if it translates back to its program", async () => {

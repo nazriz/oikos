@@ -315,7 +315,21 @@ export function copies(request: string, program: string): boolean {
 }
 
 /** A program with the same meaning counts as the same: compared in canonical form (eval/run.ts). */
-export const sameProgram = (a: string, b: string): boolean => canonical(a) === canonical(b);
+export const sameProgram = (a: string, b: string): boolean => canonical(a) === canonical(b) || loose(a) === loose(b);
+
+/** A program with what a purpose says compared loosely: "the energy bill." is "energy bill" (where a purpose starts and
+ * ends in a sentence is the reader's call, as the test cases' answer keys allow). Everything else exactly. */
+function loose(program: string): string | undefined {
+  try {
+    const p = calls.parseProgram(program);
+    if ("none" in p) return canonical(program);
+    const value = (k: string, v: calls.Value): calls.Value => ("call" in v ? { call: call(v.call) } : "text" in v && k === "for" ? { text: v.text.toLowerCase().replace(/^(the|a|an) /, "").replace(/[.!\s]+$/, "") } : v);
+    const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(k, v)])) });
+    return canonical(calls.programText({ lines: p.lines.map((l) => ({ ...l, call: call(l.call) })) }));
+  } catch {
+    return undefined;
+  }
+}
 
 /** A stable id for an example: from what it is. */
 const exampleId = (request: string, program: string) => sha256(canonicalJson({ request, program })).slice(0, 16);
