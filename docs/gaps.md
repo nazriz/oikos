@@ -53,7 +53,7 @@ A short check on pilot 9's fixes. The mayor made 388 decisions: 190 letters, 135
 
 | Gap | Status |
 |---|---|
-| Households end more often partly housed or overcrowded under the same-moment rule (5 seeds: partly housed 0.6 → 2.8, overcrowded 0.4 → 2.0; D58) | **To look into:** members now follow a leaseholder a round later. Check that they always do join, and that nothing is left waiting at the end of a wake |
+| Households end more often partly housed or overcrowded under the same-moment rule (5 seeds: partly housed 0.6 → 2.8, overcrowded 0.4 → 2.0; D58) | **Looked into (2026-10-06):** a member told to come while an act of theirs was under way (both home from work at the same moment) got the word as that act was done, in a wake that only takes them where they belong, and it waits for their next weekly plan: up to a week in the old home. They do join; the word isn't lost. Pinned by a test on the member alone (`participants/test/citizen-household.test.ts`), **not fixed**: heeding the word at once (a full plan at that wake, or a wake at the next tick) is a three-line change in the citizen's step, and was tried and taken back out, because it moves when people make their plans and the deaths test then failed (deaths at home registered within a fortnight: 11 of 18, was 14 of 18, its threshold). That test rests on something else that's fragile: a death at home is seen only in a full plan made at home while it's still among the home's last few departures, which commuting overwrites within a day or two. **To decide:** fix both together (a household's word, and the sight of a death, as news at any wake). Also open: a member's move the world refuses is tried again only by the daily round, never in a world without one |
 
 ## Boundaries
 

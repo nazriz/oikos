@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.35.4",
+  version: "0.35.7",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -178,6 +178,7 @@ export const citizen: BehaviourModule = {
       // Civic life (docs/behaviour/citizen.md "Elections and news"): enrolling, judging the town's government, standing
       // and voting; reading the local paper. Placeholders, but the turnout and readership the world gives (its profile).
       electoral_town: null as string | null, // where we enrol and vote (the world says; none: no elections)
+      paper: null as string | null, // the local paper, whose news we read (the world says; none: no paper, and nothing is read as news)
       // School (docs/behaviour/education.md): the school children of its ages go to (the world says; none: no school).
       school: null as { entity: string; building: string; ages: [number, number] } | null,
       // Health (docs/behaviour/health.md): the clinic and its waiting room; the share who go when something's wrong of a
@@ -2096,10 +2097,15 @@ export const citizen: BehaviourModule = {
         const signal = Math.max(-10_000, Math.min(10_000, 2 * (satisfaction(mind.person, levelsNow) - 5_000) - feelings.level("anger", town, t)));
         approval = Math.round(approval + (signal - approval) / Math.max(1, p.civic.approval_memory_weeks));
       }
-      if (readsNews) for (const r of book.open("news")) {
-        if (readItems.has(r.id) || r.data?.about_office !== true) continue;
+      // The paper's news (docs/behaviour/news.md): what's published in the paper's name, and nobody else's statement of
+      // the kind; about the government; each item once. Its tone as the paper gives it, -1 to 1: one beyond that counts
+      // as the limit, one that isn't a number as none. (Until 0.35.6 any statement of kind `news` was read, whoever
+      // published it, with whatever tone it claimed: one item from anyone could set a reader's approval to either end.)
+      if (readsNews && p.paper) for (const r of book.open("news")) {
+        if (readItems.has(r.id) || r.speaks_for !== p.paper || r.data?.about_office !== true) continue;
         readItems.add(r.id);
-        approval = Math.max(-10_000, Math.min(10_000, approval + Math.round(Number(r.data?.tone ?? 0) * p.civic.news_weight_bps)));
+        const tone = Number(r.data?.tone ?? 0);
+        approval = Math.max(-10_000, Math.min(10_000, approval + Math.round((Number.isFinite(tone) ? Math.max(-1, Math.min(1, tone)) : 0) * p.civic.news_weight_bps)));
       }
       // An election called: standing, with a small chance, swayed by drive (achievement, power) and by how badly we think
       // the town is run; our platform speaks to what we value most.

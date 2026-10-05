@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.35.4",
+  "version": "0.35.7",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -323,6 +323,13 @@
     "outside_account": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "paper": {
+      "schema": {
+        "description": "the local paper, whose news we read (the world says; none: no paper, and nothing is read as news)"
+      },
+      "default": null,
+      "source": "placeholder"
     },
     "participation_bps": {
       "schema": {

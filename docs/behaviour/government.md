@@ -108,6 +108,8 @@ Some offices apply a rule they were given by its id or as a parameter, not by re
 Spatial voting on one axis, from pro-development (−100) to pro-tenant (+100) (Downs 1957; Enelow & Hinich 1984).
 - A proposal's position comes from its tags: `tenant_protection` is +60 and `development` is −60.
 - A councillor votes yes when the proposal is closer to their ideal point than the status quo (0) is.
+  - A tie is no (a councillor at +30 is as far from a tenant-protection proposal at +60 as from the status quo).
+  - A proposal with neither tag (or both) sits at 0, where the status quo is, so no councillor finds it closer: all five vote no, and only the noise can pass it (three flips of five: under 3%). An amendment marked `neither`, or a law in free words about anything else, so almost never passes a code council. Pinned by a test (2026-10-06) and left for a decision: what a councillor does with a proposal off its axis needs a basis.
 - With probability `noise_bps` (1500), the vote flips. This stands in for everything the one-dimensional model leaves out.
 - Budgets pass on a base propensity `budget_yes_bps` (9000).
 

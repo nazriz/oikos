@@ -14,7 +14,12 @@ what to run and how to tell it, and that choice is where information can be shap
 | **An edition** | Every `every_days` (7), the `items_per_edition` (5) highest-scoring items new since the last, each a public `news` statement put forward to be believed (an `assertion` about the town), with its kind, tone and edition number. No edition in a week with nothing new. | — |
 
 Readers: a share of citizens (the profile's `news_readers_bps`, 40%) read each item about the government, and it moves
-their approval of the town by its tone (docs/behaviour/citizen.md, "Elections").
+their approval of the town by its tone (docs/behaviour/citizen.md, "Elections"). They read what is published in the
+paper's name (the world tells them which entity is the paper: `paper`), and nobody else's statement of kind `news`; and
+they take a tone within the paper's range, -1 to 1 (citizen 0.35.6: before, any `news` statement was read, whoever
+published it and whatever tone it claimed, so one item from anyone could set a reader's approval to either end). A reader
+knows the paper by the name an item is published in, as every reader of records does: nothing stops someone publishing
+in the paper's name (a forged masthead), and a citizen has no way to see who holds the paper's posts.
 
 **In the small town** the public record is thin: an edition about every month (6 in the first 205 days), mostly
 budgets, laws, nominations and the election.

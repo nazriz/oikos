@@ -1131,7 +1131,8 @@ export function generate(spec: TownSpec): any {
     ...(CR ? { crime: { take_bps: CR.take_bps_per_month_in_need, caught_bps: CR.caught_bps_reckoned, quantity: CR.take_quantity } } : {}),
     ...(RD ? { round: { work_start: RD.work_start_hour * HOUR, work_end: RD.work_end_hour * HOUR, work_days: RD.work_days, school_start: RD.school_start_hour * HOUR, school_end: RD.school_end_hour * HOUR } } : {}),
     ...(JU ? { tribunal: { entity: "tribunal", challenge_bps: JU.challenge_bps, apply_bps: JU.apply_bps, apply_after_days: JU.apply_after_days } } : {}),
-    ...(E ? { electoral_town: "city", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 } } : {}),
+    // (Where they enrol and vote; and the local paper, whose news they read: the paper made above, with the elections.)
+    ...(E ? { electoral_town: "city", paper: "paper", civic: { turnout_bps: E.turnout_bps, stand_bps: E.stand_bps, reads_news_bps: E.news_readers_bps, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 } } : {}),
     union: "union", union_join_bps: V.unions.membership_bps,
     // The schedule of the law a tenants' petition asks to have amended (the law on ending a tenancy, if this world has it).
     ...(records.some((r) => r.kind === "law" && r.data?.schedule === "schedule-tenancy") ? { tenancy_schedule: "schedule-tenancy" } : {}),

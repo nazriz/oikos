@@ -93,3 +93,27 @@ test("a move into the new home that the world refuses (the last tenants still th
   expect(moves(await q.wake(2 * DAY + 20 * HOUR, told)).length).toBe(2);
   for (const day of [3, 4, 10, 17, 40]) expect(moves(await q.wake(day * DAY + 20 * HOUR, { street: street({ [OLD]: ["c2"], [NEW]: ["c1"] }), in: OLD, transactions: wages(day * DAY) }))).toEqual([]);
 });
+
+test("a leaseholder's word that reaches them as an act of theirs is done (both home from work at the same moment) waits for their next weekly plan", async () => {
+  // DISAGREES WITH docs: households.md says the other adults "move when the leaseholder says" (and the town test, that
+  // they follow at their next wake). With the daily round, a wake before the week's plan is due only takes them where
+  // they belong, unless it's a wake for news. A word that arrives while an act of theirs is under way (going home from
+  // work, as the leaseholder moves in and says so) comes with that act's end, not as news: it's kept, and heeded at
+  // the next full plan, up to a week later, the member in the old home until then. (docs/gaps.md, phase A: "members
+  // now follow a leaseholder a round later". Heeding it at once is a three-line change, tried on 2026-10-06 and taken
+  // back out: it moves when people plan, and the deaths test, whose sightings of a death at home depend on that, fell
+  // from 14 of 18 registered in time to 11. Reported, for a decision with that.)
+  const p = await member({ round: ROUND });
+  const t = 3 * DAY + 17 * HOUR; // work's end; they last planned two days before, at 20:00
+  const home = street({ [OLD]: ["c2"], [NEW]: ["c1"] });
+  expect(moves(await p.wake(t, { street: home, in: "factory-1/floor.1" }))).toEqual([{ in: OLD }]);
+  expect(moves(await p.wake(t + 900, { street: home, in: OLD, woke_for: "done", inbox: [from("c1", SAYING.moveIn(NEW))] }))).toEqual([]);
+  // Day after day, woken where they are (the old home), they stay...
+  for (let h = 16; h < 123; h += 24) expect(moves(await p.wake(t + h * HOUR, { street: home, in: OLD, transactions: wages(t + h * HOUR) })).some((m) => m.in === NEW)).toBe(false);
+  // ...until the week's plan, a week after their last (123 hours on): then they go.
+  expect(moves(await p.wake(t + 123 * HOUR, { street: home, in: OLD, transactions: wages(t + 123 * HOUR) }))).toEqual([{ in: OLD, who: "c2", leave: "yes" }, { in: NEW }]);
+  // The same word as news (it found them asleep, and woke them) is heeded at once.
+  const q = await member({ round: ROUND });
+  expect(moves(await q.wake(t + 3 * HOUR, { street: home, in: OLD, woke_for: "news", inbox: [from("c1", SAYING.moveIn(NEW))] }))).toEqual([{ in: OLD, who: "c2", leave: "yes" }, { in: NEW }]);
+});
+
