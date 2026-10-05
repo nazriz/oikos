@@ -176,3 +176,34 @@ fn a_holding_at_the_top_of_its_range_refuses_more_from_work_or_a_taking() {
     run.finish("completed", None).unwrap();
     oikos_kernel::replay(&run.into_log(), None).unwrap();
 }
+
+/// A demolition empties a building as anyone leaves a space: its variables are settled first (they were rising with its
+/// occupants), and each departure is recorded for those who can see who's there. (Until 2026-10-05 a demolition did
+/// neither: the wear of the days its occupants lived there was lost, and nobody was recorded as having left.)
+#[test]
+fn a_demolition_settles_the_building_and_records_who_left() {
+    use oikos_kernel::events::VacateReason;
+    let mut run = town();
+    let wear = |run: &Run<Vec<u8>>| {
+        let st = run.kernel().state();
+        let cfg = &run.kernel().statics().config.catalogue.variables[0];
+        oikos_kernel::exec::variable_at(st, "s-house", cfg, st.t).unwrap()
+    };
+    // The house, alice inside: 100 at the start, 3 a day.
+    advance(&mut run, 10 * DAY);
+    assert_eq!(wear(&run), 130);
+    // Demolition begins (the house needs an hour's work to come down): alice is out at once.
+    let r = act(&mut run, "developer-system", Some("developer"), json!([{"block": "demolish", "structure": "s-house"}])).unwrap();
+    assert!(r.iter().any(|e| matches!(e, EventBody::Vacated { occupant, reason: VacateReason::Demolition, .. } if occupant == "alice")));
+    assert!(r.iter().any(|e| matches!(e, EventBody::DemolitionStarted { .. })));
+    let st = run.kernel().state();
+    assert!(st.structures_of("alice").is_empty());
+    let gone = st.departures.get("s-house/dwelling.1").expect("the departure is recorded");
+    assert_eq!(gone.iter().map(|d| (d.occupant.as_str(), d.reason)).collect::<Vec<_>>(), vec![("alice", VacateReason::Demolition)]);
+    // Its wear is what her ten days there made it, and rises from there at an empty house's 1 a day.
+    assert_eq!(wear(&run), 130);
+    advance(&mut run, 20 * DAY);
+    assert_eq!(wear(&run), 140);
+    run.finish("completed", None).unwrap();
+    oikos_kernel::replay(&run.into_log(), None).unwrap();
+}

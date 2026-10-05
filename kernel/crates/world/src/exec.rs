@@ -179,29 +179,55 @@ pub fn init_variables(s: &Statics, ty: &str, t: i64) -> std::collections::BTreeM
     vars_for(s, ty).map(|v| (v.id.clone(), (v.initial, day_of(t)))).collect()
 }
 
+/// Bodies leave a structure's spaces: the one way out, whatever the cause (leaving, being removed, dying, crossing out
+/// of the world, a flood, a demolition), so that no cause can miss a step. `who` alone leaves, or (None) everyone there;
+/// from the space `only`, or (None) from every space of the structure. If anyone does: the structure's variables are
+/// settled first (its occupancy is about to change), the bodies are taken out, each departure is recorded for those
+/// who can see who's there, and a `Vacated` event is added for each. Returns who left where (space, body), spaces in
+/// order and the bodies of each in order.
+///
+/// The stamps are the caller's, as each has always made them (the structure touched, the bodies moved: their order
+/// is part of the state, so it's kept).
+#[allow(clippy::too_many_arguments)]
+fn leave_spaces(s: &Statics, st: &mut State, sid: &str, who: Option<&str>, only: Option<&str>, reason: VacateReason, by: Option<&str>, events: &mut Vec<Timed>) -> Vec<(Id, Id)> {
+    let t = st.t;
+    let leaves = |space: &Id, bodies: &BTreeSet<Id>| only.is_none_or(|o| o == space) && who.map_or(!bodies.is_empty(), |w| bodies.contains(w));
+    if !st.occupancy.get(sid).is_some_and(|m| m.iter().any(|(space, bodies)| leaves(space, bodies))) {
+        return vec![];
+    }
+    settle(s, st, sid);
+    let mut left: Vec<(Id, Id)> = vec![];
+    if let Some(m) = st.occupancy.get_mut(sid) {
+        for (space, bodies) in m.iter_mut() {
+            if !leaves(space, bodies) {
+                continue;
+            }
+            match who {
+                Some(w) => {
+                    bodies.remove(w);
+                    left.push((space.clone(), w.to_string()));
+                }
+                None => left.extend(std::mem::take(bodies).into_iter().map(|b| (space.clone(), b))),
+            }
+        }
+        m.retain(|_, b| !b.is_empty());
+        if m.is_empty() {
+            st.occupancy.remove(sid);
+        }
+    }
+    for (space, body) in &left {
+        st.record_departure(space, body, reason);
+        events.push(Timed::new(t, EventBody::Vacated { occupant: body.clone(), space: space.clone(), by: by.map(String::from), reason }));
+    }
+    left
+}
+
 /// Take a body out of every space it's in.
 fn vacate_all(s: &Statics, st: &mut State, person: &str, reason: VacateReason, by: Option<&str>) -> Vec<Timed> {
-    let t = st.t;
     let mut events = vec![];
     for sid in st.structures_of(person) {
-        settle(s, st, &sid);
-        let mut spaces: Vec<Id> = vec![];
-        if let Some(m) = st.occupancy.get_mut(&sid) {
-            for (space, bodies) in m.iter_mut() {
-                if bodies.remove(person) {
-                    spaces.push(space.clone());
-                }
-            }
-            m.retain(|_, b| !b.is_empty());
-            if m.is_empty() {
-                st.occupancy.remove(&sid);
-            }
-        }
+        leave_spaces(s, st, &sid, Some(person), None, reason, by, &mut events);
         st.touch_structure(&sid);
-        for space in spaces {
-            st.record_departure(&space, person, reason);
-            events.push(Timed::new(t, EventBody::Vacated { occupant: person.into(), space, by: by.map(String::from), reason }));
-        }
     }
     if !events.is_empty() {
         st.moved(person);
@@ -518,15 +544,10 @@ fn floods(s: &Statics, st: &mut State, t: i64) -> Vec<Timed> {
             if !was {
                 st.flooded.insert(sid.clone());
                 events.push(Timed::new(t, EventBody::Flooded { structure: sid.clone(), level }));
+                // (Settled as it floods, whether or not anyone is inside: its wear is about to rise.)
                 settle(s, st, &sid);
-                if let Some(m) = st.occupancy.remove(&sid) {
-                    for (space, bodies) in m {
-                        for b in bodies {
-                            st.record_departure(&space, &b, VacateReason::Flooded);
-                            st.moved(&b);
-                            events.push(Timed::new(t, EventBody::Vacated { occupant: b, space: space.clone(), by: None, reason: VacateReason::Flooded }));
-                        }
-                    }
+                for (_, b) in leave_spaces(s, st, &sid, None, None, VacateReason::Flooded, None, &mut events) {
+                    st.moved(&b);
                 }
                 st.touch_structure(&sid);
             }
@@ -757,6 +778,9 @@ impl<'a> Exec<'a> {
     /// A structure comes down: off the ground, and gone (what was held there stays held there, to be moved out).
     fn bring_down(&mut self, sid: &str) {
         let Some(x) = self.st.structures.remove(sid) else { return };
+        // (If it was under water, it isn't any more: there's nothing there. Until 2026-10-05 its id stayed among the
+        // flooded for good, since only standing structures are looked at when the water goes down.)
+        self.st.flooded.remove(sid);
         self.st.ground.changed();
         let c = self.st.stamp();
         let cleared = self.st.nature.is_some().then(|| self.s.config.catalogue.cleared_cover.clone()).flatten();
@@ -1547,12 +1571,11 @@ impl<'a> Exec<'a> {
                 if x.demolition.is_some() {
                     return Err(refuse(RefusalCode::ComingDown, format!("{sid} is already being demolished")));
                 }
-                // Its occupants leave at once. Then it comes down: now, or once its demolition labour is done (phase B).
-                for (space, bodies) in self.st.occupancy.remove(&sid).unwrap_or_default() {
-                    for occupant in bodies {
-                        self.st.moved(&occupant);
-                        self.emit(EventBody::Vacated { occupant, space: space.clone(), by: Some(self.participant.into()), reason: VacateReason::Demolition });
-                    }
+                // Its occupants leave at once (as anyone leaves a space: its variables settled first, each departure
+                // recorded; until 2026-10-05 a demolition did neither). Then it comes down: now, or once its demolition
+                // labour is done (phase B).
+                for (_, occupant) in leave_spaces(self.s, self.st, &sid, None, None, VacateReason::Demolition, Some(self.participant), &mut self.events) {
+                    self.st.moved(&occupant);
                 }
                 if self.s.types[&x.structure_type].demolition_labour > 0 {
                     self.st.structures.get_mut(&sid).unwrap().demolition = Some(0);
@@ -1596,24 +1619,8 @@ impl<'a> Exec<'a> {
                 let sid = sid.to_string();
                 // A body is in one place at a time: coming here, it leaves wherever else it was.
                 for other in self.st.structures_of(&who) {
-                    settle(self.s, self.st, &other);
-                    let mut left = vec![];
-                    if let Some(m) = self.st.occupancy.get_mut(&other) {
-                        for (sp, bodies) in m.iter_mut() {
-                            if bodies.remove(&who) {
-                                left.push(sp.clone());
-                            }
-                        }
-                        m.retain(|_, b| !b.is_empty());
-                        if m.is_empty() {
-                            self.st.occupancy.remove(&other);
-                        }
-                    }
+                    leave_spaces(self.s, self.st, &other, Some(&who), None, VacateReason::Left, Some(self.participant), &mut self.events);
                     self.st.touch_structure(&other);
-                    for sp in left {
-                        self.st.record_departure(&sp, &who, VacateReason::Left);
-                        self.emit(EventBody::Vacated { occupant: who.clone(), space: sp, by: Some(self.participant.into()), reason: VacateReason::Left });
-                    }
                 }
                 settle(self.s, self.st, &sid);
                 self.st.occupancy.entry(sid.clone()).or_default().entry(space.clone()).or_default().insert(who.clone());
@@ -1627,29 +1634,15 @@ impl<'a> Exec<'a> {
                 let (occupant, from) = (self.r(occupant)?, self.r(from)?);
                 self.entity_exists(&occupant)?;
                 let sid = split_space(&from).map_or(from.as_str(), |(s, _)| s).to_string();
-                settle(self.s, self.st, &sid);
-                let mut left = vec![];
-                if let Some(m) = self.st.occupancy.get_mut(&sid) {
-                    for (space, bodies) in m.iter_mut() {
-                        if (space == &from || sid == from) && bodies.remove(&occupant) {
-                            left.push(space.clone());
-                        }
-                    }
-                    m.retain(|_, b| !b.is_empty());
-                    if m.is_empty() {
-                        self.st.occupancy.remove(&sid);
-                    }
-                }
+                // From the space named, or (a structure named) from every space of it.
+                let only = (sid != from).then_some(from.as_str());
+                let reason = if occupant == self.entity { VacateReason::Left } else { VacateReason::Removed };
+                let left = leave_spaces(self.s, self.st, &sid, Some(&occupant), only, reason, Some(self.participant), &mut self.events);
                 if left.is_empty() {
                     return Err(refuse(RefusalCode::NotPresent, format!("{occupant} is not in {from}")));
                 }
                 self.st.touch_structure(&sid);
                 self.st.moved(&occupant);
-                let reason = if occupant == self.entity { VacateReason::Left } else { VacateReason::Removed };
-                for space in left {
-                    self.st.record_departure(&space, &occupant, reason);
-                    self.emit(EventBody::Vacated { occupant: occupant.clone(), space, by: Some(self.participant.into()), reason });
-                }
                 Ok(())
             }
 

@@ -229,3 +229,29 @@ fn a_building_floods_above_its_level_and_recedes() {
     assert!(ev.iter().any(|e| matches!(e, EventBody::FloodReceded { structure } if structure == "s-shop")));
     act(&mut run, "carol-self", None, json!([{"block": "occupy", "space": "s-shop/workplace.1"}])).unwrap();
 }
+
+/// A flooded building that comes down isn't flooded any more: there's nothing there. (Until 2026-10-05 its id stayed
+/// among the flooded for good: only standing structures are looked at when the water goes down.)
+#[test]
+fn a_flooded_building_brought_down_is_no_longer_among_the_flooded() {
+    let mut w = nature_world();
+    for t in w["catalogue"]["structure_types"].as_array_mut().unwrap() {
+        if t["id"] == "shop" {
+            t["floods"] = json!({"field": "pollution", "above": 30, "wear_per_day": 100});
+        }
+    }
+    let mut run = start(&w);
+    let ev = advance(&mut run, 5 * DAY);
+    assert!(ev.iter().any(|e| matches!(e, EventBody::Flooded { structure, .. } if structure == "s-shop")));
+    assert!(run.kernel().state().flooded.contains("s-shop"));
+    let ev = act(&mut run, "developer-system", Some("developer"), json!([{"block": "demolish", "structure": "s-shop"}])).unwrap();
+    assert!(ev.iter().any(|e| matches!(e, EventBody::StructureDemolished { structure, .. } if structure == "s-shop")));
+    let st = run.kernel().state();
+    assert!(!st.structures.contains_key("s-shop"));
+    assert!(st.flooded.is_empty(), "still among the flooded: {:?}", st.flooded);
+    // Nothing recedes later from where nothing stands, and the run replays.
+    let ev = advance(&mut run, 40 * DAY);
+    assert!(!ev.iter().any(|e| matches!(e, EventBody::FloodReceded { .. })));
+    run.finish("completed", None).unwrap();
+    oikos_kernel::replay(&run.into_log(), None).unwrap();
+}
