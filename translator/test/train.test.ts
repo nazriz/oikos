@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter, LlmRequest } from "@oikos/participants/llm";
 import { CASES } from "../eval/cases";
-import { amountForms, askable, builtRefusals, copies, durationForms, generate, goldFromCases, goldFromLog, literals, sameProgram, sampler, shapeOf, surfaceVariant, type Example } from "../train/data";
+import { amountForms, askable, builtRefusals, copies, durationForms, generate, goldFromCases, goldFromLog, literals, refusalBriefs, sameProgram, sampler, shapeOf, surfaceVariant, type Example } from "../train/data";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
 const header = JSON.stringify({ kind: "header", body: { config: { world: { entities: [{ id: "builder", name: "Millbrook Builders" }, { id: "city", name: "Millbrook" }] }, positions: [{ id: "works", title: "Works Manager" }] } } });
@@ -135,4 +135,31 @@ test("gold programs from the seen cases cover what a town's code rarely calls", 
   const fns = new Set(gold.map((g) => g.shape.replace(/^v=/, "").split("(")[0]));
   for (const f of ["entity", "claim", "position", "form", "structure", "agreement"]) expect(fns.has(f)).toBe(true);
   expect(gold.some((g) => g.program.startsWith("none("))).toBe(false);
+});
+
+test("refusals that have to be worded: the label comes from how the brief is built; the request must carry what the brief keeps", async () => {
+  const gold = await goldFromLog(LOG);
+  const briefs = refusalBriefs(gold, 2, 9);
+  expect(briefs.map((b) => b.label)).toEqual(["needs_calculation", "not_yours", "unclear", "needs_calculation", "not_yours", "unclear"]);
+  const calc = briefs[0]!;
+  // The payment without its amount: who, from where and what for are still to be copied; no figure is given.
+  expect(calc.brief).toContain("money(for=");
+  expect(calc.brief).not.toContain("amount=");
+  expect(calc.mustCopy).toEqual(expect.arrayContaining(["acc-city", "builder"]));
+  expect(refusalBriefs(gold, 2, 9)).toEqual(briefs);
+  // A writer that words each brief; the model translating back refuses with the right label, except for vague ones.
+  const wording: LlmAdapter = { provider: "stand-in", model: "w", complete: async (req) => {
+    const said = String((req.messages[0] as any).content);
+    const isRefusal = said.startsWith("Situation:");
+    const text = !isRefusal ? saying(said.slice("Call:\n".length, said.indexOf("\n\n")), "x")
+      : said.includes("no amount stated") ? `Pay builder from acc-city a third of the budget, for ${said.includes("the kerb") ? "the kerb" : "the drain"}. (${said.length})`
+      : said.includes("theirs alone") ? `Make them agree. (${said.length})` : `Do something about it. (${said.length})`;
+    return { content: [{ type: "text", text }], usage: { input_tokens: 1, output_tokens: 1 } };
+  } };
+  const r = await generate(gold, { writers: [wording], perGold: 1, refusalsPerLabel: 2, seed: 9,
+    back: { model: "stand-in/back", translate: async (q) => (q.includes("a third") ? "none(needs_calculation)" : q.startsWith("Make them") ? "none(not_yours)" : q.startsWith("Do something") ? "structure(type=road, on=lot-1)" : "none(unclear)") } });
+  const refusals = r.examples.filter((e) => e.kind === "refusal").map((e) => e.program);
+  expect(refusals.filter((x) => x === "none(needs_calculation)").length).toBe(2);
+  expect(refusals.filter((x) => x === "none(not_yours)").length).toBe(2);
+  expect(refusals).not.toContain("none(unclear)"); // the second model made something of them: not kept
 });

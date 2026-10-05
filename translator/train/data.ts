@@ -316,6 +316,76 @@ export function builtRefusals(positives: Example[], seed = 1, share = 0.05): Exa
   return out;
 }
 
+/** How an amount is left to be worked out: each a line of instruction to the writer. */
+const WORKED_OUT = [
+  "a share of something (half, a third, a quarter of what's in an account or a budget)",
+  "a percentage of something (10% of a balance, 2% of last month's takings)",
+  "whatever is left of something after something else",
+  "an amount split equally between several people",
+  "the same as some earlier payment, plus or minus something",
+];
+/** What a vague request is vaguely about. */
+const VAGUE = ["the roads", "housing", "the budget", "the staff", "the complaints", "the river", "the invoices", "the park", "rents", "the waste", "the school", "that letter"];
+
+/** What a refusal's writer is told: the situation, and what the request must and mustn't do. */
+export interface RefusalBrief { label: calls.Label; brief: string; mustCopy: string[]; source: string }
+
+/**
+ * Briefs for the refusals that have to be worded by someone (the label is fixed by how the brief is built, not by
+ * anyone's judgement of the result):
+ *  - needs_calculation: a payment from the gold programs with its amount taken out, to be asked for as something
+ *    that would have to be worked out;
+ *  - not_yours: an outcome that's another party's to decide, wanted as a fact rather than asked for;
+ *  - unclear: something should be done about a subject, with nothing said of what.
+ */
+export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): RefusalBrief[] {
+  const rand = sampler(seed);
+  const choose = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
+  const out: RefusalBrief[] = [];
+  const payments = gold.filter((g) => /^money\(/.test(g.shape) && !g.program.includes("\n"));
+  const parties = [...new Set(gold.flatMap((g) => Object.entries(g.names).map(([id, name]) => `${name} (${id})`)))];
+  for (let i = 0; i < perLabel; i++) {
+    if (payments.length) {
+      const g = choose(payments);
+      const p = calls.parseProgram(g.program) as { lines: calls.Line[] };
+      const { amount: _, ...rest } = p.lines[0]!.call.args;
+      const without = calls.programText({ lines: [{ call: { fn: "money", args: rest } }] });
+      out.push({ label: "needs_calculation", mustCopy: literals(calls.parseProgram(without)), source: g.source,
+        brief: `A payment like this one, but with no amount stated: ${without}\nInstead of an amount, the request says what the amount should be worked out from: ${choose(WORKED_OUT)}. It must not contain the resulting figure.` });
+    }
+    if (parties.length) {
+      const who = choose(parties);
+      out.push({ label: "not_yours", mustCopy: [], source: "brief",
+        brief: `The speaker wants ${who} to decide or do something that is theirs alone to decide (their prices, their vote, whom they hire, whether they agree), and tells whoever carries things out to make it so. It is not a request to write to them, ask them, offer them anything or propose anything: it wants the outcome itself.` });
+    }
+    out.push({ label: "unclear", mustCopy: [], source: "brief",
+      brief: `The speaker wants something done about ${choose(VAGUE)} and doesn't say what: no act, no amount, no one to write to. A sentence or two that could mean many different things.` });
+  }
+  return out;
+}
+
+/** What the writer of a refusal is told. */
+export function refusalWriterSystem(): string {
+  return [
+    "You write the requests that people in a town make of whoever carries things out for them: a mayor to an office, a business owner to a clerk, a resident to an agent. Each request is one to three sentences of plain language.",
+    "This time you're given a situation rather than a call, and a style. Write one request that fits the situation exactly.",
+    "- Any id given in the situation (a bare word like acc-city or rec.412) and any quoted value must appear in your request exactly as written.",
+    "- Don't explain the situation or comment on it; write only what the person would say.",
+    "Answer with the request only.",
+  ].join("\n");
+}
+
+/** A request for a refusal brief, from a model. */
+export async function writeRefusal(adapter: LlmAdapter, b: RefusalBrief, style: string, usage?: (u: Usage) => void): Promise<string | undefined> {
+  const res = await adapter.complete({
+    purpose: "translator", subject: "training-data-writer", system: refusalWriterSystem(), maxTokens: 600,
+    messages: [{ role: "user", content: `Situation:\n${b.brief}\n\nStyle: ${STYLES[style] ?? style}` }],
+  });
+  usage?.(res.usage);
+  const text = res.content.filter((x): x is Extract<typeof x, { type: "text" }> => x.type === "text").map((x) => x.text).join(" ").trim();
+  return text ? text.replace(/^["“]|["”]$/g, "").trim() : undefined;
+}
+
 export interface Manifest {
   version: string;
   examples: number;
@@ -339,6 +409,8 @@ export async function generate(gold: Gold[], o: {
   writers: LlmAdapter[];
   styles?: string[];
   perGold?: number;
+  /** Written refusals asked for, per label (needs_calculation, not_yours, unclear); none if absent. */
+  refusalsPerLabel?: number;
   back?: { model: string; translate: (request: string, forms: string[]) => Promise<string | undefined> };
   heldOut?: Case[];
   seed?: number;
@@ -386,7 +458,38 @@ export async function generate(gold: Gold[], o: {
     }
     if (o.log && (gi + 1) % 25 === 0) o.log(`${gi + 1}/${gold.length} programs; ${positives.length} examples kept`);
   }
-  const examples = [...positives, ...builtRefusals(positives, o.seed ?? 1)];
+  // Refusals that have to be worded: each brief to a writer in turn, kept if it carries what it must and (with a second
+  // model) comes back refused with the same label.
+  const written: Example[] = [];
+  for (const b of o.refusalsPerLabel ? refusalBriefs(gold, o.refusalsPerLabel, o.seed ?? 1) : []) {
+    const writer = o.writers[turn % o.writers.length]!;
+    const style = styles[turn++ % styles.length]!;
+    const model = `${writer.provider}/${writer.model}`;
+    const request = await writeRefusal(writer, b, style, add(model));
+    if (!request) continue;
+    const program = `none(${b.label})`;
+    if (!b.mustCopy.every((l) => request.includes(l))) {
+      dropped.not_copied++;
+      continue;
+    }
+    const key = request.toLowerCase().replace(/\s+/g, " ");
+    if (seen.has(key)) {
+      dropped.duplicate++;
+      continue;
+    }
+    seen.add(key);
+    let verified: string | undefined;
+    if (o.back) {
+      const got = await o.back.translate(request, []);
+      if (got === undefined || !sameProgram(got, program)) {
+        dropped.round_trip++;
+        continue;
+      }
+      verified = o.back.model;
+    }
+    written.push({ id: exampleId(request, program), request, forms: [], program, kind: "refusal", shape: program, style, written_by: model, ...(verified ? { verified_by: verified } : {}), source: `written: ${b.source}` });
+  }
+  const examples = [...positives, ...written, ...builtRefusals(positives, o.seed ?? 1)];
   if (o.heldOut?.length) {
     const shared = leaks(o.heldOut, [{ name: "the training data", text: examples.map((e) => e.request).join("\n") }]);
     if (shared.length) throw new Error(`the training data shares wording with ${new Set(shared.map((s) => s.id)).size} held-out case(s) (${[...new Set(shared.map((s) => s.id))].join(", ")}): not usable as it is`);
