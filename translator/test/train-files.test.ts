@@ -3,7 +3,7 @@
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter } from "@oikos/participants/llm";
-import { fromWritten, generate, goldFromLog, literals, planOf, refusalWriterSystem, writerSystem, type PlanItem, type WrittenRequest } from "../train/data";
+import { fromWritten, generate, goldFromLog, literals, planOf, refusalRequestBrief, refusalStyle, refusalWriterSystem, writerSystem, type PlanItem, type RefusalBrief, type WrittenRequest } from "../train/data";
 import { piled } from "../train/synthetic";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
@@ -116,4 +116,15 @@ test("requests handed in as files give the examples a run with models gives for 
   // A request with marks round the whole of it is read as a model's answer is: without them.
   const quoted = await fromWritten(plan, [{ writer: "claude", requests: all.map((x) => (x.id === left.id ? { id: x.id, request: `  "${x.request}"  ` } : x)) }], o);
   expect(quoted.examples.map((e) => e.request)).toEqual(files.examples.map((e) => e.request));
+});
+
+test("a refusal with no record in it is never given the style that cites a record's id: it is written formally, and one that names a record keeps the style", () => {
+  const without: RefusalBrief = { label: "unclear", brief: "The speaker wants something done about shop-41, and says nothing of what.", mustCopy: ["shop-41"], source: "test" };
+  const withRecord: RefusalBrief = { ...without, brief: "The speaker wants something done about rec.412, and says nothing of what.", mustCopy: ["rec.412"] };
+  expect(refusalStyle(without, "cited")).toBe("formal");
+  expect(refusalRequestBrief(without, "cited")).toBe(refusalRequestBrief(without, "formal"));
+  expect(refusalRequestBrief(without, "cited")).not.toContain("record's id");
+  expect(refusalStyle(withRecord, "cited")).toBe("cited");
+  expect(refusalRequestBrief(withRecord, "cited")).toContain("record's id");
+  expect(refusalStyle(without, "terse")).toBe("terse");
 });

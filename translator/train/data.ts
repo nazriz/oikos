@@ -62,7 +62,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.4.0";
+export const DATA_VERSION = "0.4.1";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -1717,8 +1717,18 @@ export function refusalWriterSystem(): string {
   ].join("\n");
 }
 
+/**
+ * The style a refusal brief is written in. The cited style asks for a record’s id: where the situation names no
+ * record, a writer can only invent one (seen in the first set, 2026-10-06), so such a brief is written formally, as
+ * a request that could take a citation and has none is (styleBrief).
+ */
+export const refusalStyle = (b: RefusalBrief, style: string): string => (style === "cited" && !/\b(rec\.\d+|law-[a-z][a-z-]*)\b/.test(b.brief) ? "formal" : style);
+
 /** What a writer is sent for a refusal brief in a style, whoever the writer is. */
-export const refusalRequestBrief = (b: RefusalBrief, style: string): string => `Situation:\n${b.brief}\n\nStyle: ${STYLES[style] ?? style}`;
+export const refusalRequestBrief = (b: RefusalBrief, style: string): string => {
+  const s = refusalStyle(b, style);
+  return `Situation:\n${b.brief}\n\nStyle: ${STYLES[s] ?? s}`;
+};
 
 /** A request for a refusal brief, from a model. */
 export async function writeRefusal(adapter: LlmAdapter, b: RefusalBrief, style: string, usage?: (u: Usage) => void): Promise<string | undefined> {
@@ -1852,7 +1862,7 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
     for (const b of briefs) {
       const { writer, styleKey, n } = next();
       const brief = refusalRequestBrief(b, styleKey);
-      plan.push({ id: idOf(n, brief), kind: "refusal", writer, style: styleKey, brief, refusal: b, round });
+      plan.push({ id: idOf(n, brief), kind: "refusal", writer, style: refusalStyle(b, styleKey), brief, refusal: b, round });
     }
   }
   return plan;
