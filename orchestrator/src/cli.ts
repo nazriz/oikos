@@ -47,6 +47,17 @@
 //         [--per-shape N] [--per-gold N] [--refusals N] [--limit N] [--seed N]
 //     Training data for the local translation model: requests written by the models given for the calls code
 //     participants made in those logs, each checked (training.ts).
+//   oikos translator-data <LOG|DIR>... --briefs [--writers NAME,NAME,...] [--no-spares] --out DIR
+//         [--shard I/N] [--per-shape N] [--per-gold N] [--refusals N] [--refusal-floor N] [--floor N] [--generated N]
+//         [--ceiling N] [--validation SHARE] [--limit N] [--seed N]      (these options on a run with models too)
+//     No model: the plan of what is to be written (DIR/plan.json), what each writer is asked, item by item
+//     (DIR/briefs.jsonl: {id, kind, brief}; with --writers, DIR/briefs-NAME.jsonl each, the items dealt in turn), and
+//     the writers' instructions (DIR/writer-instructions.txt), for writers who work on files. --shard I/N: part I of
+//     N of the gold set, counted from 1. --no-spares leaves out the refusals asked for ahead of need (used only where
+//     a label comes out short of its floor).
+//   oikos translator-data-write <DIR> --requests FILE --writer NAME [--requests FILE --writer NAME ...]
+//     The requests such writers handed in ({id, request}, a line each), checked as a model's are and made into DIR's
+//     examples.jsonl, rejects.jsonl, blind.jsonl and manifest.json, for translator-data-check.
 //   oikos translator-data-check <DIR> --answers FILE [--reader NAME]
 //   oikos translator-data-check <DIR> --blind [--seed N]
 //     Blind checking of a data folder (translator/train/blind.ts). --blind writes its requests as DIR/blind.jsonl, in a
@@ -76,7 +87,7 @@ const flag = (name: string, dflt?: string) => {
 const flags = (name: string) => rest.flatMap((x, i) => (x === `--${name}` && rest[i + 1] !== undefined ? [rest[i + 1]!] : []));
 const has = (name: string) => rest.includes(`--${name}`);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind", "--briefs", "--no-spares"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
@@ -209,16 +220,31 @@ try {
       report = { ...report, real_requests: real };
     }
     if (flag("out")) await Bun.write(flag("out")!, JSON.stringify(report, null, 2));
-  } else if (cmd === "translator-data" && positional()[0] && flags("model").length && flag("out")) {
-    // Training data for the local translation model, from runs' logs (training.ts).
+  } else if (cmd === "translator-data" && positional()[0] && (flags("model").length || has("briefs")) && flag("out")) {
+    // Training data for the local translation model, from runs' logs (training.ts); or (--briefs) what its writers
+    // are to be asked, for writers who work on files.
     const { trainingData } = await import("./training");
     const pick = (name: string) => chooseModel(name, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
     const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    // (A part is given as people count them, from 1: `--shard 13/24` is the thirteenth of 24.)
+    const part = flag("shard") ? /^(\d+)\/(\d+)$/.exec(flag("shard")!) : undefined;
+    if (flag("shard") && !part) throw new Error(`--shard: expected I/N (part I of N, from 1), got ${flag("shard")}`);
     const r = await trainingData({
-      sources: positional(), writers: flags("model").map(pick), backs: flags("back-model").map(pick), out: flag("out")!,
-      perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), limit: num("limit"), seed: num("seed"), log: console.log,
+      sources: positional(), out: flag("out")!,
+      ...(has("briefs") ? { briefsOnly: true, noSpares: has("no-spares"), briefsFor: (flag("writers") ?? "").split(",").map((x) => x.trim()).filter(Boolean) } : { writers: flags("model").map(pick), backs: flags("back-model").map(pick) }),
+      ...(part ? { shard: { index: Number(part[1]) - 1, of: Number(part[2]) } } : {}),
+      perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), refusalFloor: num("refusal-floor"), floor: num("floor"), generated: num("generated"), ceiling: num("ceiling"), validation: num("validation"),
+      limit: num("limit"), seed: num("seed"), log: console.log,
     });
-    console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);
+    if (has("briefs")) console.log(`${r.briefs} briefs written to ${r.out} (plan.json, briefs.jsonl${flag("writers") ? ", a briefs file for each writer" : ""}, writer-instructions.txt)`);
+    else console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);
+  } else if (cmd === "translator-data-write" && positional()[0] && flags("requests").length) {
+    // The requests writers handed in for a folder's plan, made into its data (training.ts).
+    const { writtenData } = await import("./training");
+    const files = flags("requests"), names = flags("writer");
+    if (names.length !== files.length) throw new Error(`a --writer NAME for each --requests FILE: ${files.length} files, ${names.length} names`);
+    const r = await writtenData(positional()[0]!, files.map((file, i) => ({ file, writer: names[i]! })));
+    console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, rejects.jsonl, blind.jsonl, manifest.json): ${r.rejects} requests rejected, ${r.no_request} planned items had no request${r.duplicate_ids ? `, ${r.duplicate_ids} ids were written twice (the first kept)` : ""}${r.unknown_ids ? `, ${r.unknown_ids} requests were for nothing planned` : ""}`);
   } else if (cmd === "translator-data-check" && positional()[0] && (flag("answers") || has("blind"))) {
     // A blind reader's answers against a data folder's gold programs; or (--blind) the requests for such a reader.
     const { checkBlind, writeBlind } = await import("./training");

@@ -3,8 +3,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { LlmAdapter } from "@oikos/participants/llm";
 import { calls } from "@oikos/participants";
-import { functionOf, literals, refusalBriefs, type Example } from "../../translator/train/data";
-import { balancedGold, checkBlind, goldOf, trainingData, writeBlind } from "../src/training";
+import { functionOf, literals, refusalBriefs, refusalWriterSystem, writerSystem, type Example } from "../../translator/train/data";
+import { balancedGold, checkBlind, goldOf, trainingData, writeBlind, writerInstructions, writtenData } from "../src/training";
 
 const dir = join(import.meta.dir, "../../runs/test-training-data");
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
@@ -249,4 +249,112 @@ test("a long job is done in parts: the parts of a gold set don't overlap, togeth
   const all = /^(\d+) gold programs/.exec(logs.find((l) => /gold programs/.test(l)) ?? "");
   expect(counts.reduce((a, b) => a + b, 0)).toBe(Number(all![1]));
   expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(19); // within one program per function
+});
+
+test("requests written by file: a briefs-only run and the writers' requests taken in give the data a run with models gives; the folder is then checked blind as any other", async () => {
+  const d = join(dir, "by-file");
+  rmSync(d, { recursive: true, force: true });
+  mkdirSync(d, { recursive: true });
+  const log = join(d, "town.seed1.jsonl");
+  writeFileSync(log, [
+    JSON.stringify({ kind: "header", body: { config: { world: { currencies: [{ code: "YUN", minor_units: 0, symbol: "¥", unit_words: ["yun"] }], entities: [{ id: "builder", name: "Millbrook Builders" }] } } } }),
+    ...Array.from({ length: 6 }, (_, i) => act(`money(to=builder, amount="¥${500 + i}", from=acc-city, for="the kerb")`)),
+    act('message(to=["builder"], text="Start on Monday.")'),
+    act("vote(ballot=rec.3, choice=yes)"),
+  ].join("\n") + "\n");
+  // What a stand-in writer says to a brief, however the brief reached it: every literal of a call (after the words
+  // its style says to use exactly), or a situation's own line.
+  const say = (brief: string): string => {
+    const mark = Bun.hash(brief).toString(36);
+    if (!brief.startsWith("Call:\n")) return `Request ${mark}, about this: ${brief.split("\n")[1]}`;
+    const given = brief.includes("exactly ") ? [...brief.slice(brief.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") : "";
+    return `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}please (${mark}): ${literals(calls.parseProgram(brief.slice(6, brief.indexOf("\n\nWhat it brings about")))).join(" / ")}`;
+  };
+  const model = (name: string): LlmAdapter => ({ provider: "stand-in", model: name, complete: async (req) => ({ content: [{ type: "text", text: say(String((req.messages[0] as any).content)) }], usage: { input_tokens: 7, output_tokens: 3 } }) });
+  const free = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
+  const prices = { "stand-in/a": free, "stand-in/b": free };
+  const options = { sources: [log], perGold: 2, seed: 3, floor: 8, generated: 4, perShape: 10, refusalFloor: 4, shard: { index: 1, of: 2 }, validation: 0 };
+  const lines = (folder: string, file: string) => readFileSync(join(folder, file), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  const json = (folder: string, file: string) => JSON.parse(readFileSync(join(folder, file), "utf8"));
+
+  // With models, as before.
+  const withModels = join(d, "models");
+  await trainingData({ ...options, writers: [{ adapter: model("a"), prices }, { adapter: model("b"), prices }], out: withModels });
+
+  // The briefs alone: no model is given, and none is asked.
+  const out = join(d, "files");
+  const b = await trainingData({ ...options, briefsOnly: true, briefsFor: ["stand-in/a", "stand-in/b"], out });
+  const plan = json(out, "plan.json");
+  expect(b).toEqual({ examples: 0, out, briefs: plan.items.length });
+  expect(plan).toMatchObject({ seed: 3, sources: [log], shard: { index: 1, of: 2 }, writers: ["stand-in/a", "stand-in/b"], options: { perGold: 2, refusalFloor: 4, floor: 8, generated: 4, perShape: 10, validation: 0 }, gold_programs: json(withModels, "manifest.json").gold_programs });
+  expect(typeof plan.version).toBe("string");
+  expect(plan.gold).toEqual(json(withModels, "manifest.json").gold);
+  // A line for each item, in the plan's order: its id, which instructions it goes with, and the brief.
+  const briefs = lines(out, "briefs.jsonl");
+  expect(briefs.map((x) => [x.id, x.kind, x.brief])).toEqual(plan.items.map((t: any) => [t.id, t.kind, t.brief]));
+  for (const x of briefs) expect(Object.keys(x).filter((k) => k !== "spare")).toEqual(["id", "kind", "brief"]);
+  expect(briefs.filter((x) => x.spare).map((x) => x.id)).toEqual(plan.items.filter((t: any) => t.round > 0).map((t: any) => t.id));
+  expect(briefs.some((x) => x.kind === "request") && briefs.some((x) => x.kind === "refusal")).toBe(true);
+  // Dealt between the writers in turn, and the plan says who was asked for which.
+  const [forA, forB] = [lines(out, "briefs-stand-in-a.jsonl"), lines(out, "briefs-stand-in-b.jsonl")];
+  expect(forA).toEqual(briefs.filter((_, k) => k % 2 === 0));
+  expect(forB).toEqual(briefs.filter((_, k) => k % 2 === 1));
+  expect(plan.items.map((t: any) => t.writer)).toEqual(briefs.map((_, k) => `stand-in/${"ab"[k % 2]}`));
+  // The instructions: both kinds', word for word what a model is given, and what to hand back.
+  const instructions = readFileSync(join(out, "writer-instructions.txt"), "utf8");
+  expect(instructions).toContain(writerSystem());
+  expect(instructions).toContain(refusalWriterSystem());
+  expect(instructions.split("\n")[0]).toContain('kind "request"');
+  expect(instructions).toContain("requests.jsonl");
+  expect(instructions).toBe(writerInstructions());
+  // The spare refusals can be left out of what the writers are handed; the plan is the same plan.
+  const lean = join(d, "no-spares");
+  expect((await trainingData({ ...options, briefsOnly: true, briefsFor: ["stand-in/a", "stand-in/b"], noSpares: true, out: lean })).briefs).toBe(briefs.filter((x) => !x.spare).length);
+  expect(lines(lean, "briefs.jsonl")).toEqual(briefs.filter((x) => !x.spare));
+  expect([...lines(lean, "briefs-stand-in-a.jsonl"), ...lines(lean, "briefs-stand-in-b.jsonl")].length).toBe(briefs.filter((x) => !x.spare).length);
+  expect(json(lean, "plan.json")).toEqual(plan);
+  // A model, or a price, is asked for only where a model writes.
+  await expect(trainingData({ ...options, out: join(d, "nobody") })).rejects.toThrow("no model to write the requests");
+
+  // Each writer's requests, a file each; taken in, they give the examples the models' run gave (the same ids,
+  // programs, spans and refusals), the same rejects, and the same requests for a blind reader.
+  const write = (name: string, of: any[]) => (writeFileSync(join(d, name), of.map((x) => JSON.stringify({ id: x.id, request: say(x.brief) })).join("\n") + "\n"), join(d, name));
+  const [fileA, fileB] = [write("requests-a.jsonl", forA), write("requests-b.jsonl", forB)];
+  const r = await writtenData(out, [{ file: fileA, writer: "stand-in/a" }, { file: fileB, writer: "stand-in/b" }]);
+  const examples: Example[] = lines(out, "examples.jsonl");
+  expect(examples).toEqual(lines(withModels, "examples.jsonl"));
+  expect(examples.filter((e) => e.kind === "positive" && e.spans?.length).length).toBeGreaterThan(20);
+  expect(examples.some((e) => e.kind === "refusal" && e.built_from) && examples.some((e) => e.kind === "refusal" && e.source.startsWith("written: "))).toBe(true);
+  expect(lines(out, "rejects.jsonl")).toEqual(lines(withModels, "rejects.jsonl"));
+  expect(lines(out, "blind.jsonl")).toEqual(lines(withModels, "blind.jsonl"));
+  const manifest = json(out, "manifest.json"), theirs = json(withModels, "manifest.json");
+  expect(r).toEqual({ examples: examples.length, rejects: lines(out, "rejects.jsonl").length, no_request: 0, duplicate_ids: 0, unknown_ids: 0, out });
+  for (const k of ["version", "examples", "by_kind", "by_shape", "by_function", "by_style", "writers", "dropped", "spans", "refusal_floor", "short_of_floor", "sha256", "sources", "gold_programs", "gold", "seed", "checked_against_held_out"]) expect([k, manifest[k]]).toEqual([k, theirs[k]]);
+  expect(manifest).toMatchObject({ no_request: 0, shard: { index: 1, of: 2 }, plan_version: plan.version, cost_microusd: 0, usage: {}, requests_from: [{ writer: "stand-in/a", file: fileA }, { writer: "stand-in/b", file: fileB }] });
+  expect(manifest.from_files.requests).toEqual({ "stand-in/a": forA.length, "stand-in/b": forB.length });
+
+  // The commands: the same briefs, the same data; and the blind check then reads the folder as it is.
+  const cli = (...args: string[]) => Bun.spawnSync([process.execPath, join(import.meta.dir, "../src/cli.ts"), ...args], { cwd: join(import.meta.dir, "../..") });
+  const again = join(d, "cli");
+  const made = cli("translator-data", log, "--briefs", "--writers", "stand-in/a,stand-in/b", "--out", again, "--per-gold", "2", "--seed", "3", "--floor", "8", "--generated", "4", "--per-shape", "10", "--refusal-floor", "4", "--shard", "2/2", "--validation", "0");
+  expect([made.exitCode, made.stderr.toString()]).toEqual([0, ""]);
+  expect(made.stdout.toString()).toContain(`${plan.items.length} briefs written to`);
+  expect(json(again, "plan.json")).toEqual(plan);
+  for (const f of ["briefs.jsonl", "briefs-stand-in-a.jsonl", "briefs-stand-in-b.jsonl", "writer-instructions.txt"]) expect(readFileSync(join(again, f), "utf8")).toBe(readFileSync(join(out, f), "utf8"));
+  // One writer's file lacks a request, and has one that lost what it was to copy: counted, and rejected with its reason.
+  const [lost, left] = [forB.find((x) => x.kind === "request")!, forB.filter((x) => x.kind === "request")[1]!];
+  writeFileSync(fileB, forB.filter((x) => x.id !== left.id).map((x) => JSON.stringify({ id: x.id, request: x.id === lost.id ? "Please see to it." : say(x.brief) })).join("\n") + "\n");
+  const taken = cli("translator-data-write", again, "--requests", fileA, "--writer", "reader-a", "--requests", fileB, "--writer", "reader-b");
+  expect([taken.exitCode, taken.stderr.toString()]).toEqual([0, ""]);
+  expect(taken.stdout.toString()).toContain("1 planned items had no request");
+  const theirsNow: Example[] = lines(again, "examples.jsonl");
+  expect(new Set(theirsNow.filter((e) => !e.built_from).map((e) => e.written_by))).toEqual(new Set(["reader-a", "reader-b"]));
+  expect(lines(again, "rejects.jsonl")).toContainEqual(expect.objectContaining({ request: "Please see to it.", why: "not_copied", written_by: "reader-b" }));
+  expect(json(again, "manifest.json")).toMatchObject({ no_request: 1, examples: theirsNow.length, dropped: { not_copied: manifest.dropped.not_copied + 1 } });
+  expect(cli("translator-data-write", again, "--requests", fileA).exitCode).toBe(1); // a file with no writer's name
+  const answers = join(d, "answers.jsonl");
+  writeFileSync(answers, lines(again, "blind.jsonl").map((x) => JSON.stringify({ id: x.id, program: theirsNow.find((e) => e.id === x.id)!.program })).join("\n") + "\n");
+  const checked = cli("translator-data-check", again, "--answers", answers, "--reader", "reader-y");
+  expect(checked.stdout.toString()).toContain(`reader-y: agreed on ${theirsNow.length} of ${theirsNow.length}`);
+  expect(json(again, "manifest.json")).toMatchObject({ no_request: 1, blind_check: { reader: "reader-y", agreed: theirsNow.length } });
 });

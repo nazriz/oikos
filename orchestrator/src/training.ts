@@ -8,6 +8,10 @@
 //   `--back-model` (one or more), if a model that didn't write it translates it back to a program that means the same,
 //   through the translator as runs use it.
 //
+// Where no model can be reached through an adapter, the requests are written by file: `briefsOnly` writes the plan and
+// its briefs (what a model would have been sent, item by item), a writer hands back a file of requests, and
+// `writtenData` checks them and builds the same examples (data.ts `planOf`, `fromWritten`).
+//
 // The examples are also written split into training and validation, by gold program and by form.
 // Every model call's tokens are counted in the manifest written with the data. The held-out test cases are never
 // read for this; if this machine has them, the finished data is checked against them and refused on any shared wording.
@@ -20,7 +24,7 @@ import { createTranslator, Knowledge } from "@oikos/translator";
 import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
 import { blindRequests, checkAnswers, type BlindAnswer, type BlindReport } from "../../translator/train/blind";
-import { functionOf, generate, goldFromCases, goldFromLog, knowing, sampler, shuffled, split, surfaceVariant, type Back, type Example, type Gold } from "../../translator/train/data";
+import { DATA_VERSION, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
 import { piled, synthetic } from "../../translator/train/synthetic";
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
@@ -31,7 +35,17 @@ export interface Model { adapter: LlmAdapter; prices?: Record<string, Price>; bu
 export interface TrainingDataOptions {
   /** Logs, or folders of them. */
   sources: string[];
-  writers: Model[];
+  /** The models that write the requests (none needed with `briefsOnly`). */
+  writers?: Model[];
+  /** No model: write the plan (`plan.json`), its briefs (`briefs.jsonl`) and the writers' instructions into `out`,
+   * for writers who work on files; their requests are taken in by `writtenData`. The plan is the one a run with
+   * models would follow for the same options and as many writers. */
+  briefsOnly?: boolean;
+  /** With `briefsOnly`: who is to write, by name, the plan's items dealt to them in turn (`briefs-<name>.jsonl` each). */
+  briefsFor?: string[];
+  /** With `briefsOnly`: leave the spare refusals (the later rounds', used only where a label comes out short of its
+   * floor) out of the briefs files. They stay in the plan, and one that is wanted and wasn't written is counted. */
+  noSpares?: boolean;
   /** The models that translate requests back (the check). A request is checked by the first of them that isn't the
    * model that wrote it: a model checking its own writing keeps what it parrots and rejects what another would say
    * naturally. So with a checker among the writers, give a second one for that model's requests. (`back`: one, as before.) */
@@ -202,11 +216,13 @@ export function checkBlind(dir: string, answersFile: string, reader = "blind rea
   return r.report;
 }
 
-export async function trainingData(o: TrainingDataOptions): Promise<{ examples: number; out: string; stopped?: string }> {
+export async function trainingData(o: TrainingDataOptions): Promise<{ examples: number; out: string; stopped?: string; /** With `briefsOnly`: how many briefs were written. */ briefs?: number }> {
   const log = o.log ?? (() => {});
+  const writers = o.writers ?? [];
+  if (!o.briefsOnly && !writers.length) throw new Error("no model to write the requests: give one, or ask for the briefs only");
   // (A model with no recorded price is refused before anything is asked of any of them.)
   const checkers = [...(o.backs ?? []), ...(o.back ? [o.back] : [])];
-  for (const m of [...o.writers, ...checkers]) {
+  for (const m of o.briefsOnly ? [] : [...writers, ...checkers]) {
     const key = `${m.adapter.provider}/${m.adapter.model}`;
     if (!(m.prices ?? PRICES)[key]) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
   }
@@ -241,6 +257,34 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     gold = taken;
     log(`writing requests for ${gold.length} of them`);
   }
+  // What is asked for of the gold set, whoever writes: the same for a run with models and for the briefs alone.
+  // (With a floor under the refusals: related acts for a writer to pile into one message, which is `too_much` as
+  // people make it; a third as many as the floor, beside the built ones.)
+  const asked = {
+    ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
+    ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
+    seed: o.seed ?? 1,
+  };
+  if (o.briefsOnly) {
+    const names = o.briefsFor?.length ? o.briefsFor : ["writer"];
+    if (new Set(names.map(fileName)).size !== names.length) throw new Error(`writers' names must differ: ${names.join(", ")}`);
+    const items = planOf(gold, { ...asked, writers: names });
+    const plan: Plan = {
+      version: DATA_VERSION, seed: o.seed ?? 1, sources: o.sources, ...(o.shard ? { shard: o.shard } : {}),
+      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), validation: o.validation ?? 0.15 },
+      writers: names, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}), items,
+    };
+    mkdirSync(o.out, { recursive: true });
+    writeFileSync(join(o.out, "plan.json"), JSON.stringify(plan, null, 1) + "\n");
+    const line = (t: PlanItem) => JSON.stringify({ id: t.id, kind: t.kind, ...(t.kind === "refusal" && t.round > 0 ? { spare: true } : {}), brief: t.brief });
+    const handed = o.noSpares ? items.filter((t) => !(t.kind === "refusal" && t.round > 0)) : items;
+    const briefs = (file: string, of: PlanItem[]) => writeFileSync(join(o.out, file), of.map(line).join("\n") + (of.length ? "\n" : ""));
+    briefs("briefs.jsonl", handed);
+    if (o.briefsFor?.length) for (const name of names) briefs(`briefs-${fileName(name)}.jsonl`, handed.filter((t) => t.writer === name));
+    writeFileSync(join(o.out, "writer-instructions.txt"), writerInstructions());
+    log(`${handed.length} briefs for ${names.length} writer${names.length === 1 ? "" : "s"}${o.noSpares ? ` (${items.length - handed.length} spare ones left out)` : ""}`);
+    return { examples: 0, out: o.out, briefs: handed.length };
+  }
   // Translating back: the translator as runs use it (its prompt, its tool, its parser), on the second model, one
   // attempt (a second attempt is for a seat's sake; here a miss is a miss), knowing nothing of any world but how its
   // money is written (the test town's: the gold programs' amounts are in it).
@@ -274,21 +318,90 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   const heldOut = loadHeldOut();
   const { examples, manifest, rejects } = await generate(gold, {
     concurrency: o.concurrency ?? 4,
-    writers: o.writers.map(guarded), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
-    // (With a floor under the refusals: related acts for a writer to pile into one message, which is `too_much` as
-    // people make it; a third as many as the floor, beside the built ones.)
-    ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
-    backs: backs.map((b) => b.back), ...(heldOut ? { heldOut } : {}), seed: o.seed ?? 1, log,
+    writers: writers.map(guarded), ...asked,
+    backs: backs.map((b) => b.back), ...(heldOut ? { heldOut } : {}), log,
   });
   for (const b of backs) manifest.usage[`${b.back.model} (translating back)`] = b.usage;
-  mkdirSync(o.out, { recursive: true });
-  writeFileSync(join(o.out, "examples.jsonl"), examples.map((e) => JSON.stringify(e)).join("\n") + (examples.length ? "\n" : ""));
-  writeFileSync(join(o.out, "rejects.jsonl"), rejects.map((e) => JSON.stringify(e)).join("\n") + (rejects.length ? "\n" : ""));
-  // Training and validation, split by gold program (and by form): written beside the whole, with what went where.
-  const parts = (o.validation ?? 0.15) > 0 ? split(examples, { validation: o.validation ?? 0.15, seed: o.seed ?? 1 }) : undefined;
-  if (parts) for (const side of ["train", "validation"] as const) writeFileSync(join(o.out, `${side}.jsonl`), parts[side].map((e) => JSON.stringify(e)).join("\n") + (parts[side].length ? "\n" : ""));
-  // The requests alone, shuffled, for a reader who is to see nothing else (`translator-data-check`).
-  writeFileSync(join(o.out, "blind.jsonl"), blindRequests(examples, o.seed ?? 1).map((e) => JSON.stringify(e)).join("\n") + (examples.length ? "\n" : ""));
-  writeFileSync(join(o.out, "manifest.json"), JSON.stringify({ ...manifest, sources: o.sources, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}), ...(parts ? { split: { validation_share: o.validation ?? 0.15, train: parts.train.length, validation: parts.validation.length, by_function: parts.report } } : {}), seed: o.seed ?? 1, checked_against_held_out: !!heldOut, cost_microusd: costMicroUsd }, null, 2) + "\n");
+  writeData(o.out, { examples, rejects, manifest }, { validation: o.validation ?? 0.15, seed: o.seed ?? 1 }, { sources: o.sources, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}) }, { checked_against_held_out: !!heldOut, cost_microusd: costMicroUsd });
   return { examples: examples.length, out: o.out, ...(manifest.stopped ? { stopped: manifest.stopped } : {}) };
+}
+
+/** A data folder written out: the examples, the rejects, the split, the requests for a blind reader, and the manifest
+ * (`before` and `after`: what it says beside the examples' own counts, before and after the split's). */
+function writeData(out: string, d: { examples: Example[]; rejects: Reject[]; manifest: Manifest }, o: { validation: number; seed: number }, before: object, after: object): void {
+  const lines = (xs: unknown[]) => xs.map((x) => JSON.stringify(x)).join("\n") + (xs.length ? "\n" : "");
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "examples.jsonl"), lines(d.examples));
+  writeFileSync(join(out, "rejects.jsonl"), lines(d.rejects));
+  // Training and validation, split by gold program (and by form): written beside the whole, with what went where.
+  const parts = o.validation > 0 ? split(d.examples, { validation: o.validation, seed: o.seed }) : undefined;
+  if (parts) for (const side of ["train", "validation"] as const) writeFileSync(join(out, `${side}.jsonl`), lines(parts[side]));
+  // The requests alone, shuffled, for a reader who is to see nothing else (`translator-data-check`).
+  writeFileSync(join(out, "blind.jsonl"), lines(blindRequests(d.examples, o.seed)));
+  writeFileSync(join(out, "manifest.json"), JSON.stringify({ ...d.manifest, ...before, ...(parts ? { split: { validation_share: o.validation, train: parts.train.length, validation: parts.validation.length, by_function: parts.report } } : {}), seed: o.seed, ...after }, null, 2) + "\n");
+}
+
+/** A writer's name as part of a file's name. */
+const fileName = (writer: string): string => writer.replace(/[^A-Za-z0-9._-]+/g, "-");
+
+/**
+ * What `briefsOnly` writes as `plan.json`: everything needed to make the examples once the requests are in, with
+ * nothing computed again. `items`: who was asked for what, in the plan's order (data.ts `PlanItem`: a request's gold
+ * program with its world's money and forms, its style, riders and the way of saying it chosen; a refusal's label and
+ * what it must carry).
+ */
+export interface Plan {
+  /** The pipeline's version when the plan was made (data.ts DATA_VERSION). */
+  version: string;
+  seed: number;
+  sources: string[];
+  shard?: { index: number; of: number };
+  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; validation: number };
+  /** Who was asked, in the order the items were dealt (item k to writer k mod n). */
+  writers: string[];
+  gold_programs: number;
+  gold?: GoldReport;
+  items: PlanItem[];
+}
+
+/** What a writer who works on files is told (`writer-instructions.txt`): which instructions go with which briefs, what
+ * to hand back, and the two sets of instructions, word for word what a model is given as its system prompt. */
+export function writerInstructions(): string {
+  return [
+    'Each line of a briefs file is {id, kind, brief}: the brief is what you are given, and you answer it with one request. For a brief of kind "request" follow INSTRUCTIONS FOR REQUESTS below; for a brief of kind "refusal" follow INSTRUCTIONS FOR REFUSALS.',
+    'Hand back a file requests.jsonl: one line for each brief, {"id": "<the brief\'s id>", "request": "<your request>"}, each line valid JSON by itself (quotation marks and line breaks inside a request escaped), and nothing else in the file. Write each request from its own brief alone, as if it were the only one you had been given. A brief marked "spare": true is used only if earlier ones of its kind fail a check: write it like any other.',
+    "",
+    '=== INSTRUCTIONS FOR REQUESTS (kind: "request") ===',
+    writerSystem(),
+    "",
+    '=== INSTRUCTIONS FOR REFUSALS (kind: "refusal") ===',
+    refusalWriterSystem(),
+    "",
+  ].join("\n");
+}
+
+/**
+ * `oikos translator-data-write <DIR> --requests FILE --writer NAME [--requests FILE --writer NAME ...]`: the requests
+ * writers handed in for a folder's plan (`plan.json`, from a briefs-only run), made into the folder's data. Each file
+ * is lines of `{id, request}` (or one JSON list), and may cover any part of the plan; an id written twice keeps the
+ * first. Every request gets the mechanical checks a model's gets (data.ts `fromWritten`), and the folder gets what a
+ * run with models writes: examples.jsonl (`written_by`: the writer's name), rejects.jsonl, the split if the plan asked
+ * for one, blind.jsonl and manifest.json, which also says how many planned items had no request. Nothing is
+ * translated back: the blind check (`checkBlind`) is the check of meaning, and it reads this folder as it is.
+ */
+export async function writtenData(dir: string, files: { file: string; writer: string }[]): Promise<{ examples: number; rejects: number; no_request: number; duplicate_ids: number; unknown_ids: number; out: string }> {
+  const plan = JSON.parse(readFileSync(join(dir, "plan.json"), "utf8")) as Plan;
+  const read = (file: string): WrittenRequest[] => {
+    const text = readFileSync(file, "utf8");
+    return text.trimStart().startsWith("[") ? (JSON.parse(text) as WrittenRequest[]) : jsonl<WrittenRequest>(file);
+  };
+  const heldOut = loadHeldOut();
+  const r = await fromWritten(plan.items, files.map((f) => ({ writer: f.writer, requests: read(f.file) })), {
+    ...(plan.options.refusalsPerLabel ? { refusalsPerLabel: plan.options.refusalsPerLabel } : {}), ...(plan.options.refusalFloor ? { refusalFloor: plan.options.refusalFloor } : {}),
+    ...(heldOut ? { heldOut } : {}), seed: plan.seed,
+  });
+  writeData(dir, r, { validation: plan.options.validation, seed: plan.seed }, { sources: plan.sources, gold_programs: plan.gold_programs, ...(plan.gold ? { gold: plan.gold } : {}) },
+    { ...(plan.shard ? { shard: plan.shard } : {}), plan_version: plan.version, requests_from: files.map((f) => ({ writer: f.writer, file: f.file })), checked_against_held_out: !!heldOut, cost_microusd: 0 });
+  const from = r.manifest.from_files!;
+  return { examples: r.examples.length, rejects: r.rejects.length, no_request: from.no_request, duplicate_ids: from.duplicate_ids, unknown_ids: from.unknown_ids, out: dir };
 }

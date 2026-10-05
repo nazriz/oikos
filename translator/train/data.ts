@@ -37,6 +37,9 @@
 //                   says goods come "from" the place they go to, is dropped mechanically (`badlyWritten`).
 //   one spelling    gold is kept the same way whatever wrote it (`goldText`): counts, amounts and times quoted, a
 //                   list of one unwrapped, a flag as `yes`.
+//   by file         where no model can be reached through an adapter, the plan of who writes what (`planOf`) is
+//                   written out as briefs, a writer hands back a file of requests, and they are checked and made
+//                   into examples by the same code (`fromWritten`); nothing translates them back but the blind check.
 //   blind checking  the requests alone, shuffled, go to a reader who sees nothing else, and the reader's programs are
 //                   compared with the gold ones by meaning (blind.ts).
 //   the split       into training and validation is by gold program, and by form (`split`).
@@ -1207,23 +1210,36 @@ export function writerSystem(): string {
   ].join("\n");
 }
 
-/** A request for a gold program in a style, from a model. `notes`: what else the writer is told of this program (a
- * way of saying it, chosen by seed, and what its values are: `writerNotes`). */
-export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: string, usage?: (u: Usage) => void, notes: string[] = []): Promise<string | undefined> {
+/**
+ * What a writer is sent for a gold program in a style, whoever the writer is (a model behind an adapter, or one that
+ * is handed a file of these: `planOf`). `notes`: what else the writer is told of this program (a way of saying it,
+ * chosen by seed, and what its values are: `writerNotes`).
+ */
+export function requestBrief(gold: Gold, style: string, notes: string[] = []): string {
   const names = Object.entries(gold.names).map(([id, name]) => `${id} is ${name}`);
   const form = formOf(gold.program);
   const fields = (gold.forms ?? []).filter((f) => f.form === form?.form).map(formLine);
-  const res = await adapter.complete({
-    purpose: "translator", subject: "training-data-writer", system: writerSystem(), maxTokens: 600,
-    messages: [{ role: "user", content: [
-      `Call:\n${gold.program}`, `What it brings about (for your understanding: don't reuse this wording):\n${bringsAbout(gold.program).join("\n")}`,
-      ...(notes.length ? [`How to say it:\n${notes.join("\n")}`] : []),
-      ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []), ...(fields.length ? [`The form, as the person knows of it:\n${fields.join("\n")}`] : []), `Style: ${STYLES[style] ?? style}`,
-    ].join("\n\n") }],
-  });
+  return [
+    `Call:\n${gold.program}`, `What it brings about (for your understanding: don't reuse this wording):\n${bringsAbout(gold.program).join("\n")}`,
+    ...(notes.length ? [`How to say it:\n${notes.join("\n")}`] : []),
+    ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []), ...(fields.length ? [`The form, as the person knows of it:\n${fields.join("\n")}`] : []), `Style: ${STYLES[style] ?? style}`,
+  ].join("\n\n");
+}
+
+/** A writer's answer as a request: trimmed, and marks round the whole of it taken off. The same for a model's answer
+ * and for a line of a writer's file. */
+export const asRequest = (text: string): string | undefined => (text.trim() ? unwrapped(text.trim()) : undefined);
+
+/** A brief sent to a model under a writer's instructions, and its answer as a request. */
+async function ask(adapter: LlmAdapter, system: string, brief: string, usage?: (u: Usage) => void): Promise<string | undefined> {
+  const res = await adapter.complete({ purpose: "translator", subject: "training-data-writer", system, maxTokens: 600, messages: [{ role: "user", content: brief }] });
   usage?.(res.usage);
-  const text = res.content.filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text").map((b) => b.text).join(" ").trim();
-  return text ? unwrapped(text) : undefined;
+  return asRequest(res.content.filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text").map((b) => b.text).join(" "));
+}
+
+/** A request for a gold program in a style, from a model. */
+export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: string, usage?: (u: Usage) => void, notes: string[] = []): Promise<string | undefined> {
+  return ask(adapter, writerSystem(), requestBrief(gold, style, notes), usage);
 }
 
 /** Why a written request reads as the call and not as a person, each a reason a request is dropped for (and counted). */
@@ -1701,15 +1717,12 @@ export function refusalWriterSystem(): string {
   ].join("\n");
 }
 
+/** What a writer is sent for a refusal brief in a style, whoever the writer is. */
+export const refusalRequestBrief = (b: RefusalBrief, style: string): string => `Situation:\n${b.brief}\n\nStyle: ${STYLES[style] ?? style}`;
+
 /** A request for a refusal brief, from a model. */
 export async function writeRefusal(adapter: LlmAdapter, b: RefusalBrief, style: string, usage?: (u: Usage) => void): Promise<string | undefined> {
-  const res = await adapter.complete({
-    purpose: "translator", subject: "training-data-writer", system: refusalWriterSystem(), maxTokens: 600,
-    messages: [{ role: "user", content: `Situation:\n${b.brief}\n\nStyle: ${STYLES[style] ?? style}` }],
-  });
-  usage?.(res.usage);
-  const text = res.content.filter((x): x is Extract<typeof x, { type: "text" }> => x.type === "text").map((x) => x.text).join(" ").trim();
-  return text ? unwrapped(text) : undefined;
+  return ask(adapter, refusalWriterSystem(), refusalRequestBrief(b, style), usage);
 }
 
 /** A request that wasn't kept, and why: for looking at what the writers and the round trip get wrong. `checked_by`:
@@ -1747,6 +1760,9 @@ export interface Manifest {
    * reach): what was written until then is kept. */
   stopped?: string;
   usage: { [model: string]: Usage };
+  /** Where the requests were handed in as files (`fromWritten`): how many planned items had none, and the rest of the count. */
+  no_request?: number;
+  from_files?: FromFiles;
   /** SHA-256 of the examples file: recorded with any model trained on it (§16.4). */
   sha256: string;
 }
@@ -1779,47 +1795,96 @@ function doNots(request: string, taken: [number, number][]): { text: string; at:
   return out;
 }
 
-/**
- * Write requests for the gold programs and keep the ones that hold up.
- * `writers`: the models that write requests, taken in turn, each asked for the styles in turn.
- * `backs` (or one, `back`): the models that translate a request back to a program through the real translator. Each
- * request is checked by one that didn't write it (`checkerFor`), and the example says which; with none, examples are
- * kept unverified and marked so.
- * `heldOut`: the held-out cases, if this machine has them: a request sharing wording with one is dropped.
- */
-export async function generate(gold: Gold[], o: {
-  writers: LlmAdapter[];
+/** One thing a writer is asked for: a request for a gold program (`request`), or one that fits a situation and is to
+ * be refused (`refusal`). `brief`: exactly what the writer is sent, a model or one working from a file. `writer`: who
+ * is asked. A refusal's `round`: 0, or a later one, asked for only where its label came out short of the floor. */
+interface Asked { id: string; writer: string; style: string; brief: string }
+export type PlanItem =
+  | (Asked & { kind: "request"; /** The program, with its world's money and forms. */ gold: Gold; riders: Rider[]; /** The way of saying it chosen for this request (`writerNotes`). */ notes: string[] })
+  | (Asked & { kind: "refusal"; /** Its label, and what the request must carry. */ refusal: RefusalBrief; round: number });
+
+export interface PlanOptions {
+  /** Who writes, by name, taken in turn (item k is writer k mod n's), each asked for the styles in turn. */
+  writers: string[];
   styles?: string[];
   perGold?: number;
   /** Written refusals asked for, per label that has a brief (`refusalBriefs`); none if absent. */
   refusalsPerLabel?: number;
   /** At least so many refusals of every label of the call language (`calls.LABELS`, whatever they are): briefs for
-   * the written ones, asked again for a label that came out short, and the built ones as far as the examples allow.
-   * What still came out short is in the manifest. */
+   * the written ones, two more rounds of them for a label that came out short, and the built ones as far as the
+   * examples allow. What still came out short is in the manifest. */
   refusalFloor?: number;
   /** Groups of related, separate acts for a writer to ask for in one message (`piledBriefs`): `too_much` as people make it. */
   piled?: Gold[][];
-  back?: Back;
+  seed?: number;
+}
+
+/**
+ * Who is asked for what, in which style and in which order: settled before anything is written, from the gold programs
+ * and the seed alone, so the same gold, options and seed give the same plan whoever then writes (models through
+ * adapters: `generate`; or writers handed the briefs as a file: `fromWritten`).
+ * Each request is asked for with how often its program recurs said one of the ways people say it, and with a way of
+ * saying its act, both chosen by seed (`withHowOften`, `writerNotes`): several requests for one program are asked for
+ * in different words, and the program's `every` is the span the writer was told to use.
+ * With a floor under the refusals, the briefs of the two later rounds are planned too (new ones, by other seeds); a
+ * later round's brief is used only while its label is short.
+ */
+export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
+  const styles = o.styles ?? Object.keys(STYLES);
+  const seed = o.seed ?? 1;
+  const styleRand = sampler(seed + 11);
+  const sayRand = sampler(seed + 17);
+  const plan: PlanItem[] = [];
+  let turn = 0;
+  const next = () => ({ writer: o.writers[turn % o.writers.length]!, styleKey: styles[turn % styles.length]!, n: turn++ });
+  const idOf = (n: number, brief: string) => sha256(canonicalJson({ seed, n, brief })).slice(0, 12);
+  for (const given of gold) for (let k = 0; k < (o.perGold ?? 3); k++) {
+    const { writer, styleKey, n } = next();
+    const g = withHowOften(given, sayRand);
+    const { style, instruction, riders } = styleBrief(styleKey, g, styleRand);
+    const notes = writerNotes(g.program, sayRand);
+    const brief = requestBrief(g, instruction, notes);
+    plan.push({ id: idOf(n, brief), kind: "request", writer, style, brief, gold: g, riders, notes });
+  }
+  const perLabel = Math.max(o.refusalsPerLabel ?? 0, o.refusalFloor ?? 0);
+  for (let round = 0; round < (o.refusalFloor ? 3 : 1); round++) {
+    const briefs = round === 0 ? [...(perLabel ? refusalBriefs(gold, perLabel, seed) : []), ...piledBriefs(o.piled ?? [])] : refusalBriefs(gold, perLabel, seed + round * 7919);
+    for (const b of briefs) {
+      const { writer, styleKey, n } = next();
+      const brief = refusalRequestBrief(b, styleKey);
+      plan.push({ id: idOf(n, brief), kind: "refusal", writer, style: styleKey, brief, refusal: b, round });
+    }
+  }
+  return plan;
+}
+
+/** What came back for a planned item: the request, and who wrote it. */
+export interface Written { request: string; by: string }
+
+/**
+ * A plan carried out: each item's request fetched (`write`: from a model, or looked up in what a writer handed in),
+ * checked, and kept if it holds up. The one path for both ways of writing, so the checks and the examples are the same.
+ * The requests for programs are fetched several at a time (`concurrency`: a model call is nearly all waiting) and gone
+ * through in the plan's order, so the result doesn't depend on which came back first; the refusals one after another,
+ * a later round's only while its label is short.
+ */
+async function fromPlan(plan: PlanItem[], o: {
+  write: (item: PlanItem) => Promise<Written | undefined>;
+  refusalsPerLabel?: number;
+  refusalFloor?: number;
   backs?: Back[];
   heldOut?: Case[];
   seed?: number;
-  /** How many requests are written and translated back at a time (1 if absent). */
   concurrency?: number;
   log?: (s: string) => void;
-}): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[] }> {
-  const styles = o.styles ?? Object.keys(STYLES);
-  const perGold = o.perGold ?? 3;
-  const backs = [...(o.backs ?? []), ...(o.back ? [o.back] : [])];
-  const usage: { [model: string]: Usage } = {};
-  const add = (model: string) => (u: Usage) => {
-    const t = (usage[model] ??= { input_tokens: 0, output_tokens: 0 });
-    t.input_tokens += u.input_tokens + (u.cache_read_tokens ?? 0);
-    t.output_tokens += u.output_tokens;
-  };
+  usage?: { [model: string]: Usage };
+}): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[]; /** Items that were wanted and had no request. */ unwritten: number }> {
+  const backs = o.backs ?? [];
   const dropped: Manifest["dropped"] = { not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 0, variable_named: 0, argument_named: 0, zero_wait: 0, place_reversed: 0, description_echoed: 0 };
   const rejects: Reject[] = [];
   // A limit reached, or a model out of reach, ends the writing with what there is; any other failed call loses one request.
   let stopped: string | undefined;
+  let unwritten = 0;
   const attempt = async <T>(f: () => Promise<T>): Promise<T | undefined> => {
     try {
       return await f();
@@ -1831,52 +1896,43 @@ export async function generate(gold: Gold[], o: {
   };
   const seen = new Set<string>();
   const positives: Example[] = [];
-  const styleRand = sampler((o.seed ?? 1) + 11);
-  let turn = 0;
-  // Who writes what, in which style, and who checks it, is settled first and in order (so the same gold and seed give
-  // the same plan); the writing and the translating back then run several at a time (`concurrency`: a model call is
-  // nearly all waiting), and what came back is gone through in the plan's order, so the result doesn't depend on
-  // which call returned first.
-  // Each request is written for the program with how often it recurs said one of the ways people say it, and with a
-  // way of saying its act, both chosen by seed (`withHowOften`, `writerNotes`): several requests for one program are
-  // asked for in different words, and the program's `every` is the span the writer was told to use.
-  const sayRand = sampler((o.seed ?? 1) + 17);
-  const plan = gold.flatMap((given) => Array.from({ length: perGold }, () => {
-    const writer = o.writers[turn % o.writers.length]!;
-    const g = withHowOften(given, sayRand);
-    const brief = styleBrief(styles[turn++ % styles.length]!, g, styleRand);
-    const model = `${writer.provider}/${writer.model}`;
-    return { g, notes: writerNotes(g.program, sayRand), forms: (g.forms ?? []).map(formLine), writer, model, check: checkerFor(model, backs), ...brief };
-  }));
-  type Came = { request?: string; why?: Reject["why"]; got?: string; backFailed?: boolean };
-  const came: Came[] = new Array(plan.length);
+  const requests = plan.filter((t): t is Extract<PlanItem, { kind: "request" }> => t.kind === "request");
+  type Came = { request?: string; by?: string; check?: ReturnType<typeof checkerFor>; why?: Reject["why"]; got?: string; backFailed?: boolean };
+  const came: Came[] = new Array(requests.length);
+  const formsOf = (g: Gold) => (g.forms ?? []).map(formLine);
   let next = 0, done = 0;
   await Promise.all(Array.from({ length: Math.max(1, o.concurrency ?? 1) }, async () => {
-    while (next < plan.length && !stopped) {
+    while (next < requests.length && !stopped) {
       const n = next++;
-      const t = plan[n]!;
-      const request = await attempt(() => writeRequest(t.writer, t.g, t.instruction, add(t.model), t.notes));
-      const out: Came = (came[n] = request ? { request } : {});
-      if (request) {
+      const t = requests[n]!;
+      const w = await attempt(() => o.write(t));
+      const out: Came = (came[n] = w ? { ...w, check: checkerFor(w.by, backs) } : {});
+      if (w) {
+        const request = w.request;
         // What the program takes from the request is looked for outside its riders, and each rider must be there as
         // given; then how it reads (badlyWritten); only then is a model asked.
-        if (!(t.riders.every((r) => request.includes(r.text)) && copies(withoutRiders(request, t.riders), t.g.program))) out.why = "not_copied";
-        else out.why = badlyWritten(request, t.g.program, t.riders);
-        if (!out.why && t.check) {
+        if (!(t.riders.every((r) => request.includes(r.text)) && copies(withoutRiders(request, t.riders), t.gold.program))) out.why = "not_copied";
+        else out.why = badlyWritten(request, t.gold.program, t.riders);
+        if (!out.why && out.check) {
           const failed = dropped.failed;
-          const got = await attempt(() => t.check!.back.translate(request, t.forms, t.g));
+          const got = await attempt(() => out.check!.back.translate(request, formsOf(t.gold), t.gold));
           if (got === undefined && (stopped || dropped.failed > failed)) out.backFailed = true;
           else if (got !== undefined) out.got = got;
         }
       }
-      if (o.log && ++done % 50 === 0) o.log(`${done}/${plan.length} requests written and checked`);
+      if (o.log && ++done % 50 === 0) o.log(`${done}/${requests.length} requests written and checked`);
     }
   }));
-  for (const [n, t] of plan.entries()) {
+  for (const [n, t] of requests.entries()) {
     const c = came[n];
-    if (!c?.request) continue;
-    const { g, forms, model, style, riders, check } = t;
-    const request = c.request;
+    if (!c?.request) {
+      unwritten++;
+      continue;
+    }
+    const { gold: g, style, riders } = t;
+    const forms = formsOf(g);
+    const { request, check } = c;
+    const model = c.by!;
     if (c.why) {
       dropped[c.why]++;
       rejects.push({ request, program: g.program, why: c.why, written_by: model, style });
@@ -1910,52 +1966,50 @@ export async function generate(gold: Gold[], o: {
       ...(all.length ? { riders: all } : {}),
     });
   }
-  // Refusals that have to be worded: each brief to a writer in turn, kept if it carries what it must and (with a
-  // checker) comes back refused with the same label. With a floor, a label that came out short is asked for again
-  // (new briefs, twice at most): whichever labels `refusalBriefs` has briefs for, nothing here names them.
+  // Refusals that have to be worded: each brief's request kept if it carries what it must and (with a checker) comes
+  // back refused with the same label. With a floor, a label that came out short has the later rounds' briefs (new
+  // ones, twice at most): whichever labels `refusalBriefs` has briefs for, nothing here names them.
   const written: Example[] = [];
   const have: { [label: string]: number } = {};
   const perLabel = Math.max(o.refusalsPerLabel ?? 0, o.refusalFloor ?? 0);
-  for (let round = 0; round < (o.refusalFloor ? 3 : 1) && !stopped; round++) {
-    const briefs = round === 0
-      ? [...(perLabel ? refusalBriefs(gold, perLabel, o.seed ?? 1) : []), ...piledBriefs(o.piled ?? [])]
-      : refusalBriefs(gold, perLabel, (o.seed ?? 1) + round * 7919).filter((b) => (have[b.label] ?? 0) < perLabel);
-    if (!briefs.length) break;
-    for (const b of briefs) {
-      if (stopped) break;
-      if (round > 0 && (have[b.label] ?? 0) >= perLabel) continue;
-      const writer = o.writers[turn % o.writers.length]!;
-      const style = styles[turn++ % styles.length]!;
-      const model = `${writer.provider}/${writer.model}`;
-      const request = await attempt(() => writeRefusal(writer, b, style, add(model)));
-      if (!request) continue;
-      const program = `none(${b.label})`;
-      const why: Reject["why"] | undefined = !b.mustCopy.every((l) => request.includes(l)) ? "not_copied" : !quotesBalanced(request) && !b.mustCopy.some((l) => /["“”]/.test(l)) ? "quotes" : undefined;
-      if (why) {
-        dropped[why]++;
-        rejects.push({ request, program, why, written_by: model, style });
-        continue;
-      }
-      const key = request.toLowerCase().replace(/\s+/g, " ");
-      if (seen.has(key)) {
-        dropped.duplicate++;
-        continue;
-      }
-      seen.add(key);
-      const check = checkerFor(model, backs);
-      if (check) {
-        const failed = dropped.failed;
-        const got = await attempt(() => check.back.translate(request, []));
-        if (stopped || dropped.failed > failed) continue;
-        if (got === undefined || !sameProgram(got, program)) {
-          dropped.round_trip++;
-          rejects.push({ request, program, why: "round_trip", ...(got !== undefined ? { got } : {}), written_by: model, checked_by: check.back.model, style });
-          continue;
-        }
-      }
-      have[b.label] = (have[b.label] ?? 0) + 1;
-      written.push({ id: exampleId(request, program), request, forms: [], program, kind: "refusal", shape: program, style, written_by: model, ...(check ? { verified_by: check.back.model, ...(check.own ? { verified_by_writer: true as const } : {}) } : {}), source: `written: ${b.source}`, ...(b.gold ? { gold: b.gold } : {}) });
+  for (const t of plan) {
+    if (stopped) break;
+    if (t.kind !== "refusal") continue;
+    const b = t.refusal;
+    if (t.round > 0 && (have[b.label] ?? 0) >= perLabel) continue;
+    const w = await attempt(() => o.write(t));
+    if (!w) {
+      unwritten++;
+      continue;
     }
+    const { request, by: model } = w;
+    const style = t.style;
+    const program = `none(${b.label})`;
+    const why: Reject["why"] | undefined = !b.mustCopy.every((l) => request.includes(l)) ? "not_copied" : !quotesBalanced(request) && !b.mustCopy.some((l) => /["“”]/.test(l)) ? "quotes" : undefined;
+    if (why) {
+      dropped[why]++;
+      rejects.push({ request, program, why, written_by: model, style });
+      continue;
+    }
+    const key = request.toLowerCase().replace(/\s+/g, " ");
+    if (seen.has(key)) {
+      dropped.duplicate++;
+      continue;
+    }
+    seen.add(key);
+    const check = checkerFor(model, backs);
+    if (check) {
+      const failed = dropped.failed;
+      const got = await attempt(() => check.back.translate(request, []));
+      if (stopped || dropped.failed > failed) continue;
+      if (got === undefined || !sameProgram(got, program)) {
+        dropped.round_trip++;
+        rejects.push({ request, program, why: "round_trip", ...(got !== undefined ? { got } : {}), written_by: model, checked_by: check.back.model, style });
+        continue;
+      }
+    }
+    have[b.label] = (have[b.label] ?? 0) + 1;
+    written.push({ id: exampleId(request, program), request, forms: [], program, kind: "refusal", shape: program, style, written_by: model, ...(check ? { verified_by: check.back.model, ...(check.own ? { verified_by_writer: true as const } : {}) } : {}), source: `written: ${b.source}`, ...(b.gold ? { gold: b.gold } : {}) });
   }
   // Nothing that shares wording with a held-out case is kept: each such request is dropped (and counted), so the
   // test stays a test of requests the model hasn't seen the like of.
@@ -1984,10 +2038,93 @@ export async function generate(gold: Gold[], o: {
     spans: { copy: spanCount("copy"), choice: spanCount("choice"), implied: spanCount("implied") },
     ...(o.refusalFloor ? { refusal_floor: o.refusalFloor, short_of_floor: short } : {}),
     writers: count((e) => e.written_by), checked: count((e) => (e.verified_by ? `${e.written_by} -> ${e.verified_by}` : undefined)), checked_by_writer: examples.filter((e) => e.verified_by_writer).length,
-    dropped, ...(stopped ? { stopped } : {}), usage,
+    dropped, ...(stopped ? { stopped } : {}), usage: o.usage ?? {},
     sha256: sha256(examples.map((e) => canonicalJson(e)).join("\n")),
   };
+  return { examples, manifest, rejects, unwritten };
+}
+
+/**
+ * Write requests for the gold programs and keep the ones that hold up.
+ * `writers`: the models that write requests, taken in turn, each asked for the styles in turn (`planOf`).
+ * `backs` (or one, `back`): the models that translate a request back to a program through the real translator. Each
+ * request is checked by one that didn't write it (`checkerFor`), and the example says which; with none, examples are
+ * kept unverified and marked so.
+ * `heldOut`: the held-out cases, if this machine has them: a request sharing wording with one is dropped.
+ */
+export async function generate(gold: Gold[], o: Omit<PlanOptions, "writers"> & {
+  writers: LlmAdapter[];
+  back?: Back;
+  backs?: Back[];
+  heldOut?: Case[];
+  /** How many requests are written and translated back at a time (1 if absent). */
+  concurrency?: number;
+  log?: (s: string) => void;
+}): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[] }> {
+  const usage: { [model: string]: Usage } = {};
+  const add = (model: string) => (u: Usage) => {
+    const t = (usage[model] ??= { input_tokens: 0, output_tokens: 0 });
+    t.input_tokens += u.input_tokens + (u.cache_read_tokens ?? 0);
+    t.output_tokens += u.output_tokens;
+  };
+  const names = o.writers.map((w) => `${w.provider}/${w.model}`);
+  const adapters = new Map(names.map((name, i) => [name, o.writers[i]!]));
+  const { writers: _, back, backs, ...rest } = o;
+  const { examples, manifest, rejects } = await fromPlan(planOf(gold, { ...rest, writers: names }), {
+    ...rest, backs: [...(backs ?? []), ...(back ? [back] : [])], usage,
+    write: async (t) => {
+      const request = await ask(adapters.get(t.writer)!, t.kind === "request" ? writerSystem() : refusalWriterSystem(), t.brief, add(t.writer));
+      return request ? { request, by: t.writer } : undefined;
+    },
+  });
   return { examples, manifest, rejects };
+}
+
+/** A writer's request for a planned item, as a line of the file it hands in. */
+export interface WrittenRequest { id: string; request: string }
+
+/** What was handed in against a plan, beside what the manifest says of the examples. */
+export interface FromFiles {
+  /** Requests handed in, per writer (each id's first only). */
+  requests: { [writer: string]: number };
+  /** Planned items that were wanted and had no request (a later round's refusal counts only where its label was short). */
+  no_request: number;
+  /** Requests for an id that already had one (the first is kept; counted under `dropped.duplicate` too). */
+  duplicate_ids: number;
+  /** Requests whose id is no planned item's. */
+  unknown_ids: number;
+  /** Later rounds' refusals that were written and not wanted: their labels had their floor. */
+  spares_not_needed: number;
+}
+
+/**
+ * Requests written to a plan's briefs by writers who work on files (`planOf`; a line of `{id, request}` each), made
+ * into examples: every mechanical check a model's request gets (what must be copied and where, the riders, how it
+ * reads, said before, wording shared with a held-out case), the same examples for the same requests (`written_by`:
+ * the writer who handed the request in), and the built refusals. No model translates them back here: that is the
+ * blind check's work (blind.ts). Several writers' files may each cover part of the plan; an id written twice keeps
+ * the first.
+ */
+export async function fromWritten(plan: PlanItem[], files: { writer: string; requests: WrittenRequest[] }[], o: { refusalsPerLabel?: number; refusalFloor?: number; heldOut?: Case[]; seed?: number } = {}): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[] }> {
+  const ids = new Set(plan.map((t) => t.id));
+  const given = new Map<string, Written>();
+  const from: FromFiles = { requests: {}, no_request: 0, duplicate_ids: 0, unknown_ids: 0, spares_not_needed: 0 };
+  for (const f of files) {
+    from.requests[f.writer] ??= 0;
+    for (const r of f.requests) {
+      const request = r && typeof r.id === "string" && typeof r.request === "string" ? asRequest(r.request) : undefined;
+      if (!request) continue;
+      if (!ids.has(r.id)) from.unknown_ids++;
+      else if (given.has(r.id)) from.duplicate_ids++;
+      else (given.set(r.id, { request, by: f.writer }), from.requests[f.writer]!++);
+    }
+  }
+  const wanted = new Set<string>();
+  const { examples, manifest, rejects, unwritten } = await fromPlan(plan, { ...o, write: async (t) => (wanted.add(t.id), given.get(t.id)) });
+  from.no_request = unwritten;
+  from.spares_not_needed = [...given.keys()].filter((id) => !wanted.has(id)).length;
+  manifest.dropped.duplicate += from.duplicate_ids;
+  return { examples, manifest: { ...manifest, no_request: unwritten, from_files: from }, rejects };
 }
 
 /** What an example is an example of: its program's first function, or its refusal. */
