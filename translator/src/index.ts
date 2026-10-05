@@ -86,14 +86,24 @@ const GLOSS: { [fn: string]: string } = {
   take: "things someone else holds are taken from where they are, without their agreement",
 };
 
+/** What the translator is told of amounts, in place of the contract's line (which shows how three currencies are
+ * written): true to what the parser accepts in any world, and naming no world's money. */
+const AMOUNTS = "  - amounts: whatever the request wrote as one, copied whole: the digits (with their commas and decimals, and a multiplier such as k or m, or thousand to trillion, if written) together with the sign or code before them or the word or code after them, if any. The parser reads it in the world's own money, to an integer in its smallest unit; digits written with no sign or word are whole units.";
+
 /** The translator's instructions: the call language itself, generated from the contract (P12), and nothing about any world. */
 export function translatorSystem(): string {
-  const syntax = CALLS_MD.slice(CALLS_MD.indexOf("## Syntax"), CALLS_MD.indexOf("## Functions")).trim();
+  // The contract's syntax, with its line on amounts said for any world: the contract lists how three example
+  // currencies are written, and the translator is to learn none of them (it copies; the parser, which has the world's
+  // currency, reads). The contract's examples likewise lose their sign: bare digits are an amount in any world.
+  const syntax = CALLS_MD.slice(CALLS_MD.indexOf("## Syntax"), CALLS_MD.indexOf("## Functions")).trim()
+    .split("\n").map((line) => (line.startsWith("  - amounts") ? AMOUNTS : line)).join("\n");
+  const unsigned = (text: string) => text.replace(/(amount|price|carrying)="[^0-9"]*([0-9][^"]*)"/g, (_, arg, digits) => `${arg}="${digits}"`);
   const fns = Object.entries(calls.ARGS).map(([fn, a]) => `- ${fn}(${a.allowed ? [...a.allowed].map((x) => (a.required.includes(x) ? `${x}*` : x)).join(", ") : [...a.required.map((x) => `${x}*`), "…the form's own fields"].join(", ")}): ${GLOSS[fn] ?? ""}`);
-  const examples = CALLS_MD.slice(CALLS_MD.indexOf("## Examples")).trim();
+  const examples = unsigned(CALLS_MD.slice(CALLS_MD.indexOf("## Examples")).trim());
   return [
     "You translate one plain-language request into the call language below. You don't judge it, improve it or complete it: write exactly what was asked, with exactly the inputs given.",
     "- Copy ids exactly as written (lot-00-00, apts-3/dwelling.2, acc-city, rec.412). Copy names, amounts and durations as quoted text, exactly as written; never calculate anything.",
+    "- An amount is copied exactly as written, with whatever sign or word of money the request used: its digits, its commas and decimals, and the sign, code or word before or after them. Don't add one the request didn't write, drop one it did, or put one in another's place.",
     "- If something the request needs isn't there, leave that argument out: whoever resolves the call will ask. A request that's plain but leaves a detail out is not unclear.",
     "- Never make up an id. Someone or something named or described without its id is written as the request put it, in quotes (to=\"Millbrook Builders\", by=\"the builder\", to=\"the works manager\"): whoever resolves the call knows who that is, or asks. Only an account that's described and not named (\"the town account\") is left out.",
     "- A kind of thing is the request's own word for it: \"40 goods\" is kind=goods, \"a park\" is type=park. Something published with no kind said is kind=notice.",
@@ -112,8 +122,8 @@ export function translatorSystem(): string {
     "- To fill in a form, use form(...) with the form's own field names, listed below the request.",
     "",
     "A few more examples:",
-    "  Have Acme build a shed on lot-07 for $9,000 from acc-1, under permit rec.30.  ->  structure(type=shed, on=lot-07, by=acme, price=\"$9,000\", from=acc-1, basis=rec.30)",
-    "  Get Acme to pull down str.4, paying $2k from acc-1.  ->  structure(remove=str.4, by=acme, price=\"$2k\", from=acc-1)",
+    "  Have Acme build a shed on lot-07 for 9,000 from acc-1, under permit rec.30.  ->  structure(type=shed, on=lot-07, by=acme, price=\"9,000\", from=acc-1, basis=rec.30)",
+    "  Get Acme to pull down str.4, paying 2k from acc-1.  ->  structure(remove=str.4, by=acme, price=\"2k\", from=acc-1)",
     "  Direct the clerk [clerk] to send me the minutes by Friday.  ->  message(to=clerk, text=\"Please send me the minutes by Friday.\")",
     "  Give notice on our agreement rec.9.  ->  agreement(notice=rec.9)",
     "  Pay Acme half of what we hold.  ->  none(needs_calculation)",
