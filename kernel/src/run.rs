@@ -93,6 +93,8 @@ pub struct Run<W: Write> {
     log: LogWriter<W>,
     checkpoint_every: i64,
     ended: bool,
+    /// The last command's observation as it was hashed, if it was (see `take_observed`).
+    observed: Option<crate::kernel::Observed>,
 }
 
 impl<W: Write> Run<W> {
@@ -124,7 +126,7 @@ impl<W: Write> Run<W> {
         };
         let mut log = LogWriter::new(out, anchors, loaded.config.log.anchor_every_entries);
         log.append(0, Kind::Header, serde_json::to_value(&header).expect("header serializes"))?;
-        Ok(Run { checkpoint_every: loaded.config.log.checkpoint_every, kernel, log, ended: false })
+        Ok(Run { checkpoint_every: loaded.config.log.checkpoint_every, kernel, log, ended: false, observed: None })
     }
 
     /// The full picture a participant's channels cover right now (the perception invariant's reference). Changes nothing; not logged.
@@ -153,7 +155,9 @@ impl<W: Write> Run<W> {
         let from = self.kernel.t();
         let body = serde_json::to_value(cmd).expect("commands serialize");
         let seq = self.log.append(from, Kind::Command, body)?.seq;
-        let Output { events, observation } = self.kernel.apply(cmd)?;
+        self.observed = None;
+        let Output { events, observation, observed } = self.kernel.apply(cmd)?;
+        self.observed = observed;
         let mut logged = Vec::with_capacity(events.len());
         for mut timed in events {
             timed.event.cause = seq;
@@ -166,6 +170,12 @@ impl<W: Write> Run<W> {
             }
         }
         Ok(Response { seq, events: logged, observation })
+    }
+
+    /// The observation the last command returned, in JSON as it was hashed for the log (none in a lean log, which
+    /// keeps no observation hashes): the protocol's reply carries these bytes instead of serialising it again.
+    pub fn take_observed(&mut self) -> Option<crate::kernel::Observed> {
+        self.observed.take()
     }
 
     fn checkpoint(&mut self) -> Result<(), RunError> {

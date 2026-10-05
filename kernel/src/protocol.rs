@@ -44,22 +44,32 @@ impl Session {
     /// One request, one reply (never an error: a refused request is `{"ok":false,"error":..}`). A log that couldn't
     /// be written is marked `fatal`: the host must not take it for an off-contract request and carry on.
     pub fn request(&mut self, req: &Value) -> Value {
-        handle(self, req).unwrap_or_else(|e| {
-            if e.starts_with(crate::run::LOG_WRITE_FAILED) {
+        match self.reply(req) {
+            Reply::Value(v) => v,
+            Reply::Line(s) => serde_json::from_str(&s).expect("a reply is JSON"),
+        }
+    }
+
+    fn reply(&mut self, req: &Value) -> Reply {
+        let done = if req.get("op").and_then(Value::as_str) == Some("command") { command(self, req).map(Reply::Line) } else { handle(self, req).map(Reply::Value) };
+        done.unwrap_or_else(|e| {
+            Reply::Value(if e.starts_with(crate::run::LOG_WRITE_FAILED) {
                 json!({ "ok": false, "error": e, "fatal": true })
             } else {
                 json!({ "ok": false, "error": e })
-            }
+            })
         })
     }
 
     /// One request as a line of JSON, its reply as one.
     pub fn request_line(&mut self, line: &str) -> String {
-        let reply = match serde_json::from_str::<Value>(line) {
-            Ok(req) => self.request(&req),
-            Err(e) => json!({ "ok": false, "error": format!("request is not JSON: {e}") }),
-        };
-        reply.to_string()
+        match serde_json::from_str::<Value>(line) {
+            Ok(req) => match self.reply(&req) {
+                Reply::Value(v) => v.to_string(),
+                Reply::Line(s) => s,
+            },
+            Err(e) => json!({ "ok": false, "error": format!("request is not JSON: {e}") }).to_string(),
+        }
     }
 
     /// The connection closed: a run still open ends as aborted (errors if it already ended, which is fine).
@@ -91,6 +101,46 @@ pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()>
     Ok(())
 }
 
+/// A reply: a value, or a line already written.
+enum Reply {
+    Value(Value),
+    Line(String),
+}
+
+/// A command: its reply as a line, `{"events":[..],"observation":{..}?,"ok":true,"seq":n}`. Written directly: an
+/// observation is most of what crosses to the host, and it has been serialised once already, for its hash in the log;
+/// those bytes are the reply's.
+fn command(session: &mut Session, req: &Value) -> Result<String, String> {
+    let Session { run, sched, knowledge, currency, .. } = session;
+    let r = run.as_mut().ok_or("no run started")?;
+    let cmd: Command = serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|e| format!("bad command: {e}"))?;
+    let resp = r.command(&cmd).map_err(|e| e.to_string())?;
+    let events = serde_json::to_value(&resp.events).map_err(|e| e.to_string())?;
+    let observed = match (r.take_observed(), &resp.observation) {
+        (Some(o), _) => Some(o),
+        // (A lean log keeps no observation hashes: serialised here.)
+        (None, Some(obs)) => Some(crate::kernel::Observed::of(obs).map_err(|e| e.to_string())?),
+        (None, None) => None,
+    };
+    // What the seat now knows: each observation delivered to it, as it received it.
+    if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(o)) = (&cmd, &observed) {
+        let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
+        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb(&o.value);
+    }
+    if let Some(s) = sched.as_mut() {
+        s.note(Some(r.kernel().state()), events.as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());
+    }
+    let mut line = Vec::with_capacity(observed.as_ref().map_or(0, |o| o.canonical.len()) + 256);
+    line.extend_from_slice(b"{\"events\":");
+    serde_json::to_writer(&mut line, &events).map_err(|e| e.to_string())?;
+    if let Some(o) = &observed {
+        line.extend_from_slice(b",\"observation\":");
+        line.extend_from_slice(&o.canonical);
+    }
+    line.extend_from_slice(format!(",\"ok\":true,\"seq\":{}}}", resp.seq).as_bytes());
+    String::from_utf8(line).map_err(|e| e.to_string())
+}
+
 fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
     let Session { run, sched, knowledge, types, currency } = session;
     let op = req.get("op").and_then(Value::as_str).ok_or("missing op")?;
@@ -116,22 +166,6 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
     }
     let r = run.as_mut().ok_or("no run started")?;
     match op {
-        "command" => {
-            let cmd: Command =
-                serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|e| format!("bad command: {e}"))?;
-            let resp = r.command(&cmd).map_err(|e| e.to_string())?;
-            let mut v = serde_json::to_value(&resp).map_err(|e| e.to_string())?;
-            // What the seat now knows: each observation delivered to it, as it received it.
-            if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(obs)) = (&cmd, v.get("observation")) {
-                let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
-                knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb(obs);
-            }
-            if let Some(s) = sched.as_mut() {
-                s.note(Some(r.kernel().state()), v["events"].as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());
-            }
-            v["ok"] = Value::Bool(true);
-            Ok(v)
-        }
         // A call to the seat's own acts (the resolver, from what the seat knows): blocks, or questions for the seat.
         "resolve" => {
             let participant = str_field("participant")?;

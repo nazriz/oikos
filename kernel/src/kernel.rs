@@ -16,6 +16,23 @@ pub use oikos_world::kernel::{Check, Command, ProtocolError};
 pub struct Output {
     pub events: Vec<Timed>,
     pub observation: Option<Observation>,
+    /// The observation as it was hashed, when it was: whoever delivers it needn't serialise it again.
+    pub observed: Option<Observed>,
+}
+
+/// An observation in JSON: its value, and its canonical bytes (what its hash in the log is of).
+#[derive(Debug, Clone)]
+pub struct Observed {
+    pub value: serde_json::Value,
+    pub canonical: Vec<u8>,
+}
+
+impl Observed {
+    pub fn of(obs: &Observation) -> Result<Observed, canon::CanonError> {
+        let value = serde_json::to_value(obs).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
+        let canonical = canon::canonical_value(&value)?;
+        Ok(Observed { value, canonical })
+    }
 }
 
 pub struct Kernel {
@@ -64,7 +81,7 @@ impl Kernel {
                 self.world.precheck(cmd)?;
                 Ok(self.observe(participant, only.as_deref(), looks))
             }
-            _ => Ok(Output { events: self.world.apply(cmd)?.events, observation: None }),
+            _ => Ok(Output { events: self.world.apply(cmd)?.events, observation: None, observed: None }),
         }
     }
 
@@ -83,9 +100,11 @@ impl Kernel {
         let obs = Observation { outcomes, inbox, ..obs };
         // A lean log keeps no observation hashes (the log's `detail`): hashing a whole observation is much of the cost.
         if self.world.statics().config.log.detail.as_deref() == Some("lean") {
-            return Output { events: vec![], observation: Some(obs) };
+            return Output { events: vec![], observation: Some(obs), observed: None };
         }
-        let hash = canon::hash_value(canon::DOMAIN_OBSERVATION, &obs).expect("observations are canonical");
-        Output { events: vec![Timed::new(self.world.t(), EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs) }
+        // (Exactly `canon::hash_value` of the observation, its JSON kept for whoever delivers it.)
+        let observed = Observed::of(&obs).expect("observations are canonical");
+        let hash = canon::hash_with_domain(canon::DOMAIN_OBSERVATION, &observed.canonical);
+        Output { events: vec![Timed::new(self.world.t(), EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs), observed: Some(observed) }
     }
 }
