@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter, LlmRequest } from "@oikos/participants/llm";
-import { askable, builtRefusals, copies, generate, goldFromLog, literals, sameProgram, shapeOf, type Example } from "../train/data";
+import { CASES } from "../eval/cases";
+import { amountForms, askable, builtRefusals, copies, durationForms, generate, goldFromCases, goldFromLog, literals, sameProgram, sampler, shapeOf, surfaceVariant, type Example } from "../train/data";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
 const header = JSON.stringify({ kind: "header", body: { config: { world: { entities: [{ id: "builder", name: "Millbrook Builders" }, { id: "city", name: "Millbrook" }] }, positions: [{ id: "works", title: "Works Manager" }] } } });
@@ -104,4 +105,34 @@ test("training data that shares wording with a held-out case is refused", async 
   const gold = await goldFromLog(LOG);
   const heldOut = [{ id: "x-1", request: `Would you ${saying(gold[1]!.program, "plain").slice(8)}`, expect: ["none(unclear)"] }];
   await expect(generate(gold, { writers: [writer("a", saying)], perGold: 1, styles: ["plain"], heldOut })).rejects.toThrow("shares wording with 1 held-out case(s) (x-1)");
+});
+
+test("the same program on another surface: a name for an id, an amount or a time written another way, meaning the same", async () => {
+  expect(amountForms("$27200.00")).toEqual(["$27,200", "$27200", "$27,200.00", "27,200 dollars"]);
+  expect(amountForms("$5,000")).toContain("$5k");
+  expect(amountForms("$12.50")).toEqual(["$12.5".length ? "$12.50" : "", "12.50 dollars"].filter((x) => x !== "$12.50"));
+  expect(amountForms("a lot")).toEqual([]);
+  expect(durationForms("30 days", true)).toEqual(expect.arrayContaining(["1 month", "a month", "every month", "monthly"]));
+  expect(durationForms("30 days", false)).not.toContain("monthly");
+  expect(durationForms("14 days", false)).toEqual(expect.arrayContaining(["2 weeks", "a fortnight"]));
+  const [gold] = (await goldFromLog(LOG)).filter((g) => g.shape === "money(amount,for,from,to)");
+  const rand = sampler(5);
+  const seenForms = new Set<string>();
+  for (let i = 0; i < 40; i++) {
+    const v = surfaceVariant(gold!, rand);
+    seenForms.add(v.program);
+    const p = calls.parseProgram(v.program) as any;
+    // The same act: the same cents, the same payee (by id, or by the name the resolver looks up), the same shape.
+    expect(calls.parseAmount(p.lines[0].call.args.amount.text)).toBe("50000");
+    expect([{ id: "builder" }, { text: "Millbrook Builders" }]).toContainEqual(p.lines[0].call.args.to);
+    expect(shapeOf(p)).toBe(gold!.shape);
+  }
+  expect(seenForms.size).toBeGreaterThan(3);
+});
+
+test("gold programs from the seen cases cover what a town's code rarely calls", () => {
+  const gold = goldFromCases(CASES);
+  const fns = new Set(gold.map((g) => g.shape.replace(/^v=/, "").split("(")[0]));
+  for (const f of ["entity", "claim", "position", "form", "structure", "agreement"]) expect(fns.has(f)).toBe(true);
+  expect(gold.some((g) => g.program.startsWith("none("))).toBe(false);
 });

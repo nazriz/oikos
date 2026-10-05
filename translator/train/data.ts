@@ -163,6 +163,85 @@ export async function goldFromLog(lines: AsyncIterable<string> | Iterable<string
   return out;
 }
 
+const AMOUNT_ARGS = new Set(["amount", "price", "carrying"]);
+const DURATION_ARGS = new Set(["every", "term", "our_notice", "their_notice", "first"]);
+
+/** Other ways of writing the same amount, each checked to parse to the same number of cents. */
+export function amountForms(text: string): string[] {
+  let cents: string;
+  try {
+    cents = calls.parseAmount(text);
+  } catch {
+    return [];
+  }
+  const c = BigInt(cents);
+  const whole = (c / 100n).toString();
+  const frac = (c % 100n).toString().padStart(2, "0");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const forms = frac === "00"
+    ? [`$${grouped}`, `$${whole}`, `$${grouped}.00`, `${grouped} dollars`, ...(c % 100_000n === 0n && c > 0n ? [`$${c / 100_000n}k`, `${c / 100_000n}k`] : []), ...(c % 100_000_000n === 0n && c > 0n ? [`$${c / 100_000_000n}m`, `$${c / 100_000_000n} million`] : [])]
+    : [`$${grouped}.${frac}`, `$${whole}.${frac}`, `${grouped}.${frac} dollars`];
+  return [...new Set(forms)].filter((f) => f !== text && same(() => calls.parseAmount(f), cents));
+}
+
+/** Other ways of writing the same length of time (`repeating`: for how often something recurs, "monthly" reads too). */
+export function durationForms(text: string, repeating: boolean): string[] {
+  let seconds: number;
+  try {
+    seconds = calls.parseDuration(text);
+  } catch {
+    return [];
+  }
+  const DAY = 86_400;
+  const forms: string[] = [];
+  const of = (n: number, unit: string) => forms.push(`${n} ${unit}${n === 1 ? "" : "s"}`, ...(n === 1 ? [`${/^[aeiou]/.test(unit) ? "an" : "a"} ${unit}`] : []), ...(repeating ? [n === 1 ? `every ${unit}` : `every ${n} ${unit}s`] : []));
+  if (seconds % DAY === 0) of(seconds / DAY, "day");
+  if (seconds % (7 * DAY) === 0) of(seconds / (7 * DAY), "week");
+  if (seconds % (30 * DAY) === 0) of(seconds / (30 * DAY), "month");
+  if (seconds % (365 * DAY) === 0) of(seconds / (365 * DAY), "year");
+  if (seconds === 14 * DAY) forms.push("a fortnight");
+  if (repeating) forms.push(...Object.entries({ daily: DAY, weekly: 7 * DAY, fortnightly: 14 * DAY, monthly: 30 * DAY, quarterly: 90 * DAY, yearly: 365 * DAY }).filter(([, v]) => v === seconds).map(([k]) => k));
+  return [...new Set(forms)].filter((f) => f !== text && same(() => calls.parseDuration(f), seconds));
+}
+
+const same = <T>(f: () => T, want: T): boolean => {
+  try {
+    return f() === want;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The same program written another way on its surface: an organisation or person by its name instead of its id
+ * (which a call writes as the name, quoted: the resolver looks it up), an amount or a length of time in another
+ * format that parses to the same number. What it does is unchanged; what a request for it must copy is different,
+ * so the model learns to copy what's written, in whatever form, and not one way of writing things.
+ */
+export function surfaceVariant(g: Gold, rand: () => number): Gold {
+  const p = calls.parseProgram(g.program);
+  if ("none" in p) return g;
+  const choose = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
+  const value = (key: string, v: calls.Value): calls.Value => {
+    if ("call" in v) return { call: call(v.call) };
+    if ("id" in v && g.names[v.id] && !/["\\]/.test(g.names[v.id]!) && rand() < 0.4) return { text: g.names[v.id]! };
+    if ("text" in v && AMOUNT_ARGS.has(key) && rand() < 0.6) return { text: choose([v.text, ...amountForms(v.text)]) };
+    if ("text" in v && DURATION_ARGS.has(key) && rand() < 0.6) return { text: choose([v.text, ...durationForms(v.text, key === "every")]) };
+    return v;
+  };
+  const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(k, v)])) });
+  return { ...g, program: calls.programText({ lines: p.lines.map((l) => ({ ...l, call: call(l.call) })) }) };
+}
+
+/** Gold programs from the seen test cases (each case's first accepted answer): the functions a town's own code rarely
+ * or never calls (a trust set up, a claim recorded, a post created) are there. Never from held-out cases. */
+export function goldFromCases(cases: Case[]): Gold[] {
+  return cases.filter((c) => !c.held_out && !c.expect[0]!.startsWith("none(")).map((c) => {
+    const p = calls.parseProgram(c.expect[0]!);
+    return { program: calls.programText(p), shape: shapeOf(p), names: {}, source: `case ${c.id}` };
+  });
+}
+
 /** The ways a request can be written. Each is a line of instruction to the writer. */
 export const STYLES: { [style: string]: string } = {
   terse: "As short as it can be said: a few words, like a note to staff.",
