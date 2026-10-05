@@ -65,6 +65,9 @@ function parseReply(line: string): any {
   return reply;
 }
 
+/** What a request is, for the profile: its op, and for a command which one. */
+const opOf = (req: any): string => (req.op === "command" ? req.command?.command ?? "command" : req.op ?? "?");
+
 export class Kernel {
   private proc?: Bun.Subprocess<"pipe", "pipe", "inherit">;
   private reader?: ReadableStreamDefaultReader<Uint8Array>;
@@ -78,6 +81,9 @@ export class Kernel {
   onRequest?: (req: any) => void;
   /** How the engine runs: in this process, or as a subprocess. */
   readonly transport: "inprocess" | "stdio";
+  /** Where the time went, by request (profiling only; never logged): writing the request, the engine's own work, and
+   * reading its reply, in milliseconds. (Over stdio the three can't be told apart: all of it is under `engine`.) */
+  readonly profile: { [op: string]: { n: number; encode: number; engine: number; decode: number } } = {};
 
   constructor(binary?: string) {
     const mod = binary === undefined && process.env.OIKOS_ENGINE !== "stdio" ? engineModule() : undefined;
@@ -94,12 +100,25 @@ export class Kernel {
   /** One request in-process: the same line in, the same line out. */
   private local(req: object): any {
     if (this.dead) throw new KernelDied(this.dead);
-    return parseReply(this.session!.request(JSON.stringify(req)));
+    const t0 = performance.now();
+    const line = JSON.stringify(req);
+    const t1 = performance.now();
+    const raw = this.session!.request(line);
+    const t2 = performance.now();
+    const reply = parseReply(raw);
+    const p = (this.profile[opOf(req)] ??= { n: 0, encode: 0, engine: 0, decode: 0 });
+    p.n++;
+    p.encode += t1 - t0;
+    p.engine += t2 - t1;
+    p.decode += performance.now() - t2;
+    return reply;
   }
 
   /** Over stdio, one exchange at a time, in the order asked: a reply is matched to its request only by its place in
    * the stream, so a request written while another's reply is awaited would take that reply (or wait for ever). */
-  private exchange(lines: string[]): Promise<any[]> {
+  private exchange(reqs: object[]): Promise<any[]> {
+    const ops = reqs.map(opOf);
+    const lines = reqs.map((r) => JSON.stringify(r));
     const mine = this.turn.then(async () => {
       try {
         this.proc!.stdin.write(lines.join("\n") + "\n");
@@ -108,8 +127,15 @@ export class Kernel {
         throw new KernelDied(`the kernel process can't be written to: ${(e as Error).message}`);
       }
       // Every reply is read before any is judged: a fatal one mustn't leave the others in the stream.
+      const t0 = performance.now();
       const raw: string[] = [];
       for (let i = 0; i < lines.length; i++) raw.push(await this.line());
+      const dt = (performance.now() - t0) / lines.length;
+      for (const op of ops) {
+        const p = (this.profile[op] ??= { n: 0, encode: 0, engine: 0, decode: 0 });
+        p.n++;
+        p.engine += dt;
+      }
       return raw.map(parseReply);
     });
     this.turn = mine.catch(() => {});
@@ -142,7 +168,7 @@ export class Kernel {
       if (!reply.ok) throw new KernelError(reply.error);
       return reply;
     }
-    const [reply] = await this.exchange([JSON.stringify(req)]);
+    const [reply] = await this.exchange([req]);
     if (!reply.ok) throw new KernelError(reply.error);
     return reply;
   }
@@ -159,7 +185,7 @@ export class Kernel {
       const reply = this.local(r);
       return reply.ok ? reply : null;
     });
-    return (await this.exchange(reqs.map((r) => JSON.stringify(r)))).map((reply) => (reply.ok ? reply : null));
+    return (await this.exchange(reqs)).map((reply) => (reply.ok ? reply : null));
   }
 
   /** Like request, but returns null instead of throwing on a protocol error. */

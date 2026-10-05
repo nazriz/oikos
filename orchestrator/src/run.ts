@@ -139,7 +139,9 @@ export interface RunSummary {
     refused: { [code: string]: number };
   };
   /** Where the time went (profiling only): each behaviour module's deciding, and each kind of kernel command. */
-  profile: { modules: { [module: string]: { ms: number; steps: number } }; kernel: { [command: string]: { ms: number; n: number } } };
+  profile: { modules: { [module: string]: { ms: number; steps: number } }; kernel: { [command: string]: { ms: number; n: number } };
+    /** Every request to the engine, by what it was: how many, and the milliseconds writing it, in the engine, and reading its reply. */
+    requests?: { [op: string]: { n: number; encode: number; engine: number; decode: number } } };
   /** What the run spent on models, where it had a spending limit (micro-USD; the log's usage annotations say the same). */
   spentMicroUsd?: number;
   /** Failures to decide that were recovered in place (a module that threw, a model call that failed; D59). */
@@ -1031,7 +1033,8 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   return { ...(resolverChecked ? { resolverShadow: { checked: resolverChecked, differed: resolverDiffCount } } : {}), runId: o.runId,
     end: { reason: completed ? "completed" : "aborted", ...(completed ? {} : { detail: stopped ?? `stopped at ${until}` }) }, ...(stopped ? { stopped: { why: stopped, by: stoppedBy! } } : {}), logPath, anchorsPath, stateHash: end.state_hash, commands, refused, wakes, wakesBy, participantErrors, t, kernelMs: Math.round(kernelMs), moduleMs: Math.round(moduleMs), platformMs: Math.round(platformMs),
     health: { backlog: { ...backlog }, repeats: { ...repeats }, refused: { ...refusedBy } },
-    profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])) },
+    profile: { modules: Object.fromEntries(Object.entries(profModules).map(([k, v]) => [k, { ms: Math.round(v.ms), steps: v.steps }])), kernel: Object.fromEntries(Object.entries(profKernel).map(([k, v]) => [k, { ms: Math.round(v.ms), n: v.n }])),
+      requests: Object.fromEntries(Object.entries(k.profile).map(([op, v]) => [op, { n: v.n, encode: Math.round(v.encode), engine: Math.round(v.engine), decode: Math.round(v.decode) }])) },
     ...(o.budget ? { spentMicroUsd: o.budget.spentMicroUsd } : {}) };
 }
 
