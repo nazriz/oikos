@@ -14,7 +14,7 @@ import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
-import { because, Book, callAction, Letters, message, pay, type Step, usd } from "./common";
+import { because, Book, callAction, Letters, message, pay, PAYMENT_FAILED, type Step, usd } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
@@ -224,7 +224,7 @@ export const bankPaymentSystem: BehaviourModule = {
           } else {
             // Not enough money: the payment isn't made, and the account holder is told.
             const holder = holderOf.get(p.from);
-            if (holder) blocks.push(message([holder], `Payment of ${smallestNow(p.amount)} to ${p.to} (request ${p.instruction}) failed: insufficient funds.`, p.instruction));
+            if (holder) blocks.push(message([holder], PAYMENT_FAILED.note(smallestNow(p.amount), p.to, p.instruction), p.instruction));
           }
           if ((p as any).single) break;
         }

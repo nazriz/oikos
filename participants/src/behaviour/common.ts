@@ -446,6 +446,17 @@ export class Letters {
   }
 }
 
+/**
+ * What a bank's payment system writes to an account holder when a payment it was asked to make wasn't made for want of
+ * money (docs/behaviour/bank-payment-system.md), and how whoever is told knows it for that: a code participant
+ * understands only this phrasing (a tenant's missed rent: docs/behaviour/citizen.md). The words are here, once, so the
+ * bank and its readers can't drift apart; `amount` is as the bank words it.
+ */
+export const PAYMENT_FAILED = {
+  note: (amount: string, to: string, request: string) => `Payment of ${amount} to ${to} (request ${request}) failed: insufficient funds.`,
+  is: (text: string) => /^Payment of .+ to \S+ \(request \S+\) failed: insufficient funds\.$/.test(text),
+};
+
 /** An amount in words, for reasons and letters, as the world writes its money (money.ts). */
 export const usd = moneyNow;
 

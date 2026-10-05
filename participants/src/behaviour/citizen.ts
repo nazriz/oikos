@@ -30,7 +30,7 @@ import { channels } from "../contracts";
 import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, order } from "./trade";
 import { ownerOf } from "./institutions";
@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.35.3",
+  version: "0.35.4",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -580,7 +580,7 @@ export const citizen: BehaviourModule = {
       for (const m of obs.inbox) {
         // The bank couldn't make a payment of our rent (or our share of it): we still owe it.
         const ours = [home?.order, share?.order, ...(home?.retiring ?? []).map((x) => x.order)];
-        if (m.re && ours.includes(m.re) && /failed/.test(m.text)) {
+        if (m.re && ours.includes(m.re) && PAYMENT_FAILED.is(m.text)) {
           const money = (book.records.get(m.re) as any)?.data?.outcome?.money;
           if (money?.to && Number.isInteger(cents(money.amount))) missed.push({ instruction: m.re, to: money.to, amount: cents(money.amount), what: m.re === share?.order ? "our share of the rent" : "the rent" });
           continue;

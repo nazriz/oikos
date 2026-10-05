@@ -1,0 +1,82 @@
+// The bank's payment system (docs/behaviour/bank-payment-system.md), on what it's shown alone: a standing order paid
+// on its due dates; a payment the account can't cover not made, the holder told in the words both sides rely on, and
+// that due date never tried again; and the difference between that and a payment the world refused.
+
+import { expect, test } from "bun:test";
+import type { Observation } from "../src/contracts";
+import { bankPaymentSystem } from "../src/behaviour/bank";
+import { PAYMENT_FAILED } from "../src/behaviour/common";
+import { inCurrency } from "../src/money";
+import PROFILE from "../../worlds/profiles/au-vic-2026.json";
+import { callsOf, context, DAY, MONTH, statement, wake } from "./stepping";
+
+inCurrency(PROFILE.values.currency);
+
+const who = { kind: "directory", positions: [], entities: [{ entity: "c1", kind: "person", name: "C One", participant: "c1-self" }, { entity: "c2", kind: "person", name: "C Two", participant: "c2-self" }] };
+const custody = (balances: { [holder: string]: number }) => ({ kind: "accounts", transactions: [], accounts: Object.entries(balances).map(([holder, balance]) => ({ account: `acc-${holder}`, holder, custodian: "bank", currency: "AUD", balance: String(balance) })) });
+const request = (id: string, at: number, from: string, amount: number, x: object = {}) => statement(id, at, "request", { author: `${from}-self`, speaks_for: from, addressed_to: ["bank"], visible_to: [from, "bank"],
+  data: { outcome: { money: { from: `acc-${from}`, to: "acc-landlord", amount: String(amount), for: "Rent." } }, ...x } });
+const bank = () => bankPaymentSystem.create(context("bank-pay-system", "bank", {}, { position: "bank-pay" }));
+const at = (m: any, t: number, records: any[], balances: { [account: string]: number }) => wake(m, t, { requests: { kind: "records", records }, custody: custody(balances), who }, { entity: "bank" }).said;
+
+test("the words a bank uses for a payment that failed for want of money are the words its readers know it by, and no other note of the bank's reads as one", () => {
+  const note = PAYMENT_FAILED.note("100000 cents", "acc-landlord", "rec.12");
+  expect(note).toBe("Payment of 100000 cents to acc-landlord (request rec.12) failed: insufficient funds.");
+  expect(PAYMENT_FAILED.is(note)).toBe(true);
+  // The bank's other notes about a request: a payment the world refused, and a request it can't carry out.
+  expect(PAYMENT_FAILED.is("Payment of 100000 cents to acc-landlord (request rec.12) couldn't be made: there's no such account.")).toBe(false);
+  expect(PAYMENT_FAILED.is("Request rec.12 not carried out: this bank doesn't keep account acc-x.")).toBe(false);
+  expect(PAYMENT_FAILED.is("Your application failed.")).toBe(false);
+});
+
+test("a standing order is paid on each due date (first at the request's time plus `first`, or plus `every`), naming its request", () => {
+  const m = bank();
+  const so = request("so-1", 0, "c1", 100_000, { every: MONTH, first: 0 });
+  const later = request("so-2", 0, "c2", 50_000, { every: MONTH }); // no `first`: due a period on
+  const day0 = at(m, 0, [so, later], { c1: 500_000, c2: 500_000 });
+  expect(day0.map((c) => [c.fn, c.args])).toEqual([["money", { to: "acc-landlord", amount: "$1000.00", from: "acc-c1", per_request: "so-1" }]]);
+  expect(at(m, DAY, [], { c1: 400_000, c2: 500_000 })).toEqual([]);
+  const day30 = at(m, MONTH, [], { c1: 400_000, c2: 500_000 });
+  expect(day30.map((c) => [c.args.per_request, c.args.amount])).toEqual([["so-1", "$1000.00"], ["so-2", "$500.00"]]);
+  // Waking late (two due dates gone by), it pays each once.
+  expect(at(m, 3 * MONTH + DAY, [], { c1: 400_000, c2: 500_000 }).filter((c) => c.args.per_request === "so-1").length).toBe(2);
+});
+
+test("a payment the account can't cover isn't made: the holder is told, once, in the bank's words, and that due date isn't tried again", () => {
+  const m = bank();
+  const so = request("so-1", 0, "c1", 100_000, { every: MONTH, first: 0 });
+  // Day 0: $999.99 in the account, a cent short.
+  const day0 = at(m, 0, [so], { c1: 99_999 });
+  expect(day0.map((c) => [c.fn, c.args])).toEqual([["message", { to: ["c1"], text: PAYMENT_FAILED.note("100000 cents", "acc-landlord", "so-1"), re: "so-1" }]]);
+  expect(day0[0]!.args.text).toBe("Payment of 100000 cents to acc-landlord (request so-1) failed: insufficient funds.");
+  // The money arrives the next day: nothing. The missed payment is the payer's to make good, not the bank's to retry.
+  expect(at(m, DAY, [], { c1: 900_000 })).toEqual([]);
+  expect(at(m, 29 * DAY, [], { c1: 900_000 })).toEqual([]);
+  // The next due date: one payment, the month's, and not the one missed as well.
+  const day30 = at(m, MONTH, [], { c1: 900_000 });
+  expect(day30.map((c) => [c.fn, c.args.per_request, c.args.amount])).toEqual([["money", "so-1", "$1000.00"]]);
+  // Short again a month on: told again, for that due date.
+  expect(at(m, 2 * MONTH, [], { c1: 5 }).map((c) => c.fn)).toEqual(["message"]);
+});
+
+test("a one-off payment that fails is told and done with; and payments due together are met in order while the money lasts", () => {
+  const m = bank();
+  const once = request("pay-1", DAY, "c1", 70_000);
+  expect(at(m, DAY, [once], { c1: 100 }).map((c) => [c.fn, c.args.text])).toEqual([["message", "Payment of 70000 cents to acc-landlord (request pay-1) failed: insufficient funds."]]);
+  expect(at(m, 2 * DAY, [], { c1: 900_000 })).toEqual([]);
+  // Three one-offs from one account holding enough for the first two (by due time, then request id): the third fails,
+  // counted against what the first two leave.
+  const three = [request("pay-a", 3 * DAY, "c2", 60_000), request("pay-b", 3 * DAY, "c2", 30_000), request("pay-c", 3 * DAY, "c2", 20_000)];
+  const did = at(m, 3 * DAY, three, { c1: 0, c2: 100_000 });
+  expect(did.map((c) => [c.fn, c.fn === "money" ? c.args.per_request : c.args.re])).toEqual([["money", "pay-a"], ["money", "pay-b"], ["message", "pay-c"]]);
+});
+
+test("a payment the world refuses is reported to the holder in other words (it \"couldn't be made\"), which don't read as a payment failed for want of money", () => {
+  const m = bank();
+  const channels = { requests: { kind: "records", records: [request("pay-1", DAY, "c1", 70_000)] }, custody: custody({ c1: 100_000 }), who };
+  const obs = (more: object) => ({ t: DAY, entity: "bank", participant: "bank-pay-system", channels, inbox: [], outcomes: [], woke_for: "cadence", ...more }) as unknown as Observation;
+  expect(callsOf(m.step(obs({}), undefined as any) as any).map((c) => c.fn)).toEqual(["money"]);
+  const told = callsOf(m.step(obs({ woke_for: "done", outcomes: [{ action: "a", t: DAY, status: "refused", refusal: { code: "unknown_account" } }], channels: { ...channels, requests: { kind: "records", records: [] } } }), undefined as any) as any);
+  expect(told.map((c) => [c.fn, c.args])).toEqual([["message", { to: ["c1"], text: "Payment of 70000 cents to acc-landlord (request pay-1) couldn't be made: there's no such account.", re: "pay-1" }]]);
+  expect(PAYMENT_FAILED.is(told[0]!.args.text)).toBe(false);
+});
