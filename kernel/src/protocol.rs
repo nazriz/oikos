@@ -114,18 +114,16 @@ fn command(session: &mut Session, req: &Value) -> Result<String, String> {
     let Session { run, sched, knowledge, currency, .. } = session;
     let r = run.as_mut().ok_or("no run started")?;
     let cmd: Command = serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|e| format!("bad command: {e}"))?;
-    let resp = r.command(&cmd).map_err(|e| e.to_string())?;
+    let mut resp = r.command(&cmd).map_err(|e| e.to_string())?;
     let events = serde_json::to_value(&resp.events).map_err(|e| e.to_string())?;
-    let observed = match (r.take_observed(), &resp.observation) {
-        (Some(o), _) => Some(o),
-        // (A lean log keeps no observation hashes: serialised here.)
-        (None, Some(obs)) => Some(crate::kernel::Observed::of(obs).map_err(|e| e.to_string())?),
-        (None, None) => None,
+    let observed = match resp.observation.as_mut() {
+        Some(obs) => Some(r.observed(obs).map_err(|e| e.to_string())?),
+        None => None,
     };
     // What the seat now knows: each observation delivered to it, as it received it.
     if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(o)) = (&cmd, &observed) {
         let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
-        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb(&o.value);
+        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb_with(&o.value, &o.shown);
     }
     if let Some(s) = sched.as_mut() {
         s.note(Some(r.kernel().state()), events.as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());

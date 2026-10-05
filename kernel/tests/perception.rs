@@ -84,10 +84,24 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
     let mut run = Run::start(world(params), "perception", Vec::new(), None).unwrap();
     let mut views: BTreeMap<(String, String), View> = BTreeMap::new();
     let mut looks = 0;
+    // What each participant's seat knows, taken in two ways (see below).
+    let mut known: BTreeMap<String, (oikos_resolver::Knowledge, oikos_resolver::Knowledge)> = BTreeMap::new();
     for op in ops {
         let Some(cmd) = concretize(&run, op) else { continue };
         let Some(resp) = step(&mut run, &cmd) else { continue };
-        let (Command::Observe { participant, .. }, Some(obs)) = (&cmd, resp.observation) else { continue };
+        let (Command::Observe { participant, .. }, Some(mut obs)) = (&cmd, resp.observation) else { continue };
+        // The observation as it's hashed and delivered (its records' bytes kept from the first time each is shown) is
+        // its canonical JSON, byte for byte; and a seat's knowledge takes in the same from it, with its records
+        // handed over beside it, as from the whole observation.
+        let before = obs.clone();
+        let observed = run.observed(&mut obs).unwrap();
+        prop_assert_eq!(&obs, &before, "encoding an observation changed it");
+        let plain = oikos_kernel::canon::canonical(&obs).unwrap();
+        prop_assert_eq!(String::from_utf8_lossy(&observed.canonical), String::from_utf8_lossy(&plain), "participant {}'s observation as delivered isn't its canonical JSON", participant);
+        let (whole, apart) = known.entry(participant.clone()).or_default();
+        whole.absorb(&serde_json::to_value(&obs).unwrap());
+        apart.absorb_with(&observed.value, &observed.shown);
+        prop_assert_eq!(format!("{whole:?}"), format!("{apart:?}"), "participant {}'s seat knows something else from the observation as delivered", participant);
         let reference = run.full_view(participant).unwrap();
         for (ch, data) in &obs.channels {
             let v = views.entry((participant.clone(), ch.clone())).or_default();

@@ -128,41 +128,45 @@ pub fn write_value(v: &Value, out: &mut Vec<u8>) {
             }
             out.push(b']');
         }
-        Value::Object(m) => {
-            out.push(b'{');
-            // JCS orders by UTF-16 code units; for ASCII keys that equals byte order. Keys that are ASCII and already
-            // come in byte order (as serde_json's own map gives them) are in JCS order as they stand: checked each
-            // time, never assumed, so a dependency enabling `preserve_order` still can't change a hash.
-            let mut last: Option<&str> = None;
-            let in_order = m.keys().all(|k| {
-                let ok = k.is_ascii() && last.is_none_or(|l| l.as_bytes() < k.as_bytes());
-                last = Some(k);
-                ok
-            });
-            if in_order {
-                for (i, (k, x)) in m.iter().enumerate() {
-                    if i > 0 {
-                        out.push(b',');
-                    }
-                    write_string(k, out);
-                    out.push(b':');
-                    write_value(x, out);
-                }
-            } else {
-                let mut keys: Vec<&String> = m.keys().collect();
-                keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
-                for (i, k) in keys.into_iter().enumerate() {
-                    if i > 0 {
-                        out.push(b',');
-                    }
-                    write_string(k, out);
-                    out.push(b':');
-                    write_value(&m[k], out);
-                }
+        Value::Object(m) => write_object(m, out, |_, x, out| write_value(x, out)),
+    }
+}
+
+/// An object in canonical form, each member's value written by `value` (given its key): for a writer that has some
+/// member's canonical bytes already and needn't encode it again. `write_value` is this with every value written plainly.
+pub fn write_object(m: &serde_json::Map<String, Value>, out: &mut Vec<u8>, mut value: impl FnMut(&str, &Value, &mut Vec<u8>)) {
+    out.push(b'{');
+    // JCS orders by UTF-16 code units; for ASCII keys that equals byte order. Keys that are ASCII and already come in
+    // byte order (as serde_json's own map gives them) are in JCS order as they stand: checked each time, never
+    // assumed, so a dependency enabling `preserve_order` still can't change a hash.
+    let mut last: Option<&str> = None;
+    let in_order = m.keys().all(|k| {
+        let ok = k.is_ascii() && last.is_none_or(|l| l.as_bytes() < k.as_bytes());
+        last = Some(k);
+        ok
+    });
+    if in_order {
+        for (i, (k, x)) in m.iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
             }
-            out.push(b'}');
+            write_string(k, out);
+            out.push(b':');
+            value(k, x, out);
+        }
+    } else {
+        let mut keys: Vec<&String> = m.keys().collect();
+        keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
+        for (i, k) in keys.into_iter().enumerate() {
+            if i > 0 {
+                out.push(b',');
+            }
+            write_string(k, out);
+            out.push(b':');
+            value(k, &m[k], out);
         }
     }
+    out.push(b'}');
 }
 
 pub fn write_string(s: &str, out: &mut Vec<u8>) {

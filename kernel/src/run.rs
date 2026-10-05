@@ -172,10 +172,14 @@ impl<W: Write> Run<W> {
         Ok(Response { seq, events: logged, observation })
     }
 
-    /// The observation the last command returned, in JSON as it was hashed for the log (none in a lean log, which
-    /// keeps no observation hashes): the protocol's reply carries these bytes instead of serialising it again.
-    pub fn take_observed(&mut self) -> Option<crate::kernel::Observed> {
-        self.observed.take()
+    /// The observation the last command returned, in JSON: as it was hashed for the log, so the protocol's reply
+    /// carries those bytes instead of serialising it again (or encoded now, for a lean log, which keeps no
+    /// observation hashes).
+    pub fn observed(&mut self, obs: &mut Observation) -> Result<crate::kernel::Observed, canon::CanonError> {
+        match self.observed.take() {
+            Some(o) => Ok(o),
+            None => self.kernel.observed(obs),
+        }
     }
 
     fn checkpoint(&mut self) -> Result<(), RunError> {

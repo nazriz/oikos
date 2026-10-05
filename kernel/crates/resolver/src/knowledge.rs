@@ -56,6 +56,88 @@ pub struct Knowledge {
     pub currency: Option<crate::calls::Currency>,
 }
 
+/// What a record adds to what a seat knows, worked out from the record alone (never from what the seat knew before):
+/// the same for every seat it's shown to, so whoever delivers one record to many seats can work it out once.
+#[derive(Debug, Clone, Default)]
+pub struct RecordFacts {
+    /// A withdrawal: the record it takes down.
+    withdraws: Option<String>,
+    /// An entity's declaration: the entity, and its name.
+    declares: Option<(String, String)>,
+    /// A form: its id, and the record itself.
+    form: Option<(String, Value)>,
+    /// A lot: its id, and its cells.
+    lot: Option<(String, Vec<String>)>,
+    /// Someone asking to be paid names where the money should go: who, and the account.
+    stated: Option<(String, String)>,
+}
+
+impl RecordFacts {
+    pub fn of(r: &Value) -> RecordFacts {
+        let mut facts = RecordFacts::default();
+        let kind = s(&r["record"]).unwrap_or_default();
+        if kind == "withdrawal" {
+            facts.withdraws = s(&r["withdraws"]).map(String::from);
+        }
+        if kind == "entity_declaration" {
+            if let (Some(e), Some(n)) = (s(&r["entity"]), s(&r["name"])) {
+                facts.declares = Some((e.into(), n.into()));
+            }
+        }
+        if kind == "statement" {
+            let id = s(&r["id"]).unwrap_or_default().to_string();
+            match s(&r["kind"]) {
+                Some("form") => facts.form = Some((id, r.clone())),
+                Some("lot") => {
+                    if let Some(cells) = r["data"]["cells"].as_array() {
+                        facts.lot = Some((id, cells.iter().filter_map(|c| c.as_str().map(String::from)).collect()));
+                    }
+                }
+                _ => {}
+            }
+            // Someone asking to be paid names where the money should go.
+            let m = &r["data"]["outcome"]["money"];
+            if let (Some(who), Some(to)) = (s(&r["speaks_for"]), s(&m["to"])) {
+                if m.get("from").is_none() {
+                    facts.stated = Some((who.into(), to.into()));
+                }
+            }
+        }
+        facts
+    }
+}
+
+/// What a cell of ground, as a sites channel shows it, adds to what a seat knows, worked out from that alone.
+#[derive(Debug, Clone)]
+pub struct CellFacts {
+    cell: String,
+    fact: CellFact,
+    /// The building on it: its id, and what's known of it.
+    structure: Option<(String, StructureFact)>,
+}
+
+impl CellFacts {
+    pub fn of(c: &Value) -> CellFacts {
+        let st = &c["structure"];
+        CellFacts {
+            cell: s(&c["cell"]).unwrap_or_default().to_string(),
+            fact: CellFact { x: c["x"].as_i64().unwrap_or(0), y: c["y"].as_i64().unwrap_or(0), terrain: s(&c["terrain"]).filter(|x| !x.is_empty()).map(String::from), built: st.is_object() },
+            structure: st.is_object().then(|| {
+                let spaces = st["spaces"].as_array().into_iter().flatten().filter_map(|sp| s(&sp["space"]).map(String::from)).collect();
+                (s(&st["structure"]).unwrap_or_default().into(), StructureFact { type_: s(&st["type"]).unwrap_or_default().into(), at: s(&st["at"]).unwrap_or_default().into(), spaces })
+            }),
+        }
+    }
+}
+
+/// What a channel delivered that's handed to `Knowledge::absorb_with` beside the observation, in the order delivered:
+/// what its records add (a records channel), or its cells (a sites channel).
+#[derive(Debug, Clone, Default)]
+pub struct Shown {
+    pub records: Vec<std::sync::Arc<RecordFacts>>,
+    pub cells: Vec<std::sync::Arc<CellFacts>>,
+}
+
 fn set_ordered(v: &mut Vec<(String, String)>, k: &str, val: &str) {
     match v.iter_mut().find(|(x, _)| x == k) {
         Some(e) => e.1 = val.to_string(),
@@ -74,6 +156,14 @@ impl Knowledge {
     }
 
     pub fn absorb(&mut self, obs: &Value) {
+        self.absorb_with(obs, &BTreeMap::new());
+    }
+
+    /// As `absorb`, for an observation whose records and cells are handed over beside it: `shown` has, by channel
+    /// path, what each record (`RecordFacts::of`) or cell (`CellFacts::of`) that channel delivered adds, in the order
+    /// delivered, and the observation's own `records` or `cells` there are empty. The same as absorbing the
+    /// observation with them in place.
+    pub fn absorb_with(&mut self, obs: &Value, shown: &BTreeMap<String, Shown>) {
         self.entity = s(&obs["entity"]).unwrap_or_default().to_string();
         self.t = obs["t"].as_i64().unwrap_or(self.t);
         for p in obs["positions"].as_array().into_iter().flatten() {
@@ -83,7 +173,7 @@ impl Knowledge {
                 self.held.insert(pos.into());
             }
         }
-        for ch in obs["channels"].as_object().into_iter().flat_map(|m| m.values()) {
+        for (path, ch) in obs["channels"].as_object().into_iter().flat_map(|m| m.iter()) {
             match s(&ch["kind"]) {
                 Some("accounts") => {
                     for a in ch["accounts"].as_array().into_iter().flatten() {
@@ -108,13 +198,10 @@ impl Knowledge {
                 }
                 Some("sites") => {
                     for c in ch["cells"].as_array().into_iter().flatten() {
-                        let id = s(&c["cell"]).unwrap_or_default().to_string();
-                        let st = &c["structure"];
-                        self.cells.insert(id, CellFact { x: c["x"].as_i64().unwrap_or(0), y: c["y"].as_i64().unwrap_or(0), terrain: s(&c["terrain"]).filter(|x| !x.is_empty()).map(String::from), built: st.is_object() });
-                        if st.is_object() {
-                            let spaces = st["spaces"].as_array().into_iter().flatten().filter_map(|sp| s(&sp["space"]).map(String::from)).collect();
-                            self.structures.insert(s(&st["structure"]).unwrap_or_default().into(), StructureFact { type_: s(&st["type"]).unwrap_or_default().into(), at: s(&st["at"]).unwrap_or_default().into(), spaces });
-                        }
+                        self.see(&CellFacts::of(c));
+                    }
+                    for facts in shown.get(path).into_iter().flat_map(|x| &x.cells) {
+                        self.see(facts);
                     }
                 }
                 Some("directory") => {
@@ -134,7 +221,10 @@ impl Knowledge {
                 }
                 Some("records") => {
                     for r in ch["records"].as_array().into_iter().flatten() {
-                        self.add(r);
+                        self.learn(&RecordFacts::of(r));
+                    }
+                    for facts in shown.get(path).into_iter().flat_map(|x| &x.records) {
+                        self.learn(facts);
                     }
                 }
                 _ => {}
@@ -142,39 +232,31 @@ impl Knowledge {
         }
     }
 
-    fn add(&mut self, r: &Value) {
-        let kind = s(&r["record"]).unwrap_or_default();
-        if kind == "withdrawal" {
-            if let Some(w) = s(&r["withdraws"]) {
-                self.withdrawn.insert(w.into());
-                self.lots.remove(w);
-            }
+    /// Take in a cell as a sites channel showed it.
+    fn see(&mut self, facts: &CellFacts) {
+        self.cells.insert(facts.cell.clone(), facts.fact.clone());
+        if let Some((id, structure)) = &facts.structure {
+            self.structures.insert(id.clone(), structure.clone());
         }
-        if kind == "entity_declaration" {
-            if let (Some(e), Some(n)) = (s(&r["entity"]), s(&r["name"])) {
-                set_ordered(&mut self.names, e, n);
-            }
+    }
+
+    /// Take in what a record adds.
+    fn learn(&mut self, facts: &RecordFacts) {
+        if let Some(w) = &facts.withdraws {
+            self.withdrawn.insert(w.clone());
+            self.lots.remove(w);
         }
-        if kind == "statement" {
-            let id = s(&r["id"]).unwrap_or_default().to_string();
-            match s(&r["kind"]) {
-                Some("form") => {
-                    self.forms.insert(id.clone(), r.clone());
-                }
-                Some("lot") => {
-                    if let Some(cells) = r["data"]["cells"].as_array() {
-                        self.lots.insert(id.clone(), cells.iter().filter_map(|c| c.as_str().map(String::from)).collect());
-                    }
-                }
-                _ => {}
-            }
-            // Someone asking to be paid names where the money should go.
-            let m = &r["data"]["outcome"]["money"];
-            if let (Some(who), Some(to)) = (s(&r["speaks_for"]), s(&m["to"])) {
-                if m.get("from").is_none() {
-                    self.stated.entry(who.into()).or_default().insert(to.into());
-                }
-            }
+        if let Some((e, n)) = &facts.declares {
+            set_ordered(&mut self.names, e, n);
+        }
+        if let Some((id, r)) = &facts.form {
+            self.forms.insert(id.clone(), r.clone());
+        }
+        if let Some((id, cells)) = &facts.lot {
+            self.lots.insert(id.clone(), cells.clone());
+        }
+        if let Some((who, to)) = &facts.stated {
+            self.stated.entry(who.clone()).or_default().insert(to.clone());
         }
     }
 
