@@ -1279,7 +1279,16 @@ See the design note, §16.
   - **What that costs:** the session's history and memory live on the mini, not in the cloud; a session's background commands still stop after about half an hour, so long runs are detached. The script hasn't been run from scratch since the corrections.
   - **Revisit if** cloud sessions gain a way to reach a private machine, or Remote Control proves unreliable over days (then: SSH from the laptop, which works today).
 
+- **The Codex adapter's 180 seconds stays** (2026-10-05, checked before pilot 9). Pilot 8b stopped on day 39 with 15 calls unanswered within 180 s, and the question was whether gpt-6.1-sol simply takes longer on a big answer. It doesn't: seven requests rebuilt from 8b's own transcripts (the mayor's largest first reports and the deepest turns of its day-30 sitting, 31,000 to 48,000 input tokens; then mayor, finance and planning at once, as a round runs them) answered in 28 to 56 seconds on the run server, 700 to 1,500 output tokens each. So 180 s is already three times the slowest, and 8b's failures were the laptop or the service, not the limit (they came in clusters, every seat at once, the mark of a machine asleep or a connection down).
+  - **Revisit if** a run on the mini logs "no answer within 180 s" on calls that aren't clustered, or answers grow well past 2,000 output tokens (more actions an answer, a higher reasoning effort).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
+
+- **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.
+  - **Still off:** unemployment 2.0% (1.0 to 2.9; target 4.6 ± 1.5), 1.1 points below the band, as before. Group participation 34.5% (32.5 to 36.3; target 50 ± 5), 10.5 points below the band (was 39%). Religious affiliation falling 6.1 points a year (5.3 to 7.0; target 1.6 ± 1), 3.5 points past the band (was 3.1). Demand unmet 16.7% (at most 5; was 7.0%).
+  - **Now in range:** employment to population 63.6% (was 68.7; target 63.9 ± 3) and participation 64.8% (was 70.1; target 67.1 ± 3). Saving 4.0% and renters' housing costs 22.4% of income stay in range.
+  - **Deaths and illness, two years, about 200 people:** 2, 6 and 3 deaths; 36, 40 and 46 illnesses; 12, 12 and 8 injuries. No health measure has a target for these yet.
+  - **Not comparable draw for draw** with the 2026-10-02 measurement: the rename changed every random draw, and the heat and first-year fixes went in between. Which of those moved demand unmet, groups and religion isn't known; nothing was looked into.
 
 - **Calibration after the world expansion (measured 2026-10-02, not chased: for the checkpoint).** The small town, 3 seeds × 2 years, code only, at 2fd20b4. Health: 6 breaches of 15.
   - **Labour market too tight:** unemployment 1.9% (target 4.6 ± 1.5); employment to population 68.7% (63.9 ± 3); participation 70.1% (67.1 ± 3). A likely cause, unconfirmed: the expansion's public jobs (clinic, school, police, environment office) in a small town, all filled from the start.
