@@ -118,6 +118,27 @@ Laws that code participants follow (rent reviews, industrial action) move from h
 
 No new block is needed.
 
+**Revisited 2026-10-05: a law the council passes on its form binds nobody. Proposed, for Naz to decide.**
+
+*What the code audit found.* The second bullet above isn't true as built.
+- A model mayor proposes a law on the council proposal form, whose fields are the law's words, its kind and whom it mainly affects. If it passes, the clerk enacts `{kind: "law", text}`: no `adico`, no `formal`.
+- Everyone run by code is bound by a law only through its formal condition (`prohibitions`, participants/src/behaviour/common.ts). So the law passes and changes nothing. Pilot 7d's tenancy law (day 254) was such a law.
+- Until 2026-10-05 the mayor couldn't see this either: neither the preview nor a law as read showed a rule or its absence. Both now do.
+
+*Why "the translator writes the condition" doesn't hold.* The translator copies and chooses; it never composes or calculates (docs/design/translator-and-resolver.md §16.10, and its "zero arithmetic"). A condition such as `block.data.from - now < 7776000` is composed, needs "90 days" turned into seconds, and needs the names of fields in a notice that only the landlord's code knows. A model small enough to pin and train can't be asked for that, and a large one would be writing in a notation the mayor can't check.
+
+*Who does this in a real town.* Not the mayor, and not whoever takes dictation: a drafting office (parliamentary counsel, a council's legal officer) turns what's wanted into provisions, and most changes people ask for are changes to a figure in a law that already exists: the notice period, how often, the threshold.
+
+*Proposed: the clerk drafts, from a form.*
+- For each law in force that carries figures (today: rent increases, with months between increases and days of notice; industrial action, with turnout, majority and notice), the clerk publishes a form to amend it, with those figures as its fields (a duration, a count), as it publishes the council proposal form.
+- A proposal on that form goes to a ballot like any other. If it passes, the clerk withdraws the old law and publishes the new one: its words, its rule and its condition written from the figures, by the same wording the law was first made with. Landlords, the union and the tribunal read it as they read the first, with no change to them.
+- A law proposed in free words still goes to a ballot and, passed, stands as words. The clerk's result says so in plain terms ("recorded as worded; no rule was set down with it"), so a mayor knows which kind it has passed.
+- The translator's part is filling in a form, which it already does. Nothing in the contracts changes: forms and their fields are a world's content.
+
+*What this doesn't give:* a law of a new kind that binds (a rent cap, a ban on evictions in winter). For that, two things are missing, both larger than this fix: every code participant checking every act it's about to take against the laws it knows (today three kinds of act are checked), and a way to state a condition that doesn't depend on knowing a notice's field names. Suggested with the citizens' work, after the translator.
+
+*Alternatives:* leave it, and document that council laws are words only (honest, but a steward's main lever does nothing); or let a large model write conditions (rejected above).
+
 ## 3. The citizen's mind, in code
 
 ### 3a. Who they are
