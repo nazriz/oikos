@@ -103,6 +103,9 @@ const sha256OfStream = async (stream: AsyncIterable<Buffer | string>): Promise<{
   return { hash: h.digest("hex"), bytes };
 };
 
+/** How much of a log is read at a time when the whole of it is wanted (compressing it, hashing it). */
+const BIG = { highWaterMark: 4 << 20 };
+
 /** Make sure a file's bytes, and its name in its folder, are on the disk (not only in the system's memory). */
 function sync(path: string): void {
   for (const p of [path, dirname(path)]) {
@@ -125,15 +128,20 @@ export async function compressLog(path: string): Promise<string> {
   if (path.endsWith(".zst") || !existsSync(path)) return path;
   const out = `${path}.zst`;
   const tmp = `${out}.partial`;
-  await pipeline(createReadStream(path), zlib.createZstdCompress({ params: { [zlib.constants.ZSTD_c_compressionLevel]: 3 } }), createWriteStream(tmp));
+  // (The plain log is hashed while it's compressed: its own reading of the file, as before, side by side with the
+  // compressor's instead of after it. Read and written a few megabytes at a time: a gigabyte in 64 KB pieces spends as
+  // long handing them on as compressing them. The compressed bytes are the same either way.)
+  const [, original] = await Promise.all([
+    pipeline(createReadStream(path, BIG), zlib.createZstdCompress({ params: { [zlib.constants.ZSTD_c_compressionLevel]: 3 }, chunkSize: 1 << 20 }), createWriteStream(tmp)),
+    sha256OfStream(createReadStream(path, BIG)),
+  ]);
   let back: { hash: string; bytes: number } | undefined;
   let why = "";
   try {
-    back = await sha256OfStream(createReadStream(tmp).pipe(zlib.createZstdDecompress()));
+    back = await sha256OfStream(createReadStream(tmp, BIG).pipe(zlib.createZstdDecompress({ chunkSize: 4 << 20 })));
   } catch (e) {
     why = `: ${(e as Error).message}`;
   }
-  const original = await sha256OfStream(createReadStream(path));
   if (!back || back.hash !== original.hash || back.bytes !== original.bytes) {
     rmSync(tmp, { force: true });
     throw new Error(`${path}: the compressed log didn't read back the same (${back?.bytes ?? 0} of ${original.bytes} bytes${back && back.bytes === original.bytes ? ", different content" : ""}${why}); kept the plain one`);

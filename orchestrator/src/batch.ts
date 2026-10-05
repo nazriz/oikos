@@ -364,9 +364,23 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     }
   }
   // (A run that stopped to be resumed stays as it is, plain: it isn't finished, and its resume command names this file.)
-  if (o.compress) for (const r of runs) if (r.logPath && !r.stopped) await step(`compressing ${r.logPath}`, async () => {
-    r.logPath = await compressLog(r.logPath);
-  });
+  // (Side by side, as many at a time as the runs were: compressing a log takes about a core. What went wrong is said in
+  // the runs' order, whichever finished first.)
+  if (o.compress) {
+    const todo = runs.filter((r) => r.logPath && !r.stopped);
+    const wrong: (string | undefined)[] = [];
+    let at = 0;
+    await Promise.all(Array.from({ length: Math.min(parallel, todo.length) }, async () => {
+      for (let i = at++; i < todo.length; i = at++) {
+        try {
+          todo[i]!.logPath = await compressLog(todo[i]!.logPath);
+        } catch (e) {
+          wrong[i] = (e as Error).message;
+        }
+      }
+    }));
+    for (const [i, r] of todo.entries()) if (wrong[i] !== undefined) await step(`compressing ${r.logPath}`, async () => { throw new Error(wrong[i]); });
+  }
   manifest();
   return result;
 }
