@@ -379,3 +379,54 @@ test("other offices handed to a model (mocked) do their jobs through words, tran
   expect(paid.length).toBeGreaterThan(0);
   expect(paid.every((a) => a.provenance.via === "translator")).toBe(true);
 }, 600_000);
+
+test("a model mayor can look into its reports as a code mayor reads them: which buildings something is building up at, who's who, and its papers (VISION 15)", async () => {
+  let calls = 0;
+  const results: { [id: string]: string }[] = [];
+  const read: string[] = [];
+  const adapter = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      const last = req.messages.at(-1)!.content;
+      read.push(`${req.system ?? ""}\n${JSON.stringify(req.messages)}\n${JSON.stringify(req.tools)}`);
+      if (Array.isArray(last)) results.push(Object.fromEntries(last.filter((b: any) => b.type === "tool_result").map((b: any) => [b.tool_use_id, b.content])));
+      const n = calls++;
+      const use = (id: string, name: string, input: object) => ({ type: "tool_use" as const, id, name, input });
+      if (n === 0) return [use("wear", "look", { report: "mayor/town", measure: "wear" }), use("who", "look", { report: "mayor/who", named: ["finance"] }),
+        use("papers", "look", { report: "mayor/city-business", find: [{ field: "kind", value: "signatories" }, { field: "on behalf of", value: "city" }, { field: "date", op: "<=", value: "year 1, day 1" }] }),
+        use("hall", "look", { report: "mayor/town", named: ["town-hall", "nowhere-1"] })];
+      if (n === 1) return [use("d1", "done_for_now", { days: 12 })];
+      if (n === 2) return [use("waste", "look", { report: "mayor/town", measure: "waste", limit: 50 })];
+      return [use(`d${n}`, "done_for_now", { days: 30 })];
+    },
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
+    debrief: () => [{ type: "text", text: "Thanks for asking." }],
+  });
+  const s = await run("looks", town(), 20 * DAY, { adapter });
+  const log = lines(s.logPath);
+  const ann = log.filter((e) => e.kind === "annotation").map((e) => e.body);
+  // Each look was taken as asked (none turned away), through the participant API's ordinary look.
+  expect(ann.some((a) => a.annotation === "note" && a.subject === "mayor-system" && (a.data.look_rejected || a.data.malformed_tool_use))).toBe(false);
+  const looks = log.filter((e) => e.kind === "command" && e.body.command === "look" && e.body.participant === "mayor-system").map((e) => e.body.looks);
+  expect(looks.length).toBe(5);
+  expect(looks[0]).toEqual([{ channel: "mayor/town" }]);
+  expect(looks[2]).toEqual([{ channel: "mayor/city-business", query: { where: [{ field: "kind", op: "=", value: "signatories" }, { field: "speaks_for", op: "=", value: "city" }, { field: "at", op: "<", value: DAY }], order: { field: "at", desc: true }, limit: 20 } }]);
+
+  // What it first read says where to look; what each look showed is the thing asked for, in full.
+  expect(read[0]).toContain("Wear: above zero at 0 of 59 buildings, rising at 59.");
+  const [first, second] = results as [{ [id: string]: string }, { [id: string]: string }];
+  expect(first.wear).toMatch(/## Survey of the town: what you looked at\nWear is above zero or rising at 59 buildings, the highest first:\n- [a-z -]+ [\w.-]+, at [^:\n]+: wear 0, rising [\d,]+ a day/);
+  // (Having looked at one thing, it isn't shown the rest of the standing picture over again.)
+  expect(first.wear).not.toContain("## Who's who");
+  expect(first.who).not.toContain("## Survey of the town");
+  expect(first.wear!.match(/^- .*: wear /gm)!.length).toBe(20);
+  expect(first.wear).toContain("(39 more not listed: ask for more at once, or name the ones you want.)");
+  expect(first.who).toContain("## Who's who: who you looked for\n- post: Finance officer (finance), for city: ");
+  expect(first.papers).toContain("what you looked up (1 found)\n- [signatories-city] signatories from city, to bank:");
+  expect(first.hall).toMatch(/- civic town-hall, at [^:\n]+: wear 0, rising [\d,]+ a day\n  - town-hall\//);
+  expect(first.hall).toContain("Nothing is known here by this name: nowhere-1.");
+  // Days on, homes have filled: every one where waste is above zero or rising, the highest first, with how much today.
+  expect(second.waste).toMatch(/Waste is above zero or rising at \d+ buildings, the highest first:\n- [a-z -]+ [\w.-]+, at [^:\n]+: waste [1-9][\d,]*, (rising [\d,]+ a day|steady)/);
+  // None of it names the machinery (principle 14).
+  for (const machinery of ["kernel", "translator", "resolver", "block", "channel", "refusal", "provenance", "speaks_for", "variable"]) expect(read.join("\n").toLowerCase()).not.toContain(machinery);
+  expect(Bun.spawnSync([kernelBinary(), "replay", s.logPath, "--anchors", s.anchorsPath]).exitCode).toBe(0);
+}, 300_000);
