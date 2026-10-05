@@ -53,3 +53,40 @@ test("unlawful rent increases are taken to the tribunal, found invalid, and with
   expect(withdrawn.length).toBeLessThan(orders.length);
   for (const w of withdrawn) expect(unlawful.map((n) => n.id)).toContain(w.withdraws);
 }, 900_000);
+
+test("a law repealed by the town that made it stops binding those who followed it: they are told through their book of laws", async () => {
+  // A law forbids any rent increase; every landlord complies, so none is given. On day 120 the town withdraws it (a
+  // plain repeal: nothing replaces it). The landlords and the tribunal read laws through a channel that shows laws
+  // alone: the repeal reaches them there, once, and the landlords' next reviews raise rents.
+  const config = generate({ ...spec, years: 1 });
+  config.world.records.push({ id: "law-rent-freeze", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
+    text: "A residential rent may not be increased. Or else: the increase is invalid.",
+    adico: { attribute: "landlords", deontic: "must_not", aim: "increase a tenancy's rent", or_else: "the increase is invalid" },
+    formal: { language: "cel", condition: "block.block == 'publish' && block.kind == 'rent_increase'" } });
+  for (const x of config.participants) if (x.controller?.impl === "firm.landlord") Object.assign(x.controller.params, { rent_review_months: 6, compliance_bps: 10_000 });
+  const mayor = config.positions.find((p: any) => p.id === "mayor");
+  const out = join(root, "runs", "test-justice-repeal");
+  rmSync(out, { recursive: true, force: true });
+  let repealedAt: number | undefined;
+  const told = new Map<string, number>(); // participant -> times its book of laws showed it the repeal
+  const s = await runWorld({ config, runId: "repeal", outDir: out, until: 300 * DAY,
+    inspect: async (participant, obs, kernel, _capacity, raw) => {
+      for (const [id, ch] of Object.entries(raw?.channels ?? {})) if (/(^|\/)laws$/.test(id) && ch.kind === "records")
+        for (const r of ch.records) if (r.record === "withdrawal" && r.withdraws === "law-rent-freeze") told.set(participant, (told.get(participant) ?? 0) + 1);
+      if (repealedAt === undefined && obs.t >= 120 * DAY) {
+        repealedAt = obs.t;
+        await kernel.request({ op: "command", command: { command: "act", participant: mayor.holder, as: "mayor", provenance: { via: "direct" },
+          blocks: [{ block: "withdraw", record: "law-rent-freeze", speaks_for: "city", text: "Repealed." }] } });
+      }
+    } });
+  expect(s.participantErrors).toBe(0);
+  const log = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
+  expect(recs.filter((r) => r.record === "withdrawal" && r.withdraws === "law-rent-freeze").length).toBe(1);
+  // While it stood, no increase; once it's repealed, the landlords' reviews go ahead.
+  const increases = recs.filter((r) => r.kind === "rent_increase");
+  expect(increases.filter((r) => r.at <= repealedAt!).length).toBe(0);
+  expect(increases.filter((r) => r.at > repealedAt!).length).toBeGreaterThan(3);
+  // Each landlord, the tribunal's member and the union were shown the repeal through their laws, once.
+  for (const who of ["landlord-1-office-system", "landlord-2-office-system", "tribunal-member-system", "union-organiser-system"]) expect([who, told.get(who)]).toEqual([who, 1]);
+}, 900_000);

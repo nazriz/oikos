@@ -297,10 +297,26 @@ fn involved(st: &State, rec: &Record) -> Vec<String> {
     v
 }
 
-fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&str>>) -> bool {
+/// The record a withdrawal takes down: the one it names, if whoever withdraws it is its own author's entity or
+/// whoever it speaks for (anyone may record that they "withdraw" anything; only its owner ends its standing).
+fn taken_down<'a>(st: &'a State, rec: &Record) -> Option<&'a crate::state::Stored> {
+    let crate::blocks::RecordBody::Withdrawal { withdraws, .. } = &rec.body else { return None };
+    let target = st.records.get(withdraws)?;
+    let owner = |r: &Record| -> Vec<String> { r.speaks_for.iter().cloned().chain(st.author_entity(r)).collect() };
+    let by = owner(rec);
+    owner(&target.record).iter().any(|o| by.contains(o)).then_some(target)
+}
+
+/// Does a channel's filter show this record? `news`: what a look delivers, where a statement being taken down is
+/// news to whoever is shown statements like it: its withdrawal passes the filter's `statement_kinds` and `has` if
+/// the statement does (a book of laws shows a law's repeal). A search finds the records themselves, as they are.
+fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&str>>, news: bool) -> bool {
     if f.records.as_ref().is_some_and(|k| !k.iter().any(|x| x == rec.body.kind_name())) {
         return false;
     }
+    // (What the filter's `statement_kinds` and `has` are asked of: the record, or the statement it takes down.)
+    let rec_itself = rec;
+    let rec = if news && (f.statement_kinds.is_some() || f.has.is_some()) { taken_down(st, rec).map_or(rec, |t| &*t.record) } else { rec };
     if let Some(kinds) = &f.statement_kinds {
         match &rec.body {
             crate::blocks::RecordBody::Statement { kind, .. } if kinds.contains(kind) => {}
@@ -323,7 +339,7 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&s
         }
     }
     if let Some(want) = want {
-        if !involved(st, rec).iter().any(|e| want.contains(e.as_str())) {
+        if !involved(st, rec_itself).iter().any(|e| want.contains(e.as_str())) {
             return false;
         }
     }
@@ -388,21 +404,22 @@ impl RecordIndex {
             if let crate::blocks::RecordBody::Statement { kind, .. } = &rec.body {
                 self.standing_kind.entry(kind.clone()).or_default().insert(seq);
             }
-            // A withdrawal by the record's own author (or whoever it speaks for) ends its standing.
-            if let crate::blocks::RecordBody::Withdrawal { withdraws, .. } = &rec.body {
-                if let Some(target) = st.records.get(withdraws) {
-                    let t = &*target.record;
-                    let owner = |r: &Record| -> Vec<String> { r.speaks_for.iter().cloned().chain(st.author_entity(r)).collect() };
-                    let by = owner(rec);
-                    if owner(t).iter().any(|o| by.contains(o)) {
-                        if let Some(set) = self.standing_record.get_mut(t.body.kind_name()) {
-                            set.remove(&target.seq);
-                        }
-                        if let crate::blocks::RecordBody::Statement { kind, .. } = &t.body {
-                            if let Some(set) = self.standing_kind.get_mut(kind) {
-                                set.remove(&target.seq);
-                            }
-                        }
+            // A withdrawal by the record's own author (or whoever it speaks for) ends its standing, and is news
+            // wherever statements like the one it takes down are shown (`matches`): found by that statement's
+            // kind and by the fields it carries.
+            if let Some(target) = taken_down(st, rec) {
+                let t = &*target.record;
+                if let Some(set) = self.standing_record.get_mut(t.body.kind_name()) {
+                    set.remove(&target.seq);
+                }
+                if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &t.body {
+                    if let Some(set) = self.standing_kind.get_mut(kind) {
+                        set.remove(&target.seq);
+                    }
+                    self.by_kind.entry(kind.clone()).or_default().push(seq);
+                    let carries = [("offer", offer.is_some()), ("practice", practice.is_some()), ("assertion", assertion.is_some()), ("registry", registry.is_some()), ("adico", adico.is_some()), ("formal", formal.is_some())];
+                    for (field, _) in carries.into_iter().filter(|(_, x)| *x) {
+                        self.by_has.entry(field).or_default().push(seq);
                     }
                 }
             }
@@ -784,7 +801,7 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                         records: seqs
                             .into_iter()
                             .map(at_seq)
-                            .filter(|r| can_see(st, r, &me) && placed_ok(st, r, &me, scope.as_ref()) && matches(st, r, filter, want.as_ref()))
+                            .filter(|r| can_see(st, r, &me) && placed_ok(st, r, &me, scope.as_ref()) && matches(st, r, filter, want.as_ref(), true))
                             .cloned()
                             .collect(),
                         search: None,
@@ -925,7 +942,7 @@ fn search(st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, 
     let mut hits: Vec<(u64, &Record)> = seqs
         .into_iter()
         .map(|seq| (seq, at_seq(seq)))
-        .filter(|(_, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want.as_ref()) && conditions.iter().all(|c| holds(r, c)))
+        .filter(|(_, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want.as_ref(), false) && conditions.iter().all(|c| holds(r, c)))
         .collect();
     if let Some(o) = &q.order {
         // Records without the field sort last; ties keep newest first.

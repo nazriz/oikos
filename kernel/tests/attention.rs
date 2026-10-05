@@ -80,6 +80,54 @@ fn a_search_filters_orders_and_limits_what_the_seat_may_see_now() {
 }
 
 #[test]
+fn a_statement_taken_down_is_news_wherever_statements_like_it_are_shown() {
+    // Bob's "book" shows notices (by kind); his "rules" shows whatever carries a formal condition (by field). Neither
+    // names withdrawals, and both showed him the city's notice: when the city takes it down, each tells him so, once.
+    let mut c = riverbend();
+    let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "book", "kind": "records", "match": {"statement_kinds": ["notice"]}}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "rules", "kind": "records", "match": {"has": ["formal"]}}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "statements", "kind": "records", "match": {"records": ["statement"], "statement_kinds": ["notice"]}}));
+    let mut run = Run::start(c, "attention-withdrawn", Vec::new(), None).unwrap();
+    let seen = |run: &mut Run<Vec<u8>>, channel: &str| -> Vec<String> {
+        let o = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
+        match o.channels.get(channel) {
+            Some(ChannelData::Records { records, .. }) => records.iter().map(|r| r.id.clone()).collect(),
+            other => panic!("{other:?}"),
+        }
+    };
+    let rule = post(&mut run, "mayor", json!([{"block": "publish", "kind": "notice", "speaks_for": "city", "text": "No ball games.",
+        "formal": {"language": "cel", "condition": "block.block == 'publish'"}, "ref": "n"}]));
+    let other = post(&mut run, "mayor", json!([{"block": "publish", "kind": "memo", "speaks_for": "city", "text": "A memo.", "ref": "n"}]));
+    assert_eq!(seen(&mut run, "book"), vec![rule.clone()]);
+    // Someone else "withdrawing" it takes nothing down, and is no news here; nor is the city withdrawing something else.
+    post(&mut run, "alice-self", json!([{"block": "withdraw", "record": rule, "speaks_for": "alice", "ref": "w"}]));
+    post(&mut run, "mayor", json!([{"block": "withdraw", "record": other, "speaks_for": "city", "ref": "w"}]));
+    assert_eq!(seen(&mut run, "book"), Vec::<String>::new());
+    // The city withdraws it: the withdrawal comes through both channels, and only once.
+    let gone = post(&mut run, "mayor", json!([{"block": "withdraw", "record": rule, "speaks_for": "city", "ref": "w"}]));
+    let o = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
+    for channel in ["book", "rules"] {
+        match o.channels.get(channel) {
+            Some(ChannelData::Records { records, .. }) => assert_eq!(records.iter().map(|r| r.id.clone()).collect::<Vec<_>>(), vec![gone.clone()], "{channel}"),
+            other => panic!("{other:?}"),
+        }
+    }
+    // A channel that lists the records it shows, and not withdrawals, shows none.
+    match o.channels.get("statements") {
+        Some(ChannelData::Records { records, .. }) => assert!(records.is_empty()),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(seen(&mut run, "book"), Vec::<String>::new());
+    // The whole picture the channel covers has it too (what a view built from looks must equal).
+    let full = run.full_view("bob-self").unwrap();
+    match full.channels.get("book") {
+        Some(ChannelData::Records { records, .. }) => assert_eq!(records.iter().map(|r| r.id.clone()).collect::<Vec<_>>(), vec![rule, gone]),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
 fn a_bad_look_is_refused_before_it_reaches_the_log() {
     let mut run = town();
     let bad = |q: serde_json::Value| serde_json::from_value::<Vec<oikos_kernel::config::LookRequest>>(json!([{"channel": "board", "query": q}])).unwrap();

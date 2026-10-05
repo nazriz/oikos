@@ -52,8 +52,9 @@ export class Book {
       else this.byRecord.set(r.record, [r]);
       if (r.record === "withdrawal") this.takeDown(r.withdraws, r.at);
       // A statement that says it replaces an earlier one of the same kind from whoever it speaks for (an amended law
-      // names the law it replaces, in its words too): the earlier one no longer stands for this reader, who may never
-      // be shown its withdrawal (a book of laws shows laws, not what was taken down).
+      // names the law it replaces, in its words too): the earlier one no longer stands for this reader, whether or not
+      // its withdrawal is among what it's shown. (A plain repeal reaches it as the withdrawal itself: a channel that
+      // shows statements of a kind shows them being taken down by whoever they speak for.)
       if (r.record === "statement" && typeof r.data?.replaces === "string") {
         const old = this.records.get(r.data.replaces);
         if (old?.record === "statement" && old.kind === r.kind && !!old.speaks_for && old.speaks_for === r.speaks_for) {

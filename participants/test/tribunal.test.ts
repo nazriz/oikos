@@ -54,6 +54,22 @@ test("a notice of rent increase that breaks the law is found invalid; one that d
   expect(orders.find((o) => o.application === "rec.4")).toMatchObject({ applicant: "c0001", finding: "valid" });
 });
 
+test("a law repealed is no longer applied: a notice given after the repeal is valid, one given while it stood still isn't", () => {
+  const m = member.create(ctx("tribunal-member-system", { hearing_after_days: 21 }));
+  const t0 = 400 * DAY;
+  // Both give 30 days' notice (the law asked 60). The town repeals the law between them, with nothing in its place.
+  const before = notice("rec.1", t0 - 10 * DAY, t0 + 20 * DAY, t0 - 400 * DAY);
+  const repeal = rec("rec.2", t0 - 5 * DAY, { record: "withdrawal", withdraws: "law-rent", speaks_for: "outside", visible_to: "public", text: "Repealed." });
+  const after = notice("rec.3", t0 - 2 * DAY, t0 + 28 * DAY, t0 - 400 * DAY);
+  const a1 = apply("rec.4", t0, { kind: "rent_increase", against: "landlord-1", notice: "rec.1", evidence: before });
+  const a2 = apply("rec.5", t0, { kind: "rent_increase", against: "landlord-1", notice: "rec.3", evidence: after });
+  run(m, obs(t0 - 20 * DAY, [law]));
+  run(m, obs(t0, [repeal, a1, a2]));
+  const orders = said(run(m, obs(t0 + 21 * DAY, [])), "tribunal_order");
+  expect(orders.find((o) => o.application === "rec.4")).toMatchObject({ finding: "invalid", laws: ["law-rent"] });
+  expect(orders.find((o) => o.application === "rec.5")).toMatchObject({ finding: "valid" });
+});
+
 test("a debt is ordered paid, less what the respondent says it paid; unpaid once due, the debtor's bank is ordered to pay", () => {
   const m = member.create(ctx("tribunal-member-system", { hearing_after_days: 21, pay_within_days: 28 }));
   const t0 = 100 * DAY;

@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.35.2",
+  version: "0.35.3",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -1930,7 +1930,11 @@ export const citizen: BehaviourModule = {
       const b = buying as typeof buying;
       if (b?.stage === "applied") {
         const declined = book.all("loan_decision").some((r) => r.at >= b.since && (r.addressed_to ?? []).includes(me) && r.data?.approved === false);
-        if (declined || !book.open("property_for_sale").some((r) => r.id === b.listing) || t - b.since > 60 * DAY) buying = null;
+        // (Still for sale: the listing we answered, or the seller's later one for the same lot. A home relisted cheaper
+        // is the same home, and the seller takes a purchase answering any of its listings; we are shown listings being
+        // taken down now, and a relisting must not read as the home gone.)
+        const forSale = book.open("property_for_sale").some((r) => r.id === b.listing || (r.speaks_for === b.seller && r.data?.lot === b.lot));
+        if (declined || !forSale || t - b.since > 60 * DAY) buying = null;
         else if (b.funded && acc.balance >= b.price) {
           b.stage = "paid";
           steps.push(because(`Our mortgage is through: buying ${b.structure} for ${usd(b.price)}.`,
