@@ -6,10 +6,10 @@ import { TEST_CURRENCY } from "../eval/run";
 import { translatorContext, translatorSystem } from "../src/index";
 import { resolve } from "../src/resolver";
 import {
-  amountForms, amountWritings, askable, builtRefusals, copies, durationForms, FIELD_TYPES, formLine, formOf, functionOf, generate, goldFromCases, goldFromLog, goldText, JSON_OUT_OF_SCOPE, knowing, literals, mustAppear,
-  needed, refusalBriefs, spansIn, sameProgram, sampler, shapeOf, split, STYLES, styleBrief, surfaceVariant, whyNot, withoutRiders, writerSystem, type Example, type Gold,
+  amountForms, amountWritings, askable, badlyWritten, bringsAbout, builtRefusals, checkerFor, copies, durationForms, FIELD_TYPES, formLine, formOf, functionOf, generate, goldFromCases, goldFromLog, goldText, implausible, JSON_OUT_OF_SCOPE, knowing, literals, meaningOf, mustAppear,
+  needed, piledBriefs, plausible, refusalBriefs, spansIn, sameMeaning, sameProgram, sampler, shapeOf, split, STYLES, styleBrief, surfaceVariant, whyNot, withOffice, withoutRiders, writerSystem, type Example, type Gold,
 } from "../train/data";
-import { CURRENCIES, formSets, synthetic, syntheticForms } from "../train/synthetic";
+import { CURRENCIES, formSets, piled, synthetic, syntheticForms } from "../train/synthetic";
 
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
 const header = JSON.stringify({ kind: "header", body: { config: { world: { entities: [{ id: "builder", name: "Millbrook Builders" }, { id: "city", name: "Millbrook" }] }, positions: [{ id: "works", title: "Works Manager" }] } } });
@@ -38,7 +38,7 @@ const writer = (model: string, how: (program: string, style: string) => string |
 });
 const saying = (program: string, style: string) => `(${style.slice(0, 6)}) Please see to this: ${literals(calls.parseProgram(program)).join(", ")}.`;
 /** The words a style says to use exactly (an opening, a citation, a closing sentence), if it gives any. */
-const given = (style: string) => /exactly (?:these words|this sentence)[^"]*"([^"]+)"/.exec(style)?.[1];
+const given = (style: string) => (style.includes("exactly ") ? [...style.slice(style.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") || undefined : undefined);
 /** A writer that does as the style says: the given words first, then every literal. */
 const obliging = (program: string, style: string) => `${given(style) ? `${given(style)}${/[.]$/.test(given(style)!) ? "" : ","} ` : ""}please see to this: ${literals(calls.parseProgram(program)).join(", ")}.`;
 
@@ -91,7 +91,7 @@ test("a request is kept only if it carries every literal exactly, and only if it
     back: { model: "stand-in/back", translate: async (request) => (request.includes("the drain") ? "none(unclear)" : byRequest.get(request)) },
   });
   // Four programs, two requests each: writer b loses both payments' amounts; the drain payment from writer a fails the round trip.
-  expect(r.manifest.dropped).toEqual({ not_copied: 2, round_trip: 3, duplicate: 0, failed: 0, shares_held_out_wording: 0 });
+  expect(r.manifest.dropped).toEqual({ not_copied: 2, round_trip: 3, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 0, variable_named: 0, argument_named: 0, zero_wait: 0 });
   expect(r.examples.filter((e) => e.kind === "positive").map((e) => [e.shape, e.written_by, e.verified_by])).toEqual([
     ["message(text,to)", "stand-in/a", "stand-in/back"],
     ["money(amount,for,from,to)", "stand-in/a", "stand-in/back"],
@@ -283,10 +283,11 @@ test("generated gold covers each function's ways of being used, and every argume
   // A letter to one, and to several.
   expect(gold.some((g) => /^message\(.*to=\[/.test(g.program)) && gold.some((g) => /^message\(.*to=[a-z"]/.test(g.program))).toBe(true);
   // Every argument the contract allows is used somewhere, but the ones out of the first model's scope (structured
-  // data, a rule's formal condition) and a keeper's bookkeeping.
+  // data, a rule's formal condition), a keeper's bookkeeping, and `for` where nothing reads it (goods, work: only a
+  // payment has a purpose).
   const used = new Set(gold.flatMap((g) => argsOf(g.program).map(([fn, k]) => `${fn}.${k}`)));
   const left = Object.entries(calls.ARGS).flatMap(([fn, a]) => [...(a.allowed ?? [])].map((k) => `${fn}.${k}`)).filter((k) => !used.has(k));
-  expect(left.sort()).toEqual([...JSON_OUT_OF_SCOPE, "money.per_request", "statement.formal"].sort());
+  expect(left.sort()).toEqual([...JSON_OUT_OF_SCOPE, "money.per_request", "statement.formal", "goods.for", "work.for"].sort());
   // No structured data but a list of names and a claim's slots.
   for (const g of gold) for (const [fn, k, v] of argsOf(g.program)) if ("json" in v && !Array.isArray(v.json)) expect(`${fn}.${k}`).toBe("claim.about");
 });
@@ -360,7 +361,7 @@ test("invented forms: every type of field the resolver reads, two to seven field
   expect(formLine({ form: "permit_application", to: "planning", fields: { lot: { type: "lot", required: true }, kind: { type: "choice", options: ["new", "renewal"] } } })).toBe("- permit_application, to=planning, id form-planning-permit-application: fields lot (lot, required), kind (one of new | renewal)");
 });
 
-test("invented forms filled in: every required field, some of the others, with and without the office, beside other forms or alone; the resolver takes each", () => {
+test("invented forms filled in: every required field, some of the others, always with the office it goes to, beside other forms or alone; the resolver takes each", () => {
   const gold = syntheticForms({ sets: 30, perForm: 5, seed: 2 });
   expect(gold.length).toBeGreaterThan(400);
   let withTo = 0, alone = 0, beside = 0, optional = 0;
@@ -374,8 +375,8 @@ test("invented forms filled in: every required field, some of the others, with a
     for (const [k, f] of Object.entries(spec.fields)) if (f.required) expect(given).toContain(k);
     for (const k of given) expect(Object.keys(spec.fields)).toContain(k);
     if (given.some((k) => !spec.fields[k]!.required)) optional++;
-    // Two offices with a form by this name: the call says whose.
-    if (own.length > 1) expect("to" in c.args).toBe(true);
+    // The call says where it goes (the translator's rules: to= is where the list says), whose form it is included.
+    expect("to" in c.args).toBe(true);
     "to" in c.args ? withTo++ : 0;
     g.forms!.length === 1 ? alone++ : beside++;
     expect(g.forms!.length).toBeLessThanOrEqual(4);
@@ -385,7 +386,8 @@ test("invented forms filled in: every required field, some of the others, with a
     // What the request must carry: the form's name as words, each value.
     expect(needed(calls.parseProgram(g.program)).find((n) => n.arg === "form")).toEqual({ arg: "form", value: name, exact: false });
   }
-  for (const n of [withTo, gold.length - withTo, alone, beside, optional]) expect(n).toBeGreaterThan(gold.length / 10);
+  expect(withTo).toBe(gold.length);
+  for (const n of [alone, beside, optional]) expect(n).toBeGreaterThan(gold.length / 10);
   expect(syntheticForms({ sets: 30, perForm: 5, seed: 2 })).toEqual(gold);
 });
 
@@ -513,9 +515,17 @@ test("styles the pilots' office-holders wrote in: a capacity first, a name with 
   const no = styleBrief("do_not", letter, rand);
   expect(no.riders[0]!.kind).toBe("do_not");
   expect(no.riders[0]!.text).toMatch(/[Dd]o(es)? not /);
-  // A citation is a rider only where the call has nowhere to put one.
-  const cite = styleBrief("cited", letter, rand);
+  // Now and then two of them, as the pilots' later requests close: each a rider.
+  const closings = Array.from({ length: 60 }, () => styleBrief("do_not", letter, rand));
+  expect(new Set(closings.map((b) => b.riders.length))).toEqual(new Set([1, 2]));
+  for (const b of closings) for (const r of b.riders) expect(b.instruction).toContain(`"${r.text}"`);
+  // A citation is a rider only where no argument of the call could absorb it: a vote has nowhere to put a record cited.
+  const cite = styleBrief("cited", g("vote(ballot=rec.3, choice=yes)"), rand);
   expect(cite.riders).toEqual([{ kind: "citation", text: expect.stringMatching(/ (law-[a-z]+|rec\.\d+)$/) }]);
+  // A letter does (what it is about, re=: "in accordance with rec.3495" on a letter was read as that), so it gets none;
+  // one that already says what it is about has that record worded as the citation.
+  expect(styleBrief("cited", letter, rand)).toEqual({ style: "formal", instruction: STYLES.formal!, riders: [] });
+  expect(styleBrief("cited", g('message(to=works, text="Start on Monday.", re=rec.9)'), rand)).toMatchObject({ style: "cited", riders: [] });
   // Where the call cites a record, that record is what's worded as the citation, and it's no rider.
   const withBasis = styleBrief("cited", g('structure(type=shed, on=lot-07, by=acme, price="9,000", basis=rec.30)'), rand);
   expect(withBasis).toMatchObject({ style: "cited", riders: [] });
@@ -531,24 +541,26 @@ test("styles the pilots' office-holders wrote in: a capacity first, a name with 
 
 test("a rider adds nothing to the program, and the example says so: where it is, and that the program's values are found outside it", async () => {
   const gold: Gold[] = [
-    { program: 'message(text="Start on Monday.", to=works)', shape: "message(text,to)", names: { works: "Works Manager" }, source: "t", origin: "synthetic" },
+    { program: "position(appoint=works, to=c0042)", shape: "position(appoint,to)", names: { works: "Works Manager" }, source: "t", origin: "synthetic" },
     { program: "vote(ballot=rec.3, choice=yes)", shape: "vote(ballot,choice)", names: {}, source: "t", origin: "synthetic" },
   ];
   const r = await generate(gold, { writers: [writer("a", obliging)], perGold: 3, styles: ["capacity", "cited", "do_not"], seed: 5 });
   const positives = r.examples.filter((e) => e.kind === "positive");
   expect(positives.length).toBe(6);
-  expect(r.manifest.riders).toEqual({ capacity: 2, citation: 2, do_not: 2 });
+  expect(r.manifest.riders).toMatchObject({ capacity: 2, citation: 2 });
+  expect(r.manifest.riders.do_not).toBeGreaterThanOrEqual(2);
   expect(r.manifest.by_style).toMatchObject({ capacity: 2, cited: 2, do_not: 2 });
-  expect(r.manifest.by_function).toMatchObject({ message: 3, vote: 3 });
+  expect(r.manifest.by_function).toMatchObject({ position: 3, vote: 3 });
   expect(r.manifest.by_origin).toMatchObject({ synthetic: 6 });
   for (const e of positives) {
     expect(e.program).toBe(gold.find((g) => g.shape === e.shape)!.program); // the program is the gold one, rider or no rider
-    expect(e.riders!.length).toBe(1);
-    const rider = e.riders![0]!;
-    expect(rider.adds).toBe("nothing");
-    expect(e.request.slice(...rider.at)).toBe(rider.text);
-    // No value of the program is pointed at inside the rider ("Works" in "As Works Manager of …" isn't who is written to).
-    for (const s of e.spans!) expect(s.at[1] <= rider.at[0] || s.at[0] >= rider.at[1]).toBe(true);
+    expect(e.riders!.length).toBe(e.style === "do_not" ? e.riders!.length : 1);
+    for (const rider of e.riders!) {
+      expect(rider.adds).toBe("nothing");
+      expect(e.request.slice(...rider.at)).toBe(rider.text);
+      // No value of the program is pointed at inside the rider ("Works" in "As Works Manager of …" isn't the post).
+      for (const s of e.spans!) expect(s.at[1] <= rider.at[0] || s.at[0] >= rider.at[1]).toBe(true);
+    }
     expect(e.gold).toBe(e.program);
   }
   // A writer that leaves the given words out: nothing is kept.
@@ -576,8 +588,8 @@ test("a form's examples carry the form as the translator is shown it, and the mo
     expect(e.forms.some((line) => line.startsWith(`- ${formOf(e.program)!.form}, to=`))).toBe(true);
   }
   expect(shown.some((f) => f.length > 1)).toBe(true);
-  // The writer was told the form's fields, to say which value is for which.
-  expect(writerSystem()).toContain("which of its fields each value is for");
+  // The writer was told the form's fields, to give each value against the form's own label for it.
+  expect(writerSystem()).toContain("give each value against the form's own label for it");
   // The floor on refusals: what could be built was, and what came out short is said.
   expect(r.manifest.refusal_floor).toBe(2);
   expect(r.examples.filter((e) => e.program === "none(unknown_form)").length).toBeGreaterThanOrEqual(2);
@@ -635,7 +647,7 @@ test("the split is by form for form examples: a validation form is never shown i
   for (const e of s.validation.filter((x) => x.kind === "positive")) expect(requests.has(e.request)).toBe(false);
   expect(s.report.form!.validation.gold).toBe(6); // whole sets: a fifth of thirty
   // Refusals built from several requests are built again on each side, from that side's own.
-  const parts = (e: Example) => e.request.split(/ Also: | And then: /);
+  const parts = (e: Example) => e.request.split(/ Also: | And then: | Also, separately: | And while you're at it: | One more thing: | Separately: | And another thing: /);
   const trainRequests = new Set(s.train.filter((e) => e.kind === "positive").map((e) => e.request));
   const many = s.train.filter((e) => e.program === "none(too_much)");
   expect(many.length).toBeGreaterThan(0);
@@ -665,4 +677,389 @@ test("gold from a log carries its world's money and, for a form filled in, the f
   // Its other surface is written in that world's money.
   const rand = sampler(1);
   for (let i = 0; i < 20; i++) expect(calls.parseAmount(((calls.parseProgram(surfaceVariant(form, rand).program) as any).lines[0].call.args.fee as { text: string }).text, form.currency!)).toBe("4000");
+});
+
+// ---------------------------------------------------------------- what the audit of a trial found (2026-10-06)
+
+test("two programs are compared by value: an amount, a time, a count, a flag, one id or a list of it, a letter to each; a near miss still differs", () => {
+  const cur = CURRENCIES[0]!; // a sign before, two decimals, words for the unit and its smallest part
+  const same = (a: string, b: string) => sameProgram(a, b, { currency: cur });
+  // An amount, by what it comes to in the world's money; a different amount or a different account is different.
+  expect(same('money(to=acc-1, amount="$1,500")', 'money(to=acc-1, amount="1.5k")')).toBe(true);
+  expect(same('money(to=acc-1, amount="$1,500")', 'money(to=acc-1, amount="150000 cents")')).toBe(true);
+  expect(same('money(to=acc-1, amount="$1,500")', 'money(to=acc-1, amount="$1,501")')).toBe(false);
+  expect(same('money(to=acc-1, amount="$1,500")', 'money(to=acc-2, amount="$1,500")')).toBe(false);
+  // (With no currency known, an amount is what's written and nothing more.)
+  expect(sameProgram('money(to=acc-1, amount="$1,500")', 'money(to=acc-1, amount="1.5k")')).toBe(false);
+  expect(sameProgram('money(to=acc-1, amount="$1,500")', 'money(to=acc-1, amount="$1,500")')).toBe(true);
+  // A length of time, nested in a commitment too: "every 28 days" is "28 days" is "4 weeks".
+  const lease = (every: string) => `agreement(with=c3935, term="2 years", we_do=money(to=acc-1, amount="236.55", every="${every}"))`;
+  expect(same(lease("every 28 days"), lease("28 days"))).toBe(true);
+  expect(same(lease("every 28 days"), lease("4 weeks"))).toBe(true);
+  expect(same(lease("monthly"), lease("30 days"))).toBe(true);
+  expect(same(lease("every 28 days"), lease("30 days"))).toBe(false);
+  expect(same('agreement(with=c1, term="2 years")', 'agreement(with=c1, term="24 months")')).toBe(false); // (a year is 365 days, a month 30)
+  // A count, in words or digits, quoted or bare.
+  expect(same('work(task=make, units="six", at=str.1)', "work(task=make, units=6, at=str.1)")).toBe(true);
+  expect(same('goods(kind=rope, quantity="16", at=str.1)', "goods(kind=rope, quantity=16, at=str.1)")).toBe(true);
+  expect(same('work(task=make, units="six", at=str.1)', 'work(task=make, units="7", at=str.1)')).toBe(false);
+  // A yes-or-no flag in any accepted spelling; "no" is the flag left out. Gold programs write one spelling.
+  expect(same("occupancy(in=str.181, leave=yes, who=par.568)", "occupancy(in=str.181, leave=true, who=par.568)")).toBe(true);
+  expect(same("presence(leave=yes)", 'presence(leave="Yes")')).toBe(true);
+  expect(same("occupancy(in=str.181, leave=no)", "occupancy(in=str.181)")).toBe(true);
+  expect(same("occupancy(in=str.181, leave=yes)", "occupancy(in=str.181)")).toBe(false);
+  expect(same("presence(leave=yes, who=c0045)", "presence(leave=c0045)")).toBe(false); // (the resolver doesn't read that as c0045 leaving)
+  expect(goldText(calls.parseProgram("occupancy(in=str.181, leave=true)"))).toBe("occupancy(in=str.181, leave=yes)");
+  expect(goldText(calls.parseProgram("presence(leave=yes, who=c0045)"))).toBe("presence(leave=yes, who=c0045)");
+  // One id, or a list of it; a list is a set.
+  expect(same('work(task=make, units="3", at=str.2, by=c0013)', 'work(task=make, units="3", at=str.2, by=["c0013"])')).toBe(true);
+  expect(same('work(task=make, units="3", at=str.2, by=["c0013","c0014"])', 'work(task=make, units="3", at=str.2, by=["c0014","c0013"])')).toBe(true);
+  expect(same('work(task=make, units="3", at=str.2, by=c0013)', 'work(task=make, units="3", at=str.2, by=c0014)')).toBe(false);
+  expect(same('work(task=make, units="3", at=str.2, by=["c0013","c0014"])', 'work(task=make, units="3", at=str.2, by=c0013)')).toBe(false);
+  // A letter to two, or the same letter to each: the same. Not so work: its units are the whole job.
+  expect(same('message(to=["c0013","ent.9"], text="Start on Monday.")', 'message(to=c0013, text="Start on Monday.")\nmessage(to=ent.9, text="Start on Monday.")')).toBe(true);
+  expect(same('message(to=["c0013","ent.9"], text="Start on Monday.")', 'message(to=c0013, text="Start on Monday.")\nmessage(to=ent.9, text="Start on Tuesday.")')).toBe(false);
+  expect(same('message(to=["c0013","ent.9"], text="Start on Monday.")', 'message(to=c0013, text="Start on Monday.")')).toBe(false);
+  expect(same('work(task=harvest, units="4", at=str.753, by=["ent.2368","ent.186"])', 'work(task=harvest, units="4", at=str.753, by=ent.2368)\nwork(task=harvest, units="4", at=str.753, by=ent.186)')).toBe(false);
+  // A kind in words is the label the resolver makes of it; a purpose without its article or its full stop.
+  expect(same('statement(kind="price list", text="Bread is 3.")', 'statement(kind=price_list, text="Bread is 3.")')).toBe(true);
+  expect(same('statement(kind=notice, text="Bread is 3.")', 'statement(kind=notice, text="Bread is 4.")')).toBe(false);
+  expect(same('money(to=acc-1, amount="$5", for="The energy bill.")', 'money(to=acc-1, amount="$5", for="energy bill")')).toBe(true);
+  expect(same('money(to=acc-1, amount="$5", for="the energy bill")', 'money(to=acc-1, amount="$5", for="the water bill")')).toBe(false);
+  // A form: by its name, in words or by its record's id; its office left out is where the forms known say it goes;
+  // its fields by their types.
+  const forms = [{ form: "stall_permit", to: "markets-1", id: "form-stall", fields: { fee: { type: "amount" }, stalls: { type: "count" }, period: { type: "duration" }, notes: { type: "text" } } }];
+  const filled = 'form(form=stall_permit, to=markets-1, fee="$40", stalls="16", period="2 weeks")';
+  const sameForm = (b: string) => sameProgram(filled, b, { currency: cur, forms });
+  expect(sameForm('form(form="stall permit", fee="4000 cents", stalls=16, period="14 days")')).toBe(true);
+  expect(sameForm('form(form=form-stall, to=markets-1, fee="$40.00", stalls="16", period="a fortnight")')).toBe(true);
+  expect(sameForm('form(form=stall_permit, to=parks-2, fee="$40", stalls="16", period="2 weeks")')).toBe(false);
+  expect(sameForm('form(form=stall_permit, to=markets-1, fee="$41", stalls="16", period="2 weeks")')).toBe(false);
+  expect(sameForm('form(form=stall_permit, to=markets-1, fee="$40", stalls="16", period="2 weeks", notes="16")')).toBe(false);
+  expect(sameProgram(filled, 'form(form=stall_permit, fee="$40", stalls="16", period="2 weeks")', { currency: cur })).toBe(false); // (no forms known: nothing says where it goes)
+  // What a line calls the thing it makes is no part of it; refusals by label; what isn't a program only if identical.
+  expect(same('t = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, for=t, text="It holds land.")', 'v1 = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, for=v1, text="It holds land.")')).toBe(true);
+  expect(same("none(unclear)", "none( unclear )") && !same("none(unclear)", "none(too_much)") && !same("none(unclear)", "vote(ballot=rec.1, choice=yes)")).toBe(true);
+  expect(meaningOf("nonsense(")).toBeUndefined();
+  expect(sameMeaning("nonsense(", "nonsense(") && !sameMeaning("nonsense(", "none(unclear)")).toBe(true);
+});
+
+test("a gold program is one a sentence could sensibly ask for: each reason one is dropped for, counted; the generator's programs all are", async () => {
+  const why = (p: string, o: { invented?: boolean } = {}) => implausible(p, o);
+  // A form says where it goes (the translator's rules write where the list says).
+  expect(why("form(form=permit_application, lot=lot-01)")).toBe("a form with no office named");
+  expect(why("form(form=permit_application, to=planning-1, lot=lot-01)")).toBeUndefined();
+  const known = [{ form: "permit_application", to: "planning-1", fields: { lot: { type: "lot" } } }];
+  expect(calls.programText(withOffice(calls.parseProgram("form(form=permit_application, lot=lot-01)"), known))).toBe("form(form=permit_application, lot=lot-01, to=planning-1)");
+  expect(calls.programText(withOffice(calls.parseProgram("form(form=permit_application, lot=lot-01)"), [...known, { ...known[0]!, to: "parks-2" }]))).toBe("form(form=permit_application, lot=lot-01)"); // two offices: which isn't ours to say
+  // for= only where something reads it: a payment's purpose; whose name a statement, a vote, a claim, a signature is in.
+  expect(why('goods(kind=flour, quantity="11", at=str.1, for="damages")')).toBe("for= on goods, where it means nothing");
+  expect(why('work(task=thresh, units="12", at=hall-79, for=rfbs65)')).toBe("for= on work, where it means nothing");
+  expect(why('money(to=acc-1, amount="5", for="damages")') ?? why('statement(kind=notice, text="Closed.", for=ent.4)') ?? why("vote(ballot=rec.1, choice=yes, for=ent.4)")).toBeUndefined();
+  // Several lines are one request only if each later line uses what an earlier one made, or they're the same thing done again.
+  expect(why('goods(at=apts-1, from_at=shop-1, kind=goods, quantity="7", to=c0170)\nwork(at=apts-1, task=consume, units="28")')).toBe("lines that don't depend on each other");
+  expect(why("occupancy(in=house-32/dwelling.1)\noccupancy(in=house-32/dwelling.1, who=ent.33)")).toBe("a line that repeats another");
+  expect(why('work(at=shop-2, task=consume, units="13")\nwork(at=shop-5, task=consume, units="12")')).toBeUndefined();
+  expect(why('t = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, for=t, text="It holds land.")')).toBeUndefined();
+  expect(why('t = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, for=t, text="It holds land.")\nvote(ballot=rec.1, choice=yes)')).toBe("lines that don't depend on each other");
+  expect(why('v1 = statement(kind=resolution, text="The hall will be inspected on Friday.")\nmessage(re=v1, text="The hall will be repainted tomorrow.", to=water-3)')).toBe("a letter about something other than what it's sent with");
+  expect(why('v1 = statement(kind=resolution, text="The hall will be inspected on Friday.")\nmessage(re=v1, text="Please read the resolution I have just published.", to=water-3)')).toBeUndefined();
+  // An agreement is an exchange people make.
+  expect(why("agreement(with=yarrow-trust, template=partnership, they_do=occupancy(in=str.467/dwelling.19, who=yarrow-trust))")).toBe("the other side committing to its own moving in");
+  expect(why("agreement(with=c6010, template=retainer, they_do=structure(on=lot-22-24, type=bridge), we_do=account(holder=c6010))")).toBe("having something built, wrapped in an agreement");
+  expect(why("agreement(with=c6010, template=mortgage, they_do=account(holder=c6010), we_do=occupancy(in=str.1, who=c6010))")).toBe("the other side committing to an account of its own");
+  expect(why('agreement(with=c6010, we_do=occupancy(in=str.1, who=c6010), they_do=goods(kind=grain, quantity="3", to=ent.5, at=str.2))')).toBe("an exchange in which nobody pays");
+  expect(why('agreement(with=c6010, term="a month", our_notice="5 years")')).toBe("notice longer than the agreement runs");
+  expect(why('agreement(with=c0042, template=lease, term="12 months", our_notice="60 days", we_do=occupancy(who=c0042, in=apts-3/dwelling.2), they_do=money(to=acc-landlord-1, amount="$850", every="monthly", for="rent"))')).toBeUndefined();
+  // A claim's action fits what it's done to; a child's other parent is a person; an age fits what someone comes as.
+  expect(why('claim(position=right, holder=ent.4, about={"action":"moor","object":"rec.39523"})')).toBe("a claim to do to a record what is done to a place");
+  expect(why('claim(position=right, holder=ent.4, about={"action":"sign","object":"rec.39523"})') ?? why('claim(position=right, holder=ent.4, about={"action":"moor","object":"str.9"})')).toBeUndefined();
+  expect(why('birth(name="Kaya", template=baby, with="the union")')).toBe("a second parent who is an office or an organisation");
+  expect(why('birth(name="Kaya", template=baby, with="my neighbour")') ?? why('birth(name="Kaya", template=baby, with=c0529)') ?? why('birth(name="Kaya", template=baby)')).toBeUndefined();
+  expect(why('presence(name="Ana Silva", age="11 months", template=pensioner)')).toBe("an age that doesn't fit what the person comes as");
+  expect(why('presence(name="Ana Silva", age="59 years", template=apprentice)')).toBe("an age that doesn't fit what the person comes as");
+  expect(why('presence(name="Ana Silva", age="7 months", template=newcomer, carrying="$2,400,000")')).toBe("a child carrying money");
+  expect(why('presence(name="Ana Silva", age="31 years", template=newcomer, carrying="$2,400")')).toBeUndefined();
+  // Generated programs only: an id that a writer would turn into words. A real world's ids are what they are.
+  expect(why("account(at=crh81, holder=timber)", { invented: true })).toBe("an id that is an ordinary word");
+  expect(why("position(vacate=mayor)", { invented: true })).toBe("an id that is an ordinary word");
+  expect(why("system(retire=records_clerk-3)", { invented: true })).toBe("an id with an underscore, which reads as a phrase");
+  expect(why("system(template=inspector_aid)", { invented: true })).toBe("a word with an underscore, which a sentence writes as two");
+  expect(why("account(at=crh81, holder=timber)") ?? why("position(vacate=mayor)") ?? why("system(template=inspector_aid)") ?? why("system(template=helpdesk)", { invented: true })).toBeUndefined();
+  expect(plausible("position(vacate=mayor)") && !plausible("position(vacate=mayor)", { invented: true })).toBe(true);
+
+  // Read from a log: a form gets its office, and what no sentence would ask for is left out and counted by its reason.
+  const head = JSON.stringify({ kind: "header", body: { config: { world: { entities: [] }, records: [{ id: "form-stall", kind: "form", record: "statement", in_position: "markets", data: { form: "stall_permit", submit_as: "stall_permit", submit_to: ["city"], fields: { site: { type: "lot" } } } }] } } });
+  const excluded: { [reason: string]: number } = {};
+  const fromLog = await goldFromLog([head,
+    act("form(form=stall_permit, site=lot-01-02)"),
+    act('goods(at=apts-1, from_at=shop-1, kind=goods, quantity="7", to=c0170)\nwork(at=apts-1, task=consume, units="28")'),
+    act("occupancy(in=house-32/dwelling.1)\noccupancy(in=house-32/dwelling.1, who=ent.33)"),
+    act("occupancy(in=house-32/dwelling.1, leave=true)"),
+  ], { excluded });
+  expect(fromLog.map((g) => g.program)).toEqual(["form(form=stall_permit, site=lot-01-02, to=markets)", "occupancy(in=house-32/dwelling.1, leave=yes)"]);
+  expect(excluded).toEqual({ "implausible: lines that don't depend on each other": 1, "implausible: a line that repeats another": 1 });
+
+  // The generator: nothing it makes is implausible (ids and words as a writer can only copy them, included).
+  const dropped: { [reason: string]: number } = {};
+  const gold = synthetic({ seed: 4, dropped });
+  expect(dropped).toEqual({});
+  for (const g of gold) expect([g.program, implausible(g.program, { invented: true, ...(g.forms ? { forms: g.forms } : {}) })]).toEqual([g.program, undefined]);
+  const all = gold.flatMap((g) => argsOf(g.program).map(([fn, k, v]) => ({ g, fn, k, v })));
+  // for= only where it means something, and on anything but a payment it is someone's id.
+  for (const { g, fn, k, v } of all) if (k === "for") expect([g.program, ["money", "statement", "vote", "claim", "agreement"].includes(fn), fn === "money" ? "text" in v : "id" in v || "var" in v]).toEqual([g.program, true, true]);
+  // An agreement's two sides: someone pays.
+  const offers = gold.filter((g) => /^agreement\(.*_do=/.test(g.program)).map((g) => linesOf(g.program)[0]!.call.args);
+  expect(offers.length).toBeGreaterThan(100);
+  const side = (v: calls.Value | undefined) => (v && "call" in v ? v.call.fn : "-");
+  const deals = new Set(offers.map((a) => `${side(a.we_do)}/${side(a.they_do)}`));
+  for (const a of offers) if (a.we_do && a.they_do) expect([side(a.we_do), side(a.they_do)]).toContain("money");
+  for (const d of ["occupancy/money", "money/occupancy", "goods/money", "money/goods", "money/money", "money/-", "-/money"]) expect([d, deals.has(d)]).toEqual([d, true]);
+  // (Never the other side's own moving in as its commitment, a building it puts up for us, or an account of its own.)
+  for (const a of offers) expect(["structure", "account"]).not.toContain(side(a.they_do));
+  // A birth: the name and what the child is recorded as, which the contract requires, and the other parent or nobody.
+  for (const g of gold.filter((x) => fnOf(x) === "birth")) expect(Object.keys(linesOf(g.program)[0]!.call.args).filter((k) => !["name", "template", "with"].includes(k))).toEqual([]);
+  // A newcomer's age in years, as old as what they come as; what they carry is pocket money.
+  for (const g of gold.filter((x) => /^presence\(age=/.test(x.program))) {
+    const a = linesOf(g.program)[0]!.call.args;
+    const years = calls.parseDuration((a.age as { text: string }).text) / (365 * 86_400);
+    expect(years >= 15 && years <= 90).toBe(true);
+    if ((a.template as { id: string }).id === "pensioner") expect(years).toBeGreaterThanOrEqual(62);
+    if (a.carrying) expect(BigInt(calls.parseAmount((a.carrying as { text: string }).text, g.currency!)) / 10n ** BigInt(g.currency!.minor_units) <= 400_000n).toBe(true);
+  }
+  // Something published reads as its kind: a receipt says what was received, never a rule about dogs.
+  for (const g of gold.filter((x) => /^statement\(.*kind=receipt/.test(x.program))) expect(g.program).toContain("has been received in full.");
+  expect(gold.some((g) => /on tomorrow|on the end of the week/.test(g.program))).toBe(false);
+});
+
+test("the writer is told to say the act, not the call; a request that reads as the call is dropped before any model is asked, its reason counted", async () => {
+  const system = writerSystem();
+  for (const said of ["never \"is present\"", "\"is put to work\"", "in a quantity of 33", "never \"in 0 days\"", "close the quote", "v1, v2", "Not the word \"field\", unless a form is being filled in", "with nothing else inside them", "Don't recite \"X in the Y field\" for every one"]) expect([said, system.includes(said)]).toEqual([said, true]);
+  // What a call brings about goes to the writer with it: the function's gloss, made particular where an argument settles it.
+  expect(bringsAbout("presence(who=c1587)")[0]).toContain("comes back into the world from outside");
+  expect(bringsAbout('presence(name="Ana Silva", age="31 years", template=newcomer)')[0]).toContain("arrives, is let in");
+  expect(bringsAbout("system(template=monitor)")[0]).toContain("is put to work");
+  expect(bringsAbout("agreement(notice=rec.36755)")[0]).toContain("notice is given to end an agreement");
+  expect(bringsAbout("claim(transfer=rec.9, to=ent.4)")[0]).toContain("passed on to someone else");
+  expect(bringsAbout("harm(who=c1587)")).toEqual(["harm: someone is physically harmed"]); // (the translator's own gloss)
+  expect(bringsAbout('agreement(with=c1, we_do=occupancy(who=c1, in=str.1), they_do=money(to=acc-1, amount="5"))').map((x) => x.slice(0, x.indexOf(":")))).toEqual(["agreement", "  what we commit to (occupancy)", "  what they commit to (money)"]);
+  for (const fn of Object.keys(calls.ARGS)) expect([fn, bringsAbout(fn === "form" ? "form(form=x, to=y-1)" : `${fn}()`)[0]!.length > fn.length + 10]).toEqual([fn, true]);
+  let asked = "";
+  const seen = writer("a", (program, style) => "Have it done.");
+  await generate([{ program: "presence(who=c1587)", shape: "presence(who)", names: {}, source: "t" }], { writers: [{ ...seen, complete: async (req) => ((asked = String((req.messages[0] as any).content)), seen.complete(req)) }], perGold: 1, styles: ["terse"] });
+  expect(asked).toMatch(/^Call:\npresence\(who=c1587\)\n\nWhat it brings about:\npresence: someone who was away comes back/);
+
+  // The mechanical checks, each with its reason.
+  const letter = 'message(to=c0042, text="Work starts on Monday.")';
+  expect(badlyWritten('Send c0042 this message: "Work starts on Monday.', letter)).toBe("quotes");
+  expect(badlyWritten("Send c0042 this message: “Work starts on Monday.", letter)).toBe("quotes");
+  expect(badlyWritten('Send c0042 this message: "Work starts on Monday."', letter) ?? badlyWritten("Tell c0042: Work starts on Monday. It's the foreman's wish.", letter)).toBeUndefined();
+  const post = 'v1 = position(title="Night Watch")\nposition(appoint=v1, to=c4515)';
+  expect(badlyWritten("Create the position v1 with the title Night Watch and appoint c4515 to it.", post)).toBe("variable_named");
+  expect(badlyWritten("Create a post called Night Watch and appoint c4515 to it.", post)).toBeUndefined();
+  expect(badlyWritten("Open an account with holder=c0042.", "account(holder=c0042)")).toBe("argument_named");
+  expect(badlyWritten("Open an account, with c0042 in the holder field.", "account(holder=c0042)")).toBe("argument_named");
+  expect(badlyWritten("Open an account and fill the right field with c0042.", "account(holder=c0042)")).toBe("argument_named");
+  expect(badlyWritten("Open an account for c0042.", "account(holder=c0042)")).toBeUndefined();
+  // (A form is filled in field by field: the word is a person's there. An argument's name with "=" never is.)
+  const filled = "form(form=permit_application, to=planning-1, lot=lot-01)";
+  expect(badlyWritten("Fill in the permit application for planning-1, with lot-01 in the lot field.", filled)).toBeUndefined();
+  expect(badlyWritten("Fill in the permit application for planning-1: lot=lot-01.", filled)).toBe("argument_named");
+  // (What the program copies may say anything: a letter about a field isn't the call's word for a part of itself.)
+  expect(badlyWritten('Tell c0042: "Meet me at the far field."', 'message(to=c0042, text="Meet me at the far field.")')).toBeUndefined();
+  // A wait of no time is said as starting now: "0 days" needn't be in the request, and mustn't be said of the wait.
+  const standing = 'money(to=acc.66, amount="650.99", from=acc.67, every="30 days", first="0 days")';
+  expect(mustAppear(calls.parseProgram(standing))).not.toContain("0 days");
+  expect(copies("Pay 650.99 from acc.67 to acc.66 every 30 days, starting now.", standing)).toBe(true);
+  expect(badlyWritten("Pay 650.99 from acc.67 to acc.66 every 30 days, starting now.", standing)).toBeUndefined();
+  expect(badlyWritten("Pay 650.99 from acc.67 to acc.66 every 30 days, starting in 0 days.", standing)).toBe("zero_wait");
+  expect(spansIn("Pay 650.99 from acc.67 to acc.66 every 30 days, starting now.", standing).map((x) => x.arg).sort()).toEqual(["amount", "every", "from", "to"]);
+
+  // In the pipeline: such a request never reaches the checker, and is counted under its reason.
+  const gold: Gold[] = [letter, post, "account(holder=c0042)", standing, "vote(ballot=rec.3, choice=yes)"].map((program) => ({ program, shape: shapeOf(calls.parseProgram(program)), names: {}, source: "t", origin: "synthetic" }));
+  const said: { [program: string]: string } = {
+    [letter]: 'Send c0042 this message: "Work starts on Monday.',
+    [post]: "Create the position v1 with the title Night Watch and appoint c4515 to it.",
+    "account(holder=c0042)": "Open an account, with c0042 in the holder field.",
+    [standing]: "Pay 650.99 from acc.67 to acc.66 every 30 days, starting in 0 days.",
+    "vote(ballot=rec.3, choice=yes)": "Vote yes on ballot rec.3.",
+  };
+  const checked: string[] = [];
+  const r = await generate(gold, { writers: [writer("a", (program) => said[program])], perGold: 1, styles: ["terse"], back: { model: "stand-in/back", translate: async (request, _forms, g) => (checked.push(request), g!.program) } });
+  expect(r.manifest.dropped).toEqual({ not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 1, variable_named: 1, argument_named: 1, zero_wait: 1 });
+  expect(checked).toEqual(["Vote yes on ballot rec.3."]);
+  expect(r.rejects.map((x) => x.why).sort()).toEqual(["argument_named", "quotes", "variable_named", "zero_wait"]);
+  expect(r.examples.filter((e) => e.kind === "positive").map((e) => e.program)).toEqual(["vote(ballot=rec.3, choice=yes)"]);
+});
+
+test("a span points at the right occurrence: beside its own call's values, the bracketed id, the words of a choice; ambiguous where nothing settles it; a second \"do not\" is a rider", async () => {
+  const at = (request: string, program: string) => spansIn(request, program).map((x) => `${x.line !== undefined ? `${x.line}.` : ""}${x.arg}: ${request.slice(...x.at)}@${x.at[0]}${x.ambiguous ? ` or @${x.all!.slice(1).map((y) => y[0]).join(",")}` : ""}`);
+  // The same office in each of two lines: each line's span is the occurrence said with that line's other values.
+  expect(at("Open an account at bank for ent.22, and open an account at bank for ent.23.", "account(at=bank, holder=ent.22)\naccount(at=bank, holder=ent.23)"))
+    .toEqual(["0.at: bank@19", "0.holder: ent.22@28", "1.at: bank@59", "1.holder: ent.23@68"]);
+  // A party who is also named in a commitment: the commitment's is the one among the commitment's values, the other is the party's.
+  const lease = 'agreement(with=c6010, we_do=occupancy(who=c6010, in=str.1/room.2), they_do=money(to=acc-9, amount="$5", every="monthly"))';
+  const offer = "Offer c6010 an agreement: we let c6010 live in str.1/room.2, and they pay $5 monthly into acc-9.";
+  expect(at(offer, lease)).toEqual(expect.arrayContaining(["with: c6010@6", `we_do.who: c6010@${offer.indexOf("c6010", 10)}`]));
+  expect(spansIn(offer, lease).some((x) => x.ambiguous)).toBe(false);
+  // An id in square brackets after its title: the bracketed one, not the word in the title or the name.
+  const named = "Please send the works manager [works] a message about [rec.6887] saying: The park is out of use on Tuesday.";
+  expect(at(named, 'message(re=rec.6887, text="The park is out of use on Tuesday.", to=works)')).toContain(`to: works@${named.indexOf("[works]") + 1}`);
+  const claimed = "Record Lark Cross Farms Brothers [brothers]' right to moor at [str.9] for Thistle Growers' Cooperative [cooperative].";
+  expect(at(claimed, 'claim(about={"action":"moor","object":"str.9"}, for=cooperative, holder=brothers, position=right)')).toEqual(expect.arrayContaining([`for: cooperative@${claimed.indexOf("[cooperative]") + 1}`, `holder: brothers@${claimed.indexOf("[brothers]") + 1}`]));
+  // A choice written in words: a form named in three words is those words.
+  const lodged = "Lodge an event stall permit with markets-1 for lot-01, the summer one.";
+  expect(at(lodged, "form(form=event_stall_permit, to=markets-1, lot=lot-01, season=summer)")).toEqual(expect.arrayContaining(["form: event stall permit@9", `season: summer@${lodged.indexOf("summer")}`]));
+  // One call, its value said twice: either is it, so both are recorded and the span says it is ambiguous.
+  const twice = "Pay acc-1 $5, into acc-1.";
+  expect(spansIn(twice, 'money(to=acc-1, amount="$5")')).toEqual([{ arg: "to", value: "acc-1", at: [4, 9], ambiguous: true, all: [[4, 9], [19, 24]] }, { arg: "amount", value: "$5", at: [10, 12] }]);
+  // Counted; and a brief that gave two closing sentences has two riders, as has a request whose writer added one.
+  const gold: Gold[] = [
+    { program: 'money(amount="$5", to=acc-1)', shape: "money(amount,to)", names: {}, source: "t", origin: "synthetic" },
+    { program: "vote(ballot=rec.3, choice=yes)", shape: "vote(ballot,choice)", names: {}, source: "t", origin: "synthetic" },
+  ];
+  const w = writer("a", (program, style) => (program.startsWith("money") ? `Pay acc-1 $5, into acc-1. ${given(style)}` : `Vote yes on ballot rec.3. Do not publish it. ${given(style)}`));
+  const r = await generate(gold, { writers: [w], perGold: 30, styles: ["do_not"], seed: 4 });
+  const positives = r.examples.filter((e) => e.kind === "positive");
+  expect(r.manifest.ambiguous_spans).toBe(positives.filter((e) => e.shape.startsWith("money")).length);
+  expect(r.manifest.ambiguous_spans).toBeGreaterThan(0);
+  expect(new Set(positives.filter((e) => e.shape.startsWith("money")).map((e) => e.riders!.length))).toEqual(new Set([1, 2])); // one given, or two
+  for (const e of positives) {
+    for (const rider of e.riders!) expect([rider.kind, rider.adds, e.request.slice(...rider.at)]).toEqual(["do_not", "nothing", rider.text]);
+    // The writer's own "Do not publish it." is recorded with the ones it was given, in the order they stand.
+    if (e.shape.startsWith("vote")) expect(e.riders![0]!.text).toBe("Do not publish it.");
+    expect(e.riders!.map((x) => x.at[0])).toEqual(e.riders!.map((x) => x.at[0]).sort((a, b) => a - b));
+  }
+  expect(r.manifest.riders.do_not).toBe(positives.reduce((n, e) => n + e.riders!.length, 0));
+});
+
+test("too much, as people make it: two or three related acts piled into one message, a share of long pasted ones kept; every label of the call language gets its floor", async () => {
+  // Built from examples: the ones about the same person, each a different kind of act, never a letter.
+  const example = (i: number, request: string, program: string): Example => ({ id: `e${i}`, request, forms: [], program, kind: "positive", shape: shapeOf(calls.parseProgram(program)), source: "t", gold: program });
+  const positives: Example[] = [
+    example(0, "Pay c0042 $500 from acc-city for wages.", 'money(to=c0042, amount="$500", from=acc-city, for="wages")'),
+    example(1, "Appoint c0042 to bakery-baker.", "position(appoint=bakery-baker, to=c0042)"),
+    example(2, "Move c0042 into apts-3/dwelling.2.", "occupancy(who=c0042, in=apts-3/dwelling.2)"),
+    example(3, "Tell c0042: Start on Monday.", 'message(to=c0042, text="Start on Monday.")'),
+    example(4, "Pay c0042 $20 for the kerb.", 'money(to=c0042, amount="$20", for="the kerb")'),
+    ...Array.from({ length: 12 }, (_, i) => example(10 + i, `Vote yes on ballot rec.${i}${i % 2 ? " at once" : ""}.`, `vote(ballot=rec.${i}, choice=yes${i % 2 ? ", visible=public" : ""})`)),
+    ...Array.from({ length: 6 }, (_, i) => example(30 + i, `Close account acc-${i}.`, `account(close=acc-${i})`)),
+    ...Array.from({ length: 6 }, (_, i) => example(40 + i, `Hurt c900${i}.`, `harm(who=c900${i})`)),
+    ...Array.from({ length: 6 }, (_, i) => example(50 + i, `Take ${i + 2} bricks from ent.${i} at str.${i}.`, `take(kind=bricks, quantity="${i + 2}", from=ent.${i}, at=str.${i})`)),
+  ];
+  const built = builtRefusals(positives, 5, 0, { too_much: 9 }).filter((e) => e.program === "none(too_much)");
+  expect(built.length).toBe(9);
+  const related = built.filter((e) => e.source === "built: related requests run together");
+  const pasted = built.filter((e) => e.source === "built: several requests run together");
+  expect(related.length).toBeGreaterThanOrEqual(4);
+  expect(pasted.length).toBe(3); // a third stay the long kind
+  const joins = / Also, separately: | And while you're at it: | One more thing: | Separately: | And another thing: /;
+  for (const e of related) {
+    const parts = e.request.split(joins).map((x) => positives.find((p) => p.request === x)!);
+    expect(parts.length === 2 || parts.length === 3).toBe(true);
+    expect(parts.every((p) => p && p.program.includes("c0042") && functionOf(p) !== "message")).toBe(true);
+    expect(new Set(parts.map((p) => functionOf(p))).size).toBe(parts.length); // each a different kind of act
+  }
+  for (const e of pasted) expect(e.request.split(/ Also: | And then: /).length).toBeGreaterThanOrEqual(4);
+  expect(builtRefusals(positives, 5, 0, { too_much: 9 })).toEqual(builtRefusals(positives, 5, 0, { too_much: 9 }));
+  // (Nothing related among the examples: all of them are the long kind.)
+  expect(builtRefusals(positives.slice(5), 5, 0, { too_much: 4 }).every((e) => e.source === "built: several requests run together")).toBe(true);
+
+  // Written: groups of separate acts about the same person or organisation, for a writer to ask for in one message.
+  const groups = piled({ groups: 15, seed: 2 });
+  expect(groups.length).toBe(15);
+  expect(piled({ groups: 15, seed: 2 })).toEqual(groups);
+  expect(new Set(groups.map((g) => g.length))).toEqual(new Set([2, 3]));
+  for (const g of groups) {
+    const ids = g.map((x) => new Set(mustAppear(calls.parseProgram(x.program))));
+    expect([...ids[0]!].some((x) => ids.every((s) => s.has(x)))).toBe(true); // about the same someone
+    expect(new Set(g.map(fnOf)).size).toBe(g.length);
+    for (const x of g) expect(["message", "statement"].includes(fnOf(x)) || x.program.includes("\n") || implausible(x.program, { invented: true }) !== undefined).toBe(false);
+  }
+  const briefs = piledBriefs(groups);
+  expect(briefs.every((b) => b.label === "too_much")).toBe(true);
+  for (const [i, b] of briefs.entries()) for (const x of groups[i]!) {
+    expect(b.brief).toContain(x.program);
+    for (const l of mustAppear(calls.parseProgram(x.program))) expect(b.mustCopy).toContain(l);
+  }
+  // A writer that words them (carrying every value), another that loses one; a checker that refuses a pile as too much.
+  const piling = (lose: boolean): LlmAdapter => ({ provider: "stand-in", model: lose ? "careless" : "w", complete: async (req) => {
+    const text = String((req.messages[0] as any).content);
+    const brief = briefs.find((b) => text.includes(b.brief));
+    const answer = brief ? `While you're at it, see to all of this: ${brief.mustCopy.slice(lose ? 1 : 0).join(", ")}.` : text.startsWith("Call:") ? saying(text.slice(6, text.indexOf("\n\n")), "x") : `Something else (${text.length}).`;
+    return { content: [{ type: "text", text: answer }], usage: { input_tokens: 1, output_tokens: 1 } };
+  } });
+  const back = { model: "stand-in/back", translate: async (q: string) => (q.startsWith("While you're at it") ? "none(too_much)" : "none(unclear)") };
+  const r = await generate([], { writers: [piling(false)], piled: groups, back });
+  expect(r.examples.map((e) => [e.program, e.source, e.verified_by])).toEqual(groups.map(() => ["none(too_much)", "written: piled", "stand-in/back"]));
+  expect((await generate([], { writers: [piling(true)], piled: groups, back })).manifest.dropped.not_copied).toBe(15);
+
+  // The floor is under every label the call language has, whatever they are: what is written counts towards it, what
+  // can be built makes up the rest, and a label nothing makes yet is reported short, never passed over.
+  const gold = synthetic({ seed: 3, perFunction: 12, only: ["money", "vote", "harm", "position", "occupancy", "form"] });
+  const programs = new Map<string, string>();
+  // (The briefs of each round of asking: the seed, and the seed two rounds on.)
+  const worded = [1, 7920, 15839].flatMap((seed) => refusalBriefs(gold, 6, seed));
+  let n = 0;
+  const wording: LlmAdapter = { provider: "stand-in", model: "w", complete: async (req) => {
+    const text = String((req.messages[0] as any).content);
+    const brief = briefs.find((b) => text.includes(b.brief));
+    const program = text.startsWith("Call:") ? text.slice(6, text.indexOf("\n\n")) : undefined;
+    const answer = program ? saying(program, "x") : brief ? `While you're at it, see to all of this: ${brief.mustCopy.join(", ")}.` : `LABEL ${worded.find((b) => text.includes(b.brief))?.label}: (${n++}) ${text.split("\n").slice(1).join(" ")}`;
+    if (program) programs.set(answer, program);
+    return { content: [{ type: "text", text: answer }], usage: { input_tokens: 1, output_tokens: 1 } };
+  } };
+  // (The checker gets every second "unclear" wrong: the label is asked for again until it has its floor.)
+  let unclear = 0;
+  const checker = { model: "stand-in/back", translate: async (q: string) => (q.startsWith("While you're at it") ? "none(too_much)" : q.startsWith("LABEL ") ? (q.startsWith("LABEL unclear") && unclear++ % 2 ? "vote(ballot=rec.1, choice=yes)" : `none(${q.slice(6, q.indexOf(":"))})`) : programs.get(q)) };
+  const floored = await generate(gold, { writers: [wording], perGold: 1, styles: ["formal"], refusalFloor: 6, piled: groups.slice(0, 4), back: checker, seed: 1 });
+  const made = new Set(floored.examples.filter((e) => e.kind === "refusal").map((e) => e.program.slice(5, -1)));
+  for (const label of ["too_much", "unknown_form", "needs_calculation", "not_yours", "unclear", "not_an_act"]) expect(made.has(label)).toBe(true);
+  for (const label of made) expect([label, floored.manifest.by_shape[`none(${label})`]! >= 6]).toEqual([label, true]);
+  expect(floored.manifest.short_of_floor).toEqual(Object.fromEntries(calls.LABELS.filter((l) => !made.has(l)).map((l) => [l, 0])));
+  // Four of the too_much are the written kind; the built ones make up the floor and no more than that and their share.
+  expect(floored.examples.filter((e) => e.source === "written: piled").length).toBe(4);
+  expect(floored.examples.filter((e) => e.program === "none(too_much)").length).toBeGreaterThanOrEqual(6);
+});
+
+test("the model that checks a request is never the one that wrote it: several writers, several checkers, recorded per example", async () => {
+  const back = (model: string) => ({ model, translate: async () => "none(unclear)" });
+  // The first checker that is another model; the same model reached another way is the same model.
+  expect(checkerFor("codex/sol", [back("codex/sol"), back("codex/luna")])).toMatchObject({ back: { model: "codex/luna" }, own: false });
+  expect(checkerFor("codex/luna", [back("codex/sol"), back("codex/luna")])).toMatchObject({ back: { model: "codex/sol" }, own: false });
+  expect(checkerFor("openrouter/sol", [back("codex/sol"), back("codex/luna")])).toMatchObject({ back: { model: "codex/luna" }, own: false });
+  expect(checkerFor("codex/sol", [back("other/sol")])).toMatchObject({ back: { model: "other/sol" }, own: true });
+  expect(checkerFor("codex/sol", [])).toBeUndefined();
+
+  const gold = (await goldFromLog(LOG)).filter((g) => !g.program.includes("\n"));
+  const programs = new Map<string, string>();
+  const w = (model: string) => writer(model, (program, style) => {
+    const request = `${model} asks: ${literals(calls.parseProgram(program)).join(", ")} (${style.slice(0, 5)})`;
+    programs.set(request, program);
+    return request;
+  });
+  const asked: { [model: string]: string[] } = { "stand-in/a": [], "stand-in/c": [] };
+  // (Checker c gets the drain payment wrong.)
+  const checker = (model: string) => ({ model, translate: async (request: string) => (asked[model]!.push(request), model.endsWith("/c") && request.includes("the drain") ? "none(unclear)" : programs.get(request)) });
+  const r = await generate(gold, { writers: [w("a"), w("b")], backs: [checker("stand-in/a"), checker("stand-in/c")], perGold: 2, styles: ["terse", "formal"] });
+  const positives = r.examples.filter((e) => e.kind === "positive");
+  expect(positives.length).toBeGreaterThan(3);
+  // a's requests go to c (a second checker, since the first is a itself); b's to a.
+  for (const e of positives) expect([e.written_by, e.verified_by, e.verified_by_writer]).toEqual(e.written_by === "stand-in/a" ? ["stand-in/a", "stand-in/c", undefined] : ["stand-in/b", "stand-in/a", undefined]);
+  expect(asked["stand-in/a"]!.every((q) => q.startsWith("b asks")) && asked["stand-in/c"]!.every((q) => q.startsWith("a asks"))).toBe(true);
+  expect(Object.keys(r.manifest.checked).sort()).toEqual(["stand-in/a -> stand-in/c", "stand-in/b -> stand-in/a"]);
+  expect(Object.values(r.manifest.checked).reduce((x, y) => x + y, 0)).toBe(positives.length);
+  expect(r.manifest.checked_by_writer).toBe(0);
+  // A request the checker didn't translate back says who checked it.
+  expect(r.rejects.filter((x) => x.why === "round_trip").map((x) => [x.written_by, x.checked_by])).toEqual([["stand-in/a", "stand-in/c"]]);
+  // No other model given: the writer's own checks, and the example and the manifest say so.
+  const own = await generate(gold, { writers: [w("a"), w("b")], backs: [checker("stand-in/a")], perGold: 2, styles: ["terse", "formal"] });
+  const mine = own.examples.filter((e) => e.kind === "positive" && e.written_by === "stand-in/a");
+  expect(mine.length).toBeGreaterThan(0);
+  expect(mine.every((e) => e.verified_by === "stand-in/a" && e.verified_by_writer === true)).toBe(true);
+  expect(own.examples.filter((e) => e.written_by === "stand-in/b").every((e) => e.verified_by === "stand-in/a" && e.verified_by_writer === undefined)).toBe(true);
+  expect(own.manifest.checked_by_writer).toBe(mine.length);
+  // One checker, as before: `back`.
+  const one = await generate(gold, { writers: [w("a")], back: checker("stand-in/c"), perGold: 1, styles: ["terse"] });
+  expect(one.examples.filter((e) => e.kind === "positive").every((e) => e.verified_by === "stand-in/c")).toBe(true);
 });

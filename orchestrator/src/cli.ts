@@ -43,7 +43,7 @@
 //     The translator's test set (translator/eval/cases.ts, and the held-out cases where this machine has them) on a real
 //     model: seen and held-out pass rates, and cost. --real adds the pilots' real requests (translator/eval/
 //     pilot-cases.ts) as a third group, N at a time (default 4); --only-real runs those alone.
-//   oikos translator-data <LOG|DIR>... --model provider/model [--model ...] [--back-model provider/model] --out DIR
+//   oikos translator-data <LOG|DIR>... --model provider/model [--model ...] [--back-model provider/model ...] --out DIR
 //         [--per-shape N] [--per-gold N] [--refusals N] [--limit N] [--seed N]
 //     Training data for the local translation model: requests written by the models given for the calls code
 //     participants made in those logs, each checked (training.ts).
@@ -209,7 +209,7 @@ try {
     const pick = (name: string) => chooseModel(name, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
     const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
     const r = await trainingData({
-      sources: positional(), writers: flags("model").map(pick), ...(flag("back-model") ? { back: pick(flag("back-model")!) } : {}), out: flag("out")!,
+      sources: positional(), writers: flags("model").map(pick), backs: flags("back-model").map(pick), out: flag("out")!,
       perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), limit: num("limit"), seed: num("seed"), log: console.log,
     });
     console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);

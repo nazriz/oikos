@@ -16,6 +16,17 @@
 // sentence or two (data.ts `askable`); a program of several lines is one whose later lines use what an earlier line
 // made (an organisation, then its charter), never unrelated lines (that is `too_much`).
 //
+// And every one is something a sentence could sensibly ask for (data.ts `implausible`; what it drops is counted). An
+// audit of a trial's 190 programs (2026-10-06) found a tenth of the rejected requests were the gold program's fault,
+// and kept ones reciting nonsense. So: a form always says where it goes (`to=`, as the translator's rules write it);
+// `for=` appears only where something reads it (a payment's purpose; whose name a statement, a vote, a claim or a
+// signature is in); an agreement's two sides are a sensible exchange (someone pays; someone lets, delivers or lends),
+// by a template that fits it; a claim's action fits what it is done to; what is published reads as the kind of thing
+// it is; a letter sent about something just published is about it; a newcomer's age fits what they come as; a child's
+// other parent is a person. No id is an ordinary word or holds an underscore (`timber`, `mayor`, `inspector_aid`: a
+// writer turns those into words, and the check that ids are copied can't tell): every id has a digit, a dot, a
+// hyphen or a slash in it, as nearly all of a real world's do.
+//
 // Forms are invented too: a name, the office it goes to, and two to seven fields of every type the resolver reads,
 // in small sets (what one person knows of), each filled in several ways and carried with its specification as the
 // translator would be shown it.
@@ -23,7 +34,7 @@
 // No structured data but a claim's slots is written (data.ts `JSON_OUT_OF_SCOPE`): the first model copies and chooses.
 
 import { calls, type Currency } from "@oikos/participants";
-import { amountWritings, askable, FIELD_TYPES, goldText, sampler, shapeOf, shuffled, type FormField, type FormSpec, type Gold } from "./data";
+import { amountWritings, askable, FIELD_TYPES, goldText, implausible, sampler, shapeOf, shuffled, type FormField, type FormSpec, type Gold } from "./data";
 
 /**
  * How invented worlds write their money: a sign before the amount or only a code; two decimal places, none, or three;
@@ -52,8 +63,15 @@ const TRADES = ["Builders", "Bakery", "Joinery", "Haulage", "Stores", "Farms", "
 const BODIES = ["Land Trust", "Housing Cooperative", "Tenants' Association", "Workers' Union", "Savings Bank", "Benevolent Society", "Traders' Guild", "School Board", "Water Board", "Allotment Society", "Credit Union", "Residents' Committee", "Community Fund", "Burial Society", "Growers' Cooperative"];
 const SUFFIXES = ["", "", "", " & Sons", " & Daughters", " Ltd", " Co", " Group", " Brothers"];
 const FIRST = ["Ana", "Bram", "Cleo", "Dana", "Edda", "Farid", "Greta", "Hugo", "Ines", "Jory", "Kaya", "Leif", "Mina", "Nico", "Odile", "Pavel", "Quinn", "Rosa", "Sami", "Tova", "Ula", "Viktor", "Wren", "Xavi", "Yara", "Zeno", "Amit", "Bea", "Caio", "Dalia", "Emre", "Freya", "Goran", "Hana", "Idris", "Juno", "Kofi", "Luz", "Maren", "Naoki"];
+/** First names a newcomer said to be female, or male, goes by (the rest go with either). */
+const FEMALE = ["Ana", "Cleo", "Dana", "Edda", "Greta", "Ines", "Kaya", "Mina", "Odile", "Rosa", "Tova", "Ula", "Yara", "Bea", "Dalia", "Freya", "Hana", "Luz", "Maren", "Juno"];
+const MALE = ["Bram", "Farid", "Hugo", "Leif", "Nico", "Pavel", "Sami", "Viktor", "Xavi", "Zeno", "Amit", "Caio", "Emre", "Goran", "Idris", "Kofi", "Naoki", "Jory"];
 const LAST = ["Silva", "Reyes", "Okafor", "Lindqvist", "Marsh", "Dubois", "Tanaka", "Novak", "Haddad", "Petrov", "Greene", "Castell", "Imani", "Farrow", "Bjork", "Quist", "Abara", "Mercer", "Sandoval", "Thorne", "Underhill", "Vance", "Whitlock", "Yoon", "Zamora", "Achebe", "Brandt", "Corbin", "Delacroix", "Ekwueme", "Falk", "Guerra", "Holt", "Iyer", "Jansen", "Kovac", "Lowry", "Moreau", "Nakata", "Osei"];
-const ROLES_DESCRIBED = ["the builder", "the works manager", "the clerk", "the treasurer", "the registrar", "the landlord", "the planning officer", "the harbour master", "the school", "the bank", "the union", "the finance office", "the caretaker", "the head teacher", "my neighbour", "the supplier"];
+/** Someone or something only described, by what they are: a person, an organisation, an office. */
+const PEOPLE_DESCRIBED = ["the builder", "the clerk", "the treasurer", "the registrar", "the landlord", "the caretaker", "the head teacher", "my neighbour", "the night watchman", "the baker"];
+const ORGS_DESCRIBED = ["the school", "the bank", "the union", "the supplier", "the cooperative", "the water board"];
+const OFFICES_DESCRIBED = ["the works manager", "the planning officer", "the harbour master", "the finance office", "the rates officer"];
+const PARTNERS = ["my partner", "my husband", "my wife"];
 
 const ENTITY_KINDS = ["trust", "firm", "cooperative", "association", "charity", "union", "club", "partnership", "company", "school", "clinic", "society", "guild", "agency", "foundation", "committee", "fund", "bank", "household", "church", "party", "league"];
 const GOODS = ["goods", "timber", "bricks", "grain", "bread", "tools", "cloth", "coal", "flour", "steel", "glass", "seedlings", "fuel", "paper", "medicine", "fish", "wool", "cement", "nails", "apples", "milk", "tiles", "rope", "salt", "books", "blankets", "seed", "wire", "paint", "gravel"];
@@ -61,20 +79,39 @@ const TASKS = ["make", "build", "repair", "clean", "teach", "treat", "harvest", 
 const SURVEYED = ["trout", "heron", "frogs", "otter", "pollution", "water", "kingfisher", "reed", "moss", "salmon", "noise", "soil", "bees", "lichen", "voles"];
 const STRUCTURE_TYPES = ["park", "shed", "house", "school", "clinic", "factory", "bakery", "warehouse", "road", "bridge", "library", "depot", "mill", "greenhouse", "workshop", "hall", "market", "well", "dam", "barn", "playground", "terrace", "cottage", "tower", "jetty", "stable", "kiln", "granary", "chapel", "shelter"];
 const AGREEMENTS = ["lease", "employment", "supply", "service", "loan", "sale", "construction", "tenancy", "licence", "partnership", "maintenance", "carriage", "apprenticeship", "retainer", "mortgage", "hire"];
-const NEWCOMERS = ["newcomer", "visitor", "worker", "settler", "trader", "student", "pensioner", "apprentice", "refugee", "seasonal_worker"];
+const NEWCOMERS = ["newcomer", "visitor", "worker", "settler", "trader", "student", "pensioner", "apprentice", "refugee", "labourer"];
+/** The ages (in years) each comes at: a pensioner is old, an apprentice young (data.ts `implausible` holds any program to the same). */
+const COMES_AGED: { [template: string]: [number, number] } = { newcomer: [18, 80], visitor: [18, 80], worker: [18, 64], settler: [18, 70], trader: [20, 70], student: [16, 30], pensioner: [62, 90], apprentice: [15, 24], refugee: [18, 75], labourer: [18, 60] };
 const CHILDREN = ["child", "infant", "newborn", "baby"];
-const SYSTEMS = ["assistant", "ledger_keeper", "dispatcher", "monitor", "scheduler", "records_clerk", "billing_agent", "inspector_aid", "helpdesk", "auditor", "translator_aid", "planner"];
-const STATEMENTS = ["notice", "law", "report", "charter", "minutes", "order", "policy", "budget", "announcement", "bylaw", "resolution", "invoice", "receipt", "petition", "complaint", "decision", "warning", "schedule", "advertisement", "timetable", "apology", "tender", "price_list", "roster"];
+const SYSTEMS = ["assistant", "bookkeeper", "dispatcher", "monitor", "scheduler", "archivist", "cashier", "helpdesk", "auditor", "planner", "concierge", "switchboard"];
+/** What is published, by what its words are like: a rule, news of a place, or a kind with words of its own (`Draw.publicWords`). */
+const RULE_KINDS = ["law", "bylaw", "order", "policy", "resolution", "warning"];
+const NEWS_KINDS = ["notice", "announcement", "schedule", "timetable", "advertisement"];
+const OTHER_KINDS = ["report", "charter", "minutes", "budget", "invoice", "receipt", "petition", "complaint", "decision", "apology", "tender", "tariff", "roster"];
+const STATEMENTS = [...RULE_KINDS, ...NEWS_KINDS, ...NEWS_KINDS, ...OTHER_KINDS];
 const ROLES = ["staff", "manager", "clerk", "treasurer", "director", "officer", "secretary", "inspector", "foreman", "apprentice", "trustee", "steward", "auditor", "teacher", "nurse", "driver"];
 const TITLES = ["Baker", "Head Gardener", "Treasurer", "Night Watch", "Site Foreman", "Clerk of Works", "Chief Steward", "Bookkeeper", "Owner", "Chair", "Harbour Pilot", "School Nurse", "Depot Manager", "Second Miller", "Records Keeper", "Lead Surveyor", "Warden", "Dispatcher", "Head of Stores", "Rent Collector", "Quarry Master", "Apprentice Joiner"];
 const OFFICE_WORDS = ["planning", "works", "finance", "clerk", "rates", "licensing", "housing", "parks", "registry", "council", "health", "harbour", "records", "treasury", "mayor", "inspector", "roads", "markets", "schools", "water"];
-const ACTIONS = ["build", "demolish", "occupy", "sell", "fish", "trade", "farm", "enter", "graze", "quarry", "moor", "sublet", "inspect", "use", "cross", "log", "park", "camp", "survey", "sign"];
-const CHOICES = ["yes", "no", "abstain", "for", "against", "approve", "reject", "option_a", "option_b", "defer"];
+/** What a claim can be about: an action, and the kinds of thing it is done to (nobody moors at a record). */
+type Thing = "lot" | "cell" | "structure" | "space" | "record";
+const ACTIONS: [string, Thing[]][] = [["build", ["lot", "cell"]], ["demolish", ["structure"]], ["occupy", ["space", "structure"]], ["sell", ["lot", "structure"]], ["fish", ["cell", "lot"]], ["trade", ["structure", "lot"]], ["farm", ["lot"]], ["enter", ["structure", "space", "lot"]], ["graze", ["lot", "cell"]], ["quarry", ["lot", "cell"]], ["moor", ["structure", "cell"]], ["sublet", ["space"]], ["inspect", ["structure", "space"]], ["use", ["structure", "space", "lot"]], ["cross", ["lot", "cell"]], ["log", ["lot", "cell"]], ["park", ["lot"]], ["camp", ["lot", "cell"]], ["survey", ["lot", "cell"]], ["sign", ["record"]], ["amend", ["record"]]];
+const CHOICES = ["yes", "no", "abstain", "for", "against", "approve", "reject", "defer"];
+/** Work done to a building, and work done to people (what `on` can be). */
+const DONE_TO_BUILDINGS = ["build", "repair", "demolish", "paint", "mend", "inspect", "clean"];
+const DONE_TO_PEOPLE = ["teach", "treat"];
 
 const PURPOSES = ["rent", "the fence", "wages", "the kerb", "the drain", "repairs", "school fees", "the deposit", "materials", "the survey", "last month's deliveries", "the water bill", "membership dues", "the annual levy", "stall hire", "the roof", "back pay", "the first instalment", "a refund", "the festival", "cleaning", "the energy bill", "fuel", "the loan repayment", "pension support", "overtime", "the grant", "legal costs", "the retainer", "damages"];
 const NOUNS = ["minutes", "invoice", "estimate", "roster", "survey results", "keys", "draft budget", "permit", "inspection report", "delivery schedule", "list of tenants", "accounts", "plans for the hall", "water readings", "contract", "price list"];
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "the end of the week", "tomorrow", "the first of the month", "noon"];
-const ASKS = ["Please send me the", "Could you bring the", "I still need the", "Thank you for the", "Please check the", "We have not received the", "Kindly return the", "Let me know when you have the"];
+/** When something happens, with the word that goes before it ("on tomorrow" is nobody's English). */
+const WHEN = ["on Monday", "on Tuesday", "on Wednesday", "on Thursday", "on Friday", "on Saturday", "at the end of the week", "tomorrow", "on the first of the month", "from noon"];
+/** What a letter asks for by a day, and what it says with no day ("Thank you for the estimate by Tuesday" is nobody's letter). */
+const ASKS = ["Please send me the", "Please bring the", "I still need the", "Please check the", "Kindly return the", "We must have the"];
+const SAYS = ["Thank you for the", "We have not received the", "Please check the", "Let me know when you have the", "I have read the"];
+/** The title of whoever founds an organisation. */
+const FOUNDERS = ["Owner", "Chair", "Director", "Secretary", "Treasurer", "Founder", "Manager", "Warden", "Convenor", "Head"];
+/** Kinds of organisation that are businesses (named for a trade); the rest are named for what they are. */
+const BUSINESSES = ["firm", "company", "partnership", "agency"];
 const SITES = ["depot", "market", "library", "footbridge", "school", "clinic", "hall", "north road", "harbour", "park", "mill", "yard", "office", "allotments", "ferry"];
 const EVENTS = ["will be closed", "opens", "will be inspected", "is out of use", "will be repainted", "reopens", "will have no water", "is reserved for the fair"];
 const REASONS = ["for repairs", "for the holiday", "until further notice", "for cleaning", "while the roof is mended", "for stocktaking", "by order of the council", "for the season"];
@@ -102,7 +139,7 @@ const FIELD_NAMES: { [type: string]: string[] } = {
   structure: ["structure", "building", "property"],
   position: ["office", "post", "reports_to"],
 };
-const OPTIONS = [["landlords", "tenants", "neither"], ["law", "budget", "motion"], ["low", "medium", "high"], ["residential", "commercial", "industrial", "rural"], ["new", "renewal"], ["spring", "summer", "autumn", "winter"], ["granted", "refused", "deferred"], ["cash", "transfer"], ["urgent", "routine"], ["north", "south", "east", "west", "centre"], ["owner", "tenant", "agent"], ["small", "medium", "large", "very_large"], ["weekdays", "weekends", "both"], ["indoor", "outdoor"], ["temporary", "permanent"]];
+const OPTIONS = [["landlords", "tenants", "neither"], ["law", "budget", "motion"], ["low", "medium", "high"], ["residential", "commercial", "industrial", "rural"], ["new", "renewal"], ["spring", "summer", "autumn", "winter"], ["granted", "refused", "deferred"], ["cash", "transfer"], ["urgent", "routine"], ["north", "south", "east", "west", "centre"], ["owner", "tenant", "agent"], ["small", "medium", "large", "huge"], ["weekdays", "weekends", "both"], ["indoor", "outdoor"], ["temporary", "permanent"]];
 
 // ---------------------------------------------------------------- drawing
 
@@ -138,34 +175,48 @@ class Draw {
   orgName(): string {
     return this.maybe(0.3) ? `${this.place()} ${this.pick(BODIES)}` : this.maybe(0.25) ? `${this.pick(LAST)}${this.pick([" & Sons", " Brothers", " & Co", "'s"])} ${this.pick(TRADES)}` : `${this.place()} ${this.pick(TRADES)}${this.pick(SUFFIXES)}`;
   }
-  personName(): string {
-    return `${this.pick(FIRST)} ${this.pick(LAST)}`;
+  /** A name for a new organisation of a kind: a business by its trade, a body by what it is ("Harrow Vale School",
+   * "Tarn Growers' Cooperative"): never a clinic called Supplies Brothers. */
+  orgNameFor(kind: string): string {
+    if (BUSINESSES.includes(kind)) return this.maybe(0.25) ? `${this.pick(LAST)}${this.pick([" & Sons", " Brothers", " & Co", "'s"])} ${this.pick(TRADES)}` : `${this.place()} ${this.pick(TRADES)}${this.pick(SUFFIXES)}`;
+    const word = kind[0]!.toUpperCase() + kind.slice(1);
+    const bodies = BODIES.filter((b) => b.split(" ").pop() === word);
+    return bodies.length && this.maybe(0.6) ? `${this.place()} ${this.pick(bodies)}` : `${this.place()} ${this.maybe(0.3) ? `${this.pick(["Community", "Free", "Old", "New", "People's"])} ` : ""}${word}`;
+  }
+  personName(sex?: string): string {
+    return `${this.pick(sex === "female" ? FEMALE : sex === "male" ? MALE : FIRST)} ${this.pick(LAST)}`;
+  }
+  /** An office, as people call it: the planning office, the clerk's office. */
+  officeName(w: string): string {
+    return `the ${["clerk", "mayor", "inspector"].includes(w) ? `${w}'s` : w} office`;
   }
   personId(): string {
     const s = this.maybe(0.7) ? `c${pad(this.int(1, 9999), 4)}` : this.maybe() ? `ent.${this.int(1, 4000)}` : `par.${this.int(1, 900)}`;
     this.names[s] = this.personName();
     return s;
   }
+  /** (Never the bare last word of its name: `timber`, `union` and `society` are words a writer writes as words.) */
   orgId(): string {
     const name = this.orgName();
     const words = slug(name).split("-").filter((w) => !["sons", "daughters", "co", "ltd", "s", "group"].includes(w));
-    const s = this.maybe(0.3) ? `ent.${this.int(1, 4000)}` : this.maybe(0.4) ? words[words.length - 1]! : this.maybe() ? `${words[0]}-${words[words.length - 1]}` : words.map((w) => w[0]).join("") + this.int(1, 99);
+    const s = this.maybe(0.35) ? `ent.${this.int(1, 4000)}` : this.maybe(0.55) ? `${words[0]}-${words[words.length - 1]}` : words.map((w) => w[0]).join("") + this.int(1, 99);
     this.names[s] = name;
     return s;
   }
+  /** (Never the bare word for it: `mayor`, `clerk` and `works` read as the office-holder, not as an id.) */
   officeId(): string {
     const w = this.pick(OFFICE_WORDS);
-    const s = this.maybe(0.6) ? w : this.maybe() ? `${slug(this.pick(PLACES))}-${w}` : `pos.${this.int(1, 600)}`;
-    if (s.startsWith("pos.")) this.names[s] = `the ${w} office`;
+    const s = this.maybe(0.45) ? `${slug(this.pick(PLACES))}-${w}` : this.maybe(0.6) ? `pos.${this.int(1, 600)}` : `${w}-${this.int(1, 30)}`;
+    this.names[s] = this.officeName(w);
     return s;
   }
   /** Someone or something acted on or for: an organisation, a person or an office by id; sometimes by name alone, or
-   * only described (both written as the request put them, quoted: the resolver finds who is meant). */
+   * only described as what they are (both written as the request put them, quoted: the resolver finds who is meant). */
   party(kinds: ("org" | "person" | "office")[] = ["org", "person", "office"]): V {
     const kind = this.pick(kinds);
     const r = this.rand();
-    if (r < 0.12) return tx(kind === "person" ? this.personName() : kind === "org" ? this.orgName() : `the ${this.pick(OFFICE_WORDS)} office`);
-    if (r < 0.18) return tx(this.pick(ROLES_DESCRIBED));
+    if (r < 0.12) return tx(kind === "person" ? this.personName() : kind === "org" ? this.orgName() : this.officeName(this.pick(OFFICE_WORDS)));
+    if (r < 0.18) return tx(this.pick(kind === "person" ? PEOPLE_DESCRIBED : kind === "org" ? ORGS_DESCRIBED : OFFICES_DESCRIBED));
     return id(kind === "person" ? this.personId() : kind === "org" ? this.orgId() : this.officeId());
   }
   person(): V {
@@ -217,28 +268,73 @@ class Draw {
     const frac = per > 1 && whole < 100_000 && this.maybe(0.3) ? this.int(1, per - 1) : 0;
     return tx(this.pick(amountWritings(BigInt(whole) * BigInt(per) + BigInt(frac), this.currency)));
   }
+  /** What someone carries with them: pocket money, not a fortune. */
+  pocket(): V {
+    const per = 10 ** this.currency.minor_units;
+    const whole = (this.maybe(0.5) ? this.int(2, 400) * 10 : this.int(20, 4000)) * (this.currency.minor_units === 0 ? this.pick([1, 10, 100]) : 1);
+    const frac = per > 1 && this.maybe(0.2) ? this.int(1, per - 1) : 0;
+    return tx(this.pick(amountWritings(BigInt(whole) * BigInt(per) + BigInt(frac), this.currency)));
+  }
+  /** One thing of a kind, by id. */
+  thing(kind: Thing): string {
+    return (kind === "lot" ? (this.lot() as { id: string }).id : kind === "cell" ? this.cellId() : kind === "structure" ? this.structureId() : kind === "space" ? this.spaceId() : (this.record() as { id: string }).id);
+  }
+  /** What a claim is about, as the worlds' laws read it: an action, and (nearly always) what it's done to. */
+  about(): V {
+    const [action, things] = this.pick(ACTIONS);
+    return { json: { action, ...(things[0] === "record" || this.maybe(0.9) ? { object: this.thing(this.pick(things)) } : {}) } };
+  }
   duration(): V {
     const r = this.rand();
     return tx(r < 0.75 ? `${this.pick([2, 3, 6, 7, 10, 12, 14, 18, 21, 24, 28, 30, 45, 60, 90])} ${this.pick(["days", "weeks", "months", "days", "months"])}` : r < 0.9 ? this.pick(["a week", "a fortnight", "a month", "a year", "one year", "two years", "three months", "six weeks"]) : `${this.int(2, 10)} years`);
   }
+  /** How often something recurs, at intervals people use (nothing is paid "every 28 months"). */
   every(): V {
     const r = this.rand();
-    return tx(r < 0.5 ? this.pick(["weekly", "fortnightly", "monthly", "quarterly", "yearly", "annually", "daily"]) : r < 0.75 ? `every ${this.pick([2, 3, 4, 6, 14, 28])} ${this.pick(["days", "weeks", "months"])}` : `${this.pick([7, 14, 28, 30, 90])} days`);
+    return tx(r < 0.5 ? this.pick(["weekly", "fortnightly", "monthly", "quarterly", "yearly", "annually", "daily"]) : r < 0.75 ? `every ${this.pick(["2 days", "7 days", "10 days", "14 days", "28 days", "30 days", "90 days", "2 weeks", "3 weeks", "4 weeks", "6 weeks", "2 months", "3 months", "6 months"])}` : `${this.pick([7, 14, 28, 30, 90])} days`);
+  }
+  /** How long an agreement runs, and how much notice ends it: months and years, and days and weeks (a notice is
+   * never longer than a term: data.ts `implausible` holds any program to that). */
+  term(): V {
+    const r = this.rand();
+    return tx(r < 0.5 ? `${this.pick([3, 6, 9, 12, 18, 24, 36, 60])} months` : r < 0.75 ? this.pick(["a year", "one year", "two years", "three years", "six months", "five years"]) : `${this.int(2, 10)} years`);
+  }
+  notice(): V {
+    return tx(this.pick(["7 days", "14 days", "21 days", "28 days", "30 days", "45 days", "60 days", "a week", "two weeks", "a fortnight", "a month", "2 months", "4 weeks", "6 weeks"]));
   }
   count(max = 400): V {
     return tx(this.maybe(0.1) ? this.pick(["one", "two", "three", "four", "five", "six", "ten", "twelve"]) : String(this.maybe(0.6) ? this.int(1, 20) : this.int(1, max)));
   }
   purpose(): V {
     const r = this.rand();
-    return tx(r < 0.6 ? this.pick(PURPOSES) : r < 0.8 ? `invoice ${this.int(100, 9999)}` : `${this.pick(["the", "this month's", "last week's", "the overdue"])} ${this.pick(NOUNS)}`);
+    return tx(r < 0.6 ? this.pick(PURPOSES) : r < 0.8 ? `invoice ${this.int(100, 9999)}` : `${this.pick(["this month's", "last week's", "the overdue", "last month's"])} ${this.pick(["rent", "wages", "deliveries", "repairs", "water bill", "stall hire", "cleaning", "dues"])}`);
   }
   letter(): V {
     const r = this.rand();
-    return tx(r < 0.45 ? `${this.pick(ASKS)} ${this.pick(NOUNS)} by ${this.pick(DAYS)}.` : r < 0.7 ? `The ${this.pick(SITES)} ${this.pick(EVENTS)} on ${this.pick(DAYS)}.` : r < 0.85 ? `Work on the ${this.pick(SITES)} starts on ${this.pick(DAYS)}.` : `${this.pick(ASKS)} ${this.pick(NOUNS)}.`);
+    return tx(r < 0.45 ? `${this.pick(ASKS)} ${this.pick(NOUNS)} by ${this.pick(DAYS)}.` : r < 0.7 ? `The ${this.pick(SITES)} ${this.pick(EVENTS)} ${this.pick(WHEN)}.` : r < 0.85 ? `Work on the ${this.pick(SITES)} starts ${this.pick(WHEN)}.` : `${this.pick(SAYS)} ${this.pick(NOUNS)}.`);
   }
-  publicWords(): V {
-    const r = this.rand();
-    return tx(r < 0.5 ? `The ${this.pick(SITES)} ${this.pick(EVENTS)} on ${this.pick(DAYS)} ${this.pick(REASONS)}.` : r < 0.8 ? `${this.pick(RULES)} at the ${this.pick(SITES)}.` : `${this.pick(RULES)}. ${this.pick(TERMS)}`);
+  /** What something published says, as befits its kind: a law lays down a rule, a notice gives news of a place, a
+   * receipt says what was received (a "receipt" whose words forbid fishing is nobody's receipt). */
+  publicWords(kind: string): V {
+    const site = this.pick(SITES);
+    if (RULE_KINDS.includes(kind)) return tx(this.maybe(0.7) ? `${this.pick(RULES)} at the ${site}.` : `${this.pick(RULES)}.`);
+    if (NEWS_KINDS.includes(kind)) return tx(this.maybe(0.75) ? `The ${site} ${this.pick(EVENTS)} ${this.pick(WHEN)} ${this.pick(REASONS)}.` : `Work on the ${site} starts ${this.pick(WHEN)}.`);
+    switch (kind) {
+      case "report": return tx(`The ${site} was inspected and found ${this.pick(["sound", "in need of repair", "unsafe", "in good order"])}.`);
+      case "charter": return tx(this.pick(PURPOSE_LINES));
+      case "minutes": return tx(`The committee met and agreed that the ${site} ${this.pick(["is to be repaired", "stays open", "is to be let", "needs a new roof"])}.`);
+      case "budget": return tx(`Spending on the ${site} is held to last year's figure.`);
+      case "invoice": return tx(`Payment for ${this.pick(PURPOSES)} is now due.`);
+      case "receipt": return tx(`Payment for ${this.pick(PURPOSES)} has been received in full.`);
+      case "petition": return tx(`We ask that the ${site} be ${this.pick(["kept open", "repaired", "lit at night", "cleaned every week"])}.`);
+      case "complaint": return tx(`The ${site} has been ${this.pick(["left unlit", "closed without notice", "left in disrepair"])} since ${this.pick(["Monday", "the fair", "the storm", "the first of the month"])}.`);
+      case "decision": return tx(`The application concerning the ${site} is ${this.pick(["granted", "refused", "deferred"])}.`);
+      case "apology": return tx(`We are sorry that the ${site} was closed without notice.`);
+      case "tender": return tx(`Bids are invited for work on the ${site}.`);
+      case "tariff": return tx(`Stall hire at the ${site} is charged by the day.`);
+      case "roster": return tx(`The watch at the ${site} is kept by turns, a week each.`);
+      default: return tx(`The ${site} ${this.pick(EVENTS)} ${this.pick(WHEN)}.`);
+    }
   }
 }
 
@@ -248,28 +344,63 @@ type Lines = (calls.Call | [string, calls.Call])[];
 
 // ---------------------------------------------------------------- one recipe per function
 
-/** What an agreement's side commits to: money, goods, occupancy, a building or an account (the outcomes a commitment can be). */
-function commitment(d: Draw, mine: boolean, other: V): V {
+const nest = (fn: calls.Fn, args: Args): V => ({ call: call(fn, args) });
+
+/**
+ * What an agreement's two sides commit to, with a template that fits: an exchange people make. Someone pays, and
+ * someone lets a place, delivers goods, lends, builds or keeps an account (the outcomes a commitment can be: money,
+ * goods, occupancy, a building, an account). Never a random pair: "they build a bridge and we open an account, under
+ * a retainer" is nothing anyone offers. What the other side does to us names us as the request would (who moves in
+ * is left to its default, the one offering; goods come to our own organisation, by its id).
+ */
+function deal(d: Draw, other: V): { template: string; we?: V; they?: V } {
+  const rent = () => call("money", { to: d.account(), amount: d.amount(), every: d.every(), for: d.maybe(0.6) ? tx("rent") : undefined });
+  const price = (every?: V) => call("money", { to: d.account(), amount: d.amount(), every, for: d.maybe(0.3) ? d.purpose() : undefined });
   const r = d.rand();
-  if (r < 0.5) return { call: call("money", { to: mine ? d.account() : (d.maybe(0.7) ? d.account() : other), amount: d.amount(), every: d.maybe(0.6) ? d.every() : undefined, for: d.maybe(0.5) ? d.purpose() : undefined }) };
-  if (r < 0.7) return { call: call("goods", { kind: d.word(GOODS), quantity: d.count(), to: other, at: d.structure(), every: d.maybe(0.6) ? d.every() : undefined }) };
-  if (r < 0.88) return { call: call("occupancy", { who: other, in: d.inside() }) };
-  if (r < 0.96) return { call: call("structure", d.maybe(0.8) ? { type: d.word(STRUCTURE_TYPES), on: d.ground() } : { remove: d.structure() }) };
-  return { call: call("account", { holder: other }) };
+  // We let them a place; they pay rent.
+  if (r < 0.2) return { template: d.pick(["lease", "tenancy", "licence"]), we: nest("occupancy", { who: other, in: d.inside() }), they: { call: rent() } };
+  // They let us a place; we pay rent.
+  if (r < 0.34) return { template: d.pick(["lease", "tenancy", "licence"]), we: { call: rent() }, they: nest("occupancy", { in: d.inside() }) };
+  // We supply them; they pay.
+  if (r < 0.5) {
+    const every = d.maybe(0.6) ? d.every() : undefined;
+    return { template: d.pick(["supply", "sale", "carriage"]), we: nest("goods", { kind: d.word(GOODS), quantity: d.count(), to: other, at: d.structure(), every }), they: { call: price(every) } };
+  }
+  // They supply us; we pay.
+  if (r < 0.64) {
+    const every = d.maybe(0.6) ? d.every() : undefined;
+    return { template: d.pick(["supply", "sale", "carriage"]), we: { call: price(every) }, they: nest("goods", { kind: d.word(GOODS), quantity: d.count(), to: id(d.orgId()), at: d.structure(), every }) };
+  }
+  // We pay them for their work (the work itself is no commitment the call language has); or they pay us.
+  if (r < 0.76) return { template: d.pick(["employment", "apprenticeship", "retainer", "service", "maintenance"]), we: nest("money", { to: d.maybe(0.5) ? other : d.account(), amount: d.amount(), every: d.every(), for: d.maybe(0.6) ? tx(d.pick(["wages", "the retainer", "the service", "upkeep"])) : undefined }) };
+  if (r < 0.84) return { template: d.pick(["employment", "retainer", "service", "hire"]), they: nest("money", { to: d.account(), amount: d.amount(), every: d.every(), for: d.maybe(0.6) ? tx(d.pick(["wages", "the retainer", "the service", "hire"])) : undefined }) };
+  // We lend; they repay.
+  if (r < 0.93) return { template: d.pick(["loan", "mortgage"]), we: nest("money", { to: d.maybe(0.5) ? other : d.account(), amount: d.amount() }), they: nest("money", { to: d.account(), amount: d.amount(), every: d.every(), for: d.maybe(0.6) ? tx("the loan repayment") : undefined }) };
+  // We build for them; they pay. (Having them build for us is `structure(...)` by itself, by the translator's rules.)
+  if (r < 0.97) return { template: "construction", we: nest("structure", { type: d.word(STRUCTURE_TYPES), on: d.ground() }), they: { call: price() } };
+  // We keep an account for them; they pay for it.
+  return { template: "service", we: nest("account", { holder: other }), they: nest("money", { to: d.account(), amount: d.amount(), every: d.every(), for: d.maybe(0.5) ? tx("account fees") : undefined }) };
 }
+
+/** A post, by id. */
+const post = (d: Draw): V => id(d.maybe(0.6) ? `${slug(d.pick(TRADES))}-${slug(d.pick(TITLES))}` : d.officeId());
 
 const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
   money: (d) => {
     const every = d.maybe(0.3);
     return [call("money", { to: d.maybe(0.6) ? d.account() : d.party(), amount: d.amount(), from: d.maybe(0.6) ? d.account() : undefined, every: every ? d.every() : undefined, first: every && d.maybe(0.25) ? d.duration() : undefined, for: d.maybe(0.55) ? d.purpose() : undefined, basis: d.maybe(0.15) ? d.record() : undefined, settles: d.maybe(0.12) ? d.rec() : undefined })];
   },
-  goods: (d) => [call("goods", { kind: d.word(GOODS), quantity: d.count(), to: d.maybe(0.6) ? d.party(["org", "person"]) : undefined, at: d.structure(), from_at: d.maybe(0.4) ? d.structure() : undefined, for: d.maybe(0.15) ? d.purpose() : undefined })],
+  // (No `for`: only a payment has a purpose, and nothing reads whose name goods move or work is done in.)
+  goods: (d) => [call("goods", { kind: d.word(GOODS), quantity: d.count(), to: d.maybe(0.6) ? d.party(["org", "person"]) : undefined, at: d.structure(), from_at: d.maybe(0.4) ? d.structure() : undefined })],
   work: (d) => {
     const by = () => (d.maybe(0.7) ? d.person() : list(Array.from({ length: d.int(2, 4) }, () => d.personId())));
     const r = d.rand();
     if (r < 0.12) return [call("work", { task: id("survey"), at: d.maybe(0.5) ? d.lot() : d.structure(), survey: d.word(SURVEYED), cells: list(Array.from({ length: d.int(1, 4) }, () => d.cellId())), by: d.maybe(0.7) ? by() : undefined, units: d.maybe(0.3) ? d.count(8) : undefined })];
     if (r < 0.22) return [call("work", { task: id("investigate"), units: d.count(12), at: d.structure(), by: d.maybe(0.8) ? by() : undefined, investigate: d.party(["org", "person"]), taken_at: d.structure(), kind: d.word(GOODS) })];
-    return [call("work", { task: d.word(TASKS), units: d.count(60), at: d.maybe(0.8) ? d.structure() : d.ground(), by: d.maybe(0.8) ? by() : undefined, on: d.maybe(0.3) ? (d.maybe(0.6) ? d.structure() : d.maybe() ? d.person() : id(d.spaceId())) : undefined, for: d.maybe(0.06) ? id(d.orgId()) : undefined })];
+    // What it's done to, where the work is done to something: a building, or (teaching, treating) a person or a room of people.
+    const task = d.pick(TASKS);
+    const on = !d.maybe(0.5) ? undefined : DONE_TO_BUILDINGS.includes(task) ? d.structure() : DONE_TO_PEOPLE.includes(task) ? (d.maybe() ? d.person() : id(d.spaceId())) : undefined;
+    return [call("work", { task: id(task), units: d.count(60), at: d.maybe(0.8) ? d.structure() : d.ground(), by: d.maybe(0.8) ? by() : undefined, on })];
   },
   account: (d) => {
     const r = d.rand();
@@ -285,34 +416,41 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
     return [call("structure", { type: d.word(STRUCTURE_TYPES), on: d.ground(), ...terms, materials_at: !hired && d.maybe(0.4) ? d.structure() : undefined })];
   },
   occupancy: (d) => [call("occupancy", { in: d.inside(), who: d.maybe(0.6) ? d.person() : undefined, leave: d.maybe(0.35) ? id("yes") : undefined })],
-  entity: (d) => [call("entity", { kind: d.word(ENTITY_KINDS), name: tx(d.orgName()), position: d.maybe(0.4) ? tx(d.pick(TITLES)) : undefined, visible: d.maybe(0.12) ? id("public") : undefined })],
+  entity: (d) => {
+    const kind = d.pick(ENTITY_KINDS);
+    return [call("entity", { kind: id(kind), name: tx(d.orgNameFor(kind)), position: d.maybe(0.4) ? tx(d.pick(FOUNDERS)) : undefined, visible: d.maybe(0.12) ? id("public") : undefined })];
+  },
   claim: (d) => {
     const r = d.rand();
     if (r < 0.15) return [call("claim", { release: d.rec(), basis: d.maybe(0.2) ? d.record() : undefined })];
     if (r < 0.32) return [call("claim", { transfer: d.rec(), to: d.party(["org", "person"]), basis: d.maybe(0.2) ? d.record() : undefined })];
-    // What it's about, as the worlds' laws read it: an action, and what it's done to.
-    const about: { [slot: string]: string } = { action: d.pick(ACTIONS) };
-    if (d.maybe(0.9)) about.object = (d.pick([() => d.lot(), () => d.structure(), () => id(d.spaceId()), () => id(d.cellId()), () => d.record(), () => d.lot()])() as { id: string }).id;
-    return [call("claim", { position: d.word(["right", "liberty", "power", "immunity", "liberty", "right"]), holder: d.maybe(0.85) ? d.party(["org", "person"]) : undefined, about: { json: about }, against: d.maybe(0.3) ? d.party(["org", "person"]) : undefined, basis: d.maybe(0.3) ? d.record() : undefined, visible: d.maybe(0.1) ? id("public") : undefined, for: d.maybe(0.06) ? id(d.orgId()) : undefined })];
+    // Whose name it's recorded in (`for`), now and then, and then with little else: a sentence holds only so much.
+    const named = d.maybe(0.07);
+    return [call("claim", { position: d.word(["right", "liberty", "power", "immunity", "liberty", "right"]), holder: named || d.maybe(0.85) ? d.party(["org", "person"]) : undefined, about: d.about(), against: !named && d.maybe(0.3) ? d.party(["org", "person"]) : undefined, basis: !named && d.maybe(0.3) ? d.record() : undefined, visible: d.maybe(0.1) ? id("public") : undefined, for: named ? id(d.orgId()) : undefined })];
   },
   agreement: (d) => {
     const r = d.rand();
     if (r < 0.14) return [call("agreement", { sign: d.rec(), for: d.maybe(0.15) ? id(d.orgId()) : undefined })];
     if (r < 0.28) return [call("agreement", { notice: d.rec(), text: d.maybe(0.3) ? tx(d.pick(["We are moving out.", "The work is finished.", "We no longer need the service.", "The rent is more than we can pay.", "The post has been filled."])) : undefined })];
     const other = d.party(["org", "person"]);
-    const both = d.rand();
+    // Terms only, now and then (a partnership, a hire: what each side does is in its words); otherwise a deal, of
+    // which one side alone is sometimes all that's said.
+    const bare = d.maybe(0.1);
+    const { template, we, they } = bare ? { template: d.pick(["partnership", "hire", "maintenance", "service"]), we: undefined, they: undefined } : deal(d, other);
+    const side = we && they && d.maybe(0.15) ? d.pick(["we", "they"]) : undefined;
     const term = d.maybe(0.6);
     return [call("agreement", {
-      with: other, template: d.maybe(0.75) ? d.word(AGREEMENTS) : undefined, term: term ? d.duration() : undefined, then: term && d.maybe(0.2) ? id("periodic") : undefined,
-      our_notice: d.maybe(0.3) ? d.duration() : undefined, their_notice: d.maybe(0.3) ? d.duration() : undefined,
-      we_do: both < 0.75 ? commitment(d, true, other) : undefined, they_do: both > 0.2 ? commitment(d, false, other) : undefined,
-      terms: d.maybe(0.2) ? tx(d.pick(TERMS)) : undefined, basis: d.maybe(0.1) ? d.record() : undefined, visible: d.maybe(0.06) ? id("public") : undefined,
+      with: other, template: d.maybe(0.75) ? id(template) : undefined, term: term ? d.term() : undefined, then: term && d.maybe(0.2) ? id("periodic") : undefined,
+      our_notice: d.maybe(0.3) ? d.notice() : undefined, their_notice: d.maybe(0.3) ? d.notice() : undefined,
+      we_do: side === "they" ? undefined : we, they_do: side === "we" ? undefined : they,
+      terms: bare || d.maybe(0.15) ? tx(d.pick(TERMS)) : undefined, basis: d.maybe(0.1) ? d.record() : undefined, visible: d.maybe(0.06) ? id("public") : undefined,
     })];
   },
   statement: (d) => {
     if (d.maybe(0.15)) return [call("statement", { withdraw: d.rec(), text: d.maybe(0.3) ? tx(d.pick(["It was issued in error.", "It has been replaced.", "The matter is settled.", "The figures were wrong."])) : undefined })];
     const to = d.rand();
-    return [call("statement", { kind: d.word(STATEMENTS), text: d.publicWords(), to: to < 0.2 ? d.party() : to < 0.3 ? list([d.orgId(), d.personId()]) : undefined, visible: d.maybe(0.3) ? id("public") : undefined, basis: d.maybe(0.2) ? d.record() : undefined, for: d.maybe(0.12) ? id(d.orgId()) : undefined, on: d.maybe(0.12) ? d.lot() : undefined })];
+    const kind = d.pick(STATEMENTS);
+    return [call("statement", { kind: id(kind), text: d.publicWords(kind), to: to < 0.2 ? d.party() : to < 0.3 ? list([d.orgId(), d.personId()]) : undefined, visible: d.maybe(0.3) ? id("public") : undefined, basis: d.maybe(0.2) ? d.record() : undefined, for: d.maybe(0.12) ? id(d.orgId()) : undefined, on: d.maybe(0.12) ? d.lot() : undefined })];
   },
   vote: (d) => [call("vote", { ballot: d.rec(), choice: d.maybe(0.8) ? d.word(CHOICES) : d.maybe() ? id(d.personId()) : tx(d.personName()), visible: d.maybe(0.1) ? id("public") : undefined, for: d.maybe(0.08) ? id(d.orgId()) : undefined })],
   message: (d) => {
@@ -323,40 +461,61 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
     const r = d.rand();
     if (r < 0.2) return [call("presence", { leave: id("yes"), who: d.maybe(0.6) ? d.person() : undefined })];
     if (r < 0.35) return [call("presence", { who: d.person() })];
-    return [call("presence", { name: tx(d.personName()), age: tx(d.maybe(0.85) ? `${d.int(1, 88)} years` : `${d.int(2, 11)} months`), template: d.word(NEWCOMERS), sex: d.maybe(0.35) ? d.word(["female", "male"]) : undefined, carrying: d.maybe(0.6) ? d.amount() : undefined })];
+    // A newcomer of an age that fits what they come as, with what they'd carry in their pockets.
+    const template = d.pick(NEWCOMERS);
+    const sex = d.maybe(0.35) ? d.pick(["female", "male"]) : undefined;
+    return [call("presence", { name: tx(d.personName(sex)), age: tx(`${d.int(...COMES_AGED[template]!)} years`), template: id(template), sex: sex ? id(sex) : undefined, carrying: d.maybe(0.6) ? d.pocket() : undefined })];
   },
-  birth: (d) => [call("birth", { name: tx(d.maybe(0.5) ? d.personName() : d.pick(FIRST)), template: d.word(CHILDREN), with: d.maybe(0.6) ? d.person() : undefined })],
+  // What the contract requires of a birth (a name, and what the child is recorded as), and the other parent if
+  // there is one: a person, by id, by name, or as the speaker would call them. Nothing else.
+  birth: (d) => [call("birth", { name: tx(d.maybe(0.5) ? d.personName() : d.pick(FIRST)), template: d.word(CHILDREN), with: !d.maybe(0.6) ? undefined : d.maybe(0.7) ? id(d.personId()) : tx(d.maybe() ? d.personName() : d.pick(PARTNERS)) })],
   take: (d) => [call("take", { kind: d.word(GOODS), quantity: d.count(80), from: d.party(["org", "person"]), at: d.structure() })],
   harm: (d) => [call("harm", { who: d.person() })],
   position: (d) => {
     const r = d.rand();
-    const post = () => id(d.maybe(0.6) ? `${slug(d.pick(TRADES))}-${slug(d.pick(TITLES))}` : d.maybe() ? d.officeId() : `pos.${d.int(1, 600)}`);
-    if (r < 0.2) return [call("position", { vacate: post() })];
-    if (r < 0.5) return [call("position", { appoint: post(), to: d.maybe(0.8) ? d.person() : id(`par.${d.int(1, 900)}`) })];
+    if (r < 0.2) return [call("position", { vacate: post(d) })];
+    if (r < 0.5) return [call("position", { appoint: post(d), to: d.maybe(0.8) ? d.person() : id(`par.${d.int(1, 900)}`) })];
     return [call("position", { title: tx(d.maybe(0.7) ? d.pick(TITLES) : `${d.pick(["Deputy", "Senior", "Assistant", "Acting", "Night"])} ${d.pick(TITLES)}`), role: d.maybe(0.65) ? d.word(ROLES) : undefined })];
   },
   system: (d) => {
-    if (d.maybe(0.3)) return [call("system", { retire: id(d.maybe(0.5) ? `par.${d.int(1, 900)}` : `${d.pick(SYSTEMS).replace(/_/g, "-")}-${d.int(1, 40)}`) })];
+    if (d.maybe(0.3)) return [call("system", { retire: id(d.maybe(0.5) ? `par.${d.int(1, 900)}` : `${d.pick(SYSTEMS)}-${d.int(1, 40)}`) })];
     return [call("system", { template: d.word(SYSTEMS), title: d.maybe(0.5) ? tx(`${d.pick(["Front Desk", "Night", "Payroll", "Depot", "Records", "Rates", "Permit", "Stores"])} ${d.pick(["Assistant", "Monitor", "Clerk", "Dispatcher", "Helper"])}`) : undefined })];
   },
 };
 
+/** A new organisation, named as its kind is. */
+const founded = (d: Draw, titled: boolean): calls.Call => {
+  const kind = d.pick(ENTITY_KINDS);
+  return call("entity", { kind: id(kind), name: tx(d.orgNameFor(kind)), position: titled ? tx(d.pick(FOUNDERS)) : undefined });
+};
+
+/** What a letter says that goes out with something just published: about that thing, by its kind. */
+const COVERING = ["Please read the KIND I have just published.", "The KIND published today concerns you.", "Please put the new KIND up where everyone can see it.", "Here is the KIND we spoke about.", "Please act on the KIND published today."];
+
 /** Programs of several lines, each later line using what an earlier one made: listed under the first line's function. */
 const DEPENDENT: { [fn: string]: ((d: Draw) => Lines)[] } = {
   entity: [
-    (d) => [["v1", call("entity", { kind: d.word(ENTITY_KINDS), name: tx(d.orgName()), position: d.maybe(0.3) ? tx(d.pick(TITLES)) : undefined })], call("statement", { kind: id("charter"), for: { var: "v1" }, text: tx(d.pick(PURPOSE_LINES)), visible: d.maybe(0.3) ? id("public") : undefined })],
-    (d) => [["v1", call("entity", { kind: d.word(ENTITY_KINDS), name: tx(d.orgName()) })], call("account", { holder: { var: "v1" }, at: d.maybe(0.7) ? d.party(["org"]) : undefined })],
-    (d) => [["v1", call("entity", { kind: d.word(ENTITY_KINDS), name: tx(d.orgName()) })], call("claim", { position: d.word(["right", "liberty", "power"]), holder: { var: "v1" }, about: { json: { action: d.pick(ACTIONS), object: (d.lot() as { id: string }).id } } })],
+    (d) => [["v1", founded(d, d.maybe(0.3))], call("statement", { kind: id("charter"), for: { var: "v1" }, text: tx(d.pick(PURPOSE_LINES)), visible: d.maybe(0.3) ? id("public") : undefined })],
+    (d) => [["v1", founded(d, false)], call("account", { holder: { var: "v1" }, at: d.maybe(0.7) ? d.party(["org"]) : undefined })],
+    (d) => [["v1", founded(d, false)], call("claim", { position: d.word(["right", "liberty", "power"]), holder: { var: "v1" }, about: d.about() })],
   ],
   account: [(d) => [["v1", call("account", { holder: d.party(["org", "person"]), at: d.maybe(0.6) ? d.party(["org"]) : undefined })], call("money", { to: { var: "v1" }, amount: d.amount(), from: d.maybe(0.6) ? d.account() : undefined, for: d.maybe(0.4) ? d.purpose() : undefined })]],
   position: [(d) => [["v1", call("position", { title: tx(d.pick(TITLES)), role: d.maybe(0.6) ? d.word(ROLES) : undefined })], call("position", { appoint: { var: "v1" }, to: d.person() })]],
-  statement: [(d) => [["v1", call("statement", { kind: d.word(STATEMENTS), text: d.publicWords(), visible: d.maybe(0.4) ? id("public") : undefined })], call("message", { to: d.party(), text: d.letter(), re: { var: "v1" } })]],
-  presence: [(d) => [["v1", call("presence", { name: tx(d.personName()), age: tx(`${d.int(18, 80)} years`), template: d.word(NEWCOMERS) })], call("occupancy", { who: { var: "v1" }, in: d.inside() })]],
+  // Something published, and a letter to someone about it: the letter is about what was published, not about anything else.
+  statement: [(d) => {
+    const kind = d.pick(STATEMENTS);
+    return [["v1", call("statement", { kind: id(kind), text: d.publicWords(kind), visible: d.maybe(0.4) ? id("public") : undefined })], call("message", { to: d.party(), text: tx(d.pick(COVERING).replace("KIND", kind)), re: { var: "v1" } })];
+  }],
+  presence: [(d) => {
+    const template = d.pick(NEWCOMERS);
+    return [["v1", call("presence", { name: tx(d.personName()), age: tx(`${d.int(...COMES_AGED[template]!)} years`), template: id(template) })], call("occupancy", { who: { var: "v1" }, in: d.inside() })];
+  }],
   system: [(d) => [["v1", call("system", { template: d.word(SYSTEMS) })], call("position", { appoint: id(d.officeId()), to: { var: "v1" } })]],
 };
 
-/** A program worth keeping, as gold: it parses back, passes the contract and is askable; otherwise undefined. */
-function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[]): Gold | undefined {
+/** A program worth keeping, as gold: it parses back, passes the contract, is askable and is a plausible thing to ask
+ * for (`dropped` counts, by reason, the ones that aren't plausible); otherwise undefined. */
+function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[], dropped?: { [reason: string]: number }): Gold | undefined {
   let p: calls.Program;
   try {
     p = calls.parseProgram(calls.programText(calls.programOf(...lines)));
@@ -364,6 +523,11 @@ function goldOf(lines: Lines, d: Draw, source: string, forms?: FormSpec[]): Gold
     return undefined;
   }
   if (calls.contractErrors(p).length || !askable(p)) return undefined;
+  const why = implausible(p, { invented: true, ...(forms ? { forms } : {}) });
+  if (why) {
+    if (dropped) dropped[why] = (dropped[why] ?? 0) + 1;
+    return undefined;
+  }
   const program = goldText(p);
   const mentioned = new Set<string>();
   const walk = (v: V) => ("id" in v ? mentioned.add(v.id) : "json" in v && Array.isArray(v.json) ? v.json.forEach((x) => mentioned.add(String(x))) : "call" in v ? Object.values(v.call.args).forEach(walk) : undefined);
@@ -381,6 +545,8 @@ export interface SyntheticOptions {
   dependent?: number;
   /** How the invented worlds write money (default: CURRENCIES). */
   currencies?: Currency[];
+  /** Counts, by reason, the programs drawn and dropped as no plausible thing to ask for (data.ts `implausible`). */
+  dropped?: { [reason: string]: number };
 }
 
 /**
@@ -397,7 +563,7 @@ export function synthetic(o: SyntheticOptions = {}): Gold[] {
     if (!calls.ARGS[fn]) continue;
     if (fn === "form") {
       // About five ways of filling in each form: enough forms that none is learned by heart.
-      out.push(...syntheticForms({ sets: Math.ceil(per / 10), perForm: 5, seed: o.seed ?? 1, ...(o.currencies ? { currencies: o.currencies } : {}) }).slice(0, per));
+      out.push(...syntheticForms({ sets: Math.ceil(per / 10), perForm: 5, seed: o.seed ?? 1, ...(o.currencies ? { currencies: o.currencies } : {}), ...(o.dropped ? { dropped: o.dropped } : {}) }).slice(0, per));
       continue;
     }
     const rand = sampler(hash(`${o.seed ?? 1}:${fn}`));
@@ -406,7 +572,7 @@ export function synthetic(o: SyntheticOptions = {}): Gold[] {
     for (let tries = 0; seen.size < per && tries < per * 40; tries++) {
       const d = new Draw(rand, o.currencies ?? CURRENCIES);
       const lines = dependent.length && rand() < (o.dependent ?? 0.12) ? d.pick(dependent)(d) : RECIPES[fn](d);
-      const g = goldOf(lines, d, `synthetic: ${fn}`);
+      const g = goldOf(lines, d, `synthetic: ${fn}`, undefined, o.dropped);
       if (!g || seen.has(g.program)) continue;
       seen.add(g.program);
       out.push(g);
@@ -481,6 +647,7 @@ export interface FormOptions {
   perForm?: number;
   seed?: number;
   currencies?: Currency[];
+  dropped?: { [reason: string]: number };
 }
 
 /** The invented forms, in their sets: for a seed, always the same. */
@@ -506,8 +673,9 @@ export function formSets(o: FormOptions = {}): FormSpec[][] {
 
 /**
  * Filled-in forms as gold programs: for each invented form, `perForm` ways of filling it in (every required field,
- * some of the others; the office named or, where the name says enough, not), each carrying what the person knows of:
- * the form alone, or with one or two others of its set beside it. The form's specification goes with the example
+ * some of the others; always with the office it goes to, `to=`: the translator's rules write where the list says it
+ * goes, so a gold program without it is one the rules would write differently), each carrying what the person knows
+ * of: the form alone, or with one or two others of its set beside it. The form's specification goes with the example
  * exactly as the translator would be shown it (data.ts `formLine`).
  */
 export function syntheticForms(o: FormOptions = {}): Gold[] {
@@ -515,7 +683,6 @@ export function syntheticForms(o: FormOptions = {}): Gold[] {
   const seen = new Set<string>();
   formSets(o).forEach((set, si) => set.forEach((spec, fi) => {
     const rand = sampler(hash(`${o.seed ?? 1}:form ${si}.${fi}`));
-    const twin = set.some((x) => x !== spec && x.form === spec.form);
     for (let n = 0, tries = 0; n < (o.perForm ?? 5) && tries < 60; tries++) {
       const d = new Draw(rand, o.currencies ?? CURRENCIES);
       // (A set of forms is one world's: its amounts are all in that world's money.)
@@ -525,12 +692,55 @@ export function syntheticForms(o: FormOptions = {}): Gold[] {
       // Shown alone, or beside one or two others of its set (always beside its namesake, if it has one).
       const others = shuffled(set.filter((x) => x !== spec && x.form !== spec.form), rand).slice(0, d.pick([0, 1, 1, 2]));
       const shown = shuffled([spec, ...set.filter((x) => x !== spec && x.form === spec.form), ...others], rand);
-      const g = goldOf([call("form", { form: id(spec.form), to: twin || d.maybe(0.5) ? id(spec.to) : undefined, ...Object.fromEntries(fields.map(([k, f]) => [k, fieldValue(d, f)])) })], d, `synthetic: form ${spec.form}`, shown);
+      const g = goldOf([call("form", { form: id(spec.form), to: id(spec.to), ...Object.fromEntries(fields.map(([k, f]) => [k, fieldValue(d, f)])) })], d, `synthetic: form ${spec.form}`, shown, o.dropped);
       if (!g || seen.has(g.program)) continue;
       seen.add(g.program);
       out.push(g);
       n++;
     }
   }));
+  return out;
+}
+
+// ---------------------------------------------------------------- several separate acts about the same thing
+
+/** Separate acts about one person, and about one organisation: each a different function, none depending on another,
+ * none a letter or something published (that, with an act about the same thing, is one request by the rules). */
+const ABOUT_A_PERSON: ((d: Draw, who: string) => calls.Call)[] = [
+  (d, who) => call("money", { to: id(who), amount: d.amount(), from: d.maybe(0.6) ? d.account() : undefined, for: d.purpose() }),
+  (d, who) => call("occupancy", { who: id(who), in: d.inside() }),
+  (d, who) => call("position", { appoint: post(d), to: id(who) }),
+  (d, who) => call("work", { task: d.word(TASKS), units: d.count(40), at: d.structure(), by: id(who) }),
+  (d, who) => call("goods", { kind: d.word(GOODS), quantity: d.count(), to: id(who), at: d.structure() }),
+  (d, who) => call("account", { holder: id(who), at: d.maybe(0.6) ? id(d.orgId()) : undefined }),
+  (d, who) => call("claim", { position: d.word(["right", "liberty"]), holder: id(who), about: d.about() }),
+];
+const ABOUT_AN_ORG: ((d: Draw, who: string) => calls.Call)[] = [
+  (d, who) => call("money", { to: id(who), amount: d.amount(), from: d.maybe(0.6) ? d.account() : undefined, for: d.purpose() }),
+  (d, who) => call("goods", { kind: d.word(GOODS), quantity: d.count(), to: id(who), at: d.structure() }),
+  (d, who) => call("account", { holder: id(who) }),
+  (d, who) => (d.maybe(0.3) ? call("structure", { remove: d.structure(), by: id(who), price: d.amount() }) : call("structure", { type: d.word(STRUCTURE_TYPES), on: d.ground(), by: id(who), price: d.amount(), from: d.maybe(0.6) ? d.account() : undefined })),
+  (d, who) => call("claim", { position: d.word(["right", "liberty"]), holder: id(who), about: d.about() }),
+  (d, who) => call("take", { kind: d.word(GOODS), quantity: d.count(40), from: id(who), at: d.structure() }),
+];
+
+/**
+ * Groups of two or three separate acts about the same person or organisation, each a gold program of its own: what a
+ * person piles into one message ("pay c0412 her wages, and while you're at it move her into apts-3/dwelling.2"). A
+ * writer asks for a group in one request and the translator is to refuse it as `too_much` (data.ts `piledBriefs`):
+ * the refusal as people make it, where the built kind pastes unrelated requests together. For a seed, always the same.
+ */
+export function piled(o: { groups?: number; seed?: number; currencies?: Currency[] } = {}): Gold[][] {
+  const rand = sampler(hash(`${o.seed ?? 1}:piled`));
+  const want = o.groups ?? 20;
+  const out: Gold[][] = [];
+  for (let tries = 0; out.length < want && tries < want * 20; tries++) {
+    const d = new Draw(rand, o.currencies ?? CURRENCIES);
+    const person = d.maybe(0.6);
+    const who = person ? d.personId() : d.orgId();
+    const acts = shuffled(person ? ABOUT_A_PERSON : ABOUT_AN_ORG, rand).slice(0, d.maybe(0.3) ? 3 : 2);
+    const gold = acts.map((act) => goldOf([act(d, who)], d, "synthetic: piled")).filter((g): g is Gold => !!g);
+    if (gold.length === acts.length) out.push(gold);
+  }
   return out;
 }

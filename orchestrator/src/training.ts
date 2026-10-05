@@ -4,8 +4,9 @@
 //   gold programs from the calls code participants wrote in the logs given (and from the seen test cases), with
 //   generated ones (translator/train/synthetic.ts) so that every function of the call language has its floor;
 //   requests for them written by the models given (`--model`, more than one: no single writer's voice);
-//   each kept only if it carries its program's literals exactly, and, with `--back-model`, if that model translates
-//   it back to the same program through the translator as runs use it.
+//   each kept only if it carries its program's literals exactly and reads as a person's request, and, with
+//   `--back-model` (one or more), if a model that didn't write it translates it back to a program that means the same,
+//   through the translator as runs use it.
 //
 // The examples are also written split into training and validation, by gold program and by form.
 // Every model call's tokens are counted in the manifest written with the data. The held-out test cases are never
@@ -18,8 +19,8 @@ import { callModel, PRICES, type Budget, type LlmAdapter, type LlmIO, type Price
 import { createTranslator, Knowledge } from "@oikos/translator";
 import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
-import { functionOf, generate, goldFromCases, goldFromLog, knowing, sampler, shuffled, split, surfaceVariant, type Gold } from "../../translator/train/data";
-import { synthetic } from "../../translator/train/synthetic";
+import { functionOf, generate, goldFromCases, goldFromLog, knowing, sampler, shuffled, split, surfaceVariant, type Back, type Gold } from "../../translator/train/data";
+import { piled, synthetic } from "../../translator/train/synthetic";
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
 
@@ -30,6 +31,10 @@ export interface TrainingDataOptions {
   /** Logs, or folders of them. */
   sources: string[];
   writers: Model[];
+  /** The models that translate requests back (the check). A request is checked by the first of them that isn't the
+   * model that wrote it: a model checking its own writing keeps what it parrots and rejects what another would say
+   * naturally. So with a checker among the writers, give a second one for that model's requests. (`back`: one, as before.) */
+  backs?: Model[];
   back?: Model;
   out: string;
   perShape?: number;
@@ -85,6 +90,9 @@ export interface GoldReport {
   excluded: { [reason: string]: number };
   /** Functions whose log programs were sampled down to the ceiling, with how many there were. */
   capped: { [fn: string]: number };
+  /** Generated programs drawn and dropped as no plausible thing to ask for, by reason (data.ts `implausible`); a
+   * log's own are in `excluded`, as "implausible: …". */
+  implausible: { [reason: string]: number };
   floor: number;
   refusal_floor?: number;
 }
@@ -103,6 +111,7 @@ export async function balancedGold(sources: string[], o: { perShape?: number; se
   const floor = o.floor ?? 300;
   const rand = sampler(seed + 1);
   const excluded: { [reason: string]: number } = {};
+  const dropped: { [reason: string]: number } = {};
   const seen = new Set<string>();
   let gold: Gold[] = [];
   const add = (g: Gold) => void (seen.has(g.program) || (seen.add(g.program), gold.push(g)));
@@ -136,9 +145,9 @@ export async function balancedGold(sources: string[], o: { perShape?: number; se
   for (const g of gold) have[functionOf(g)] = (have[functionOf(g)] ?? 0) + 1;
   for (const fn of Object.keys(calls.ARGS)) {
     const need = Math.max(floor - (have[fn] ?? 0), o.generated ?? 100, 0);
-    if (floor > 0 && need > 0) for (const g of synthetic({ only: [fn], perFunction: need, seed })) add(g);
+    if (floor > 0 && need > 0) for (const g of synthetic({ only: [fn], perFunction: need, seed, dropped })) add(g);
   }
-  const report: GoldReport = { gold: gold.length, by_function: {}, by_source: {}, by_shape: {}, excluded: Object.fromEntries(Object.entries(excluded).sort()), capped, floor, ...(o.refusalFloor ? { refusal_floor: o.refusalFloor } : {}) };
+  const report: GoldReport = { gold: gold.length, by_function: {}, by_source: {}, by_shape: {}, excluded: Object.fromEntries(Object.entries(excluded).sort()), capped, implausible: Object.fromEntries(Object.entries(dropped).sort()), floor, ...(o.refusalFloor ? { refusal_floor: o.refusalFloor } : {}) };
   for (const g of gold) {
     const f = (report.by_function[functionOf(g)] ??= { log: 0, case: 0, synthetic: 0, total: 0 });
     f[g.origin ?? "log"]++;
@@ -155,7 +164,8 @@ export async function balancedGold(sources: string[], o: { perShape?: number; se
 export async function trainingData(o: TrainingDataOptions): Promise<{ examples: number; out: string; stopped?: string }> {
   const log = o.log ?? (() => {});
   // (A model with no recorded price is refused before anything is asked of any of them.)
-  for (const m of [...o.writers, ...(o.back ? [o.back] : [])]) {
+  const checkers = [...(o.backs ?? []), ...(o.back ? [o.back] : [])];
+  for (const m of [...o.writers, ...checkers]) {
     const key = `${m.adapter.provider}/${m.adapter.model}`;
     if (!(m.prices ?? PRICES)[key]) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
   }
@@ -192,26 +202,30 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   });
   const seenSystems = new Set<string>();
   const guarded = (m: Model): LlmAdapter => ({ provider: m.adapter.provider, model: m.adapter.model, complete: (req) => callModel(io(m), req, seenSystems) });
-  const backUsage: Usage = { input_tokens: 0, output_tokens: 0 };
-  const back = o.back && (() => {
-    const t = createTranslator(io(o.back!, backUsage), async () => ({ ok: true }), () => undefined, "translator-data", 1);
+  const backs = checkers.map((m) => {
+    const usage: Usage = { input_tokens: 0, output_tokens: 0 };
+    const t = createTranslator(io(m, usage), async () => ({ ok: true }), () => undefined, "translator-data", 1);
     let n = 0;
-    return {
-      model: `${o.back!.adapter.provider}/${o.back!.adapter.model}`,
+    const back: Back = {
+      model: `${m.adapter.provider}/${m.adapter.model}`,
       // (The translator is shown the forms the program's asker knows of, in a world that writes money as theirs does.)
       translate: async (request: string, _forms: string[], g?: Gold) => {
-        const r = await t.translate({ draftId: `data.${++n}`, participant: "someone", proposal: request, knowledge: g?.forms?.length || g?.currency ? knowing(g.forms ?? [], g.currency ?? TEST_CURRENCY) : new Knowledge(TEST_CURRENCY) });
+        const r = await t.translate({ draftId: `data.${m.adapter.model}.${++n}`, participant: "someone", proposal: request, knowledge: g?.forms?.length || g?.currency ? knowing(g.forms ?? [], g.currency ?? TEST_CURRENCY) : new Knowledge(TEST_CURRENCY) });
         return r.ok ? r.draft.call : r.call;
       },
     };
-  })();
+    return { back, usage };
+  });
   const heldOut = loadHeldOut();
   const { examples, manifest, rejects } = await generate(gold, {
     concurrency: o.concurrency ?? 4,
     writers: o.writers.map(guarded), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
-    ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(back ? { back } : {}), ...(heldOut ? { heldOut } : {}), seed: o.seed ?? 1, log,
+    // (With a floor under the refusals: related acts for a writer to pile into one message, which is `too_much` as
+    // people make it; a third as many as the floor, beside the built ones.)
+    ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
+    backs: backs.map((b) => b.back), ...(heldOut ? { heldOut } : {}), seed: o.seed ?? 1, log,
   });
-  if (back) manifest.usage[`${back.model} (translating back)`] = backUsage;
+  for (const b of backs) manifest.usage[`${b.back.model} (translating back)`] = b.usage;
   mkdirSync(o.out, { recursive: true });
   writeFileSync(join(o.out, "examples.jsonl"), examples.map((e) => JSON.stringify(e)).join("\n") + (examples.length ? "\n" : ""));
   writeFileSync(join(o.out, "rejects.jsonl"), rejects.map((e) => JSON.stringify(e)).join("\n") + (rejects.length ? "\n" : ""));

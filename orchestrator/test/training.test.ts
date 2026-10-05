@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { LlmAdapter } from "@oikos/participants/llm";
 import { calls } from "@oikos/participants";
-import { functionOf, literals, type Example } from "../../translator/train/data";
+import { functionOf, literals, refusalBriefs, type Example } from "../../translator/train/data";
 import { balancedGold, goldOf, trainingData } from "../src/training";
 
 const dir = join(import.meta.dir, "../../runs/test-training-data");
@@ -30,7 +30,7 @@ test("training data from a log: gold programs, requests from two writers, each t
     const said = String((req.messages[0] as any).content);
     const program = said.slice("Call:\n".length, said.indexOf("\n\n"));
     // (Whatever words the style says to use exactly, then every literal.)
-    const given = /exactly (?:these words|this sentence)[^"]*"([^"]+)"/.exec(said)?.[1];
+    const given = (said.includes("exactly ") ? [...said.slice(said.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") || undefined : undefined);
     const text = `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}${model} asks: ${literals(calls.parseProgram(program)).join(" / ")} [${said.slice(-12)}]`;
     programs.set(text, program);
     return { content: [{ type: "text", text }], usage: { input_tokens: 7, output_tokens: 3 } };
@@ -104,7 +104,7 @@ test("a balanced gold set: a floor under every function, made up with generated 
   const writer: LlmAdapter = { provider: "stand-in", model: "a", complete: async (req) => {
     const said = String((req.messages[0] as any).content);
     const isCall = said.startsWith("Call:\n");
-    const given = /exactly (?:these words|this sentence)[^"]*"([^"]+)"/.exec(said)?.[1];
+    const given = (said.includes("exactly ") ? [...said.slice(said.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") || undefined : undefined);
     const text = isCall ? `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}please: ${literals(calls.parseProgram(said.slice(6, said.indexOf("\n\n")))).join(" / ")}` : `Request ${++asked}, about this: ${said.split("\n")[1]}`; // (the situation's own line: whatever it names is in it)
     return { content: [{ type: "text", text }], usage: { input_tokens: 7, output_tokens: 3 } };
   } };
@@ -118,8 +118,14 @@ test("a balanced gold set: a floor under every function, made up with generated 
   expect(manifest.by_origin.synthetic).toBeGreaterThan(0);
   expect(manifest.by_origin.log).toBeGreaterThan(0);
   expect(manifest.refusal_floor).toBe(8);
-  for (const label of ["needs_calculation", "not_yours", "unclear", "not_an_act", "too_much", "unknown_form"]) expect([label, manifest.by_shape[`none(${label})`] >= 8]).toEqual([label, true]);
-  expect(manifest.short_of_floor).toEqual({});
+  // Every label that has a way of being made (a brief for a writer, or built from examples) has its floor, whichever
+  // labels those are; one the call language has and nothing here makes yet is said to be short, not passed over.
+  const made = [...new Set([...refusalBriefs(gold, 1).map((b) => b.label), "too_much", "unknown_form"])];
+  for (const label of ["needs_calculation", "not_yours", "unclear", "not_an_act", "too_much", "unknown_form"]) expect(made).toContain(label);
+  for (const label of made) expect([label, manifest.by_shape[`none(${label})`] >= 8]).toEqual([label, true]);
+  expect(manifest.short_of_floor).toEqual(Object.fromEntries(calls.LABELS.filter((l) => !made.includes(l)).map((l) => [l, 0])));
+  // What the generator drew and dropped as no plausible thing to ask for is counted, by reason.
+  expect(typeof manifest.gold.implausible).toBe("object");
   // Form examples carry their forms; the split is written, and no validation form is shown in training.
   const train = read("train.jsonl"), validation = read("validation.jsonl");
   expect(manifest.split).toMatchObject({ train: train.length, validation: validation.length, validation_share: 0.15 });
@@ -131,4 +137,59 @@ test("a balanced gold set: a floor under every function, made up with generated 
   expect(names(validation).size).toBeGreaterThan(0);
   for (const n of names(validation)) expect(names(train).has(n)).toBe(false);
   expect(train.filter((e) => functionOf(e) === "form").every((e) => e.forms.length > 0)).toBe(true);
+});
+
+test("several checkers: each request is translated back by a model that didn't write it, and the data says by which", async () => {
+  const d = join(dir, "checkers");
+  rmSync(d, { recursive: true, force: true });
+  mkdirSync(d, { recursive: true });
+  const log = join(d, "town.seed1.jsonl");
+  writeFileSync(log, [
+    JSON.stringify({ kind: "header", body: { config: { world: { entities: [] } } } }),
+    act('money(to=acc-builder, amount="$500", from=acc-city, for="the kerb")'),
+    act('message(to=["c0042"], text="Start on Monday.")'),
+    act("vote(ballot=rec.3, choice=yes)"),
+    act("occupancy(in=apts-3/dwelling.2, leave=true, who=c0042)"),
+  ].join("\n") + "\n");
+  // One stand-in per model, writing when asked for a request and translating when shown one. As a translator each
+  // spells a flag its own way: what comes back is compared by what it means, so nothing is lost to that.
+  const programs = new Map<string, string>();
+  const translated: { [model: string]: string[] } = { a: [], b: [], c: [] };
+  const model = (name: string): LlmAdapter => ({ provider: "stand-in", model: name, complete: async (req) => {
+    const said = String((req.messages[0] as any).content);
+    if (said.startsWith("Request: ")) {
+      const request = said.split("\n")[0]!.slice("Request: ".length);
+      translated[name]!.push(request);
+      return { content: [{ type: "tool_use", id: "1", name: "call", input: { program: (programs.get(request) ?? "none(unclear)").replace("leave=yes", "leave=true") } }], usage: { input_tokens: 11, output_tokens: 5 } };
+    }
+    const program = said.slice("Call:\n".length, said.indexOf("\n\n"));
+    const text = `${name} asks: ${literals(calls.parseProgram(program)).join(" / ")} [${said.slice(-12)}]`;
+    programs.set(text, program);
+    return { content: [{ type: "text", text }], usage: { input_tokens: 7, output_tokens: 3 } };
+  } });
+  const free = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
+  const prices = { "stand-in/a": free, "stand-in/b": free, "stand-in/c": free };
+  const out = join(d, "data");
+  // Writers a and b; checkers a and c: a's requests can't be checked by a, so c takes them; b's go to a.
+  await trainingData({ sources: [log], writers: [{ adapter: model("a"), prices }, { adapter: model("b"), prices }], backs: [{ adapter: model("a"), prices }, { adapter: model("c"), prices }], out, perGold: 2, seed: 3, floor: 0, validation: 0 });
+  const examples: Example[] = readFileSync(join(out, "examples.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
+  const positives = examples.filter((e) => e.kind === "positive");
+  expect(new Set(positives.map((e) => `${e.written_by} -> ${e.verified_by}`))).toEqual(new Set(["stand-in/a -> stand-in/c", "stand-in/b -> stand-in/a"]));
+  expect(translated.a!.length > 0 && translated.a!.every((q) => q.startsWith("b asks"))).toBe(true);
+  expect(translated.c!.length > 0 && translated.c!.every((q) => q.startsWith("a asks"))).toBe(true);
+  expect(translated.b).toEqual([]);
+  expect(manifest.checked).toEqual({ "stand-in/a -> stand-in/c": positives.filter((e) => e.written_by === "stand-in/a").length, "stand-in/b -> stand-in/a": positives.filter((e) => e.written_by === "stand-in/b").length });
+  expect(manifest.checked_by_writer).toBe(0);
+  // Each checker's tokens are counted, apart from what the same model spent writing.
+  expect(manifest.usage["stand-in/a (translating back)"].input_tokens).toBeGreaterThan(0);
+  expect(manifest.usage["stand-in/c (translating back)"].input_tokens).toBeGreaterThan(0);
+  expect(manifest.usage["stand-in/a"].input_tokens).toBeGreaterThan(0);
+  // The gold program writes the flag one way (leave=yes); a checker's leave=true is the same program.
+  const leaving = positives.filter((e) => e.source === "town.seed1" && e.shape.startsWith("occupancy("));
+  expect(leaving.length).toBeGreaterThan(0);
+  expect(leaving.every((e) => e.program === "occupancy(in=apts-3/dwelling.2, leave=yes, who=c0042)")).toBe(true);
+  expect(manifest.dropped.round_trip).toBe(0);
+  // A checker with no recorded price is refused like any model.
+  await expect(trainingData({ sources: [log], writers: [{ adapter: model("a"), prices }], backs: [{ adapter: model("z"), prices }], out: join(d, "unpriced"), perGold: 1, seed: 3, floor: 0 })).rejects.toThrow("no price recorded for stand-in/z");
 });

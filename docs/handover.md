@@ -57,7 +57,8 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
   quote it: `translator/eval/held-out.ts` says why. Results come by case id, outcome and shape only.
 - **Baseline on the clean set** (gpt-6-luna through Codex, translator 0.5.1): held out 44/60 right, 11 no draft, 5 wrong
   drafts; seen 41/55, 3 wrong drafts. Ten of the sixteen held-out misses are refusals it didn't make.
-- **Training data:** `oikos translator-data <logs> --model … --back-model … --out DIR` (translator/train/data.ts) is
+- **Training data:** `oikos translator-data <logs> --model … --back-model … --out DIR` (translator/train/data.ts; give `--model`
+  and `--back-model` more than once: a request is checked by a model that didn't write it) is
   built and tested with stand-in models. No model has written anything yet: see "Waiting on Naz".
 
 ## Waiting on Naz
