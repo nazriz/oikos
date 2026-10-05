@@ -9,6 +9,7 @@
 // field of every kind of act and expects the preview to change.
 
 import { formatMoney, type Block } from "@oikos/participants";
+import { ruleWords } from "@oikos/participants/llm";
 import type { Knowledge } from "./knowledge";
 
 const DAY = 86_400;
@@ -45,13 +46,10 @@ export class Preview {
   private seenBy(v: unknown): string {
     return v === "public" ? ", publicly" : Array.isArray(v) ? `, seen only by ${v.map((x: string) => this.who(x)).join(", ")}` : v === undefined ? "" : `, visible to ${JSON.stringify(v)}`;
   }
-  /** A law's rule, as its Institutional Grammar breakdown says it, and the condition offices and others check acts by. */
+  /** A law's rule and the condition acts are checked against, as anyone reading the law later is shown them. */
   private rule(b: any): string {
-    const a = b.adico;
-    const deontic = ({ may: "may", must: "must", must_not: "must not" } as Record<string, string>)[a?.deontic] ?? a?.deontic;
-    const rule = a ? ` Its rule, as recorded: ${[a.attribute ?? "(nobody named)", deontic ?? "(may, must or must not isn't said)", a.aim ?? "(no action named)"].join(" ")}${a.condition ? `, ${a.condition}` : ""}${a.or_else ? `; or else: ${a.or_else}` : ""}.${this.also(a, ["attribute", "deontic", "aim", "condition", "or_else"])}` : "";
-    const formal = b.formal ? ` The condition acts are checked against, as written${b.formal.language === "cel" ? "" : ` (in ${b.formal.language})`}: ${b.formal.condition}${this.also(b.formal, ["language", "condition"], " (").replace(/\.$/, ")")}.` : "";
-    return rule + formal;
+    const words = ruleWords(b);
+    return words ? ` ${words}` : "";
   }
 
   outcome(o: any, every?: number): string {

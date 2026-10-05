@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { money, outcomeWords, renderObservation, when } from "../src/llm/render";
+import { money, outcomeWords, renderObservation, renderStanding, ruleWords, when } from "../src/llm/render";
 import { canonical } from "../src/canon";
 
 test("money and time read as a person would read them", () => {
@@ -135,4 +135,19 @@ test("a form is shown whole, on file and in a report, however many fields it has
   expect(forms.length).toBeGreaterThan(0);
   const filed = renderStanding(obs({ forms: { kind: "records", records: forms } }), new Set(["forms"]));
   for (const f of forms) for (const name of Object.keys(f.data.fields)) expect(filed).toContain(`"${name}":`);
+});
+
+test("a law's rule and the condition acts are checked against are shown to whoever reads it; a law in words only shows neither", () => {
+  const law = { adico: { attribute: "landlords", deontic: "must_not", aim: "raise a rent", condition: "with less than 90 days' notice", or_else: "the rise is invalid" },
+    formal: { language: "cel", condition: "block.kind == 'rent_increase' && block.data.from - now < 7776000" } };
+  expect(ruleWords(law)).toBe("Its rule, as recorded: landlords must not raise a rent, with less than 90 days' notice; or else: the rise is invalid. The condition acts are checked against, as written: block.kind == 'rent_increase' && block.data.from - now < 7776000.");
+  expect(ruleWords({})).toBe("");
+  // On file for a seat (its standing documents), and in a report that lists the law.
+  const record = { id: "law-1", record: "statement", author: "clerk", at: 0, visible_to: "public", kind: "law", speaks_for: "city", text: "No rent rise without ninety days' notice.", ...law };
+  const obs = { participant: "mayor-system", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: { laws: { kind: "records", records: [record, { ...record, id: "law-2", text: "Be kind.", adico: undefined, formal: undefined }] } } } as any;
+  const onFile = renderStanding(obs, new Set(["laws"]));
+  expect(onFile).toContain('[law-1] law of city: "No rent rise without ninety days\' notice." Its rule, as recorded: landlords must not raise a rent');
+  expect(onFile).toContain('- [law-2] law of city: "Be kind."');
+  expect(onFile.split("\n")[1]).not.toContain("Its rule");
+  expect(renderObservation(obs, { standing: new Set(), titles: new Map() })).toContain("The condition acts are checked against, as written: block.kind == 'rent_increase'");
 });

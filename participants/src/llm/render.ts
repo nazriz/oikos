@@ -37,6 +37,22 @@ const details = (x: unknown, max = 400) => {
  * request made on it sees every one (a long form cut short reads as a form without its last fields). */
 const dataWords = (r: { kind: string; data?: unknown }) => details(r.data, r.kind === "form" ? Infinity : 400);
 
+/**
+ * A statement's rule, where it has one on record: its Institutional Grammar breakdown (who may, must or must not do
+ * what, when, or else what), and the condition acts are checked against. This is what gives a law its force for
+ * every office, landlord and firm that checks what it's about to do: someone reading a law, or about to pass one,
+ * sees it (VISION 15: nothing that binds is in a field only code reads). Empty for a statement in words only.
+ */
+export function ruleWords(r: { adico?: any; formal?: any }): string {
+  const a = r.adico;
+  const more = (o: any, said: string[]) => Object.entries(o).filter(([k]) => !said.includes(k)).map(([k, v]) => `; ${words(k)}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("");
+  const deontic = ({ may: "may", must: "must", must_not: "must not" } as { [k: string]: string })[a?.deontic] ?? a?.deontic;
+  const rule = a ? `Its rule, as recorded: ${[a.attribute ?? "(nobody named)", deontic ?? "(may, must or must not isn't said)", a.aim ?? "(no action named)"].join(" ")}${a.condition ? `, ${a.condition}` : ""}${a.or_else ? `; or else: ${a.or_else}` : ""}${more(a, ["attribute", "deontic", "aim", "condition", "or_else"])}.` : "";
+  const f = r.formal;
+  const formal = f ? `The condition acts are checked against, as written${f.language === "cel" ? "" : ` (in ${f.language})`}: ${f.condition}${more(f, ["language", "condition"])}.` : "";
+  return [rule, formal].filter(Boolean).join(" ");
+}
+
 /** An outcome someone commits to or is asked for (§9), in words. */
 export function outcomeWords(o: any, every?: number): string {
   const rep = every ? ` every ${duration(every)}` : "";
@@ -57,7 +73,8 @@ function describeRecord(r: Record): string {
     case "statement": {
       if (r.kind === "request" && r.data?.outcome) return `[${r.id}] ${who} asked ${(r.addressed_to ?? []).join(", ")} to ${outcomeWords(r.data.outcome, r.data.every)}${from}`;
       const d = dataWords(r);
-      return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${r.basis}` : ""}`;
+      const rule = ruleWords(r);
+      return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${r.basis}` : ""}${rule ? `. ${rule}` : ""}`;
     }
     case "claim":
       return `[${r.id}] ${r.holder} ${POSITION[r.position] ?? r.position}${r.counterparty ? ` against ${r.counterparty}` : ""}: ${details(r.about) || "(no details)"}${r.basis ? `, citing ${r.basis}` : ""}${from}`;
@@ -282,7 +299,7 @@ export function renderStanding(obs: Observation, standing: Set<string>): string 
   const out: string[] = [];
   for (const [id, ch] of Object.entries(obs.channels)) {
     if (!standing.has(id) || ch.kind !== "records") continue;
-    for (const r of ch.records) if (r.record === "statement") out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}`);
+    for (const r of ch.records) if (r.record === "statement") out.push(`- [${r.id}] ${words(r.kind)}${r.speaks_for ? ` of ${r.speaks_for}` : ""}: "${r.text}"${r.data ? ` (${dataWords(r)})` : ""}${ruleWords(r) ? ` ${ruleWords(r)}` : ""}`);
   }
   return out.join("\n");
 }
