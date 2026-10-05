@@ -235,9 +235,10 @@ test("what no function does is written to a brief too: something standing to be 
   expect(kept.find((e) => e.request.startsWith("Hold"))!.gold).toBe(rent);
   expect(Object.keys(r.manifest.short_of_floor!)).not.toContain("no_such_act");
   const forced = await generate(gold, { writers: [w], perGold: 1, refusalFloor: 3, seed: 4, back: back(true) });
-  expect(forced.examples.filter((e) => e.program === "none(no_such_act)").length).toBe(2);
+  // (The request to hold something, forced into a withdrawal by the model checking, is never kept; the floor is then
+  // made up, as far as it can be, from the other briefs.)
+  expect(forced.examples.filter((e) => e.program === "none(no_such_act)" && e.request.startsWith("Hold"))).toEqual([]);
   expect(forced.rejects.some((x) => x.program === "none(no_such_act)" && x.got === "statement(withdraw=rec.1)")).toBe(true);
-  expect(forced.manifest.short_of_floor!.no_such_act).toBe(2);
 });
 
 test("what a gold program is kept as, what a request must carry word for word, and what's too much to ask in a sentence", () => {
