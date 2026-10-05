@@ -10,7 +10,8 @@
 //!   {"op":"annotate","annotation":{..}}    -> {"ok":true,"seq":n}
 //!   {"op":"state"}                         -> {"ok":true,"t":..,"state_hash":..,"head":..}
 //!   {"op":"finish","reason":"completed","detail":".."?} -> {"ok":true,"seq":n,"state_hash":..}
-//! Errors: {"ok":false,"error":".."}. Errors are never logged.
+//! Errors: {"ok":false,"error":".."}. Errors are never logged. A failure to write the log itself is
+//! {"ok":false,"error":"log write failed: ..","fatal":true}: not a refused request, the end of the run.
 
 use crate::blocks::Block;
 use crate::kernel::Command;
@@ -40,9 +41,16 @@ impl Session {
         Self::default()
     }
 
-    /// One request, one reply (never an error: a refused request is `{"ok":false,"error":..}`).
+    /// One request, one reply (never an error: a refused request is `{"ok":false,"error":..}`). A log that couldn't
+    /// be written is marked `fatal`: the host must not take it for an off-contract request and carry on.
     pub fn request(&mut self, req: &Value) -> Value {
-        handle(self, req).unwrap_or_else(|e| json!({ "ok": false, "error": e }))
+        handle(self, req).unwrap_or_else(|e| {
+            if e.starts_with(crate::run::LOG_WRITE_FAILED) {
+                json!({ "ok": false, "error": e, "fatal": true })
+            } else {
+                json!({ "ok": false, "error": e })
+            }
+        })
     }
 
     /// One request as a line of JSON, its reply as one.

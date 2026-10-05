@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { MockAdapter, OpenAICompatibleAdapter, type LlmAdapter, type LlmRequest } from "@oikos/participants/llm";
 import { generate } from "@oikos/worlds/generator/generate";
-import { Kernel, KernelDied } from "../src/kernel";
+import { Kernel, KernelDied, KernelError, KernelLogFailed, kernelBinary } from "../src/kernel";
 import { prepareResume, recordedCalls, Serving } from "../src/resume";
 import { runWorld } from "../src/run";
 
@@ -182,3 +182,85 @@ test("a slow but healthy model call keeps the run's breadcrumbs moving; the watc
   expect(beats.length).toBeGreaterThanOrEqual(3);
   expect(Math.max(...beats.map((m: any) => m.for_s))).toBeGreaterThanOrEqual(20);
 }, 120_000);
+
+test("over stdio the kernel answers many requests made at once, each caller getting its own reply", async () => {
+  // (A kernel given its binary runs as a subprocess over stdio: the transport of a machine without the native module.)
+  const d = dir("stdio-queue");
+  const k = new Kernel(kernelBinary());
+  expect(k.transport).toBe("stdio");
+  const log = join(d, "q.jsonl");
+  await k.request({ op: "start", config: generate({ ...spec, citizens: 40, nature: false }), run_id: "q", log_path: log });
+  // Three kinds of request, told apart by their replies, all asked before any is answered (as several model seats'
+  // translations do in one round): notes (each reply its log seq), the state, a refused request, and a batch.
+  const note = (i: number) => ({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { i } } });
+  const asked: Promise<{ i: number; kind: string; reply: any }>[] = [];
+  for (let i = 0; i < 300; i++) {
+    if (i % 4 === 0) asked.push(k.request(note(i)).then((reply) => ({ i, kind: "note", reply })));
+    else if (i % 4 === 1) asked.push(k.request({ op: "state" }).then((reply) => ({ i, kind: "state", reply })));
+    else if (i % 4 === 2) asked.push(k.request({ op: `nothing-${i}` }).then(() => ({ i, kind: "refused", reply: "answered" }), (e) => ({ i, kind: "refused", reply: e })));
+    else asked.push(k.tryRequestMany([note(i), { op: `nothing-${i}` }, note(i + 1000)]).then((reply) => ({ i, kind: "many", reply })));
+  }
+  const answers = await Promise.all(asked);
+  await k.request({ op: "finish", reason: "completed" });
+  await k.close();
+  const noted = new Map(lines(log).map((l) => JSON.parse(l)).filter((e) => e.kind === "annotation").map((e) => [e.seq, e.body.data.i]));
+  let last = -1;
+  for (const { i, kind, reply } of answers) {
+    if (kind === "note") {
+      expect(noted.get(reply.seq)).toBe(i);
+      expect(reply.seq).toBeGreaterThan(last); // in the order asked
+      last = reply.seq;
+    } else if (kind === "state") expect(typeof reply.state_hash).toBe("string");
+    else if (kind === "refused") {
+      expect(reply).toBeInstanceOf(KernelError);
+      expect(reply.message).toBe(`unknown op nothing-${i}`);
+    } else {
+      expect(reply.length).toBe(3);
+      expect(noted.get(reply[0].seq)).toBe(i);
+      expect(reply[1]).toBeNull();
+      expect(noted.get(reply[2].seq)).toBe(i + 1000);
+      expect(reply[0].seq).toBeGreaterThan(last);
+      last = reply[2].seq;
+    }
+  }
+}, 60_000);
+
+/** A log nobody reads any more (a named pipe whose reader has gone): every write to it fails, as on a full disk. */
+function brokenLog(path: string) {
+  rmSync(path, { force: true });
+  expect(Bun.spawnSync(["mkfifo", path]).exitCode).toBe(0);
+  const reader = Bun.spawn(["cat", path], { stdout: "ignore", stderr: "ignore" });
+  return { break: async () => (reader.kill(), void (await reader.exited)) };
+}
+
+test("a log the kernel can't write is fatal, and never taken for a refused request", async () => {
+  const d = dir("log-fails");
+  const k = new Kernel(kernelBinary());
+  const log = join(d, "f.jsonl");
+  const pipe = brokenLog(log);
+  await k.request({ op: "start", config: generate({ ...spec, citizens: 40, nature: false }), run_id: "f", log_path: log });
+  await pipe.break();
+  // (Notes larger than the kernel's write buffer, so each is written through at once.)
+  const big = { op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { filler: "x".repeat(40_000) } } };
+  const failed = await k.request(big).catch((e) => e);
+  expect(failed).toBeInstanceOf(KernelLogFailed);
+  expect(failed.message).toMatch(/couldn't write the run's log \(log write failed: /);
+  // Neither does a batch turn it into "refused", nor the forgiving form into null; a refused request is still one.
+  await expect(k.tryRequestMany([big, big])).rejects.toBeInstanceOf(KernelLogFailed);
+  await expect(k.tryRequest(big)).rejects.toBeInstanceOf(KernelLogFailed);
+  expect(await k.tryRequest({ op: "nothing" })).toBeNull();
+  k.kill();
+}, 60_000);
+
+test("a run whose log can no longer be written stops there, saying so", async () => {
+  const d = dir("log-fails-run");
+  const pipe = brokenLog(join(d, "full.jsonl"));
+  let looks = 0;
+  const run = runWorld({ config: generate({ ...spec, citizens: 40, nature: false }), runId: "full", outDir: d, until: 30 * DAY, kernel: new Kernel(kernelBinary()),
+    inspect: async () => {
+      if (++looks === 50) await pipe.break();
+    } });
+  const failed = await run.catch((e) => e);
+  expect(failed).toBeInstanceOf(KernelLogFailed);
+  expect(failed.message).toContain("couldn't write the run's log");
+}, 60_000);

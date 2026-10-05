@@ -54,12 +54,25 @@ export class KernelError extends Error {}
  * refused request (D59: a dead kernel used to read as "off-contract", and the run would go on against nothing). */
 export class KernelDied extends Error {}
 
+/** The kernel couldn't write its log (a full or unwritable disk, say): the world may have moved on without its record,
+ * so the run ends here. Never mistaken for a refused request: a skipped command would be a silent hole in the run. */
+export class KernelLogFailed extends Error {}
+
+/** A reply read: itself, or (for a log that couldn't be written) the end of the run. */
+function parseReply(line: string): any {
+  const reply = JSON.parse(line);
+  if (!reply.ok && reply.fatal) throw new KernelLogFailed(`the kernel couldn't write the run's log (${reply.error}): the run can't go on. Check the disk the log is on (space, permissions), then resume the run.`);
+  return reply;
+}
+
 export class Kernel {
   private proc?: Bun.Subprocess<"pipe", "pipe", "inherit">;
   private reader?: ReadableStreamDefaultReader<Uint8Array>;
   private session?: NativeSession;
   private dead?: string; // an in-process session ended by kill(): why
   private buf = "";
+  /** The stdio transport's queue: the exchange before this one (its requests written, its replies read). */
+  private turn: Promise<unknown> = Promise.resolve();
   private decoder = new TextDecoder();
   /** Called before each request is sent (the run's breadcrumbs, D59). */
   onRequest?: (req: any) => void;
@@ -81,7 +94,26 @@ export class Kernel {
   /** One request in-process: the same line in, the same line out. */
   private local(req: object): any {
     if (this.dead) throw new KernelDied(this.dead);
-    return JSON.parse(this.session!.request(JSON.stringify(req)));
+    return parseReply(this.session!.request(JSON.stringify(req)));
+  }
+
+  /** Over stdio, one exchange at a time, in the order asked: a reply is matched to its request only by its place in
+   * the stream, so a request written while another's reply is awaited would take that reply (or wait for ever). */
+  private exchange(lines: string[]): Promise<any[]> {
+    const mine = this.turn.then(async () => {
+      try {
+        this.proc!.stdin.write(lines.join("\n") + "\n");
+        this.proc!.stdin.flush();
+      } catch (e) {
+        throw new KernelDied(`the kernel process can't be written to: ${(e as Error).message}`);
+      }
+      // Every reply is read before any is judged: a fatal one mustn't leave the others in the stream.
+      const raw: string[] = [];
+      for (let i = 0; i < lines.length; i++) raw.push(await this.line());
+      return raw.map(parseReply);
+    });
+    this.turn = mine.catch(() => {});
+    return mine;
   }
 
   private async line(): Promise<string> {
@@ -110,13 +142,7 @@ export class Kernel {
       if (!reply.ok) throw new KernelError(reply.error);
       return reply;
     }
-    try {
-      this.proc!.stdin.write(JSON.stringify(req) + "\n");
-      this.proc!.stdin.flush();
-    } catch (e) {
-      throw new KernelDied(`the kernel process can't be written to: ${(e as Error).message}`);
-    }
-    const reply = JSON.parse(await this.line());
+    const [reply] = await this.exchange([JSON.stringify(req)]);
     if (!reply.ok) throw new KernelError(reply.error);
     return reply;
   }
@@ -124,7 +150,7 @@ export class Kernel {
   /**
    * Several requests at once: all written, then the replies read, in order (the kernel takes its requests strictly in
    * turn, so it's the same as sending them one by one, without waiting on each reply). Each reply, or null for a protocol
-   * error, as tryRequest.
+   * error, as tryRequest; a log the kernel couldn't write is neither (KernelLogFailed: the run ends).
    */
   async tryRequestMany(reqs: object[]): Promise<(any | null)[]> {
     if (!reqs.length) return [];
@@ -133,18 +159,7 @@ export class Kernel {
       const reply = this.local(r);
       return reply.ok ? reply : null;
     });
-    try {
-      this.proc!.stdin.write(reqs.map((r) => JSON.stringify(r)).join("\n") + "\n");
-      this.proc!.stdin.flush();
-    } catch (e) {
-      throw new KernelDied(`the kernel process can't be written to: ${(e as Error).message}`);
-    }
-    const out: (any | null)[] = [];
-    for (let i = 0; i < reqs.length; i++) {
-      const reply = JSON.parse(await this.line());
-      out.push(reply.ok ? reply : null);
-    }
-    return out;
+    return (await this.exchange(reqs.map((r) => JSON.stringify(r)))).map((reply) => (reply.ok ? reply : null));
   }
 
   /** Like request, but returns null instead of throwing on a protocol error. */

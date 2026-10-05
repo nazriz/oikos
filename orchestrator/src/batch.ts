@@ -16,7 +16,7 @@ import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
 import { chooseModel } from "./models";
-import { KernelDied, kernelBinary } from "./kernel";
+import { KernelDied, KernelLogFailed, kernelBinary } from "./kernel";
 import { clearForFreshRun, compressLog, isLog, isStoppedLog, logsOf, realModelIn } from "./logs";
 import { logToResume, recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
@@ -112,7 +112,7 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
       ...(serving ? { resumedFrom: { log: basename(stoppedLog!), serving } } : {}) });
   } catch (e) {
     const err = e as Error;
-    const reason = e instanceof KernelDied ? "kernel died" : e instanceof RunStuck ? "stuck" : "error";
+    const reason = e instanceof KernelDied ? "kernel died" : e instanceof KernelLogFailed ? "log not written" : e instanceof RunStuck ? "stuck" : "error";
     writeFileSync(diagnosisPath, JSON.stringify({ run_id: runId, reason, error: err.message, doing: watchdog.last, at: new Date().toISOString(),
       what_next: "Fix the cause, then resume the run: `oikos resume <log>` re-runs it with every model response served from this log." }, null, 2));
     throw e;

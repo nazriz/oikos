@@ -43,6 +43,10 @@ pub struct Header {
     pub canary: String,
 }
 
+/// How a failure to write the log reads (`RunError::Io`). The protocol marks a reply that starts with it as fatal:
+/// the world may have moved on without its record, so nothing after it can be trusted.
+pub const LOG_WRITE_FAILED: &str = "log write failed: ";
+
 #[derive(Debug)]
 pub enum RunError {
     Protocol(ProtocolError),
@@ -54,7 +58,7 @@ impl std::fmt::Display for RunError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             RunError::Protocol(e) => write!(f, "protocol error: {e}"),
-            RunError::Io(e) => write!(f, "log write failed: {e}"),
+            RunError::Io(e) => write!(f, "{LOG_WRITE_FAILED}{e}"),
             RunError::Config(e) => write!(f, "invalid config: {e}"),
         }
     }
