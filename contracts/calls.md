@@ -25,7 +25,7 @@ value    := ID                    e.g.  lot-00-00   cell.3.4   apts-3/dwelling.2
   - amounts: `"$500"`, `"$1,234.56"`, `"60k"`, `"$1.5k"`, `"$2m"`, `"500 dollars"` → integer cents;
   - durations: `"30 days"`, `"2 weeks"`, `"monthly"`, `"fortnightly"`, `"every 3 months"` → seconds. The world has no calendar: a month is 30 days and a year is 365.
 - **Every call is checked against the argument table below** (the parsed form's schema, calls.schema.json). An unknown or missing argument means the call is refused as unclear; it is never silently ignored.
-- **`none(LABEL)`** is the translator's refusal, with one of five labels: `not_yours`, `needs_calculation`, `too_much`, `unclear`, `unknown_form`.
+- **`none(LABEL)`** is the translator's refusal, with one of six labels: `not_yours`, `needs_calculation`, `too_much`, `unclear`, `unknown_form`, `not_an_act` (the request is to see, read or check something, not to bring anything about: looking is the participant's own to do, with what it's shown; added 2026-10-05, when a sixth of the pilots' failed requests turned out to be of this kind and were being answered "it isn't clear what should happen").
 
 ## Functions
 

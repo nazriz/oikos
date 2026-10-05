@@ -34,6 +34,7 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
   too_much: "Please take this one step at a time.",
   unclear: "It isn't clear what should happen. Could you say it more plainly?",
   unknown_form: "You haven't seen a form by that name.",
+  not_an_act: "That's something to look up or read, not something to do. Look at your reports and papers, or write to whoever keeps it.",
 };
 
 class Ask extends Error {}

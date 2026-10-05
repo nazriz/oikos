@@ -33,7 +33,8 @@
             "needs_calculation",
             "too_much",
             "unclear",
-            "unknown_form"
+            "unknown_form",
+            "not_an_act"
           ]
         }
       }
