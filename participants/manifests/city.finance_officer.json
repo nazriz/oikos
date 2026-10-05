@@ -1,6 +1,6 @@
 {
   "name": "city.finance_officer",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "doc": "docs/behaviour/government.md",
   "params": {
     "approval_over": {
@@ -45,6 +45,14 @@
         "type": "integer"
       },
       "default": 1209600,
+      "source": "placeholder"
+    },
+    "procedure": {
+      "schema": {
+        "type": "string",
+        "description": "the record its approval rule comes from, if the world names one: withdrawn, the rule no longer applies"
+      },
+      "default": "",
       "source": "placeholder"
     }
   },

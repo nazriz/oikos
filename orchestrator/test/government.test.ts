@@ -7,12 +7,153 @@
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { generate } from "@oikos/worlds/generator/generate";
+import { draftLaw } from "@oikos/participants";
+import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
+import { generate, rentIncreaseLaw } from "@oikos/worlds/generator/generate";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
 const DAY = 86_400;
 const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")) as any;
+
+// A law made from figures, amended by the council (docs/behaviour/government.md; docs/design/ai-citizens.md 2e). A
+// model mayor (the mock, scripted) asks for a longer notice of rent increases; its request becomes the law's amendment
+// form; the clerk ballots it. Passed: the clerk publishes the law rewritten from the new figure in place of the old,
+// and those who read the old read the new, with no change to them: a landlord gives the longer notice; one who keeps
+// no book of laws gives what it always gave, is taken to the tribunal by its tenants, and loses, under the new law.
+// Rejected: nothing changes.
+async function amendment(name: string, leaning: number) {
+  const config = generate({ ...spec, citizens: 80, mayor: "llm", years: 1 });
+  // The law at the start: an increase a month after the last at the soonest, on 30 days' notice. Landlords review
+  // monthly and give 30 days, as the law asks, and obey the law as they read it; the first reads the laws, the others
+  // keep no book of them (so go on by their own practice, whatever the council does).
+  const i = config.world.records.findIndex((r: any) => r.id === "law-rent-increases");
+  config.world.records[i] = rentIncreaseLaw(1, 30);
+  const challenging = (c: any) => c?.impl === "citizen.default" && c.params?.tribunal && (c.params = { ...c.params, tribunal: { ...c.params.tribunal, challenge_bps: 10_000 } });
+  for (const x of config.participants) {
+    const c = x.controller;
+    if (c?.impl === "firm.landlord") Object.assign(c.params, { rent_review_months: 1, rent_increase_notice_days: 30, compliance_bps: 10_000 });
+    if (c?.impl === "city.councillor") Object.assign(c.params, { leaning, noise_bps: 0 });
+    if (c?.impl === "city.council_clerk") Object.assign(c.params, { vote_days: 7 });
+    challenging(c);
+  }
+  for (const t of config.templates) challenging(t.controller);
+  for (const pos of config.positions) if (/^landlord-[2-9]-office$/.test(pos.id)) pos.channels = pos.channels.filter((c: any) => c.id !== "laws");
+  let calls = 0, asked = false;
+  const seen: string[] = [];
+  const tool = (tool: string, input: object) => [{ type: "tool_use" as const, id: `t${++calls}`, name: tool, input }];
+  const adapter = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      const obs = req.context.observation;
+      seen.push(JSON.stringify(req.messages.at(-1)!.content));
+      if (calls === 0) return tool("do", { what: "Put to the council: tenants must have at least 75 days' notice of a rent increase." });
+      const d = obs.drafts[0];
+      if (d) return tool("confirm", { ref: d.id, decision: "confirm" });
+      if (!asked && obs.t >= 10 * DAY) {
+        asked = true;
+        return tool("write", { to: ["council-clerk"], text: "What became of the amendment?", as: "mayor" });
+      }
+      return tool("done_for_now", { days: 7 });
+    },
+    // (What a translator makes of it: the law's amendment form, filled in. The resolver checks the fields' types.)
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: 'form(to=city, form=amend_rent_increases, notice="75 days", affects=tenants)' } }],
+    debrief: () => [{ type: "text", text: "Thanks." }],
+  });
+  const out = join(root, "runs", `test-government-${name}`);
+  rmSync(out, { recursive: true, force: true });
+  const s = await runWorld({ config, runId: name, outDir: out, until: 70 * DAY, adapter });
+  expect(s.participantErrors).toBe(0);
+  const recs = readFileSync(s.logPath, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
+  return { recs, read: seen.join("\n"), kind: (k: string) => recs.filter((r) => r.kind === k) };
+}
+
+test("an amendment that passes binds: the clerk rewrites the law from the new figure, a landlord's next notice complies, and the tribunal judges by it", async () => {
+  const { recs, read, kind } = await amendment("amendment-passed", 80);
+  // The mayor's request, on the law's form, as the resolver read it; balloted as what it would change.
+  const prop = kind("proposal").find((r) => r.basis === "form-amend-rent-increases");
+  expect(prop).toMatchObject({ author: "mayor-system", data: { notice: 75 * DAY, affects: "tenants" } });
+  const ballot = kind("ballot").find((r) => r.data.proposal === prop.id);
+  expect(ballot.text).toBe("Council ballot: to amend the law on rent increases (law-rent-increases): notice of an increase 75 days (now 30 days).");
+  expect(ballot.data.tags).toEqual(["tenant_protection"]);
+  const result = kind("ballot_result").find((r) => r.data.ballot === ballot.id);
+  expect(result.data).toMatchObject({ passed: true, yes: 5, no: 0 });
+  expect(result.text).toContain("The law on rent increases is amended: notice of an increase 75 days (was 30 days). The amended law takes the place of law-rent-increases.");
+  // The amended law: the clerk's, citing the ballot, by the same schedule (words, breakdown, rule), the figures recorded.
+  const law = kind("law").find((r) => r.basis === ballot.id);
+  const first = rentIncreaseLaw(1, 75);
+  expect(law).toMatchObject({ author: "council-clerk-system", speaks_for: "city", visible_to: "public", adico: first.adico, formal: first.formal,
+    data: { schedule: "schedule-rent-increases", replaces: "law-rent-increases", figures: { review: { value: 30 * DAY, unit: "seconds" }, notice: { value: 75 * DAY, unit: "seconds" } } } });
+  expect(law.text).toBe(`${first.text} (As amended by the council on ballot ${ballot.id}; this replaces law-rent-increases.)`);
+  expect(recs.some((r) => r.record === "withdrawal" && r.withdraws === "law-rent-increases" && r.author === "council-clerk-system" && r.at === law.at)).toBe(true);
+  // The mayor is told, in the town's terms (the result, and the clerk's report with the figure as it now stands).
+  expect(read).toContain("The law on rent increases is amended");
+  expect(read).toContain(`the law on rent increases (${law.id}) on amend_rent_increases (notice: notice of an increase, now 75 days; review: least time between increases, now 1 month)`);
+
+  // Landlords, unchanged: the one who reads the laws gives at least the new notice (its own practice is 30 days); the
+  // others, who don't, give their 30 days (an increase starts with the next day).
+  const notices = kind("rent_increase").filter((n) => n.at >= law.at);
+  const obeying = notices.filter((n) => n.speaks_for === "landlord-1");
+  const others = notices.filter((n) => n.speaks_for !== "landlord-1");
+  expect(obeying.length).toBeGreaterThan(0);
+  expect(others.length).toBeGreaterThan(0);
+  for (const n of obeying) expect(n.data.from - n.at).toBeGreaterThanOrEqual(75 * DAY);
+  for (const n of others) expect(n.data.from - n.at).toBeLessThan(31 * DAY);
+  // Tenants, unchanged, take the short notices (lawful under the old law) to the tribunal, which finds them invalid
+  // under the amended law; nobody applies against the landlord who complied.
+  const applications = kind("tribunal_application");
+  expect(applications.length).toBeGreaterThan(0);
+  expect(applications.every((a) => others.some((n) => n.id === a.data.notice))).toBe(true);
+  const orders = kind("tribunal_order");
+  expect(orders.length).toBeGreaterThan(0);
+  for (const o of orders) expect(o.data).toMatchObject({ finding: "invalid", laws: [law.id] });
+}, 600_000);
+
+test("an amendment that fails changes nothing: the law stands, and landlords and the tribunal go on by it", async () => {
+  const { recs, kind } = await amendment("amendment-rejected", -80);
+  const prop = kind("proposal").find((r) => r.basis === "form-amend-rent-increases");
+  const ballot = kind("ballot").find((r) => r.data.proposal === prop.id);
+  const result = kind("ballot_result").find((r) => r.data.ballot === ballot.id);
+  expect(result.data).toMatchObject({ passed: false, yes: 0, no: 5 });
+  expect(result.text).toBe("Rejected: 0 for, 5 against.");
+  expect(kind("law")).toEqual([]);
+  expect(recs.some((r) => r.record === "withdrawal" && r.withdraws === "law-rent-increases")).toBe(false);
+  // Every landlord's notice is on 30 days (an increase starts with the next day), lawful as the law stands: nobody
+  // goes to the tribunal over one.
+  const notices = kind("rent_increase");
+  expect(notices.length).toBeGreaterThan(0);
+  for (const n of notices) {
+    expect(n.data.from - n.at).toBeGreaterThanOrEqual(30 * DAY);
+    expect(n.data.from - n.at).toBeLessThan(31 * DAY);
+  }
+  expect(kind("tribunal_application").filter((a) => a.data.kind === "rent_increase")).toEqual([]);
+}, 600_000);
+
+test("the generated town: every law made from figures reads as its schedule writes it, and has a form to amend it", () => {
+  const config = generate({ ...spec, citizens: 80 });
+  const records: any[] = config.world.records;
+  const schedules = records.filter((r) => r.kind === "law_schedule");
+  expect(schedules.map((s) => s.id).sort()).toEqual(["schedule-industrial-action", "schedule-rent-increases", "schedule-tenancy"]);
+  for (const s of schedules) {
+    const law = records.find((r) => r.kind === "law" && r.data?.schedule === s.id);
+    expect(law.speaks_for).toBe("city");
+    const drafted = draftLaw(s.id, s.data, Object.fromEntries(Object.entries(law.data.figures).map(([k, f]: [string, any]) => [k, f.value])));
+    expect({ text: law.text, adico: law.adico, formal: law.formal, data: law.data }).toEqual({ text: drafted.text, adico: drafted.adico, formal: drafted.formal, data: drafted.data });
+    // Its form: the figures as optional fields of the types forms already have, and whom it bears on.
+    const form = records.find((r) => r.kind === "form" && r.data?.amends === s.id);
+    expect(form.data).toMatchObject({ form: s.data.form, submit_as: "proposal", submit_to: ["city"] });
+    expect(Object.keys(form.data.fields)).toEqual([...Object.keys(s.data.figures), "affects"]);
+    for (const [k, f] of Object.entries(s.data.figures) as [string, any][]) expect(form.data.fields[k]).toMatchObject({ type: f.type });
+    for (const f of Object.values(form.data.fields) as any[]) {
+      expect(f.required).toBeUndefined();
+      expect(["duration", "count", "choice"]).toContain(f.type);
+    }
+  }
+  // The laws on rent increases and industrial action, as they read from the profile's figures.
+  expect(records.find((r) => r.id === "law-rent-increases")).toMatchObject({ text: "A residential rent may be increased no more than once every 12 months, and only on written notice to the tenant of at least 60 days. Or else: the increase is invalid.",
+    formal: { language: "cel", condition: `block.block == 'publish' && block.kind == 'rent_increase' && (block.data.from - now < ${60 * DAY} || block.data.from - block.data.last_from < ${360 * DAY})` } });
+  expect(records.find((r) => r.id === "law-industrial-action")).toMatchObject({ text: "Industrial action is protected only if a ballot of the members concerned approves it, with at least 50% of them voting and more than 50% of the votes yes, and the employer has written notice of at least 3 days.",
+    formal: { language: "cel", condition: `block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < ${3 * DAY} || block.data.voted * 10000 < 5000 * block.data.eligible || block.data.yes * 10000 <= 5000 * block.data.voted)` } });
+});
 
 test("budget, park and rates run through the town's own procedures", async () => {
   // (Landlords who pay what they owe: whether they do is a propensity, not what's tested here.)

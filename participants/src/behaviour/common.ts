@@ -15,6 +15,10 @@ export const MONTH = 30 * DAY;
 export class Book {
   readonly records = new Map<string, Record>();
   readonly withdrawn = new Set<string>();
+  /** When each record seen to be withdrawn (or replaced) stopped standing. */
+  readonly withdrawnAt = new Map<string, number>();
+  /** A record replaced by a later one of the same kind from whoever it spoke for (an amended law): old -> new. */
+  readonly replacedBy = new Map<string, string>();
   readonly signatures = new Map<string, Set<string>>(); // agreement -> parties who signed
   readonly notices = new Map<string, { as: string; at: number }[]>(); // agreement -> notices
   readonly signedTimes = new Map<string, number[]>(); // agreement -> signature times
@@ -46,12 +50,16 @@ export class Book {
       const typed = this.byRecord.get(r.record);
       if (typed) typed.push(r);
       else this.byRecord.set(r.record, [r]);
-      if (r.record === "withdrawal") {
-        this.withdrawn.add(r.withdraws);
-        const w = this.records.get(r.withdraws);
-        if (w?.record === "statement") this.standing.get(w.kind)?.delete(w.id);
-        this.withPractice.delete(r.withdraws);
-        this.withAssertion.delete(r.withdraws);
+      if (r.record === "withdrawal") this.takeDown(r.withdraws, r.at);
+      // A statement that says it replaces an earlier one of the same kind from whoever it speaks for (an amended law
+      // names the law it replaces, in its words too): the earlier one no longer stands for this reader, who may never
+      // be shown its withdrawal (a book of laws shows laws, not what was taken down).
+      if (r.record === "statement" && typeof r.data?.replaces === "string") {
+        const old = this.records.get(r.data.replaces);
+        if (old?.record === "statement" && old.kind === r.kind && !!old.speaks_for && old.speaks_for === r.speaks_for) {
+          this.replacedBy.set(old.id, r.id);
+          this.takeDown(old.id, r.at);
+        }
       }
       if (r.record === "signature") {
         const s = this.signatures.get(r.agreement) ?? new Set();
@@ -83,6 +91,28 @@ export class Book {
       }
     }
     return fresh;
+  }
+
+  private takeDown(id: string, at: number) {
+    this.withdrawn.add(id);
+    if (!this.withdrawnAt.has(id)) this.withdrawnAt.set(id, at);
+    const w = this.records.get(id);
+    if (w?.record === "statement") this.standing.get(w.kind)?.delete(w.id);
+    this.withPractice.delete(id);
+    this.withAssertion.delete(id);
+  }
+
+  /** The record in force that an id names now: itself while it stands, or what has replaced it (an amended law, and
+   * what amended that), if that stands. None: never seen, or withdrawn with nothing in its place. */
+  current(id: string): Record | undefined {
+    let at = id;
+    for (let i = 0; i < 1000 && this.replacedBy.has(at); i++) at = this.replacedBy.get(at)!;
+    return this.withdrawn.has(at) ? undefined : this.records.get(at);
+  }
+
+  /** Seen to be withdrawn, with nothing standing in its place (a law repealed, a procedure revoked). */
+  repealed(id: string): boolean {
+    return this.withdrawn.has(id) && !this.current(id);
   }
 
   /** Every statement of a kind seen, withdrawn or not, in the order seen. */
@@ -152,9 +182,11 @@ export class Book {
   }
 }
 
-/** Laws seen and standing that prohibit (institutional grammar: must not) with a formal condition, in id order. */
-export function prohibitions(book: Book): StatementRecord[] {
-  return book.open("law").filter((l) => l.formal?.condition && (l.adico as any)?.deontic === "must_not").sort((a, b) => (a.id < b.id ? -1 : 1));
+/** Laws seen that prohibit (institutional grammar: must not) with a formal condition, in id order: those standing now,
+ * or, given a time, those in force then (made by then, and not withdrawn or replaced by then). */
+export function prohibitions(book: Book, at?: number): StatementRecord[] {
+  const laws = at === undefined ? book.open("law") : book.all("law").filter((l) => l.at <= at && !((book.withdrawnAt.get(l.id) ?? Infinity) <= at));
+  return laws.filter((l) => l.formal?.condition && (l.adico as any)?.deontic === "must_not").sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
 /**
@@ -164,10 +196,69 @@ export function prohibitions(book: Book): StatementRecord[] {
  * only code reads (VISION 15). Whether to comply is still the participant's: breaking a law is always possible.
  */
 export function breaches(book: Book, act: object, actor: string, now: number): StatementRecord[] {
-  return prohibitions(book).filter((l) => {
+  // (The laws in force at `now`, the moment of the act: a notice is judged by the law as it stood when it was given.)
+  return prohibitions(book, now).filter((l) => {
     const v = evaluate(l.formal!.condition, { block: act, actor, now }, []);
     return "value" in v && v.value;
   });
+}
+
+// ------------------------------------------------------------------ laws made from figures (docs/behaviour/government.md)
+//
+// A law whose substance is a few figures (a notice period, how often, a threshold) is written from them by a schedule:
+// world content (a record of kind `law_schedule`) giving the figures with their types and units, and how the law's
+// words, its Institutional Grammar breakdown and its rule (a formal condition) read with the figures in place. A world's
+// generator writes its opening laws this way and the council's clerk writes an amended law the same way, so whoever
+// reads the first reads the second. The law carries its figures openly (`data.figures`), so anyone can see what can be
+// amended. Nothing here knows any particular law.
+
+/** A figure of a law. A duration is held in seconds and worded in `unit` (days, months...); a count is held in
+ * `held_in` (default: its unit), `per_unit` of them to one `unit` (a share: unit "percent", held in basis points, 100
+ * to one). `type` is also the type of the figure's field on the law's amendment form. */
+export type LawFigure = { type: "duration" | "count"; unit: string; label?: string; held_in?: string; per_unit?: number; description?: string };
+/** A schedule: in its `text`, each of its `adico` parts and its `formal` (a CEL condition, if acts can be checked
+ * against the law), `{name}` stands for the figure as worded ("60 days", "50") and `{name:seconds}` (any word after the
+ * colon; by convention the unit it's held in) for the number as held. */
+export type LawSchedule = { title: string; form?: string; figures: { [name: string]: LawFigure }; text: string; adico?: { [part: string]: string }; formal?: string };
+/** A law's figures as it carries them: each value with the unit it's held in. */
+export type LawFigures = { [name: string]: { value: number; unit: string } };
+
+const DURATION_UNITS: [string, string, number][] = [["years", "year", 365 * DAY], ["months", "month", MONTH], ["weeks", "week", 7 * DAY], ["days", "day", DAY], ["hours", "hour", 3600], ["minutes", "minute", 60], ["seconds", "second", 1]];
+
+/** The unit a figure's value is held in. */
+export const heldIn = (f: LawFigure): string => (f.type === "duration" ? "seconds" : f.held_in ?? f.unit);
+
+/** A figure's value as held, from what its form field gives (a duration arrives in seconds; a count in the figure's unit). */
+export const heldValue = (f: LawFigure, given: number): number => (f.type === "duration" ? given : given * (f.per_unit ?? 1));
+
+/** A figure in words: a duration in the schedule's unit when it's a whole number of them, else in days (or hours...);
+ * a count in its unit ("50%", "3 times"; without the unit, "50"). */
+export function figureWords(f: LawFigure, value: number, withUnit = true): string {
+  if (f.type === "duration") {
+    const own = DURATION_UNITS.find(([plural]) => plural === f.unit);
+    const [plural, singular, size] = [own, ...DURATION_UNITS.slice(3)].find((u) => u && value >= u[2] && value % u[2] === 0) ?? DURATION_UNITS.at(-1)!;
+    return `${value / size} ${value / size === 1 ? singular : plural}`;
+  }
+  const n = String(value / (f.per_unit ?? 1));
+  return withUnit ? (f.unit === "percent" ? `${n}%` : `${n} ${f.unit}`) : n;
+}
+
+/** A law written from figures by a schedule: its words, its breakdown, its rule, and the figures it carries. Throws if
+ * the schedule names a figure it isn't given (a law can't be written with a gap in it). */
+export function draftLaw(scheduleId: string, s: LawSchedule, values: { [name: string]: number }): { text: string; adico?: { [part: string]: string }; formal?: { language: "cel"; condition: string }; data: { schedule: string; figures: LawFigures } } {
+  const fill = (template: string) => template.replace(/\{(\w+)(?::(\w+))?\}/g, (_, name: string, held?: string) => {
+    const f = s.figures[name];
+    const v = values[name];
+    if (!f || !Number.isSafeInteger(v)) throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
+    return held ? String(v) : figureWords(f, v!, false);
+  });
+  const figures: LawFigures = {};
+  for (const [name, f] of Object.entries(s.figures)) {
+    if (!Number.isSafeInteger(values[name])) throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
+    figures[name] = { value: values[name]!, unit: heldIn(f) };
+  }
+  return { text: fill(s.text), ...(s.adico ? { adico: Object.fromEntries(Object.entries(s.adico).map(([k, v]) => [k, fill(v)])) } : {}),
+    ...(s.formal ? { formal: { language: "cel" as const, condition: fill(s.formal) } } : {}), data: { schedule: scheduleId, figures } };
 }
 
 /** Signatures on a petition this participant can see: votes with choice "sign", one per signing entity (the organiser sees them all). */

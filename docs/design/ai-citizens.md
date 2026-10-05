@@ -118,10 +118,10 @@ Laws that code participants follow (rent reviews, industrial action) move from h
 
 No new block is needed.
 
-**Revisited 2026-10-05: a law the council passes on its form binds nobody. Proposed, for Naz to decide.**
+**Revisited 2026-10-05: a law the council passed on its form bound nobody. Built the same day: the clerk drafts, from a form.**
 
 *What the code audit found.* The second bullet above isn't true as built.
-- A model mayor proposes a law on the council proposal form, whose fields are the law's words, its kind and whom it mainly affects. If it passes, the clerk enacts `{kind: "law", text}`: no `adico`, no `formal`.
+- A model mayor proposes a law on the council proposal form, whose fields are the law's words, its kind and whom it mainly affects. If it passed, the clerk enacted `{kind: "law", text}`: no `adico`, no `formal`.
 - Everyone run by code is bound by a law only through its formal condition (`prohibitions`, participants/src/behaviour/common.ts). So the law passes and changes nothing. Pilot 7d's tenancy law (day 254) was such a law.
 - Until 2026-10-05 the mayor couldn't see this either: neither the preview nor a law as read showed a rule or its absence. Both now do.
 
@@ -129,11 +129,14 @@ No new block is needed.
 
 *Who does this in a real town.* Not the mayor, and not whoever takes dictation: a drafting office (parliamentary counsel, a council's legal officer) turns what's wanted into provisions, and most changes people ask for are changes to a figure in a law that already exists: the notice period, how often, the threshold.
 
-*Proposed: the clerk drafts, from a form.*
-- For each law in force that carries figures (today: rent increases, with months between increases and days of notice; industrial action, with turnout, majority and notice), the clerk publishes a form to amend it, with those figures as its fields (a duration, a count), as it publishes the council proposal form.
-- A proposal on that form goes to a ballot like any other. If it passes, the clerk withdraws the old law and publishes the new one: its words, its rule and its condition written from the figures, by the same wording the law was first made with. Landlords, the union and the tribunal read it as they read the first, with no change to them.
-- A law proposed in free words still goes to a ballot and, passed, stands as words. The clerk's result says so in plain terms ("recorded as worded; no rule was set down with it"), so a mayor knows which kind it has passed.
-- The translator's part is filling in a form, which it already does. Nothing in the contracts changes: forms and their fields are a world's content.
+*Built: the clerk drafts, from a form* (clerk 0.6.0; docs/behaviour/government.md, "Laws made from figures"; decisions.md, 2026-10-05).
+- **A schedule** says how a law whose substance is a few figures is written from them: the figures (a duration, a count, a share), and the law's words, its Institutional Grammar breakdown and its rule with the figures in place. Schedules are world content (`worlds/law/schedules.json`, records of kind `law_schedule`), three so far: rent increases (time between increases, notice), industrial action (turnout, majority, notice), ending a tenancy (the landlord's notice, the tenant's). The generator writes the town's opening laws from them with the profile's figures, and each such law carries its figures (`data.figures`, each with its unit), so anyone can see what can be amended.
+- **For each schedule the clerk has a form to amend its law**, with those figures as its fields (a duration, a count), each optional, and whom the change mainly bears on, as the council proposal form asks.
+- **A proposal on that form goes to a ballot like any other**, put as what it would change ("notice of an increase 75 days (now 60 days)"). If it passes, the clerk publishes the law rewritten by the same schedule, the figures given changed and the rest as they stood, citing the ballot and naming the law it replaces, and withdraws the old one. Landlords, the union, tenants and the tribunal read it as they read the first, with no change to them (a test: a mock-model mayor's amendment to 75 days' notice passes; the landlord who reads the laws gives 79 days; those who don't are taken to the tribunal and lose under the new law).
+- **A law proposed in free words still goes to a ballot and, passed, stands as words.** The clerk's result says so ("The law is recorded as worded. No rule was set down with it for acts to be checked against."), and names the laws that are amended on their own forms; so do the council proposal form and the clerk's report.
+- **The clerk knows no law by name.** A fourth schedule is a record and nothing else (the clerk's tests use one that exists in no world).
+- The translator's part is filling in a form, which it already does. Nothing in the contracts changed: forms, their fields and schedules are a world's content.
+- *Found on the way:* a participant's book of laws is shown laws, never withdrawals, so a law withdrawn was never known to be by landlords, tenants or the tribunal. An amended law therefore names the law it replaces (in its words and in `data.replaces`), and a reader takes it in the old one's place. A law simply repealed still isn't known to be by those readers (open, below).
 
 *What this doesn't give:* a law of a new kind that binds (a rent cap, a ban on evictions in winter). For that, two things are missing, both larger than this fix: every code participant checking every act it's about to take against the laws it knows (today three kinds of act are checked), and a way to state a condition that doesn't depend on knowing a notice's field names. Suggested with the citizens' work, after the translator.
 

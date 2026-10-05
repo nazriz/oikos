@@ -80,7 +80,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.12.0",
+  version: "0.12.1",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -355,19 +355,23 @@ export const landlord: BehaviourModule = {
         const lastFrom = (rentChanges.get(a.id) ?? []).at(-1)?.from ?? book.signedAt(a.id)!;
         const notice = (from: number) => ({ lease: a.id, rent: market, from, was: now, last_from: lastFrom });
         const act = (from: number) => ({ block: "publish", kind: "rent_increase", data: notice(from) });
+        // An increase starts with a day: the first to begin once the notice has run. (Until 2026-10-05 it started to the
+        // second, the notice counted from when we decided; the notice is on the record a moment later, so one given on
+        // exactly the law's period was short of it by that moment, and invalid before the tribunal.)
+        const startsOn = (at: number, lead: number) => (Math.floor((at + lead) / DAY) + 1) * DAY;
         let lead = noticeDays * DAY;
-        let broken = breaches(book, act(t + lead), me, t);
-        while (broken.length && lead < (noticeDays + 182) * DAY) broken = breaches(book, act(t + (lead += 7 * DAY)), me, t);
+        let broken = breaches(book, act(startsOn(t, lead)), me, t);
+        while (broken.length && lead < (noticeDays + 182) * DAY) broken = breaches(book, act(startsOn(t, (lead += 7 * DAY))), me, t);
         const complies = obeys(`rent-law-${a.id}-${t}`);
         if (broken.length && complies) continue;
         if (broken.length) lead = noticeDays * DAY; // (not complying: our own practice, whatever the law says)
         lastReview.set(a.id, t);
         const why = broken.length ? `; this breaches ${broken.map((l) => l.id).join(", ")}, and we raise it anyway` : lead > noticeDays * DAY ? `, from as soon as the law allows` : "";
         // The notice counts from when it's given: if that's later than now, the date moves with it.
-        const change = { from: t + lead, rent: market };
+        const change = { from: startsOn(t, lead), rent: market };
         rentChanges.set(a.id, [...(rentChanges.get(a.id) ?? []), change]);
         const give = (at: number): Step => {
-          change.from = at + lead;
+          change.from = startsOn(at, lead);
           return Object.assign(because(`A rent review (every ${reviewMonths} months): what we'd ask for ${unit.space} now is ${usd(market)} a month (${p.markup_bps / 100}% over ${others.length ? "what similar homes in the building let for" : "the base rent"}), above the ${usd(now)} it lets for: raising it, with ${Math.round(lead / DAY)} days' notice${why}.`,
             say("rent_increase", `Notice of rent increase for ${unit.space}: ${usd(market)} a month from ${Math.floor(change.from / DAY)} (day), up from ${usd(now)}; it last changed on day ${Math.floor(lastFrom / DAY)}.`, { to: [tenant], visible: [me, tenant], basis: a.id, data: notice(change.from) })), { redo: give });
         };

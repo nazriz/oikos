@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.35.0",
+  "version": "0.35.1",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -505,6 +505,13 @@
         "enterprise_openness": 0.4,
         "enterprise_achievement": 0.3
       },
+      "source": "placeholder"
+    },
+    "tenancy_schedule": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "threshold_mean_bps": {

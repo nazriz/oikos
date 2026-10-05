@@ -38,13 +38,20 @@
       "speaks_for": "city",
       "kind": "law",
       "basis": "law-charter",
-      "text": "A landlord may end a tenancy only by giving at least 60 days' notice in writing, and may not remove a tenant before the notice has run out. A tenant may leave on 30 days' notice. Or else: the removal is unlawful and the tenant may return.",
+      "text": "A landlord may end a tenancy only by giving written notice of at least 60 days, and may not remove a tenant before the notice has run out. A tenant may leave on notice of 30 days. Or else: the removal is unlawful and the tenant may return.",
       "adico": {
         "attribute": "landlords",
         "deontic": "must_not",
         "aim": "remove a tenant",
-        "condition": "before 60 days' written notice has run out",
+        "condition": "before written notice of at least 60 days has run out",
         "or_else": "the removal is unlawful; the tenant may return"
+      },
+      "data": {
+        "schedule": "schedule-tenancy",
+        "figures": {
+          "notice": { "value": 5184000, "unit": "seconds" },
+          "tenant_notice": { "value": 2592000, "unit": "seconds" }
+        }
       }
     },
     {
