@@ -44,6 +44,9 @@ export interface TrainingDataOptions {
   /** Write requests for at most this many gold programs (a seeded sample, taken function by function in turn, so a
    * trial run touches every function): for a trial run. */
   limit?: number;
+  /** Only this part of the gold set (0-based `index` of `of` parts, the same cut every time): for doing a long job in
+   * parts, each written out as it finishes. */
+  shard?: { index: number; of: number };
   /** At least so many gold programs of every function, made up from generated ones where the logs fall short
    * (`balancedGold`; default 300). 0: the logs' and the seen cases' programs only, as before 2026-10-06. */
   floor?: number;
@@ -210,6 +213,20 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   const balanced = (o.floor ?? 300) > 0 ? await balancedGold(o.sources, o) : undefined;
   let gold = balanced?.gold ?? (await goldOf(o.sources, o));
   log(`${gold.length} gold programs of ${new Set(gold.map((g) => g.shape)).size} shapes`);
+  if (o.shard) {
+    // One part of several: the same gold set is cut the same way every time (every `of`-th program, counted function
+    // by function so each part has every function), so a long job is done part by part, each kept as it finishes,
+    // and a part that fails is done again without the others.
+    const { index, of } = o.shard;
+    if (!(Number.isInteger(index) && Number.isInteger(of) && of > 0 && index >= 0 && index < of)) throw new Error(`shard: expected index 0..of-1, got ${index} of ${of}`);
+    const seenOf = new Map<string, number>();
+    gold = gold.filter((g) => {
+      const n = seenOf.get(functionOf(g)) ?? 0;
+      seenOf.set(functionOf(g), n + 1);
+      return n % of === index;
+    });
+    log(`part ${index + 1} of ${of}: ${gold.length} programs`);
+  }
   if (o.limit && gold.length > o.limit) {
     // A sample that touches every function: one of each in turn (each function's in a seeded order), until there are enough.
     const rand = sampler(o.seed ?? 1);

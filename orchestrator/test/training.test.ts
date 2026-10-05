@@ -231,3 +231,22 @@ test("several checkers: each request is translated back by a model that didn't w
   // A checker with no recorded price is refused like any model.
   await expect(trainingData({ sources: [log], writers: [{ adapter: model("a"), prices }], backs: [{ adapter: model("z"), prices }], out: join(d, "unpriced"), perGold: 1, seed: 3, floor: 0 })).rejects.toThrow("no price recorded for stand-in/z");
 });
+
+test("a long job is done in parts: the parts of a gold set don't overlap, together are all of it, and are the same every time", async () => {
+  const out = join(dir, "parts");
+  rmSync(out, { recursive: true, force: true });
+  const seenPrograms: string[][] = [];
+  const quiet: LlmAdapter = { provider: "stand-in", model: "p", complete: async () => ({ content: [], usage: { input_tokens: 0, output_tokens: 0 } }) };
+  const prices = { "stand-in/p": { input: 0, output: 0, cache_read: 0, cache_write: 0 } };
+  const logs: string[] = [];
+  for (const index of [0, 1, 2, 0]) {
+    logs.length = 0;
+    await trainingData({ sources: [], writers: [{ adapter: quiet, prices }], out: join(out, String(index)), perGold: 1, floor: 12, generated: 12, shard: { index, of: 3 }, validation: 0, seed: 9, log: (s) => logs.push(s) });
+    seenPrograms.push(logs.filter((l) => l.startsWith("part ")));
+  }
+  expect(seenPrograms[3]).toEqual(seenPrograms[0]); // the same part again is the same part
+  const counts = seenPrograms.slice(0, 3).map((l) => Number(/: (\d+) programs/.exec(l[0]!)![1]));
+  const all = /^(\d+) gold programs/.exec(logs.find((l) => /gold programs/.test(l)) ?? "");
+  expect(counts.reduce((a, b) => a + b, 0)).toBe(Number(all![1]));
+  expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(19); // within one program per function
+});
