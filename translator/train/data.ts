@@ -11,13 +11,23 @@
 //                   gives (several, so the translator doesn't learn one writer's voice).
 //   every literal   of the program (an id, a name, an amount, a text) must appear in the request exactly: the
 //                   translator copies, it never composes (§16.10). A request that lost one is dropped, mechanically.
-//   a second model  then translates the request back, through the real translator path; it is kept if the program
-//                   that comes back is the gold one (a round trip).
-//   refusals        are built, not judged, where they can be: several requests run together (too_much), a form the
-//                   person doesn't know of (unknown_form), an amount that would have to be worked out
-//                   (needs_calculation).
+//   how it reads    a request that reads as the call and not as a person (an argument's name with "=", "the … field"
+//                   outside a form, the name a program gives what it makes, a quote left open, "in 0 days") is
+//                   dropped too, mechanically, each with its reason counted (`badlyWritten`).
+//   another model   then translates the request back, through the real translator path; it is kept if the program
+//                   that comes back means what the gold one does (a round trip; compared by value: meaning.ts). The
+//                   model that checks a request is never the one that wrote it: a model keeps its own parroted
+//                   wording and rejects natural wording that isn't its own.
+//   plausible       a gold program is one a sentence could sensibly ask for (`implausible` says why one isn't, and
+//                   each dropped is counted).
+//   refusals        are built, not judged, where they can be: requests run together (too_much: two or three related
+//                   ones as a person piles tasks into a message, and a share of long pasted ones), a form the person
+//                   doesn't know of (unknown_form), an amount that would have to be worked out (needs_calculation).
 //   riders          what office-holders say that adds nothing to the program (the capacity they act in, a record
-//                   cited in passing, a closing "do not …") is recorded as that, with where it is.
+//                   cited in passing, a closing "do not …" or two) is recorded as that, with where it is.
+//   spans           where each value of the program is in the request: the occurrence beside the other values of the
+//                   same call where a value occurs more than once, every occurrence (marked ambiguous) where that
+//                   doesn't settle it.
 //   the split       into training and validation is by gold program, and by form (`split`).
 //   money           is any world's: amounts are written and read in the currency of the world a program is from.
 //
@@ -32,9 +42,13 @@ import type { LlmAdapter, Usage } from "@oikos/participants/llm";
 import { canonical, fixture, TEST_CURRENCY, tidy } from "../eval/run";
 import { sharesWording } from "../eval/held-out";
 import type { Case } from "../eval/cases";
+import { translatorSystem } from "../src/index";
 import { Knowledge } from "../src/knowledge";
+import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.2.0";
+export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
+
+export const DATA_VERSION = "0.3.0";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -99,12 +113,15 @@ export interface Example {
   shape: string;
   style?: string;
   /** Where each value the program takes from the request is in it: the argument, the value, and [start, end) in
-   * characters (what a model that points at spans is trained on). */
-  spans?: { arg: string; value: string; at: [number, number] }[];
-  /** Who wrote the request, and who translated it back (absent: built mechanically, or not yet verified). */
+   * characters (what a model that points at spans is trained on). See `Span`. */
+  spans?: Span[];
+  /** Who wrote the request, and who translated it back: never the same model, unless `verified_by_writer` says so
+   * (absent: built mechanically, or not yet verified). */
   written_by?: string;
   verified_by?: string;
   source: string;
+  /** The model that checked it is the one that wrote it (no other was given): a weaker check, and counted. */
+  verified_by_writer?: true;
   /** Where its gold program came from (log, case, synthetic). */
   origin?: string;
   /** The gold program this was written for or built from, by its family (Gold.family): what a split keeps together. */
@@ -112,6 +129,13 @@ export interface Example {
   /** What the request says that adds nothing to the program (the style asked for it), and where: each `adds: "nothing"`. */
   riders?: { kind: Rider["kind"]; text: string; at: [number, number]; adds: "nothing" }[];
 }
+
+/**
+ * Where a value of the program is in the request. `line`: which line of a program of several the value is of (from 0).
+ * `ambiguous`: the value is in the request more than once and nothing settles which occurrence is this argument's:
+ * `at` is the first of them and `all` is every one, so whoever trains on spans can leave it out or accept any.
+ */
+export interface Span { arg: string; value: string; at: [number, number]; line?: number; ambiguous?: true; all?: [number, number][] }
 
 /** A small seeded generator (mulberry32), for sampling only. */
 export function sampler(seed: number): () => number {
@@ -196,22 +220,168 @@ export function askable(p: calls.Program, maxLines = 3): boolean {
   return whyNot(p, maxLines) === undefined;
 }
 
-/** A gold program as it's kept: tidied (eval/run.ts), and a payment's purpose without a full stop a sentence would
- * swallow ("for rent." asked for in a sentence is "for rent"). */
+/** Arguments whose bare value is a word (a kind of thing, a choice) and not the id of anything. */
+const WORD_ARGS = new Set(["kind", "task", "type", "template", "role", "position", "choice", "survey", "then", "visible", "leave", "sex", "form"]);
+/** The functions on which `for` means something (contracts/calls.md, and the resolver): a payment's purpose on
+ * `money`; whose name the act is in on the others. On anything else nothing reads it. */
+const FOR_MEANS = new Set(["money", "statement", "vote", "claim", "agreement", "form"]);
+/** What is done to a record and not to a place (a claim's action). */
+const DONE_TO_RECORDS = new Set(["sign", "amend", "withdraw", "publish", "read", "inspect", "cite", "enforce", "vote"]);
+/** The ages (in years) someone can sensibly be who comes as one of these: only words whose meaning says so. */
+const AGES: { [template: string]: [number, number] } = { pensioner: [55, 110], apprentice: [14, 30], student: [5, 40], worker: [15, 75], labourer: [15, 75], trader: [16, 100], settler: [16, 100] };
+const YEAR = 365 * 86_400;
+
+/**
+ * Why no sentence could sensibly ask for a program, or why the translator's rules would write it differently; undefined
+ * if it is a plausible thing to ask (the audit of 2026-10-06 found ten of 47 rejected requests were the gold program's
+ * fault, and several kept ones recited nonsense). Whatever the program's source:
+ *  - a form with no office named (the rules: `to=` is where the list says it goes);
+ *  - `for=` where nothing reads it (on goods, work and the like: only a payment has a purpose);
+ *  - lines that don't depend on each other (that is `too_much`), a line that repeats another, a letter sent "about"
+ *    something published in the same breath whose words are about something else;
+ *  - an agreement in which the other side commits to its own moving in or to an account of its own, has something
+ *    built (the rules write that as `structure(...)` by itself), in which two things are exchanged and nobody pays,
+ *    or whose notice is longer than it runs;
+ *  - a claim to do to a record what is done to a place; a second parent who is an office or an organisation;
+ *  - a newcomer whose age doesn't fit what they come as, or a child carrying money.
+ * `invented`: for generated programs, also an id that is an ordinary word or holds an underscore (a writer turns it
+ * into words, and the check that ids are copied can't tell), and a word with an underscore. A real world's ids are
+ * what they are (`builder`, `works`), so a log's programs aren't held to this.
+ */
+export function implausible(program: calls.Program | string, o: { invented?: boolean; forms?: FormSpec[] } = {}): string | undefined {
+  const p = typeof program === "string" ? calls.parseProgram(program) : program;
+  if ("none" in p) return undefined;
+  const said = (v: calls.Value | undefined): string | undefined => (v === undefined ? undefined : "id" in v ? v.id : "text" in v ? v.text : undefined);
+  const nested = (v: calls.Value | undefined): calls.Call | undefined => (v !== undefined && "call" in v ? v.call : undefined);
+  const one = (c: calls.Call): string | undefined => {
+    const a = c.args;
+    if ("for" in a && !FOR_MEANS.has(c.fn)) return `for= on ${c.fn}, where it means nothing`;
+    if (c.fn === "form" && !("to" in a)) return "a form with no office named";
+    if (c.fn === "birth") {
+      const w = said(a.with);
+      if (w !== undefined && "text" in a.with! && (/^(the|our|a|an)\s/i.test(w) || /\b(office|union|school|bank|board|council|trust|society|cooperative|company|committee|guild|association|fund|ltd)\b/i.test(w))) return "a second parent who is an office or an organisation";
+    }
+    if (c.fn === "presence" && "age" in a) {
+      let years: number | undefined;
+      try {
+        years = calls.parseDuration(said(a.age) ?? "") / YEAR;
+      } catch {
+        years = undefined;
+      }
+      if (years !== undefined) {
+        if (years > 110) return "an age nobody reaches";
+        if (years < 15 && "carrying" in a) return "a child carrying money";
+        const range = AGES[said(a.template) ?? ""];
+        if (range && (years < range[0] || years > range[1])) return "an age that doesn't fit what the person comes as";
+      }
+    }
+    if (c.fn === "claim" && a.about && "json" in a.about && flat(a.about.json)) {
+      const { action, object } = a.about.json;
+      if (action && object && /^(rec\.|law-)/.test(object) && !DONE_TO_RECORDS.has(action)) return "a claim to do to a record what is done to a place";
+    }
+    if (c.fn === "agreement") {
+      const we = nested(a.we_do), they = nested(a.they_do), other = said(a.with);
+      if (they?.fn === "occupancy" && other !== undefined && said(they.args.who) === other) return "the other side committing to its own moving in";
+      if (they?.fn === "structure") return "having something built, wrapped in an agreement";
+      if (they?.fn === "account" && (!("holder" in they.args) || said(they.args.holder) === other)) return "the other side committing to an account of its own";
+      if (we && they && we.fn !== "money" && they.fn !== "money") return "an exchange in which nobody pays";
+      const seconds = (v: calls.Value | undefined): number | undefined => {
+        try {
+          return calls.parseDuration(said(v) ?? "");
+        } catch {
+          return undefined;
+        }
+      };
+      const term = seconds(a.term);
+      if (term !== undefined && [a.our_notice, a.their_notice].some((n) => (seconds(n) ?? 0) > term)) return "notice longer than the agreement runs";
+    }
+    for (const v of Object.values(a)) {
+      const inner = nested(v) && one(nested(v)!);
+      if (inner) return inner;
+    }
+    if (o.invented) {
+      const spec = c.fn === "form" ? (o.forms ?? []).find((f) => f.form === said(a.form) && (!("to" in a) || f.to === said(a.to))) : undefined;
+      for (const [k, v] of Object.entries(a)) {
+        const type = spec?.fields[k]?.type;
+        const word = c.fn === "form" ? k === "form" || type === "choice" || type === "structure_type" || (k !== "to" && !spec) : WORD_ARGS.has(k);
+        const ids = "id" in v ? [v.id] : "json" in v && Array.isArray(v.json) ? v.json.filter((x): x is string => typeof x === "string") : [];
+        for (const x of ids) {
+          if (word && k !== "form" && x.includes("_")) return "a word with an underscore, which a sentence writes as two";
+          if (!word && x.includes("_")) return "an id with an underscore, which reads as a phrase";
+          if (!word && !/[0-9.\/-]/.test(x)) return "an id that is an ordinary word";
+        }
+      }
+    }
+    return undefined;
+  };
+  for (const l of p.lines) {
+    const w = one(l.call);
+    if (w) return w;
+  }
+  if (p.lines.length > 1) {
+    const mentions = (v: calls.Value, name: string): boolean => ("var" in v ? v.var === name : "id" in v ? v.id === name : "call" in v ? Object.values(v.call.args).some((x) => mentions(x, name)) : false);
+    const uses = (l: calls.Line, i: number) => p.lines.slice(0, i).some((e) => e.bind !== undefined && Object.values(l.call.args).some((v) => mentions(v, e.bind!)));
+    // The same kind of thing done several times is one request (the translator's rules); anything else of several
+    // lines is one only if each later line uses what an earlier one made.
+    const alike = p.lines.every((l) => l.call.fn === p.lines[0]!.call.fn && !l.bind);
+    if (alike) {
+      const texts = p.lines.map((l) => Object.entries(l.call.args).map(([k, v]) => `${k}=${calls.callText({ fn: "harm", args: { who: v } })}`));
+      for (const [i, x] of texts.entries()) for (const [j, y] of texts.entries()) if (i !== j && x.every((t) => y.includes(t)) && (x.length < y.length || i < j)) return "a line that repeats another";
+    } else if (!p.lines.slice(1).every((l, i) => uses(l, i + 1))) return "lines that don't depend on each other";
+    for (const l of p.lines) {
+      const re = l.call.args.re;
+      const about = l.call.fn === "message" && re && "var" in re ? p.lines.find((e) => e.bind === re.var && e.call.fn === "statement") : undefined;
+      const kind = said(about?.call.args.kind)?.replace(/_/g, " ").toLowerCase();
+      if (about && kind && !(said(l.call.args.text) ?? "").toLowerCase().includes(kind)) return "a letter about something other than what it's sent with";
+    }
+  }
+  return undefined;
+}
+
+/** Whether a program is a plausible thing to ask for: see `implausible`. */
+export function plausible(program: calls.Program | string, o: { invented?: boolean; forms?: FormSpec[] } = {}): boolean {
+  return implausible(program, o) === undefined;
+}
+
+/**
+ * A gold program as it's kept: tidied (eval/run.ts); a payment's purpose without a full stop a sentence would swallow
+ * ("for rent." asked for in a sentence is "for rent"); and a yes-or-no flag in its one spelling (`leave=yes`, never
+ * `leave=true`: meaning.ts reads either, gold writes one).
+ */
 export function goldText(p: calls.Program): string {
   const t = tidy(p);
   if ("none" in t) return calls.programText(t);
-  const value = (k: string, v: calls.Value): calls.Value => ("call" in v ? { call: call(v.call) } : "text" in v && k === "for" ? { text: v.text.replace(/[.\s]+$/, "") || v.text } : v);
-  const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(k, v)])) });
+  const value = (fn: string, k: string, v: calls.Value): calls.Value =>
+    "call" in v ? { call: call(v.call) }
+    : "text" in v && k === "for" ? { text: v.text.replace(/[.\s]+$/, "") || v.text }
+    : FLAGS[fn]?.includes(k) && /^(yes|true)$/i.test("id" in v ? v.id : "text" in v ? v.text.trim() : "") ? { id: FLAG_YES }
+    : v;
+  const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(c.fn, k, v)])) });
   return calls.programText({ lines: t.lines.map((l) => ({ ...l, call: call(l.call) })) });
+}
+
+/**
+ * A program that fills in a form with the office it goes to written in, where the forms known say there is one such
+ * office and the program doesn't (the translator's rules: `to=` is where the list says it goes). Otherwise unchanged.
+ */
+export function withOffice(p: calls.Program, forms: FormSpec[]): calls.Program {
+  if ("none" in p) return p;
+  return { lines: p.lines.map((l) => {
+    const f = l.call.args.form;
+    if (l.call.fn !== "form" || "to" in l.call.args || !f) return l;
+    const name = formOf(calls.callText(l.call))?.form;
+    const goes = [...new Set(forms.filter((x) => x.form === name || ("id" in f && x.id === f.id)).map((x) => x.to))];
+    return goes.length === 1 && /^[a-z0-9][a-z0-9._\/-]*$/.test(goes[0]!) ? { ...l, call: { fn: l.call.fn, args: { ...l.call.args, to: { id: goes[0]! } } } } : l;
+  }) };
 }
 
 /** Arguments whose bare value is a yes-or-no kind of choice the request implies without saying the word (someone
  * "is leaving": `leave=yes`; "is permitted to": `position=liberty`): never looked for in the request. */
 const IMPLIED = new Set(["leave", "then", "position", "sex", "visible"]);
 
-/** What a request has to carry of its program, each with how it must appear. */
-export interface Needed { value: string; arg: string; exact: boolean }
+/** What a request has to carry of its program, each with how it must appear (`line`: which line it is of, in a
+ * program of several). */
+export interface Needed { value: string; arg: string; exact: boolean; line?: number }
 
 /**
  * What a request has to carry of its program for a model that copies and chooses (design §16.10) to learn from it:
@@ -220,7 +390,8 @@ export interface Needed { value: string; arg: string; exact: boolean }
  *  - as a word of the request: a bare word naming something in the world's catalogue or a record's kind (`park`,
  *    `make`, `lease`, `notice`, `permit_application`: in any case, with spaces for underscores), so the model points
  *    at it and never has to guess a word nobody said;
- *  - not at all: a yes-or-no kind of choice the wording implies (IMPLIED).
+ *  - not at all: a yes-or-no kind of choice the wording implies (IMPLIED), and a wait of no time at all (`first="0
+ *    days"`: a person says it starts now, and nobody says "in 0 days").
  * A claim's content (`about={"action":"build","object":"lot-12-03"}`) is JSON in the call, which a copying model can't
  * write, so it's carried as slots: `about.action` (a word of the request) and `about.object` (an id, exactly), each
  * found like any other value. The program stays as the call language writes it; whoever decodes the model's answer
@@ -231,38 +402,74 @@ export function needed(p: calls.Program): Needed[] {
   const bound = new Set(p.lines.map((l) => l.bind).filter(Boolean));
   const out: Needed[] = [];
   const idLike = (s: string) => /[0-9.\/-]/.test(s); // (not an underscore: a form or a kind named in two words is a word)
+  const several = p.lines.length > 1;
+  let line = 0;
+  const push = (n: Needed) => out.push(several ? { ...n, line } : n);
   const value = (arg: string, v: calls.Value) => {
+    const key = arg.slice(arg.lastIndexOf(".") + 1);
     if ("id" in v) {
-      if (bound.has(v.id) || IMPLIED.has(arg)) return;
-      out.push({ value: v.id, arg, exact: idLike(v.id) });
-    } else if ("text" in v) out.push({ value: v.text, arg, exact: true });
-    else if ("json" in v) {
-      if (Array.isArray(v.json)) v.json.forEach((x) => typeof x === "string" && out.push({ value: x, arg, exact: idLike(x) }));
-      else if (flat(v.json)) for (const [slot, x] of Object.entries(v.json)) out.push({ value: x, arg: `${arg}.${slot}`, exact: idLike(x) || /\s/.test(x) });
+      if (bound.has(v.id) || IMPLIED.has(key)) return;
+      push({ value: v.id, arg, exact: idLike(v.id) });
+    } else if ("text" in v) {
+      if (DURATION_ARGS.has(key) && noTime(v.text)) return;
+      push({ value: v.text, arg, exact: true });
+    } else if ("json" in v) {
+      if (Array.isArray(v.json)) v.json.forEach((x) => typeof x === "string" && push({ value: x, arg, exact: idLike(x) }));
+      else if (flat(v.json)) for (const [slot, x] of Object.entries(v.json)) push({ value: x, arg: `${arg}.${slot}`, exact: idLike(x) || /\s/.test(x) });
     } else if ("call" in v) Object.entries(v.call.args).forEach(([k, x]) => value(`${arg}.${k}`, x));
   };
-  for (const l of p.lines) Object.entries(l.call.args).forEach(([k, v]) => value(k, v));
+  for (const [i, l] of p.lines.entries()) {
+    line = i;
+    Object.entries(l.call.args).forEach(([k, v]) => value(k, v));
+  }
   return out;
 }
 
-/** Where a needed value is in a request: [start, end) in characters, or undefined if it isn't there. */
-export function spanOf(request: string, n: Needed): [number, number] | undefined {
+/** Whether a length of time, as written, is none at all ("0 days"). */
+const noTime = (text: string): boolean => {
+  try {
+    return calls.parseDuration(text) === 0;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Everywhere a needed value could be meant in a request, in order: each [start, end) in characters.
+ *  - Copied text and ids: where it stands by itself, if it does anywhere ("3" in "3 units", not the 3 of rec.30);
+ *    otherwise wherever it is.
+ *  - A word: as a word of the request, in any case, underscores as spaces (a form named `event_stall_permit` is the
+ *    words "event stall permit": the span is the words), not inside a longer word.
+ * Then the likelier ones only, where there are any: the value in square brackets by itself (in "the works manager
+ * [works]" the id is the bracketed one, not the word in the title), and a word written exactly as the value is.
+ */
+export function occurrences(request: string, n: Needed): [number, number][] {
+  let found: [number, number][] = [];
   if (n.exact) {
-    // Where it stands by itself, if it does anywhere ("3" in "3 units", not the 3 of rec.30); otherwise wherever it is.
     const wordy = (c: string | undefined) => c !== undefined && /[A-Za-z0-9]/.test(c);
     const joint = (c: string | undefined) => c === "." || c === "-" || c === "/" || c === ",";
-    const first = request.indexOf(n.value);
-    for (let at = first; at >= 0; at = request.indexOf(n.value, at + 1)) {
+    const alone: [number, number][] = [];
+    if (n.value) for (let at = request.indexOf(n.value); at >= 0; at = request.indexOf(n.value, at + 1)) {
       const end = at + n.value.length;
+      found.push([at, end]);
       const joinedBefore = wordy(n.value[0]) && (wordy(request[at - 1]) || (joint(request[at - 1]) && wordy(request[at - 2])));
       const joinedAfter = wordy(n.value[n.value.length - 1]) && (wordy(request[end]) || (joint(request[end]) && wordy(request[end + 1])));
-      if (!joinedBefore && !joinedAfter) return [at, end];
+      if (!joinedBefore && !joinedAfter) alone.push([at, end]);
     }
-    return first < 0 ? undefined : [first, first + n.value.length];
+    if (alone.length) found = alone;
+  } else {
+    const re = new RegExp(`(?<![A-Za-z0-9])${n.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/_/g, "[ _-]")}(?![A-Za-z0-9])`, "gi");
+    for (let m = re.exec(request); m; m = re.exec(request)) found.push([m.index, m.index + m[0].length]);
   }
-  // A word of the request, in any case, underscores as spaces, not inside a longer word.
-  const m = new RegExp(`(?<![A-Za-z0-9])${n.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/_/g, "[ _-]")}(?![A-Za-z0-9])`, "i").exec(request);
-  return m ? [m.index, m.index + m[0].length] : undefined;
+  const prefer = (keep: (at: [number, number]) => boolean) => void (found.some(keep) && (found = found.filter(keep)));
+  prefer(([a, b]) => request[a - 1] === "[" && request[b] === "]");
+  if (!n.exact) prefer(([a, b]) => request.slice(a, b) === n.value);
+  return found;
+}
+
+/** Where a needed value is in a request (the first place it could be meant: `occurrences`), or undefined if it isn't there. */
+export function spanOf(request: string, n: Needed): [number, number] | undefined {
+  return occurrences(request, n)[0];
 }
 
 /** The values a request has to carry exactly (ids and copied text): see `needed`. */
@@ -320,7 +527,8 @@ export function formOf(program: string): { form: string; to?: string } | undefin
  * most `perShape` different programs of each shape (a seeded sample of those seen), in shape order. Each carries how
  * its world writes money (the log's header) and, for a form filled in, that form as the world's config has it, with
  * up to two of the world's other forms beside it. `currency`: the money of a log whose header doesn't say.
- * `excluded`: counts, by reason, the acts whose call was left out.
+ * `excluded`: counts, by reason, the acts whose call was left out (one no sentence would sensibly ask for among them:
+ * `implausible`).
  */
 export async function goldFromLog(lines: AsyncIterable<string> | Iterable<string>, o: { perShape?: number; seed?: number; source?: string; currency?: Currency; excluded?: { [reason: string]: number } } = {}): Promise<Gold[]> {
   const perShape = o.perShape ?? 8;
@@ -357,11 +565,13 @@ export async function goldFromLog(lines: AsyncIterable<string> | Iterable<string
     if (typeof text !== "string") continue;
     let p: calls.Program;
     try {
-      p = calls.parseProgram(text);
+      // (A form filled in says where it goes, as the translator's rules have it written.)
+      p = withOffice(calls.parseProgram(text), forms);
     } catch {
       continue;
     }
-    const why = whyNot(p) ?? (calls.contractErrors(p).length ? "against the contract" : undefined);
+    const not = implausible(p, { forms });
+    const why = whyNot(p) ?? (calls.contractErrors(p).length ? "against the contract" : not ? `implausible: ${not}` : undefined);
     if (why) {
       out_(why);
       continue;
@@ -506,7 +716,7 @@ export function surfaceVariant(g: Gold, rand: () => number, cur: Currency | unde
 export function goldFromCases(cases: Case[]): Gold[] {
   const known: FormSpec[] = fixture().forms.map((f) => ({ id: f.id, form: String(f.data?.form), to: String((f as any).in_position ?? (f as any).speaks_for ?? f.author), fields: (f.data?.fields ?? {}) as FormSpec["fields"] }));
   return cases.filter((c) => !c.held_out && !c.expect[0]!.startsWith("none(")).filter((c) => askable(calls.parseProgram(c.expect[0]!))).map((c) => {
-    const program = goldText(calls.parseProgram(c.expect[0]!));
+    const program = goldText(withOffice(calls.parseProgram(c.expect[0]!), known));
     const own = known.filter((f) => f.form === formOf(program)?.form);
     return { program, shape: shapeOf(calls.parseProgram(program)), names: {}, source: `case ${c.id}`, origin: "case" as const, currency: TEST_CURRENCY, ...(own.length ? { forms: own } : {}) };
   });
@@ -514,22 +724,23 @@ export function goldFromCases(cases: Case[]): Gold[] {
 
 /**
  * The ways a request can be written. Each is a line of instruction to the writer. The last five are how the pilots'
- * office-holders wrote (docs/real-models.md, and the requests in the pilots' logs): the capacity stated first, a name
- * with its id in square brackets after it, a record cited in passing, a closing "do not …", and one long instruction
- * of stacked clauses. For a gold program, `styleBrief` gives three of them their exact words.
+ * office-holders wrote (docs/real-models.md, translator/eval/pilot-style.md, and the requests in the pilots' logs): the
+ * capacity stated first, a name with its id in square brackets after it, a record cited in passing, a closing "do not
+ * …" (or two), and one long instruction of stacked clauses. For a gold program, `styleBrief` gives three of them their
+ * exact words.
  */
 export const STYLES: { [style: string]: string } = {
-  terse: "As short as it can be said: a few words, like a note to staff.",
+  terse: "As short as it can be said: a few words, like a note to staff. Still a sentence a person would write, with a verb for what is to happen.",
   formal: "Formal and complete, as in an official instruction.",
   chatty: "Conversational, the way someone talks to a colleague they know well.",
-  reasoned: "With a short reason or a little background attached, before or after what's wanted.",
+  reasoned: "With a short reason or a little background attached, before or after what's wanted. The reason explains; it asks for nothing more and names no record.",
   polite: "As a polite question or request (\"could you…\", \"please…\", \"I'd like…\").",
-  bracketed: "Naming things with their ids in square brackets, as someone reading them off a report would: [acc-city], [rec.412].",
+  bracketed: "Naming things with their ids in square brackets, as someone reading them off a report would: [acc-city], [rec.412]. Inside the brackets is the id and nothing else.",
   capacity: "Opening with the capacity it's said in, as an office-holder does (\"As Mayor of the town, …\"). The opening changes nothing about what is asked.",
-  named: "Naming each organisation, person and office by its name or role with its id in square brackets straight after it (the works manager [works], the town account [acc-city]); an id with no name known goes in square brackets by itself.",
+  named: "Naming each organisation, person and office by its name or role with its id in square brackets straight after it (the works manager [works], the town account [acc-city]); an id with no name known goes in square brackets by itself. Inside the brackets is the id and nothing else.",
   cited: "As an office-holder who cites, in passing, what an act rests on or answers (\"under …\", \"pursuant to …\", \"responding to …\"), with the record's id.",
   do_not: "Ending with a sentence that begins \"Do not\" and rules out something that was never asked for. It changes nothing about what is asked.",
-  stacked: "As one long, careful instruction of stacked clauses, the way an office-holder writes: what is to be done, to or for whom, from what, on what terms, each its own clause, joined by commas, semicolons and \"and\". Nothing is added that the call doesn't say.",
+  stacked: "As one long, careful instruction of stacked clauses, the way an office-holder writes: what is to be done, to or for whom, from what, on what terms, each its own clause in the words a person would use for it, joined by commas, semicolons and \"and\". Nothing is added that the call doesn't say, and no clause is a part of the call read out by its name.",
 };
 
 const OFFICES = ["Mayor", "Works Manager", "Finance Officer", "Planning Officer", "Council Clerk", "Treasurer", "Harbour Master", "Registrar", "Housing Officer", "Chair", "Director", "Secretary", "Head Teacher", "Warden", "Rates Officer", "Building Inspector"];
@@ -547,13 +758,18 @@ const DO_NOT = [
   "Do not act on any related matter until I say so.",
   "This does not authorise anything beyond what is stated.",
 ];
+/** The arguments that take a record an act rests on, answers or settles: a record cited in passing would be written
+ * into one of these if the function has it, so it is no rider there. */
+const ABSORBS_A_RECORD = ["basis", "re", "settles"];
 
 /**
  * What the writer is told for a gold program in a style, and the riders the request must then carry word for word.
  * A rider adds nothing to the program: the capacity an act is made in is on the action, not in the call
- * (contracts/calls.md); a "do not" that rules out what wasn't asked for asks for nothing; and a citation is a rider
- * only where the call has nowhere to put one. Where the program cites a record (`basis`), the cited style words that
- * record as the citation; where it could cite one and doesn't, a citation would change it, so the request is written
+ * (contracts/calls.md); a "do not" that rules out what wasn't asked for asks for nothing (the pilots' late requests
+ * often close with two: so, sometimes, do these); and a citation is a rider only where no argument of the call could
+ * absorb it. Where the program cites a record (`basis`, or what a letter is about, `re`), the cited style words that
+ * record as the citation; where it could take one and doesn't (the audit of 2026-10-06: "in accordance with rec.3495"
+ * on a letter was read, rightly, as what the letter is about), a citation would change it, so the request is written
  * formally with none.
  */
 export function styleBrief(style: string, g: Gold, rand: () => number): { style: string; instruction: string; riders: Rider[] } {
@@ -565,14 +781,16 @@ export function styleBrief(style: string, g: Gold, rand: () => number): { style:
   }
   if (style === "do_not") {
     const text = choose(DO_NOT);
+    const second = rand() < 0.3 ? choose(DO_NOT.filter((x) => x !== text)) : undefined;
+    if (second) return { style, instruction: `${base} End with exactly these two sentences, in this order: "${text}" "${second}"`, riders: [{ kind: "do_not", text }, { kind: "do_not", text: second }] };
     return { style, instruction: `${base} End with exactly this sentence: "${text}"`, riders: [{ kind: "do_not", text }] };
   }
   if (style === "cited") {
     const p = calls.parseProgram(g.program);
     const lines = "none" in p ? [] : p.lines;
-    if (lines.some((l) => "basis" in l.call.args)) return { style, instruction: `${base} The record the call cites is the one to word that way.`, riders: [] };
+    if (lines.some((l) => ABSORBS_A_RECORD.some((k) => k in l.call.args))) return { style, instruction: `${base} The record the call cites (what it rests on, answers or settles) is the one to word that way, and no other record is mentioned.`, riders: [] };
     const form = formOf(g.program);
-    const couldCite = lines.some((l) => calls.ARGS[l.call.fn]?.allowed?.has("basis")) || (g.forms ?? []).some((f) => f.form === form?.form && Object.values(f.fields).some((x) => x.type === "record"));
+    const couldCite = lines.some((l) => ABSORBS_A_RECORD.some((k) => calls.ARGS[l.call.fn]?.allowed?.has(k))) || (g.forms ?? []).some((f) => f.form === form?.form && Object.values(f.fields).some((x) => x.type === "record"));
     if (couldCite) return { style: "formal", instruction: STYLES.formal!, riders: [] };
     const used = new Set(literals(p));
     let id = "";
@@ -593,18 +811,72 @@ export function withoutRiders(request: string, riders: Rider[]): string {
   return out;
 }
 
-/** What the writer is told. The call language's own glosses, and the one rule that makes the data usable: copy. */
+/**
+ * What a call brings about where an argument settles which of a function's outcomes is meant, in the words a person
+ * would use: the first entry whose argument the call has (the last, with none, is the function's ordinary use). The
+ * audit of 2026-10-06 found requests that said the call and not the act: someone "is present" for someone arriving
+ * from outside, "agree to notice" for giving notice, "set things up using the monitor template" with no word for what
+ * was being set up. A function not listed here is said in its gloss alone (`glossOf`).
+ */
+const PARTICULAR: { [fn: string]: [arg: string, said: string][] } = {
+  account: [["close", "an account is closed"], ["", "an account is opened (for whoever is to hold it; with whoever keeps accounts, if named)"]],
+  structure: [["remove", "a building comes down: it is demolished, pulled down (by whoever is named)"], ["", "a building goes up: something is built on a lot or a cell (by whoever is named, for a price, paid from an account)"]],
+  occupancy: [["leave", "someone moves out of a place: leaves it, vacates it"], ["", "someone moves into a place: comes to live or work there"]],
+  claim: [["release", "a right or permission that is on record is released: given up for good"], ["transfer", "a right or permission that is on record is passed on to someone else"], ["", "it is put on record that someone has a right, a liberty (a permission), a power or an immunity to do something"]],
+  agreement: [["sign", "an agreement that was offered is signed: accepted"], ["notice", "notice is given to end an agreement (the agreement is the one named; any words given are the notice's own)"], ["", "an agreement is offered to someone: what we commit to, what they commit to, for how long, on what notice"]],
+  statement: [["withdraw", "something published earlier is withdrawn, for good"], ["", "something is published (a notice, a law, a report: its kind is the call's word, its words are given)"]],
+  presence: [["leave", "someone leaves the world: goes away from it altogether"], ["who", "someone who was away comes back into the world from outside: returns, arrives back (never \"is present\" or \"attends\")"], ["", "a newcomer comes into the world from outside: arrives, is let in (their name, their age, what they come as; any money they carry)"]],
+  position: [["vacate", "a post is left empty: whoever holds it holds it no longer"], ["appoint", "someone is appointed to a post"], ["", "a new post is created in the organisation (its title; its role, if given)"]],
+  system: [["retire", "a system (software, an AI system) is switched off for good"], ["", "a system (software, an AI system) is put to work for the organisation: say that it is a system; what kind is the call's word for it; its title, if it has one"]],
+  birth: [["", "the speaker has a child: a child is conceived (its name; what the child is recorded as: the call's word; the other parent, if named)"]],
+  work: [["survey", "people survey something (a species, or something measured) in certain cells of a place"], ["investigate", "people look into things of some kind taken from someone, at the place they were taken from"], ["", "people do so many units of a kind of work at a place (who does it; what it is done to, if said)"]],
+  take: [["", "things someone else holds are taken from where they are, without their agreement"]],
+};
+
+let glosses: Map<string, string> | undefined;
+/** What a function brings about: its gloss, as the translator is told it (translator/src/index.ts: the call language's own). */
+export function glossOf(fn: string): string {
+  if (!glosses) {
+    glosses = new Map();
+    const system = translatorSystem();
+    for (const line of system.slice(system.indexOf("## Functions")).split("\n")) {
+      const m = /^- ([a-z_]+)\(.*?\): (.+)$/.exec(line);
+      if (m) glosses.set(m[1]!, m[2]!);
+    }
+  }
+  return glosses.get(fn) ?? "";
+}
+
+/** What a program brings about, a line to each of its calls, in plain words (PARTICULAR, or the function's gloss). */
+export function bringsAbout(program: string): string[] {
+  const p = calls.parseProgram(program);
+  if ("none" in p) return [];
+  const of = (c: calls.Call): string => (PARTICULAR[c.fn] ?? []).find(([arg]) => arg === "" || arg in c.args)?.[1] ?? glossOf(c.fn);
+  const out: string[] = [];
+  for (const l of p.lines) {
+    out.push(`${l.call.fn}: ${of(l.call)}`);
+    for (const [k, v] of Object.entries(l.call.args)) if ("call" in v) out.push(`  ${k === "we_do" ? "what we commit to" : k === "they_do" ? "what they commit to" : k} (${v.call.fn}): ${of(v.call)}`);
+  }
+  return out;
+}
+
+/** What the writer is told. What each call brings about comes with the call (`bringsAbout`); the one rule that makes
+ * the data usable is to copy, and the one that makes it worth having is to say it as a person would. */
 export function writerSystem(): string {
   return [
     "You write the requests that people in a town make of whoever carries things out for them: a mayor to an office, a business owner to a clerk, a resident to an agent. Each request is one to three sentences of plain language.",
-    "You're given what should happen, as a call in a small formal language (function(argument=value, …); an id is a bare word like acc-city or rec.412; quoted text is copied text), and a style.",
-    "Write a request that means exactly that call: everything the call says, and nothing it doesn't.",
-    "- Every id and every quoted value in the call must appear in your request exactly as written, character for character (the id acc-city as acc-city; an amount with its digits, its commas and decimals, and whatever sign, code or word of money it has, all as written; a quoted text word for word). Don't reformat amounts or durations, don't change an amount's sign or word for another, and don't replace an id with a description.",
-    "- Don't mention the call, its function names or its argument names, and don't use a function's name as your verb where nobody would (not \"structure a park\": have one built); say it as a person would.",
-    "- Everything the call says must be in the request, including who it's to or for. Its ids and quoted values appear exactly. A bare word that names a kind of thing (park, lease, notice, make, goods, a form's name) appears as that same word, in a sentence where a person would use it (an underscore may be a space: permit_application as \"permit application\"); don't swap it for another word or another form of it (\"make\", not \"made\" or \"manufacture\"). Only a plain yes or no (someone leaving, something permitted) is left to how you say it.",
+    "You're given what should happen, as a call in a small formal language (function(argument=value, …); an id is a bare word like acc-city or rec.412; quoted text is copied text), what the call brings about in plain words, and a style.",
+    "Write a request that means exactly that call: everything the call says, and nothing it doesn't. Someone who has never seen the call language must read it as an ordinary request, and someone who knows it must be able to write the call back from your words alone.",
+    "- Say what is to happen in the words given for what the call brings about, as a person would: someone \"arrives\" or \"is let in\" (never \"is present\"); a system \"is put to work\" (never \"set up using a template\", with no word for what it is); a right \"is passed on to\" someone; notice \"is given on\" an agreement. If your sentence could as well be asking for something else, it is wrong.",
+    "- Never use the call's own names for its parts. No function's name as a verb or noun where nobody would say it (not \"structure a park\": have one built; not \"arrange occupancy\": someone moves in). No argument's name (not \"with the text\", \"as the holder\", \"of the kind\", \"using the … template\", \"in a quantity of\", \"on the basis of\"; never a name with \"=\"). No name a line gives to what it makes (v1, v2: say \"it\", \"the new trust\", \"that account\"). Not the word \"field\", unless a form is being filled in.",
+    "- Every id and every quoted value in the call must appear in your request exactly as written, character for character (the id acc-city as acc-city, and in brackets as [acc-city], with nothing else inside them; an amount with its digits, its commas and decimals, and whatever sign, code or word of money it has, all as written; a quoted text word for word). Don't reformat amounts or durations, don't change an amount's sign or word for another, and never replace an id with a description or turn it into ordinary words.",
+    "- Everything the call says must be in the request, including who it's to or for. A bare word that names a kind of thing (park, lease, notice, make, goods, a form's name) appears as that same word, in a sentence where a person would use it (an underscore may be a space: permit_application as \"permit application\"); don't swap it for another word or another form of it (\"make\", not \"made\" or \"manufacture\"). Only a plain yes or no (someone leaving, something permitted) is left to how you say it.",
+    "- A number of things is said as a person says it: \"33 bags\", \"12 units of make\"; never \"in a quantity of 33\", and never in quotes. A wait of \"0 days\" before the first of something means it starts now: say that it starts now (at once, today), never \"in 0 days\".",
+    "- If you quote words, close the quote. A text the call quotes is given word for word, in quotes or after a colon, and nothing else is run into it.",
     "- What a claim is about is written as data ({\"action\":\"build\",\"object\":\"lot-12-03\"}): say it in words that hold each of its values as written (\"is permitted to build on lot-12-03\").",
-    "- A form filled in: name the form by its name, and say which of its fields each value is for, in ordinary words (the field's name, an underscore as a space), so that nobody could put a value in the wrong field.",
-    "- Don't add details the call doesn't have (no dates, reasons that change what's asked, extra recipients).",
+    "- In an agreement, say who does what, each as a person would: \"they pay 850 monthly into acc-1\", \"we let them live in apts-3/dwelling.2\".",
+    "- A form filled in: name the form (by its name; its record's id may follow it), say which office it goes to, and give each value against the form's own label for it, the way people fill forms in (\"kind: law; mainly affects: tenants; staff 500\", or in a sentence: \"for lot-00-00, a park\"), so that nobody could put a value under the wrong label. Don't recite \"X in the Y field\" for every one.",
+    "- Don't add details the call doesn't have (no dates, reasons that change what's asked, extra recipients, records it doesn't cite).",
     "- If the style gives words to open with, to include or to end with, use them exactly as given. They ask for nothing: the request means the same with them as without.",
     "Answer with the request only.",
   ].join("\n");
@@ -617,18 +889,113 @@ export async function writeRequest(adapter: LlmAdapter, gold: Gold, style: strin
   const fields = (gold.forms ?? []).filter((f) => f.form === form?.form).map(formLine);
   const res = await adapter.complete({
     purpose: "translator", subject: "training-data-writer", system: writerSystem(), maxTokens: 600,
-    messages: [{ role: "user", content: [`Call:\n${gold.program}`, ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []), ...(fields.length ? [`The form, as the person knows of it:\n${fields.join("\n")}`] : []), `Style: ${STYLES[style] ?? style}`].join("\n\n") }],
+    messages: [{ role: "user", content: [`Call:\n${gold.program}`, `What it brings about:\n${bringsAbout(gold.program).join("\n")}`, ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []), ...(fields.length ? [`The form, as the person knows of it:\n${fields.join("\n")}`] : []), `Style: ${STYLES[style] ?? style}`].join("\n\n") }],
   });
   usage?.(res.usage);
   const text = res.content.filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text").map((b) => b.text).join(" ").trim();
   return text ? text.replace(/^["“]|["”]$/g, "").trim() : undefined;
 }
 
-/** Where each needed value of a program is in a request (for an example's `spans`). */
-export function spansIn(request: string, program: string): { arg: string; value: string; at: [number, number] }[] {
-  return needed(calls.parseProgram(program)).flatMap((n) => {
-    const at = spanOf(request, n);
-    return at ? [{ arg: n.arg, value: n.value, at }] : [];
+/** Why a written request reads as the call and not as a person, each a reason a request is dropped for (and counted). */
+export type Unnatural = "quotes" | "variable_named" | "argument_named" | "zero_wait";
+export const UNNATURAL: Unnatural[] = ["quotes", "variable_named", "argument_named", "zero_wait"];
+
+/** Whether a text's quotes are closed: straight ones in pairs, curly ones opened and closed. */
+export function quotesBalanced(text: string): boolean {
+  return (text.match(/"/g) ?? []).length % 2 === 0 && (text.match(/“/g) ?? []).length === (text.match(/”/g) ?? []).length;
+}
+
+/**
+ * Why a written request reads as its program and not as something a person would say, or undefined if nothing here
+ * says so. Checked mechanically, before any model is asked (what the copy check can't see, and what a model checking
+ * its own kind of wording lets through: the audit of 2026-10-06 found a fifth of kept requests right but unnatural):
+ *  - quotes: a quote opened and never closed (what follows is swallowed into the quoted words);
+ *  - variable_named: the name a line of the program gives to what it makes (v1) appears in the request;
+ *  - argument_named: an argument's name followed by "=", or "the <name> field" (or the word "field" at all) where no
+ *    form is being filled in;
+ *  - zero_wait: "0 days" said of something that starts now.
+ * What the program copies from the request (its quoted texts, its ids) is looked past: a letter's own words may say
+ * anything.
+ */
+export function badlyWritten(request: string, program: string, riders: Rider[] = []): Unnatural | undefined {
+  const p = calls.parseProgram(program);
+  if ("none" in p) return quotesBalanced(request) ? undefined : "quotes";
+  let bare = withoutRiders(request, riders);
+  const quoted = literals(p).some((x) => /["“”]/.test(x));
+  for (const x of [...mustAppear(p)].sort((a, b) => b.length - a.length)) bare = bare.split(x).join("\u0001".repeat(x.length));
+  if (!quoted && !quotesBalanced(request)) return "quotes";
+  const word = (name: string) => new RegExp(`(?<![A-Za-z0-9_.\\/-])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9_\\/-])`);
+  for (const l of p.lines) if (l.bind && word(l.bind).test(bare)) return "variable_named";
+  const names = new Set<string>();
+  let form = false, zero = false;
+  const walk = (c: calls.Call) => {
+    if (c.fn === "form") form = true;
+    for (const [k, v] of Object.entries(c.args)) {
+      names.add(k);
+      if ("call" in v) walk(v.call);
+      else if ("text" in v && DURATION_ARGS.has(k) && noTime(v.text)) zero = true;
+    }
+  };
+  for (const l of p.lines) walk(l.call);
+  for (const k of names) {
+    const spelled = k.replace(/_/g, "[ _]");
+    if (new RegExp(`(?<![A-Za-z0-9])${spelled}\\s*=`, "i").test(bare)) return "argument_named";
+    if (!form && new RegExp(`\\bthe ["“']?${spelled}["”']? field\\b`, "i").test(bare)) return "argument_named";
+  }
+  if (!form && /\bfields?\b/i.test(bare)) return "argument_named";
+  if (zero && /(?<![0-9.,])0 (seconds?|minutes?|hours?|days?|weeks?|months?|years?)\b/i.test(bare)) return "zero_wait";
+  return undefined;
+}
+
+/**
+ * Where each needed value of a program is in a request (for an example's `spans`).
+ * A value that is in the request once is there. One that is there more than once (an office named in each of two
+ * lines; a party who is also an account's holder) is placed by the other values of its own call: the values of one
+ * call are said together, so the occurrence that lies with its own call's values and not with another call's, or
+ * nearest its own, is the one (a line of a program is a call, and so is each commitment nested in an agreement). An
+ * occurrence that is another argument's is not this one's as well. Where none of that settles it (one call alone,
+ * where every occurrence is among its own values; occurrences equally near), every occurrence is recorded and the
+ * span is marked ambiguous.
+ */
+export function spansIn(request: string, program: string): Span[] {
+  const needs = needed(calls.parseProgram(program));
+  const group = (n: Needed) => `${n.line ?? 0}:${n.arg.includes(".") && !/^about\.[^.]+$/.test(n.arg) ? n.arg.slice(0, n.arg.lastIndexOf(".")) : ""}`;
+  const found = needs.map((n) => occurrences(request, n));
+  const settled: ([number, number] | undefined)[] = found.map((f) => (f.length === 1 ? f[0] : undefined));
+  // The places a value could still be: not where another argument with the same value has been placed.
+  const open = (i: number): [number, number][] => {
+    const taken = needs.flatMap((m, j) => (j !== i && m.value === needs[i]!.value && settled[j] ? [settled[j]![0]] : []));
+    const left = found[i]!.filter((at) => !taken.includes(at[0]));
+    return left.length ? left : found[i]!;
+  };
+  // The stretch of the request each call's settled values take up, and how far a place is from it.
+  const hull = (g: string, but: number): [number, number] | undefined => {
+    const own = needs.flatMap((n, i) => (i !== but && group(n) === g && settled[i] ? [settled[i]!] : []));
+    return own.length ? [Math.min(...own.map((x) => x[0])), Math.max(...own.map((x) => x[1]))] : undefined;
+  };
+  const gap = (at: [number, number], h: [number, number]) => (at[1] <= h[0] ? h[0] - at[1] : at[0] >= h[1] ? at[0] - h[1] : 0);
+  const groups = [...new Set(needs.map(group))];
+  for (let pass = 0; pass < 3; pass++) for (const [i, n] of needs.entries()) {
+    if (settled[i] || found[i]!.length < 2) continue;
+    const places = open(i);
+    if (places.length === 1) {
+      settled[i] = places[0];
+      continue;
+    }
+    const own = hull(group(n), i);
+    const others = groups.filter((g) => g !== group(n)).map((g) => hull(g, i)).filter((h): h is [number, number] => !!h);
+    if (!own || !others.length) continue;
+    const ours = places.filter((at) => others.every((h) => gap(at, own) < gap(at, h)));
+    const among = ours.length ? ours : places;
+    const gaps = among.map((at) => gap(at, own));
+    const least = Math.min(...gaps);
+    if (gaps.filter((x) => x === least).length === 1) settled[i] = among[gaps.indexOf(least)];
+  }
+  return needs.flatMap((n, i): Span[] => {
+    if (!found[i]!.length) return [];
+    const base = { arg: n.arg, value: n.value, ...(n.line !== undefined ? { line: n.line } : {}) };
+    const all = open(i);
+    return [settled[i] ? { ...base, at: settled[i]! } : { ...base, at: all[0]!, ambiguous: true, all }];
   });
 }
 
@@ -637,55 +1004,81 @@ export function copies(request: string, program: string): boolean {
   return needed(calls.parseProgram(program)).every((n) => spanOf(request, n) !== undefined);
 }
 
-/** A program with the same meaning counts as the same: compared in canonical form (eval/run.ts). */
-export const sameProgram = (a: string, b: string): boolean => canonical(a) === canonical(b) || loose(a) === loose(b);
-
-/** A program with what a purpose says compared loosely: "the energy bill." is "energy bill" (where a purpose starts and
- * ends in a sentence is the reader's call, as the test cases' answer keys allow). Everything else exactly. */
-function loose(program: string): string | undefined {
-  try {
-    const p = calls.parseProgram(program);
-    if ("none" in p) return canonical(program);
-    const value = (k: string, v: calls.Value): calls.Value => ("call" in v ? { call: call(v.call) } : "text" in v && k === "for" ? { text: v.text.toLowerCase().replace(/^(the|a|an) /, "").replace(/[.!\s]+$/, "") } : v);
-    const call = (c: calls.Call): calls.Call => ({ fn: c.fn, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, value(k, v)])) });
-    return canonical(calls.programText({ lines: p.lines.map((l) => ({ ...l, call: call(l.call) })) }));
-  } catch {
-    return undefined;
-  }
-}
+/**
+ * A program with the same meaning counts as the same: the same in canonical form (eval/run.ts), or the same by value
+ * (meaning.ts: an amount, a length of time or a count that reads as the same number, a flag in either spelling, one
+ * id or a list of it, a letter to two or one to each). `ctx`: the money and the forms of the world they are from.
+ */
+export const sameProgram = (a: string, b: string, ctx: MeaningContext = {}): boolean => canonical(a) === canonical(b) || sameMeaning(a, b, ctx);
 
 /** A stable id for an example: from what it is. */
 const exampleId = (request: string, program: string) => sha256(canonicalJson({ request, program })).slice(0, 16);
 
+/** How one request runs on into the next when someone piles tasks into one message. */
+const AND_ALSO = [" Also, separately: ", " And while you're at it: ", " One more thing: ", " Separately: ", " And another thing: "];
+
 /**
  * Refusals that can be built without anyone's judgement:
- *  - too_much: four or more unrelated requests run together (shown with every form any of them was shown with, so
- *    that it's the number of things asked, and no missing form, that makes it a refusal);
+ *  - too_much, as people make it: two or three requests about the same person, organisation, account or place (they
+ *    share an id), each a different kind of act, run on in one message ("… And while you're at it: …"). None is a
+ *    letter or something published (doing something and writing to someone about it is one request, by the
+ *    translator's rules), and none is a second act of the same kind (the same thing done several times is one too).
+ *    A share of them (`pasted`, a third if not said; all of them where no examples are related) are the long kind:
+ *    four to six unrelated requests pasted together. Either is shown with every form any of its parts was shown with,
+ *    so that it's the number of things asked, and no missing form, that makes it a refusal. (The natural kind is also
+ *    written, by a writer given related acts: `piledBriefs`.)
  *  - unknown_form: a request to fill in a form, shown to the translator without that form (under any office), and
  *    still with whatever other forms were shown beside it.
- * `floor`: at least so many of each, as far as the examples allow (a share of them otherwise).
- * (needs_calculation, not_yours, unclear and not_an_act have to be written; they come from a writer, checked by a
- * second model.)
+ * `floor`: at least so many of a label, as far as the examples allow (a share of them otherwise); a label this can't
+ * build is left to whoever writes it.
+ * (The other refusals have to be written; they come from a writer, checked by another model: `refusalBriefs`.)
  */
-export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floor: { too_much?: number; unknown_form?: number } = {}): Example[] {
+export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floor: { [label in calls.Label]?: number } = {}, o: { pasted?: number } = {}): Example[] {
   const rand = sampler(seed);
   const out: Example[] = [];
   const ids = new Set<string>();
-  const pick = () => positives[Math.floor(rand() * positives.length)]!;
+  const pick = <T>(xs: T[]): T => xs[Math.floor(rand() * xs.length)]!;
+  const said = (e: Example) => e.request.replace(/\s+/g, " ").trim();
+  const add = (parts: Example[], request: string, source: string): boolean => {
+    const id = exampleId(request, "none(too_much)");
+    if (ids.has(id)) return false;
+    ids.add(id);
+    out.push({ id, request, forms: [...new Set(parts.flatMap((e) => e.forms))], program: "none(too_much)", kind: "refusal", shape: "none(too_much)", source });
+    return true;
+  };
   const n = Math.max(Math.floor(positives.length * share), floor.too_much ?? 0);
-  for (let i = 0, made = 0; made < n && i < n * 4 && positives.length >= 8; i++) {
+  // The related kind: what each example mentions by id, and so which examples are about the same thing.
+  const mentioned = new Map<Example, string[]>();
+  const about = new Map<string, Example[]>();
+  const separate = (e: Example) => !["message", "statement"].includes(functionOf(e)) && !e.program.includes("\n") && !(e.riders ?? []).some((r) => r.kind === "do_not");
+  for (const e of positives.filter(separate)) {
+    let found: string[] = [];
+    try {
+      found = mustAppear(calls.parseProgram(e.program)).filter((x) => /^[a-z0-9][a-z0-9._\/-]*$/.test(x) && /[0-9.\/-]/.test(x) && !/^[0-9]+$/.test(x));
+    } catch {
+      // not a program: about nothing
+    }
+    mentioned.set(e, found);
+    for (const x of found) (about.get(x) ?? about.set(x, []).get(x)!).push(e);
+  }
+  const partnersOf = (e: Example) => [...new Set((mentioned.get(e) ?? []).flatMap((x) => about.get(x)!))].filter((x) => x !== e && !(x.riders ?? []).length && functionOf(x) !== functionOf(e) && (x.gold ?? x.program) !== (e.gold ?? e.program));
+  const firsts = [...mentioned.keys()].filter((e) => partnersOf(e).length);
+  const pasted = Math.ceil(n * (o.pasted ?? 1 / 3));
+  let made = 0;
+  for (let i = 0; made < n - pasted && i < n * 4 && firsts.length; i++) {
+    const first = pick(firsts);
+    const parts = [first];
+    for (const x of shuffled(partnersOf(first), rand)) if (parts.length < (rand() < 0.35 ? 3 : 2) && !parts.some((y) => functionOf(y) === functionOf(x))) parts.push(x);
+    if (add(parts, parts.map(said).reduce((all, next) => all + pick(AND_ALSO) + next), "built: related requests run together")) made++;
+  }
+  for (let i = 0; made < n && i < n * 4 && positives.length >= 8; i++) {
     const parts = new Map<string, Example>();
     for (let tries = 0; parts.size < 4 + Math.floor(rand() * 3) && tries < 64; tries++) {
-      const e = pick();
+      const e = pick(positives);
       if (![...parts.values()].some((x) => x.shape === e.shape)) parts.set(e.id, e);
     }
     if (parts.size < 4) continue;
-    const request = [...parts.values()].map((e) => e.request.replace(/\s+/g, " ").trim()).join(rand() < 0.5 ? " Also: " : " And then: ");
-    const id = exampleId(request, "none(too_much)");
-    if (ids.has(id)) continue;
-    ids.add(id);
-    made++;
-    out.push({ id, request, forms: [...new Set([...parts.values()].flatMap((e) => e.forms))], program: "none(too_much)", kind: "refusal", shape: "none(too_much)", source: "built: several requests run together" });
+    if (add([...parts.values()], [...parts.values()].map(said).join(rand() < 0.5 ? " Also: " : " And then: "), "built: several requests run together")) made++;
   }
   const forms = positives.filter((e) => e.shape.startsWith("form(") && e.forms.length);
   const chosen = new Set(forms.filter(() => rand() < Math.max(share * 4, 0.2)));
@@ -755,6 +1148,26 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
   return out;
 }
 
+/**
+ * Briefs for `too_much` as a person makes it (the label is fixed by how the brief is built): two or three separate acts
+ * about the same people or places, each a gold program of its own (synthetic.ts `piled` makes such groups), for a
+ * writer to ask for in one natural message. Every id and quoted value of every one must be in the request.
+ */
+export function piledBriefs(groups: Gold[][]): RefusalBrief[] {
+  return groups.filter((g) => g.length >= 2).map((g) => {
+    const names = [...new Set(g.flatMap((x) => Object.entries(x.names).map(([id, name]) => `${id} is ${name}`)))];
+    return {
+      label: "too_much" as const, source: "piled", mustCopy: [...new Set(g.flatMap((x) => mustAppear(calls.parseProgram(x.program))))],
+      brief: [
+        `The speaker piles ${g.length === 2 ? "two" : "several"} separate things into one message, the way people do ("…, and while you're at it …", "… Also, …"). They concern the same people or places, but each is an act of its own and none depends on another. Each is given here as a call in a small formal language (function(argument=value, …); an id is a bare word; quoted text is copied text), with what it brings about:`,
+        ...g.map((x, i) => `${i + 1}. ${x.program}\n   (${bringsAbout(x.program).map((b) => b.trim()).join("; ")})`),
+        ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []),
+        "Ask for all of them in one natural request of two to four sentences. Say each as a person would, never by the call's function names or argument names; a bare word that names a kind of thing is used as that same word; don't number them, and don't say that they are separate.",
+      ].join("\n"),
+    };
+  });
+}
+
 /** What the writer of a refusal is told. */
 export function refusalWriterSystem(): string {
   return [
@@ -777,8 +1190,9 @@ export async function writeRefusal(adapter: LlmAdapter, b: RefusalBrief, style: 
   return text ? text.replace(/^["“]|["”]$/g, "").trim() : undefined;
 }
 
-/** A request that wasn't kept, and why: for looking at what the writers and the round trip get wrong. */
-export interface Reject { request: string; program: string; why: "not_copied" | "round_trip"; got?: string; written_by: string; style: string }
+/** A request that wasn't kept, and why: for looking at what the writers and the round trip get wrong. `checked_by`:
+ * the model whose translation back (`got`) wasn't the program. */
+export interface Reject { request: string; program: string; why: "not_copied" | "round_trip" | Unnatural; got?: string; written_by: string; checked_by?: string; style: string }
 
 export interface Manifest {
   version: string;
@@ -786,16 +1200,25 @@ export interface Manifest {
   by_kind: { [k: string]: number };
   by_shape: { [shape: string]: number };
   writers: { [model: string]: number };
+  /** Who checked whose requests: "writer -> checker", for the examples kept. */
+  checked: { [pair: string]: number };
+  /** Examples whose checker was the model that wrote them (no other was given): the weaker check. */
+  checked_by_writer: number;
   /** By the first function of the program each example is for, by where its gold program came from, and by style. */
   by_function: { [fn: string]: number };
   by_origin: { [origin: string]: number };
   by_style: { [style: string]: number };
   /** Requests carrying something that adds nothing to their program, by kind (capacity, citation, do_not). */
   riders: { [kind: string]: number };
+  /** Spans whose value is in the request more than once, with nothing to settle which is meant (each records them all). */
+  ambiguous_spans: number;
   /** The least asked for of each refusal label, and the labels that came out short of it (with how many there are). */
   refusal_floor?: number;
   short_of_floor?: { [label: string]: number };
-  dropped: { not_copied: number; round_trip: number; duplicate: number; failed: number; shares_held_out_wording: number };
+  /** Requests dropped, by reason: a value not copied; reading as the call and not as a person (`Unnatural`: quotes,
+   * variable_named, argument_named, zero_wait); not translated back to the program; said before; a failed call;
+   * wording shared with a held-out case. */
+  dropped: { not_copied: number; round_trip: number; duplicate: number; failed: number; shares_held_out_wording: number } & { [why in Unnatural]: number };
   /** Why writing stopped before every program had its requests, if it did (a spending or usage limit, a model out of
    * reach): what was written until then is kept. */
   stopped?: string;
@@ -804,25 +1227,56 @@ export interface Manifest {
   sha256: string;
 }
 
+/** A model that translates a request back to a program, through the real translator. `forms`: what the translator is
+ * to be shown with the request, as lines; `gold`: the program it was written for (its world's money and its forms as
+ * data), absent for a refusal. */
+export interface Back { model: string; translate: (request: string, forms: string[], gold?: Gold) => Promise<string | undefined> }
+
+/**
+ * Who checks a writer's requests: the first of the checkers that is a different model from the writer (the same model
+ * reached another way is the same model). A model checking its own writing keeps what it parrots and rejects what
+ * another would say naturally (the audit of 2026-10-06), so with a checker among the writers a second checker takes
+ * that model's requests. `own`: no other was given, and the writer's own model checks (kept, and counted as that).
+ */
+export function checkerFor(writer: string, backs: Back[]): { back: Back; own: boolean } | undefined {
+  const name = (m: string) => m.slice(m.lastIndexOf("/") + 1);
+  const other = backs.find((b) => name(b.model) !== name(writer));
+  return other ? { back: other, own: false } : backs[0] ? { back: backs[0], own: true } : undefined;
+}
+
+/** Sentences of a request that begin "Do not" (or "Don't", or "This does not"), outside the stretches already taken. */
+function doNots(request: string, taken: [number, number][]): { text: string; at: [number, number] }[] {
+  const out: { text: string; at: [number, number] }[] = [];
+  const re = /(?:^|(?<=[.!?]["”)]?\s))(?:Do not|Don't|This does not)\b[^.!?]*[.!?]/g;
+  for (let m = re.exec(request); m; m = re.exec(request)) {
+    const at: [number, number] = [m.index, m.index + m[0].length];
+    if (!taken.some((t) => t[0] < at[1] && at[0] < t[1])) out.push({ text: m[0], at });
+  }
+  return out;
+}
+
 /**
  * Write requests for the gold programs and keep the ones that hold up.
  * `writers`: the models that write requests, taken in turn, each asked for the styles in turn.
- * `back`: translates a request to a program through the real translator (a different model from the writer's is the
- * point); absent, examples are kept unverified and marked so.
+ * `backs` (or one, `back`): the models that translate a request back to a program through the real translator. Each
+ * request is checked by one that didn't write it (`checkerFor`), and the example says which; with none, examples are
+ * kept unverified and marked so.
  * `heldOut`: the held-out cases, if this machine has them: a request sharing wording with one is dropped.
  */
 export async function generate(gold: Gold[], o: {
   writers: LlmAdapter[];
   styles?: string[];
   perGold?: number;
-  /** Written refusals asked for, per label (needs_calculation, not_yours, unclear, not_an_act); none if absent. */
+  /** Written refusals asked for, per label that has a brief (`refusalBriefs`); none if absent. */
   refusalsPerLabel?: number;
-  /** At least so many refusals of every label: briefs for the written ones, and the built ones (too_much,
-   * unknown_form) as far as the examples allow. What came out short is in the manifest. */
+  /** At least so many refusals of every label of the call language (`calls.LABELS`, whatever they are): briefs for
+   * the written ones, asked again for a label that came out short, and the built ones as far as the examples allow.
+   * What still came out short is in the manifest. */
   refusalFloor?: number;
-  /** `forms`: what the translator is to be shown with the request, as lines; `gold`: the program it was written for
-   * (its world's money and its forms as data), absent for a refusal. */
-  back?: { model: string; translate: (request: string, forms: string[], gold?: Gold) => Promise<string | undefined> };
+  /** Groups of related, separate acts for a writer to ask for in one message (`piledBriefs`): `too_much` as people make it. */
+  piled?: Gold[][];
+  back?: Back;
+  backs?: Back[];
   heldOut?: Case[];
   seed?: number;
   /** How many requests are written and translated back at a time (1 if absent). */
@@ -831,13 +1285,14 @@ export async function generate(gold: Gold[], o: {
 }): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[] }> {
   const styles = o.styles ?? Object.keys(STYLES);
   const perGold = o.perGold ?? 3;
+  const backs = [...(o.backs ?? []), ...(o.back ? [o.back] : [])];
   const usage: { [model: string]: Usage } = {};
   const add = (model: string) => (u: Usage) => {
     const t = (usage[model] ??= { input_tokens: 0, output_tokens: 0 });
     t.input_tokens += u.input_tokens + (u.cache_read_tokens ?? 0);
     t.output_tokens += u.output_tokens;
   };
-  const dropped = { not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0 };
+  const dropped: Manifest["dropped"] = { not_copied: 0, round_trip: 0, duplicate: 0, failed: 0, shares_held_out_wording: 0, quotes: 0, variable_named: 0, argument_named: 0, zero_wait: 0 };
   const rejects: Reject[] = [];
   // A limit reached, or a model out of reach, ends the writing with what there is; any other failed call loses one request.
   let stopped: string | undefined;
@@ -854,15 +1309,17 @@ export async function generate(gold: Gold[], o: {
   const positives: Example[] = [];
   const styleRand = sampler((o.seed ?? 1) + 11);
   let turn = 0;
-  // Who writes what, in which style, is settled first and in order (so the same gold and seed give the same plan);
-  // the writing and the translating back then run several at a time (`concurrency`: a model call is nearly all waiting),
-  // and what came back is gone through in the plan's order, so the result doesn't depend on which call returned first.
+  // Who writes what, in which style, and who checks it, is settled first and in order (so the same gold and seed give
+  // the same plan); the writing and the translating back then run several at a time (`concurrency`: a model call is
+  // nearly all waiting), and what came back is gone through in the plan's order, so the result doesn't depend on
+  // which call returned first.
   const plan = gold.flatMap((g) => Array.from({ length: perGold }, () => {
     const writer = o.writers[turn % o.writers.length]!;
     const brief = styleBrief(styles[turn++ % styles.length]!, g, styleRand);
-    return { g, forms: (g.forms ?? []).map(formLine), writer, model: `${writer.provider}/${writer.model}`, ...brief };
+    const model = `${writer.provider}/${writer.model}`;
+    return { g, forms: (g.forms ?? []).map(formLine), writer, model, check: checkerFor(model, backs), ...brief };
   }));
-  type Came = { request?: string; copied?: boolean; got?: string; backFailed?: boolean };
+  type Came = { request?: string; why?: Reject["why"]; got?: string; backFailed?: boolean };
   const came: Came[] = new Array(plan.length);
   let next = 0, done = 0;
   await Promise.all(Array.from({ length: Math.max(1, o.concurrency ?? 1) }, async () => {
@@ -872,11 +1329,13 @@ export async function generate(gold: Gold[], o: {
       const request = await attempt(() => writeRequest(t.writer, t.g, t.instruction, add(t.model)));
       const out: Came = (came[n] = request ? { request } : {});
       if (request) {
-        // What the program takes from the request is looked for outside its riders, and each rider must be there as given.
-        out.copied = t.riders.every((r) => request.includes(r.text)) && copies(withoutRiders(request, t.riders), t.g.program);
-        if (out.copied && o.back) {
+        // What the program takes from the request is looked for outside its riders, and each rider must be there as
+        // given; then how it reads (badlyWritten); only then is a model asked.
+        if (!(t.riders.every((r) => request.includes(r.text)) && copies(withoutRiders(request, t.riders), t.g.program))) out.why = "not_copied";
+        else out.why = badlyWritten(request, t.g.program, t.riders);
+        if (!out.why && t.check) {
           const failed = dropped.failed;
-          const got = await attempt(() => o.back!.translate(request, t.forms, t.g));
+          const got = await attempt(() => t.check!.back.translate(request, t.forms, t.g));
           if (got === undefined && (stopped || dropped.failed > failed)) out.backFailed = true;
           else if (got !== undefined) out.got = got;
         }
@@ -887,11 +1346,11 @@ export async function generate(gold: Gold[], o: {
   for (const [n, t] of plan.entries()) {
     const c = came[n];
     if (!c?.request) continue;
-    const { g, forms, model, style, riders } = t;
+    const { g, forms, model, style, riders, check } = t;
     const request = c.request;
-    if (!c.copied) {
-      dropped.not_copied++;
-      rejects.push({ request, program: g.program, why: "not_copied", written_by: model, style });
+    if (c.why) {
+      dropped[c.why]++;
+      rejects.push({ request, program: g.program, why: c.why, written_by: model, style });
       continue;
     }
     const key = request.toLowerCase().replace(/\s+/g, " ");
@@ -900,66 +1359,82 @@ export async function generate(gold: Gold[], o: {
       continue;
     }
     seen.add(key);
-    let verified: string | undefined;
-    if (o.back) {
+    if (check) {
       if (c.backFailed) continue;
-      if (c.got === undefined || !sameProgram(c.got, g.program)) {
+      if (c.got === undefined || !sameProgram(c.got, g.program, { ...(g.currency ? { currency: g.currency } : {}), ...(g.forms ? { forms: g.forms } : {}) })) {
         dropped.round_trip++;
-        rejects.push({ request, program: g.program, why: "round_trip", ...(c.got !== undefined ? { got: c.got } : {}), written_by: model, style });
+        rejects.push({ request, program: g.program, why: "round_trip", ...(c.got !== undefined ? { got: c.got } : {}), written_by: model, checked_by: check.back.model, style });
         continue;
       }
-      verified = o.back.model;
     }
-    const bare = withoutRiders(request, riders);
+    const spans = spansIn(withoutRiders(request, riders), g.program);
+    const given = riders.map((r) => ({ ...r, at: [request.indexOf(r.text), request.indexOf(r.text) + r.text.length] as [number, number], adds: "nothing" as const }));
+    // A "Do not …" the writer added of its own accord rules out what wasn't asked for, like one it was given (the
+    // program came back the same with it there): recorded as a rider too.
+    const more = doNots(request, [...spans.flatMap((x) => x.all ?? [x.at]), ...given.map((r) => r.at)]).map((r) => ({ kind: "do_not" as const, ...r, adds: "nothing" as const }));
+    const all = [...given, ...more].sort((x, y) => x.at[0] - y.at[0]);
     positives.push({
-      id: exampleId(request, g.program), request, forms, program: g.program, kind: "positive", shape: g.shape, style, spans: spansIn(bare, g.program), written_by: model, ...(verified ? { verified_by: verified } : {}),
+      id: exampleId(request, g.program), request, forms, program: g.program, kind: "positive", shape: g.shape, style, spans, written_by: model,
+      ...(check ? { verified_by: check.back.model, ...(check.own ? { verified_by_writer: true as const } : {}) } : {}),
       source: g.source, ...(g.origin ? { origin: g.origin } : {}), gold: g.family ?? g.program,
-      ...(riders.length ? { riders: riders.map((r) => ({ ...r, at: [request.indexOf(r.text), request.indexOf(r.text) + r.text.length] as [number, number], adds: "nothing" as const })) } : {}),
+      ...(all.length ? { riders: all } : {}),
     });
   }
-  // Refusals that have to be worded: each brief to a writer in turn, kept if it carries what it must and (with a second
-  // model) comes back refused with the same label.
+  // Refusals that have to be worded: each brief to a writer in turn, kept if it carries what it must and (with a
+  // checker) comes back refused with the same label. With a floor, a label that came out short is asked for again
+  // (new briefs, twice at most): whichever labels `refusalBriefs` has briefs for, nothing here names them.
   const written: Example[] = [];
+  const have: { [label: string]: number } = {};
   const perLabel = Math.max(o.refusalsPerLabel ?? 0, o.refusalFloor ?? 0);
-  for (const b of perLabel ? refusalBriefs(gold, perLabel, o.seed ?? 1) : []) {
-    if (stopped) break;
-    const writer = o.writers[turn % o.writers.length]!;
-    const style = styles[turn++ % styles.length]!;
-    const model = `${writer.provider}/${writer.model}`;
-    const request = await attempt(() => writeRefusal(writer, b, style, add(model)));
-    if (!request) continue;
-    const program = `none(${b.label})`;
-    if (!b.mustCopy.every((l) => request.includes(l))) {
-      dropped.not_copied++;
-      rejects.push({ request, program, why: "not_copied", written_by: model, style });
-      continue;
-    }
-    const key = request.toLowerCase().replace(/\s+/g, " ");
-    if (seen.has(key)) {
-      dropped.duplicate++;
-      continue;
-    }
-    seen.add(key);
-    let verified: string | undefined;
-    if (o.back) {
-      const failed = dropped.failed;
-      const got = await attempt(() => o.back!.translate(request, []));
-      if (stopped || dropped.failed > failed) continue;
-      if (got === undefined || !sameProgram(got, program)) {
-        dropped.round_trip++;
-        rejects.push({ request, program, why: "round_trip", ...(got !== undefined ? { got } : {}), written_by: model, style });
+  for (let round = 0; round < (o.refusalFloor ? 3 : 1) && !stopped; round++) {
+    const briefs = round === 0
+      ? [...(perLabel ? refusalBriefs(gold, perLabel, o.seed ?? 1) : []), ...piledBriefs(o.piled ?? [])]
+      : refusalBriefs(gold, perLabel, (o.seed ?? 1) + round * 7919).filter((b) => (have[b.label] ?? 0) < perLabel);
+    if (!briefs.length) break;
+    for (const b of briefs) {
+      if (stopped) break;
+      if (round > 0 && (have[b.label] ?? 0) >= perLabel) continue;
+      const writer = o.writers[turn % o.writers.length]!;
+      const style = styles[turn++ % styles.length]!;
+      const model = `${writer.provider}/${writer.model}`;
+      const request = await attempt(() => writeRefusal(writer, b, style, add(model)));
+      if (!request) continue;
+      const program = `none(${b.label})`;
+      const why: Reject["why"] | undefined = !b.mustCopy.every((l) => request.includes(l)) ? "not_copied" : !quotesBalanced(request) && !b.mustCopy.some((l) => /["“”]/.test(l)) ? "quotes" : undefined;
+      if (why) {
+        dropped[why]++;
+        rejects.push({ request, program, why, written_by: model, style });
         continue;
       }
-      verified = o.back.model;
+      const key = request.toLowerCase().replace(/\s+/g, " ");
+      if (seen.has(key)) {
+        dropped.duplicate++;
+        continue;
+      }
+      seen.add(key);
+      const check = checkerFor(model, backs);
+      if (check) {
+        const failed = dropped.failed;
+        const got = await attempt(() => check.back.translate(request, []));
+        if (stopped || dropped.failed > failed) continue;
+        if (got === undefined || !sameProgram(got, program)) {
+          dropped.round_trip++;
+          rejects.push({ request, program, why: "round_trip", ...(got !== undefined ? { got } : {}), written_by: model, checked_by: check.back.model, style });
+          continue;
+        }
+      }
+      have[b.label] = (have[b.label] ?? 0) + 1;
+      written.push({ id: exampleId(request, program), request, forms: [], program, kind: "refusal", shape: program, style, written_by: model, ...(check ? { verified_by: check.back.model, ...(check.own ? { verified_by_writer: true as const } : {}) } : {}), source: `written: ${b.source}`, ...(b.gold ? { gold: b.gold } : {}) });
     }
-    written.push({ id: exampleId(request, program), request, forms: [], program, kind: "refusal", shape: program, style, written_by: model, ...(verified ? { verified_by: verified } : {}), source: `written: ${b.source}`, ...(b.gold ? { gold: b.gold } : {}) });
   }
   // Nothing that shares wording with a held-out case is kept: each such request is dropped (and counted), so the
   // test stays a test of requests the model hasn't seen the like of.
   const shares = o.heldOut?.length ? sharesWording(o.heldOut) : () => false;
   const clean = (e: Example) => !shares(e.request) || (dropped.shares_held_out_wording++, false);
   const kept = positives.filter(clean);
-  const examples = [...kept, ...written.filter(clean), ...builtRefusals(kept, o.seed ?? 1, 0.05, o.refusalFloor ? { too_much: o.refusalFloor, unknown_form: o.refusalFloor } : {}).filter(clean)];
+  // The floor under each label the built refusals can make: what the written ones left short of it.
+  const floors = o.refusalFloor ? Object.fromEntries(calls.LABELS.map((l) => [l, Math.max(0, o.refusalFloor! - (have[l] ?? 0))])) : {};
+  const examples = [...kept, ...written.filter(clean), ...builtRefusals(kept, o.seed ?? 1, 0.05, floors).filter(clean)];
   const count = (key: (e: Example) => string | undefined) => {
     const out: { [k: string]: number } = {};
     for (const e of examples) {
@@ -974,8 +1449,10 @@ export async function generate(gold: Gold[], o: {
   const short = o.refusalFloor ? Object.fromEntries(calls.LABELS.filter((l) => (labels[l] ?? 0) < o.refusalFloor!).map((l) => [l, labels[l] ?? 0])) : {};
   const manifest: Manifest = {
     version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), by_function: count((e) => functionOf(e)), by_origin: count((e) => e.origin ?? (e.kind === "refusal" ? "refusal" : "unknown")), by_style: count((e) => e.style),
-    riders, ...(o.refusalFloor ? { refusal_floor: o.refusalFloor, short_of_floor: short } : {}),
-    writers: count((e) => e.written_by), dropped, ...(stopped ? { stopped } : {}), usage,
+    riders, ambiguous_spans: examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.ambiguous).length, 0),
+    ...(o.refusalFloor ? { refusal_floor: o.refusalFloor, short_of_floor: short } : {}),
+    writers: count((e) => e.written_by), checked: count((e) => (e.verified_by ? `${e.written_by} -> ${e.verified_by}` : undefined)), checked_by_writer: examples.filter((e) => e.verified_by_writer).length,
+    dropped, ...(stopped ? { stopped } : {}), usage,
     sha256: sha256(examples.map((e) => canonicalJson(e)).join("\n")),
   };
   return { examples, manifest, rejects };
