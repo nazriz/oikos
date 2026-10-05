@@ -190,6 +190,16 @@ export class CodexCliAdapter implements LlmAdapter {
         try {
           input = JSON.parse(u.input_json ?? "{}");
         } catch {
+          // A line break or a tab written as itself inside a text (not as \n): the commonest way a long notebook
+          // comes back unreadable (the stress run of 2026-10-06: six of a finance officer's notebooks in two days).
+          // Each is written as its escape, and what the model wrote is read as it meant it.
+          try {
+            input = JSON.parse(controlsEscaped(u.input_json ?? ""));
+            content.push({ type: "tool_use", id: `codex-${++this.calls}`, name: u.tool, input });
+            continue;
+          } catch {
+            // not that: below
+          }
           // A whole object followed by stray characters (pilot 7d: a notebook's text, then "}]}],"): the object, as the
           // model wrote it. Anything else is recorded as it came, and treated as malformed.
           input = leadingObject(u.input_json ?? "") ?? { _unparsed: u.input_json };
@@ -201,6 +211,30 @@ export class CodexCliAdapter implements LlmAdapter {
       rmSync(dir, { recursive: true, force: true });
     }
   }
+}
+
+/** JSON text with the control characters inside its strings written as their escapes (a raw line break as \n), and
+ * everything else as it was: for a model that wrote a text's line breaks as themselves. */
+export function controlsEscaped(s: string): string {
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]!;
+    if (inString) {
+      if (ch === "\\") {
+        out += ch + (s[i + 1] ?? "");
+        i++;
+      } else if (ch === '"') {
+        inString = false;
+        out += ch;
+      } else if (ch < " ") out += ch === "\n" ? "\\n" : ch === "\r" ? "\\r" : ch === "\t" ? "\\t" : `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`;
+      else out += ch;
+    } else {
+      if (ch === '"') inString = true;
+      out += ch;
+    }
+  }
+  return out;
 }
 
 /** The JSON object a string starts with, if it starts with a whole one (and only stray characters follow). */

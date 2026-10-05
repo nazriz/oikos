@@ -2,7 +2,7 @@
 // these check what would be sent and how replies are read, never a real call.
 
 import { expect, test } from "bun:test";
-import { codexPrompt, LIMITED, leadingObject, runBounded } from "../src/llm/codex";
+import { CodexCliAdapter, codexPrompt, controlsEscaped, LIMITED, leadingObject, runBounded } from "../src/llm/codex";
 import { AnthropicAdapter, callModel, OpenAICompatibleAdapter, SpendingLimitReached, toChat, type LlmRequest } from "../src/llm";
 
 const req: LlmRequest = {
@@ -203,3 +203,20 @@ test("a command that won't end can't hang a call: asked to end at the time limit
   const never = (_a: string[], stdin: string, cwd: string, timeoutMs: number) => runBounded(stuck, stdin, cwd, timeoutMs, 100, 100);
   await expect(new CodexCliAdapter("gpt-5", never, { timeoutMs: 200, attempts: 1 }).complete(req)).rejects.toThrow("no answer within");
 }, 30_000);
+
+test("a text written with its line breaks as themselves is read as the model meant it", async () => {
+  const raw = '{"text":"Day 11.\nRates: 295 valued,\tnone levied.\nNext: \\"review\\" the draft."}';
+  expect(() => JSON.parse(raw)).toThrow();
+  expect(JSON.parse(controlsEscaped(raw))).toEqual({ text: 'Day 11.\nRates: 295 valued,\tnone levied.\nNext: "review" the draft.' });
+  // (Outside a text nothing changes, and well-formed JSON comes back as it was.)
+  expect(controlsEscaped('{\n "a": "b\\n"\n}')).toBe('{\n "a": "b\\n"\n}');
+  // Through the adapter: the notebook is a notebook, not something unreadable.
+  const answer = JSON.stringify({ tool: "notebook", input_json: raw, also: [], text: "" });
+  const adapter = new CodexCliAdapter("gpt-test", async (args) => {
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(args[args.indexOf("--output-last-message") + 1]!, answer);
+    return { code: 0, stdout: "", stderr: "" };
+  });
+  const res = await adapter.complete({ purpose: "participant", subject: "x", system: "s", messages: [{ role: "user", content: "hi" }], tools: [{ name: "notebook", description: "", input_schema: {} }], maxTokens: 100 });
+  expect(res.content).toEqual([{ type: "tool_use", id: "codex-1", name: "notebook", input: { text: 'Day 11.\nRates: 295 valued,\tnone levied.\nNext: "review" the draft.' } }]);
+});
