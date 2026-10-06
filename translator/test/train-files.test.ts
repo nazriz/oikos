@@ -67,7 +67,9 @@ test("the plan is settled before anything is written: the same for the same gold
 
 test("requests handed in as files give the examples a run with models gives for the same texts; what fails a check is rejected with its reason, what is missing is counted", async () => {
   const gold = await goldFromLog(LOG);
-  const o = { perGold: 2, refusalFloor: 3, piled: piled({ groups: 1, seed: 5 }), seed: 5 };
+  // (Four requests to a program: half are in the seats' voices, and a `late` one is no part of a built refusal, so
+  // there must be enough of the others to build some from.)
+  const o = { perGold: 4, refusalFloor: 3, piled: piled({ groups: 1, seed: 5 }), seed: 5 };
   const plan: PlanItem[] = JSON.parse(JSON.stringify(planOf(gold, { ...o, writers: ["stand-in/a", "stand-in/b"] })));
   const of = (name: string) => plan.filter((t) => t.writer === name);
   // Two writers, each with its own part of the plan, against two models answering the same.

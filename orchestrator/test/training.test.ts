@@ -28,11 +28,13 @@ test("training data from a log: gold programs, requests from two writers, each t
   const programs = new Map<string, string>();
   const writer = (model: string): LlmAdapter => ({ provider: "stand-in", model, complete: async (req) => {
     const said = String((req.messages[0] as any).content);
-    const program = said.slice("Call:\n".length, said.indexOf("\n\n"));
+    // (A letter asked for indirectly: what is asked of them is the writer's to invent, and to mark.)
+    const asked = said.includes("Asked indirectly") ? `mend the fence by the ${model} gate` : undefined;
+    const program = said.slice("Call:\n".length, said.indexOf("\n\n")).replace("⟦…⟧", asked ?? "");
     // (Whatever words the style says to use exactly, then every literal.)
     const given = (said.includes("exactly ") ? [...said.slice(said.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") || undefined : undefined);
-    const text = `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}${model} asks: ${literals(calls.parseProgram(program)).join(" / ")} [${said.slice(-12)}]`;
-    programs.set(text, program);
+    const text = `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}${model} asks: ${literals(calls.parseProgram(program)).map((l) => (l === asked ? `⟦${l}⟧` : l)).join(" / ")} (${Bun.hash(said).toString(36)})`;
+    programs.set(text.replace(/[⟦⟧]/g, ""), program); // (the model translating back is shown the request without the marks)
     return { content: [{ type: "text", text }], usage: { input_tokens: 7, output_tokens: 3 } };
   } });
   const back: LlmAdapter = { provider: "stand-in", model: "back", complete: async (req) => {
@@ -56,6 +58,9 @@ test("training data from a log: gold programs, requests from two writers, each t
   expect(manifest.usage["stand-in/back (translating back)"].input_tokens).toBeGreaterThan(0);
   expect(manifest.gold_programs).toBe(6);
   expect(manifest.examples).toBe(examples.length);
+  // (No letter of these six is asked for indirectly: the one sampled says what it is about, and only a plain letter
+  // is. The by-file test below has them; translator/test/train-seats.test.ts has the round trip.)
+  expect(manifest.indirect).toBe(0);
 
   // Blind checking, the next step. The requests alone were written beside the data, shuffled: what a reader is given.
   const lines = (file: string) => readFileSync(join(out, file), "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l));
@@ -268,7 +273,10 @@ test("requests written by file: a briefs-only run and the writers' requests take
     const mark = Bun.hash(brief).toString(36);
     if (!brief.startsWith("Call:\n")) return `Request ${mark}, about this: ${brief.split("\n")[1]}`;
     const given = brief.includes("exactly ") ? [...brief.slice(brief.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") : "";
-    return `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}please (${mark}): ${literals(calls.parseProgram(brief.slice(6, brief.indexOf("\n\nWhat it brings about")))).join(" / ")}`;
+    // (A letter asked for indirectly: the words asked of them are the writer's own, marked.)
+    const asked = brief.includes("Asked indirectly") ? `check the drains (${mark}) and report back` : undefined;
+    const program = brief.slice(6, brief.indexOf("\n\nWhat it brings about")).replace("⟦…⟧", asked ?? "");
+    return `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}please (${mark}): ${literals(calls.parseProgram(program)).map((l) => (l === asked ? `⟦${l}⟧` : l)).join(" / ")}`;
   };
   const model = (name: string): LlmAdapter => ({ provider: "stand-in", model: name, complete: async (req) => ({ content: [{ type: "text", text: say(String((req.messages[0] as any).content)) }], usage: { input_tokens: 7, output_tokens: 3 } }) });
   const free = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
@@ -324,12 +332,23 @@ test("requests written by file: a briefs-only run and the writers' requests take
   const examples: Example[] = lines(out, "examples.jsonl");
   expect(examples).toEqual(lines(withModels, "examples.jsonl"));
   expect(examples.filter((e) => e.kind === "positive" && e.spans?.length).length).toBeGreaterThan(20);
+  // Letters asked for indirectly among them, by file as with models: the plan says which, the marked words are the text.
+  expect(plan.options.indirect).toBe(0.5);
+  expect(examples.filter((e) => e.indirect).length).toBeGreaterThan(0);
+  expect(examples.filter((e) => e.indirect).length).toBeLessThanOrEqual(plan.items.filter((t: any) => t.indirect).length);
+  for (const e of examples.filter((x) => x.indirect)) {
+    expect(e.program).toMatch(/^message\(text="check the drains \([a-z0-9]+\) and report back", to=/);
+    expect(e.request).not.toMatch(/[⟦⟧]/);
+    const text = e.spans!.find((x) => x.arg === "text")!;
+    expect([text.how, e.request.slice(...text.at!)]).toEqual(["copy", text.value]);
+  }
+  expect(instructions).toContain("hand the request back with the marks in it");
   expect(examples.some((e) => e.kind === "refusal" && e.built_from) && examples.some((e) => e.kind === "refusal" && e.source.startsWith("written: "))).toBe(true);
   expect(lines(out, "rejects.jsonl")).toEqual(lines(withModels, "rejects.jsonl"));
   expect(lines(out, "blind.jsonl")).toEqual(lines(withModels, "blind.jsonl"));
   const manifest = json(out, "manifest.json"), theirs = json(withModels, "manifest.json");
   expect(r).toEqual({ examples: examples.length, rejects: lines(out, "rejects.jsonl").length, no_request: 0, duplicate_ids: 0, unknown_ids: 0, out });
-  for (const k of ["version", "examples", "by_kind", "by_shape", "by_function", "by_style", "writers", "dropped", "spans", "refusal_floor", "short_of_floor", "sha256", "sources", "gold_programs", "gold", "seed", "checked_against_held_out"]) expect([k, manifest[k]]).toEqual([k, theirs[k]]);
+  for (const k of ["version", "examples", "by_kind", "by_shape", "by_function", "by_style", "writers", "dropped", "spans", "indirect", "refusal_floor", "short_of_floor", "sha256", "sources", "gold_programs", "gold", "seed", "checked_against_held_out"]) expect([k, manifest[k]]).toEqual([k, theirs[k]]);
   expect(manifest).toMatchObject({ no_request: 0, shard: { index: 1, of: 2 }, plan_version: plan.version, cost_microusd: 0, usage: {}, requests_from: [{ writer: "stand-in/a", file: fileA }, { writer: "stand-in/b", file: fileB }] });
   expect(manifest.from_files.requests).toEqual({ "stand-in/a": forA.length, "stand-in/b": forB.length });
 

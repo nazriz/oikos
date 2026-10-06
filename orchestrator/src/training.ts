@@ -3,7 +3,9 @@
 //
 //   gold programs from the calls code participants wrote in the logs given (and from the seen test cases), with
 //   generated ones (translator/train/synthetic.ts) so that every function of the call language has its floor;
-//   requests for them written by the models given (`--model`, more than one: no single writer's voice);
+//   requests for them written by the models given (`--model`, more than one: no single writer's voice), half of them
+//   in the voices the pilots' model seats wrote in, and half of the letters asked for indirectly, as seats ask
+//   ("Direct them to …": data.ts `DEAL`, `marked`);
 //   each kept only if it carries its program's literals exactly and reads as a person's request, and, with
 //   `--back-model` (one or more), if a model that didn't write it translates it back to a program that means the same,
 //   through the translator as runs use it.
@@ -24,7 +26,7 @@ import { createTranslator, Knowledge } from "@oikos/translator";
 import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
 import { blindRequests, checkAnswers, type BlindAnswer, type BlindReport } from "../../translator/train/blind";
-import { DATA_VERSION, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
+import { CLOSE, DATA_VERSION, OPEN, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
 import { piled, synthetic } from "../../translator/train/synthetic";
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
@@ -70,6 +72,9 @@ export interface TrainingDataOptions {
   ceiling?: number;
   /** At least so many refusals of every label (generate's `refusalFloor`); absent: no floor. */
   refusalFloor?: number;
+  /** The share of the letters asked for indirectly, the writer inventing and marking what is asked of whoever they
+   * go to (data.ts `planOf`; a half if absent, 0 for none). */
+  indirect?: number;
   /** The share of gold programs whose examples are set aside for validation (default 0.15; 0: no split written). */
   validation?: number;
   seed?: number;
@@ -263,7 +268,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   const asked = {
     ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
     ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
-    seed: o.seed ?? 1,
+    indirect: o.indirect ?? 0.5, seed: o.seed ?? 1,
   };
   if (o.briefsOnly) {
     const names = o.briefsFor?.length ? o.briefsFor : ["writer"];
@@ -271,7 +276,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     const items = planOf(gold, { ...asked, writers: names });
     const plan: Plan = {
       version: DATA_VERSION, seed: o.seed ?? 1, sources: o.sources, ...(o.shard ? { shard: o.shard } : {}),
-      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), validation: o.validation ?? 0.15 },
+      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, validation: o.validation ?? 0.15 },
       writers: names, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}), items,
     };
     mkdirSync(o.out, { recursive: true });
@@ -356,7 +361,7 @@ export interface Plan {
   seed: number;
   sources: string[];
   shard?: { index: number; of: number };
-  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; validation: number };
+  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; validation: number };
   /** Who was asked, in the order the items were dealt (item k to writer k mod n). */
   writers: string[];
   gold_programs: number;
@@ -370,6 +375,7 @@ export function writerInstructions(): string {
   return [
     'Each line of a briefs file is {id, kind, brief}: the brief is what you are given, and you answer it with one request. For a brief of kind "request" follow INSTRUCTIONS FOR REQUESTS below; for a brief of kind "refusal" follow INSTRUCTIONS FOR REFUSALS.',
     'Hand back a file requests.jsonl: one line for each brief, {"id": "<the brief\'s id>", "request": "<your request>"}, each line valid JSON by itself (quotation marks and line breaks inside a request escaped), and nothing else in the file. Write each request from its own brief alone, as if it were the only one you had been given. A brief marked "spare": true is used only if earlier ones of its kind fail a check: write it like any other.',
+    `A brief that says its request is "Asked indirectly" has you mark some words of your request with ${OPEN} and ${CLOSE}: hand the request back with the marks in it. No other request has them.`,
     "",
     '=== INSTRUCTIONS FOR REQUESTS (kind: "request") ===',
     writerSystem(),
