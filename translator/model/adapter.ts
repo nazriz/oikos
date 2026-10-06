@@ -2,7 +2,7 @@
 // a run call it as they call any other (`--model decide/<name>`: the model in $OIKOS_TRANSLATOR_MODELS/<name>, by
 // default runs/translator-model/<name>). It reads the request and the forms out of what the translator would send a
 // language model, and answers with a program. Below `threshold` of sureness it asks back: none(unclear).
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { join, resolve } from "node:path";
 import type { LlmAdapter, LlmRequest, LlmResponse } from "@oikos/participants/llm";
 import { decode, inputOf } from "./encode";
@@ -21,7 +21,7 @@ export function shown(text: string): { request: string; forms: string[] } {
 
 export class DecideAdapter implements LlmAdapter {
   provider = "decide";
-  private proc?: ChildProcessWithoutNullStreams;
+  private proc?: ChildProcess;
   private waiting: ((line: string) => void)[] = [];
   private buffer = "";
   private queue: Promise<unknown> = Promise.resolve();
@@ -31,8 +31,8 @@ export class DecideAdapter implements LlmAdapter {
 
   private start(): void {
     const dir = this.o.dir ?? join(process.env.OIKOS_TRANSLATOR_MODELS ?? resolve(HERE, "../../runs/translator-model"), this.model);
-    this.proc = spawn("uv", ["run", "--project", join(HERE, "py"), "python", join(HERE, "py/predict.py"), dir], { stdio: ["pipe", "pipe", "inherit"] });
-    this.proc.stdout.on("data", (d: Buffer) => {
+    const proc = (this.proc = spawn("uv", ["run", "--project", join(HERE, "py"), "python", join(HERE, "py/predict.py"), dir], { stdio: ["pipe", "pipe", "inherit"] }));
+    proc.stdout!.on("data", (d: Buffer) => {
       this.buffer += d.toString();
       for (let nl = this.buffer.indexOf("\n"); nl >= 0; nl = this.buffer.indexOf("\n")) {
         const line = this.buffer.slice(0, nl);
@@ -55,7 +55,7 @@ export class DecideAdapter implements LlmAdapter {
       if (!this.proc) this.start();
       this.waiting.push((line) => done(JSON.parse(line)));
       this.hold(true);
-      this.proc!.stdin.write(JSON.stringify(o) + "\n");
+      this.proc!.stdin!.write(JSON.stringify(o) + "\n");
     }));
     this.queue = next.catch(() => {});
     return next;
@@ -88,6 +88,6 @@ export class DecideAdapter implements LlmAdapter {
   }
 
   close(): void {
-    this.proc?.stdin.end();
+    this.proc?.stdin?.end();
   }
 }
