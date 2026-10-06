@@ -49,7 +49,11 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
     writers’ family (for a third of them, the same model). Reading those parts again with gpt-6.1-sol once the
     Codex limit resets would close that; `part-NN/blind.jsonl` is what a reader is given.
   - `part-13-sol-partial` (145 examples sol wrote before the stop) is kept and is in neither side: never blind-checked.
-  - **Next:** the choice of base model and where it trains (Naz’s, not made).
+  - **Next:** more data in the seats’ own voice (below).
+- **The translator’s own model is being trained** (begun 2026-10-06; decisions log, “The translator’s own model”). Code: `translator/model/` (`encode.ts` programs as steps, `export.ts`, `score.ts`, `adapter.ts`; `py/` the model, `train.py`, `predict.py`, run with `uv run`). Runs and exported data: `runs/translator-model/` on the mini (each run’s folder has its log and a NOTE where its numbers shouldn’t be trusted).
+  - To train: `bun translator/model/export.ts runs/translator-data-2026-10-06/all runs/translator-model/data-N`, then in `translator/model/py`: `uv run python train.py <data> <out> --epochs 45 --renumber 0.8 --forms 0.7 --dropout 0.2 --piece-dropout 0.15` (detached). To score: `bun translator/model/score.ts` for validation, `oikos translator-eval --model decide/<run> --real` for the tests.
+  - **Where it stands:** good on validation (88%), poor on the tests (real 12/180): the training set isn’t in the seats’ voice. The pass mark is agreed (confidently wrong ≤ 1%, right ≥ 90%).
+  - **Codex:** Naz’s plan is Plus now; a five-hour window lasts about 20 minutes of our use. Pilot 9 is paused on his word at day 178 (resume as before when pilots are decided on). Still to run when a window is open: gpt-6.1-sol on the real requests under prompt 0.7.4 (`oikos translator-eval --model codex/gpt-6.1-sol --only-real`).
   - What follows in this section was written before the stop.
 - **The translator's training data is being written**: `runs/translator-data-2026-10-06/` on the mini, 24 parts
   (`part-NN/examples.jsonl`, `manifest.json`, `rejects.jsonl`), by `make.ts` there (its pid in `pid`, its console in

@@ -152,3 +152,12 @@ sources); this list is for the architecture and design ideas.
 |---|---|---|
 | Offending as a choice weighed against the chance and cost of being caught | Becker, G. S. (1968), "Crime and punishment: an economic approach", *Journal of Political Economy* 76(2), 169–217 | The chance of taking falls with the chance of being caught one reckons |
 | Routine activity: crime needs a motivated offender, a suitable target, and no capable guardian | Cohen, L. E. & Felson, M. (1979), "Social change and crime rate trends: a routine activity approach", *American Sociological Review* 44(4), 588–608 | Taking only where one is, from goods there (work), in need |
+
+## The translator's own model (translator/model; docs/design/translator-and-resolver.md §16.10)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Output steps that point at positions of the input instead of writing from a vocabulary | Vinyals, O., Fortunato, M. & Jaitly, N. (2015), "Pointer networks", *Advances in Neural Information Processing Systems* 28 | Every id, amount, name and text in a program is a span of the request (`encode.ts`, the model's span heads) |
+| A word known by hashes of its character n-grams, so an unseen word still has a representation | Bojanowski, P., Grave, E., Joulin, A. & Mikolov, T. (2017), "Enriching word vectors with subword information", *Transactions of the ACL* 5, 135–146 | A piece of the request is known by hashes of itself and of its letters three at a time (`py/model.py`, `features`): no word list |
+| Reader and writer built of attention layers | Vaswani, A. et al. (2017), "Attention is all you need", *Advances in Neural Information Processing Systems* 30 | The model's reader and writer |
+| Fitting one temperature on held-out data so stated confidence matches how often answers are right (to confirm: not built yet) | Guo, C., Pleiss, G., Sun, Y. & Weinberger, K. Q. (2017), "On calibration of modern neural networks", *ICML* | Planned for the threshold below which the model asks back |

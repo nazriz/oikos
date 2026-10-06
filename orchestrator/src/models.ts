@@ -6,10 +6,11 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { DecideAdapter } from "../../translator/model/adapter";
 import { AnthropicAdapter, CodexCliAdapter, OpenAICompatibleAdapter, type Budget, type LlmAdapter, type Price } from "@oikos/participants/llm";
 
 /** Providers whose calls cost nothing per call: local models (your compute), and the Codex CLI on a ChatGPT subscription (flat rate; its usage limits apply). */
-export const LOCAL_PROVIDERS = ["ollama", "local", "codex"];
+export const LOCAL_PROVIDERS = ["ollama", "local", "codex", "decide"];
 
 export function priceTable(): Record<string, Price> {
   const t = JSON.parse(readFileSync(join(import.meta.dir, "../prices.json"), "utf8"));
@@ -44,6 +45,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
     provider === "anthropic" ? new AnthropicAdapter(model, { apiKey: need("ANTHROPIC_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "codex" ? new CodexCliAdapter(model) // ("model@effort": the effort is part of the model's name, so the log records it)
+    : provider === "decide" ? new DecideAdapter(model, env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}) // our own trained model (translator/model)
     : provider === "ollama" ? new OpenAICompatibleAdapter("ollama", model, { baseUrl: o.baseUrl ?? "http://localhost:11434/v1" })
     : provider === "local" ? new OpenAICompatibleAdapter("local", model, { baseUrl: o.baseUrl ?? (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })() })
     : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, codex, ollama or local`); })();

@@ -64,7 +64,7 @@ export const CASES: Case[] = [
   { id: "look-ledger", request: "Inspect the transaction ledger for acc-city and show me every payment over $2,000 this month.", expect: ["none(not_an_act)"] },
   { id: "look-record", request: "Read rec.3 and tell me what it says.", expect: ["none(not_an_act)"] },
   { id: "look-post", request: "Show me who currently holds the planning post.", expect: ["none(not_an_act)"] },
-  { id: "look-ask", request: "Ask the planning officer to send me the list of permits decided this month.", expect: ['message(to=planning, text="Please send me the list of permits decided this month.")', 'message(to="the planning officer", text="Please send me the list of permits decided this month.")', 'message(to="planning officer", text="Please send me the list of permits decided this month.")'], ignore: ["text"], note: "asking someone for it is an act: a letter" },
+  { id: "look-ask", request: "Ask the planning officer to send me the list of permits decided this month.", expect: ['message(to=planning, text="send me the list of permits decided this month")', 'message(to="the planning officer", text="send me the list of permits decided this month")', 'message(to="planning officer", text="send me the list of permits decided this month")'], ignore: ["text"], note: "asking someone for it is an act: a letter" },
   // nothing does it (seen; added 2026-10-06, of the kind the pilots' offices asked for)
   { id: "hold-payment", request: "Temporarily pause the recurring payment rec.90 from acc-city until I release the pause. Keep it on record.", expect: ["none(no_such_act)"] },
   { id: "go-and-see", request: "Visit str.9 today and record whether the waste there has been collected.", expect: ["none(no_such_act)"] },
