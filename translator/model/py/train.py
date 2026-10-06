@@ -214,6 +214,7 @@ def main() -> None:
     ap.add_argument("--validate-every", type=int, default=5); ap.add_argument("--token-budget", type=int, default=12288)
     ap.add_argument("--batch", type=int, default=48); ap.add_argument("--lr", type=float, default=6e-4)
     ap.add_argument("--renumber", type=float, default=0.0); ap.add_argument("--forms", type=float, default=0.0); ap.add_argument("--dropout", type=float, default=0.1); ap.add_argument("--piece-dropout", type=float, default=0.0)
+    ap.add_argument("--resume", action="store_true"); ap.add_argument("--stop-after", type=int, default=0)
     ap.add_argument("--seed", type=int, default=1); ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
     a = ap.parse_args()
     torch.manual_seed(a.seed); random.seed(a.seed)
@@ -262,8 +263,17 @@ def main() -> None:
     report = {"parameters": params, "config": {k: v for k, v in cfg.to_json().items() if k != "vocabulary"}, "seed": a.seed, "renumber": a.renumber, "forms": a.forms, "epochs": []}
     if a.encoder:
         report.update({"encoder_lr": a.encoder_lr, "lr": a.lr, "left_out": left_out})
-    best = -1
-    for epoch in range(1, a.epochs + 1):
+    best, first = -1, 1
+    # A run that was cut short (the machine's memory, a restart) goes on from its last whole epoch: the weights, the
+    # optimiser, the schedule and the draws (all but the graphics device's own, so the losses after differ a little).
+    kept = out / "checkpoint.pt"
+    if a.resume and kept.exists():
+        c = torch.load(str(kept), map_location=device, weights_only=False)
+        model.load_state_dict(c["model"]); opt.load_state_dict(c["opt"]); sched.load_state_dict(c["sched"])
+        random.setstate(c["random"]); torch.set_rng_state(c["torch"].cpu())
+        best, first, report["epochs"] = c["best"], c["epoch"] + 1, c["epochs"]
+        print(f"resumed after epoch {c['epoch']}", flush=True)
+    for epoch in range(first, a.epochs + 1):
         model.train()
         t0 = time.time()
         order = sorted(range(len(train)), key=lambda k: (len(train[k]["row"]["pieces"]) // 16, random.random()))
@@ -289,6 +299,9 @@ def main() -> None:
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step(); sched.step()
             running += loss * len(b); seen += len(b)
+            # Batches of many shapes leave the graphics memory holding what it no longer needs, until it is full.
+            if device.type == "mps" and at % 25 == 24:
+                torch.mps.empty_cache()
         line = {"epoch": epoch, "loss": round(running / seen, 4), "seconds": round(time.time() - t0, 1)}
         if epoch % a.validate_every == 0 or epoch == a.epochs:
             s = score(model, val, device)
@@ -302,8 +315,13 @@ def main() -> None:
                 (out / "validation.jsonl").write_text("\n".join(json.dumps(r) for r in s["results"]) + "\n")
         report["epochs"].append(line)
         print(json.dumps(line), flush=True)
+        torch.save({"model": model.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(), "random": random.getstate(), "torch": torch.get_rng_state(), "best": best, "epoch": epoch, "epochs": report["epochs"]}, str(kept) + ".part")
+        (Path(str(kept) + ".part")).replace(kept)
+        if epoch == a.stop_after:
+            return
     report["best_validation_right"] = best
     (out / "report.json").write_text(json.dumps(report, indent=1))
+    kept.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
