@@ -376,4 +376,50 @@ test("requests written by file: a briefs-only run and the writers' requests take
   const checked = cli("translator-data-check", again, "--answers", answers, "--reader", "reader-y");
   expect(checked.stdout.toString()).toContain(`reader-y: agreed on ${theirsNow.length} of ${theirsNow.length}`);
   expect(json(again, "manifest.json")).toMatchObject({ no_request: 1, blind_check: { reader: "reader-y", agreed: theirsNow.length } });
+
+  // A part weighted toward what seats ask, by the command. Letters only, nine in ten indirect, with more generated
+  // letters than a gold set has of itself (the other functions' programs are as many as ever).
+  const weigh = (name: string, ...args: string[]) => cli("translator-data", log, "--briefs", "--writers", "a,b", "--out", join(d, name), "--per-gold", "2", "--seed", "3", "--floor", "8", "--per-shape", "10", "--validation", "0", ...args);
+  const lettersOnly = weigh("letters", "--only", "message", "--indirect", "0.9", "--generated", "60");
+  expect([lettersOnly.exitCode, lettersOnly.stderr.toString()]).toEqual([0, ""]);
+  const lp = json(join(d, "letters"), "plan.json");
+  expect(lp.options).toMatchObject({ only: ["message"], indirect: 0.9, generated: 60 });
+  expect(lp.gold.by_function.message.synthetic).toBe(60);
+  expect(lp.gold.by_function.vote.synthetic).toBe(100); // (as many as without --generated: it counts the letters only)
+  expect(lp.items.length).toBe(lp.gold.by_function.message.total * 2);
+  expect(lp.items.every((t: any) => t.kind === "request" && t.gold.shape.includes("message("))).toBe(true);
+  const plain = lp.items.filter((t: any) => t.gold.shape === "message(text,to)");
+  expect(plain.length).toBeGreaterThan(60);
+  expect(plain.filter((t: any) => t.indirect).length / plain.length).toBeGreaterThan(0.8);
+  expect(lettersOnly.stdout.toString()).toContain(`requests for ${lp.gold.by_function.message.total} of them (message)`);
+  // Refusals alone, of two labels, to a high floor.
+  const looksOnly = weigh("looks", "--only", "none", "--refusal-labels", "not_an_act,no_such_act", "--refusal-floor", "9", "--no-spares");
+  expect([looksOnly.exitCode, looksOnly.stderr.toString()]).toEqual([0, ""]);
+  const rp = json(join(d, "looks"), "plan.json");
+  expect(rp.options).toMatchObject({ only: ["none"], refusalLabels: ["not_an_act", "no_such_act"], refusalFloor: 9 });
+  const handed = lines(join(d, "looks"), "briefs.jsonl");
+  expect(handed.length).toBe(18);
+  expect(handed.every((x) => x.kind === "refusal")).toBe(true);
+  expect(new Set(rp.items.map((t: any) => t.refusal.label))).toEqual(new Set(["not_an_act", "no_such_act"]));
+  // Taken in, the manifest says what the part was weighted toward, and holds only those labels to the floor.
+  writeFileSync(join(d, "looks.jsonl"), handed.map((x) => JSON.stringify({ id: x.id, request: say(x.brief) })).join("\n") + "\n");
+  expect(cli("translator-data-write", join(d, "looks"), "--requests", join(d, "looks.jsonl"), "--writer", "w").exitCode).toBe(0);
+  const lm = json(join(d, "looks"), "manifest.json");
+  expect(lm).toMatchObject({ only: ["none"], refusal_labels: ["not_an_act", "no_such_act"], indirect_share: 0.5, by_shape: { "none(not_an_act)": 9 } });
+  expect(Object.keys(lm.by_shape).sort()).toEqual(["none(no_such_act)", "none(not_an_act)"]);
+  // (Two briefs for the same routine in the same style are the same brief, and the stand-in then says the same
+  // thing twice: said before, so that label may be one short. No other label is counted short: none was asked for.)
+  expect(Object.keys(lm.short_of_floor).every((l) => l === "no_such_act")).toBe(true);
+  // With models, the same options and the same record.
+  const weighted = join(d, "weighted-models");
+  await trainingData({ ...options, shard: undefined, refusalFloor: undefined, only: ["message"], indirect: 1, writers: [{ adapter: model("a"), prices }], out: weighted });
+  const wm = json(weighted, "manifest.json");
+  expect(wm).toMatchObject({ only: ["message"], indirect_share: 1, by_function: { message: expect.any(Number) } });
+  expect(Object.keys(wm.by_function)).toEqual(["message"]);
+  expect(wm.indirect).toBeGreaterThan(0);
+  expect(Object.keys(wm.request_length).length).toBeGreaterThan(3);
+  // A function or a label the call language doesn't have, or a share that is none, is refused before anything is written.
+  await expect(trainingData({ ...options, only: ["letters"], briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("only: no function letters");
+  await expect(trainingData({ ...options, refusalLabels: ["reading"], briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("refusal labels: no label reading");
+  await expect(trainingData({ ...options, indirect: 9, briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("indirect: a share from 0 to 1");
 });

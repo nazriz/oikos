@@ -69,7 +69,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.5.0";
+export const DATA_VERSION = "0.6.0";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -904,7 +904,7 @@ export const STYLES: { [style: string]: string } = {
   do_not: "Ending with a sentence that begins \"Do not\" and rules out something that was never asked for. It changes nothing about what is asked.",
   stacked: "As one long, careful instruction of stacked clauses, the way an office-holder writes: what is to be done, to or for whom, from what, on what terms, each its own clause in the words a person would use for it, joined by commas, semicolons and \"and\". Nothing is added that the call doesn't say, and no clause is a part of the call read out by its name.",
   early: "As an office-holder writing an instruction for the record: formal, complete sentences, no \"please\" and no question, about 300 characters in two or three sentences. It opens with the words given below, if any are given, and otherwise with an imperative verb (Submit, Direct, Withdraw, Pay, Place, Record, Appoint …). Each organisation, person, office, account, place and record is named by a short description with its id in square brackets straight after it (the works manager [works], the town account [acc-city], council ballot [rec.2045]); inside the brackets is the id and nothing else. The first sentence says the act, all of it (where the call quotes words or fills in a form, they follow at once). What comes after says only what the act is for or what is to stay as it is: it asks for nothing more, and names no id, amount, record or person the call doesn't have.",
-  late: "As an office-holder writing a careful, defensive instruction: formal and exact, complete sentences, no \"please\", no question, and no capacity stated. It opens with an imperative verb (Submit, Withdraw, Direct, Pay, Place, Record, Appoint …). Ids are written bare, never in brackets (from acc-city to acc-c0003, budget rec.4754), with a short description before one where it helps. The first sentence says the act, all of it (where the call quotes words or fills in a form, they follow at once). Then come further sentences that qualify it, each a sentence of its own, as listed below. They ask for nothing more: no second act, nobody else to be written to or told, nothing to be sent to anyone. They name no id, amount, record or person the call doesn't have, and speak of what the act names in plain words (the payment, that account, the notice), not by repeating its ids.",
+  late: "As an office-holder writing a careful, defensive instruction: formal and exact, complete sentences, no \"please\", no question, and no capacity stated. It opens with an imperative verb (Submit, Withdraw, Direct, Pay, Place, Record, Appoint …). Ids are written bare, never in brackets (from acc-city to acc-c0003, budget rec.4754), with a short description before one where it helps. The first sentence says the act, all of it, with every particular the call has said as a seat says them: what, for whom, from what, on what terms, each in a clause of its own, and a few words before an id for what it is (where the call quotes words or fills in a form, they follow at once). Then come further sentences that qualify it, as listed below: each a full sentence of its own, twelve to thirty words, never a tag of five. They ask for nothing more: no second act, nobody else to be written to or told, nothing to be sent to anyone. They name no id, amount, record or person the call doesn't have, and speak of what the act names in plain words (the payment, that account, the notice), not by repeating its ids. The whole request comes to 300 to 700 characters: the length is from saying each thing in full, never from adding anything.",
 };
 
 /** The seats' two voices (pilot-style.md), each a whole way of writing and not one habit. */
@@ -926,7 +926,7 @@ export const DEAL: string[] = Object.keys(STYLES).filter((s) => !SEATS.includes(
  */
 const REFUSAL_STYLES: { [style: string]: string } = {
   early: "As an office-holder writing an instruction for the record: formal, complete sentences, no \"please\" and no question, about 300 characters in two or three sentences. It opens \"As <the office the speaker holds>, …\" (mayor, finance officer, works manager, council clerk …; now and then with the office's own id in square brackets after it) or with an imperative verb. Anything the situation names by an id is given a short description with the id in square brackets straight after it (the town account [acc-city]); inside the brackets is the id and nothing else. The first sentence says what is wanted; what comes after says only what it is for or which particulars matter, and names no id, amount, record or person the situation doesn't give.",
-  late: "As an office-holder writing a careful, defensive instruction: formal and exact, complete sentences, no \"please\", no question, and no capacity stated. It opens with an imperative verb. Ids are written bare, never in brackets, with a short description before one where it helps. The first sentence says what is wanted, all of it. Then two to five further sentences qualify it, each a sentence of its own, of whichever of these kinds fit: which particulars matter or in what order; what is to stay as it is (\"Preserve …\", \"Keep … unchanged.\"); what is not wanted (\"Do not …\"); what to say if it cannot be had or done (\"If … is unavailable, report that rather than …\"). They ask for nothing separate and name no id, amount, record or person the situation doesn't give. (Where the situation speaks of a sentence or two, that is the request before these further sentences; where it says what the request must not say or add, that holds for them too.)",
+  late: "As an office-holder writing a careful, defensive instruction: formal and exact, complete sentences, no \"please\", no question, and no capacity stated. It opens with an imperative verb. Ids are written bare, never in brackets, with a short description before one where it helps. The first sentence says what is wanted, all of it. Then two to five further sentences qualify it, each a sentence of its own, of whichever of these kinds fit: which particulars matter or in what order; what is to stay as it is (\"Preserve …\", \"Keep … unchanged.\"); what is not wanted (\"Do not …\"); what to say if it cannot be had or done (\"If … is unavailable, report that rather than …\"). They ask for nothing separate and name no id, amount, record or person the situation doesn't give. (Where the situation speaks of a sentence or two, that is the request before these further sentences; where it says what the request must not say or add, that holds for them too.) Each further sentence is a full one, twelve to thirty words, and the whole request comes to 300 to 700 characters.",
 };
 
 const OFFICES = ["Mayor", "Works Manager", "Finance Officer", "Planning Officer", "Council Clerk", "Treasurer", "Harbour Master", "Registrar", "Housing Officer", "Chair", "Director", "Secretary", "Head Teacher", "Warden", "Rates Officer", "Building Inspector"];
@@ -949,18 +949,18 @@ const DO_NOT = [
  * instruction to the writer, who words it to suit the act. None asks for anything: the program is the act's alone.
  */
 const QUALIFIERS = [
-  "what must stay as it is (\"Preserve …\", \"Keep … unchanged.\", \"Leave … intact.\")",
-  "what it must not do: a sentence beginning \"Do not\" that rules out something that was never asked for (reversing, cancelling, replacing, paying, ending something)",
-  "what it does not amount to (\"This authorises no …\", \"No … is part of this action.\")",
-  "what to do if it cannot be done as asked (\"If … is unavailable, report that limitation rather than substituting …\")",
-  "what is to be shown before it is carried out (\"Show the exact … for confirmation.\")",
+  "what must stay as it is, naming two or three things in plain words (\"Preserve the existing arrangement, its history and everything already recorded under it just as they stand.\", \"Leave earlier entries, standing instructions and whatever has already been paid or delivered intact.\")",
+  "what it must not do: a sentence beginning \"Do not\" that rules out, each by name, two or three things that were never asked for (\"Do not reverse anything already completed, end the standing arrangement or put a replacement in its place.\")",
+  "what it does not amount to (\"This instruction authorises no further payment, appointment or change beyond the one stated.\", \"No replacement, refund or new agreement is part of this action.\")",
+  "what to do if it cannot be done as asked (\"If it cannot be carried out as stated, report that limitation and the reason for it rather than substituting a different step.\")",
+  "what is to be shown before it is carried out (\"Show the entry that would be made and what it would change, for confirmation before anything is carried out.\")",
 ];
 /** The same for a letter asked for indirectly: about the direction itself, so that none can be read as more words for
  * whoever it goes to. */
 const QUALIFIERS_OF_A_DIRECTION = [
-  "that the direction is all that is wanted (\"This is a direction only.\", \"Do not carry out the work in their place.\")",
-  "that it goes to nobody else (\"Do not send it to any other office.\")",
-  "what it does not amount to (\"This direction authorises no spending.\", \"No payment is part of this action.\")",
+  "that the direction is all that is wanted (\"This is a direction to them and nothing more: do not carry out any part of the work in their place.\")",
+  "that it goes to nobody else (\"Do not send it to any other office or person, and do not publish it.\")",
+  "what it does not amount to (\"This direction authorises no spending, appointment or agreement, and no payment is part of this action.\")",
 ];
 /** An office's id, as a seat writes its own after its capacity ("As mayor [mayor], …"). */
 const officeId = (office: string) => office.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -986,6 +986,12 @@ const ABSORBS_A_RECORD = ["basis", "re", "settles"];
  * request), so they are no riders the request is held to; a "Do not …" among them is recorded as one when the example
  * is made (`doNots`). `indirect`: the program is a letter asked for indirectly (`requestBrief`), whose sentences after
  * the act speak of the direction itself.
+ *
+ * Length (0.6.0): the first part written to these briefs came out at a median of 139 characters in the late voice
+ * (real: 630), the further sentences five words each. The style now says how long each part is (the act with every
+ * particular in a clause of its own; each further sentence twelve to thirty words; 300 to 700 characters in all; a
+ * direction's own words 20 to 45), and each kind shows a sentence of the length meant. Still nothing mechanical holds
+ * a request to it: the manifest counts lengths by style (`request_length`), which is where to look.
  */
 export function styleBrief(style: string, g: Gold, rand: () => number, o: { indirect?: boolean } = {}): { style: string; instruction: string; riders: Rider[] } {
   const base = STYLES[style] ?? style;
@@ -1000,8 +1006,8 @@ export function styleBrief(style: string, g: Gold, rand: () => number, o: { indi
     const r = rand();
     const kinds = o.indirect ? shuffled(QUALIFIERS_OF_A_DIRECTION, rand).slice(0, r < 0.5 ? 1 : 2) : shuffled(QUALIFIERS, rand).slice(0, r < 0.3 ? 2 : r < 0.65 ? 3 : r < 0.9 ? 4 : 5);
     const n = ["one sentence", "two sentences", "three sentences", "four sentences", "five sentences"][kinds.length - 1]!;
-    const first = o.indirect ? " What they are asked to do is itself long and careful, two or three clauses in one sentence (what to do, in what order or by when, what to report back when it is done), all of it between the marks." : "";
-    return { style, instruction: `${base}${first} After the act, write ${n}, no more and no fewer, in this order, each in your own words to suit the act: ${kinds.map((k, i) => `(${i + 1}) ${k}`).join("; ")}.`, riders: [] };
+    const first = o.indirect ? " What they are asked to do is itself long and careful: two or three clauses in one sentence of 20 to 45 words (what to do, by when or in what order, what to report back when it is done), all of it between the marks." : "";
+    return { style, instruction: `${base}${first} After the act, write ${n}, no more and no fewer, in this order, each in your own words to suit the act (the sentences in brackets show the kind and the length, not the words to use): ${kinds.map((k, i) => `(${i + 1}) ${k}`).join("; ")}.`, riders: [] };
   }
   if (style === "capacity") {
     const text = `As ${choose(OFFICES)} of ${choose(TOWNS)}`;
@@ -1330,7 +1336,7 @@ export function indirectNotes(program: string, rand: () => number): string[] {
 
 /** What a writer is told when a letter is to be asked for indirectly. */
 const INDIRECTLY = [
-  "Asked indirectly: this request quotes no letter. It directs, asks, tells or instructs them to do something, or has or gets them to do it, and what they are to do is yours to invent: an ordinary administrative task for whoever they are (arrange, inspect, collect, repair, prepare, review, confirm, report back …), one to three clauses, in the voice of the style. It is something said to them in words: not so many units of a kind of work at a place, not a payment, not a form.",
+  "Asked indirectly: this request quotes no letter. It directs, asks, tells or instructs them to do something, or has or gets them to do it, and what they are to do is yours to invent: an ordinary administrative task for whoever they are (arrange, inspect, collect, repair, prepare, review, confirm, report back …), one to three clauses (more where the style says so), in the voice of the style. It is something said to them in words: not so many units of a kind of work at a place, not a payment, not a form.",
   `In your request, put ${OPEN} straight before the first word of what they are to do and ${CLOSE} straight after its last word, so that the words between the marks are precisely what would be said to them: not the "to" before them, not who they are, not the full stop after. Use the marks once, with no quotation marks between them. Who it goes to is said outside the marks, as the call writes it.`,
 ].join("\n");
 
@@ -1773,6 +1779,10 @@ const UNTIL = ["until the speaker says to resume it", "for a month, and then car
 const ROUTINES = [
   "advertising a post again whenever one falls vacant", "signing renewals as they come in", "sending reminders on a fixed day", "paying bills on the day they arrive",
   "the hours it keeps its counter open", "the order in which it takes up what comes in", "how often it makes its rounds", "issuing a receipt for everything handed in",
+  "taking on a replacement by itself whenever someone leaves", "reordering stock when it runs low", "renewing its agreements on the same terms when they run out", "answering every complaint within a set number of days",
+  "counting its stores at the end of every week", "sending overdue accounts on for collection", "inspecting what it lets before each new tenancy", "posting its accounts where anyone can read them",
+  "putting every purchase above a set sum out to tender", "rounding what it charges to the nearest whole unit", "keeping a waiting list in the order people applied", "closing its books on the last day of the month",
+  "chasing arrears after a set number of days", "giving its own staff first refusal on vacancies", "setting aside a share of what it takes in each month", "sending a collector round on a fixed day",
 ];
 /** The arguments that say where: a place a body could go to. */
 const WHERE = ["at", "on", "in", "from_at", "taken_at", "materials_at"];
@@ -1794,7 +1804,22 @@ function placesIn(p: calls.Program): string[] {
 }
 
 /** What a refusal's writer is told: the situation, and what the request must and mustn't do. */
-export interface RefusalBrief { label: calls.Label; brief: string; mustCopy: string[]; source: string; gold?: string }
+export interface RefusalBrief {
+  label: calls.Label; brief: string; mustCopy: string[]; source: string; gold?: string;
+  /** What else the writer is told where the request is in one of the seats' voices (`refusalRequestBrief`): the
+   * particulars a seat gives with a request of this kind (pilot-style.md), which a short request doesn't have. */
+  seats?: string;
+}
+
+/** What a seat asks for with a request to read or inspect: the stretch of time it covers and what each entry is to
+ * show. (Time is the world's own: days of a year, never a calendar date.) */
+const PARTICULARS = "In this voice the request asks for particulars, as an office-holder does: the stretch of time it covers where that makes sense, in days of the year and never a calendar date (\"for days 40 to 64 of year 2\": choose your own), and what each entry is to show, three or four things by name (each payment's date, amount, recipient and the line it was approved under; each holder and since when; each decision, who made it and on what grounds). They are particulars of what is to be shown, never a second request.";
+/** What a seat says with a request to hold something: what is kept, so that it can be taken up again. */
+const KEPT = "In this voice the request says what is to be kept so that it can be resumed, each thing by name in plain words (the instruction itself and its history, whatever has already been paid under it, the agreement it serves and what is owed under that), and that a permanent cancellation is not wanted; if it cannot be held without being ended, it asks to be told so rather than have it ended.";
+/** What a seat says with a request to go and see: what to look for there and what to note. */
+const LOOKED_FOR = "In this voice the request says what the speaker will look for there and what is to be noted of it, three or four things by name (what state the place is in, whether anything is waiting or missing, who is there, how it compares with what was reported), all of it the speaker's own seeing.";
+/** What a seat says with a request to change a routine: what stays in place while it changes. */
+const STAYS = "In this voice the request says from when the change holds and what stays in place while it does, each thing by name in plain words (what is already under way, what has been agreed, what is already owed or paid).";
 
 /**
  * Briefs for the refusals that have to be worded by someone (the label is fixed by how the brief is built, not by
@@ -1827,15 +1852,15 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
       const p = calls.parseProgram(g.program) as { lines: calls.Line[] };
       const ids = new Set(Object.values(p.lines[0]!.call.args).flatMap((v) => ("id" in v ? [v.id] : [])));
       return { label: "no_such_act", mustCopy: mustAppear(p).filter((x) => ids.has(x)), source: g.source, gold: g.family ?? g.program,
-        brief: `This arrangement already stands and keeps repeating: ${g.program}\nThe speaker wants it ${choose(HELD)} ${choose(UNTIL)}: kept exactly as it is, not ended, cancelled or withdrawn, and not replaced by a new one. It is not a request to write to or ask anyone: the speaker wants the hold itself. Name the arrangement as a person would (the payment, to whom, perhaps how much or how often), never by reading the call out part by part.` };
+        brief: `This arrangement already stands and keeps repeating: ${g.program}\nThe speaker wants it ${choose(HELD)} ${choose(UNTIL)}: kept exactly as it is, not ended, cancelled or withdrawn, and not replaced by a new one. It is not a request to write to or ask anyone: the speaker wants the hold itself. Name the arrangement as a person would (the payment, to whom, perhaps how much or how often), never by reading the call out part by part.`, seats: KEPT };
     }
     if (i % 3 === 1 && places.length) {
       const place = choose(places);
       return { label: "no_such_act", mustCopy: [place], source: "brief",
-        brief: `The speaker wants to go to ${place} in person, see for themselves how things stand there, and note what they find. It is not a request to read a record or a report, nor to ask or send anyone else: the speaker is to go and look.` };
+        brief: `The speaker wants to go to ${place} in person, see for themselves how things stand there, and note what they find. It is not a request to read a record or a report, nor to ask or send anyone else: the speaker is to go and look.`, seats: LOOKED_FOR };
     }
     return { label: "no_such_act", mustCopy: [], source: "brief",
-      brief: `The speaker wants a routine of their own office or organisation changed, stopped or started from now on: ${choose(ROUTINES)}. It is something the office carries on by itself, without anyone asking each time. It is not a request to write to anyone, to publish a rule or a notice, or to undo anything already done, and it names no record.` };
+      brief: `The speaker wants a routine of their own office or organisation changed, stopped or started from now on: ${choose(ROUTINES)}. It is something the office carries on by itself, without anyone asking each time. It is not a request to write to anyone, to publish a rule or a notice, or to undo anything already done, and it names no record.`, seats: STAYS };
   };
   for (let i = 0; i < perLabel; i++) {
     if (payments.length) {
@@ -1856,7 +1881,7 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
       brief: `The speaker wants something done about ${choose(VAGUE)} and doesn't say what: no act, no amount, no one to write to. The vagueness is of this kind: ${choose(VAGUENESS)}. A sentence or two that could mean many different things. It doesn't ask to see or be told anything, and it doesn't begin "Something about".` });
     const named = gold.length ? mustAppear(calls.parseProgram(choose(gold).program)).filter((x) => ID.test(x)) : [];
     const subject = named.length && rand() < 0.75 ? choose(named) : undefined;
-    out.push({ label: "not_an_act", mustCopy: subject ? [subject] : [], source: "brief",
+    out.push({ label: "not_an_act", mustCopy: subject ? [subject] : [], source: "brief", seats: PARTICULARS,
       brief: `The speaker wants to see, read, check or be told something, and to bring nothing about: ${subject ? `${choose(LOOKS)} ${subject}` : choose(LOOKED_AT)}. Put it something like "${choose(LOOK_VERBS)}", in your own words (not "Show me", unless that is the way given). It is for the speaker's own eyes: not a request to ask or tell anyone else. Just ask to look, as a person does: don't add that nothing is to be changed, sent or recorded, or that nobody is to be contacted.` });
     out.push(noSuchAct(i));
   }
@@ -1904,10 +1929,11 @@ export function refusalWriterSystem(): string {
 export const refusalStyle = (b: RefusalBrief, style: string): string => (style === "cited" && !/\b(rec\.\d+|law-[a-z][a-z-]*)\b/.test(b.brief) ? "formal" : style);
 
 /** What a writer is sent for a refusal brief in a style, whoever the writer is. (The seats' voices are worded for a
- * situation: REFUSAL_STYLES.) */
+ * situation: REFUSAL_STYLES; and in them a brief that has particulars of its own to ask for says so: `seats`. The
+ * first part written came out with one-line requests to read and to pause, where a seat's run to several sentences.) */
 export const refusalRequestBrief = (b: RefusalBrief, style: string): string => {
   const s = refusalStyle(b, style);
-  return `Situation:\n${b.brief}\n\nStyle: ${REFUSAL_STYLES[s] ?? STYLES[s] ?? s}`;
+  return `Situation:\n${b.brief}${b.seats && SEATS.includes(s) ? `\n${b.seats}` : ""}\n\nStyle: ${REFUSAL_STYLES[s] ?? STYLES[s] ?? s}`;
 };
 
 /** A request for a refusal brief, from a model. */
@@ -1948,6 +1974,9 @@ export interface Manifest {
   spans: { copy: number; choice: number; implied: number };
   /** Letters asked for indirectly, their text the words the writer marked (`Example.indirect`). */
   indirect: number;
+  /** How long the requests are, by style, in characters: how many, the median and the ninth decile. (The seats'
+   * voices are long by design, 300 characters and more: this is where to see whether the writers made them so.) */
+  request_length: { [style: string]: { requests: number; median: number; p90: number } };
   /** The least asked for of each refusal label, and the labels that came out short of it (with how many there are). */
   refusal_floor?: number;
   short_of_floor?: { [label: string]: number };
@@ -2018,6 +2047,12 @@ export interface PlanOptions {
   /** The share of the letters (`isLetter`) asked for indirectly, "Direct them to …", the writer inventing and marking
    * what is asked of them (none if absent). */
   indirect?: number;
+  /** Requests are planned only for the gold programs whose first call is one of these functions (all, if absent; a
+   * name no function has, as `none`, plans none). The refusal briefs are made from every gold program given, whatever
+   * this says: they need the payments, parties and places of the whole. */
+  only?: string[];
+  /** Refusal briefs are planned for these labels only, and only these are built and held to the floor (all, if absent). */
+  refusalLabels?: string[];
   seed?: number;
 }
 
@@ -2043,7 +2078,8 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
   let turn = 0;
   const next = () => ({ writer: o.writers[turn % o.writers.length]!, styleKey: styles[turn % styles.length]!, n: turn++ });
   const idOf = (n: number, brief: string) => sha256(canonicalJson({ seed, n, brief })).slice(0, 12);
-  for (const given of gold) for (let k = 0; k < (o.perGold ?? 3); k++) {
+  const labelled = (b: RefusalBrief) => !o.refusalLabels || o.refusalLabels.includes(b.label);
+  for (const given of gold) for (let k = 0; k < (o.perGold ?? 3) && (!o.only || o.only.includes(functionOf(given))); k++) {
     const { writer, styleKey, n } = next();
     const g = withHowOften(given, sayRand);
     const indirect = (o.indirect ?? 0) > 0 && isLetter(g.program) && indirectRand() < o.indirect!;
@@ -2055,7 +2091,10 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
   const perLabel = Math.max(o.refusalsPerLabel ?? 0, o.refusalFloor ?? 0);
   for (let round = 0; round < (o.refusalFloor ? 3 : 1); round++) {
     const briefs = round === 0 ? [...(perLabel ? refusalBriefs(gold, perLabel, seed) : []), ...piledBriefs(o.piled ?? [])] : refusalBriefs(gold, perLabel, seed + round * 7919);
-    for (const b of briefs) {
+    // (Some labels only: their briefs come label by label in turn, and so do the styles and the writers, so with two
+    // labels one would get every seat's voice and the other none, and with two writers each would get one label. They
+    // are dealt in a seeded order instead. With every label asked for, the order is as it always was.)
+    for (const b of o.refusalLabels ? shuffled(briefs.filter(labelled), sampler(seed + 29 + round)) : briefs) {
       const { writer, styleKey, n } = next();
       const brief = refusalRequestBrief(b, styleKey);
       plan.push({ id: idOf(n, brief), kind: "refusal", writer, style: refusalStyle(b, styleKey), brief, refusal: b, round });
@@ -2078,6 +2117,7 @@ async function fromPlan(plan: PlanItem[], o: {
   write: (item: PlanItem) => Promise<Written | undefined>;
   refusalsPerLabel?: number;
   refusalFloor?: number;
+  refusalLabels?: string[];
   backs?: Back[];
   heldOut?: Case[];
   seed?: number;
@@ -2238,8 +2278,10 @@ async function fromPlan(plan: PlanItem[], o: {
   const clean = (e: Example) => !shares(e.request) || (dropped.shares_held_out_wording++, false);
   const kept = positives.filter(clean);
   // The floor under each label the built refusals can make: what the written ones left short of it.
-  const floors = o.refusalFloor ? Object.fromEntries(calls.LABELS.map((l) => [l, Math.max(0, o.refusalFloor! - (have[l] ?? 0))])) : {};
-  const examples = [...kept, ...written.filter(clean), ...builtRefusals(kept, o.seed ?? 1, 0.05, floors).filter(clean)];
+  // (Where only some labels were asked for, only those are built and held to the floor.)
+  const labels_ = calls.LABELS.filter((l) => !o.refusalLabels || o.refusalLabels.includes(l));
+  const floors = o.refusalFloor ? Object.fromEntries(labels_.map((l) => [l, Math.max(0, o.refusalFloor! - (have[l] ?? 0))])) : {};
+  const examples = [...kept, ...written.filter(clean), ...builtRefusals(kept, o.seed ?? 1, 0.05, floors).filter((e) => (labels_ as string[]).includes(e.program.slice(5, -1))).filter(clean)];
   const count = (key: (e: Example) => string | undefined) => {
     const out: { [k: string]: number } = {};
     for (const e of examples) {
@@ -2251,13 +2293,17 @@ async function fromPlan(plan: PlanItem[], o: {
   const riders: { [kind: string]: number } = {};
   for (const e of examples) for (const r of e.riders ?? []) riders[r.kind] = (riders[r.kind] ?? 0) + 1;
   const labels = count((e) => (e.kind === "refusal" ? e.program.slice(5, -1) : undefined));
-  const short = o.refusalFloor ? Object.fromEntries(calls.LABELS.filter((l) => (labels[l] ?? 0) < o.refusalFloor!).map((l) => [l, labels[l] ?? 0])) : {};
+  const short = o.refusalFloor ? Object.fromEntries(labels_.filter((l) => (labels[l] ?? 0) < o.refusalFloor!).map((l) => [l, labels[l] ?? 0])) : {};
   const spanCount = (how: Span["how"]) => examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.how === how).length, 0);
   const manifest: Manifest = {
     version: DATA_VERSION, examples: examples.length, by_kind: count((e) => e.kind), by_shape: count((e) => e.shape), by_function: count((e) => functionOf(e)), by_origin: count((e) => e.origin ?? (e.kind === "refusal" ? "refusal" : "unknown")), by_style: count((e) => e.style),
     riders, ambiguous_spans: examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.ambiguous).length, 0),
     spans: { copy: spanCount("copy"), choice: spanCount("choice"), implied: spanCount("implied") },
     indirect: examples.filter((e) => e.indirect).length,
+    request_length: Object.fromEntries(Object.keys(count((e) => e.style)).map((style) => {
+      const lengths = examples.filter((e) => e.style === style).map((e) => e.request.length).sort((a, b) => a - b);
+      return [style, { requests: lengths.length, median: lengths[Math.floor((lengths.length - 1) / 2)]!, p90: lengths[Math.floor((lengths.length - 1) * 0.9)]! }];
+    })),
     ...(o.refusalFloor ? { refusal_floor: o.refusalFloor, short_of_floor: short } : {}),
     writers: count((e) => e.written_by), checked: count((e) => (e.verified_by ? `${e.written_by} -> ${e.verified_by}` : undefined)), checked_by_writer: examples.filter((e) => e.verified_by_writer).length,
     dropped, ...(stopped ? { stopped } : {}), usage: o.usage ?? {},
@@ -2327,7 +2373,7 @@ export interface FromFiles {
  * blind check's work (blind.ts). Several writers' files may each cover part of the plan; an id written twice keeps
  * the first.
  */
-export async function fromWritten(plan: PlanItem[], files: { writer: string; requests: WrittenRequest[] }[], o: { refusalsPerLabel?: number; refusalFloor?: number; heldOut?: Case[]; seed?: number } = {}): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[] }> {
+export async function fromWritten(plan: PlanItem[], files: { writer: string; requests: WrittenRequest[] }[], o: { refusalsPerLabel?: number; refusalFloor?: number; refusalLabels?: string[]; heldOut?: Case[]; seed?: number } = {}): Promise<{ examples: Example[]; manifest: Manifest; rejects: Reject[] }> {
   const ids = new Set(plan.map((t) => t.id));
   const given = new Map<string, Written>();
   const from: FromFiles = { requests: {}, no_request: 0, duplicate_ids: 0, unknown_ids: 0, spares_not_needed: 0 };

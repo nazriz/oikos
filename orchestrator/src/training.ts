@@ -6,6 +6,9 @@
 //   requests for them written by the models given (`--model`, more than one: no single writer's voice), half of them
 //   in the voices the pilots' model seats wrote in, and half of the letters asked for indirectly, as seats ask
 //   ("Direct them to …": data.ts `DEAL`, `marked`);
+//   a part can be weighted toward what seats really ask (pilot-style.md: reading a third, a direction to another
+//   office a sixth, …): requests for some functions only (`only`), more of the letters indirect (`indirect`), the
+//   refusals of some labels only (`refusalLabels`). A gold set left to itself has one function in twenty a letter;
 //   each kept only if it carries its program's literals exactly and reads as a person's request, and, with
 //   `--back-model` (one or more), if a model that didn't write it translates it back to a program that means the same,
 //   through the translator as runs use it.
@@ -75,6 +78,13 @@ export interface TrainingDataOptions {
   /** The share of the letters asked for indirectly, the writer inventing and marking what is asked of whoever they
    * go to (data.ts `planOf`; a half if absent, 0 for none). */
   indirect?: number;
+  /** Requests are written only for the gold programs whose first call is one of these functions (`none`: for no
+   * program at all, so only refusal briefs are planned). The refusal briefs are still made from the whole gold set
+   * (or part). With it, `generated` and `limit` count these functions' programs only: `only: ["message"]` with
+   * `generated: 1500` is a gold set as ever with 1,500 generated letters in it. */
+  only?: string[];
+  /** Refusal briefs are planned for these labels only, and only they are built and held to the floor. */
+  refusalLabels?: string[];
   /** The share of gold programs whose examples are set aside for validation (default 0.15; 0: no split written). */
   validation?: number;
   seed?: number;
@@ -129,7 +139,7 @@ export interface GoldReport {
  * The floor under each refusal label (`refusalFloor`) is kept when requests are written (generate): refusals aren't
  * programs, so it's only carried in the report here.
  */
-export async function balancedGold(sources: string[], o: { perShape?: number; seed?: number; floor?: number; generated?: number; ceiling?: number; refusalFloor?: number } = {}): Promise<{ gold: Gold[]; report: GoldReport }> {
+export async function balancedGold(sources: string[], o: { perShape?: number; seed?: number; floor?: number; generated?: number; ceiling?: number; refusalFloor?: number; /** `generated` is for these functions only (the others get what they get without it). */ only?: string[] } = {}): Promise<{ gold: Gold[]; report: GoldReport }> {
   const seed = o.seed ?? 1;
   const floor = o.floor ?? 300;
   const rand = sampler(seed + 1);
@@ -167,7 +177,7 @@ export async function balancedGold(sources: string[], o: { perShape?: number; se
   const have: { [fn: string]: number } = {};
   for (const g of gold) have[functionOf(g)] = (have[functionOf(g)] ?? 0) + 1;
   for (const fn of Object.keys(calls.ARGS)) {
-    const need = Math.max(floor - (have[fn] ?? 0), o.generated ?? 100, 0);
+    const need = Math.max(floor - (have[fn] ?? 0), (!o.only || o.only.includes(fn) ? o.generated : undefined) ?? 100, 0);
     if (floor > 0 && need > 0) for (const g of synthetic({ only: [fn], perFunction: need, seed, dropped })) add(g);
   }
   const report: GoldReport = { gold: gold.length, by_function: {}, by_source: {}, by_shape: {}, excluded: Object.fromEntries(Object.entries(excluded).sort()), capped, implausible: Object.fromEntries(Object.entries(dropped).sort()), floor, ...(o.refusalFloor ? { refusal_floor: o.refusalFloor } : {}) };
@@ -231,6 +241,10 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     const key = `${m.adapter.provider}/${m.adapter.model}`;
     if (!(m.prices ?? PRICES)[key]) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
   }
+  for (const fn of o.only ?? []) if (fn !== "none" && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone)`);
+  for (const l of o.refusalLabels ?? []) if (!(calls.LABELS as readonly string[]).includes(l)) throw new Error(`refusal labels: no label ${l} (they are: ${calls.LABELS.join(", ")})`);
+  if (o.indirect !== undefined && !(o.indirect >= 0 && o.indirect <= 1)) throw new Error(`indirect: a share from 0 to 1, got ${o.indirect}`);
+  const wanted = (g: Gold) => !o.only || o.only.includes(functionOf(g));
   const balanced = (o.floor ?? 300) > 0 ? await balancedGold(o.sources, o) : undefined;
   let gold = balanced?.gold ?? (await goldOf(o.sources, o));
   log(`${gold.length} gold programs of ${new Set(gold.map((g) => g.shape)).size} shapes`);
@@ -248,18 +262,20 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     });
     log(`part ${index + 1} of ${of}: ${gold.length} programs`);
   }
-  if (o.limit && gold.length > o.limit) {
+  if (o.only) log(`requests for ${gold.filter(wanted).length} of them (${o.only.join(", ")})`);
+  if (o.limit && gold.filter(wanted).length > o.limit) {
     // A sample that touches every function: one of each in turn (each function's in a seeded order), until there are enough.
+    // (Of the functions requests are written for; the other programs stay, for the refusal briefs to be made from.)
     const rand = sampler(o.seed ?? 1);
     const by = new Map<string, Gold[]>();
-    for (const g of gold) (by.get(functionOf(g)) ?? by.set(functionOf(g), []).get(functionOf(g))!).push(g);
+    for (const g of gold.filter(wanted)) (by.get(functionOf(g)) ?? by.set(functionOf(g), []).get(functionOf(g))!).push(g);
     const queues = [...by.keys()].sort().map((fn) => shuffled(by.get(fn)!, rand));
     const taken: Gold[] = [];
     for (let i = 0; taken.length < o.limit; i++) {
       const q = queues[i % queues.length]!;
       if (q.length) taken.push(q.shift()!);
     }
-    gold = taken;
+    gold = [...taken, ...gold.filter((g) => !wanted(g))];
     log(`writing requests for ${gold.length} of them`);
   }
   // What is asked for of the gold set, whoever writes: the same for a run with models and for the briefs alone.
@@ -268,15 +284,17 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   const asked = {
     ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
     ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
-    indirect: o.indirect ?? 0.5, seed: o.seed ?? 1,
+    indirect: o.indirect ?? 0.5, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), seed: o.seed ?? 1,
   };
+  // What a part was weighted toward, for whoever reads its manifest.
+  const weighted = { indirect_share: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusal_labels: o.refusalLabels } : {}) };
   if (o.briefsOnly) {
     const names = o.briefsFor?.length ? o.briefsFor : ["writer"];
     if (new Set(names.map(fileName)).size !== names.length) throw new Error(`writers' names must differ: ${names.join(", ")}`);
     const items = planOf(gold, { ...asked, writers: names });
     const plan: Plan = {
       version: DATA_VERSION, seed: o.seed ?? 1, sources: o.sources, ...(o.shard ? { shard: o.shard } : {}),
-      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, validation: o.validation ?? 0.15 },
+      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), validation: o.validation ?? 0.15 },
       writers: names, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}), items,
     };
     mkdirSync(o.out, { recursive: true });
@@ -327,7 +345,7 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     backs: backs.map((b) => b.back), ...(heldOut ? { heldOut } : {}), log,
   });
   for (const b of backs) manifest.usage[`${b.back.model} (translating back)`] = b.usage;
-  writeData(o.out, { examples, rejects, manifest }, { validation: o.validation ?? 0.15, seed: o.seed ?? 1 }, { sources: o.sources, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}) }, { checked_against_held_out: !!heldOut, cost_microusd: costMicroUsd });
+  writeData(o.out, { examples, rejects, manifest }, { validation: o.validation ?? 0.15, seed: o.seed ?? 1 }, { sources: o.sources, gold_programs: gold.length, ...weighted, ...(balanced ? { gold: balanced.report } : {}) }, { checked_against_held_out: !!heldOut, cost_microusd: costMicroUsd });
   return { examples: examples.length, out: o.out, ...(manifest.stopped ? { stopped: manifest.stopped } : {}) };
 }
 
@@ -361,7 +379,7 @@ export interface Plan {
   seed: number;
   sources: string[];
   shard?: { index: number; of: number };
-  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; validation: number };
+  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; /** The functions requests were planned for, and the refusal labels (all, where absent). */ only?: string[]; refusalLabels?: string[]; validation: number };
   /** Who was asked, in the order the items were dealt (item k to writer k mod n). */
   writers: string[];
   gold_programs: number;
@@ -404,9 +422,11 @@ export async function writtenData(dir: string, files: { file: string; writer: st
   const heldOut = loadHeldOut();
   const r = await fromWritten(plan.items, files.map((f) => ({ writer: f.writer, requests: read(f.file) })), {
     ...(plan.options.refusalsPerLabel ? { refusalsPerLabel: plan.options.refusalsPerLabel } : {}), ...(plan.options.refusalFloor ? { refusalFloor: plan.options.refusalFloor } : {}),
+    ...(plan.options.refusalLabels ? { refusalLabels: plan.options.refusalLabels } : {}),
     ...(heldOut ? { heldOut } : {}), seed: plan.seed,
   });
-  writeData(dir, r, { validation: plan.options.validation, seed: plan.seed }, { sources: plan.sources, gold_programs: plan.gold_programs, ...(plan.gold ? { gold: plan.gold } : {}) },
+  const weighted = { ...(plan.options.indirect !== undefined ? { indirect_share: plan.options.indirect } : {}), ...(plan.options.only ? { only: plan.options.only } : {}), ...(plan.options.refusalLabels ? { refusal_labels: plan.options.refusalLabels } : {}) };
+  writeData(dir, r, { validation: plan.options.validation, seed: plan.seed }, { sources: plan.sources, gold_programs: plan.gold_programs, ...weighted, ...(plan.gold ? { gold: plan.gold } : {}) },
     { ...(plan.shard ? { shard: plan.shard } : {}), plan_version: plan.version, requests_from: files.map((f) => ({ writer: f.writer, file: f.file })), checked_against_held_out: !!heldOut, cost_microusd: 0 });
   const from = r.manifest.from_files!;
   return { examples: r.examples.length, rejects: r.rejects.length, no_request: from.no_request, duplicate_ids: from.duplicate_ids, unknown_ids: from.unknown_ids, out: dir };

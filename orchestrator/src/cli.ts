@@ -49,12 +49,18 @@
 //     participants made in those logs, each checked (training.ts).
 //   oikos translator-data <LOG|DIR>... --briefs [--writers NAME,NAME,...] [--no-spares] --out DIR
 //         [--shard I/N] [--per-shape N] [--per-gold N] [--refusals N] [--refusal-floor N] [--floor N] [--generated N]
-//         [--ceiling N] [--validation SHARE] [--limit N] [--seed N]      (these options on a run with models too)
+//         [--ceiling N] [--validation SHARE] [--limit N] [--seed N]
+//         [--only FN,FN,...] [--indirect SHARE] [--refusal-labels L,L,...]   (these options on a run with models too)
 //     No model: the plan of what is to be written (DIR/plan.json), what each writer is asked, item by item
 //     (DIR/briefs.jsonl: {id, kind, brief}; with --writers, DIR/briefs-NAME.jsonl each, the items dealt in turn), and
 //     the writers' instructions (DIR/writer-instructions.txt), for writers who work on files. --shard I/N: part I of
 //     N of the gold set, counted from 1. --no-spares leaves out the refusals asked for ahead of need (used only where
 //     a label comes out short of its floor).
+//     Weighting a part toward what seats really ask: --only writes requests for the programs of those functions
+//     alone (--only none: for none, refusal briefs only; --generated and --limit then count those functions'
+//     programs); --indirect is the share of plain letters asked for as "Direct them to …" (a half if absent);
+//     --refusal-labels plans, builds and holds to the floor those labels only. All three are in plan.json and the
+//     manifest.
 //   oikos translator-data-write <DIR> --requests FILE --writer NAME [--requests FILE --writer NAME ...]
 //     The requests such writers handed in ({id, request}, a line each), checked as a model's are and made into DIR's
 //     examples.jsonl, rejects.jsonl, blind.jsonl and manifest.json, for translator-data-check.
@@ -226,6 +232,7 @@ try {
     const { trainingData } = await import("./training");
     const pick = (name: string) => chooseModel(name, { budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") });
     const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    const list = (name: string) => flag(name)!.split(",").map((x) => x.trim()).filter(Boolean);
     // (A part is given as people count them, from 1: `--shard 13/24` is the thirteenth of 24.)
     const part = flag("shard") ? /^(\d+)\/(\d+)$/.exec(flag("shard")!) : undefined;
     if (flag("shard") && !part) throw new Error(`--shard: expected I/N (part I of N, from 1), got ${flag("shard")}`);
@@ -235,6 +242,7 @@ try {
       ...(part ? { shard: { index: Number(part[1]) - 1, of: Number(part[2]) } } : {}),
       perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), refusalFloor: num("refusal-floor"), floor: num("floor"), generated: num("generated"), ceiling: num("ceiling"), validation: num("validation"),
       limit: num("limit"), seed: num("seed"), log: console.log,
+      ...(flag("indirect") !== undefined ? { indirect: Number(flag("indirect")) } : {}), ...(flag("only") ? { only: list("only") } : {}), ...(flag("refusal-labels") ? { refusalLabels: list("refusal-labels") } : {}),
     });
     if (has("briefs")) console.log(`${r.briefs} briefs written to ${r.out} (plan.json, briefs.jsonl${flag("writers") ? ", a briefs file for each writer" : ""}, writer-instructions.txt)`);
     else console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);

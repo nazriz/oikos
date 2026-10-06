@@ -313,3 +313,103 @@ test("refusals come in the seats' voices too, long and qualified; what is anothe
   }
   expect(new Set(long.map((e) => e.program)).size).toBeGreaterThanOrEqual(4);
 });
+
+test("a part can be weighted toward what seats ask: requests for some functions only, refusals of some labels only, most letters indirect", async () => {
+  const gold = [...LETTERS, ...ACTS];
+  // Only the letters are written for; the refusal briefs are still made from every program (a payment with its
+  // amount taken out needs the payments).
+  const letters = planOf(gold, { writers: ["w"], perGold: 2, only: ["message"], indirect: 0.9, refusalFloor: 2, seed: 8 });
+  const requests = letters.filter((t): t is Extract<PlanItem, { kind: "request" }> => t.kind === "request");
+  expect(requests.length).toBe(LETTERS.length * 2);
+  expect(requests.every((t) => isLetter(t.gold.program))).toBe(true);
+  expect(requests.filter((t) => t.indirect).length).toBeGreaterThanOrEqual(LETTERS.length * 2 - 3);
+  expect(letters.some((t) => t.kind === "refusal" && t.refusal.label === "needs_calculation" && t.brief.includes("acc-city"))).toBe(true);
+  expect(planOf(gold, { writers: ["w"], perGold: 2, only: ["message", "vote"], seed: 8 }).length).toBe((LETTERS.length + 1) * 2);
+  // No function at all: refusal briefs alone.
+  const none = planOf(gold, { writers: ["w"], perGold: 2, only: ["none"], refusalFloor: 2, seed: 8 });
+  expect(none.length).toBeGreaterThan(0);
+  expect(none.every((t) => t.kind === "refusal")).toBe(true);
+  // Some labels only: so many of each as asked, in every round, and no others (the piled kind is too_much).
+  const o = { perGold: 1, only: ["none"], refusalLabels: ["not_an_act", "no_such_act"], refusalFloor: 5, piled: [[ACTS[0]!, ACTS[1]!]], seed: 8 };
+  const looks = planOf(gold, { ...o, writers: ["w"] });
+  const count = (items: PlanItem[], round: number) => { const out: { [l: string]: number } = {}; for (const t of items) if (t.kind === "refusal" && t.round === round) out[t.refusal.label] = (out[t.refusal.label] ?? 0) + 1; return out; };
+  for (const round of [0, 1, 2]) expect(count(looks, round)).toEqual({ not_an_act: 5, no_such_act: 5 });
+  // Each label in the seats' voices and in others, and for each writer of two (dealt label by label in turn, one
+  // label would have had every seat's voice and one writer every request to read).
+  const many = planOf(gold, { ...o, refusalFloor: 40, writers: ["a", "b"] }).filter((t): t is Extract<PlanItem, { kind: "refusal" }> => t.kind === "refusal" && t.round === 0);
+  for (const label of o.refusalLabels) {
+    const of = many.filter((t) => t.refusal.label === label);
+    for (const [what, n] of [["late", of.filter((t) => t.style === "late").length], ["early", of.filter((t) => t.style === "early").length], ["older", of.filter((t) => !SEATS.includes(t.style)).length], ["a", of.filter((t) => t.writer === "a").length], ["b", of.filter((t) => t.writer === "b").length]] as const) expect([label, what, n >= 5]).toEqual([label, what, true]);
+  }
+  expect(planOf(gold, { ...o, refusalFloor: 40, writers: ["a", "b"] })).toEqual(planOf(gold, { ...o, refusalFloor: 40, writers: ["a", "b"] }));
+  expect(planOf(gold, { ...o, refusalLabels: ["too_much"], writers: ["w"] }).filter((t) => t.kind === "refusal" && t.round === 0).length).toBe(1);
+  // Carried out: nothing of another label is written, built or held to the floor; by file as by model.
+  const run = await generate(gold, { ...o, writers: [model("a")] });
+  expect(run.manifest.by_shape).toEqual({ "none(no_such_act)": 5, "none(not_an_act)": 5 });
+  expect(run.manifest.short_of_floor).toEqual({});
+  const files = await fromWritten(JSON.parse(JSON.stringify(planOf(gold, { ...o, writers: ["stand-in/a"] }))), [{ writer: "stand-in/a", requests: written(planOf(gold, { ...o, writers: ["stand-in/a"] })) }], o);
+  expect(files.examples).toEqual(run.examples);
+  // With programs written for and some labels asked: the refusals that are built keep to the labels too.
+  const mixed = await generate(gold, { perGold: 2, styles: ["terse", "formal"], refusalLabels: ["too_much"], refusalFloor: 3, seed: 8, writers: [model("a")] });
+  expect(Object.keys(mixed.manifest.by_shape).filter((x) => x.startsWith("none("))).toEqual(["none(too_much)"]);
+  expect(mixed.manifest.by_shape["none(too_much)"]).toBeGreaterThanOrEqual(3);
+  const all = await generate(gold, { perGold: 2, styles: ["terse", "formal"], refusalFloor: 3, seed: 8, writers: [model("a")] });
+  expect(Object.keys(all.manifest.by_shape).filter((x) => x.startsWith("none(")).length).toBeGreaterThan(4);
+});
+
+test("the late voice is asked for at a seat's length: every particular in the act, full sentences after it, 300 to 700 characters; the manifest counts lengths by style", async () => {
+  expect(STYLES.late).toContain("with every particular the call has said as a seat says them: what, for whom, from what, on what terms");
+  expect(STYLES.late).toContain("each a full sentence of its own, twelve to thirty words, never a tag of five");
+  expect(STYLES.late).toContain("The whole request comes to 300 to 700 characters");
+  expect(STYLES.late).toContain("never from adding anything");
+  // Each kind of sentence is shown at the length meant (the first part's were five words: so were the examples).
+  const rand = sampler(11);
+  const shown = new Set<string>();
+  for (let i = 0; i < 80; i++) for (const indirect of [false, true]) {
+    const b = styleBrief("late", indirect ? LETTERS[0]! : ACTS[0]!, rand, { indirect }).instruction;
+    expect(b).toContain("the sentences in brackets show the kind and the length, not the words to use");
+    for (const m of b.slice(b.indexOf("After the act")).matchAll(/"([^"]+)"/g)) if (m[1] !== "Do not") shown.add(m[1]!);
+    // A direction's own words: two or three clauses, 20 to 45 words, inside the marks.
+    expect(b.includes("two or three clauses in one sentence of 20 to 45 words (what to do, by when or in what order, what to report back when it is done), all of it between the marks")).toBe(indirect);
+  }
+  expect(shown.size).toBeGreaterThanOrEqual(9);
+  for (const x of shown) expect([x, x.split(" ").length >= 11 && x.length >= 60]).toEqual([x, true]);
+  // The refusals' late voice says the same of its own sentences.
+  expect(refusalRequestBrief({ label: "unclear", brief: "The speaker wants something done.", mustCopy: [], source: "t" }, "late")).toContain("Each further sentence is a full one, twelve to thirty words, and the whole request comes to 300 to 700 characters.");
+  // How long the requests came out, by style: where to see whether the writers made them long.
+  const r = await generate(ACTS, { writers: [model("a")], styles: ["late", "terse"], perGold: 2, seed: 4 });
+  expect(r.manifest.request_length.late).toEqual({ requests: ACTS.length, median: expect.any(Number), p90: expect.any(Number) });
+  expect(r.manifest.request_length.late!.median).toBeGreaterThan(350);
+  expect(r.manifest.request_length.terse!.p90).toBeLessThan(120);
+  expect(r.manifest.request_length.late!.p90).toBeGreaterThanOrEqual(r.manifest.request_length.late!.median);
+});
+
+test("in the seats' voices a request to read asks for particulars, one to pause says what is kept for resuming, one to visit what is looked for", () => {
+  const gold = [g('money(to=acc-landlord-1, amount="$850", from=acc-city, every="monthly", for="rent")'), ...ACTS];
+  const briefs = refusalBriefs(gold, 6, 4);
+  const of = (label: string, has: string) => briefs.find((b) => b.label === label && b.brief.includes(has))!;
+  const look = of("not_an_act", "to bring nothing about"), pause = of("no_such_act", "already stands"), visit = of("no_such_act", "in person"), routine = of("no_such_act", "a routine of their own");
+  for (const style of SEATS) {
+    // To read or inspect: the stretch of time (the world's own days, no calendar date) and what each entry is to show.
+    const read = refusalRequestBrief(look, style);
+    expect(read).toContain("what each entry is to show, three or four things by name");
+    expect(read).toContain("in days of the year and never a calendar date");
+    expect(read).toContain("never a second request");
+    // To pause: what is kept, so that it can be taken up again, and that it is not to be ended for good.
+    expect(refusalRequestBrief(pause, style)).toContain("what is to be kept so that it can be resumed, each thing by name in plain words");
+    expect(refusalRequestBrief(pause, style)).toContain("a permanent cancellation is not wanted");
+    expect(refusalRequestBrief(visit, style)).toContain("what the speaker will look for there and what is to be noted of it");
+    expect(refusalRequestBrief(routine, style)).toContain("what stays in place while it does");
+    // (Said with the situation, before the style.)
+    expect(read.indexOf("In this voice")).toBeLessThan(read.indexOf("\n\nStyle: "));
+  }
+  // The other styles' briefs are as they were: a short request stays short.
+  for (const b of [look, pause, visit, routine]) for (const style of ["terse", "chatty", "formal"]) expect(refusalRequestBrief(b, style)).not.toContain("In this voice");
+  // The other labels have nothing of the kind to add.
+  for (const b of briefs.filter((x) => ["unclear", "not_yours", "needs_calculation"].includes(x.label))) expect(b.seats).toBeUndefined();
+  // Many routines, so a part of nothing but these doesn't say eight things over and over.
+  const routines = new Set(refusalBriefs([], 300, 2).filter((b) => b.label === "no_such_act").map((b) => /from now on: (.+?)\. It is something/.exec(b.brief)![1]));
+  expect(routines.size).toBeGreaterThanOrEqual(20);
+  // Nothing of any place: no town's name and no figure of money in what the generator says.
+  for (const b of [look, pause, visit, routine]) expect(b.seats!).not.toMatch(/[$£€]|[A-Z][a-z]+(brook|ville|town|ford)\b/);
+});
