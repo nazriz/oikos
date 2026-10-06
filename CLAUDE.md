@@ -37,7 +37,7 @@ Naz values honest pushback over agreement. Have opinions, flag trade-offs, and s
 - **Cite the ideas we use** in `docs/research/references.md`, with where they're used; mark the unverified "(to confirm)".
 - **The platform is invisible to seats:** participants see the world's terms only; the kernel, translator and resolver have no in-world identity.
 - **Models:** the mock as long as possible. Real-model runs go through the Codex CLI on Naz's subscription until the translator is trained and the platform is mature; paid APIs need his go-ahead. The driver seat is `gpt-6.1-sol`, simple narrow work (the translator) `gpt-6-luna`, never `gpt-6-astra`; always name the model.
-- **Model runs are training data:** never delete one; keep every run's log. Translator training data is mostly generated (from code participants' calls, requests written in several styles by several models, not one steward's voice); real pilot requests are for style and the test; the held-out test cases stay out of all of it.
+- **Model runs are training data:** never delete one; keep every run's log. Translator training data is mostly generated (from code participants' calls, requests written in several styles by several models, not one steward's voice); real pilot requests and seats’ real situations may be used for training too (Naz, 2026-10-06), except the real test cases (`translator/eval/pilot-cases.ts`) and the seat-days they come from; the held-out test cases stay out of all of it.
 - **Never commit with failing tests.** `bun run test:fast` after a change, `bun run test:all` before a merge.
 - **Nothing references the project's old name** (renamed Oikos, 2026-10-05).
 
