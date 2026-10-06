@@ -19,6 +19,22 @@ export function shown(text: string): { request: string; forms: string[] } {
   return { request, forms: at < 0 ? [] : text.slice(at + marker.length).split("\n").filter((l) => l.startsWith("- ")) };
 }
 
+/** The program a model's steps come to (a span as its first and last piece), or to ask back where no program is
+ * made of them: steps that don't parse, or a span of no piece (a reader with tokens of its own can point at a mark
+ * that is none of the input). */
+export function programOf(input: string, ps: { at: [number, number] }[], steps: (string | [string, number, number])[]): string {
+  try {
+    return decode(input, steps.map((s) => {
+      if (typeof s === "string") return s;
+      const a = ps[s[1]], z = ps[s[2]];
+      if (!a || !z || z.at[1] <= a.at[0]) throw new Error("a span of no piece");
+      return [s[0] as "id", a.at[0], z.at[1]];
+    }));
+  } catch {
+    return "none(unclear)";
+  }
+}
+
 export class DecideAdapter implements LlmAdapter {
   provider = "decide";
   private proc?: ChildProcess;
@@ -67,13 +83,10 @@ export class DecideAdapter implements LlmAdapter {
     const ps = pieces(input);
     const breaks: number[] = [];
     for (let at = input.indexOf("\n"); at >= 0; at = input.indexOf("\n", at + 1)) breaks.push(ps.findIndex((p) => p.at[0] > at));
-    const a = await this.ask({ pieces: ps.map((p) => p.text), breaks });
-    let program: string;
-    try {
-      program = decode(input, a.steps.map((s: string | [string, number, number]) => (typeof s === "string" ? s : [s[0], ps[s[1]]!.at[0], ps[s[2]]!.at[1]])));
-    } catch {
-      program = "none(unclear)"; // steps no program is made of: it asks back
-    }
+    // Where each piece stands goes too: a model whose reader has tokens of its own reads the input by them, and
+    // answers in pieces as every model does.
+    const a = await this.ask({ pieces: ps.map((p) => p.text), breaks, at: ps.map((p) => p.at) });
+    let program = programOf(input, ps, a.steps);
     if (a.sure < (this.o.threshold ?? 0)) program = "none(unclear)";
     this.answers.push({ sure: a.sure, ms: a.ms, program });
     return { program, sure: a.sure, ms: a.ms };

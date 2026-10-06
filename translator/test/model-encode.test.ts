@@ -1,7 +1,7 @@
 // A program as decisions and copies (translator/model/encode.ts): every kind of value comes back exactly.
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
-import { shown } from "../model/adapter";
+import { programOf, shown } from "../model/adapter";
 import { asWord, decode, encode, vocabulary, type Span } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
 
@@ -69,4 +69,17 @@ test("a form's field is an argument by pointing at it in the form as shown; a va
 test("the adapter reads the request and the forms out of what the translator sends a model", () => {
   expect(shown("Request: Pay c0412 $5.")).toEqual({ request: "Pay c0412 $5.", forms: [] });
   expect(shown("Request: Fill it in.\nSecond line.\n\nForms this person knows of:\n- a, to=x, id f: fields n (text)\n- b, to=y, id g: fields m (text)")).toEqual({ request: "Fill it in.\nSecond line.", forms: ["- a, to=x, id f: fields n (text)", "- b, to=y, id g: fields m (text)"] });
+});
+
+test("a model's steps over pieces come to a program, and steps no program is made of ask back", () => {
+  const input = "Pay c0412 $5.";
+  const ps = pieces(input);
+  expect(ps.map((p) => p.text)).toEqual(["Pay", "c0412", "$", "5", "."]);
+  expect(programOf(input, ps, ["fn:money", "arg:amount", ["text", 2, 3], "arg:to", ["id", 1, 1], ")", "eos"])).toBe('money(amount="$5", to=c0412)');
+  expect(programOf(input, ps, ["none:not_yours", "eos"])).toBe("none(not_yours)");
+  // A reader with tokens of its own can point at a mark that is none of the input (piece -1), or past the end.
+  expect(programOf(input, ps, ["fn:money", "arg:to", ["id", -1, 1], ")", "eos"])).toBe("none(unclear)");
+  expect(programOf(input, ps, ["fn:money", "arg:to", ["id", 1, 9], ")", "eos"])).toBe("none(unclear)");
+  expect(programOf(input, ps, ["fn:money", "arg:to", ["id", 3, 1], ")", "eos"])).toBe("none(unclear)");
+  expect(programOf(input, ps, ["fn:money", "arg:to"])).toBe("none(unclear)");
 });

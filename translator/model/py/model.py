@@ -4,8 +4,10 @@ It reads the request (and the forms the person knows of) as pieces, and writes a
 choice from a closed set (a function, an argument, a refusal label, ...) or a span of the pieces it read. It has no
 way to write a word of its own.
 
-Trained from nothing: a piece is known by hashes of itself and of its letters, so there is no word list to carry,
-and an id it has never seen is still something it can point at.
+Two readers, one writer. Trained from nothing: a piece is known by hashes of itself and of its letters, so there is
+no word list to carry, and an id it has never seen is still something it can point at. Or (`Config.encoder`) the
+reader is a small pretrained encoder, fine-tuned: it reads its own tokens (tokens.py maps spans of pieces to spans of
+tokens and back), and the writer, the heads and the loss are the same.
 """
 from __future__ import annotations
 
@@ -37,6 +39,10 @@ class Config:
     max_lines: int = 12
     dropout: float = 0.1
     piece_dropout: float = 0.0
+    # The second arm: a pretrained encoder's name (Hugging Face) in place of the hash reader, and the most tokens
+    # of it an input may be (longer is asked back, never cut).
+    encoder: str = ""
+    max_tokens: int = 512
 
     def to_json(self) -> dict:
         return asdict(self)
@@ -87,21 +93,35 @@ def features(pieces: list[str], breaks: list[int], cfg: Config) -> dict[str, tor
 
 
 class Translator(nn.Module):
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, encoder_from: str | None = None, pretrained: bool = False):
+        """`encoder_from`: where the encoder's make is read from (its name, or a folder saved beside a trained
+        model); `pretrained`: begin from its published weights (training), or leave them to be loaded (answering)."""
         super().__init__()
         self.cfg = cfg
         d = cfg.width
         self.choices = cfg.vocabulary + [f"<{p}>" for p in POINTERS]
         self.n_choices = len(self.choices)
         self.first_pointer = len(cfg.vocabulary)
-        self.word = nn.Embedding(cfg.buckets, d)
-        self.gram = nn.Embedding(cfg.buckets, d)
-        self.shape = nn.Embedding(SHAPES, d)
-        self.line = nn.Embedding(cfg.max_lines, d)
-        self.place = nn.Embedding(cfg.max_pieces, d)
-        self.read_norm = nn.LayerNorm(d)
-        layer = nn.TransformerEncoderLayer(d, cfg.heads, cfg.feed, cfg.dropout, batch_first=True, norm_first=True)
-        self.reader = nn.TransformerEncoder(layer, cfg.reader_layers, enable_nested_tensor=False)
+        if cfg.encoder:
+            from transformers import AutoConfig, AutoModel
+            source = encoder_from or cfg.encoder
+            self.encoder = AutoModel.from_pretrained(source, dtype=torch.float32) if pretrained else AutoModel.from_config(AutoConfig.from_pretrained(source))
+            self.encoder.float()
+            hidden = self.encoder.config.hidden_size
+            # Which line a token is on, added to what the encoder is given. It starts as nothing, so the first
+            # step of training is from the encoder exactly as it was published.
+            self.line = nn.Embedding(cfg.max_lines, hidden)
+            nn.init.zeros_(self.line.weight)
+            self.fit = nn.Linear(hidden, d) if hidden != d else nn.Identity()
+        else:
+            self.word = nn.Embedding(cfg.buckets, d)
+            self.gram = nn.Embedding(cfg.buckets, d)
+            self.shape = nn.Embedding(SHAPES, d)
+            self.line = nn.Embedding(cfg.max_lines, d)
+            self.place = nn.Embedding(cfg.max_pieces, d)
+            self.read_norm = nn.LayerNorm(d)
+            layer = nn.TransformerEncoderLayer(d, cfg.heads, cfg.feed, cfg.dropout, batch_first=True, norm_first=True)
+            self.reader = nn.TransformerEncoder(layer, cfg.reader_layers, enable_nested_tensor=False)
         self.step = nn.Embedding(self.n_choices + 1, d)  # the last is the start of a program
         self.step_place = nn.Embedding(cfg.max_steps + 1, d)
         self.span = nn.Linear(2 * d, d)
@@ -118,6 +138,9 @@ class Translator(nn.Module):
     # ---- reading
     def read(self, f: dict[str, torch.Tensor], pad: torch.Tensor) -> torch.Tensor:
         """f: batched features; pad: True where there is no piece."""
+        if self.cfg.encoder:
+            x = self.encoder.get_input_embeddings()(f["tokens"]) + self.line(f["line"])
+            return self.fit(self.encoder(inputs_embeds=x, attention_mask=(~pad).long()).last_hidden_state)
         g = (self.gram(f["grams"]) * f["gram_mask"].unsqueeze(-1)).sum(2) / f["gram_mask"].sum(2, keepdim=True).clamp(min=1)
         w = self.word(f["word"])
         if self.training and self.cfg.piece_dropout > 0:
@@ -177,7 +200,7 @@ class Translator(nn.Module):
     def translate(self, f: dict[str, torch.Tensor]) -> tuple[list, float]:
         """One request, greedily: its steps (a choice's name, or [kind, first piece, last piece]) and how sure the
         model is of the whole (the product of every decision's probability)."""
-        pad = torch.zeros(1, f["shape"].shape[1], dtype=torch.bool, device=f["shape"].device)
+        pad = torch.zeros(1, f["line"].shape[1], dtype=torch.bool, device=f["line"].device)
         read = self.read(f, pad)
         prev, starts, ends = [self.n_choices], [0], [0]
         steps: list = []
