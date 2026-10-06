@@ -431,14 +431,22 @@ test("requests written by file: a briefs-only run and the writers' requests take
   expect(sp.items.every((t: any) => t.kind === "request" && t.gold.tag === "amount_form" && t.brief.includes("each said against the form's own label for it"))).toBe(true);
   writeFileSync(join(d, "sums.jsonl"), sp.items.map((x: any) => JSON.stringify({ id: x.id, request: say(x.brief) })).join("\n") + "\n");
   expect(cli("translator-data-write", join(d, "sums"), "--requests", join(d, "sums.jsonl"), "--writer", "w").exitCode).toBe(0);
-  expect(json(join(d, "sums"), "manifest.json")).toMatchObject({ only: ["amount_form"], amount_forms: 6, by_function: { form: 48 } });
+  // (This stand-in says each value once and no total: where two fields have the same amount, or a total was asked
+  // for, its request is not the call's and is dropped; the rest are kept.)
+  const sm = json(join(d, "sums"), "manifest.json");
+  expect(sm).toMatchObject({ only: ["amount_form"], amount_forms: 6 });
+  expect(sm.by_function.form + sm.dropped.not_copied).toBe(48);
+  expect(sm.by_function.form).toBeGreaterThan(10);
   const two = weigh("two", "--only", "form,statement", "--pairs", "1", "--pairs-only", "--generated", "40");
   expect([two.exitCode, two.stderr.toString()]).toEqual([0, ""]);
   const tp = json(join(d, "two"), "plan.json");
   expect(tp.options).toMatchObject({ only: ["form", "statement"], pairs: 1, pairsOnly: true });
   expect(tp.items.length).toBeGreaterThan(80);
-  expect(tp.items.every((t: any) => t.kind === "request" && t.pair && t.gold.program.split("\n").length === 2)).toBe(true);
-  expect(new Set(tp.items.map((t: any) => t.pair))).toEqual(new Set(["form+message", "withdraw+message", "withdraw+withdraw"]));
+  // (Two lines each, but for the forms that close with what becomes of them and name nobody: one line, about a
+  // quarter as many as the forms with a direction.)
+  expect(tp.items.every((t: any) => t.kind === "request" && (t.pair ? t.gold.program.split("\n").length === 2 : t.riders.some((r: any) => r.kind === "what_next") && !t.gold.program.includes("\n")))).toBe(true);
+  expect(tp.items.filter((t: any) => !t.pair).length).toBeGreaterThan(5);
+  expect(new Set(tp.items.map((t: any) => t.pair).filter(Boolean))).toEqual(new Set(["form+message", "withdraw+message", "withdraw+withdraw"]));
   await expect(trainingData({ ...options, pairs: 3, briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("pairs: a share from 0 to 1");
   // With models, the same options and the same record.
   const weighted = join(d, "weighted-models");

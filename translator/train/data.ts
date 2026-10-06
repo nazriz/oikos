@@ -77,7 +77,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.8.0";
+export const DATA_VERSION = "0.9.0";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -139,8 +139,11 @@ export const inOnly = (g: Gold, only: string[] | undefined): boolean => !only ||
  * closing "do not …" that rules out what wasn't asked for. */
 export interface Rider {
   /** `mention`: the id of something the request names and the act doesn't touch ("Keep ballot rec.2679 unchanged"):
-   * `text` is the id, given to the writer to use, and every place it stands in the request is recorded. */
-  kind: "capacity" | "citation" | "do_not" | "mention"; text: string;
+   * `text` is the id, given to the writer to use, and every place it stands in the request is recorded.
+   * `total`: a sentence after a form's amounts saying what they come to ("Total 670,000."), which is no field's.
+   * `what_next`: a closing sentence saying what becomes of a form once handed in, with nobody named ("It then goes to
+   * the councillors' ballot."): by the translator's rules that is for whoever takes the form in, and adds no line. */
+  kind: "capacity" | "citation" | "do_not" | "mention" | "total" | "what_next"; text: string;
 }
 
 /** One training example. `kind`: a request with the program it becomes, or one that should be refused. */
@@ -1345,21 +1348,88 @@ export function amountNotes(g: Gold, rand: () => number): string[] {
   if (amounts.length < 2) return [];
   const [a, b] = amounts as [string, string];
   const choices = Object.keys(c.args).filter((k) => spec.fields[k]?.type === "choice" && said(k) !== undefined);
+  // Two fields with the same amount (real requests often have them: two lines of a budget alike): then the label
+  // comes before its amount in every way offered, since that is how the span of each is told from the other's
+  // (`labelBefore`), and the way that puts the label after is not offered.
+  const same = amounts.filter((k) => amounts.some((j) => j !== k && said(j) === said(k)));
+  const purpose = `the label and the amount, then straight on, with no comma or other mark between the amount and them, a few words of your own for what it is for, which fill nothing and name no figure or id ("${label(a)} ${said(a)} for …, ${label(b)} ${said(b)} for …")`;
   const ways = [
+    purpose, purpose,
     `the label, then the amount, one after another ("${label(a)} ${said(a)}; ${label(b)} ${said(b)}")`,
-    `the label and the amount, then a few words of your own for what it is for, which fill nothing and name no figure or id ("${label(a)} ${said(a)} for …, ${label(b)} ${said(b)} for …")`,
     `one list, the form's other answers in it with the amounts, parted by semicolons ("${choices.map((k) => `${label(k)} ${said(k)}; `).join("")}${label(a)} ${said(a)}; ${label(b)} ${said(b)}")`,
-    `in a sentence, each amount beside its label ("… with ${said(a)} under ${label(a)} and ${said(b)} under ${label(b)}")`,
+    ...(same.length ? [] : [`in a sentence, each amount beside its label ("… with ${said(a)} under ${label(a)} and ${said(b)} under ${label(b)}")`]),
   ];
   const out = [`The amounts are each said against the form's own label for it, so that none could be put under another's: ${ways[Math.floor(rand() * ways.length)]!}.`];
+  if (same.length) out.push(`Some of the amounts are the same (${same.map(label).join(", ")}): say the amount once for each of them, each time straight after its own label, never once for several ("… each", "both …").`);
   const text = Object.keys(c.args).find((k) => spec.fields[k]?.type === "text" && (said(k)?.length ?? 0) > 60);
   if (text) {
     const again = amounts.filter((k) => said(text)!.includes(said(k)!));
-    out.push(`The ${label(text)} is long: give it whole, word for word, after its label ("${label(text)[0]!.toUpperCase()}${label(text).slice(1)}: …") or in quotation marks, with nothing run into it.${again.length ? ` Its words say ${again.length === 1 ? "an amount" : "amounts"} that the form also asks for (${again.map(label).join(", ")}): say ${again.length === 1 ? "it against its label all the same, as with the others" : "each of them against its own label all the same, as with the others"}. An amount that stands only in those words fills nothing.` : ""}`);
+    out.push(`What goes under "${label(text)}" is long: give it whole, word for word, after its label ("${label(text)[0]!.toUpperCase()}${label(text).slice(1)}: …") or in quotation marks, with nothing run into it.${again.length ? ` Its words say ${again.length === 1 ? "an amount" : "amounts"} that the form also asks for (${again.map(label).join(", ")}): say ${again.length === 1 ? "it against its label all the same, as with the others" : "each of them against its own label all the same, as with the others"}. An amount that stands only in those words fills nothing.` : ""}`);
   }
   const empty = Object.keys(spec.fields).filter((k) => spec.fields[k]!.type === "amount" && !(k in c.args));
   if (empty.length) out.push(`The form has other amounts that this call leaves empty (${empty.map(label).join(", ")}): say nothing of them.`);
   return out;
+}
+
+/**
+ * What a form's amounts come to, as a sentence for the request to carry after the last of them, outside the form's
+ * long text ("Total 670,000."): it fills nothing, and it is given word for word, a rider (`total`). Real requests
+ * have one ("staff $470,000 for the works crew. Total $670,000 …"), and a model that had seen none copied through it:
+ * the span of an amount ends where the amount ends. Undefined where the form has fewer than two amounts, the money's
+ * writing isn't known, or the total is one of the amounts (a line of nothing beside one other).
+ */
+export function amountTotal(g: Gold, rand: () => number): { rider: Rider; note: string } | undefined {
+  const p = calls.parseProgram(g.program);
+  const c = "none" in p ? undefined : p.lines.map((l) => l.call).find((x) => x.fn === "form");
+  const spec = c && (g.forms ?? []).find((f) => f.form === formOf(calls.callText(c))?.form);
+  if (!c || !spec || !g.currency) return undefined;
+  const amounts = Object.keys(c.args).filter((k) => spec.fields[k]?.type === "amount").map((k) => c.args[k]!).flatMap((v) => ("text" in v ? [v.text] : []));
+  if (amounts.length < 2) return undefined;
+  let sum = 0n;
+  try {
+    for (const a of amounts) sum += BigInt(calls.parseAmount(a, g.currency));
+  } catch {
+    return undefined;
+  }
+  const total = amountWritings(sum, g.currency)[0];
+  if (!total || amounts.includes(total)) return undefined;
+  const text = [`Total ${total}.`, `In all ${total}.`, `Total: ${total}.`, `That is ${total} in all.`][Math.floor(rand() * 4)]!;
+  return { rider: { kind: "total", text }, note: `After the last of the amounts (and outside the form's long text) add this sentence as it stands, which fills nothing: "${text}"` };
+}
+
+/** How a form's field is labelled in a request: its name, an underscore a space. */
+const labelOf = (k: string) => new RegExp(`(?<![A-Za-z0-9])${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/_/g, "[ _-]")}(?![A-Za-z0-9])`, "gi");
+
+/**
+ * Whether the label that stands nearest before a place in a request, of all a form's labels, is this field's own:
+ * how an amount two fields share is told to be the one field's and not the other's ("services 100,000; parks 100,000").
+ */
+export function labelBefore(request: string, spec: FormSpec, field: string, at: [number, number]): boolean {
+  let nearest: string | undefined, end = -1;
+  for (const k of Object.keys(spec.fields)) for (const m of request.slice(0, at[0]).matchAll(labelOf(k))) if (m.index + m[0].length > end) [nearest, end] = [k, m.index + m[0].length];
+  return nearest === field;
+}
+
+/**
+ * Whether every amount of a form that another of its fields shares is placed by its own label: its span is where the
+ * request says the amount straight after that field's label (`labelBefore`), and nowhere else. A request that says a
+ * shared amount once for both ("100,000 each"), or in a way that leaves whose it is to the reader, is not held to
+ * say the call: dropped, like any value not carried.
+ */
+export function sharedAmountsPlaced(request: string, program: string, forms: FormSpec[] = []): boolean {
+  const p = calls.parseProgram(program);
+  if ("none" in p) return true;
+  const spans = spansIn(request, program, forms);
+  for (const [line, l] of p.lines.entries()) {
+    const spec = l.call.fn === "form" ? forms.find((f) => f.form === formOf(calls.callText(l.call))?.form) : undefined;
+    if (!spec) continue;
+    const amounts = Object.entries(l.call.args).flatMap(([k, v]) => (spec.fields[k]?.type === "amount" && "text" in v ? [[k, v.text] as const] : []));
+    for (const [k, value] of amounts.filter(([k, v]) => amounts.some(([j, w]) => j !== k && w === v))) {
+      const sp = spans.find((x) => x.arg === k && (x.line ?? 0) === (p.lines.length > 1 ? line : 0) && x.value === value);
+      if (!sp?.at || sp.ambiguous || !labelBefore(request, spec, k, sp.at)) return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -1700,12 +1770,16 @@ export function strayIds(request: string, program: string, o: { riders?: Rider[]
  * nearest its own, is the one (a line of a program is a call, and so is each commitment nested in an agreement). An
  * occurrence that is another argument's is not this one's as well, and neither is one inside another, longer value
  * that has been placed (an amount a form's long text says again), where the value also stands outside it. Where none
- * of that settles it (one call alone,
+ * of that settles it there, a form's field is where its value stands straight after the field's own label, if in one
+ * place alone (two fields with the same amount: `labelBefore`). Where nothing settles it (one call alone,
  * where every occurrence is among its own values; occurrences equally near), every occurrence is recorded and the
  * span is marked ambiguous.
  */
 export function spansIn(request: string, program: string, forms: FormSpec[] = []): Span[] {
-  const { needed: needs, implied } = valuesOf(calls.parseProgram(program), forms);
+  const parsed = calls.parseProgram(program);
+  const { needed: needs, implied } = valuesOf(parsed, forms);
+  // The form each line fills in, as known: its fields' labels say whose an amount is where two fields share one.
+  const specs = "none" in parsed ? [] : parsed.lines.map((l) => (l.call.fn === "form" ? forms.find((f) => f.form === formOf(calls.callText(l.call))?.form) : undefined));
   const group = (n: Needed) => `${n.line ?? 0}:${n.arg.includes(".") && !/^about\.[^.]+$/.test(n.arg) ? n.arg.slice(0, n.arg.lastIndexOf(".")) : ""}`;
   const found = needs.map((n) => occurrences(request, n));
   const settled: ([number, number] | undefined)[] = found.map((f) => (f.length === 1 ? f[0] : undefined));
@@ -1730,6 +1804,13 @@ export function spansIn(request: string, program: string, forms: FormSpec[] = []
     const places = open(i);
     if (places.length === 1) {
       settled[i] = places[0];
+      continue;
+    }
+    // A form's field: the place that stands straight after its own label, if one alone does.
+    const spec = specs[n.line ?? 0];
+    const labelled = spec && n.arg in spec.fields ? places.filter((at) => labelBefore(request, spec, n.arg, at)) : [];
+    if (labelled.length === 1) {
+      settled[i] = labelled[0];
       continue;
     }
     const own = hull(group(n), i);
@@ -2285,6 +2366,14 @@ export interface PlanOptions {
  * The styles are dealt in turn, to requests and refusals alike: half in the seats' voices, where the caller names none
  * (`DEAL`). Which letters are asked for indirectly is settled here too, by seed (`indirect`).
  */
+/** What becomes of a form once handed in, said with nobody named: a sentence of many makes, so that it is the
+ * saying of it and no one sentence that a model meets. No place's bodies: a council, a board, a committee, members. */
+const GOES = ["It then goes to", "Put it to", "It is to go to", "It should then be put to", "This is for", "From there it goes to", "It is then a matter for", "Let it go on to"];
+const GOES_TO = ["the councillors' ballot", "the council's 14-day ballot", "a vote at the next meeting", "the board for decision", "the committee's next sitting", "the members' ballot", "the next full meeting for a decision", "the usual 21-day ballot", "the panel that decides such things", "a ballot of the members over 7 days"];
+function whatNext(rand: () => number): Rider {
+  return { kind: "what_next", text: `${GOES[Math.floor(rand() * GOES.length)]} ${GOES_TO[Math.floor(rand() * GOES_TO.length)]}.` };
+}
+
 export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
   const styles = o.styles ?? DEAL;
   const seed = o.seed ?? 1;
@@ -2301,15 +2390,27 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
     const one = withHowOften(given, sayRand);
     // Two acts in one request, for a share of the programs that can carry a second (`pairOf`): the act as it is, and
     // a direction to someone about it (a letter asked for indirectly, its words the writer's) or a second withdrawal.
-    const two = (o.pairs ?? 0) > 0 && pairRand() < o.pairs! ? pairOf(one, pairRand) : undefined;
-    if (o.pairsOnly && !two) continue;
+    let two = (o.pairs ?? 0) > 0 && pairRand() < o.pairs! ? pairOf(one, pairRand) : undefined;
+    // The other side of that line, for a fifth of the forms that would have had a direction (a quarter as many as
+    // those that do): the form alone, closing with what becomes of it and nobody named, which is ONE line by the
+    // translator's rules ("adds no line, unless the request asks for someone it names to be told"). Without these a
+    // model learns that any closing sentence about what happens next is a letter.
+    const after = two?.pair === "form+message" && pairRand() < 0.2 ? whatNext(pairRand) : undefined;
+    if (after) two = undefined;
+    if (o.pairsOnly && !two && !after) continue;
     const { writer, styleKey, n } = next();
     const g = two?.gold ?? one;
     const indirect = two ? two.letter !== undefined : (o.indirect ?? 0) > 0 && isLetter(g.program) && indirectRand() < o.indirect!;
     // (A pair's further sentences are about its act, as any act's are: the direction comes last, after them.)
-    const { style, instruction, riders, inside } = styleBrief(styleKey, g, styleRand, { indirect: indirect && !two });
+    const styled = styleBrief(styleKey, g, styleRand, { indirect: indirect && !two });
+    const { style, inside } = styled;
+    // (What a form's amounts come to, a third of the time: after the last of them, a sentence that is no field's.)
+    const total = !indirect || two ? (sayRand() < 0.35 ? amountTotal(one, sayRand) : undefined) : undefined;
+    const riders = [...styled.riders, ...(total ? [total.rider] : []), ...(after ? [after] : [])];
+    const instruction = after ? `${styled.instruction} Whatever else the style asks, the request's last sentence is exactly this one, which says what becomes of the form once it is handed in, names nobody and asks nobody for anything: "${after.text}"` : styled.instruction;
     const notes = two?.letter ? [...writerNotes(one.program, sayRand), ...amountNotes(one, sayRand), ...indirectNotes(two.letter, sayRand).map((x) => x.replace("The act, said", "The direction, said"))]
       : indirect ? indirectNotes(g.program, sayRand) : [...writerNotes(g.program, sayRand), ...amountNotes(g, sayRand)];
+    if (total) notes.push(total.note);
     const brief = requestBrief(g, instruction, notes, { indirect, ...(two ? { pair: two.pair } : {}) });
     plan.push({ id: idOf(n, brief), kind: "request", writer, style, brief, gold: g, riders, notes, ...(indirect ? { indirect: true as const } : {}), ...(inside ? { inside } : {}), ...(two ? { pair: two.pair } : {}) });
   }
@@ -2397,6 +2498,8 @@ async function fromPlan(plan: PlanItem[], o: {
         else if (!(t.riders.every((r) => request.includes(r.text)) && (t.inside ?? []).every((id) => said?.words.includes(id)) && copies(withoutRiders(request, t.riders), program))) out.why = "not_copied";
         // (A form's amount said only inside its long text is under no label: nothing says which field it is.)
         else if (onlyInsideAnother(withoutRiders(request, t.riders), program, t.gold.forms ?? [])) out.why = "not_copied";
+        // (Nor is an amount two fields share, unless the request says it for each straight after that field's label.)
+        else if (!sharedAmountsPlaced(withoutRiders(request, t.riders), program, t.gold.forms ?? [])) out.why = "not_copied";
         else out.why = badlyWritten(request, program, t.riders) ?? (SEATS.includes(t.style) && strayIds(request, program, { riders: t.riders, ...(t.gold.forms ? { forms: t.gold.forms } : {}) }).length ? "stray_id" : undefined);
         if (!out.why && out.check) {
           const failed = dropped.failed;

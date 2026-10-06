@@ -742,8 +742,9 @@ function inventAmountForm(d: Draw, taken: Set<string>): FormSpec {
 
 /**
  * Forms of several amounts filled in, as gold programs (`tag: "amount_form"`): for each invented form (in sets of two,
- * a set one world's, shown alone or beside its fellow), `perForm` ways of filling it in. Every amount is a different
- * one, all written the one way a world writes money. Sometimes only some of the amounts are filled (always two or
+ * a set one world's, shown alone or beside its fellow), `perForm` ways of filling it in. The amounts are
+ * all written the one way a world writes money; in a third two or three fields have the same amount, and now and then
+ * one is nothing. Sometimes only some of the amounts are filled (always two or
  * more). The long text is two to five sentences; about half the time it says some of the form's amounts again in
  * prose, or what they come to, or a figure that is no field's (last time's): the field's amount is the one a request
  * says against its label, and the text is copied whole. For a seed, always the same.
@@ -767,7 +768,9 @@ export function amountForms(o: { forms?: number; perForm?: number; seed?: number
       const all = Object.keys(spec.fields).filter((k) => spec.fields[k]!.type === "amount");
       const some = d.maybe(0.45) ? all.filter((k) => spec.fields[k]!.required || d.maybe(0.5)) : all;
       const lines = some.length >= 2 ? some : all.slice(0, 2);
-      // Amounts: each a different one, round or to the smallest unit.
+      // Amounts: round or to the smallest unit, each a different one to begin with. Then, in a third of the forms
+      // filled in, two or three of the lines are given the same amount (real requests often have two lines alike: a
+      // model that never saw it gives one field's amount to another), and now and then a line is nothing at all.
       const sums = new Map<string, number>();
       for (const k of lines) for (let t = 0; t < 20 && !sums.has(k); t++) {
         const whole = d.int(1, 999) * d.pick([10, 100, 100, 1000]);
@@ -775,12 +778,17 @@ export function amountForms(o: { forms?: number; perForm?: number; seed?: number
         if (![...sums.values()].includes(x)) sums.set(k, x);
       }
       if (sums.size !== lines.length) continue;
+      if (d.maybe(1 / 3)) {
+        const alike = shuffled(lines, rand).slice(0, lines.length >= 3 && d.maybe(0.3) ? 3 : 2);
+        for (const k of alike) sums.set(k, sums.get(alike[0]!)!);
+      }
+      if (d.maybe(0.12)) sums.set(d.pick(lines), 0);
       const total = [...sums.values()].reduce((a, b) => a + b, 0);
       const said = shuffled(lines, rand).slice(0, d.int(1, Math.min(3, lines.length)));
       const sentences = [`This ${words(spec.form)} covers ${d.pick(SPANS_OF_TIME)}.`, d.pick(BESIDES)];
       if (d.maybe(0.5)) {
         for (const k of said) sentences.push(d.pick([`It sets ${words(k)} at ${write(sums.get(k)!)}.`, `It allows ${write(sums.get(k)!)} for ${words(k)}.`, `Of the whole, ${write(sums.get(k)!)} goes to ${words(k)}.`]));
-        if (d.maybe(0.5) && ![...sums.values()].includes(total)) sentences.push(`The lines come to ${write(total)} in all.`);
+        if (d.maybe(0.5) && total > 0 && ![...sums.values()].includes(total)) sentences.push(`The lines come to ${write(total)} in all.`);
         if (d.maybe(0.25)) { const before = (d.int(1, 999) * 100 + 7) * per; if (![...sums.values(), total].includes(before)) sentences.push(`Last time the whole came to ${write(before)}.`); }
       }
       const withText = Object.keys(spec.fields).filter((k) => spec.fields[k]!.type === "text" && (spec.fields[k]!.required || d.maybe(0.8)));

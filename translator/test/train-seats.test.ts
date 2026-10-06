@@ -5,7 +5,7 @@ import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter } from "@oikos/participants/llm";
 import {
-  CLOSE, DEAL, OPEN, SEATS, STYLES, amountNotes, builtRefusals, formLine, inOnly, onlyInsideAnother, pairOf, spansIn, fromWritten, generate, indirectNotes, isLetter, literals, marked, mentions, piledBriefs, planOf, refusalBriefs, refusalRequestBrief, refusalWriterSystem, requestBrief, sampler, shapeOf, split, strayIds, styleBrief,
+  CLOSE, DEAL, OPEN, SEATS, STYLES, amountNotes, amountTotal, builtRefusals, labelBefore, sharedAmountsPlaced, formLine, inOnly, onlyInsideAnother, pairOf, spansIn, fromWritten, generate, indirectNotes, isLetter, literals, marked, mentions, piledBriefs, planOf, refusalBriefs, refusalRequestBrief, refusalWriterSystem, requestBrief, sampler, shapeOf, split, strayIds, styleBrief,
   withText, writerSystem, type Gold, type PlanItem, type RefusalBrief, type WrittenRequest,
 } from "../train/data";
 import { translatorSystem } from "../src/index";
@@ -29,7 +29,13 @@ const programIn = (brief: string) => brief.slice("Call:\n".length, brief.indexOf
 /** The words a style says to open with, to include and to end with, if it gives any. */
 const opening = (brief: string) => /Open with exactly these words: "([^"]+)"/.exec(brief)?.[1];
 const cited = (brief: string) => /Include exactly these words[^:]*: "([^"]+)"/.exec(brief)?.[1];
-const closing = (brief: string) => [.../End with exactly [^:]+: (.+)$/.exec(brief)?.[1]?.matchAll(/"([^"]+)"/g) ?? []].map((m) => ` ${m[1]}`).join("");
+const closing = (brief: string) => [.../End with exactly [^:]+: (.+)$/.exec(brief.split(" Whatever else the style asks")[0]!)?.[1]?.matchAll(/"([^"]+)"/g) ?? []].map((m) => ` ${m[1]}`).join("") + (/last sentence is exactly this one[^:]*: "([^"]+)"/.exec(brief)?.[1]?.replace(/^/, " ") ?? "");
+/** What a form's amounts come to, where the brief gives a sentence for it. */
+const totalled = (brief: string) => /add this sentence as it stands, which fills nothing: "([^"]+)"/.exec(brief)?.[1]?.replace(/^/, " ") ?? "";
+/** A call's values as a stand-in says them: a form's each straight after its own label (so two fields with the same
+ * amount are each said), anything else's one after another. */
+const spoken = (program: string): string => (calls.parseProgram(program) as { lines: calls.Line[] }).lines.map((l) => (l.call.fn !== "form" ? literals({ lines: [l] }).filter((x) => x !== `${OPEN}…${CLOSE}`).join(", ")
+  : `${literals({ lines: [{ call: { fn: "form", args: { form: l.call.args.form!, ...(l.call.args.to ? { to: l.call.args.to } : {}) } } }] }).join(", ")}: ${Object.entries(l.call.args).filter(([k]) => k !== "form" && k !== "to").map(([k, v]) => `${k.replace(/_/g, " ")} ${literals({ lines: [{ call: { fn: "harm", args: { who: v } } }] }).join(" and ")}`).join("; ")}`)).join("; and ");
 /** The ids a brief gives its writer to name (each set off by quotation marks, with what it is), after the words that say so. */
 const idsAfter = (brief: string, words: RegExp): string[] => { const at = brief.search(words); return at < 0 ? [] : [...brief.slice(at, brief.indexOf("The quotation marks here only set", at)).matchAll(/"([^"\s]+)" \(/g)].map((m) => m[1]!); };
 /** Other things an act leaves alone; what a direction concerns; what a request to read, pause or visit covers. */
@@ -51,13 +57,13 @@ const say = (brief: string): string => {
   // (Two acts: the first as any act is said, its further sentences after it, and the direction last, its words marked.)
   if (programIn(brief).includes(`${OPEN}…${CLOSE}`) && !brief.includes("Asked indirectly")) {
     const cites = /^message\(.*re=(rec\.[0-9]+)/m.exec(programIn(brief))?.[1];
-    return `${open}carry this out (${mark}): ${literals(calls.parseProgram(programIn(brief))).filter((l) => l !== `${OPEN}…${CLOSE}`).join(", ")}.${late ? QUALIFIED : ""}${left(brief)}${closing(brief)} Direct them${cites ? `, regarding ${cites},` : ""} to ${OPEN}put it on the list for the next meeting (${mark})${CLOSE}.`;
+    return `${open}carry this out (${mark}): ${spoken(programIn(brief))}.${totalled(brief)}${late ? QUALIFIED : ""}${left(brief)}${closing(brief)} Direct them${cites ? `, regarding ${cites},` : ""} to ${OPEN}put it on the list for the next meeting (${mark})${CLOSE}.`;
   }
   if (brief.includes("Asked indirectly")) {
     const to = literals(calls.parseProgram(programIn(brief))).filter((l) => l !== `${OPEN}…${CLOSE}`);
     return `${open}direct ${to.join(" and ")} to ${OPEN}inspect the drains at ${within(brief).join(" and ") || "the depot"} (${mark}) and report when it is complete${CLOSE}.${late ? " This is a direction only." : ""}${closing(brief)}`;
   }
-  return `${open}carry this out (${mark}): ${literals(calls.parseProgram(programIn(brief))).join(", ")}.${late ? QUALIFIED : ""}${left(brief)}${closing(brief)}`;
+  return `${open}carry this out (${mark}): ${spoken(programIn(brief))}.${totalled(brief)}${late ? QUALIFIED : ""}${left(brief)}${closing(brief)}`;
 };
 const model = (name: string, how: (brief: string) => string = say): LlmAdapter => ({ provider: "stand-in", model: name, complete: async (req) => ({ content: [{ type: "text", text: how(String((req.messages[0] as any).content)) }], usage: { input_tokens: 1, output_tokens: 1 } }) });
 const written = (items: PlanItem[], how: (t: PlanItem) => string = (t) => say(t.brief)): WrittenRequest[] => items.map((t) => ({ id: t.id, request: how(t) }));
@@ -596,7 +602,7 @@ test("a form of several amounts: each said against its label, the long text copi
   expect(amountForms({ forms: 30, seed: 3 })).toEqual(gold);
   expect(gold.length).toBe(120);
   expect(new Set(gold.map((x) => x.source)).size).toBe(30);
-  let partly = 0, again = 0, total = 0, other = 0;
+  let partly = 0, again = 0, total = 0, other = 0, alike = 0, nothing = 0;
   for (const x of gold) {
     expect(x.tag).toBe("amount_form");
     expect(inOnly(x, ["amount_form"]) && inOnly(x, ["form"]) && !inOnly(x, ["money"])).toBe(true);
@@ -612,7 +618,9 @@ test("a form of several amounts: each said against its label, the long text copi
     // Filled: two amounts or more, each a different one, each money as its world writes it; sometimes not all.
     const filled = of("amount").filter((k) => k in c.args).map((k) => (c.args[k] as { text: string }).text);
     expect(filled.length).toBeGreaterThanOrEqual(2);
-    expect(new Set(filled).size).toBe(filled.length);
+    if (new Set(filled).size < filled.length) alike++;
+    if (filled.some((a) => calls.parseAmount(a, x.currency!) === "0")) nothing++;
+    expect(filled.length - new Set(filled).size).toBeLessThanOrEqual(3);
     for (const a of filled) expect(() => calls.parseAmount(a, x.currency!)).not.toThrow();
     if (filled.length < of("amount").length) partly++;
     for (const k of of("amount")) if (spec.fields[k]!.required && filled.length === of("amount").length) expect(k in c.args).toBe(true);
@@ -626,12 +634,19 @@ test("a form of several amounts: each said against its label, the long text copi
     // The writer is told: one of the seats' ways, shown with the call's own values; the text whole; what is left empty.
     const notes = amountNotes(x, sampler(x.program.length));
     expect(notes[0]).toContain("each said against the form's own label for it");
-    expect(filled.filter((a) => notes[0]!.includes(a)).length).toBe(2);
+    expect(filled.filter((a) => notes[0]!.includes(a)).length).toBeGreaterThanOrEqual(2);
+    // Where two fields have the same amount: said once for each, after its label; and the way that puts the label after is not offered.
+    expect(notes.some((n) => n.includes("say the amount once for each of them, each time straight after its own label"))).toBe(new Set(filled).size < filled.length);
+    if (new Set(filled).size < filled.length) for (let i = 0; i < 12; i++) expect(amountNotes(x, sampler(i))[0]).not.toContain("in a sentence, each amount beside its label");
     expect(notes.some((n) => n.includes("is long: give it whole, word for word, after its label"))).toBe(true);
     expect(notes.some((n) => n.includes("say nothing of them"))).toBe(filled.length < of("amount").length);
     expect(notes.some((n) => n.includes("An amount that stands only in those words fills nothing."))).toBe(filled.some((a) => text.includes(a)));
   }
   expect(partly).toBeGreaterThan(20);
+  // About a third with two or three fields alike; now and then a line of nothing.
+  expect(alike).toBeGreaterThan(28);
+  expect(alike).toBeLessThan(60);
+  expect(nothing).toBeGreaterThan(2);
   expect(again).toBeGreaterThan(35);
   expect(again).toBeLessThan(85);
   expect(total).toBeGreaterThan(8);
@@ -641,7 +656,7 @@ test("a form of several amounts: each said against its label, the long text copi
 
   // Where a value stands: said against its label and again inside the text, the field's is the one against the label,
   // and nothing is left ambiguous; the text's span is the whole of it.
-  const x = gold.find((y) => { const m = /"([^"]*It (sets|allows)[^"]*)"/.exec(y.program); return m && y.program.split(m[1]!).length === 2; })!;
+  const x = gold.find((y) => { const m = /"([^"]*It (sets|allows)[^"]*)"/.exec(y.program); return m && y.program.split(m[1]!).length === 2 && !amountNotes(y, sampler(1)).some((n) => n.includes("are the same")); })!;
   const c = (calls.parseProgram(x.program) as { lines: calls.Line[] }).lines[0]!.call;
   const spec = x.forms!.find((f) => f.form === (c.args.form as { id: string }).id)!;
   const said = (k: string) => { const v = c.args[k]!; return "text" in v ? v.text : (v as { id: string }).id; };
@@ -675,8 +690,69 @@ test("a form of several amounts: each said against its label, the long text copi
   expect(plan[0]!.brief).toContain(formLine(spec));
   const dropped = await fromWritten(plan, [{ writer: "w", requests: [{ id: plan[0]!.id, request: lacking }] }]);
   expect(dropped.rejects.map((r) => r.why)).toEqual(["not_copied"]);
-  const kept = await fromWritten(plan, [{ writer: "w", requests: [{ id: plan[0]!.id, request: `${head}${lines.map((k) => `${label(k)} ${said(k)}`).join("; ")}.${tail}` }] }]);
+  const kept = await fromWritten(plan, [{ writer: "w", requests: [{ id: plan[0]!.id, request: `${head}${lines.map((k) => `${label(k)} ${said(k)}`).join("; ")}.${totalled(plan[0]!.brief)}${tail}` }] }]);
   expect(kept.examples.map((e) => [e.program, e.spans!.filter((sp) => sp.ambiguous).length])).toEqual([[x.program, 0]]);
+  // Two fields with the same amount: each field's span is where the amount stands straight after ITS label, in every
+  // way offered (the label alone; a purpose straight after the amount; a list), with the text saying it again or not,
+  // and with a total after the last of them.
+  const twins = gold.filter((y) => amountNotes(y, sampler(1)).some((n) => n.includes("are the same")));
+  expect(twins.length).toBeGreaterThan(28);
+  let withTotal = 0;
+  for (const y of twins) {
+    const cy = (calls.parseProgram(y.program) as { lines: calls.Line[] }).lines[0]!.call;
+    const sy = y.forms!.find((f) => f.form === (cy.args.form as { id: string }).id)!;
+    const val = (k: string) => { const v = cy.args[k]!; return "text" in v ? v.text : (v as { id: string }).id; };
+    const amounts = Object.keys(cy.args).filter((k) => sy.fields[k]?.type === "amount");
+    const rest = Object.keys(cy.args).filter((k) => !["form", "to"].includes(k) && !amounts.includes(k));
+    const sum = amountTotal(y, sampler(2));
+    if (sum) withTotal++;
+    const others_ = rest.map((k) => `${label(k)}: ${val(k)}`).join(" ");
+    const ways = [
+      `Submit the ${label(val("form"))} to ${val("to")}: ${amounts.map((k) => `${label(k)} ${val(k)}`).join("; ")}.${sum ? ` ${sum.rider.text}` : ""} ${others_}`,
+      `Submit the ${label(val("form"))} to ${val("to")} with ${amounts.map((k) => `${label(k)} ${val(k)} for the usual work of the season`).join(", ")}.${sum ? ` ${sum.rider.text}` : ""} ${others_}`,
+      `${others_} Submit the ${label(val("form"))} to ${val("to")}; ${amounts.map((k) => `${label(k)} ${val(k)}`).join("; ")}.`,
+    ];
+    for (const request of ways) {
+      const bare = sum ? request.replace(sum.rider.text, "\u0001".repeat(sum.rider.text.length)) : request;
+      const spans = spansIn(bare, y.program, y.forms);
+      const places = new Set<number>();
+      for (const k of amounts) {
+        const sp = spans.find((z) => z.arg === k)!;
+        expect([k, sp.ambiguous, request.slice(...sp.at!), request.slice(0, sp.at![0]).endsWith(`${label(k)} `), labelBefore(request, sy, k, sp.at!)]).toEqual([k, undefined, val(k), true, true]);
+        places.add(sp.at![0]);
+        // (The span ends where the amount ends: not in the purpose that runs on from it, nor in the total.)
+        expect(request.slice(sp.at![1], sp.at![1] + 1)).toMatch(/[ ;.,]/);
+      }
+      expect(places.size).toBe(amounts.length); // no two fields at one place
+      expect(sharedAmountsPlaced(bare, y.program, y.forms)).toBe(true);
+    }
+    // Said once for both, or with the label after: nothing says whose it is; not the call's request.
+    const twin = amounts.filter((k) => amounts.some((j) => j !== k && val(j) === val(k)));
+    const each = `Submit the ${label(val("form"))} to ${val("to")}: ${amounts.filter((k) => !twin.includes(k)).map((k) => `${label(k)} ${val(k)}; `).join("")}${val(twin[0]!)} each for ${twin.map(label).join(" and ")}. ${others_}`;
+    expect(sharedAmountsPlaced(each, y.program, y.forms)).toBe(false);
+    const after = `Submit the ${label(val("form"))} to ${val("to")} with ${amounts.map((k) => `${val(k)} under ${label(k)}`).join(" and ")}. ${others_}`;
+    expect(sharedAmountsPlaced(after, y.program, y.forms)).toBe(false);
+  }
+  expect(withTotal).toBeGreaterThan(20);
+  // In the pipeline: such a request is dropped as not carrying the call; the total is a rider that adds nothing.
+  const y = twins.find((z) => amountTotal(z, sampler(2)))!;
+  const planned = planOf(twins, { writers: ["w"], perGold: 3, styles: ["formal"], seed: 2 }).filter((t): t is Extract<PlanItem, { kind: "request" }> => t.kind === "request");
+  const totals = planned.filter((t) => t.riders.some((r) => r.kind === "total"));
+  expect(totals.length).toBeGreaterThan(planned.length * 0.2);
+  expect(totals.length).toBeLessThan(planned.length * 0.5);
+  for (const t of totals) expect(t.brief).toContain(`add this sentence as it stands, which fills nothing: "${t.riders.find((r) => r.kind === "total")!.text}"`);
+  expect(planned.filter((t) => t.brief.includes("then straight on, with no comma or other mark between the amount and them, a few words of your own for what it is for")).length).toBeGreaterThan(planned.length * 0.35);
+  const taken = await fromWritten(planned, [{ writer: "w", requests: planned.map((t) => ({ id: t.id, request: say(t.brief) })) }]);
+  expect(taken.rejects).toEqual([]);
+  expect(taken.manifest.riders.total).toBeGreaterThanOrEqual(totals.length - taken.manifest.dropped.duplicate); // (two briefs alike are one request, said before)
+  for (const e of taken.examples.filter((z) => z.kind === "positive")) {
+    for (const sp of e.spans!) expect([sp.arg, sp.ambiguous]).toEqual([sp.arg, undefined]);
+    for (const r of (e.riders ?? []).filter((z) => z.kind === "total")) { expect(e.request.slice(...r.at)).toBe(r.text); for (const sp of e.spans!) if (sp.at) expect(sp.at[1] <= r.at[0] || sp.at[0] >= r.at[1]).toBe(true); }
+  }
+  const once = await fromWritten(planned, [{ writer: "w", requests: planned.map((t) => ({ id: t.id, request: `carry this out (${t.id}): ${literals(calls.parseProgram(t.gold.program)).join(", ")}.${totalled(t.brief)}` })) }]);
+  expect(once.examples.filter((e) => e.kind === "positive")).toEqual([]);
+  expect(once.manifest.dropped.not_copied).toBe(planned.length);
+  expect(y.tag).toBe("amount_form");
   // The whole of them through the pipeline, in every style: by file as by model, and no span left ambiguous by a repeat.
   const o = { perGold: 2, seed: 6 };
   const run = await generate(gold.slice(0, 40), { ...o, writers: [model("a")] });
@@ -731,12 +807,13 @@ test("two acts that are one request: an act and a direction to someone about it,
   const o = { perGold: 6, pairs: 1, pairsOnly: true, seed: 3 };
   const plan = planOf(gold, { ...o, writers: ["stand-in/a"] }).filter((t): t is Extract<PlanItem, { kind: "request" }> => t.kind === "request");
   expect(plan.length).toBe(6 * 5); // (rec.44 is withdrawn by one of ACTS too)
-  expect(plan.every((t) => t.pair && t.gold.program.split("\n").length === 2)).toBe(true);
+  expect(plan.every((t) => (t.pair ? t.gold.program.split("\n").length === 2 : t.riders.some((r) => r.kind === "what_next") && !t.gold.program.includes("\n")))).toBe(true);
   const half = planOf(gold, { writers: ["w"], perGold: 6, pairs: 0.5, seed: 3 }).filter((t) => t.kind === "request");
   expect(half.length).toBe(gold.length * 6);
   expect(half.filter((t) => t.kind === "request" && t.pair).length).toBeGreaterThan(8);
   expect(half.filter((t) => t.kind === "request" && t.pair).length).toBeLessThan(22);
   for (const t of plan) {
+    if (!t.pair) continue; // (the form alone, with what becomes of it: the next test)
     expect(t.brief.startsWith(`Call:\n${withText(t.gold.program, "⟦…⟧")}\n\n`)).toBe(true);
     if (t.pair === "withdraw+withdraw") { expect([t.indirect, t.brief.includes("The same thing done twice in one request")]).toEqual([undefined, true]); continue; }
     expect(t.indirect).toBe(true);
@@ -758,8 +835,9 @@ test("two acts that are one request: an act and a direction to someone about it,
   expect(files.examples).toEqual(run.examples);
   expect(run.rejects).toEqual([]);
   const pairs = run.examples.filter((e) => e.pair);
-  expect(pairs.length).toBe(30);
-  expect(run.manifest.pairs).toEqual({ "form+message": 6, "withdraw+message": expect.any(Number), "withdraw+withdraw": expect.any(Number) });
+  expect(pairs.length).toBe(items.filter((t) => t.kind === "request" && t.pair).length);
+  expect(pairs.length).toBeGreaterThan(24);
+  expect(run.manifest.pairs).toEqual({ "form+message": expect.any(Number), "withdraw+message": expect.any(Number), "withdraw+withdraw": expect.any(Number) });
   for (const e of pairs) {
     const p = calls.parseProgram(e.program) as { lines: calls.Line[] };
     expect([e.kind, p.lines.length, e.program.startsWith("none(")]).toEqual(["positive", 2, false]);
@@ -792,4 +870,51 @@ test("two acts that are one request: an act and a direction to someone about it,
   const unmarked = await generate(gold, { ...o, writers: [model("a", (b) => say(b).replace(/[⟦⟧]/g, ""))] });
   expect(unmarked.manifest.dropped.marks).toBe(plan.filter((t) => t.indirect).length);
   expect(unmarked.examples.filter((e) => e.pair).every((e) => e.pair === "withdraw+withdraw")).toBe(true);
+});
+
+test("what becomes of a form, with nobody named, is no second line: a form alone that closes so, a quarter as many as the forms with a direction", async () => {
+  // The translator's own rule for it.
+  expect(translatorSystem()).toContain("What becomes of a form once it's handed in (put to a vote, decided, processed) is for whoever takes it in: it adds no line, unless the request asks for someone it names to be told.");
+  const gold = amountForms({ forms: 60, seed: 8 });
+  const o = { perGold: 2, pairs: 1, pairsOnly: true, seed: 8 };
+  const plan = planOf(gold, { ...o, writers: ["stand-in/a"] }).filter((t): t is Extract<PlanItem, { kind: "request" }> => t.kind === "request");
+  const [directed, alone] = [plan.filter((t) => t.pair === "form+message"), plan.filter((t) => !t.pair)];
+  expect(directed.length + alone.length).toBe(gold.length * 2);
+  expect(alone.length / directed.length).toBeGreaterThan(0.17);
+  expect(alone.length / directed.length).toBeLessThan(0.34);
+  const sentences = new Set<string>();
+  for (const t of alone) {
+    // One line, the form's; the closing sentence given word for word, a rider; in every voice the plan deals.
+    expect([t.gold.program.includes("\n"), t.indirect, gold.some((x) => x.program === t.gold.program)]).toEqual([false, undefined, true]);
+    const next = t.riders.filter((r) => r.kind === "what_next");
+    expect(next.length).toBe(1);
+    sentences.add(next[0]!.text);
+    expect(t.brief).toContain(`the request's last sentence is exactly this one, which says what becomes of the form once it is handed in, names nobody and asks nobody for anything: "${next[0]!.text}"`);
+    expect(t.brief).not.toContain("Two things in one request");
+    // (It names no one: no id, no office, nobody to be told.)
+    expect(next[0]!.text).not.toMatch(/\b(clerk|officer|manager|registrar|secretary|treasurer)\b|[a-z]+[.-][0-9]/);
+    expect(strayIds(next[0]!.text, "vote(ballot=rec.1, choice=yes)")).toEqual([]);
+  }
+  expect(sentences.size).toBeGreaterThan(Math.min(20, alone.length / 2));
+  expect(new Set(alone.map((t) => (SEATS.includes(t.style) ? t.style : "older")))).toEqual(new Set(["early", "late", "older"]));
+  // No pairs asked for, none of these either; and with a share of pairs, the same quarter.
+  expect(planOf(gold, { perGold: 2, seed: 8, writers: ["w"] }).some((t) => t.kind === "request" && t.riders.some((r) => r.kind === "what_next"))).toBe(false);
+  // Written: a positive of one line, the form's program as it was, the sentence recorded as adding nothing.
+  const run = await generate(gold, { ...o, writers: [model("a")] });
+  expect(run.rejects).toEqual([]);
+  expect((await fromWritten(JSON.parse(JSON.stringify(planOf(gold, { ...o, writers: ["stand-in/a"] }))), [{ writer: "stand-in/a", requests: written(planOf(gold, { ...o, writers: ["stand-in/a"] })) }], o)).examples).toEqual(run.examples);
+  const closed = run.examples.filter((e) => (e.riders ?? []).some((r) => r.kind === "what_next"));
+  expect(closed.length).toBe(alone.length);
+  expect(run.manifest.riders.what_next).toBe(alone.length);
+  for (const e of closed) {
+    expect([e.kind, e.pair, e.program.includes("\n"), e.shape.startsWith("form(")]).toEqual(["positive", undefined, false, true]);
+    const r = e.riders!.find((x) => x.kind === "what_next")!;
+    expect([r.adds, e.request.slice(...r.at), e.request.endsWith(r.text)]).toEqual(["nothing", r.text, true]);
+    for (const sp of e.spans!) if (sp.at) expect(sp.at[1] <= r.at[0]).toBe(true);
+  }
+  expect(run.examples.filter((e) => e.pair === "form+message").length).toBe(directed.length);
+  // Left out, the request is a plain form's and not what was asked for: dropped.
+  const without = await generate(gold, { ...o, writers: [model("a", (b) => say(b).replace(/ [A-Z][^.]*(ballot|meeting|decision|sitting|things|days)[^.]*\.$/, ""))] });
+  expect(without.examples.filter((e) => (e.riders ?? []).some((r) => r.kind === "what_next"))).toEqual([]);
+  expect(without.manifest.dropped.not_copied).toBeGreaterThanOrEqual(alone.length);
 });
