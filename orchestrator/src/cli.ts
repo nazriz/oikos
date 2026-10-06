@@ -50,7 +50,8 @@
 //   oikos translator-data <LOG|DIR>... --briefs [--writers NAME,NAME,...] [--no-spares] --out DIR
 //         [--shard I/N] [--per-shape N] [--per-gold N] [--refusals N] [--refusal-floor N] [--floor N] [--generated N]
 //         [--ceiling N] [--validation SHARE] [--limit N] [--seed N]
-//         [--only FN,FN,...] [--indirect SHARE] [--refusal-labels L,L,...]   (these options on a run with models too)
+//         [--only FN,FN,...] [--indirect SHARE] [--refusal-labels L,L,...]
+//         [--amount-forms N] [--pairs SHARE [--pairs-only]]                  (these options on a run with models too)
 //     No model: the plan of what is to be written (DIR/plan.json), what each writer is asked, item by item
 //     (DIR/briefs.jsonl: {id, kind, brief}; with --writers, DIR/briefs-NAME.jsonl each, the items dealt in turn), and
 //     the writers' instructions (DIR/writer-instructions.txt), for writers who work on files. --shard I/N: part I of
@@ -60,7 +61,10 @@
 //     alone (--only none: for none, refusal briefs only; --generated and --limit then count those functions'
 //     programs); --indirect is the share of plain letters asked for as "Direct them to …" (a half if absent);
 //     --refusal-labels plans, builds and holds to the floor those labels only. All three are in plan.json and the
-//     manifest.
+//     manifest. --amount-forms N adds N invented forms of several amounts to the gold set, each filled in four
+//     ways (--only amount_form: requests for those alone). --pairs SHARE asks for that share of the forms filled in
+//     and of the withdrawals with a second act in the same request (a direction to someone about it, or a second
+//     withdrawal: one request of two lines, never too_much); --pairs-only writes requests for those alone.
 //   oikos translator-data-write <DIR> --requests FILE --writer NAME [--requests FILE --writer NAME ...]
 //     The requests such writers handed in ({id, request}, a line each), checked as a model's are and made into DIR's
 //     examples.jsonl, rejects.jsonl, blind.jsonl and manifest.json, for translator-data-check.
@@ -258,6 +262,7 @@ try {
       perShape: num("per-shape"), perGold: num("per-gold"), refusalsPerLabel: num("refusals"), refusalFloor: num("refusal-floor"), floor: num("floor"), generated: num("generated"), ceiling: num("ceiling"), validation: num("validation"),
       limit: num("limit"), seed: num("seed"), log: console.log,
       ...(flag("indirect") !== undefined ? { indirect: Number(flag("indirect")) } : {}), ...(flag("only") ? { only: list("only") } : {}), ...(flag("refusal-labels") ? { refusalLabels: list("refusal-labels") } : {}),
+      amountForms: num("amount-forms"), pairs: num("pairs"), pairsOnly: has("pairs-only"),
     });
     if (has("briefs")) console.log(`${r.briefs} briefs written to ${r.out} (plan.json, briefs.jsonl${flag("writers") ? ", a briefs file for each writer" : ""}, writer-instructions.txt)`);
     else console.log(`${r.examples} examples written to ${r.out} (examples.jsonl, manifest.json)${r.stopped ? `; writing stopped early: ${r.stopped}` : ""}`);

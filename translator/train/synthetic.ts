@@ -717,6 +717,102 @@ export function syntheticForms(o: FormOptions = {}): Gold[] {
   return out;
 }
 
+// ---------------------------------------------------------------- forms of several amounts
+
+/** What a line of spending can be for: a form's amount fields are named for some of these. Ordinary words, no place's. */
+const SPENT_ON = ["wages", "upkeep", "lighting", "drainage", "tools", "fuel", "training", "repairs", "cleaning", "printing", "insurance", "hire", "seed", "feed", "fencing", "paving", "signage", "catering", "prizes", "storage", "transport", "surveys", "reserve", "grants", "materials", "security", "heating", "planting", "stationery", "licences", "equipment", "outreach"];
+const LINE_ENDS = ["", "", "_line", "_budget", "_cost", "_allowance"];
+const LONG_TEXTS = ["proposal", "proposal_text", "full_proposal", "details", "summary", "statement", "justification", "explanation", "case", "terms"];
+const SPANS_OF_TIME = ["the coming year", "the next quarter", "the season ahead", "the next six months", "the year to come", "the winter"];
+const BESIDES = ["It replaces the figures agreed before.", "Nothing in it changes what has already been agreed.", "It was drawn up after the last meeting.", "Every line was costed from last season's bills.", "It is put forward for a decision at the next meeting.", "No line may be spent on anything but what it is named for."];
+
+/** A form with three to seven amounts, one or two choices and one long text: a budget, an estimate, a claim for costs. */
+function inventAmountForm(d: Draw, taken: Set<string>): FormSpec {
+  let form = "";
+  for (let tries = 0; tries < 200 && (!form || taken.has(form)); tries++) form = [...new Set([d.pick([...FORM_WORDS, "spending", "estimates", "allocation", "costs", "funding"]), d.pick(["proposal", "request", "return", "claim", "submission", "application", "estimate", "plan"])])].join("_");
+  taken.add(form);
+  const end = d.pick(LINE_ENDS);
+  const lines = shuffled(SPENT_ON, d.rand).slice(0, d.int(3, 7)).map((w): [string, FormField] => [`${w}${end}`, { type: "amount", ...(d.maybe(0.6) ? { required: true } : {}) }]);
+  const choices = shuffled(FIELD_NAMES.choice!, d.rand).slice(0, d.int(1, 2)).map((k): [string, FormField] => [k, { type: "choice", required: true, options: optionsFor(d) }]);
+  const text: [string, FormField] = [d.pick(LONG_TEXTS), { type: "text", ...(d.maybe(0.7) ? { required: true } : {}) }];
+  // (As forms list them: what kind it is first or last, the amounts together, the long text at one end.)
+  const body = d.maybe(0.5) ? [...choices, ...lines] : [...lines, ...choices];
+  return { form, to: d.officeId(), fields: Object.fromEntries(d.maybe(0.7) ? [...body, text] : [text, ...body]) };
+}
+
+/**
+ * Forms of several amounts filled in, as gold programs (`tag: "amount_form"`): for each invented form (in sets of two,
+ * a set one world's, shown alone or beside its fellow), `perForm` ways of filling it in. Every amount is a different
+ * one, all written the one way a world writes money. Sometimes only some of the amounts are filled (always two or
+ * more). The long text is two to five sentences; about half the time it says some of the form's amounts again in
+ * prose, or what they come to, or a figure that is no field's (last time's): the field's amount is the one a request
+ * says against its label, and the text is copied whole. For a seed, always the same.
+ * These are longer than what a sentence or two asks (a text of up to some 400 characters, up to a dozen values), which
+ * is what a seat's form request is: they are not held to `askable`, only to the contract and to `implausible`.
+ */
+export function amountForms(o: { forms?: number; perForm?: number; seed?: number; currencies?: Currency[]; dropped?: { [reason: string]: number } } = {}): Gold[] {
+  const out: Gold[] = [];
+  const seen = new Set<string>();
+  const taken = new Set<string>();
+  const currencies = o.currencies ?? CURRENCIES;
+  const words = (k: string) => k.replace(/_/g, " ");
+  for (let si = 0; si * 2 < (o.forms ?? 20); si++) {
+    const rand = sampler(hash(`${o.seed ?? 1}:amount forms ${si}`));
+    const d = new Draw(rand, currencies);
+    d.currency = currencies[si % currencies.length]!;
+    const per = 10 ** d.currency.minor_units;
+    const write = (n: number) => amountWritings(BigInt(n), d.currency)[0]!;
+    const set = [inventAmountForm(d, taken), inventAmountForm(d, taken)].slice(0, (o.forms ?? 20) - si * 2);
+    for (const spec of set) for (let n = 0, tries = 0; n < (o.perForm ?? 4) && tries < 40; tries++) {
+      const all = Object.keys(spec.fields).filter((k) => spec.fields[k]!.type === "amount");
+      const some = d.maybe(0.45) ? all.filter((k) => spec.fields[k]!.required || d.maybe(0.5)) : all;
+      const lines = some.length >= 2 ? some : all.slice(0, 2);
+      // Amounts: each a different one, round or to the smallest unit.
+      const sums = new Map<string, number>();
+      for (const k of lines) for (let t = 0; t < 20 && !sums.has(k); t++) {
+        const whole = d.int(1, 999) * d.pick([10, 100, 100, 1000]);
+        const x = whole * per + (per > 1 && d.maybe(0.3) ? d.int(1, per - 1) : 0);
+        if (![...sums.values()].includes(x)) sums.set(k, x);
+      }
+      if (sums.size !== lines.length) continue;
+      const total = [...sums.values()].reduce((a, b) => a + b, 0);
+      const said = shuffled(lines, rand).slice(0, d.int(1, Math.min(3, lines.length)));
+      const sentences = [`This ${words(spec.form)} covers ${d.pick(SPANS_OF_TIME)}.`, d.pick(BESIDES)];
+      if (d.maybe(0.5)) {
+        for (const k of said) sentences.push(d.pick([`It sets ${words(k)} at ${write(sums.get(k)!)}.`, `It allows ${write(sums.get(k)!)} for ${words(k)}.`, `Of the whole, ${write(sums.get(k)!)} goes to ${words(k)}.`]));
+        if (d.maybe(0.5) && ![...sums.values()].includes(total)) sentences.push(`The lines come to ${write(total)} in all.`);
+        if (d.maybe(0.25)) { const before = (d.int(1, 999) * 100 + 7) * per; if (![...sums.values(), total].includes(before)) sentences.push(`Last time the whole came to ${write(before)}.`); }
+      }
+      const withText = Object.keys(spec.fields).filter((k) => spec.fields[k]!.type === "text" && (spec.fields[k]!.required || d.maybe(0.8)));
+      const args: Args = { form: id(spec.form), to: id(spec.to) };
+      for (const [k, f] of Object.entries(spec.fields)) {
+        if (f.type === "amount" && sums.has(k)) args[k] = tx(write(sums.get(k)!));
+        else if (f.type === "choice") args[k] = id(d.pick(f.options!));
+        else if (f.type === "text" && withText.includes(k)) args[k] = tx(sentences.join(" "));
+      }
+      let p: calls.Program;
+      try {
+        p = calls.parseProgram(calls.programText(calls.programOf(call("form", args))));
+      } catch {
+        continue;
+      }
+      if (calls.contractErrors(p).length) continue;
+      const shown = d.maybe(0.5) ? [spec] : shuffled(set, rand);
+      const why = implausible(p, { invented: true, forms: shown });
+      if (why) {
+        if (o.dropped) o.dropped[why] = (o.dropped[why] ?? 0) + 1;
+        continue;
+      }
+      const program = goldText(p);
+      if (seen.has(program)) continue;
+      seen.add(program);
+      out.push({ program, shape: shapeOf(calls.parseProgram(program)), names: Object.fromEntries(Object.entries(d.names).filter(([k]) => k === spec.to)), source: `synthetic: amount form ${spec.form}`, origin: "synthetic", currency: d.currency, forms: shown, tag: "amount_form" });
+      n++;
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- several separate acts about the same thing
 
 /** Separate acts about one person, and about one organisation: each a different function, none depending on another,

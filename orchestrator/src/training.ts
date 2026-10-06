@@ -29,8 +29,8 @@ import { createTranslator, Knowledge } from "@oikos/translator";
 import { loadHeldOut, TEST_CURRENCY } from "@oikos/translator/eval";
 import { CASES } from "../../translator/eval/cases";
 import { blindRequests, checkAnswers, type BlindAnswer, type BlindReport } from "../../translator/train/blind";
-import { CLOSE, DATA_VERSION, OPEN, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
-import { piled, synthetic } from "../../translator/train/synthetic";
+import { CLOSE, DATA_VERSION, OPEN, inOnly, fromWritten, functionOf, generate, goldFromCases, goldFromLog, knowing, planOf, refusalWriterSystem, sampler, shuffled, split, surfaceVariant, writerSystem, type Back, type Example, type Gold, type Manifest, type PlanItem, type Reject, type WrittenRequest } from "../../translator/train/data";
+import { amountForms, piled, synthetic } from "../../translator/train/synthetic";
 import { logsIn } from "./corpus";
 import { logLines, runOf } from "./logs";
 
@@ -85,6 +85,14 @@ export interface TrainingDataOptions {
   only?: string[];
   /** Refusal briefs are planned for these labels only, and only they are built and held to the floor. */
   refusalLabels?: string[];
+  /** So many forms of several amounts are invented and added to the gold set, each filled in four ways
+   * (synthetic.ts `amountForms`; none if absent). `only: ["amount_form"]` writes requests for them alone. */
+  amountForms?: number;
+  /** The share of forms filled in and of withdrawals asked for with a second act in the same request (a direction to
+   * someone about it, or a second withdrawal: data.ts `pairOf`; none if absent), and whether requests are written
+   * for those alone. */
+  pairs?: number;
+  pairsOnly?: boolean;
   /** The share of gold programs whose examples are set aside for validation (default 0.15; 0: no split written). */
   validation?: number;
   seed?: number;
@@ -241,12 +249,16 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
     const key = `${m.adapter.provider}/${m.adapter.model}`;
     if (!(m.prices ?? PRICES)[key]) throw new Error(`no price recorded for ${key}: add it to the price table before using this model`);
   }
-  for (const fn of o.only ?? []) if (fn !== "none" && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone)`);
+  for (const fn of o.only ?? []) if (fn !== "none" && fn !== "amount_form" && !calls.ARGS[fn as calls.Fn]) throw new Error(`only: no function ${fn} in the call language (or "none", for refusals alone; or "amount_form", for the forms of several amounts)`);
+  if (o.pairs !== undefined && !(o.pairs >= 0 && o.pairs <= 1)) throw new Error(`pairs: a share from 0 to 1, got ${o.pairs}`);
   for (const l of o.refusalLabels ?? []) if (!(calls.LABELS as readonly string[]).includes(l)) throw new Error(`refusal labels: no label ${l} (they are: ${calls.LABELS.join(", ")})`);
   if (o.indirect !== undefined && !(o.indirect >= 0 && o.indirect <= 1)) throw new Error(`indirect: a share from 0 to 1, got ${o.indirect}`);
-  const wanted = (g: Gold) => !o.only || o.only.includes(functionOf(g));
+  const wanted = (g: Gold) => inOnly(g, o.only);
   const balanced = (o.floor ?? 300) > 0 ? await balancedGold(o.sources, o) : undefined;
   let gold = balanced?.gold ?? (await goldOf(o.sources, o));
+  // Forms of several amounts, where asked for: beside the gold set's own forms (they are forms like any other to a
+  // part of the set, a split and a refusal built from one).
+  if (o.amountForms) gold = [...gold, ...amountForms({ forms: o.amountForms, seed: o.seed ?? 1 })];
   log(`${gold.length} gold programs of ${new Set(gold.map((g) => g.shape)).size} shapes`);
   if (o.shard) {
     // One part of several: the same gold set is cut the same way every time (every `of`-th program, counted function
@@ -285,17 +297,17 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   const asked = {
     ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
     ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: o.refusalLabels?.includes("too_much") ? o.refusalFloor : Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
-    indirect: o.indirect ?? 0.5, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), seed: o.seed ?? 1,
+    indirect: o.indirect ?? 0.5, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), seed: o.seed ?? 1,
   };
   // What a part was weighted toward, for whoever reads its manifest.
-  const weighted = { indirect_share: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusal_labels: o.refusalLabels } : {}) };
+  const weighted = { indirect_share: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusal_labels: o.refusalLabels } : {}), ...(o.amountForms ? { amount_forms: o.amountForms } : {}), ...(o.pairs ? { pairs_share: o.pairs, ...(o.pairsOnly ? { pairs_only: true } : {}) } : {}) };
   if (o.briefsOnly) {
     const names = o.briefsFor?.length ? o.briefsFor : ["writer"];
     if (new Set(names.map(fileName)).size !== names.length) throw new Error(`writers' names must differ: ${names.join(", ")}`);
     const items = planOf(gold, { ...asked, writers: names });
     const plan: Plan = {
       version: DATA_VERSION, seed: o.seed ?? 1, sources: o.sources, ...(o.shard ? { shard: o.shard } : {}),
-      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), validation: o.validation ?? 0.15 },
+      options: { ...(o.perShape ? { perShape: o.perShape } : {}), ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}), ...(o.refusalFloor ? { refusalFloor: o.refusalFloor } : {}), ...(o.limit ? { limit: o.limit } : {}), floor: o.floor ?? 300, ...(o.generated !== undefined ? { generated: o.generated } : {}), ...(o.ceiling !== undefined ? { ceiling: o.ceiling } : {}), indirect: asked.indirect, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), ...(o.amountForms ? { amountForms: o.amountForms } : {}), ...(o.pairs ? { pairs: o.pairs, ...(o.pairsOnly ? { pairsOnly: true } : {}) } : {}), validation: o.validation ?? 0.15 },
       writers: names, gold_programs: gold.length, ...(balanced ? { gold: balanced.report } : {}), items,
     };
     mkdirSync(o.out, { recursive: true });
@@ -380,7 +392,7 @@ export interface Plan {
   seed: number;
   sources: string[];
   shard?: { index: number; of: number };
-  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; /** The functions requests were planned for, and the refusal labels (all, where absent). */ only?: string[]; refusalLabels?: string[]; validation: number };
+  options: { perShape?: number; perGold?: number; refusalsPerLabel?: number; refusalFloor?: number; limit?: number; floor: number; generated?: number; ceiling?: number; /** The share of the letters asked for indirectly (which ones is in the items). */ indirect?: number; /** The functions requests were planned for, and the refusal labels (all, where absent). */ only?: string[]; refusalLabels?: string[]; /** Forms of several amounts added to the gold set; the share of requests with a second act, and whether those alone. */ amountForms?: number; pairs?: number; pairsOnly?: boolean; validation: number };
   /** Who was asked, in the order the items were dealt (item k to writer k mod n). */
   writers: string[];
   gold_programs: number;
@@ -426,7 +438,7 @@ export async function writtenData(dir: string, files: { file: string; writer: st
     ...(plan.options.refusalLabels ? { refusalLabels: plan.options.refusalLabels } : {}),
     ...(heldOut ? { heldOut } : {}), seed: plan.seed,
   });
-  const weighted = { ...(plan.options.indirect !== undefined ? { indirect_share: plan.options.indirect } : {}), ...(plan.options.only ? { only: plan.options.only } : {}), ...(plan.options.refusalLabels ? { refusal_labels: plan.options.refusalLabels } : {}) };
+  const weighted = { ...(plan.options.indirect !== undefined ? { indirect_share: plan.options.indirect } : {}), ...(plan.options.only ? { only: plan.options.only } : {}), ...(plan.options.refusalLabels ? { refusal_labels: plan.options.refusalLabels } : {}), ...(plan.options.amountForms ? { amount_forms: plan.options.amountForms } : {}), ...(plan.options.pairs ? { pairs_share: plan.options.pairs, ...(plan.options.pairsOnly ? { pairs_only: true } : {}) } : {}) };
   writeData(dir, r, { validation: plan.options.validation, seed: plan.seed }, { sources: plan.sources, gold_programs: plan.gold_programs, ...weighted, ...(plan.gold ? { gold: plan.gold } : {}) },
     { ...(plan.shard ? { shard: plan.shard } : {}), plan_version: plan.version, requests_from: files.map((f) => ({ writer: f.writer, file: f.file })), checked_against_held_out: !!heldOut, cost_microusd: 0 });
   const from = r.manifest.from_files!;

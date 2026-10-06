@@ -37,6 +37,12 @@
 //                   says goods come "from" the place they go to, is dropped mechanically (`badlyWritten`).
 //   one spelling    gold is kept the same way whatever wrote it (`goldText`): counts, amounts and times quoted, a
 //                   list of one unwrapped, a flag as `yes`.
+//   several amounts a form with several amounts is asked for each against its label, the ways seats say them, and
+//                   its long text, copied whole, may say some of them again: the field's amount is the one said
+//                   against the label (`amountNotes`; an amount said only inside the text is no field's: dropped).
+//   two acts        an act and a direction to someone about that same thing (a form handed in and the clerk asked to
+//                   put it to a ballot), or the same thing done twice, are ONE request by the translator's rules, of
+//                   two lines (`pairOf`): never `too_much`, and no part of a pile.
 //   by file         where no model can be reached through an adapter, the plan of who writes what (`planOf`) is
 //                   written out as briefs, a writer hands back a file of requests, and they are checked and made
 //                   into examples by the same code (`fromWritten`); nothing translates them back but the blind check.
@@ -71,7 +77,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.7.0";
+export const DATA_VERSION = "0.8.0";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -119,7 +125,15 @@ export interface Gold {
   family?: string;
   currency?: Currency;
   forms?: FormSpec[];
+  /** A kind of program a part can be made of by name, beside its function (`inOnly`): `amount_form`. */
+  tag?: string;
 }
+
+/** What kinds of two acts one request can ask for (`pairOf`). */
+export type Pair = "form+message" | "withdraw+message" | "withdraw+withdraw";
+
+/** Whether requests are wanted for a gold program, where only some are (`PlanOptions.only`): by its first function, or by its tag. */
+export const inOnly = (g: Gold, only: string[] | undefined): boolean => !only || only.includes(functionOf(g)) || (g.tag !== undefined && only.includes(g.tag));
 
 /** Something a request says that adds nothing to its program: the capacity it's said in, a record cited in passing, a
  * closing "do not …" that rules out what wasn't asked for. */
@@ -165,6 +179,9 @@ export interface Example {
   /** A letter asked for indirectly ("Direct them to …"): its `text` is what the writer marked in the request, not the
    * gold program's (`marked`); `gold` is still the program it was planned from. */
   indirect?: true;
+  /** Two acts in one request, by the translator's rules one thing: an act and a direction to someone about it, or
+   * the same thing done twice (`pairOf`). Its program has two lines. */
+  pair?: Pair;
 }
 
 /**
@@ -1309,6 +1326,55 @@ export function writerNotes(program: string, rand: () => number): string[] {
   return out;
 }
 
+/**
+ * What a writer is told of a form filled in with several amounts (two or more fields of type amount, by the form as
+ * the person knows of it): one of the ways seats say them, chosen by seed and shown with the call's own values (the
+ * label then the amount; the amount with a few words of what it is for, which has no field; a list with the form's
+ * choices in it; a sentence), and what to do with the form's long text, which is copied whole and may say some of the
+ * same amounts again. Why: of 30 real form requests 13 came back with the right form and its amounts under the wrong
+ * fields or left in the text (pilot-style.md, "How a form is asked for").
+ */
+export function amountNotes(g: Gold, rand: () => number): string[] {
+  const p = calls.parseProgram(g.program);
+  const c = "none" in p ? undefined : p.lines.map((l) => l.call).find((x) => x.fn === "form");
+  const spec = c && (g.forms ?? []).find((f) => f.form === formOf(calls.callText(c))?.form && (!("to" in c.args) || !("id" in c.args.to!) || f.to === c.args.to.id));
+  if (!c || !spec) return [];
+  const said = (k: string) => { const v = c.args[k]; return v === undefined ? undefined : "text" in v ? v.text : "id" in v ? v.id : undefined; };
+  const label = (k: string) => k.replace(/_/g, " ");
+  const amounts = Object.keys(c.args).filter((k) => spec.fields[k]?.type === "amount" && said(k) !== undefined);
+  if (amounts.length < 2) return [];
+  const [a, b] = amounts as [string, string];
+  const choices = Object.keys(c.args).filter((k) => spec.fields[k]?.type === "choice" && said(k) !== undefined);
+  const ways = [
+    `the label, then the amount, one after another ("${label(a)} ${said(a)}; ${label(b)} ${said(b)}")`,
+    `the label and the amount, then a few words of your own for what it is for, which fill nothing and name no figure or id ("${label(a)} ${said(a)} for …, ${label(b)} ${said(b)} for …")`,
+    `one list, the form's other answers in it with the amounts, parted by semicolons ("${choices.map((k) => `${label(k)} ${said(k)}; `).join("")}${label(a)} ${said(a)}; ${label(b)} ${said(b)}")`,
+    `in a sentence, each amount beside its label ("… with ${said(a)} under ${label(a)} and ${said(b)} under ${label(b)}")`,
+  ];
+  const out = [`The amounts are each said against the form's own label for it, so that none could be put under another's: ${ways[Math.floor(rand() * ways.length)]!}.`];
+  const text = Object.keys(c.args).find((k) => spec.fields[k]?.type === "text" && (said(k)?.length ?? 0) > 60);
+  if (text) {
+    const again = amounts.filter((k) => said(text)!.includes(said(k)!));
+    out.push(`The ${label(text)} is long: give it whole, word for word, after its label ("${label(text)[0]!.toUpperCase()}${label(text).slice(1)}: …") or in quotation marks, with nothing run into it.${again.length ? ` Its words say ${again.length === 1 ? "an amount" : "amounts"} that the form also asks for (${again.map(label).join(", ")}): say ${again.length === 1 ? "it against its label all the same, as with the others" : "each of them against its own label all the same, as with the others"}. An amount that stands only in those words fills nothing.` : ""}`);
+  }
+  const empty = Object.keys(spec.fields).filter((k) => spec.fields[k]!.type === "amount" && !(k in c.args));
+  if (empty.length) out.push(`The form has other amounts that this call leaves empty (${empty.map(label).join(", ")}): say nothing of them.`);
+  return out;
+}
+
+/**
+ * Whether a form's value stands in the request only inside another of its values (an amount said in the form's long
+ * text and never against its own label): then nothing in the request says which field it is, and the request is not
+ * the call's.
+ */
+export function onlyInsideAnother(request: string, program: string, forms: FormSpec[] = []): boolean {
+  const p = calls.parseProgram(program);
+  if ("none" in p || !p.lines.some((l) => l.call.fn === "form")) return false;
+  const needs = needed(p, forms).filter((n) => n.exact);
+  const places = needs.map((n) => occurrences(request, n));
+  return needs.some((n, i) => places[i]!.length > 0 && places[i]!.every((at) => needs.some((m, j) => j !== i && m.value.length > n.value.length && places[j]!.some((big) => big[0] <= at[0] && at[1] <= big[1]))));
+}
+
 let glosses: Map<string, string> | undefined;
 /** What a function brings about: its gloss, as the translator is told it (translator/src/index.ts: the call language's own). */
 export function glossOf(fn: string): string {
@@ -1375,10 +1441,50 @@ export function isLetter(program: string): boolean {
   return c.fn === "message" && Object.keys(c.args).sort().join() === "text,to" && "text" in c.args.text!;
 }
 
-/** A letter with other words for its text. */
+/** A letter with other words for its text (in a program of two lines, its letter: the other line is left as it is). */
 export function withText(program: string, text: string): string {
   const p = calls.parseProgram(program) as { lines: calls.Line[] };
-  return calls.programText({ lines: p.lines.map((l) => ({ ...l, call: { fn: l.call.fn, args: { ...l.call.args, text: { text } } } })) });
+  return calls.programText({ lines: p.lines.map((l) => (l.call.fn === "message" ? { ...l, call: { fn: l.call.fn, args: { ...l.call.args, text: { text } } } } : l)) });
+}
+
+/** Offices a direction goes to, by what they are called, where the request names one in words. */
+const DIRECTED = ["the council clerk", "the works manager", "the finance officer", "the registrar", "the planning officer", "the records keeper", "the treasurer", "the harbour master", "the housing officer", "the rates officer", "the returning officer", "the secretary"];
+
+/**
+ * Two acts in one request that are one thing by the translator's rules (translator/src/index.ts, `too_much`: "doing
+ * something together with writing to someone about that same thing (hand in a proposal and ask the clerk to put it to
+ * a ballot …)", and "the same kind of thing done several times"), made from a gold program of one act:
+ *  - a form handed in, and a direction to someone about it (a third of the pilots' form requests carry one);
+ *  - something withdrawn, and a direction to someone about it; the letter says what it is about (`re=`) only where
+ *    the request cites it by id again for them, three times in ten;
+ *  - two things withdrawn.
+ * The direction is a letter asked for indirectly: its words are the writer's to invent and to mark, and its line's
+ * text is whatever was marked (`marked`). Whoever it goes to is invented here: an office, a person or an organisation
+ * by id, or an office by what it is called. Undefined for a program that is none of these acts.
+ * Why: a model trained without them writes the first act and stops (13 real requests want a form and a letter).
+ */
+export function pairOf(g: Gold, rand: () => number): { gold: Gold; pair: Pair; /** The direction by itself, for the way of saying it. */ letter?: string } | undefined {
+  const p = calls.parseProgram(g.program);
+  if ("none" in p || p.lines.length !== 1) return undefined;
+  const c = p.lines[0]!.call;
+  const withdrawn = c.fn === "statement" && c.args.withdraw && "id" in c.args.withdraw ? c.args.withdraw.id : undefined;
+  if (c.fn !== "form" && withdrawn === undefined) return undefined;
+  const own = literals(p);
+  const made = (second: calls.Call, pair: Pair, names: { [id: string]: string } = {}): { gold: Gold; pair: Pair; letter?: string } => {
+    const program = calls.programText({ lines: [...p.lines, { call: second }] });
+    return { pair, gold: { ...g, program, shape: shapeOf(calls.parseProgram(program)), names: { ...g.names, ...names }, family: g.family ?? g.program }, ...(second.fn === "message" ? { letter: calls.programText({ lines: [{ call: second }] }) } : {}) };
+  };
+  if (withdrawn !== undefined && rand() < 0.4) {
+    let other = withdrawn;
+    for (let tries = 0; tries < 20 && own.some((x) => x.includes(other) || other.includes(x)); tries++) other = `rec.${1 + Math.floor(rand() * 40000)}`;
+    return made({ fn: "statement", args: { withdraw: { id: other } } }, "withdraw+withdraw");
+  }
+  const r = rand();
+  const who = r < 0.25 ? undefined : mentions(rand, 1, own, r < 0.7 ? ["an office"] : ["a person", "an organisation"])[0];
+  const title = DIRECTED[Math.floor(rand() * DIRECTED.length)]!;
+  const to: calls.Value = who ? { id: who.id } : { text: title };
+  const cited = withdrawn !== undefined && rand() < 0.3;
+  return made({ fn: "message", args: { to, text: { text: "…" }, ...(cited ? { re: { id: withdrawn! } } : {}) } }, c.fn === "form" ? "form+message" : "withdraw+message", who?.what === "an office" ? { [who.id]: title } : {});
 }
 
 /**
@@ -1409,13 +1515,21 @@ const INDIRECTLY = [
  * chosen by seed, and what its values are: `writerNotes`). `indirect`: the program is a letter to be asked for
  * indirectly: the call is shown with its text left open, and the writer is told to invent and mark it.
  */
-export function requestBrief(gold: Gold, style: string, notes: string[] = [], o: { indirect?: boolean } = {}): string {
+/** What a writer is told of a request for two acts (`pairOf`). */
+const PAIRED: { [pair in Pair]: string } = {
+  "form+message": "Two things in one request, as office-holders ask them: the form of line 1 is handed in, said first and whole; and then, in a sentence of its own, someone is directed, asked, told or instructed to do something about that same form (what is to become of it next: put it to a ballot, enter it in the register, list it for the next meeting, tell those it concerns), which is line 2. What they are to do is yours to invent: one or two clauses, in the voice of the style, said to them in words.",
+  "withdraw+message": "Two things in one request, as office-holders ask them: what line 1 names is withdrawn, said first and whole; and then, in a sentence of its own, someone is directed, asked, told or instructed to do something about that same withdrawal (take it off the agenda, strike it from the register, tell those it concerned, stop work that rested on it), which is line 2. What they are to do is yours to invent: one or two clauses, in the voice of the style, said to them in words.",
+  "withdraw+withdraw": "The same thing done twice in one request: both of the things named are withdrawn, each by its id. Say it as one request (\"Withdraw … and …\"), not as two.",
+};
+const PAIRED_ORDER = "Where the style asks for further sentences after the act, they come after line 1's act and before the direction, and are about the act: the direction is the last sentence of the request. What the style says of asking for nothing more and telling nobody else is said of those further sentences: the direction is part of what is asked.";
+
+export function requestBrief(gold: Gold, style: string, notes: string[] = [], o: { indirect?: boolean; pair?: Pair } = {}): string {
   const names = Object.entries(gold.names).map(([id, name]) => `${id} is ${name}`);
   const form = formOf(gold.program);
   const fields = (gold.forms ?? []).filter((f) => f.form === form?.form).map(formLine);
   return [
     `Call:\n${o.indirect ? withText(gold.program, `${OPEN}…${CLOSE}`) : gold.program}`, `What it brings about (for your understanding: don't reuse this wording):\n${bringsAbout(gold.program).join("\n")}`,
-    ...(o.indirect ? [INDIRECTLY] : []),
+    ...(o.pair ? [[PAIRED[o.pair], ...(o.indirect ? [INDIRECTLY.split("\n")[1]!, ...((calls.parseProgram(gold.program) as { lines: calls.Line[] }).lines.some((l) => l.call.fn === "message" && "re" in l.call.args) ? ["The call's letter says what it is about (re=): name that id again where they are directed, outside the marks (\"Direct them, regarding rec.412, to …\")."] : []), PAIRED_ORDER] : [])].join("\n")] : o.indirect ? [INDIRECTLY] : []),
     ...(notes.length ? [`How to say it:\n${notes.join("\n")}`] : []),
     ...(names.length ? [`For your understanding only (still write the ids): ${names.join("; ")}.`] : []), ...(fields.length ? [`The form, as the person knows of it:\n${fields.join("\n")}`] : []), `Style: ${STYLES[style] ?? style}`,
   ].join("\n\n");
@@ -1584,7 +1698,9 @@ export function strayIds(request: string, program: string, o: { riders?: Rider[]
  * lines; a party who is also an account's holder) is placed by the other values of its own call: the values of one
  * call are said together, so the occurrence that lies with its own call's values and not with another call's, or
  * nearest its own, is the one (a line of a program is a call, and so is each commitment nested in an agreement). An
- * occurrence that is another argument's is not this one's as well. Where none of that settles it (one call alone,
+ * occurrence that is another argument's is not this one's as well, and neither is one inside another, longer value
+ * that has been placed (an amount a form's long text says again), where the value also stands outside it. Where none
+ * of that settles it (one call alone,
  * where every occurrence is among its own values; occurrences equally near), every occurrence is recorded and the
  * span is marked ambiguous.
  */
@@ -1597,7 +1713,10 @@ export function spansIn(request: string, program: string, forms: FormSpec[] = []
   const open = (i: number): [number, number][] => {
     const taken = needs.flatMap((m, j) => (j !== i && m.value === needs[i]!.value && settled[j] ? [settled[j]![0]] : []));
     const left = found[i]!.filter((at) => !taken.includes(at[0]));
-    return left.length ? left : found[i]!;
+    // Nor where it stands inside another, longer value that has been placed (an amount said again in a form's long
+    // text: the text is copied whole, and the field's amount is the one said against its label), if it stands elsewhere.
+    const outside = left.filter((at) => !needs.some((_, j) => j !== i && settled[j] && settled[j]![0] <= at[0] && at[1] <= settled[j]![1] && settled[j]![1] - settled[j]![0] > at[1] - at[0]));
+    return outside.length ? outside : left.length ? left : found[i]!;
   };
   // The stretch of the request each call's settled values take up, and how far a place is from it.
   const hull = (g: string, but: number): [number, number] | undefined => {
@@ -1647,6 +1766,9 @@ export function copies(request: string, program: string): boolean {
  * id or a list of it, a letter to two or one to each). `ctx`: the money and the forms of the world they are from.
  */
 export const sameProgram = (a: string, b: string, ctx: MeaningContext = {}): boolean => canonical(a) === canonical(b) || sameMeaning(a, b, ctx);
+
+/** Which line of a program is its letter (the first that is one). */
+const letterLine = (program: string): number => { const p = calls.parseProgram(program); return "none" in p ? -1 : p.lines.findIndex((l) => l.call.fn === "message"); };
 
 /** A stable id for an example: from what it is. */
 const exampleId = (request: string, program: string) => sha256(canonicalJson({ request, program })).slice(0, 16);
@@ -1750,7 +1872,9 @@ export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floo
   // (One message is said in one capacity: only its first part may open with one, or the second "As … of …" marks the
   // paste.)
   const capacity = (e: Example) => (e.riders ?? []).some((r) => r.kind === "capacity");
-  const pastable = positives.filter((e) => e.style !== "late");
+  // (Nor is a request for two acts that are one thing, `pair`: what is run together here is acts that are each a
+  // request of their own, and a pile with such a pair in it would have the model count lines.)
+  const pastable = positives.filter((e) => e.style !== "late" && !e.pair);
   for (let i = 0; made < n && i < n * 4 && pastable.length >= 8; i++) {
     const parts = new Map<string, Example>();
     for (let tries = 0; parts.size < 4 + Math.floor(rand() * 3) && tries < 64; tries++) {
@@ -1766,7 +1890,7 @@ export function builtRefusals(positives: Example[], seed = 1, share = 0.05, floo
   for (const e of shuffled(forms, rand)) if (chosen.size < Math.min(floor.unknown_form ?? 0, forms.length)) chosen.add(e);
   for (const e of forms.filter((x) => chosen.has(x))) {
     const name = formOf(e.program)?.form;
-    const { spans: _, riders: __, ...rest } = e;
+    const { spans: _, riders: __, pair: ___, indirect: ____, ...rest } = e; // (what it was as a positive is not what it is as a refusal)
     out.push({ ...rest, id: exampleId(e.request, "none(unknown_form)"), forms: e.forms.filter((line) => !line.startsWith(`- ${name}, to=`)), program: "none(unknown_form)", kind: "refusal", shape: "none(unknown_form)", gold: e.gold ?? e.program, source: "built: the form left out of what's known" });
   }
   return out;
@@ -2060,6 +2184,8 @@ export interface Manifest {
   spans: { copy: number; choice: number; implied: number };
   /** Letters asked for indirectly, their text the words the writer marked (`Example.indirect`). */
   indirect: number;
+  /** Requests for two acts that are one thing (`Example.pair`), by kind. */
+  pairs: { [pair: string]: number };
   /** How long the requests are, by style, in characters: how many, the median and the ninth decile. (The seats'
    * voices are long by design, 300 characters and more: this is where to see whether the writers made them so.) */
   request_length: { [style: string]: { requests: number; median: number; p90: number } };
@@ -2114,7 +2240,7 @@ function doNots(request: string, taken: [number, number][]): { text: string; at:
  * is asked. A refusal's `round`: 0, or a later one, asked for only where its label came out short of the floor. */
 interface Asked { id: string; writer: string; style: string; brief: string }
 export type PlanItem =
-  | (Asked & { kind: "request"; /** The program, with its world's money and forms. */ gold: Gold; riders: Rider[]; /** The way of saying it chosen for this request (`writerNotes`). */ notes: string[]; /** A letter to be asked for indirectly: the request comes back with the words asked of them marked, and they are the example's text (`marked`). */ indirect?: true; /** Ids such a letter was given to name inside its marked words. */ inside?: string[] })
+  | (Asked & { kind: "request"; /** The program, with its world's money and forms. */ gold: Gold; riders: Rider[]; /** The way of saying it chosen for this request (`writerNotes`). */ notes: string[]; /** A letter to be asked for indirectly: the request comes back with the words asked of them marked, and they are the example's text (`marked`). */ indirect?: true; /** Ids such a letter was given to name inside its marked words. */ inside?: string[]; /** Two acts in one request (`pairOf`): `gold` is the program of two lines. */ pair?: Pair })
   | (Asked & { kind: "refusal"; /** Its label, and what the request must carry. */ refusal: RefusalBrief; round: number });
 
 export interface PlanOptions {
@@ -2139,6 +2265,11 @@ export interface PlanOptions {
   only?: string[];
   /** Refusal briefs are planned for these labels only, and only these are built and held to the floor (all, if absent). */
   refusalLabels?: string[];
+  /** The share of the programs that can be (a form filled in, something withdrawn) asked for with a second act in the
+   * same request: a direction to someone about it, or a second withdrawal (`pairOf`; none if absent). */
+  pairs?: number;
+  /** Requests are planned for those pairs only. */
+  pairsOnly?: boolean;
   seed?: number;
 }
 
@@ -2160,19 +2291,27 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
   const styleRand = sampler(seed + 11);
   const sayRand = sampler(seed + 17);
   const indirectRand = sampler(seed + 19);
+  const pairRand = sampler(seed + 41);
   const plan: PlanItem[] = [];
   let turn = 0;
   const next = () => ({ writer: o.writers[turn % o.writers.length]!, styleKey: styles[turn % styles.length]!, n: turn++ });
   const idOf = (n: number, brief: string) => sha256(canonicalJson({ seed, n, brief })).slice(0, 12);
   const labelled = (b: RefusalBrief) => !o.refusalLabels || o.refusalLabels.includes(b.label);
-  for (const given of gold) for (let k = 0; k < (o.perGold ?? 3) && (!o.only || o.only.includes(functionOf(given))); k++) {
+  for (const given of gold) for (let k = 0; k < (o.perGold ?? 3) && inOnly(given, o.only); k++) {
+    const one = withHowOften(given, sayRand);
+    // Two acts in one request, for a share of the programs that can carry a second (`pairOf`): the act as it is, and
+    // a direction to someone about it (a letter asked for indirectly, its words the writer's) or a second withdrawal.
+    const two = (o.pairs ?? 0) > 0 && pairRand() < o.pairs! ? pairOf(one, pairRand) : undefined;
+    if (o.pairsOnly && !two) continue;
     const { writer, styleKey, n } = next();
-    const g = withHowOften(given, sayRand);
-    const indirect = (o.indirect ?? 0) > 0 && isLetter(g.program) && indirectRand() < o.indirect!;
-    const { style, instruction, riders, inside } = styleBrief(styleKey, g, styleRand, { indirect });
-    const notes = indirect ? indirectNotes(g.program, sayRand) : writerNotes(g.program, sayRand);
-    const brief = requestBrief(g, instruction, notes, { indirect });
-    plan.push({ id: idOf(n, brief), kind: "request", writer, style, brief, gold: g, riders, notes, ...(indirect ? { indirect: true as const } : {}), ...(inside ? { inside } : {}) });
+    const g = two?.gold ?? one;
+    const indirect = two ? two.letter !== undefined : (o.indirect ?? 0) > 0 && isLetter(g.program) && indirectRand() < o.indirect!;
+    // (A pair's further sentences are about its act, as any act's are: the direction comes last, after them.)
+    const { style, instruction, riders, inside } = styleBrief(styleKey, g, styleRand, { indirect: indirect && !two });
+    const notes = two?.letter ? [...writerNotes(one.program, sayRand), ...amountNotes(one, sayRand), ...indirectNotes(two.letter, sayRand).map((x) => x.replace("The act, said", "The direction, said"))]
+      : indirect ? indirectNotes(g.program, sayRand) : [...writerNotes(g.program, sayRand), ...amountNotes(g, sayRand)];
+    const brief = requestBrief(g, instruction, notes, { indirect, ...(two ? { pair: two.pair } : {}) });
+    plan.push({ id: idOf(n, brief), kind: "request", writer, style, brief, gold: g, riders, notes, ...(indirect ? { indirect: true as const } : {}), ...(inside ? { inside } : {}), ...(two ? { pair: two.pair } : {}) });
   }
   const perLabel = Math.max(o.refusalsPerLabel ?? 0, o.refusalFloor ?? 0);
   for (let round = 0; round < (o.refusalFloor ? 3 : 1); round++) {
@@ -2256,6 +2395,8 @@ async function fromPlan(plan: PlanItem[], o: {
         if (m && "marks" in m) (out.why = "marks"), (out.marks = m.marks);
         else if (!t.indirect && (request.includes(OPEN) || request.includes(CLOSE))) (out.why = "marks"), (out.marks = "unasked");
         else if (!(t.riders.every((r) => request.includes(r.text)) && (t.inside ?? []).every((id) => said?.words.includes(id)) && copies(withoutRiders(request, t.riders), program))) out.why = "not_copied";
+        // (A form's amount said only inside its long text is under no label: nothing says which field it is.)
+        else if (onlyInsideAnother(withoutRiders(request, t.riders), program, t.gold.forms ?? [])) out.why = "not_copied";
         else out.why = badlyWritten(request, program, t.riders) ?? (SEATS.includes(t.style) && strayIds(request, program, { riders: t.riders, ...(t.gold.forms ? { forms: t.gold.forms } : {}) }).length ? "stray_id" : undefined);
         if (!out.why && out.check) {
           const failed = dropped.failed;
@@ -2300,7 +2441,7 @@ async function fromPlan(plan: PlanItem[], o: {
       }
     }
     // (The words a writer marked are where it marked them, whatever else in the request reads the same.)
-    const spans = spansIn(withoutRiders(request, riders), program, g.forms ?? []).map((x): Span => (c.said && x.arg === "text" ? { arg: x.arg, value: x.value, how: "copy", at: c.said } : x));
+    const spans = spansIn(withoutRiders(request, riders), program, g.forms ?? []).map((x): Span => (c.said && x.arg === "text" && (x.line === undefined || x.line === letterLine(program)) ? { arg: x.arg, value: x.value, how: "copy", ...(x.line !== undefined ? { line: x.line } : {}), at: c.said } : x));
     // (Each rider where it stands; an id mentioned, at every place it stands.)
     const given = riders.flatMap((r) => (r.kind === "mention" ? occurrences(request, { value: r.text, arg: "", exact: true, how: "copy" }) : [[request.indexOf(r.text), request.indexOf(r.text) + r.text.length] as [number, number]]).map((at) => ({ ...r, at, adds: "nothing" as const })));
     // A "Do not …" the writer added of its own accord rules out what wasn't asked for, like one it was given (the
@@ -2314,6 +2455,7 @@ async function fromPlan(plan: PlanItem[], o: {
       ...(g.currency ? { currency: g.currency } : {}),
       ...(all.length ? { riders: all } : {}),
       ...(c.said ? { indirect: true as const } : {}),
+      ...(t.pair ? { pair: t.pair } : {}),
     });
   }
   // Refusals that have to be worded: each brief's request kept if it carries what it must and (with a checker) comes
@@ -2389,6 +2531,7 @@ async function fromPlan(plan: PlanItem[], o: {
     riders, ambiguous_spans: examples.reduce((n, e) => n + (e.spans ?? []).filter((x) => x.ambiguous).length, 0),
     spans: { copy: spanCount("copy"), choice: spanCount("choice"), implied: spanCount("implied") },
     indirect: examples.filter((e) => e.indirect).length,
+    pairs: count((e) => e.pair),
     request_length: Object.fromEntries(Object.keys(count((e) => e.style)).map((style) => {
       const lengths = examples.filter((e) => e.style === style).map((e) => e.request.length).sort((a, b) => a - b);
       return [style, { requests: lengths.length, median: lengths[Math.floor((lengths.length - 1) / 2)]!, p90: lengths[Math.floor((lengths.length - 1) * 0.9)]! }];
