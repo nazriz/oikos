@@ -156,12 +156,17 @@ export function translatorSystem(): string {
   ].join("\n");
 }
 
+/** A form as the translator is shown it, one line: its name, where it goes (the `to` to write: the office it was made
+ * in, or its author's organisation), its record's id (people cite a form by the id on the paper as often as by its
+ * name; 2026-10-06), and its fields; a choice field lists its options. */
+export function formShown(f: Knowledge["forms"][number]): string {
+  const field = ([k, v]: [string, any]) => `${k} (${v.type === "choice" && v.options?.length ? `one of ${v.options.join(" | ")}` : v.type}${v.required ? ", required" : ""})`;
+  return `- ${f.data?.form}, to=${f.in_position ?? f.speaks_for ?? f.author}, id ${f.id}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`;
+}
+
 /** What the translator is given: the request, and the forms this person knows of (where each goes, and its fields). */
 export function translatorContext(req: TranslateRequest): string {
-  // Where it goes (the `to` to write): the office it was made in, or its author's organisation. A choice field lists its options.
-  const field = ([k, v]: [string, any]) => `${k} (${v.type === "choice" && v.options?.length ? `one of ${v.options.join(" | ")}` : v.type}${v.required ? ", required" : ""})`;
-  // (Each with its record's id: people cite a form by the id on the paper as often as by its name; 2026-10-06.)
-  const forms = req.knowledge.forms.map((f) => `- ${f.data?.form}, to=${f.in_position ?? f.speaks_for ?? f.author}, id ${f.id}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`);
+  const forms = req.knowledge.forms.map(formShown);
   return [`Request: ${req.proposal}`, ...(forms.length ? ["", "Forms this person knows of:", ...forms] : [])].join("\n");
 }
 

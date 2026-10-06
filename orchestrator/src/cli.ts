@@ -70,6 +70,21 @@
 //     shuffled order, for a reader who is to see nothing else. --answers takes that reader's answers ({id, program}, a
 //     line each), compares them with the gold programs by meaning, and writes DIR/checked.jsonl (the examples agreed
 //     on, marked verified by the reader), DIR/disagreed.jsonl (both programs) and the counts per function in the manifest.
+//   oikos in-situ <LOG|DIR>... --out DIR [--writers NAME,NAME,...] [--max-chars N] [--every N] [--seed N]
+//     Translator training requests written in situ (in-situ.ts): from model seats' runs, every time a seat was asked
+//     what to do as a situation (its prompt as sent, what it was shown), in DIR/situations.jsonl, each marked if a real
+//     test case was asked in it; the seats' real requests that are no test case, for readers (real-unlabelled.jsonl,
+//     real-blind.jsonl); and what writers are given: writer-instructions.txt and chunks/<writer>-NN.jsonl ({id, system,
+//     shown} a line, at most --max-chars characters a chunk, 120,000 if not given; one seat's day in --every, 3 if not
+//     given, a different one for each writer). Logs are only read. No model is called.
+//   oikos in-situ-requests <DIR> --requests FILE --writer NAME [--requests FILE --writer NAME ...] [--out FILE] [--seed N]
+//     What such writers handed back ({id, requests: [...]}, a line for each situation), as requests for readers:
+//     DIR/written-unlabelled.jsonl ({id, request, forms, from}), and its blind file beside it.
+//   oikos in-situ-blind <FILE> [--seed N] [--out FILE]
+//     A file of such requests as a blind reader is given them ({id, request, forms}, shuffled).
+//   oikos in-situ-label <FILE> --answers FILE --reader NAME --answers FILE --reader NAME --out DIR
+//     Two readers' answers ({id, program}) to a file of such requests, made into DIR's examples.jsonl (a request both
+//     read as the same program, which the request carries whole), rejects.jsonl (the rest, each with why) and manifest.json.
 //   oikos replay <log.jsonl> [--anchors <anchors.jsonl>]      (the kernel's own replay)
 //   oikos story <log.jsonl> [participant]                     (what a language-model participant did, day by day)
 //
@@ -266,6 +281,36 @@ try {
       console.log(`${r.reader}: agreed on ${r.agreed} of ${r.examples}, disagreed on ${r.disagreed}, left ${r.unanswered} unanswered${r.unknown_ids ? `; ${r.unknown_ids} answers were for no example here` : ""} (checked.jsonl, disagreed.jsonl, manifest.json)`);
       for (const [fn, n] of Object.entries(r.by_function)) if (n.disagreed || n.unanswered) console.log(`  ${fn}: ${n.agreed} agreed, ${n.disagreed} disagreed${n.unanswered ? `, ${n.unanswered} unanswered` : ""}`);
     }
+  } else if (cmd === "in-situ" && positional()[0] && flag("out")) {
+    // Situations for writers who answer as a seat, from model seats' logs; and the seats' real requests, for readers.
+    const { inSitu } = await import("./in-situ");
+    const num = (name: string) => (flag(name) ? Number(flag(name)) : undefined);
+    const r = await inSitu({ sources: positional(), out: flag("out")!, writers: (flag("writers") ?? "").split(",").map((x) => x.trim()).filter(Boolean), maxChars: num("max-chars"), every: num("every"), seed: num("seed"), log: console.log });
+    const t = r.totals;
+    console.log(`${t.situations} situations written to ${flag("out")} (situations.jsonl): ${t.test} marked test, ${t.partial} with a sitting that isn't whole, ${t.usable} usable${t.no_forms ? `; ${t.no_forms} with no forms recovered` : ""}${t.no_system ? `; ${t.no_system} calls left out, their system prompt not in the log` : ""}`);
+    for (const [run, seats] of Object.entries(r.situations)) for (const [seat, n] of Object.entries(seats)) console.log(`  ${run} ${seat}: ${n.situations} situations on ${n.seat_days} days, ${n.test} marked test, ${n.usable} usable; ${n.asked} requests made`);
+    for (const [what, c] of Object.entries(r.characters)) console.log(`  ${what}: ${c.min} to ${c.max} characters, median ${c.median}, ninth decile ${c.p90}`);
+    const q = r.real_requests;
+    console.log(`${q.kept} real requests for readers (real-unlabelled.jsonl, real-blind.jsonl) of ${q.asked} made: ${q.test} are test cases, ${q.same_as_test} more in a test case's exact words, ${q.starts_as_test} beginning as one does, ${q.said_before} said before, ${q.no_forms} with no forms recovered`);
+    for (const [writer, c] of Object.entries(r.chunks)) console.log(`${writer}: ${c.situations} situations in ${c.chunks} chunks (chunks/), ${c.sizes.length ? `${Math.min(...c.sizes)} to ${Math.max(...c.sizes)} characters a chunk` : "none"}; ${c.where_the_seat_asked} are turns where the seat asked for something`);
+    if (r.too_large_for_a_chunk) console.log(`${r.too_large_for_a_chunk} situations are larger than a chunk (${r.max_chars} characters) and are given to no one`);
+  } else if (cmd === "in-situ-requests" && positional()[0] && flags("requests").length) {
+    const { takeInFiles } = await import("./in-situ");
+    const files = flags("requests"), names = flags("writer");
+    if (names.length !== files.length) throw new Error(`a --writer NAME for each --requests FILE: ${files.length} files, ${names.length} names`);
+    const r = await takeInFiles(positional()[0]!, files.map((file, i) => ({ file, writer: names[i]! })), { out: flag("out"), seed: flag("seed") ? Number(flag("seed")) : undefined });
+    console.log(`${r.kept} requests written to ${r.out} (blind: ${r.blind}) from ${r.answers} situations answered, ${r.none} of them with no request: of ${r.written} requests, ${r.said_before} said before, ${r.same_as_test} in a test case's exact words, ${r.starts_as_test} beginning as one does, ${r.empty} empty, ${r.no_forms} for a situation with no forms recovered, ${r.unknown_situation} for no situation here, ${r.test_situation} for a situation marked test`);
+  } else if (cmd === "in-situ-blind" && positional()[0]) {
+    const { blindFile } = await import("./in-situ");
+    const w = blindFile(positional()[0]!, { seed: flag("seed") ? Number(flag("seed")) : undefined, out: flag("out") });
+    console.log(`${w.requests} requests written to ${w.out}, in a shuffled order`);
+  } else if (cmd === "in-situ-label" && positional()[0] && flags("answers").length && flag("out")) {
+    const { label } = await import("./in-situ");
+    const files = flags("answers"), names = flags("reader");
+    if (names.length !== files.length) throw new Error(`a --reader NAME for each --answers FILE: ${files.length} files, ${names.length} names`);
+    const m = label(positional()[0]!, files.map((file, i) => ({ file, reader: names[i]! })), flag("out")!);
+    console.log(`${m.examples} examples of ${m.requests} requests written to ${flag("out")} (examples.jsonl, rejects.jsonl, manifest.json); dropped: ${Object.entries(m.by_reason).filter(([, n]) => n).map(([why, n]) => `${why} ${n}`).join(", ") || "none"}`);
+    console.log(`  by function: ${Object.entries(m.by_function).map(([fn, n]) => `${fn} ${n}`).join(", ")}`);
   } else if (cmd === "dataset" && positional()[0]) {
     // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
     const { logsIn } = await import("./corpus");

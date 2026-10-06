@@ -47,9 +47,12 @@ export function logsIn(path: string): string[] {
   return currentLogs(path);
 }
 
-/** The translator corpus of one log. */
-export async function corpusOf(logPath: string): Promise<CorpusExample[]> {
-  const run = runOf(logPath);
+/**
+ * The translator corpus as a log is read: `take` is given each entry of the log in order, `rows` gives the corpus of
+ * what has been taken so far. For whoever reads a log for something else as well, in the one pass (a log can be
+ * gigabytes: in-situ.ts).
+ */
+export function corpusReader(run: string): { take(e: any): void; rows(): CorpusExample[] } {
   const systems = new Map<string, string>();
   const ex = new Map<string, CorpusExample>();
   const bySeq = new Map<number, string>(); // command seq -> draft
@@ -58,43 +61,52 @@ export async function corpusOf(logPath: string): Promise<CorpusExample[]> {
     if (!x) ex.set(draft, (x = { run, draft, t, participant, synthetic: false, exchange: [], retries: [], result: "unknown" }));
     return x;
   };
-  for await (const line of logLines(logPath)) {
-    if (!line) continue;
-    const e = JSON.parse(line);
-    const b = e.body ?? {};
-    if (e.kind === "annotation") {
-      if (b.annotation === "transcript") {
-        const d = b.data ?? {};
-        if (d.system_sha256 && d.system) systems.set(d.system_sha256, d.system);
-        if (d.purpose !== "translator" || !d.ref) continue;
-        const x = get(d.ref, e.t);
-        x.model = `${d.provider}/${d.model}`;
-        x.synthetic = d.provider === "mock";
-        x.system_sha256 = d.system_sha256;
-        x.exchange.push({ turn: d.turn, input: d.input, output: d.output });
-      } else if (b.annotation === "draft") {
-        const d = b.draft;
-        const x = get(d.id, e.t, d.participant);
-        Object.assign(x, { participant: d.participant, ...(d.as ? { as: d.as } : {}), proposal: d.proposal, result: "drafted", translator: d.translator, call: d.call, blocks: d.blocks, summary: d.summary, check: d.check, ...(d.caveats ? { caveats: d.caveats } : {}) });
-      } else if (b.annotation === "translation_failure") {
-        const d = b.data ?? {};
-        const x = get(d.draft, e.t, b.subject);
-        Object.assign(x, { participant: b.subject, proposal: d.proposal, result: "failed", failure: { reason: d.reason, ...(d.call ? { call: d.call } : {}), ...(d.invalid ? { invalid: d.invalid } : {}), ...(d.raw ? { raw: d.raw } : {}) } });
-      } else if (b.annotation === "note" && b.data?.translation_retry) {
-        const r = b.data.translation_retry;
-        get(r.draft, e.t, b.subject).retries.push({ attempt: r.attempt, reason: r.reason, ...(r.call ? { call: r.call } : {}) });
-      } else if (b.annotation === "signoff") {
-        get(b.draft, e.t, b.participant).signoff = { decision: b.decision, ...(b.note ? { note: b.note } : {}) };
+  return {
+    take(e) {
+      const b = e.body ?? {};
+      if (e.kind === "annotation") {
+        if (b.annotation === "transcript") {
+          const d = b.data ?? {};
+          if (d.system_sha256 && d.system) systems.set(d.system_sha256, d.system);
+          if (d.purpose !== "translator" || !d.ref) return;
+          const x = get(d.ref, e.t);
+          x.model = `${d.provider}/${d.model}`;
+          x.synthetic = d.provider === "mock";
+          x.system_sha256 = d.system_sha256;
+          x.exchange.push({ turn: d.turn, input: d.input, output: d.output });
+        } else if (b.annotation === "draft") {
+          const d = b.draft;
+          const x = get(d.id, e.t, d.participant);
+          Object.assign(x, { participant: d.participant, ...(d.as ? { as: d.as } : {}), proposal: d.proposal, result: "drafted", translator: d.translator, call: d.call, blocks: d.blocks, summary: d.summary, check: d.check, ...(d.caveats ? { caveats: d.caveats } : {}) });
+        } else if (b.annotation === "translation_failure") {
+          const d = b.data ?? {};
+          const x = get(d.draft, e.t, b.subject);
+          Object.assign(x, { participant: b.subject, proposal: d.proposal, result: "failed", failure: { reason: d.reason, ...(d.call ? { call: d.call } : {}), ...(d.invalid ? { invalid: d.invalid } : {}), ...(d.raw ? { raw: d.raw } : {}) } });
+        } else if (b.annotation === "note" && b.data?.translation_retry) {
+          const r = b.data.translation_retry;
+          get(r.draft, e.t, b.subject).retries.push({ attempt: r.attempt, reason: r.reason, ...(r.call ? { call: r.call } : {}) });
+        } else if (b.annotation === "signoff") {
+          get(b.draft, e.t, b.participant).signoff = { decision: b.decision, ...(b.note ? { note: b.note } : {}) };
+        }
+      } else if (e.kind === "command" && b.command === "act" && b.provenance?.via === "translator" && b.provenance.draft) {
+        bySeq.set(e.seq, b.provenance.draft);
+        get(b.provenance.draft, e.t, b.participant).executed = { seq: e.seq, applied: true };
+      } else if (e.kind === "event" && b.event === "action_refused" && bySeq.has(b.cause)) {
+        const x = ex.get(bySeq.get(b.cause)!)!;
+        x.executed = { seq: b.cause, applied: false, refusal: { code: b.code, ...(b.detail ? { detail: b.detail } : {}) } };
       }
-    } else if (e.kind === "command" && b.command === "act" && b.provenance?.via === "translator" && b.provenance.draft) {
-      bySeq.set(e.seq, b.provenance.draft);
-      get(b.provenance.draft, e.t, b.participant).executed = { seq: e.seq, applied: true };
-    } else if (e.kind === "event" && b.event === "action_refused" && bySeq.has(b.cause)) {
-      const x = ex.get(bySeq.get(b.cause)!)!;
-      x.executed = { seq: b.cause, applied: false, refusal: { code: b.code, ...(b.detail ? { detail: b.detail } : {}) } };
-    }
-  }
-  const out = [...ex.values()].sort((a, b) => a.t - b.t || (a.draft < b.draft ? -1 : 1));
-  for (const x of out) if (x.system_sha256 && systems.has(x.system_sha256)) x.system = systems.get(x.system_sha256);
-  return out;
+    },
+    rows() {
+      const out = [...ex.values()].sort((a, b) => a.t - b.t || (a.draft < b.draft ? -1 : 1));
+      for (const x of out) if (x.system_sha256 && systems.has(x.system_sha256)) x.system = systems.get(x.system_sha256);
+      return out;
+    },
+  };
+}
+
+/** The translator corpus of one log. */
+export async function corpusOf(logPath: string): Promise<CorpusExample[]> {
+  const reader = corpusReader(runOf(logPath));
+  for await (const line of logLines(logPath)) if (line) reader.take(JSON.parse(line));
+  return reader.rows();
 }

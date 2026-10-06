@@ -26,7 +26,7 @@ export interface BlindAnswer { id: string; program: string }
 
 /** The requests of a data set for a blind reader, in a seeded shuffled order: the same examples and seed give the same
  * order, and the order says nothing of what an example is. */
-export function blindRequests(examples: Example[], seed = 1): BlindRequest[] {
+export function blindRequests(examples: Pick<Example, "id" | "request" | "forms">[], seed = 1): BlindRequest[] {
   // (Shuffled from a fixed order, by id, so the order the examples came in doesn't show through either.)
   const sorted = [...examples].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   return shuffled(sorted, sampler(seed + 4099)).map((e) => ({ id: e.id, request: e.request, forms: e.forms }));
