@@ -1129,7 +1129,8 @@ test("too much, as people make it: two or three related acts piled into one mess
   const piling = (lose: boolean): LlmAdapter => ({ provider: "stand-in", model: lose ? "careless" : "w", complete: async (req) => {
     const text = String((req.messages[0] as any).content);
     const brief = briefs.find((b) => text.includes(b.brief));
-    const answer = brief ? `While you're at it, see to all of this: ${brief.mustCopy.slice(lose ? 1 : 0).join(", ")}.` : text.startsWith("Call:") ? saying(text.slice(6, text.indexOf("\n\n")), "x") : `Something else (${text.length}).`;
+    const answer = brief ? `While you're at it, see to all of this: ${[...brief.mustCopy.slice(lose ? 1 : 0), ...(text.includes("In this voice") ? brief.mention ?? [] : [])].join(", ")}.` // (in a seat's voice, with the ids it was given to name)
+      : text.startsWith("Call:") ? saying(text.slice(6, text.indexOf("\n\n")), "x") : `Something else (${text.length}).`;
     return { content: [{ type: "text", text: answer }], usage: { input_tokens: 1, output_tokens: 1 } };
   } });
   const back = { model: "stand-in/back", translate: async (q: string) => (q.startsWith("While you're at it") ? "none(too_much)" : "none(unclear)") };

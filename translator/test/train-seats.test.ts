@@ -5,7 +5,7 @@ import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
 import type { LlmAdapter } from "@oikos/participants/llm";
 import {
-  CLOSE, DEAL, OPEN, SEATS, STYLES, fromWritten, generate, indirectNotes, isLetter, literals, marked, planOf, refusalBriefs, refusalRequestBrief, refusalWriterSystem, requestBrief, sampler, shapeOf, split, strayIds, styleBrief,
+  CLOSE, DEAL, OPEN, SEATS, STYLES, fromWritten, generate, indirectNotes, isLetter, literals, marked, mentions, piledBriefs, planOf, refusalBriefs, refusalRequestBrief, refusalWriterSystem, requestBrief, sampler, shapeOf, split, strayIds, styleBrief,
   withText, writerSystem, type Gold, type PlanItem, type RefusalBrief, type WrittenRequest,
 } from "../train/data";
 
@@ -28,6 +28,14 @@ const programIn = (brief: string) => brief.slice("Call:\n".length, brief.indexOf
 const opening = (brief: string) => /Open with exactly these words: "([^"]+)"/.exec(brief)?.[1];
 const cited = (brief: string) => /Include exactly these words[^:]*: "([^"]+)"/.exec(brief)?.[1];
 const closing = (brief: string) => [.../End with exactly [^:]+: (.+)$/.exec(brief)?.[1]?.matchAll(/"([^"]+)"/g) ?? []].map((m) => ` ${m[1]}`).join("");
+/** The ids a brief gives its writer to name (each set off by quotation marks, with what it is), after the words that say so. */
+const idsAfter = (brief: string, words: RegExp): string[] => { const at = brief.search(words); return at < 0 ? [] : [...brief.slice(at, brief.indexOf("The quotation marks here only set", at)).matchAll(/"([^"\s]+)" \(/g)].map((m) => m[1]!); };
+/** Other things an act leaves alone; what a direction concerns; what a request to read, pause or visit covers. */
+const others = (brief: string) => idsAfter(brief, /name exactly these other things by id/);
+const within = (brief: string) => idsAfter(brief, /names exactly these by id, as what the task concerns/);
+const covered = (brief: string) => idsAfter(brief, /names? these (other things )?by id/);
+/** (In the early voice an id stands in square brackets.) */
+const left = (brief: string) => (others(brief).length ? ` Leave ${others(brief).map((id) => (brief.includes("instruction for the record") ? `the other one [${id}]` : id)).join(" and ")} as they stand.` : "");
 /**
  * What a stand-in writer says to a brief, whoever it is and however the brief reached it. A situation: its own line
  * (whatever it names is in it), at length in the `late` voice. A letter asked indirectly: a direction with the words
@@ -36,13 +44,13 @@ const closing = (brief: string) => [.../End with exactly [^:]+: (.+)$/.exec(brie
 const say = (brief: string): string => {
   const mark = Bun.hash(brief).toString(36);
   const late = brief.includes("careful, defensive instruction");
-  if (!brief.startsWith("Call:\n")) return `Request ${mark}, about this: ${brief.split("\n")[1]}${late ? QUALIFIED : ""}`;
+  if (!brief.startsWith("Call:\n")) return `Request ${mark}, about this: ${brief.split("\n")[1]}${covered(brief).length ? ` It covers ${covered(brief).join(", ")}.` : ""}${late ? QUALIFIED : ""}`;
   const open = `${opening(brief) ? `${opening(brief)}, ` : ""}${cited(brief) ? `${cited(brief)}, ` : ""}`;
   if (brief.includes("Asked indirectly")) {
     const to = literals(calls.parseProgram(programIn(brief))).filter((l) => l !== `${OPEN}…${CLOSE}`);
-    return `${open}direct ${to.join(" and ")} to ${OPEN}inspect the drains at the depot (${mark}) and report when it is complete${CLOSE}.${late ? " This is a direction only." : ""}${closing(brief)}`;
+    return `${open}direct ${to.join(" and ")} to ${OPEN}inspect the drains at ${within(brief).join(" and ") || "the depot"} (${mark}) and report when it is complete${CLOSE}.${late ? " This is a direction only." : ""}${closing(brief)}`;
   }
-  return `${open}carry this out (${mark}): ${literals(calls.parseProgram(programIn(brief))).join(", ")}.${late ? QUALIFIED : ""}${closing(brief)}`;
+  return `${open}carry this out (${mark}): ${literals(calls.parseProgram(programIn(brief))).join(", ")}.${late ? QUALIFIED : ""}${left(brief)}${closing(brief)}`;
 };
 const model = (name: string, how: (brief: string) => string = say): LlmAdapter => ({ provider: "stand-in", model: name, complete: async (req) => ({ content: [{ type: "text", text: how(String((req.messages[0] as any).content)) }], usage: { input_tokens: 1, output_tokens: 1 } }) });
 const written = (items: PlanItem[], how: (t: PlanItem) => string = (t) => say(t.brief)): WrittenRequest[] => items.map((t) => ({ id: t.id, request: how(t) }));
@@ -64,11 +72,11 @@ test("the seats' two voices are half of what is dealt, beside every older style;
   expect(STYLES.early).toContain("about 300 characters");
   const rand = sampler(7);
   const early = Array.from({ length: 200 }, () => styleBrief("early", ACTS[0]!, rand));
-  const opened = early.filter((b) => b.riders.length);
+  const opened = early.filter((b) => b.riders.some((r) => r.kind === "capacity"));
   expect(opened.length).toBeGreaterThan(60);
   expect(opened.length).toBeLessThan(140);
   for (const b of opened) {
-    expect(b.riders).toEqual([{ kind: "capacity", text: expect.stringMatching(/^As ([a-z ]+|[A-Z][A-Za-z ]+ of [A-Za-z ]+|[a-z ]+ \[[a-z-]+\])$/) }]);
+    expect(b.riders.filter((r) => r.kind !== "mention")).toEqual([{ kind: "capacity", text: expect.stringMatching(/^As ([a-z ]+|[A-Z][A-Za-z ]+ of [A-Za-z ]+|[a-z ]+ \[[a-z-]+\])$/) }]);
     expect(b.instruction).toContain(`Open with exactly these words: "${b.riders[0]!.text},"`);
   }
   for (const way of [/^As [a-z ]+$/, / of /, /\]$/]) expect(opened.some((b) => way.test(b.riders[0]!.text))).toBe(true);
@@ -76,11 +84,11 @@ test("the seats' two voices are half of what is dealt, beside every older style;
   // is given word for word), which ask for nothing and name nothing the call doesn't have.
   expect(STYLES.late).toContain("Ids are written bare");
   expect(STYLES.late).toContain("They ask for nothing more");
-  expect(STYLES.late).toContain("name no id, amount, record or person the call doesn't have");
+  expect(STYLES.late).toContain("name no amount or person the call doesn't have, and no other id but the ones given below to be named");
   const late = Array.from({ length: 200 }, () => styleBrief("late", ACTS[0]!, rand));
   const counts = late.map((b) => [...b.instruction.slice(b.instruction.indexOf("After the act")).matchAll(/\((\d)\) /g)].length);
   expect(new Set(counts)).toEqual(new Set([2, 3, 4, 5]));
-  for (const b of late) expect(b).toMatchObject({ style: "late", riders: [] });
+  for (const b of late) expect([b.style, b.riders.every((r) => r.kind === "mention")]).toEqual(["late", true]); // (no sentence is given word for word: only ids to name)
   for (const kind of ["what must stay as it is", "what it must not do", "what it does not amount to", "what to do if it cannot be done as asked", "what is to be shown before it is carried out"]) expect(late.some((b) => b.instruction.includes(kind))).toBe(true);
   // The writers are told that a style may ask for more than three sentences, and that what it adds asks for nothing.
   expect(writerSystem()).toContain("one to three sentences of plain language, unless the style asks for more");
@@ -106,7 +114,7 @@ test("a long request of one act in the late voice is a positive with its program
     // Every value is found, in the act and not in what follows it; the closing "Do not …" is recorded as adding nothing.
     const act = e.request.indexOf(" Preserve");
     for (const s of e.spans!) if (s.how !== "implied") expect([s.arg, s.at![1] <= act, s.ambiguous]).toEqual([s.arg, true, undefined]);
-    expect(e.riders).toEqual([{ kind: "do_not", text: "Do not reverse, cancel or replace anything already done.", at: expect.any(Array), adds: "nothing" }]);
+    expect(e.riders!.filter((r) => r.kind !== "mention")).toEqual([{ kind: "do_not", text: "Do not reverse, cancel or replace anything already done.", at: expect.any(Array), adds: "nothing" }]);
   }
   // The refusals built by running requests together are made of the other requests only: related ones, and long
   // pasted ones. No late request is a part of any, so length alone never makes one.
@@ -131,6 +139,10 @@ test("a request in a seat's voice that names an id its program doesn't have is d
   expect(strayIds("Vote yes on council ballot [rec.3] from the town account [acc-city], under law-charter.", vote)).toEqual(["acc-city", "law-charter"]);
   expect(strayIds("Vote yes on council ballot [rec.3]. Preserve the ballot and its history.", vote)).toEqual([]);
   expect(strayIds("Vote yes on ballot rec.3, rec.30 and rec.3.", vote)).toEqual(["rec.30"]);
+  // Anything in the shape of an id, not only a record's: an account, a person, a place, an instruction.
+  expect(strayIds("Vote yes on ballot rec.3. Leave acc-c0004, c0042, str.7, lot-12-03, house-165 and job-c0011-wages as they are.", vote)).toEqual(["acc-c0004", "c0042", "str.7", "lot-12-03", "house-165", "job-c0011-wages"]);
+  // The ids a request was given to name are its to name, wherever and however often; any other is still one too many.
+  expect(strayIds("Vote yes on ballot rec.3. Keep rec.2679 and acc-c0004 unchanged; rec.2679 stays as it is, and so does acc-c0008.", vote, { riders: [{ kind: "mention", text: "rec.2679" }, { kind: "mention", text: "acc-c0004" }] })).toEqual(["acc-c0008"]);
   // Not what a rider was given to say, not what the program copies whole, not a form named by its record's id.
   expect(strayIds("As mayor [mayor], vote yes on ballot [rec.3] under law-rates.", vote, { riders: [{ kind: "capacity", text: "As mayor [mayor]" }, { kind: "citation", text: "under law-rates" }] })).toEqual([]);
   expect(strayIds("Tell the clerk [pos.7]: See rec.88 and [lot-01-02] before Friday.", 'message(to=pos.7, text="See rec.88 and [lot-01-02] before Friday.")')).toEqual([]);
@@ -138,7 +150,7 @@ test("a request in a seat's voice that names an id its program doesn't have is d
   expect(strayIds("Submit the permit application [form-permit] to the planning office [pos.9] for lot [lot-00-00].", "form(form=permit_application, to=pos.9, lot=lot-00-00)", { forms: [spec] })).toEqual([]);
   expect(strayIds("Submit the permit application [form-other] to the planning office [pos.9] for lot [lot-00-00].", "form(form=permit_application, to=pos.9, lot=lot-00-00)", { forms: [spec] })).toEqual(["form-other"]);
   // In the pipeline: the seats' voices are held to it (their further sentences are the writer's own); the reason is counted.
-  const stray = (brief: string) => `${opening(brief) ? `${opening(brief)}, ` : ""}vote yes on ballot rec.3. Keep replacement ballot rec.2679 unchanged. (${Bun.hash(brief).toString(36)})`;
+  const stray = (brief: string) => `${opening(brief) ? `${opening(brief)}, ` : ""}vote yes on ballot rec.3. Keep replacement ballot rec.2679 unchanged.${left(brief)} (${Bun.hash(brief).toString(36)})`;
   const r = await generate([g(vote)], { writers: [model("a", stray)], perGold: 3, styles: ["late", "early", "formal"], seed: 2 });
   expect(r.rejects.map((x) => [x.style, x.why])).toEqual([["late", "stray_id"], ["early", "stray_id"]]);
   expect(r.manifest.dropped.stray_id).toBe(2);
@@ -225,7 +237,7 @@ test("a letter asked for indirectly: about half of the letters, the writer told 
     // where they were marked, copied; the gold program it was planned from is what a split keeps it with.
     expect(e.request).not.toMatch(/[⟦⟧]/);
     const text = e.spans!.find((s) => s.arg === "text")!;
-    expect(text).toEqual({ arg: "text", value: expect.stringMatching(/^inspect the drains at the depot \([a-z0-9]+\) and report when it is complete$/), how: "copy", at: expect.any(Array) });
+    expect(text).toEqual({ arg: "text", value: expect.stringMatching(/^inspect the drains at .+ \([a-z0-9]+\) and report when it is complete$/), how: "copy", at: expect.any(Array) });
     expect(e.request.slice(...text.at!)).toBe(text.value);
     expect(e.program).toBe(withText(e.gold!, text.value));
     expect(e.program).not.toBe(e.gold);
@@ -360,7 +372,7 @@ test("a part can be weighted toward what seats ask: requests for some functions 
 test("the late voice is asked for at a seat's length: every particular in the act, full sentences after it, 300 to 700 characters; the manifest counts lengths by style", async () => {
   expect(STYLES.late).toContain("with every particular the call has said as a seat says them: what, for whom, from what, on what terms");
   expect(STYLES.late).toContain("each a full sentence of its own, twelve to thirty words, never a tag of five");
-  expect(STYLES.late).toContain("The whole request comes to 300 to 700 characters");
+  expect(STYLES.late).toContain("The whole request comes to 300 to 700 characters, or up to 1,000 where it has many ids to name");
   expect(STYLES.late).toContain("never from adding anything");
   // Each kind of sentence is shown at the length meant (the first part's were five words: so were the examples).
   const rand = sampler(11);
@@ -368,7 +380,7 @@ test("the late voice is asked for at a seat's length: every particular in the ac
   for (let i = 0; i < 80; i++) for (const indirect of [false, true]) {
     const b = styleBrief("late", indirect ? LETTERS[0]! : ACTS[0]!, rand, { indirect }).instruction;
     expect(b).toContain("the sentences in brackets show the kind and the length, not the words to use");
-    for (const m of b.slice(b.indexOf("After the act")).matchAll(/"([^"]+)"/g)) if (m[1] !== "Do not") shown.add(m[1]!);
+    for (const m of b.slice(b.indexOf("After the act")).split(/ In those further sentences, name| What they are asked to do names/)[0]!.matchAll(/"([^"]+)"/g)) if (m[1] !== "Do not") shown.add(m[1]!);
     // A direction's own words: two or three clauses, 20 to 45 words, inside the marks.
     expect(b.includes("two or three clauses in one sentence of 20 to 45 words (what to do, by when or in what order, what to report back when it is done), all of it between the marks")).toBe(indirect);
   }
@@ -412,4 +424,162 @@ test("in the seats' voices a request to read asks for particulars, one to pause 
   expect(routines.size).toBeGreaterThanOrEqual(20);
   // Nothing of any place: no town's name and no figure of money in what the generator says.
   for (const b of [look, pause, visit, routine]) expect(b.seats!).not.toMatch(/[$£€]|[A-Z][a-z]+(brook|ville|town|ford)\b/);
+});
+
+test("one act that names many things: in the seats' voices a request is given other ids to name, each recorded as a rider that adds nothing; any other id is still dropped", async () => {
+  // Invented ids, in the shapes worlds' ids have: different, none the call's own or part of one, often of one kind.
+  const rand = sampler(3);
+  for (let i = 0; i < 200; i++) {
+    const n = 1 + (i % 10);
+    const ms = mentions(rand, n, ["acc-c0003", "c0003", "rec.3"]);
+    expect(ms.length).toBe(n);
+    expect(new Set(ms.map((m) => m.id)).size).toBe(n);
+    for (const m of ms) {
+      expect(["acc-c0003", "c0003", "rec.3"].some((a) => a.includes(m.id) || m.id.includes(a))).toBe(false);
+      expect([m.id, strayIds(`Leave ${m.id} alone.`, "vote(ballot=rec.9, choice=yes)")]).toEqual([m.id, [m.id]]); // (its shape is one the check knows)
+    }
+  }
+  expect(new Set(Array.from({ length: 300 }, () => mentions(rand, 1)[0]!.what)).size).toBe(7);
+  expect(mentions(rand, 5, [], ["a place"]).every((m) => m.what === "a place")).toBe(true);
+  // The plan: every request in a seat's voice (but a letter asked indirectly) has one to four, the early voice one
+  // or two; the brief names them, and they are riders; the other styles have none.
+  const plan = planOf(ACTS, { writers: ["w"], perGold: 4, seed: 12 }).filter((t): t is Extract<PlanItem, { kind: "request" }> => t.kind === "request");
+  const counts: { [style: string]: Set<number> } = { early: new Set(), late: new Set() };
+  for (const t of plan) {
+    const named = t.riders.filter((r) => r.kind === "mention").map((r) => r.text);
+    if (!SEATS.includes(t.style)) { expect(named).toEqual([]); continue; }
+    counts[t.style]!.add(named.length);
+    expect(others(t.brief)).toEqual(named);
+    expect(t.brief).toContain("as things the act leaves alone, does not touch or is not about (never as anything to be done)");
+    expect(t.brief).toContain(t.style === "late" ? "write each bare" : "write each in square brackets");
+    const own = literals(calls.parseProgram(t.gold.program));
+    for (const id of named) expect(own.some((x) => x.includes(id) || id.includes(x))).toBe(false);
+  }
+  expect(counts).toEqual({ early: new Set([1, 2]), late: new Set([1, 2, 3, 4]) });
+  // Written: each id where it stands, every time it stands, adding nothing; the program's own values are found
+  // elsewhere; a "Do not …" that names one is still recorded as that.
+  const wording = (brief: string) => {
+    const ids = others(brief);
+    return `${opening(brief) ? `${opening(brief)}, ` : ""}carry this out (${Bun.hash(brief).toString(36)}): ${literals(calls.parseProgram(programIn(brief))).join(", ")}.${ids.length ? ` Do not alter ${ids[0]} or anything recorded under it. Keep ${ids.join(", ")} unchanged.` : ""}`;
+  };
+  const o = { styles: ["late", "early", "terse"], perGold: 3, seed: 12 };
+  const r = await generate(ACTS, { ...o, writers: [model("a", wording)] });
+  expect(r.rejects).toEqual([]);
+  const items = planOf(ACTS, { ...o, writers: ["w"] }).filter((t): t is Extract<PlanItem, { kind: "request" }> => t.kind === "request");
+  for (const e of r.examples.filter((x) => x.kind === "positive")) {
+    const t = items.find((x) => x.gold.program === e.program && x.style === e.style)!;
+    const given = t.riders.filter((x) => x.kind === "mention").map((x) => x.text);
+    const recorded = (e.riders ?? []).filter((x) => x.kind === "mention");
+    if (e.style === "terse") { expect(recorded).toEqual([]); continue; }
+    expect(recorded.length).toBe(given.length + 1); // (the first is named twice)
+    expect(new Set(recorded.map((x) => x.text))).toEqual(new Set(given));
+    for (const x of recorded) expect([x.adds, e.request.slice(...x.at)]).toEqual(["nothing", x.text]);
+    expect(e.riders!.filter((x) => x.kind === "do_not").map((x) => x.text)).toEqual([`Do not alter ${given[0]} or anything recorded under it.`]);
+    // No value of the program is pointed at inside something only mentioned, and the program is the act's alone.
+    for (const sp of e.spans!) if (sp.at) for (const x of recorded) expect(sp.at[1] <= x.at[0] || sp.at[0] >= x.at[1]).toBe(true);
+    expect(ACTS.map((a) => a.program)).toContain(e.program);
+  }
+  expect(r.manifest.riders.mention).toBeGreaterThan(ACTS.length * 3);
+  // Left out, an id it was given: not what was asked. Another id of its own: dropped as before.
+  const without = await generate(ACTS, { ...o, writers: [model("a", (b) => wording(b).replace(/ Keep .* unchanged\.$/, "").replace(/ Do not alter .*$/, ""))] });
+  expect(without.examples.filter((e) => e.kind === "positive").map((e) => e.style)).toEqual(ACTS.map(() => "terse"));
+  expect(without.manifest.dropped.not_copied).toBe(ACTS.length * 2);
+  const more = await generate(ACTS, { ...o, writers: [model("a", (b) => `${wording(b)} Leave acc-c9999 as it is.`)] });
+  expect(more.manifest.dropped.stray_id).toBe(ACTS.length * 2);
+  expect(more.examples.filter((e) => e.kind === "positive").every((e) => e.style === "terse")).toBe(true);
+});
+
+test("a letter asked for indirectly in a seat's voice names ids inside its marked words; a request to read, pause or visit names three to ten", async () => {
+  const plan = planOf(LETTERS, { writers: ["w"], perGold: 8, indirect: 1, seed: 5 }).filter((t): t is Extract<PlanItem, { kind: "request" }> => t.kind === "request");
+  for (const t of plan) {
+    expect(t.indirect).toBe(true);
+    if (!SEATS.includes(t.style)) { expect(t.inside).toBeUndefined(); continue; }
+    // Two or three in the late voice, one or two in the early: what the task concerns, between the marks; and no
+    // other thing to name outside them.
+    expect([t.style, t.inside!.length >= (t.style === "late" ? 2 : 1) && t.inside!.length <= (t.style === "late" ? 3 : 2)]).toEqual([t.style, true]);
+    expect(within(t.brief)).toEqual(t.inside!);
+    expect(t.brief).toContain("as what the task concerns, all of them between the marks");
+    expect(t.brief).toContain("between the marks there are none");
+    expect(t.riders.filter((r) => r.kind === "mention")).toEqual([]);
+  }
+  // (A sum of money is offered now and then, where the program's world says how its money is written.)
+  const cur = { code: "FLN", minor_units: 2, symbol: "ƒ" };
+  const sums = planOf(LETTERS.map((l) => ({ ...l, currency: cur })), { writers: ["w"], perGold: 8, indirect: 1, styles: ["late"], seed: 5 }).map((t) => /names this sum where it fits \(a limit, an estimate\): "(ƒ[0-9,]+(\.[0-9]+)?)"/.exec(t.brief)?.[1]);
+  expect(sums.some((x) => x) && sums.some((x) => !x)).toBe(true);
+  // Written so: the ids are part of the letter's text, which is copied whole; left outside the marks, the request
+  // is not what was asked.
+  const r = await generate(LETTERS, { writers: [model("a")], perGold: 8, indirect: 1, seed: 5 });
+  expect(r.rejects).toEqual([]);
+  for (const t of plan.filter((x) => x.inside)) {
+    const e = r.examples.find((x) => x.gold === (t.gold.family ?? t.gold.program) && x.style === t.style && t.inside!.every((id) => x.program.includes(id)))!;
+    expect(e.indirect).toBe(true);
+    const text = e.spans!.find((x) => x.arg === "text")!;
+    for (const id of t.inside!) expect(text.value).toContain(id);
+    expect((e.riders ?? []).filter((x) => x.kind === "mention")).toEqual([]);
+  }
+  const outside = await generate(LETTERS, { writers: [model("a", (b) => (within(b).length ? say(b).replace(` at ${within(b).join(" and ")}`, "").replace(/\.$/, `, with ${within(b).join(" and ")} in mind.`) : say(b)))], perGold: 8, indirect: 1, seed: 5 });
+  expect(outside.manifest.dropped.not_copied).toBe(plan.filter((t) => t.inside).length);
+
+  // Refusals: three to ten ids for a request to read, three to six to pause, three to five to visit; none for a
+  // routine. In a seat's voice the brief gives them and the request must carry them; in another style neither.
+  const gold = [g('money(to=acc-landlord-1, amount="$850", from=acc-city, every="monthly", for="rent")'), ...ACTS];
+  const briefs = refusalBriefs(gold, 200, 4);
+  const sizes = (f: (b: RefusalBrief) => boolean) => new Set(briefs.filter(f).map((b) => b.mention?.length ?? 0));
+  expect(sizes((b) => b.label === "not_an_act")).toEqual(new Set([3, 4, 5, 6, 7, 8, 9, 10]));
+  expect(sizes((b) => b.brief.includes("already stands"))).toEqual(new Set([3, 4, 5, 6]));
+  expect(sizes((b) => b.brief.includes("in person"))).toEqual(new Set([3, 4, 5]));
+  expect(sizes((b) => b.brief.includes("a routine of their own"))).toEqual(new Set([0]));
+  expect(sizes((b) => ["unclear", "not_yours", "needs_calculation"].includes(b.label))).toEqual(new Set([0]));
+  for (const b of briefs.filter((x) => x.mention)) {
+    for (const id of b.mention!) expect(b.mustCopy.some((x) => x.includes(id) || id.includes(x))).toBe(false);
+    for (const style of SEATS) expect(covered(refusalRequestBrief(b, style))).toEqual(b.mention!);
+    expect(covered(refusalRequestBrief(b, "terse"))).toEqual([]);
+  }
+  expect(refusalBriefs(gold, 200, 4)).toEqual(briefs);
+  // (Several acts piled into one message, in a seat's voice: each act a sentence of its own, and other things named too.)
+  const piles = piledBriefs([[ACTS[0]!, ACTS[1]!], [ACTS[2]!, ACTS[3]!, ACTS[4]!]], 4);
+  for (const b of piles) {
+    expect(b.mention!.length >= 1 && b.mention!.length <= 3).toBe(true);
+    expect(refusalRequestBrief(b, "late")).toContain("each act is a sentence of its own with its own particulars");
+    expect(covered(refusalRequestBrief(b, "late"))).toEqual(b.mention!);
+    expect(refusalRequestBrief(b, "chatty")).not.toContain("In this voice");
+  }
+  const o = { perGold: 1, only: ["none"], refusalLabels: ["not_an_act", "no_such_act"], refusalFloor: 30, seed: 4 };
+  const items = planOf(gold, { ...o, writers: ["w"] }).filter((t): t is Extract<PlanItem, { kind: "refusal" }> => t.kind === "refusal" && t.round === 0);
+  const [seat, plain] = [items.find((t) => t.style === "late" && t.refusal.label === "not_an_act")!, items.find((t) => t.style === "terse" && t.refusal.label === "not_an_act")!];
+  expect(covered(seat.brief).length).toBeGreaterThanOrEqual(3);
+  for (const id of covered(seat.brief)) expect(seat.refusal.mustCopy).toContain(id);
+  expect(plain.refusal.mustCopy.length).toBeLessThanOrEqual(1);
+  const kept = await generate(gold, { ...o, writers: [model("a")] });
+  expect(kept.rejects).toEqual([]);
+  const dense = kept.examples.filter((e) => e.style === "late" && e.program === "none(not_an_act)");
+  expect(dense.length).toBeGreaterThan(3);
+  for (const e of dense) expect(strayIds(e.request, "vote(ballot=rec.0, choice=yes)").length).toBeGreaterThanOrEqual(3); // (as full of ids as a real one)
+  const sparse = await generate(gold, { ...o, writers: [model("a", (b) => say(b).replace(/ It covers [^.]*(\.[^ ][^.]*)*\./, ""))] });
+  expect(sparse.rejects.length).toBeGreaterThan(10);
+  expect(sparse.rejects.every((x) => x.why === "not_copied" && SEATS.includes(x.style))).toBe(true);
+});
+
+test("what is built as too much is still several acts, each its own, whatever else its parts mention", async () => {
+  const o = { styles: ["early", "terse", "formal"], perGold: 3, refusalLabels: ["too_much"], refusalFloor: 8, seed: 9 };
+  const r = await generate(ACTS, { ...o, writers: [model("a")] });
+  const byId = new Map(r.examples.map((e) => [e.id, e]));
+  const built = r.examples.filter((e) => e.program === "none(too_much)" && e.built_from);
+  expect(built.length).toBeGreaterThanOrEqual(8);
+  for (const e of built) {
+    // Two acts or more, each a positive of its own with another program than the rest, each said whole in the message.
+    const parts = e.built_from!.map((id) => byId.get(id)!);
+    expect(parts.length).toBeGreaterThanOrEqual(2);
+    expect(parts.every((p) => p.kind === "positive" && p.style !== "late")).toBe(true);
+    expect(new Set(parts.map((p) => p.gold ?? p.program)).size).toBe(parts.length);
+    for (const p of parts) for (const sp of p.spans!) if (sp.how === "copy") expect(e.request).toContain(sp.value);
+  }
+  // Some of them have a part that mentions other things by id, as one act alone does: so neither the number of ids
+  // nor the length says which is which, only the acts.
+  const mentioning = built.filter((e) => e.built_from!.some((id) => (byId.get(id)!.riders ?? []).some((x) => x.kind === "mention")));
+  expect(mentioning.length).toBeGreaterThan(0);
+  const single = r.examples.filter((e) => e.kind === "positive" && (e.riders ?? []).some((x) => x.kind === "mention"));
+  expect(single.length).toBeGreaterThan(5);
+  // (The related kind takes such a part as readily as the pasted kind: a mention is no closing "Do not …".)
+  expect(built.some((e) => e.source === "built: related requests run together" && e.built_from!.slice(1).some((id) => (byId.get(id)!.riders ?? []).some((x) => x.kind === "mention")))).toBe(true);
 });

@@ -19,9 +19,11 @@ const LOG = [
 /** What a stand-in writer says to a brief, whoever it is and however the brief reached it: for a program, the words
  * the style says to use exactly and every literal; for a situation, its own line (whatever it names is in it). A
  * careless one loses what it was to copy. */
+/** The ids a brief gives its writer to name (set off by quotation marks, each with what it is), for a stand-in to say. */
+const toName = (brief: string): string => { const at = brief.search(/names? (exactly )?these (other things )?by id/); return at < 0 ? "" : [...brief.slice(at).matchAll(/"([^"\s]+)" \(/g)].map((m) => ` ${m[1]}`).join(""); };
 const say = (brief: string, careless = false): string => {
   const mark = Bun.hash(brief).toString(36);
-  if (!brief.startsWith("Call:\n")) return careless && /needs|no amount/.test(brief) ? `Work it out. (${mark})` : `Request ${mark}, about this: ${brief.split("\n")[1]}`;
+  if (!brief.startsWith("Call:\n")) return careless && /needs|no amount/.test(brief) ? `Work it out. (${mark})` : `Request ${mark}, about this: ${brief.split("\n")[1]}${toName(brief)}`;
   const given = brief.includes("exactly ") ? [...brief.slice(brief.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") : "";
   const program = brief.slice("Call:\n".length, brief.indexOf("\n\nWhat it brings about"));
   return `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}please see to this (${mark}): ${literals(calls.parseProgram(program)).join(" / ")}`;

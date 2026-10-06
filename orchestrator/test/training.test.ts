@@ -7,6 +7,8 @@ import { functionOf, literals, refusalBriefs, refusalWriterSystem, writerSystem,
 import { balancedGold, checkBlind, goldOf, trainingData, writeBlind, writerInstructions, writtenData } from "../src/training";
 
 const dir = join(import.meta.dir, "../../runs/test-training-data");
+/** The ids a brief gives its writer to name (set off by quotation marks, each with what it is), for a stand-in to say. */
+const toName = (brief: string): string => { const at = brief.search(/names? (exactly )?these (other things )?by id/); return at < 0 ? "" : [...brief.slice(at).matchAll(/"([^"\s]+)" \(/g)].map((m) => ` ${m[1]}`).join(""); };
 const act = (call: string) => JSON.stringify({ kind: "command", body: { command: "act", provenance: { via: "call", call } } });
 
 test("training data from a log: gold programs, requests from two writers, each translated back by a third model; the data and its manifest written", async () => {
@@ -147,7 +149,7 @@ test("a balanced gold set: a floor under every function, made up with generated 
     const said = String((req.messages[0] as any).content);
     const isCall = said.startsWith("Call:\n");
     const given = (said.includes("exactly ") ? [...said.slice(said.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") || undefined : undefined);
-    const text = isCall ? `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}please: ${literals(calls.parseProgram(said.slice(6, said.indexOf("\n\n")))).join(" / ")}` : `Request ${++asked}, about this: ${said.split("\n")[1]}`; // (the situation's own line: whatever it names is in it)
+    const text = isCall ? `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}please: ${literals(calls.parseProgram(said.slice(6, said.indexOf("\n\n")))).join(" / ")}` : `Request ${++asked}, about this: ${said.split("\n")[1]}${toName(said)}`; // (the situation's own line: whatever it names is in it)
     return { content: [{ type: "text", text }], usage: { input_tokens: 7, output_tokens: 3 } };
   } };
   const out = join(d, "data");
@@ -205,7 +207,9 @@ test("several checkers: each request is translated back by a model that didn't w
       return { content: [{ type: "tool_use", id: "1", name: "call", input: { program: (programs.get(request) ?? "none(unclear)").replace("leave=yes", "leave=true") } }], usage: { input_tokens: 11, output_tokens: 5 } };
     }
     const program = said.slice("Call:\n".length, said.indexOf("\n\n"));
-    const text = `${name} asks: ${literals(calls.parseProgram(program)).join(" / ")} [${said.slice(-12)}]`;
+    // (Whatever words the style says to use exactly, the ids it gives to name among them; then every literal.)
+    const given = said.includes("exactly ") ? [...said.slice(said.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") : "";
+    const text = `${given ? `${given}${given.endsWith(".") ? "" : ","} ` : ""}${name} asks: ${literals(calls.parseProgram(program)).join(" / ")} (${Bun.hash(said).toString(36)})`;
     programs.set(text, program);
     return { content: [{ type: "text", text }], usage: { input_tokens: 7, output_tokens: 3 } };
   } });
@@ -218,8 +222,8 @@ test("several checkers: each request is translated back by a model that didn't w
   const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
   const positives = examples.filter((e) => e.kind === "positive");
   expect(new Set(positives.map((e) => `${e.written_by} -> ${e.verified_by}`))).toEqual(new Set(["stand-in/a -> stand-in/c", "stand-in/b -> stand-in/a"]));
-  expect(translated.a!.length > 0 && translated.a!.every((q) => q.startsWith("b asks"))).toBe(true);
-  expect(translated.c!.length > 0 && translated.c!.every((q) => q.startsWith("a asks"))).toBe(true);
+  expect(translated.a!.length > 0 && translated.a!.every((q) => q.includes("b asks: "))).toBe(true);
+  expect(translated.c!.length > 0 && translated.c!.every((q) => q.includes("a asks: "))).toBe(true);
   expect(translated.b).toEqual([]);
   // (Counted over every example: a refusal built from a positive, the form left out, keeps who wrote and checked its request.)
   expect(manifest.checked).toEqual({ "stand-in/a -> stand-in/c": examples.filter((e) => e.written_by === "stand-in/a").length, "stand-in/b -> stand-in/a": examples.filter((e) => e.written_by === "stand-in/b").length });
@@ -271,7 +275,7 @@ test("requests written by file: a briefs-only run and the writers' requests take
   // its style says to use exactly), or a situation's own line.
   const say = (brief: string): string => {
     const mark = Bun.hash(brief).toString(36);
-    if (!brief.startsWith("Call:\n")) return `Request ${mark}, about this: ${brief.split("\n")[1]}`;
+    if (!brief.startsWith("Call:\n")) return `Request ${mark}, about this: ${brief.split("\n")[1]}${toName(brief)}`;
     const given = brief.includes("exactly ") ? [...brief.slice(brief.indexOf("exactly ")).matchAll(/"([^"]+)"/g)].map((m) => m[1]).join(" ") : "";
     // (A letter asked for indirectly: the words asked of them are the writer's own, marked.)
     const asked = brief.includes("Asked indirectly") ? `check the drains (${mark}) and report back` : undefined;
@@ -410,6 +414,14 @@ test("requests written by file: a briefs-only run and the writers' requests take
   // (Two briefs for the same routine in the same style are the same brief, and the stand-in then says the same
   // thing twice: said before, so that label may be one short. No other label is counted short: none was asked for.)
   expect(Object.keys(lm.short_of_floor).every((l) => l === "no_such_act")).toBe(true);
+  // Several acts in one message, asked for by name: as many written piles as the floor (there are no positives to
+  // build any from), each in a seat's voice told to name other things by id as one act is.
+  const piles = weigh("piles", "--only", "none", "--refusal-labels", "too_much", "--refusal-floor", "6", "--no-spares");
+  expect([piles.exitCode, piles.stderr.toString()]).toEqual([0, ""]);
+  const pp = json(join(d, "piles"), "plan.json");
+  expect(pp.items.length).toBe(6);
+  expect(pp.items.every((t: any) => t.kind === "refusal" && t.refusal.label === "too_much" && t.refusal.source === "piled")).toBe(true);
+  for (const t of pp.items) expect([t.style, t.brief.includes("each act is a sentence of its own"), t.refusal.mustCopy.includes(t.refusal.mention[0])]).toEqual([t.style, ["early", "late"].includes(t.style), ["early", "late"].includes(t.style)]);
   // With models, the same options and the same record.
   const weighted = join(d, "weighted-models");
   await trainingData({ ...options, shard: undefined, refusalFloor: undefined, only: ["message"], indirect: 1, writers: [{ adapter: model("a"), prices }], out: weighted });

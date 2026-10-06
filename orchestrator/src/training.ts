@@ -280,10 +280,11 @@ export async function trainingData(o: TrainingDataOptions): Promise<{ examples: 
   }
   // What is asked for of the gold set, whoever writes: the same for a run with models and for the briefs alone.
   // (With a floor under the refusals: related acts for a writer to pile into one message, which is `too_much` as
-  // people make it; a third as many as the floor, beside the built ones.)
+  // people make it; a third as many as the floor, beside the built ones. Where that label is asked for by name, as
+  // many as the floor: a part of several acts in the seats' voice is written, there being no positives to build from.)
   const asked = {
     ...(o.perGold ? { perGold: o.perGold } : {}), ...(o.refusalsPerLabel ? { refusalsPerLabel: o.refusalsPerLabel } : {}),
-    ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
+    ...(o.refusalFloor ? { refusalFloor: o.refusalFloor, piled: piled({ groups: o.refusalLabels?.includes("too_much") ? o.refusalFloor : Math.ceil(o.refusalFloor / 3), seed: o.seed ?? 1 }) } : {}),
     indirect: o.indirect ?? 0.5, ...(o.only ? { only: o.only } : {}), ...(o.refusalLabels ? { refusalLabels: o.refusalLabels } : {}), seed: o.seed ?? 1,
   };
   // What a part was weighted toward, for whoever reads its manifest.
