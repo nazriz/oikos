@@ -3,4 +3,4 @@ name = "oikos-translator-model"
 version = "0.1.0"
 description = "The translator as a small model that decides and copies: training and scoring."
 requires-python = ">=3.11,<3.14"
-dependencies = ["torch>=2.4", "numpy>=1.26", "safetensors>=0.4"]
+dependencies = ["torch>=2.4", "numpy>=1.26", "safetensors>=0.4", "transformers>=4.44", "tokenizers>=0.19", "sentencepiece>=0.2", "protobuf>=4.25"]
