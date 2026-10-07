@@ -54,19 +54,26 @@ impl Session {
 
     fn reply(&mut self, req: &Value) -> Reply {
         let done = if req.get("op").and_then(Value::as_str) == Some("command") { command(self, req).map(Reply::Line) } else { handle(self, req).map(Reply::Value) };
-        done.unwrap_or_else(|e| {
-            Reply::Value(if e.starts_with(crate::run::LOG_WRITE_FAILED) {
-                json!({ "ok": false, "error": e, "fatal": true })
-            } else {
-                json!({ "ok": false, "error": e })
-            })
-        })
+        done.unwrap_or_else(refused)
+    }
+
+    /// As `reply`, for a request that is the caller's to take from: a run is started from its config where it is (a
+    /// large world's isn't copied first).
+    fn reply_taking(&mut self, req: &mut Value) -> Reply {
+        if req.get("op").and_then(Value::as_str) != Some("start") || self.run.is_some() {
+            return self.reply(req);
+        }
+        // (What the session keeps of the config is read before the config is taken.)
+        let types = structure_types(&req["config"]);
+        let currency = oikos_resolver::calls::Currency::from_config(&req["config"]["world"]["currencies"][0]);
+        let config = req.get_mut("config").map(Value::take);
+        start(self, req, config, types, currency).map(Reply::Value).unwrap_or_else(refused)
     }
 
     /// One request as a line of JSON, its reply as one.
     pub fn request_line(&mut self, line: &str) -> String {
         match serde_json::from_str::<Value>(line) {
-            Ok(req) => match self.reply(&req) {
+            Ok(mut req) => match self.reply_taking(&mut req) {
                 Reply::Value(v) => v.to_string(),
                 Reply::Line(s) => s,
             },
@@ -101,6 +108,15 @@ pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()>
     }
     session.close();
     Ok(())
+}
+
+/// The reply to a request that wasn't carried out (a log that couldn't be written is marked fatal).
+fn refused(e: String) -> Reply {
+    Reply::Value(if e.starts_with(crate::run::LOG_WRITE_FAILED) {
+        json!({ "ok": false, "error": e, "fatal": true })
+    } else {
+        json!({ "ok": false, "error": e })
+    })
 }
 
 /// A reply: a value, or a line already written.
@@ -143,33 +159,47 @@ fn command(session: &mut Session, req: &Value) -> Result<String, String> {
     String::from_utf8(line).map_err(|e| e.to_string())
 }
 
-fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
+/// The world's structure types (its catalogue), by id.
+fn structure_types(config: &Value) -> std::collections::BTreeMap<String, Value> {
+    config["catalogue"]["structure_types"].as_array().into_iter().flatten().filter_map(|t| Some((t["id"].as_str()?.to_string(), t.clone()))).collect()
+}
+
+/// Starts a session's run from a config (the request's, handed over), with what the session keeps of it.
+fn start(session: &mut Session, req: &Value, config: Option<Value>, structure_types: std::collections::BTreeMap<String, Value>, money: Option<oikos_resolver::calls::Currency>) -> Result<Value, String> {
     let Session { run, sched, knowledge, types, currency } = session;
+    let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
+    if run.is_some() {
+        return Err("a run is already started".into());
+    }
+    let log = File::create(str_field("log_path")?).map_err(|e| e.to_string())?;
+    let anchors: Option<Box<dyn Write>> = match req.get("anchors_path").and_then(Value::as_str) {
+        Some(p) => Some(Box::new(File::create(p).map_err(|e| e.to_string())?)),
+        None => None,
+    };
+    let config = config.ok_or("missing config")?;
+    let mut r = Run::start(config, str_field("run_id")?, BufWriter::new(log), anchors).map_err(|e| e.to_string())?;
+    // A host that keeps the records it's handed asks for each one whole once, and by its id from then on.
+    if req.get("record_refs").and_then(Value::as_bool) == Some(true) {
+        r.refer_to_records();
+    }
+    let reply = json!({ "ok": true, "seq": 0, "head": r.head(), "t": r.kernel().t() });
+    *types = structure_types;
+    *currency = money;
+    knowledge.clear();
+    *sched = Some(crate::schedule::Scheduler::new(r.kernel().statics().tick));
+    *run = Some(r);
+    Ok(reply)
+}
+
+fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
     let op = req.get("op").and_then(Value::as_str).ok_or("missing op")?;
     let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
     if op == "start" {
-        if run.is_some() {
-            return Err("a run is already started".into());
-        }
-        let log = File::create(str_field("log_path")?).map_err(|e| e.to_string())?;
-        let anchors: Option<Box<dyn Write>> = match req.get("anchors_path").and_then(Value::as_str) {
-            Some(p) => Some(Box::new(File::create(p).map_err(|e| e.to_string())?)),
-            None => None,
-        };
-        let config = req.get("config").cloned().ok_or("missing config")?;
-        let mut r = Run::start(config, str_field("run_id")?, BufWriter::new(log), anchors).map_err(|e| e.to_string())?;
-        // A host that keeps the records it's handed asks for each one whole once, and by its id from then on.
-        if req.get("record_refs").and_then(Value::as_bool) == Some(true) {
-            r.refer_to_records();
-        }
-        let reply = json!({ "ok": true, "seq": 0, "head": r.head(), "t": r.kernel().t() });
-        *types = req["config"]["catalogue"]["structure_types"].as_array().into_iter().flatten().filter_map(|t| Some((t["id"].as_str()?.to_string(), t.clone()))).collect();
-        *currency = oikos_resolver::calls::Currency::from_config(&req["config"]["world"]["currencies"][0]);
-        knowledge.clear();
-        *sched = Some(crate::schedule::Scheduler::new(r.kernel().statics().tick));
-        *run = Some(r);
-        return Ok(reply);
+        let types = structure_types(&req["config"]);
+        let currency = oikos_resolver::calls::Currency::from_config(&req["config"]["world"]["currencies"][0]);
+        return start(session, req, req.get("config").cloned(), types, currency);
     }
+    let Session { run, sched, knowledge, types, currency } = session;
     let r = run.as_mut().ok_or("no run started")?;
     match op {
         // A call to the seat's own acts (the resolver, from what the seat knows): blocks, or questions for the seat.

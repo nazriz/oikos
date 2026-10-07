@@ -115,18 +115,23 @@ impl<W: Write> Run<W> {
         }
         let loaded = config::load(config).map_err(RunError::Config)?;
         let kernel = Kernel::new(&loaded).map_err(RunError::Config)?;
+        // (The header is made without its config, which is then put in where it stands: a large world's config is
+        // written to the log from the one copy there is.)
         let header = Header {
             contracts: CONTRACTS_VERSION.into(),
             kernel: identity,
             run_id: run_id.into(),
-            config: loaded.canonical.clone(),
+            config: Value::Null,
             config_hash: loaded.hash.clone(),
             initial_state_hash: kernel.state_hash().map_err(|e| RunError::Config(e.to_string()))?,
             canary: loaded.config.meta.canary.clone(),
         };
-        let mut log = LogWriter::new(out, anchors, loaded.config.log.anchor_every_entries);
-        log.append(0, Kind::Header, serde_json::to_value(&header).expect("header serializes"))?;
-        Ok(Run { checkpoint_every: loaded.config.log.checkpoint_every, kernel, log, ended: false, observed: None })
+        let mut body = serde_json::to_value(&header).expect("header serializes");
+        let (anchor_every, checkpoint_every) = (loaded.config.log.anchor_every_entries, loaded.config.log.checkpoint_every);
+        body["config"] = loaded.canonical;
+        let mut log = LogWriter::new(out, anchors, anchor_every);
+        log.append(0, Kind::Header, body)?;
+        Ok(Run { checkpoint_every, kernel, log, ended: false, observed: None })
     }
 
     /// The full picture a participant's channels cover right now (the perception invariant's reference). Changes nothing; not logged.
