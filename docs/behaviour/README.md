@@ -26,6 +26,7 @@ Rules every module follows (so re-runs are reproducible):
 | `world.funding` | lends into the world from outside (a town bank's funding) | [boundary.md](boundary.md) |
 | (winding up) | an insolvent firm's winding up, or one its owners close; selling its premises; in factories' and shops' modules | [insolvency.md](insolvency.md) |
 | (entry) | founding a business: a citizen buys premises for sale and holds the new firm's first position; the firm sets itself up | [entry.md](entry.md) |
+| `fund.retirement` | a retirement fund's trustee: takes in what the fund's shares pay, pays its costs, keeps each member's part until they retire and pays it as a pension after | [firm-ownership.md](firm-ownership.md) |
 | `bank.lending` | a bank's lending office: decides loans on serviceability from the account it keeps, pays out, follows arrears and default, draws funding | [credit.md](credit.md) |
 | `world.export_demand` | the outside world's purchases as money on a schedule (worlds without goods) | [boundary.md](boundary.md) |
 | `citizen.default` | a townsperson: housing, work, shopping and using goods up, leaving town | [citizen.md](citizen.md) |

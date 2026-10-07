@@ -27,7 +27,7 @@ A shop buys goods wholesale and sells them to households. Selling takes its staf
 - **The wage offered** follows Lengnick's vacancy rule.
 - **Headcount** moves one worker a month toward the staff last month's demand needed to serve, planning to fill 80% of their hours (`utilisation_bps`, a placeholder; at least 1, at most the shop's room). Serving can't be stored and orders come in lumps: staff for exactly the average demand leave queues that never clear (Kingman 1961). At 100% (before C6), 17% of the goods ordered in the 200-person town weren't served within three days and were refunded; the unspent refunds showed up as households saving 9–11%, against the 6.5% their rule saves.
 - **Restocking keeps back** the next pay period's wages for this month's headcount (the staff it has or is hiring to), so a new shop's first stock doesn't take the wages of its first hire. It also lets someone go if it can't cover the next pay period, and doesn't hire again that month.
-- **Dividends:** out of the month's earnings, what it holds beyond a buffer (a month's wages and stock, and χ of the wage bill) goes to its shareholders.
+- **Dividends:** out of the month's earnings, what it holds beyond a buffer (a month's wages and stock, and χ of the wage bill) goes to its shareholders (in the generated town its owners, one household or a few, or a company elsewhere: [firm-ownership.md](firm-ownership.md)).
 
 ## Where the rules come from
 

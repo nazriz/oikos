@@ -11,7 +11,7 @@ Turns a short spec (`worlds/town.yaml`) and a **profile** (`worlds/profiles/`, d
 - **Land:** a grid of cells, each a lot on the town's registry (a `lot` record naming its cell). The southern row is the river.
 - **Catalogue:** the kinds of building, each with its materials, hours of building and demolition work, and least time to build ([building.md](building.md)), including a `park` and the builder's `yard`. Three resource kinds: `goods` (items), `inputs` (kg) and `materials` (kg). Three tasks: `make` (a factory's), `serve` (a shop's) and `consume` (a household's). A working day of 8 hours.
 - **Buildings:** apartment blocks (12 units: 3 one-bedroom, 7 two, 2 three) and houses (three or four bedrooms) owned by landlords; shops and factories owning their premises; the builder's yard (a workplace for its crew of up to 12; it starts with 4); a town hall. Every other lot is recorded as the town's. A home's physical capacity is 2 per bedroom plus 2.
-- **Entities:** the outside world, the town, one bank, a builder, landlords, shops, factories, and the people, in **households** drawn from ABS Census 2021 shares, with ages and birth dates ([households.md](households.md)).
+- **Entities:** the outside world, the town, one bank, a builder, landlords, shops, factories, a retirement fund, and the people, in **households** drawn from ABS Census 2021 shares, with ages and birth dates ([households.md](households.md)).
 - **Money:** every account is held at the bank, except the outside world's, which it holds itself.
 - **Holdings:** the builder starts with a house's worth of materials (120 t) in its yard.
 - **Genesis records:**
@@ -20,7 +20,8 @@ Turns a short spec (`worlds/town.yaml`) and a **profile** (`worlds/profiles/`, d
   - each household (a `household` record);
   - leases and jobs already in force (tenancies part-way through, 12–24-month terms; a lease is the leaseholder's, naming the household and the account the rent is paid from);
   - the standing orders that pay rent, the other adults' shares of the rent, and wages;
-  - the town's `signatories` list for its account (the finance officer's position) and its payments procedure.
+  - the town's `signatories` list for its account (the finance officer's position) and its payments procedure;
+  - who owns each firm (its `shareholders` register): its owners, the outside world, or (a factory) the outside world, the town's retirement fund and the households that hold shares directly; and the fund's register of members ([firm-ownership.md](firm-ownership.md)).
 - **Positions and participants:** every organisation acts through positions, each held at the start by a system participant running the job's module:
   - the mayor: with `mayor: llm`, a language-model participant (weekly cadence; the laws and the forms on file as standing documents; until a real model is used, the mock, with `city.mayor_code` as its brain, see docs/design/m2-llm-participants.md), or with `mayor: code` the rule-following code mayor (the all-code control);
   - the finance officer's budget brief (`budget_lines`): one line, parks, at the builder's price for a park (as the builder publishes it);
