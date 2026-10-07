@@ -549,6 +549,10 @@ export const citizen: BehaviourModule = {
         if (r.kind === "enterprise_agreement" && r.data?.employer === job.employer && r.at >= job.since) {
           job.wage = Math.floor((job.wage * (10_000 + Number(r.data?.rise_bps ?? 0))) / 10_000);
           job.paidAt = obs.t;
+          // (Read at work some days after it was made: a pay at the new rate that came before we had read of the rise
+          // was our wages as agreed, and counts as that now, as it would have had we known.)
+          const net = job.wage - withholding(incomeTaxLaw(book), job.wage, job.period);
+          for (const x of inflows) if (x.t >= r.at && (x.amount === job.wage || x.amount === net)) mind.learn("job", job.employer, 10_000);
           if (p.union && isMember()) {
             mind.learn("membership", "member", Math.min(10_000, 6_000 + Number(r.data?.rise_bps ?? 0) * 10)); // it paid
             // Grateful to the union, and surer of what it says.
