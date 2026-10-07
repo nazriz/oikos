@@ -70,6 +70,40 @@ test("taking from work, found at a stocktake, investigated, charged, ordered and
   for (const c of charges) expect(taken.some((e) => e.by === c.data.against && e.from === c.data.victim)).toBe(true);
   const orders = recs.filter((r) => r.kind === "tribunal_order" && r.data.kind === "charge");
   expect(orders.length).toBe(charges.filter((c) => recs.some((o) => o.kind === "tribunal_order" && o.basis === c.id)).length);
-  const paid = new Set(ev.filter((e) => e.event === "transfer").map((e) => e.settles));
-  if (orders.length) expect(orders.some((o) => paid.has(o.id))).toBe(true);
+  // Paid by those who can: someone ordered to pay does once they have the sum beside a month's essentials (the
+  // citizen's rule; they plan at least weekly), from their own account to the one the order names, the sum ordered.
+  // An order left unpaid is one whose debtor never had that much for a week after it.
+  // (Until 2026-10-08 this asked only that some order had been paid. Every household was then paid dividends by every
+  // firm, so those in need, who are the ones who take, soon had the sum. Firms now pay their owners
+  // (docs/behaviour/firm-ownership.md), someone in need may not have it before the run ends, and every order is
+  // checked against what its debtor had. Paying under an order in a run is also followed in justice.test.ts.)
+  const ESSENTIALS = 400_000; // (as the citizens here were given, above)
+  const transfers = ev.filter((e) => e.event === "transfer");
+  const end = ev.at(-1)!.t;
+  for (const o of orders) {
+    const account = `acc-${o.data.against}`;
+    const payment = transfers.find((e) => e.settles === o.id);
+    if (payment) {
+      expect([payment.from, payment.to, Number(payment.amount)]).toEqual([account, o.data.to, o.data.amount]);
+      continue;
+    }
+    let balance = Number(config.world.accounts.find((a: any) => a.id === account)?.balance ?? 0);
+    let since: number | null = null;
+    let longest = 0;
+    const until = (t: number) => {
+      if (since !== null) longest = Math.max(longest, t - since);
+      since = null;
+    };
+    const own = transfers.filter((x) => x.from === account || x.to === account);
+    const change = (e: any) => (e.to === account ? Number(e.amount) : -Number(e.amount));
+    for (const e of own.filter((x) => x.t < o.at)) balance += change(e);
+    if (balance >= o.data.amount + ESSENTIALS) since = o.at;
+    for (const e of own.filter((x) => x.t >= o.at)) {
+      balance += change(e);
+      if (balance >= o.data.amount + ESSENTIALS) since ??= e.t;
+      else until(e.t);
+    }
+    until(end);
+    expect(longest).toBeLessThan(7 * DAY);
+  }
 }, 900_000);

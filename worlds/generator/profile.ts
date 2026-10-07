@@ -55,8 +55,23 @@ export interface Profile {
     town_finance: { parks_per_year: number; payment_approval_over: number };
     retiree_savings: [number, number];
     support: { pension: { amount: number; every_days: number; from_age: number }; unemployment: { amount: number; every_days: number; from_age: number } };
-    wealth_quintile_shares_bps: [number, number, number, number, number];
-    outside_ownership_bps: { factory: number; shop: number; landlord: number };
+    /** Who owns firms (docs/behaviour/firm-ownership.md). Fifths are of households by wealth, lowest first. */
+    firm_ownership: {
+      /** Of the firms of each kind, the share held each way: by one household or a few; from outside; widely. */
+      forms_bps: { [kind in "factory" | "shop" | "landlord"]: { closely_held: number; outside: number; widely_held: number } };
+      /** A closely held firm: the shares with one, two, three... owning households; the weight of each fifth in who owns. */
+      closely_held: { households_bps: number[]; owner_wealth_fifth_bps: [number, number, number, number, number] };
+      /** A widely held firm: the part held from outside; the rest is the town's (its direct holders'; where a world has a
+       * retirement fund, the fund's share of it first). */
+      widely_held: { outside_bps: number };
+      /** Households holding shares directly: the share of each fifth that does, and how many firms one holds (a range). */
+      direct_holders: { by_wealth_fifth_bps: [number, number, number, number, number]; firms_held: [number, number] };
+    };
+    /** A retirement fund's figures, for a world that asks for one (the town's description: retirement_fund; off unless
+     * asked for, docs/behaviour/firm-ownership.md): its share of the town's part of a widely held firm, the share of
+     * adults who are members, how often it pays pensions, the least it pays of a balance a year by age, its costs as a
+     * share of what it takes in. */
+    retirement_fund?: { share_bps_of_local: number; member_bps: number; pension_every_days: number; drawdown_bps_by_age: { from: number; bps: number }[]; cost_bps_of_income: number };
     industry: { factory_labour_share_bps: number; factory_input_share_bps: number; retail_purchases_share_bps: number; retail_labour_share_bps: number };
     prices: { goods_world: number; goods_import_markup_bps: number; inputs_per_kg: number; materials_per_kg: number };
     public_finance: {
