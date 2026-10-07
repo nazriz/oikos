@@ -28,7 +28,11 @@ export class NotEncodable extends Error {}
 
 /** The order a call's arguments are written in: as the request says them (`said`), or by name (`name`: how the
  * models before data-11 were trained; a model answers either way, the steps say which argument each is). */
-export const ORDER: "said" | "name" = process.env.OIKOS_ENCODE_ORDER === "name" ? "name" : "said";
+export const ORDER: "said" | "name" | "text_last" = process.env.OIKOS_ENCODE_ORDER === "name" ? "name" : process.env.OIKOS_ENCODE_ORDER === "text_last" ? "text_last" : "said";
+/** A copied text this long or longer is a long one (`text_last`: by name, the long texts after everything else, so
+ * that no argument waits behind a copy of several hundred characters, and which argument comes next is still known
+ * by its name). */
+const LONG = 80;
 
 /** The arguments a function has by name. A form’s are its two own (which form, and to whom): every other is a field
  * of the form being filled in, known only from the form as shown, so it is pointed at, never chosen from a list. */
@@ -88,7 +92,7 @@ export function encode(e: { request: string; forms: string[]; program: string; s
       // Each argument's steps, then the arguments in the order the request says them (ORDER): what the request
       // doesn't spell first, by name; then each by where its value first stands. The writer then goes through the
       // request once, and closing the call is what follows the last thing said, not a count kept by name.
-      const parts: { name: string; from: number; steps: Step[] }[] = [];
+      const parts: { name: string; from: number; long: boolean; steps: Step[] }[] = [];
       for (const k of Object.keys(c.args).sort()) {
         const before = steps.length;
         if (!fixed || fixed.has(k)) steps.push(`arg:${k}`);
@@ -101,9 +105,11 @@ export function encode(e: { request: string; forms: string[]; program: string; s
         value(prefix + k, c.args[k]!);
         const mine = steps.splice(before);
         const said = mine.filter((x): x is Pointer => typeof x !== "string" && x[0] !== "field").map((x) => x[1]);
-        parts.push({ name: k, from: said.length ? Math.min(...said) : -1, steps: mine });
+        const long = mine.some((x) => typeof x !== "string" && x[0] === "text" && x[2] - x[1] >= LONG);
+        parts.push({ name: k, from: said.length ? Math.min(...said) : -1, long, steps: mine });
       }
       if (ORDER === "said") parts.sort((a, b) => a.from - b.from || (a.name < b.name ? -1 : 1));
+      if (ORDER === "text_last") parts.sort((a, b) => Number(a.long) - Number(b.long) || (a.name < b.name ? -1 : 1));
       for (const part of parts) steps.push(...part.steps);
       steps.push(")");
     };
