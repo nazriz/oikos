@@ -47,3 +47,35 @@ test("a step that counts from when it's done is made again if it's done later th
   expect(which(s.step(obs(3600)))).toBe("notice from 3605");
   expect(made).toEqual([0, 3600]);
 });
+
+test("what a module needs to look up is asked before it plans, one look after another, and what followed from its last act is kept over the looks", () => {
+  // It needs two things looked up (a register, say), each found by the look it asks; then it plans, knowing them.
+  const known = new Set<string>();
+  const wanted = ["lot-1", "lot-2"];
+  let planned: string[] = [];
+  const s = stepper(
+    (o) => { for (const ch of Object.values(o.channels) as any[]) for (const r of ch.records ?? []) known.add(r.id); },
+    () => { planned = [...known].sort(); return [note(1)]; },
+    undefined,
+    () => { const next = wanted.find((w) => !known.has(w)); return next ? [{ channel: "lots", query: { where: [{ field: "id", op: "=", value: next }], limit: 1 } }] : []; },
+  );
+  const found = (t: number, id: string): Observation => ({ t, entity: "firm", outcomes: [], channels: { lots: { kind: "records", search: true, records: [{ id }] } } }) as unknown as Observation;
+  const first: any = s.step(obs(0));
+  expect(first).toEqual({ type: "look", looks: [{ channel: "lots", query: { where: [{ field: "id", op: "=", value: "lot-1" }], limit: 1 } }] });
+  const second: any = s.step(found(0, "lot-1"));
+  expect(second.looks[0].query.where[0].value).toBe("lot-2");
+  expect(which(s.step(found(0, "lot-2")))).toBe("step 1");
+  expect(planned).toEqual(["lot-1", "lot-2"]);
+  expect(which(s.step(obs(0)))).toBe("wait");
+
+  // An act whose outcome says what comes next, done as the last of a wake; at the next wake a look comes first, and
+  // what followed is still done, before what is planned then.
+  let wake = 0, ask = false;
+  const act: Step = Object.assign(because("order", C.call("message", { to: C.json(["x"]), text: C.text("o") })), { then: () => [note(7)] });
+  const m = stepper(() => {}, () => (wake++ === 0 ? [act] : [note(8)]), undefined, () => (ask ? ((ask = false), [{ channel: "lots" }]) : []));
+  expect(which(m.step(obs(0)))).toBe("order");
+  ask = true;
+  const done = { ...obs(3600), outcomes: [{ action: "a", t: 3600, status: "applied" }] } as unknown as Observation;
+  expect((m.step(done) as any).type).toBe("look");
+  expect([which(m.step(obs(3600))), which(m.step(obs(3600))), which(m.step(obs(3600)))]).toEqual(["step 7", "step 8", "wait"]);
+});

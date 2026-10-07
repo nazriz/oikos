@@ -1,6 +1,6 @@
 {
   "name": "firm.builder",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "build_markup_bps": {
@@ -84,6 +84,11 @@
       "unit": "days",
       "default": 30,
       "source": "a published price is honoured this long (placeholder: a common term for a builder's quote)"
+    },
+    "register": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     },
     "supplier": {
       "schema": {

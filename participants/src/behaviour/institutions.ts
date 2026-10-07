@@ -7,7 +7,7 @@
 
 import { amount, cents, smallestNow } from "../money";
 import * as C from "../calls";
-import type { StatementRecord } from "../contracts";
+import type { LookRequest, Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
@@ -191,7 +191,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.10.0",
+  version: "0.11.0",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -213,11 +213,27 @@ export const builder: BehaviourModule = {
         horizon_days: 90, // the crew it wants: enough to do the work in hand within this
         notice_days: 14,
         let_go_every_days: 7, // at most one let go in this time
+        // The land register, where this world keeps one to look things up in: our channel onto its plans of lots.
+        // (None: whatever plans we know are those we're shown.)
+        register: null as { lots: string } | null,
       },
       ctx.params,
     );
     need(p, ["supplier"], "firm.builder");
     const book = new Book();
+    // The plan of a lot a client asks us to build on, looked up in the register when the job comes in, once.
+    const planAsked = new Set<string>();
+    const plansToRead = (obs: Observation): LookRequest[] => {
+      if (!p.register) return [];
+      for (const r of book.ofType("agreement")) {
+        if (r.record !== "agreement" || !r.terms.parties.includes(obs.entity)) continue;
+        const lot = commitmentOf(r, obs.entity).outcome?.structure?.on;
+        if (!lot || book.records.has(lot) || planAsked.has(lot)) continue;
+        planAsked.add(lot);
+        return [{ channel: p.register.lots, query: { where: [{ field: "id", op: "=", value: lot }], limit: 1 } }];
+      }
+      return [];
+    };
     const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker", ...(p.industry ? { industry: p.industry } : {}) });
     // What's recorded against us to pay (rates on our yard, a fine), paid as a firm pays its debts (we don't wind up).
     const dues = new WindingUp(ctx.entity, { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 });
@@ -455,6 +471,7 @@ export const builder: BehaviourModule = {
         return steps;
       },
       p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
+      plansToRead,
     ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };

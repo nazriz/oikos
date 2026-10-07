@@ -517,9 +517,9 @@
       }
     },
     "QueryField": {
-      "description": "A place in a record: record (its kind of record), kind (a statement's kind), at, author, speaks_for, basis, data.<path> (a statement's data) or about.<path> (a claim's contents).",
+      "description": "A place in a record: id (the record's own), record (its kind of record), kind (a statement's kind), at, author, speaks_for, basis, claim (the claim a transfer or a release names), data.<path> (a statement's data) or about.<path> (a claim's contents).",
       "type": "string",
-      "pattern": "^(record|kind|at|author|speaks_for|basis|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
+      "pattern": "^(id|record|kind|at|author|speaks_for|basis|claim|(data|about)(\\.[A-Za-z0-9_-]+)+)$"
     },
     "ResolverId": {
       "type": "object",

@@ -75,7 +75,9 @@ A citizen doesn't receive the housing or job market. It looks when it needs to, 
 - **Needing a home:** standing rental listings within its budget and with the bedrooms needed, dearest first, the top 20.
 - **Needing work, or looking for better:** standing job postings, best-paid first, the top 20.
 - **Every wake:** a glance at the petitions board. Signature counts arrive as an ordinary report.
-- **Always:** its own records, money and holdings, the laws, enterprise agreements, the town's gatherings and teachings, and prices.
+- **Every plan, in work** (0.36.0): the enterprise agreements at its own workplace made since it started there (the same look as the boards; before, every workplace's agreement was shown to everyone).
+- **Always:** its own records (among them its own titles), money and holdings, the laws, the town's gatherings and teachings, and prices.
+- **The land register** (0.36.0): never shown, searched when a paper of its own calls for it: the plan of a lot it holds, and a title passed to it with the dealings in it ([ownership.md](ownership.md), "What an owner knows").
 
 ## Position: what a citizen can see around it (D44)
 

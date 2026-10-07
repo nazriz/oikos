@@ -33,7 +33,6 @@ import * as C from "../calls";
 import { because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
-import { ownerOf } from "./institutions";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
@@ -118,7 +117,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.35.7",
+  version: "0.36.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -201,6 +200,13 @@ export const citizen: BehaviourModule = {
       // Homes for sale (docs/behaviour/ownership.md): the month's chance a renting household that can afford a home that
       // suits it buys one (`buy_bps`), with the deposit and costs it takes, on a mortgage from our bank. A home of ours
       // unsold after `relist_days` is listed again for `cut_bps` less, down to `floor_bps` of what we first asked.
+      // The land register, where this world keeps one for people to look things up in (docs/behaviour/ownership.md):
+      // our channels onto its plans of lots, its titles, and the dealings in a title, each searched when we need it.
+      // (None: whatever of the register we know is what we're shown.)
+      register: null as { lots: string; titles: string; dealings: string } | null,
+      // Enterprise agreements, where this world keeps them to be looked up (docs/behaviour/unions.md): our channel onto
+      // them, read for our own workplace's when we plan. (None: we know of those we're shown.)
+      work_board: null as string | null,
       market: null as { buy_bps: number; deposit_bps: number; costs_bps: number; mortgage_months: number; bedrooms_by_type: { [type: string]: number }; relist_days: number; cut_bps: number; floor_bps: number } | null,
       civic: { turnout_bps: 9000, stand_bps: 30, reads_news_bps: 5000, approval_memory_weeks: 26, news_weight_bps: 1500, platform_weight_bps: 2500 },
       // Voice (docs/behaviour/citizen.md): petitions, after Granovetter (1978).
@@ -442,23 +448,65 @@ export const citizen: BehaviourModule = {
     let nextFertility = ctx.rng("fertility-day").below(30) * DAY;
     const householdIncome = () => monthlyIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0);
 
+    // ---- the land register, looked up (docs/behaviour/ownership.md, "What an owner knows, and what is looked up") ----
+    // Nobody is shown the register. A title of ours reaches us as our own paper (held from the start, or passed to us);
+    // what that paper doesn't say is looked up where it is kept, once: the plan of its lot, and, for a title that came
+    // to us from someone else, the title itself and the dealings in it (was it theirs to pass on?).
+    const planAsked = new Set<string>(); // lots whose plan we've asked the register for
+    const titleAsked = new Map<string, number>(); // a title -> when we last asked the register about it
+    /** In the order made (a record the kernel numbered is later than one it didn't, and than a lower number). */
+    const madeBefore = (a: Record, b: Record) => {
+      const n = (r: Record) => (r.id.startsWith("rec.") ? Number(r.id.slice(4)) : -1);
+      return a.at - b.at || n(a) - n(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    };
+    /** Whom a title is registered to, by what we've read of the register: the title, and the dealings in it in the order
+     * made (a transfer counts if the holder made it, or whoever issued the title, as `ownerOf` reads a whole register).
+     * Nobody: released or withdrawn, or not a title we've read. */
+    const holderOf = (title: string): string | undefined => {
+      const c = book.records.get(title) as any;
+      if (c?.record !== "claim" || c.about?.kind !== "ownership" || book.released.has(c.id) || book.withdrawn.has(c.id)) return undefined;
+      let holder: string = c.holder;
+      for (const r of book.ofType("claim_transfer").filter((r: any) => r.claim === c.id).sort(madeBefore) as any[]) if (r.speaks_for === holder || r.speaks_for === c.speaks_for) holder = r.to;
+      return holder;
+    };
+    /** The titles that are ours, as far as we've read: ours from the start, then those passed to us. */
+    const ourTitles = (): { id: string; about: { object: string } }[] =>
+      [...new Set([...book.claimsBy("holder", me).filter((c: any) => c.about?.kind === "ownership").map((c) => c.id), ...book.ofType("claim_transfer").filter((r: any) => r.to === me).map((r: any) => r.claim as string)])]
+        .filter((id) => holderOf(id) === me).map((id) => book.records.get(id) as any);
+    /** What we need to read in the register now, as one look: a title passed to us that we haven't read since (the
+     * title and its dealings), else the plan of a lot of ours we've never seen. One thing a look; the next follows. */
+    const registerLooks = (t: number): LookRequest[] => {
+      const reg = p.register;
+      if (!reg) return [];
+      for (const r of book.ofType("claim_transfer") as any[]) {
+        if (r.to !== me || (titleAsked.get(r.claim) ?? -1) >= r.at) continue;
+        titleAsked.set(r.claim, t);
+        return [{ channel: reg.titles, query: { where: [{ field: "id", op: "=", value: r.claim }], limit: 1 } },
+          { channel: reg.dealings, query: { where: [{ field: "claim", op: "=", value: r.claim }], order: { field: "at" }, limit: p.search_limit } }];
+      }
+      for (const title of ourTitles()) {
+        const lot = title.about.object;
+        if (book.records.has(lot) || planAsked.has(lot)) continue;
+        planAsked.add(lot);
+        return [{ channel: reg.lots, query: { where: [{ field: "id", op: "=", value: lot }], limit: 1 } }];
+      }
+      return [];
+    };
+
     /** A home we own (world-expansion 6.2): a lot whose title is ours (the world's, bought, or inherited), with a dwelling
      * we live in on it. What we pay on a loan for it (its text names the home) is what it costs us a month. */
     const findOwnHome = (obs: Observation) => {
       const street = obs.channels.street;
       if (!isLeaseholder() || street?.kind !== "sites") return;
-      const titles = new Set([...book.claimsBy("holder", me).filter((c: any) => c.about?.kind === "ownership").map((c: any) => c.about.object),
-        ...book.ofType("claim_transfer").filter((r: any) => r.to === me).map((r: any) => (book.records.get(r.claim) as any)?.about?.object).filter(Boolean)]);
-      for (const lot of titles) {
-        if (ownerOf(book, lot) !== me) continue;
+      for (const title of ourTitles()) {
+        const lot = title.about.object;
         const cells = new Set((book.records.get(lot) as any)?.data?.cells ?? []);
         const st = street.cells.find((c) => cells.has(c.cell) && c.structure)?.structure;
         const space = st?.spaces.find((sp) => sp.kind === "dwelling" && sp.occupants?.includes(me))?.space;
         if (!st || !space) continue;
-        const title = book.claimsBy("object", lot).find((c: any) => c.about?.kind === "ownership") as any;
         const loan = book.ofType("agreement").find((r: any) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(me) && book.inForce(r.id) && String(r.terms.text ?? "").includes(space)) as any;
         const repay = loan ? cents(loan.terms.commitments.find((c: any) => c.who === me)?.does?.outcome?.money?.amount ?? 0) : 0;
-        home = { agreement: title?.id ?? lot, space, structure: st.structure, landlord: me, rent: repay, movedIn: true, owned: true };
+        home = { agreement: title.id, space, structure: st.structure, landlord: me, rent: repay, movedIn: true, owned: true };
         livingAt = null;
         return;
       }
@@ -1140,7 +1188,7 @@ export const citizen: BehaviourModule = {
         (homelessSince !== null && t - homelessSince >= homelessDays * DAY) ||
         (joblessSince !== null && t - joblessSince >= joblessDays * DAY && earnedIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((a, b) => a + b, 0) : 0) === 0 && broke));
       // (An owner who'd leave sells first, and goes once it's sold: docs/behaviour/ownership.md.)
-      if (wouldLeave && home?.owned && p.market && !selling) { const lot = lotOf(obs, home.structure); if (lot) sell(obs, lot, true); }
+      if (wouldLeave && home?.owned && p.market && !selling) { const lot = ownLot(); if (lot) sell(obs, lot, true); }
       const leave = wouldLeave && !home?.owned && !selling;
       if (leave) {
         const why = homelessSince !== null && t - homelessSince >= homelessDays * DAY
@@ -1838,7 +1886,8 @@ export const citizen: BehaviourModule = {
     let nextBuyChance = ctx.rng("buy-day").below(30) * DAY;
     let soldAndGoing: number | null = null; // when we'd sold up to leave (we go at a later wake, with what's left)
     const soldLots = new Set<string>();
-    const titleOf = (lot: string) => book.claimsBy("object", lot).find((c: any) => c.about?.kind === "ownership") as any;
+    /** The title to a lot: ours, if one of those we've read is; else the first we've read. */
+    const titleOf = (lot: string) => { const all = book.claimsBy("object", lot).filter((c: any) => c.about?.kind === "ownership") as any[]; return all.find((c) => holderOf(c.id) === me) ?? all[0]; };
     const valuationOf = (lot: string) => book.open("valuation").filter((v) => v.data?.lot === lot).sort((a, b) => b.at - a.at)[0]?.data?.value as number | undefined;
     const mortgageFor = (space: string) => book.ofType("agreement").find((r: any) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(me) && book.inForce(r.id) && String(r.terms.text ?? "").includes(space)) as any;
     /** The house on a lot (from the street), and its dwelling. */
@@ -1847,10 +1896,8 @@ export const citizen: BehaviourModule = {
       const st = channels.cells(obs).find((c) => cells.has(c.cell) && c.structure)?.structure;
       return st ? { structure: st.structure, type: st.type, space: st.spaces.find((sp) => sp.kind === "dwelling")?.space } : undefined;
     };
-    const lotOf = (obs: Observation, structure: string) => {
-      const cell = channels.cells(obs).find((c) => c.structure?.structure === structure)?.cell;
-      return cell ? book.lotOver(cell)?.id : undefined;
-    };
+    /** The lot our own home stands on: the one its title names (our own paper: nothing to look up). */
+    const ownLot = () => (home?.owned ? (book.records.get(home.agreement) as any)?.about?.object as string | undefined : undefined);
     /** Put a lot of ours with a house on it up for sale, at its valuation. */
     const sell = (obs: Observation, lot: string, leaveAfter: boolean): boolean => {
       const h = houseOn(obs, lot);
@@ -1866,13 +1913,13 @@ export const citizen: BehaviourModule = {
       // Our mortgage in default: the home sold before the bank takes it (we rent after).
       const ourLoan = home?.owned ? mortgageFor(home.space) : undefined;
       if (!selling && ourLoan && book.all("loan_default").some((r) => r.data?.loan === ourLoan.id && (r.addressed_to ?? []).includes(me))) {
-        const lot = lotOf(obs, home!.structure);
+        const lot = ownLot();
         if (lot) sell(obs, lot, false);
       }
       // Inherited land with a house we don't live in: sold.
       if (!selling) for (const r of book.ofType("claim_transfer")) {
         const lot = r.to === me ? (book.records.get(r.claim) as any)?.about?.object as string | undefined : undefined;
-        if (!lot || soldLots.has(lot) || ownerOf(book, lot) !== me || home?.owned && titleOf(lot)?.id === home.agreement) continue;
+        if (!lot || soldLots.has(lot) || holderOf(r.claim) !== me || home?.owned && r.claim === home.agreement) continue;
         if (sell(obs, lot, false)) break; // (Not until it's valued in our name.)
       }
       // ---- selling: listed at the valuation; once paid in full, the title passed and the mortgage paid off ----
@@ -1944,7 +1991,7 @@ export const citizen: BehaviourModule = {
             say("property_purchase", `Purchase of ${b.structure}, as listed.`, { to: [b.seller], visible: [me, b.seller], basis: b.listing, data: { listing: b.listing, account: acc.account } }),
             pay(b.account, b.price, { from: acc.account, for: `Buying ${b.structure}.` })));
         }
-      } else if (b?.stage === "paid" && ownerOf(book, b.lot) === me) {
+      } else if (b?.stage === "paid" && ourTitles().some((x) => x.about.object === b.lot)) {
         // Ours: notice on the home we rented, and in once the seller's out (the round takes us there).
         const old = home;
         if (old && !old.owned) steps.push(because(`${b.structure} is ours: giving notice on the home we rented.`,
@@ -2228,6 +2275,10 @@ export const citizen: BehaviourModule = {
         // (Planned when a wake begins; woken because an act of ours is done, we carry on with the plan, and plan afresh
         // only once it's done: the stepper.)
         if (plannedAt !== obs.t && (obs.woke_for !== "done" || todo.length === 0)) {
+          // Papers about land of ours that we haven't read up on: the register first (the answer comes at once, with
+          // the next observation, and the plan is made knowing it).
+          const register = registerLooks(obs.t);
+          if (register.length) return { type: "look", looks: register };
           const acc = ownBanked(obs, me);
           const usual = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
           if (cheaperThan && (home || obs.t >= cheaperThan.until)) cheaperThan = null;
@@ -2263,6 +2314,8 @@ export const citizen: BehaviourModule = {
             if ((!job || searchingWork) && !retired && p.in_labour_force) looks.push({ channel: "jobs", query: { standing: true, order: { field: "data.wage", desc: true }, limit: p.search_limit } });
             // A glance at the petitions board: what's standing now.
             looks.push({ channel: "petitions", query: { standing: true, limit: 10 } });
+            // And at the notices at work: an enterprise agreement at our own workplace, made since we started there.
+            if (job && p.work_board) looks.push({ channel: p.work_board, query: { where: [{ field: "data.employer", op: "=", value: job.employer }, { field: "at", op: ">=", value: job.since }], limit: p.search_limit } });
           }
           if (looks.length) {
             lookedAt = obs.t;

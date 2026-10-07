@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.35.7",
+  "version": "0.36.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -382,6 +382,11 @@
       "default": 200,
       "source": "placeholder"
     },
+    "register": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "registry": {
       "schema": {},
       "source": "the world gives it (no default)"
@@ -584,6 +589,11 @@
         "description": "consumption a year per unit of wealth"
       },
       "default": 300,
+      "source": "placeholder"
+    },
+    "work_board": {
+      "schema": {},
+      "default": null,
       "source": "placeholder"
     },
     "year": {

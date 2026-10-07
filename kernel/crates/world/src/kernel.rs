@@ -676,8 +676,9 @@ impl World {
     }
 }
 
-/// A field a search may use (a look's query): the record's own, or a structured field in its data or `about`.
+/// A field a search may use (a look's query): the record's own, the claim a transfer or release names, or a
+/// structured field in its data or `about`.
 pub fn known_field(f: &str) -> bool {
-    matches!(f, "record" | "kind" | "at" | "author" | "speaks_for" | "basis")
+    matches!(f, "id" | "record" | "kind" | "at" | "author" | "speaks_for" | "basis" | "claim")
         || f.strip_prefix("data.").or_else(|| f.strip_prefix("about.")).is_some_and(|p| !p.is_empty() && p.split('.').all(|x| !x.is_empty()))
 }
