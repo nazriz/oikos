@@ -1,0 +1,31 @@
+{
+  "id": "rec.28410",
+  "record": "statement",
+  "author": "finance-system",
+  "in_position": "finance",
+  "at": 5216402,
+  "visible_to": [
+    "city",
+    "bank"
+  ],
+  "kind": "request",
+  "speaks_for": "city",
+  "addressed_to": [
+    "bank"
+  ],
+  "basis": [
+    "rec.11904"
+  ],
+  "text": "Please pay 318,773 from acc-city to acc-landfill, for disposal of waste.",
+  "data": {
+    "outcome": {
+      "money": {
+        "from": "acc-city",
+        "to": "acc-landfill",
+        "amount": "318773",
+        "for": "disposal of waste",
+        "settles": "rec.28337"
+      }
+    }
+  }
+}

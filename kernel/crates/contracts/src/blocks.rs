@@ -203,7 +203,7 @@ pub enum Block {
         counterparty: Option<IdOrRef>,
         about: Value,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        basis: Option<IdOrRef>,
+        basis: Option<BasisArg>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         speaks_for: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -215,7 +215,7 @@ pub enum Block {
         claim: IdOrRef,
         to: IdOrRef,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        basis: Option<IdOrRef>,
+        basis: Option<BasisArg>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         speaks_for: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -226,7 +226,7 @@ pub enum Block {
     ReleaseClaim {
         claim: IdOrRef,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        basis: Option<IdOrRef>,
+        basis: Option<BasisArg>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         speaks_for: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -237,7 +237,7 @@ pub enum Block {
     ProposeAgreement {
         terms: AgreementTerms,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        basis: Option<IdOrRef>,
+        basis: Option<BasisArg>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         speaks_for: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -284,7 +284,7 @@ pub enum Block {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         registry: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        basis: Option<IdOrRef>,
+        basis: Option<BasisArg>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         addressed_to: Option<Vec<IdOrRef>>,
         /// A cell it's put up on: then it's seen by being near there.
@@ -302,7 +302,7 @@ pub enum Block {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         text: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        basis: Option<IdOrRef>,
+        basis: Option<BasisArg>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         speaks_for: Option<IdOrRef>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -369,6 +369,121 @@ pub enum Position {
     Liberty,
     Power,
     Immunity,
+}
+
+/// One record, or a list of them: how a basis is written (contracts: common Basis, records Basis).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum BasisForm {
+    One(Id),
+    Several(Vec<Id>),
+}
+
+/// The most records one act may cite.
+pub const MAX_BASES: usize = 64;
+
+fn listed(ids: &[Id], at_least: usize) -> Result<(), String> {
+    if ids.len() < at_least || ids.len() > MAX_BASES {
+        return Err(format!("a basis written as a list names {at_least} to {MAX_BASES} records, not {}", ids.len()));
+    }
+    if let Some(twice) = ids.iter().enumerate().find(|(i, x)| ids[..*i].contains(x)) {
+        return Err(format!("a basis names {} twice", twice.1));
+    }
+    Ok(())
+}
+
+/// What a block says its record rests on, as it was written: one record (or a `$name` bound earlier in the action),
+/// or a list of them in the order cited (at least one, none twice). It is kept as written, so a command reads in the
+/// log as it was given; the record made from it has the one stored form (`Basis`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "BasisForm", into = "BasisForm")]
+pub struct BasisArg(BasisForm);
+
+impl BasisArg {
+    pub fn one(id: impl Into<IdOrRef>) -> Self {
+        BasisArg(BasisForm::One(id.into()))
+    }
+
+    /// The records cited, in order.
+    pub fn ids(&self) -> &[IdOrRef] {
+        match &self.0 {
+            BasisForm::One(id) => std::slice::from_ref(id),
+            BasisForm::Several(ids) => ids,
+        }
+    }
+}
+
+impl TryFrom<BasisForm> for BasisArg {
+    type Error = String;
+    fn try_from(f: BasisForm) -> Result<Self, String> {
+        if let BasisForm::Several(ids) = &f {
+            listed(ids, 1)?;
+        }
+        Ok(BasisArg(f))
+    }
+}
+
+impl From<BasisArg> for BasisForm {
+    fn from(b: BasisArg) -> BasisForm {
+        b.0
+    }
+}
+
+/// What a record says it rests on: the records it cites, in the order cited, none twice and at least one. It has one
+/// written form: a single record is its id alone (as every record written before a basis could be several), and
+/// only two or more are a list. The kernel checks that each exists and nothing else about them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "BasisForm", into = "BasisForm")]
+pub struct Basis(Vec<Id>);
+
+impl Basis {
+    /// These records, in order, each kept where it is first named; nothing at all if there are none.
+    pub fn of(ids: impl IntoIterator<Item = Id>) -> Option<Basis> {
+        let mut out: Vec<Id> = vec![];
+        for id in ids {
+            if !out.contains(&id) {
+                out.push(id);
+            }
+        }
+        (!out.is_empty()).then_some(Basis(out))
+    }
+
+    /// The records cited, in order (never empty).
+    pub fn ids(&self) -> &[Id] {
+        &self.0
+    }
+
+    /// The record cited first.
+    pub fn first(&self) -> &str {
+        &self.0[0]
+    }
+
+    pub fn cites(&self, record: &str) -> bool {
+        self.0.iter().any(|x| x == record)
+    }
+}
+
+impl TryFrom<BasisForm> for Basis {
+    type Error = String;
+    fn try_from(f: BasisForm) -> Result<Self, String> {
+        match f {
+            BasisForm::One(id) => Ok(Basis(vec![id])),
+            BasisForm::Several(ids) => {
+                listed(&ids, 2)?;
+                Ok(Basis(ids))
+            }
+        }
+    }
+}
+
+impl From<Basis> for BasisForm {
+    fn from(mut b: Basis) -> BasisForm {
+        if b.0.len() == 1 {
+            BasisForm::One(b.0.remove(0))
+        } else {
+            BasisForm::Several(b.0)
+        }
+    }
 }
 
 /// `"public"`, or the entities whose participants may perceive the record.
@@ -494,7 +609,7 @@ pub struct Record {
     pub at: i64,
     pub visible_to: Visibility,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub basis: Option<Id>,
+    pub basis: Option<Basis>,
     #[serde(flatten)]
     pub body: RecordBody,
 }

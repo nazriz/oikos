@@ -93,7 +93,8 @@ pub fn resolve(program: &Program, k: &Knowledge, type_of: &dyn Fn(&str) -> Optio
     if !invalid.is_empty() {
         return Resolution::Questions { questions: vec![label_text("unclear").into()], invalid };
     }
-    let mut r = Resolver { k, me: k.acting_for(as_), refs: lines.iter().filter_map(|l| l.bind.clone()).collect(), n: 0, type_of };
+    let bound: BTreeSet<String> = lines.iter().filter_map(|l| l.bind.clone()).collect();
+    let mut r = Resolver { k, me: k.acting_for(as_), refs: bound.clone(), bound, n: 0, type_of };
     let mut blocks = vec![];
     let mut questions = vec![];
     for line in lines {
@@ -116,6 +117,8 @@ struct Resolver<'a> {
     k: &'a Knowledge,
     me: String,
     refs: BTreeSet<String>,
+    /// The names the program's own lines bind (`refs` also holds the ones made up here).
+    bound: BTreeSet<String>,
     n: u32,
     type_of: &'a dyn Fn(&str) -> Option<Json>,
 }
@@ -163,6 +166,38 @@ impl Resolver<'_> {
     }
     fn id(&self, c: &Call, key: &str) -> R<Option<String>> {
         self.id_as(c, key, key)
+    }
+    /// What the act cites: one record as any id is written, or a list of records, passed on in the order given. In a
+    /// list, a name bound on a line of the program is that line's record, and anything not written as an id is a
+    /// name the seat knows. One cited twice is kept where it first stands, and a list of one is that record alone.
+    fn basis(&self, c: &Call) -> R<Option<Json>> {
+        let Some(Value::Json(j)) = c.get("basis") else { return Ok(self.id(c, "basis")?.map(Json::from)) };
+        let Some(items) = j.as_array().filter(|a| a.iter().all(Json::is_string)) else { return ask("basis should be a record, or a list of records.") };
+        let mut out: Vec<String> = vec![];
+        for x in items.iter().filter_map(Json::as_str) {
+            let written_as_id = !x.is_empty() && x.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || "_.:/-".contains(ch));
+            let id = if self.bound.contains(x) {
+                format!("${x}")
+            } else if written_as_id {
+                x.to_string()
+            } else {
+                let found = self.k.by_name(x);
+                match found.len() {
+                    1 => found[0].clone(),
+                    0 => return ask(format!("You don't know of anyone or anything called \"{x}\" (for basis).")),
+                    _ => return ask(format!("More than one basis is called \"{x}\": {}. Which one?", found.join(", "))),
+                }
+            };
+            if !out.contains(&id) {
+                out.push(id);
+            }
+        }
+        match out.len() {
+            0 => ask("basis should name at least one record."),
+            1 => Ok(Some(json!(out[0]))),
+            2..=64 => Ok(Some(json!(out))),
+            _ => ask("That cites more records than one act can: 64 at most."),
+        }
     }
     fn need(&self, c: &Call, key: &str, question: &str) -> R<String> {
         match self.id(c, key)? {
@@ -434,7 +469,7 @@ impl Resolver<'_> {
         let mut money = out.clone();
         money.as_object_mut().unwrap().insert("from".into(), json!(from));
         let data = obj(vec![("outcome", some(json!({ "money": money }))), ("every", every.map(Json::from)), ("first", first.map(Json::from))]);
-        let basis = self.id(c, "basis")?;
+        let basis = self.basis(c)?;
         Ok(vec![obj(vec![
             ("block", some("publish")),
             ("kind", some("request")),
@@ -443,7 +478,7 @@ impl Resolver<'_> {
             ("visible_to", some(json!([self.me, keeper]))),
             ("text", some(text)),
             ("data", some(data)),
-            ("basis", basis.map(Json::from)),
+            ("basis", basis),
             ("ref", bind.map(Json::from)),
         ])])
     }
@@ -491,7 +526,7 @@ impl Resolver<'_> {
         let Some(by) = by else { return ask(format!("Who should {place}?")) };
         let type_ = if remove.is_some() { None } else { Some(self.need(c, "type", "What should be built?")?) };
         let on = if remove.is_some() { None } else { Some(self.need(c, "on", "On which lot or cell?")?) };
-        let basis = self.id(c, "basis")?;
+        let basis = self.basis(c)?;
         if self.k.entity_of(&by) == self.me {
             // Building it yourself: materials from your own holding where you keep them; the building work is work.
             let yard = self.id(c, "materials_at")?;
@@ -515,7 +550,7 @@ impl Resolver<'_> {
                 ("block", some("propose_agreement")),
                 ("speaks_for", some(self.me.clone())),
                 ("ref", some(r.clone())),
-                ("basis", basis.map(Json::from)),
+                ("basis", basis),
                 (
                     "terms",
                     some(json!({
@@ -682,7 +717,7 @@ impl Resolver<'_> {
     }
 
     fn common(&self, c: &Call, bind: Option<&str>) -> R<Vec<(&'static str, Option<Json>)>> {
-        Ok(vec![("speaks_for", some(self.speaks_for(c)?)), ("basis", self.id(c, "basis")?.map(Json::from)), ("visible_to", self.visible(c)?), ("ref", bind.map(Json::from))])
+        Ok(vec![("speaks_for", some(self.speaks_for(c)?)), ("basis", self.basis(c)?), ("visible_to", self.visible(c)?), ("ref", bind.map(Json::from))])
     }
 
     fn claim(&self, c: &Call, bind: Option<&str>) -> R<Vec<Json>> {
@@ -788,7 +823,7 @@ impl Resolver<'_> {
         }
         .filter(|t| !t.is_empty());
         let r = bind.map(String::from).unwrap_or_else(|| self.fresh("offer"));
-        let basis = self.id(c, "basis")?;
+        let basis = self.basis(c)?;
         let vis = self.visible(c)?;
         let template = Self::str_(c, "template")?.map(|t| as_label(&t)).filter(|t| !t.is_empty());
         let terms = obj(vec![
@@ -801,7 +836,7 @@ impl Resolver<'_> {
             ("text", text.map(Json::from)),
         ]);
         Ok(vec![
-            obj(vec![("block", some("propose_agreement")), ("ref", some(r.clone())), ("speaks_for", some(me.clone())), ("basis", basis.map(Json::from)), ("visible_to", vis), ("terms", some(terms))]),
+            obj(vec![("block", some("propose_agreement")), ("ref", some(r.clone())), ("speaks_for", some(me.clone())), ("basis", basis), ("visible_to", vis), ("terms", some(terms))]),
             json!({ "block": "sign_agreement", "agreement": format!("${r}"), "as": me }),
         ])
     }
@@ -997,6 +1032,80 @@ pub fn as_label(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::as_label;
+    use super::{resolve, Resolution};
+    use crate::calls::{parse_program, Currency};
+    use crate::Knowledge;
+    use serde_json::{json, Value as Json};
+
+    /// A town's office, as its holder knows it: its account is kept by a bank.
+    fn office() -> Knowledge {
+        let mut k = Knowledge::new(Currency::from_config(&json!({ "code": "XYZ", "minor_units": 2 })));
+        k.absorb(&json!({ "entity": "city", "t": 0, "positions": [], "channels": {
+            "treasury": { "kind": "accounts", "transactions": [], "accounts": [{ "account": "acc-city", "holder": "city", "custodian": "bank", "balance": "10000000" }] },
+            "who": { "kind": "directory", "entities": [{ "entity": "city", "name": "Millbrook" }, { "entity": "bank", "name": "Millbrook Bank" }, { "entity": "greenco", "name": "GreenCo" }], "positions": [] } } }));
+        k
+    }
+
+    fn blocks(src: &str) -> Vec<Json> {
+        match resolve(&parse_program(src).unwrap(), &office(), &|_| None, None) {
+            Resolution::Blocks(b) => b,
+            Resolution::Questions { questions, .. } => panic!("{src}: {questions:?}"),
+        }
+    }
+
+    fn asks(src: &str) -> Vec<String> {
+        match resolve(&parse_program(src).unwrap(), &office(), &|_| None, None) {
+            Resolution::Blocks(b) => panic!("{src}: {b:?}"),
+            Resolution::Questions { questions, .. } => questions,
+        }
+    }
+
+    /// (The same cases as translator/test/resolver.test.ts has for this repository's resolver.)
+    #[test]
+    fn an_act_may_rest_on_several_records() {
+        // Passed on in the order given, on every act that takes a basis.
+        assert_eq!(blocks(r#"money(to=acc-greenco, amount="2,150", from=acc-city, settles=rec.640, basis=["rec.611","rec.627","rec.305"])"#)[0]["basis"], json!(["rec.611", "rec.627", "rec.305"]));
+        assert_eq!(blocks(r#"structure(type=park, on=lot-00, by=greenco, price="60,000", from=acc-city, basis=["rec.512","rec.498"])"#)[0]["basis"], json!(["rec.512", "rec.498"]));
+        assert_eq!(blocks(r#"agreement(with=greenco, terms="Mowing, weekly.", basis=["rec.9","rec.3"])"#)[0]["basis"], json!(["rec.9", "rec.3"]));
+        assert_eq!(
+            blocks(r#"claim(position=liberty, holder=greenco, about={"action":"build","object":"lot-00"}, basis=["law-planning","rec.861"])"#),
+            vec![json!({ "block": "record_claim", "position": "liberty", "holder": "greenco", "about": { "action": "build", "object": "lot-00" }, "speaks_for": "city", "basis": ["law-planning", "rec.861"] })]
+        );
+        assert_eq!(blocks(r#"claim(release=rec.70, basis=["rec.71","rec.72"])"#)[0]["basis"], json!(["rec.71", "rec.72"]));
+        assert_eq!(blocks(r#"claim(transfer=rec.70, to=greenco, basis=["rec.71","rec.72"])"#)[0]["basis"], json!(["rec.71", "rec.72"]));
+        assert_eq!(blocks(r#"statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.741"])"#)[0]["basis"], json!(["rec.733", "rec.741"]));
+        assert_eq!(blocks(r#"statement(withdraw=rec.50, basis=["rec.733","rec.741"])"#)[0]["basis"], json!(["rec.733", "rec.741"]));
+        // One record is written one way: a list of one is that record, and one cited twice is cited once.
+        let one = blocks(r#"statement(kind=notice, text="The pool closes.", basis=rec.733)"#);
+        assert_eq!(one[0]["basis"], json!("rec.733"));
+        assert_eq!(blocks(r#"statement(kind=notice, text="The pool closes.", basis=["rec.733"])"#), one);
+        assert_eq!(blocks(r#"statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.733"])"#), one);
+        assert_eq!(blocks(r#"statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.741","rec.733"])"#)[0]["basis"], json!(["rec.733", "rec.741"]));
+        // What an earlier line makes can be among them, by the name it was bound to.
+        let two = blocks("t = entity(kind=trust, name=\"River Land Trust\")\nstatement(kind=charter, text=\"Its charter.\", basis=[\"rec.5\",\"t\"])");
+        assert_eq!(two[1]["basis"], json!(["rec.5", "$t"]));
+        // A name in the list is something the seat knows, or a question; data that names nothing is a question.
+        assert_eq!(asks(r#"statement(kind=notice, text="x", basis=["rec.733","the parks budget"])"#), vec![r#"You don't know of anyone or anything called "the parks budget" (for basis)."#]);
+        assert_eq!(asks(r#"statement(kind=notice, text="x", basis=[])"#), vec!["basis should name at least one record."]);
+        assert_eq!(asks(r#"statement(kind=notice, text="x", basis=[1,2])"#), vec!["basis should be a record, or a list of records."]);
+        assert_eq!(asks(r#"statement(kind=notice, text="x", basis={"permit":"rec.1"})"#), vec!["basis should be a record, or a list of records."]);
+        let many: Vec<String> = (1..=65).map(|i| format!("rec.{i}")).collect();
+        assert_eq!(asks(&format!(r#"statement(kind=notice, text="x", basis={})"#, json!(many))), vec!["That cites more records than one act can: 64 at most."]);
+        assert_eq!(blocks(&format!(r#"statement(kind=notice, text="x", basis={})"#, json!(many[..64])))[0]["basis"], json!(many[..64]));
+    }
+
+    /// The payment a finance seat lost in a pilot (four dockets and a budget cited, written as a list): a request to
+    /// the account's keeper that cites all five.
+    #[test]
+    fn a_payment_citing_five_records_is_a_request_that_cites_them() {
+        let b = blocks(r#"money(amount="3,187.73", basis=["rec.11904","rec.16123","rec.21887","rec.25703","rec.25150"], for="disposal of waste", from=acc-city, settles=rec.28337, to=acc-outside)"#);
+        assert_eq!(b.len(), 1);
+        assert_eq!(b[0]["block"], json!("publish"));
+        assert_eq!(b[0]["kind"], json!("request"));
+        assert_eq!(b[0]["addressed_to"], json!(["bank"]));
+        assert_eq!(b[0]["data"]["outcome"]["money"], json!({ "from": "acc-city", "to": "acc-outside", "amount": "318773", "for": "disposal of waste", "settles": "rec.28337" }));
+        assert_eq!(b[0]["basis"], json!(["rec.11904", "rec.16123", "rec.21887", "rec.25703", "rec.25150"]));
+    }
 
     #[test]
     fn words_as_a_label() {

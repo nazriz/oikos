@@ -1,0 +1,29 @@
+{
+  "block": "propose_agreement",
+  "speaks_for": "city",
+  "basis": [
+    "$permit",
+    "rec.4019"
+  ],
+  "terms": {
+    "template": "construction",
+    "parties": [
+      "city",
+      "builder"
+    ],
+    "commitments": [
+      {
+        "who": "builder",
+        "does": {
+          "outcome": {
+            "structure": {
+              "type": "park",
+              "on": "lot-00-00"
+            }
+          }
+        }
+      }
+    ],
+    "text": "The builder will build a park on lot-00-00."
+  }
+}

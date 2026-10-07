@@ -93,6 +93,23 @@
         }
       ]
     },
+    "Basis": {
+      "description": "What an act says it rests on: one record, or a list of records in the order they are cited (at least one, none twice). A list of one is the same as that one record alone, and is stored as it (records: Basis). The kernel checks only that each exists.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IdOrRef"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IdOrRef"
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      ]
+    },
     "RefName": {
       "description": "Declares a LocalRef; written without the '$'.",
       "type": "string",
