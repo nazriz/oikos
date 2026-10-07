@@ -46,8 +46,9 @@ pub struct Knowledge {
     pub held: BTreeSet<String>,
     pub structures: BTreeMap<String, StructureFact>,
     pub cells: BTreeMap<String, CellFact>,
-    /// lot -> its cells. (Shared with every seat that has seen the lot: a register of lots is shown to many.)
-    pub lots: BTreeMap<Arc<str>, Arc<[String]>>,
+    /// lot -> its cells. (Shared with every seat that has seen the lot: a register of lots is shown to many. The
+    /// map itself is a persistent one, so seats that learned the same register at one look share it too: `Registers`.)
+    pub lots: Lots,
     /// Forms seen, by id (their statement records; shared likewise).
     pub forms: BTreeMap<Arc<str>, Arc<Value>>,
     pub entity: String,
@@ -131,6 +132,42 @@ impl CellFacts {
     }
 }
 
+/// lot -> its cells.
+pub type Lots = imbl::OrdMap<Arc<str>, Arc<[String]>>;
+
+/// How long a list of lots is taken in as a whole.
+const A_REGISTER: usize = 32;
+
+/// How many registers are kept to be shared.
+const REGISTERS_KEPT: usize = 8;
+
+/// The registers of lots that seats have been shown whole, each with the map a seat that knew of no lot makes of it:
+/// a town's register is shown, the same list, to every seat that reads it, and each seat's map of it would be the
+/// same map. Kept by whoever holds many seats' knowledge (a session); never part of what any seat knows.
+#[derive(Debug, Default)]
+pub struct Registers {
+    lists: Vec<(Vec<Arc<RecordFacts>>, Lots)>,
+}
+
+impl Registers {
+    /// The map a seat that knows of no lot makes of this list, if every record in it is a lot and nothing more
+    /// (learning them one by one from nothing gives exactly this map: each lot's cells, the last said of each).
+    fn of(&mut self, list: &[Arc<RecordFacts>]) -> Option<Lots> {
+        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.stated.is_none()) {
+            return None;
+        }
+        if let Some((_, lots)) = self.lists.iter().find(|(known, _)| known.len() == list.len() && known.iter().zip(list).all(|(a, b)| Arc::ptr_eq(a, b))) {
+            return Some(lots.clone());
+        }
+        let lots: Lots = list.iter().filter_map(|f| f.lot.clone()).collect();
+        if self.lists.len() == REGISTERS_KEPT {
+            self.lists.remove(0);
+        }
+        self.lists.push((list.to_vec(), lots.clone()));
+        Some(lots)
+    }
+}
+
 /// What a channel delivered that's handed to `Knowledge::absorb_with` beside the observation, in the order delivered:
 /// what its records add (a records channel), or its cells (a sites channel).
 #[derive(Debug, Clone, Default)]
@@ -165,6 +202,12 @@ impl Knowledge {
     /// delivered, and the observation's own `records` or `cells` there are empty. The same as absorbing the
     /// observation with them in place.
     pub fn absorb_with(&mut self, obs: &Value, shown: &BTreeMap<String, Shown>) {
+        self.absorb_sharing(obs, shown, &mut Registers::default());
+    }
+
+    /// As `absorb_with`, by a holder of many seats' knowledge: a register of lots a seat is shown whole is held once
+    /// between the seats shown it (`Registers`). What the seat knows is the same.
+    pub fn absorb_sharing(&mut self, obs: &Value, shown: &BTreeMap<String, Shown>, registers: &mut Registers) {
         self.entity = s(&obs["entity"]).unwrap_or_default().to_string();
         self.t = obs["t"].as_i64().unwrap_or(self.t);
         for p in obs["positions"].as_array().into_iter().flatten() {
@@ -224,8 +267,15 @@ impl Knowledge {
                     for r in ch["records"].as_array().into_iter().flatten() {
                         self.learn(&RecordFacts::of(r));
                     }
-                    for facts in shown.get(path).into_iter().flat_map(|x| &x.records) {
-                        self.learn(facts);
+                    let beside = shown.get(path).map_or(&[][..], |x| &x.records);
+                    // (A whole register of lots, to a seat that knows of none: the map of it, shared.)
+                    match if self.lots.is_empty() { registers.of(beside) } else { None } {
+                        Some(lots) => self.lots = lots,
+                        None => {
+                            for facts in beside {
+                                self.learn(facts);
+                            }
+                        }
                     }
                 }
                 _ => {}
@@ -402,5 +452,61 @@ mod tests {
         assert_eq!(k.by_name("works office"), vec!["works"]);
         assert!(k.by_name("the theatre").is_empty());
         assert!(k.by_name("thebuilder").is_empty());
+    }
+
+    /// A register of lots taken in whole, and shared, is what its records taken in one by one are.
+    #[test]
+    fn a_register_taken_in_whole_is_its_lots_taken_in_one_by_one() {
+        let lot = |i: usize, cells: &[&str]| json!({ "id": format!("lot-{i}"), "record": "statement", "kind": "lot", "speaks_for": "city", "data": { "cells": cells } });
+        let facts = |records: &[Value]| -> Vec<Arc<RecordFacts>> { records.iter().map(|r| Arc::new(RecordFacts::of(r))).collect() };
+        let obs = json!({ "entity": "c1", "t": 5, "positions": [], "channels": { "lots": { "kind": "records", "records": [] } } });
+        let shown = |list: &[Arc<RecordFacts>]| -> BTreeMap<String, Shown> { [("lots".to_string(), Shown { records: list.to_vec(), cells: vec![] })].into() };
+        // One by one: what `learn` does with each, from nothing.
+        let plain = |before: &Knowledge, list: &[Arc<RecordFacts>]| {
+            let mut k = before.clone();
+            k.absorb_with(&obs, &BTreeMap::new());
+            for f in list {
+                k.learn(f);
+            }
+            format!("{k:?}")
+        };
+        let mut many: Vec<Value> = (0..40).map(|i| lot(i, &[&format!("cell.{i}.0"), &format!("cell.{i}.1")])).collect();
+        many.push(lot(3, &["cell.9.9"])); // said again: the last said stands
+        let register = facts(&many);
+        let mut registers = Registers::default();
+        let mut seats: Vec<Knowledge> = vec![];
+        for _ in 0..3 {
+            let mut k = Knowledge::default();
+            k.absorb_sharing(&obs, &shown(&register), &mut registers);
+            assert_eq!(format!("{k:?}"), plain(&Knowledge::default(), &register));
+            assert_eq!(k.lots.get("lot-3").map(|c| c.to_vec()), Some(vec!["cell.9.9".to_string()]));
+            seats.push(k);
+        }
+        assert_eq!(registers.lists.len(), 1, "one register, made once for the three seats");
+        // What a seat learns later is its own: the others' is as it was.
+        let later = facts(&[lot(41, &["cell.41.0"]), json!({ "id": "w1", "record": "withdrawal", "withdraws": "lot-2" })]);
+        let before = seats[0].clone();
+        seats[0].absorb_sharing(&obs, &shown(&later), &mut registers);
+        assert_eq!(format!("{:?}", seats[0]), plain(&before, &later));
+        assert!(seats[0].lots.get("lot-2").is_none() && seats[1].lots.get("lot-2").is_some() && seats[1].lots.get("lot-41").is_none());
+        // A list that isn't lots alone, a short one, and one shown to a seat that knows of a lot already: one by one.
+        let mut mixed = many.clone();
+        mixed.insert(7, json!({ "id": "w2", "record": "withdrawal", "withdraws": "lot-5" }));
+        for (list, knows) in [(facts(&mixed), false), (facts(&many[..10]), false), (register.clone(), true)] {
+            let mut k = Knowledge::default();
+            if knows {
+                k.absorb_sharing(&obs, &shown(&facts(&[lot(99, &["cell.0.0"])])), &mut registers);
+            }
+            let before = k.clone();
+            k.absorb_sharing(&obs, &shown(&list), &mut registers);
+            assert_eq!(format!("{k:?}"), plain(&before, &list));
+        }
+        assert_eq!(registers.lists.len(), 1);
+        // The same lots in a list of its own (other records, as another look would hand them): a register of its own.
+        let again = facts(&many);
+        let mut k = Knowledge::default();
+        k.absorb_sharing(&obs, &shown(&again), &mut registers);
+        assert_eq!(format!("{k:?}"), plain(&Knowledge::default(), &again));
+        assert_eq!(registers.lists.len(), 2);
     }
 }

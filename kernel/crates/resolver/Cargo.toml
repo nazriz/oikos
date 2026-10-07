@@ -8,3 +8,5 @@ rust-version = "1.85"
 
 [dependencies]
 serde_json = { workspace = true }
+# A persistent map: a town's register of lots, known to every seat that has read it, is held once between them.
+imbl = "7.0.2"
