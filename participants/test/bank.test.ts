@@ -7,6 +7,7 @@ import type { Observation } from "../src/contracts";
 import { bankPaymentSystem } from "../src/behaviour/bank";
 import { PAYMENT_FAILED } from "../src/behaviour/common";
 import { inCurrency } from "../src/money";
+import { Randomness } from "../src/rng";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import { callsOf, context, DAY, MONTH, statement, wake } from "./stepping";
 
@@ -79,4 +80,71 @@ test("a payment the world refuses is reported to the holder in other words (it \
   const told = callsOf(m.step(obs({ woke_for: "done", outcomes: [{ action: "a", t: DAY, status: "refused", refusal: { code: "unknown_account" } }], channels: { ...channels, requests: { kind: "records", records: [] } } }), undefined as any) as any);
   expect(told.map((c) => [c.fn, c.args])).toEqual([["message", { to: ["c1"], text: "Payment of 70000 cents to acc-landlord (request pay-1) couldn't be made: there's no such account.", re: "pay-1" }]]);
   expect(PAYMENT_FAILED.is(told[0]!.args.text)).toBe(false);
+});
+
+test("going through standing orders only when they're due gives the payments and replies that going through every one at every plan does", () => {
+  const people = ["c1", "c2", "c3", "c4", "c5", "c6"];
+  for (const seed of [1n, 2n, 3n, 4n, 5n, 6n]) {
+    const rng = new Randomness(seed).stream(["bank", "orders"]);
+    const pick = <T>(xs: T[]): T => xs[rng.below(xs.length)]!;
+    const short = bankPaymentSystem.create(context("bank-pay-system", "bank", { courts: ["tribunal"], town: "city" }, { position: "bank-pay" }));
+    const long = bankPaymentSystem.create(context("bank-pay-system", "bank", { courts: ["tribunal"], town: "city", review_all: true }, { position: "bank-pay" }));
+    // The world as the bank is shown it: who has an account and what's in it, who is who, and what has been written.
+    const balances: { [holder: string]: number } = Object.fromEntries([...people.slice(0, 4), "firm", "city"].map((h) => [h, 300_000]));
+    let known = people.slice(0, 3); // the people the directory names (a request from one it doesn't name isn't its holder's)
+    let directory: any;
+    let boss = "firm"; // whose the position "firm-boss" is (it changes hands: an order written in it is the firm's only while it's the firm's)
+    const redirect = () => (directory = { kind: "directory", positions: [{ position: "firm-clerk", entity: "firm" }, { position: "firm-boss", entity: boss }],
+      entities: [{ entity: "firm", kind: "organisation", name: "Firm" }, ...known.map((c) => ({ entity: c, kind: "person", name: c, participant: `${c}-self` }))] });
+    redirect();
+    const written: any[] = [];
+    let n = 0, paid = 0, told = 0;
+    for (let hour = 0; hour < 24 * 45; hour += 1 + rng.below(9)) {
+      const t = hour * 3600;
+      const records: any[] = [];
+      for (let i = rng.below(4); i > 0; i--) {
+        const id = `r${String(++n).padStart(4, "0")}`, who = pick(people);
+        const money = { from: `acc-${pick([who, who, who, pick(people), "firm"])}`, to: `acc-${pick(people)}`, amount: String(pick([500, 2_000, 40_000, 0, 900_000])), for: "x" };
+        const by = pick([{ author: `${who}-self`, speaks_for: who }, { author: `${who}-self`, speaks_for: who }, { author: `${pick(people)}-self`, speaks_for: who },
+          { author: "clerk-1", in_position: pick(["firm-clerk", "firm-boss"]), speaks_for: "firm" }, { author: "genesis", speaks_for: who }]);
+        const firm = by.speaks_for === "firm";
+        const data: any = pick<() => any>([
+          () => ({ outcome: { money: firm ? { ...money, from: "acc-firm" } : money }, every: pick([3600, 7200, DAY, 3 * DAY, 10 * DAY]), ...(rng.below(2) ? { first: pick([0, 3600, 5 * DAY]) } : {}) }),
+          () => ({ outcome: { money: firm ? { ...money, from: "acc-firm" } : money }, every: pick([DAY, 2 * DAY]) }),
+          () => ({ outcome: { money } }),
+          () => ({ from: money.from, payments: [{ to: "acc-c1", amount: "700" }, { to: "acc-c2", amount: pick(["300", "0"]) }] }),
+          () => ({ outcome: { account: { holder: pick([who, "c6"]) } }, ...(rng.below(2) ? { every: DAY } : {}) }),
+          () => ({ outcome: { occupancy: { who, in: "somewhere" } }, every: DAY }),
+          () => ({ outcome: { money: { ...money, to: 7 } }, every: DAY }),
+        ])();
+        records.push(statement(id, t, "request", { ...by, addressed_to: [pick(["bank", "bank", "bank", "other-bank"])], visible_to: [who, "bank"], data }));
+      }
+      const some = (what: number) => rng.below(what) === 0;
+      if (written.length && some(6)) records.push({ id: `w${++n}`, at: t, record: "withdrawal", author: "x", withdraws: pick(written).id, visible_to: ["bank"] });
+      if (some(8)) records.push(statement(`s${++n}`, t, "signatories", { author: "clerk-1", in_position: "firm-clerk", speaks_for: "firm", addressed_to: ["bank"], visible_to: ["bank"], data: { account: "acc-firm", positions: [pick(["firm-clerk", "firm-boss"])] } }));
+      if (some(60)) records.push(statement(`d${++n}`, t, "death_registration", { speaks_for: "city", data: { deceased: pick(people), partner: pick(people), adult_children: [pick(people)] } }));
+      if (some(40)) records.push(statement(`g${++n}`, t, "garnishee_order", { speaks_for: "tribunal", addressed_to: ["bank"], visible_to: ["bank"], data: { debtor: pick(people), to: `acc-${pick(people)}`, amount: "1500", claim: "claim-1" } }));
+      // An account closed, or opened; someone the directory comes to name.
+      if (some(30) && Object.keys(balances).length > 2) delete balances[pick(Object.keys(balances))];
+      if (some(20)) balances[pick([...people, "firm"])] ??= 250_000;
+      if (some(25) && known.length < people.length) {
+        known = people.slice(0, known.length + 1);
+        redirect();
+      }
+      if (some(6)) {
+        boss = boss === "firm" ? "elsewhere" : "firm";
+        redirect();
+      }
+      for (const h of Object.keys(balances)) if (some(5)) balances[h] = pick([0, 1_000, 60_000, 400_000]);
+      written.push(...records.filter((r) => r.record === "statement"));
+      const shown = () => ({ requests: { kind: "records", records }, custody: custody(balances), who: directory });
+      const [a, b] = [wake(short, t, shown(), { entity: "bank" }).said, wake(long, t, shown(), { entity: "bank" }).said];
+      expect(a).toEqual(b);
+      paid += a.filter((c) => c.fn === "money").length;
+      told += a.filter((c) => c.fn === "message").length;
+    }
+    // (The stream does make the bank pay, and refuse.)
+    expect(paid).toBeGreaterThan(100);
+    expect(told).toBeGreaterThan(20);
+  }
 });

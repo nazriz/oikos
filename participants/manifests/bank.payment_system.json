@@ -28,6 +28,13 @@
       "default": 32,
       "source": "placeholder"
     },
+    "review_all": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
+      "source": "placeholder"
+    },
     "settles": {
       "schema": {},
       "source": "the world gives it (no default)"

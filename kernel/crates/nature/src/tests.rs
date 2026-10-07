@@ -238,6 +238,74 @@ fn a_spin_up_is_exactly_the_days_stepped_one_by_one() {
     assert_eq!((one.fields, one.populations, one.extinct), (fast.fields, fast.populations, fast.extinct));
 }
 
+/// The same over a ground with everything a spin-up takes a shorter way through: fields that settle, one that goes
+/// round a few states, a scale on the sources that changes on the way; species in few cells and in most of them, with
+/// and without a home range, with barriers, one that dies out, one given a number below zero.
+#[test]
+fn a_spin_up_over_a_whole_ground_is_exactly_the_days_stepped_one_by_one() {
+    let (w, h) = (12i64, 9i64);
+    let cells: Vec<(String, i64, i64)> = (0..h).flat_map(|y| (0..w).map(move |x| (format!("cell.{x}.{y}"), x, y))).collect();
+    let flows: Vec<FlowCfg> = (0..w - 1).map(|x| FlowCfg { from: format!("cell.{x}.4"), to: format!("cell.{}.4", x + 1) }).collect();
+    let g = Ground::new(&cells, &flows);
+    // (The ground's cells are in id order, not row by row.)
+    let cover = |x: i64, y: i64| match (x, y) {
+        (_, 4) => "riverbank",
+        (5, _) => "road",
+        (x, y) if x < 5 && y < 4 => "wetland",
+        (x, _) if x > 8 => "woodland",
+        (x, y) if (x + y) % 3 == 0 => "built",
+        _ => "grassland",
+    };
+    let covers: Vec<&str> = g.xy.iter().map(|(x, y)| cover(*x, *y)).collect();
+    let mut l = land(&covers);
+    for (i, c) in covers.iter().enumerate() {
+        if *c == "built" && i % 2 == 0 {
+            l.anchored[i] = vec!["works".into()];
+        }
+    }
+    let c = cat(serde_json::json!({
+        "fields": [
+            { "id": "pollution", "min": 0, "max": 1000000, "decay_bps_per_day": 300, "diffusion_bps_per_day": 800, "flow_bps_per_day": 5000, "from_structures": { "works": 40 }, "from_covers": { "grassland": 1 } },
+            { "id": "water", "min": 0, "max": 1000000, "decay_bps_per_day": 1000, "flow_bps_per_day": 5000, "from_covers": { "riverbank": 1000, "wetland": -500 }, "spills_above": 3000, "spill_bps_per_day": 3000,
+              "source_by_day": [{ "from_day": -500, "bps": 7000 }, { "from_day": -260, "bps": 14000 }, { "from_day": -40, "bps": 0 }] },
+            { "id": "heat", "min": 0, "max": 12, "decay_bps_per_day": 5000, "from_covers": { "grassland": 10, "built": 12, "road": 12 } },
+            // (Soaked up by as much as its sources give, less one a day: it goes back and forth.)
+            { "id": "swing", "min": 0, "max": 9, "decay_bps_per_day": 10000, "baseline": 4, "from_covers": { "woodland": 7 } }
+        ],
+        "species": [
+            { "id": "frog", "capacity_per_1000_cells": { "wetland": 9000, "riverbank": 2000 }, "home_range": 1, "growth_bps_per_year": 12000, "mortality_bps_per_year": 4000,
+              "dispersal_bps_per_year": 1500, "dispersal_range": 8, "barriers": ["built", "road"], "min_viable": 4, "detection_bps": 5000,
+              "tolerance": { "pollution": { "above": 60, "mortality_bps_per_day": 50 }, "water": { "above": 2500, "mortality_bps_per_day": 20 } } },
+            { "id": "glider", "capacity_per_1000_cells": { "woodland": 400 }, "home_range": 4, "growth_bps_per_year": 3000, "mortality_bps_per_year": 2000,
+              "dispersal_bps_per_year": 1000, "dispersal_range": 3, "barriers": ["built", "road"], "min_viable": 1, "detection_bps": 3000 },
+            { "id": "wren", "capacity_per_1000_cells": { "grassland": 3000, "woodland": 1500, "riverbank": 2000 }, "home_range": 2, "growth_bps_per_year": 5000, "mortality_bps_per_year": 3000,
+              "dispersal_bps_per_year": 1000, "dispersal_range": 20, "min_viable": 1, "detection_bps": 8000 },
+            { "id": "moth", "capacity_per_1000_cells": { "grassland": 20000 }, "growth_bps_per_year": 8000, "mortality_bps_per_year": 5000,
+              "dispersal_bps_per_year": 4000, "dispersal_range": 2, "min_viable": 2, "detection_bps": 2000 },
+            { "id": "stray", "capacity_per_1000_cells": { "road": 10 }, "home_range": 1, "growth_bps_per_year": 100, "mortality_bps_per_year": 9000,
+              "dispersal_bps_per_year": 100, "dispersal_range": 1, "min_viable": 9, "detection_bps": 2000 }
+        ] }));
+    for seed in [1, 8, 23] {
+        let start = || {
+            let mut st = NatureState::default();
+            st.populations.insert("frog".into(), [("cell.1.1".to_string(), 30), ("cell.3.4".to_string(), 12)].into());
+            st.populations.insert("glider".into(), [("cell.10.2".to_string(), 3), ("cell.11.7".to_string(), 2), ("cell.9.0".to_string(), -2)].into());
+            st.populations.insert("wren".into(), g.cells.iter().step_by(2).map(|c| (c.clone(), 2)).collect());
+            st.populations.insert("moth".into(), g.cells.iter().step_by(3).map(|c| (c.clone(), 5)).collect());
+            st.populations.insert("stray".into(), [("cell.6.0".to_string(), 3)].into());
+            st.fields.insert("pollution".into(), [("cell.6.6".to_string(), 900)].into());
+            st
+        };
+        let r = Randomness::new(seed);
+        let mut one = start();
+        let gone: Vec<Id> = run(&c, &g, &l, &mut one, -500..0, &r).into_iter().flat_map(|d| d.extinct).collect();
+        let mut fast = start();
+        assert_eq!(spin_up(&c, &g, &l, &mut fast, -500, 500, &r), gone, "seed {seed}");
+        assert_eq!((&one.fields, &one.populations, &one.extinct), (&fast.fields, &fast.populations, &fast.extinct), "seed {seed}");
+        assert!(one.extinct.contains_key("stray") && total(&one, "wren") > 0 && total(&one, "frog") > 0, "seed {seed}: the species live and die as the test means them to");
+    }
+}
+
 /// A field at the ends of the range the contracts allow steps without overflow, and exactly: the products of a value
 /// and a rate pass 64 bits there (a test build stopped; a release build wrapped, to a different world).
 #[test]

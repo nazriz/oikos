@@ -26,7 +26,7 @@ impl KernelSession {
     /// One request as a line of JSON; its reply as one.
     #[napi]
     pub fn request(&mut self, line: String) -> String {
-        self.session.request_line(&line)
+        self.session.request_owned(line)
     }
 
     /// The host is done with it: a run still open ends as aborted.

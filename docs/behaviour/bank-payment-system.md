@@ -31,6 +31,11 @@ Real retail banking: payments are made on the account holder's instruction; stan
 |---|---|---|
 | `verify_author` | `true` | Require the instruction to be written by one of the account holder's own seats |
 | `max_batch` | `32` | Payments per action |
+| `review_all` | `false` | Go through every standing order at every plan, due or not. The same payments and replies either way (`participants/test/bank.test.ts` holds the two side by side); it is there to check the shorter way against |
+
+## What it goes through at a plan
+
+A new request is gone through when it arrives. A standing order is gone through again when it is next due, and at every plan while it has no due date (it was refused, or isn't its account holder's). Going through an order that isn't due does nothing unless something the bank's checks read has changed: the accounts it keeps and whose they are, the signatories it has been told of, the directory. When one of those has changed since the last plan, every standing order is gone through, as they all were at every plan before (at 3,000 people, 3,000 orders at each of 2,800 plans a month, of which under 10,000 were due).
 
 ## Leaves out
 

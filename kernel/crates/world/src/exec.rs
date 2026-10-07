@@ -198,6 +198,7 @@ fn leave_spaces(s: &Statics, st: &mut State, sid: &str, who: Option<&str>, only:
     settle(s, st, sid);
     let mut left: Vec<(Id, Id)> = vec![];
     if let Some(m) = st.occupancy.get_mut(sid) {
+        let m = Arc::make_mut(m);
         for (space, bodies) in m.iter_mut() {
             if !leaves(space, bodies) {
                 continue;
@@ -334,9 +335,9 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
             template: Some(template.into()),
             def: Arc::new(ParticipantDef {
                 title: title.or_else(|| tpl.title.clone()),
-                channels: tpl.channels.clone(),
-                controller: tpl.controller.clone(),
-                framing: tpl.framing.clone(),
+                channels: Arc::new(tpl.channels.clone()),
+                controller: Arc::new(tpl.controller.clone()),
+                framing: Arc::new(tpl.framing.clone()),
                 on_opt_out: tpl.on_opt_out.clone(),
                 lanes: None,
             }),

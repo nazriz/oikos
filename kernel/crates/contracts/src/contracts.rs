@@ -42,6 +42,11 @@ pub fn contracts() -> &'static Contracts {
 
 /// Ok, or the first few violations as one message.
 pub fn check(v: &jsonschema::Validator, instance: &Value) -> Result<(), String> {
+    // (Nearly everything checked is valid, and saying only that is much the cheaper question: the violations are
+    // looked for when there are some.)
+    if v.is_valid(instance) {
+        return Ok(());
+    }
     let errors: Vec<String> = v
         .iter_errors(instance)
         .take(3)

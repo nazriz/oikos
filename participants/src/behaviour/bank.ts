@@ -18,6 +18,45 @@ import { because, Book, callAction, Letters, message, pay, PAYMENT_FAILED, type 
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
+/** Things kept by a time, the soonest first out (a binary heap; those of one time in no promised order). */
+class Soonest {
+  private readonly items: [number, string][] = [];
+
+  first(): [number, string] | undefined {
+    return this.items[0];
+  }
+
+  add(at: number, what: string): void {
+    const items = this.items;
+    let i = items.length;
+    items.push([at, what]);
+    while (i > 0) {
+      const up = (i - 1) >> 1;
+      if (items[up]![0] <= items[i]![0]) break;
+      [items[up], items[i]] = [items[i]!, items[up]!];
+      i = up;
+    }
+  }
+
+  take(): [number, string] | undefined {
+    const items = this.items;
+    const top = items[0], last = items.pop();
+    if (items.length && last) {
+      items[0] = last;
+      for (let i = 0; ; ) {
+        const l = 2 * i + 1, r = l + 1;
+        let least = i;
+        if (l < items.length && items[l]![0] < items[least]![0]) least = l;
+        if (r < items.length && items[r]![0] < items[least]![0]) least = r;
+        if (least === i) break;
+        [items[least], items[i]] = [items[i]!, items[least]!];
+        i = least;
+      }
+    }
+    return top;
+  }
+}
+
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
   version: "0.10.0",
@@ -26,6 +65,7 @@ export const bankPaymentSystem: BehaviourModule = {
   firstWake: () => 0,
   create(ctx: ParticipantContext) {
     const verifyAuthor = ctx.params.verify_author ?? true;
+    const reviewAll: boolean = ctx.params.review_all ?? false; // go through every standing order at every plan (the long way: for checking the short one)
     const maxBatch = Math.min(32, ctx.params.max_batch ?? 32);
     const done = new Set<string>(); // one-off instructions handled
     const settled = new Map<string, string[]>(); // death registration -> the heirs' accounts its estate goes to
@@ -36,6 +76,16 @@ export const bankPaymentSystem: BehaviourModule = {
     // (so a plan never rescans every instruction ever made).
     let cursor = 0;
     const standing = new Map<string, StatementRecord>();
+    // A standing order is gone through again when it's next due, not at every plan: going through one that isn't due
+    // does nothing unless what the bank's checks read has changed since (the accounts it keeps and whose they are, the
+    // signatories it has been told of, the directory: `changed` below), and then every one is gone through, as before.
+    // `byDue` holds each order under its next due time (an entry is stale once that has moved on); `undated` the
+    // orders with no due time yet (never got as far as being due: refused, or not their holder's), gone through at
+    // every plan as they always were.
+    const byDue = new Soonest();
+    const undated = new Set<string>();
+    let withdrawnSeen = 0;
+    let read: { accounts: string[]; holders: string[]; signatories?: unknown; directory?: unknown } | undefined;
     let queue: Payment[] = [];
     let queuedAt = -1;
     let inFlight: Payment[] = [];
@@ -53,13 +103,46 @@ export const bankPaymentSystem: BehaviourModule = {
     const plan = (obs: Observation) => {
       const me = obs.entity;
       const withdrawn = book.withdrawn;
-      const custody = new Map(channels.accounts(obs).filter((a) => a.custodian === me).map((a) => [a.account, { ...a, balance: cents(a.balance) }]));
+      const kept = channels.accounts(obs).filter((a) => a.custodian === me);
+      // (The accounts it keeps, by id: made when first asked for. Balances are read where they're used.)
+      let byId: Map<string, (typeof kept)[number]> | undefined;
+      const custody = () => (byId ??= new Map(kept.map((a) => [a.account, a])));
+      // Has what the checks read changed since the last plan?
+      const signatoryLists = book.standingOf("signatories"), directory = channels.directory(obs)?.positions;
+      const changed = reviewAll || !read || read.signatories !== signatoryLists || read.directory !== directory || read.accounts.length !== kept.length || kept.some((a, i) => a.account !== read!.accounts[i] || a.holder !== read!.holders[i]);
+      if (changed) read = { accounts: kept.map((a) => a.account), holders: kept.map((a) => a.holder), signatories: signatoryLists, directory };
       const all = book.all("request");
       const fresh = all.slice(cursor).filter((r) => (r.addressed_to ?? []).includes(me));
       cursor = all.length;
-      for (const r of fresh) if (Number.isInteger(r.data?.every) && r.data!.every > 0 && !Array.isArray(r.data?.payments)) standing.set(r.id, r);
-      for (const id of [...standing.keys()]) if (withdrawn.has(id)) standing.delete(id);
-      const instructions = [...new Map([...standing, ...fresh.map((r) => [r.id, r] as const)]).values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+      for (const r of fresh) {
+        if (Number.isInteger(r.data?.every) && r.data!.every > 0 && !Array.isArray(r.data?.payments) && !withdrawn.has(r.id)) {
+          standing.set(r.id, r);
+          if (!nextDue.has(r.id)) undated.add(r.id);
+        }
+      }
+      // (Those withdrawn since the last plan: the set only grows, in the order they were withdrawn.)
+      if (withdrawn.size !== withdrawnSeen) {
+        let i = 0;
+        for (const id of withdrawn) if (i++ >= withdrawnSeen && standing.delete(id)) undated.delete(id);
+        withdrawnSeen = withdrawn.size;
+      }
+      // The instructions to go through: the new ones, and of the standing orders every one if what's checked has
+      // changed, else those due by now and those with no due time.
+      const look = new Map<string, StatementRecord>();
+      const due: [number, string][] = [];
+      if (changed) for (const [id, r] of standing) look.set(id, r);
+      else {
+        for (const id of undated) look.set(id, standing.get(id)!);
+        for (let e = byDue.first(); e && e[0] <= obs.t; e = byDue.first()) {
+          byDue.take();
+          const r = standing.get(e[1]);
+          if (!r || nextDue.get(e[1]) !== e[0] || look.has(e[1])) continue; // (withdrawn, or its due time has moved on)
+          look.set(e[1], r);
+          due.push(e);
+        }
+      }
+      for (const r of fresh) look.set(r.id, r);
+      const instructions = [...look.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
       const out: Payment[] = [];
       // Deaths registered: the dead person's instructions are no longer carried out (law-succession).
       const deaths = book.all("death_registration");
@@ -93,7 +176,7 @@ export const bankPaymentSystem: BehaviourModule = {
           continue;
         }
         const d = { from: m.from, to: m.to, pay: cents(m.amount), settles: m.settles, every: bulk ? undefined : ins.data.every, first: ins.data.first };
-        const acc = custody.get(d.from);
+        const acc = custody().get(d.from);
         if (acc && dead.has(acc.holder)) continue; // the account holder has died: it pays out only to settle the estate
         if (!acc) {
           cannot(`this bank doesn't keep account ${d.from}.`);
@@ -114,12 +197,17 @@ export const bankPaymentSystem: BehaviourModule = {
           continue;
         }
         if (Number.isInteger(d.every) && d.every > 0) {
-          let due = nextDue.get(ins.id) ?? ins.at + (Number.isInteger(d.first) ? d.first : d.every);
+          const was = nextDue.get(ins.id);
+          let due = was ?? ins.at + (Number.isInteger(d.first) ? d.first : d.every);
           while (due <= obs.t) {
             out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due });
             due += d.every;
           }
           nextDue.set(ins.id, due);
+          if (due !== was && standing.has(ins.id)) {
+            undated.delete(ins.id);
+            byDue.add(due, ins.id);
+          }
         } else if (bulk && !done.has(ins.id)) {
           done.add(ins.id);
           for (const b of bulk) out.push({ instruction: ins.id, from: d.from, to: b.to as string, amount: cents(b.amount as any), due: ins.at });
@@ -128,10 +216,13 @@ export const bankPaymentSystem: BehaviourModule = {
           out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due: ins.at, ...(typeof d.settles === "string" ? { settles: d.settles } : {}) }); // the payer's reference, as given
         }
       }
+      // (An order that was due and wasn't gone through to its payments, its holder dead or its author not the holder's:
+      // still due, so gone through again at the next plan.)
+      for (const e of due) if (standing.has(e[1]) && nextDue.get(e[1]) === e[0]) byDue.add(e[0], e[1]);
       // Settling an estate, as law-succession says: to the partner; else equally to the adult children; else the town.
       // The heirs are settled once; what comes into the estate later (a dividend, a refund) is passed on to them too,
       // as an estate's administrator does.
-      const accountOf = (holder: string) => [...custody.values()].find((a) => a.holder === holder && !dead.has(holder))?.account;
+      const accountOf = (holder: string) => [...custody().values()].find((a) => a.holder === holder && !dead.has(holder))?.account;
       for (const r of deaths) {
         if (!settled.has(r.id)) {
           const heirs = [r.data?.partner].filter((x): x is string => !!x && !!accountOf(x));
@@ -140,11 +231,13 @@ export const bankPaymentSystem: BehaviourModule = {
         }
         const to = settled.get(r.id)!;
         if (!to.length) continue;
-        for (const acc of custody.values()) {
-          if (acc.holder !== r.data?.deceased || acc.balance <= 0) continue;
-          const each = Math.floor(acc.balance / to.length);
+        for (const acc of custody().values()) {
+          if (acc.holder !== r.data?.deceased) continue;
+          const balance = cents(acc.balance);
+          if (balance <= 0) continue;
+          const each = Math.floor(balance / to.length);
           to.forEach((account, i) => {
-            const amount = i === 0 ? acc.balance - each * (to.length - 1) : each;
+            const amount = i === 0 ? balance - each * (to.length - 1) : each;
             if (amount > 0) out.push({ instruction: r.id, from: acc.account, to: account, amount, due: obs.t });
           });
         }
@@ -157,7 +250,7 @@ export const bankPaymentSystem: BehaviourModule = {
         let left = cents(g.data?.amount ?? 0);
         const to = g.data?.to;
         if (typeof to !== "string" || left <= 0) continue;
-        for (const acc of [...custody.values()].filter((a) => a.holder === g.data?.debtor && a.balance > 0).sort((a, b) => (a.account < b.account ? -1 : 1))) {
+        for (const acc of [...custody().values()].map((a) => ({ ...a, balance: cents(a.balance) })).filter((a) => a.holder === g.data?.debtor && a.balance > 0).sort((a, b) => (a.account < b.account ? -1 : 1))) {
           const amount = Math.min(left, acc.balance);
           left -= amount;
           out.push({ instruction: g.id, from: acc.account, to, amount, due: obs.t, ...(typeof g.data?.claim === "string" ? { settles: g.data.claim } : {}) });
@@ -211,19 +304,21 @@ export const bankPaymentSystem: BehaviourModule = {
         if (opens.length) return callAction(because("Opening accounts people asked for.", ...opens.splice(0, 32)));
         if (queue.length === 0) return wait();
 
-        const balance = new Map(channels.accounts(obs).map((a) => [a.account, cents(a.balance)]));
-        const holderOf = new Map(channels.accounts(obs).map((a) => [a.account, a.holder]));
+        // (Each account as it's seen, and beside it what's left in those this batch pays from.)
+        const seen = new Map(channels.accounts(obs).map((a) => [a.account, a]));
+        const left = new Map<string, number>();
         const blocks: Step = [];
         while (queue.length && blocks.length < maxBatch) {
           const p = queue.shift()!;
-          const have = balance.get(p.from) ?? 0;
+          const from = seen.get(p.from);
+          const have = left.get(p.from) ?? (from ? cents(from.balance) : 0);
           if (have >= p.amount) {
             blocks.push(pay(p.to, p.amount, { from: p.from, per_request: p.instruction, settles: p.settles }));
-            balance.set(p.from, have - p.amount);
+            left.set(p.from, have - p.amount);
             inFlight.push(p);
           } else {
             // Not enough money: the payment isn't made, and the account holder is told.
-            const holder = holderOf.get(p.from);
+            const holder = from?.holder;
             if (holder) blocks.push(message([holder], PAYMENT_FAILED.note(smallestNow(p.amount), p.to, p.instruction), p.instruction));
           }
           if ((p as any).single) break;

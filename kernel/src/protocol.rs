@@ -36,6 +36,8 @@ pub struct Session {
     types: std::collections::BTreeMap<String, Value>,
     /// How the world's money is written (its config's first currency): how the resolver reads and writes amounts.
     currency: Option<oikos_resolver::calls::Currency>,
+    /// The registers of lots seats have been shown whole, held once between them (never part of what a seat knows).
+    registers: oikos_resolver::knowledge::Registers,
 }
 
 impl Session {
@@ -72,7 +74,19 @@ impl Session {
 
     /// One request as a line of JSON, its reply as one.
     pub fn request_line(&mut self, line: &str) -> String {
-        match serde_json::from_str::<Value>(line) {
+        self.reply_to(serde_json::from_str::<Value>(line))
+    }
+
+    /// `request_line`, for a line that is the caller's to give up: it's let go once read, before the request is
+    /// carried out (a large world's start is not held as its text too while the world is made).
+    pub fn request_owned(&mut self, line: String) -> String {
+        let req = serde_json::from_str::<Value>(&line);
+        drop(line);
+        self.reply_to(req)
+    }
+
+    fn reply_to(&mut self, req: serde_json::Result<Value>) -> String {
+        match req {
             Ok(mut req) => match self.reply_taking(&mut req) {
                 Reply::Value(v) => v.to_string(),
                 Reply::Line(s) => s,
@@ -102,7 +116,7 @@ pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()>
         if line.trim().is_empty() {
             continue;
         }
-        output.write_all(session.request_line(&line).as_bytes())?;
+        output.write_all(session.request_owned(line).as_bytes())?;
         output.write_all(b"\n")?;
         output.flush()?;
     }
@@ -129,7 +143,7 @@ enum Reply {
 /// observation is most of what crosses to the host, and it has been serialised once already, for its hash in the log;
 /// those bytes are the reply's.
 fn command(session: &mut Session, req: &Value) -> Result<String, String> {
-    let Session { run, sched, knowledge, currency, .. } = session;
+    let Session { run, sched, knowledge, currency, registers, .. } = session;
     let r = run.as_mut().ok_or("no run started")?;
     let cmd: Command = serde_json::from_value(req.get("command").cloned().ok_or("missing command")?).map_err(|e| format!("bad command: {e}"))?;
     let mut resp = r.command(&cmd).map_err(|e| e.to_string())?;
@@ -141,7 +155,7 @@ fn command(session: &mut Session, req: &Value) -> Result<String, String> {
     // What the seat now knows: each observation delivered to it, as it received it.
     if let (Command::Observe { participant, only } | Command::Look { participant, only, .. }, Some(o)) = (&cmd, &observed) {
         let key = only.as_ref().map_or_else(|| participant.clone(), |o| format!("{participant}|{o}"));
-        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb_with(&o.value, &o.shown);
+        knowledge.entry(key).or_insert_with(|| oikos_resolver::Knowledge::new(currency.clone())).absorb_sharing(&o.value, &o.shown, registers);
     }
     if let Some(s) = sched.as_mut() {
         s.note(Some(r.kernel().state()), events.as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());
@@ -166,7 +180,7 @@ fn structure_types(config: &Value) -> std::collections::BTreeMap<String, Value> 
 
 /// Starts a session's run from a config (the request's, handed over), with what the session keeps of it.
 fn start(session: &mut Session, req: &Value, config: Option<Value>, structure_types: std::collections::BTreeMap<String, Value>, money: Option<oikos_resolver::calls::Currency>) -> Result<Value, String> {
-    let Session { run, sched, knowledge, types, currency } = session;
+    let Session { run, sched, knowledge, types, currency, registers } = session;
     let str_field = |k: &str| req.get(k).and_then(Value::as_str).ok_or(format!("missing {k}"));
     if run.is_some() {
         return Err("a run is already started".into());
@@ -186,6 +200,7 @@ fn start(session: &mut Session, req: &Value, config: Option<Value>, structure_ty
     *types = structure_types;
     *currency = money;
     knowledge.clear();
+    *registers = Default::default();
     *sched = Some(crate::schedule::Scheduler::new(r.kernel().statics().tick));
     *run = Some(r);
     Ok(reply)
@@ -199,7 +214,7 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
         let currency = oikos_resolver::calls::Currency::from_config(&req["config"]["world"]["currencies"][0]);
         return start(session, req, req.get("config").cloned(), types, currency);
     }
-    let Session { run, sched, knowledge, types, currency } = session;
+    let Session { run, sched, knowledge, types, currency, .. } = session;
     let r = run.as_mut().ok_or("no run started")?;
     match op {
         // A call to the seat's own acts (the resolver, from what the seat knows): blocks, or questions for the seat.

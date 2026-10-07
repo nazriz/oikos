@@ -680,7 +680,7 @@ fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCel
                             attrs: spec.attrs.clone(),
                             count: bodies.map_or(0, |b| b.len()) as u32,
                             occupants: known.then(|| bodies.map(|b| b.iter().cloned().collect()).unwrap_or_default()),
-                            left: known.then(|| st.departures.get(&space).cloned()).flatten(),
+                            left: known.then(|| st.departures.get(&space).map(|l| (**l).clone())).flatten(),
                             space,
                         }
                     })

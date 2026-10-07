@@ -71,40 +71,46 @@ impl<W: Write> LogWriter<W> {
 
     pub fn append(&mut self, t: i64, kind: Kind, body: Value) -> io::Result<Entry> {
         let err = |e: canon::CanonError| io::Error::new(io::ErrorKind::InvalidData, e.to_string());
-        let seq = self.next_seq;
-        // Canonicalise the body once, then assemble both the hashed form and the
-        // written line from it. Keys in canonical order: body, hash, kind, prev, seq, t.
-        // (Byte-identical to canonicalising the whole entry; see entry_hash and the tests.)
         let body_bytes = canon::canonical_value(&body).map_err(err)?;
+        let (seq, prev) = (self.next_seq, self.prev.clone());
+        let hash = self.append_canonical(t, kind, &body_bytes)?;
+        debug_assert_eq!(Ok(&hash), entry_hash(seq, t, kind, &body, &prev).as_ref());
+        Ok(Entry { seq, t, kind, body, prev, hash })
+    }
+
+    /// `append`, for a body whose canonical JSON the caller has (and vouches for). The hashed form and the written
+    /// line are both made of it, part by part, and neither is put together first: a large body (the header's, with
+    /// its config) is held once. Keys in canonical order: body, hash, kind, prev, seq, t. Returns the entry's hash.
+    /// (Byte-identical to canonicalising the whole entry; see entry_hash and the tests.)
+    pub fn append_canonical(&mut self, t: i64, kind: Kind, body: &[u8]) -> io::Result<String> {
+        use sha2::{Digest, Sha256};
         let kind_name = serde_json::to_value(kind).expect("kinds serialize");
         let mut tail = Vec::with_capacity(160);
         tail.extend_from_slice(b",\"kind\":");
         canon::write_string(kind_name.as_str().expect("kind is a string"), &mut tail);
         tail.extend_from_slice(b",\"prev\":");
         canon::write_string(&self.prev, &mut tail);
-        tail.extend_from_slice(format!(",\"seq\":{seq},\"t\":{t}}}").as_bytes());
-        let mut unhashed = Vec::with_capacity(body_bytes.len() + tail.len() + 16);
-        unhashed.extend_from_slice(b"{\"body\":");
-        unhashed.extend_from_slice(&body_bytes);
-        unhashed.extend_from_slice(&tail);
-        let hash = canon::hash_with_domain(canon::DOMAIN_LOG, &unhashed);
-        let mut line = Vec::with_capacity(unhashed.len() + 80);
-        line.extend_from_slice(b"{\"body\":");
-        line.extend_from_slice(&body_bytes);
-        line.extend_from_slice(b",\"hash\":");
-        canon::write_string(&hash, &mut line);
-        line.extend_from_slice(&tail);
-        line.push(b'\n');
-        debug_assert_eq!(hash, entry_hash(seq, t, kind, &body, &self.prev).unwrap());
-        let entry = Entry { seq, t, kind, body, prev: self.prev.clone(), hash: hash.clone() };
-        debug_assert_eq!(&line[..line.len() - 1], &canon::canonical(&entry).unwrap()[..]);
-        self.out.write_all(&line)?;
+        tail.extend_from_slice(format!(",\"seq\":{},\"t\":{t}}}\n", self.next_seq).as_bytes());
+        // (Hashed: the entry without `hash`, and without the line's end.)
+        let mut h = Sha256::new();
+        h.update(canon::DOMAIN_LOG.as_bytes());
+        h.update(b"{\"body\":");
+        h.update(body);
+        h.update(&tail[..tail.len() - 1]);
+        let hash = canon::to_hex(&h.finalize());
+        let mut after = Vec::with_capacity(tail.len() + 80);
+        after.extend_from_slice(b",\"hash\":");
+        canon::write_string(&hash, &mut after);
+        after.extend_from_slice(&tail);
+        self.out.write_all(b"{\"body\":")?;
+        self.out.write_all(body)?;
+        self.out.write_all(&after)?;
         self.next_seq += 1;
-        self.prev = hash;
+        self.prev = hash.clone();
         if self.next_seq % self.anchor_every == 0 {
             self.anchor()?;
         }
-        Ok(entry)
+        Ok(hash)
     }
 
     /// Export the current head to the witness file.
