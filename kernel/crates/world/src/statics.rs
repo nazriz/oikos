@@ -6,7 +6,8 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct Statics {
-    pub config: Config,
+    /// (The one the run was loaded from: shared, not a copy.)
+    pub config: std::sync::Arc<Config>,
     pub types: BTreeMap<String, StructureType>,
     /// Each structure type's spaces, in order: local id (`dwelling.3`) -> spec.
     pub spaces: BTreeMap<String, BTreeMap<String, SpaceSpec>>,

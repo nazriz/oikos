@@ -72,7 +72,19 @@ impl Session {
 
     /// One request as a line of JSON, its reply as one.
     pub fn request_line(&mut self, line: &str) -> String {
-        match serde_json::from_str::<Value>(line) {
+        self.reply_to(serde_json::from_str::<Value>(line))
+    }
+
+    /// `request_line`, for a line that is the caller's to give up: it's let go once read, before the request is
+    /// carried out (a large world's start is not held as its text too while the world is made).
+    pub fn request_owned(&mut self, line: String) -> String {
+        let req = serde_json::from_str::<Value>(&line);
+        drop(line);
+        self.reply_to(req)
+    }
+
+    fn reply_to(&mut self, req: serde_json::Result<Value>) -> String {
+        match req {
             Ok(mut req) => match self.reply_taking(&mut req) {
                 Reply::Value(v) => v.to_string(),
                 Reply::Line(s) => s,
@@ -102,7 +114,7 @@ pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()>
         if line.trim().is_empty() {
             continue;
         }
-        output.write_all(session.request_line(&line).as_bytes())?;
+        output.write_all(session.request_owned(line).as_bytes())?;
         output.write_all(b"\n")?;
         output.flush()?;
     }

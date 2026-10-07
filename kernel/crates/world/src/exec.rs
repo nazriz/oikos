@@ -334,9 +334,9 @@ fn create_participant(s: &Statics, st: &mut State, template: &str, person: Optio
             template: Some(template.into()),
             def: Arc::new(ParticipantDef {
                 title: title.or_else(|| tpl.title.clone()),
-                channels: tpl.channels.clone(),
-                controller: tpl.controller.clone(),
-                framing: tpl.framing.clone(),
+                channels: Arc::new(tpl.channels.clone()),
+                controller: Arc::new(tpl.controller.clone()),
+                framing: Arc::new(tpl.framing.clone()),
                 on_opt_out: tpl.on_opt_out.clone(),
                 lanes: None,
             }),

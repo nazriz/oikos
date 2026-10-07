@@ -119,7 +119,7 @@ fn refusal_info(r: &Refusal) -> RefusalInfo {
 
 impl World {
     pub fn new(loaded: &LoadedConfig) -> Result<World, String> {
-        let c = loaded.config.clone();
+        let c = &*loaded.config;
         let w = &c.world;
         let currency = w.currencies[0].code.clone();
         let cur_of = |a: &crate::config::AccountCfg| a.currency.clone().unwrap_or_else(|| currency.clone());
@@ -150,9 +150,22 @@ impl World {
                     .collect();
                 oikos_nature::Ground::new(&cells.into_iter().collect::<Vec<_>>(), &w.flows)
             }),
-            config: c.clone(),
+            config: loaded.config.clone(),
         };
         let person_of: BTreeMap<&str, &str> = c.participants.iter().filter_map(|p| p.person.as_deref().map(|e| (e, p.id.as_str()))).collect();
+        // Each parent's children, in the order the entities are given (found once, not by looking through every
+        // entity for every person).
+        let mut children_of: BTreeMap<&str, Vec<Id>> = BTreeMap::new();
+        for child in &w.entities {
+            let mut seen: Vec<&str> = vec![];
+            for parent in child.parents.iter().flatten() {
+                // (A parent named twice has the child once.)
+                if !seen.contains(&parent.as_str()) {
+                    seen.push(parent);
+                    children_of.entry(parent).or_default().push(child.id.clone());
+                }
+            }
+        }
         let mut cells = crate::state::Map::new();
         // Cells exist only where a place is detailed (D58); nested detailed places share theirs.
         for r in crate::config::detailed_rects(&w.places) {
@@ -172,7 +185,7 @@ impl World {
                     let body = (e.kind == crate::config::PERSON).then(|| Body {
                         born_at: e.born_at.unwrap_or(0),
                         sex: e.sex,
-                        children: w.entities.iter().filter(|c| c.parents.as_ref().is_some_and(|ps| ps.contains(&e.id))).map(|c| c.id.clone()).collect(),
+                        children: children_of.get(e.id.as_str()).cloned().unwrap_or_default(),
                         present: e.present.unwrap_or(true),
                         alive: true,
                         parents: e.parents.clone().unwrap_or_default(),
@@ -278,7 +291,7 @@ impl World {
             st.enter(sid, &o.space, &o.occupant);
         }
         for r in &w.records {
-            st.store(r.clone());
+            st.store_shared(r.clone());
         }
         // Nature at the start (docs/design/world-expansion.md 2), stepped each day from the next.
         if s.nature.is_some() {
@@ -346,34 +359,23 @@ impl World {
         let mut rest = self.state.clone(); // (a persistent copy: cheap)
         rest.records = crate::state::Map::new();
         rest.record_order = imbl::Vector::new();
-        let v = serde_json::to_value(&rest).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
-        canon::check_integers(&v)?;
-        let Value::Object(m) = &v else { return Err(canon::CanonError::Serialize("the state is not an object".into())) };
-        let mut keys: Vec<&String> = m.keys().collect();
-        keys.sort_by(|a, b| a.encode_utf16().cmp(b.encode_utf16()));
+        // (Its members' canonical bytes, in order, written straight from the state: no JSON value is made of it.)
+        let members = canon::canonical_members(&rest)?;
         let mut cache = self.canon_cache.borrow_mut();
         let cache = &mut *cache;
         sink(b"{");
-        for (i, k) in keys.into_iter().enumerate() {
+        for (i, (k, bytes)) in members.iter().enumerate() {
             let mut buf = Vec::new();
             if i > 0 {
                 buf.push(b',');
             }
             canon::write_string(k, &mut buf);
             buf.push(b':');
+            sink(&buf);
             match k.as_str() {
-                "records" => {
-                    sink(&buf);
-                    self.write_records(cache, sink)?;
-                }
-                "record_order" => {
-                    sink(&buf);
-                    self.write_order(cache, sink);
-                }
-                _ => {
-                    canon::write_value(&m[k], &mut buf);
-                    sink(&buf);
-                }
+                "records" => self.write_records(cache, sink)?,
+                "record_order" => self.write_order(cache, sink),
+                _ => sink(bytes),
             }
         }
         sink(b"}");

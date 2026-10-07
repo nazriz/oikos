@@ -249,11 +249,17 @@ fn step_field_dense(f: &oikos_contracts::config::FieldCfg, ground: &Ground, land
     step_field_from(f, ground, &field_sources(f, ground, land), v, day)
 }
 
+/// What a field's sources are scaled by on a day (rain, drought), in basis points: all a field's day takes from which
+/// day it is.
+fn source_scale(f: &oikos_contracts::config::FieldCfg, day: i64) -> i64 {
+    f.source_by_day.iter().rev().find(|s| s.from_day <= day).map_or(BPS, |s| s.bps)
+}
+
 /// A field's day, from what its sources add to each cell (`field_sources`).
 fn step_field_from(f: &oikos_contracts::config::FieldCfg, ground: &Ground, sources: &[i64], mut v: Vec<i64>, day: i64) -> Vec<i64> {
     let n = ground.cells.len();
     // Sources (a cover's may be negative: soaking it up), scaled for the day (rain, drought).
-    let scale = f.source_by_day.iter().rev().find(|s| s.from_day <= day).map_or(BPS, |s| s.bps);
+    let scale = source_scale(f, day);
     for i in 0..n {
         let add = sources[i];
         v[i] = v[i].saturating_add(if add > 0 { add.saturating_mul(scale) / BPS } else { add });
@@ -356,6 +362,40 @@ fn home_range_sums(ground: &Ground, v: &[i64], r: i64) -> Vec<i64> {
         .collect()
 }
 
+/// `home_range_sums` of a species' numbers, at the cells where it has any (the only ones its day reads; the rest are
+/// left at zero). Where few cells have any, each one's square is summed cell by cell, which is less work than the
+/// whole ground's prefix sums: the same sums either way.
+fn crowding(ground: &Ground, n: &[i64], r: i64) -> Vec<i64> {
+    if !few_enough(n.iter().filter(|x| **x > 0).count(), r, n.len()) {
+        return home_range_sums(ground, n, r);
+    }
+    let mut sums = vec![0i64; n.len()];
+    for (i, _) in n.iter().enumerate().filter(|(_, x)| **x > 0) {
+        sums[i] = home_range_sum(ground, n, r, i);
+    }
+    sums
+}
+
+/// One cell's sum of `v` over the square of cells `r` each way around it, cell by cell: what `home_range_sums` gives
+/// for it.
+fn home_range_sum(ground: &Ground, v: &[i64], r: i64, i: usize) -> i64 {
+    let (x0, y0) = ground.xy[i];
+    let mut sum = 0i64;
+    for y in y0 - r..=y0 + r {
+        for x in x0 - r..=x0 + r {
+            if let Some(j) = ground.at(x, y) {
+                sum += v[j];
+            }
+        }
+    }
+    sum
+}
+
+/// Whether summing each occupied cell's square one by one is less work than the whole ground's prefix sums.
+fn few_enough(occupied: usize, r: i64, cells: usize) -> bool {
+    r != 0 && (occupied as i64).saturating_mul((2 * r + 1) * (2 * r + 1)) <= cells as i64
+}
+
 /// `sround` on wide numbers (a home range's capacity times a rate can pass 2^63), clamped to i64.
 fn sround_wide(num: i128, den: i128, rng: &mut Rng) -> i64 {
     if num <= 0 || den <= 0 {
@@ -366,52 +406,128 @@ fn sround_wide(num: i128, den: i128, rng: &mut Rng) -> i64 {
     i64::try_from(q + i128::from(extra)).unwrap_or(i64::MAX)
 }
 
-/// A species' capacity per 1,000 cells, cell by cell, and over each cell's home range: what the land gives it (the same
-/// while the land is).
+/// A species' capacity per 1,000 cells, cell by cell, and over each cell's home range, and the cells whose cover is a
+/// barrier to it: what the land gives it (the same while the land is).
 struct Capacity {
     cap: Vec<i64>,
     room: Vec<i64>,
+    barrier: Vec<bool>,
 }
 
 fn capacity(sp: &SpeciesCfg, ground: &Ground, land: &Land) -> Capacity {
     let cap: Vec<i64> = land.cover.iter().map(|c| sp.capacity_per_1000_cells.get(c).copied().unwrap_or(0)).collect();
     let room = home_range_sums(ground, &cap, sp.home_range);
-    Capacity { cap, room }
+    let barriers: BTreeSet<&str> = sp.barriers.iter().map(String::as_str).collect();
+    let barrier = land.cover.iter().map(|c| barriers.contains(c.as_str())).collect();
+    Capacity { cap, room, barrier }
 }
 
 fn step_species(sp: &SpeciesCfg, ground: &Ground, land: &Land, n: &[i64], fields: &BTreeMap<Id, Vec<i64>>, rng: &mut Rng) -> Vec<i64> {
-    step_species_with(sp, ground, land, &capacity(sp, ground, land), n, fields, rng)
+    let fields: Vec<(&str, &[i64])> = fields.iter().map(|(id, v)| (id.as_str(), v.as_slice())).collect();
+    step_species_with(sp, ground, &capacity(sp, ground, land), n, &fields, rng)
 }
 
-fn step_species_with(sp: &SpeciesCfg, ground: &Ground, land: &Land, capacity: &Capacity, n: &[i64], fields: &BTreeMap<Id, Vec<i64>>, rng: &mut Rng) -> Vec<i64> {
-    let cells = ground.cells.len();
-    let barriers: BTreeSet<&str> = sp.barriers.iter().map(String::as_str).collect();
+/// A species' day over the whole ground. `fields` is each field's values that day, by id.
+fn step_species_with(sp: &SpeciesCfg, ground: &Ground, capacity: &Capacity, n: &[i64], fields: &[(&str, &[i64])], rng: &mut Rng) -> Vec<i64> {
+    let crowd = crowding(ground, n, sp.home_range);
+    let mut next = vec![0i64; n.len()];
+    let mut arriving: Vec<usize> = vec![];
+    let living = n.iter().enumerate().filter(|(_, x)| **x > 0).map(|(i, x)| (i, *x, crowd[i]));
+    species_day(sp, ground, capacity, living, fields, rng, &mut |i, left| next[i] = left, &mut |j| arriving.push(j));
+    for j in arriving {
+        next[j] += 1;
+    }
+    next
+}
+
+/// A species' numbers through a spin-up, kept both ways: the cells it's in and how many in each (in the ground's
+/// order), and the whole ground's (what the sums over home ranges read). A day then costs what the cells it's in do,
+/// not the ground: the same day as `step_species_with`'s, draw for draw.
+struct Spread {
+    living: Vec<(usize, i64)>,
+    dense: Vec<i64>,
+    /// Cells given a number below zero at the start: counted in the first day's sums as they stand, and none after it.
+    below: Vec<usize>,
+}
+
+impl Spread {
+    fn of(dense: Vec<i64>) -> Spread {
+        let living = dense.iter().enumerate().filter(|(_, x)| **x > 0).map(|(i, x)| (i, *x)).collect();
+        let below = dense.iter().enumerate().filter(|(_, x)| **x < 0).map(|(i, _)| i).collect();
+        Spread { living, dense, below }
+    }
+
+    fn day(&mut self, sp: &SpeciesCfg, ground: &Ground, capacity: &Capacity, fields: &[(&str, &[i64])], rng: &mut Rng) {
+        let r = sp.home_range;
+        let dense = &self.dense;
+        // (Each cell's sum over its home range: its own square where the species is in few cells, else the whole ground's.)
+        let sums = (!few_enough(self.living.len(), r, dense.len())).then(|| home_range_sums(ground, dense, r));
+        let living = self.living.iter().map(|&(i, here)| (i, here, sums.as_ref().map_or_else(|| home_range_sum(ground, dense, r, i), |s| s[i])));
+        let mut staying: Vec<(usize, i64)> = Vec::with_capacity(self.living.len());
+        let mut arriving: Vec<usize> = vec![];
+        species_day(sp, ground, capacity, living, fields, rng, &mut |i, left| staying.push((i, left)), &mut |j| arriving.push(j));
+        for i in self.living.iter().map(|(i, _)| *i).chain(self.below.drain(..)) {
+            self.dense[i] = 0;
+        }
+        // Those that stayed and those that arrived, cell by cell in order.
+        arriving.sort_unstable();
+        let (mut stayed, mut arrived) = (staying.into_iter().peekable(), arriving.into_iter().peekable());
+        self.living.clear();
+        loop {
+            let i = match (stayed.peek(), arrived.peek()) {
+                (Some(&(i, _)), Some(&j)) => i.min(j),
+                (Some(&(i, _)), None) => i,
+                (None, Some(&j)) => j,
+                (None, None) => break,
+            };
+            let mut count = stayed.next_if(|(cell, _)| *cell == i).map_or(0, |(_, left)| left);
+            while arrived.next_if_eq(&i).is_some() {
+                count += 1;
+            }
+            self.dense[i] = count;
+            if count > 0 {
+                self.living.push((i, count));
+            }
+        }
+    }
+}
+
+/// A species' day at the cells it's in: `living` gives each, in the ground's order, with how many are there and how
+/// many over its home range. `stay` is told how many are left in each of those cells, and `arrive` of each one that
+/// settles in a cell (any cell). `fields` is each field's values that day, by id.
+#[allow(clippy::too_many_arguments)]
+fn species_day(
+    sp: &SpeciesCfg,
+    ground: &Ground,
+    capacity: &Capacity,
+    living: impl Iterator<Item = (usize, i64, i64)>,
+    fields: &[(&str, &[i64])],
+    rng: &mut Rng,
+    stay: &mut dyn FnMut(usize, i64),
+    arrive: &mut dyn FnMut(usize),
+) {
     let year = BPS * DAYS_A_YEAR;
     // The individuals over each cell's home range, against its capacity.
     let (cap, room) = (&capacity.cap, &capacity.room);
     let best = sp.capacity_per_1000_cells.values().copied().max().unwrap_or(1).max(1);
-    let crowd = home_range_sums(ground, n, sp.home_range);
-    let mut next = vec![0i64; cells];
-    let mut arriving = vec![0i64; cells];
-    for i in 0..cells {
-        let here = n[i];
-        if here <= 0 {
-            continue;
-        }
+    // (The fields it tolerates only so much of, found once.)
+    let tolerated: Vec<(&[i64], &oikos_contracts::config::ToleranceCfg)> =
+        sp.tolerance.iter().filter_map(|(field, tol)| fields.iter().rev().find(|(id, _)| *id == field.as_str()).map(|(_, v)| (*v, tol))).collect();
+    for (i, here, crowd) in living {
         // (Crowding is the others there: counting itself, a sparse animal whose home range holds about two would settle
         // at half its capacity.)
-        let (local, k) = (i128::from((crowd[i] - 1).max(0)) * 1000, i128::from(room[i]));
+        let (local, k) = (i128::from((crowd - 1).max(0)) * 1000, i128::from(room[i]));
         // Deaths: background, and where a field passes what it tolerates.
         let mut deaths = sround(here * sp.mortality_bps_per_year, year, rng);
-        for (field, tol) in &sp.tolerance {
-            if fields.get(field).is_some_and(|v| v[i] > tol.above) {
+        for (v, tol) in &tolerated {
+            if v[i] > tol.above {
                 deaths += sround(here * tol.mortality_bps_per_day, BPS, rng);
             }
         }
         // Births: replacing the background deaths, plus logistic growth toward the capacity of the home range (so it
         // settles there), where there are enough to breed; crowding past it kills.
         let (m, r, h) = (i128::from(sp.mortality_bps_per_year), i128::from(sp.growth_bps_per_year), i128::from(here));
-        let births = if k > local && crowd[i] >= sp.min_viable.max(1) { sround_wide(h * (m * k + r * (k - local)), k * i128::from(year), rng) } else { 0 };
+        let births = if k > local && crowd >= sp.min_viable.max(1) { sround_wide(h * (m * k + r * (k - local)), k * i128::from(year), rng) } else { 0 };
         if k > 0 && local > k {
             deaths += sround_wide(h * r * (local - k), k * i128::from(year), rng);
         }
@@ -445,7 +561,7 @@ fn step_species_with(sp: &SpeciesCfg, ground: &Ground, land: &Land, capacity: &C
                     way = 3 - way;
                     continue;
                 };
-                if barriers.contains(land.cover[j].as_str()) {
+                if capacity.barrier[j] {
                     break;
                 }
                 at = j;
@@ -453,47 +569,84 @@ fn step_species_with(sp: &SpeciesCfg, ground: &Ground, land: &Land, capacity: &C
                 let away = (x - x0).abs().max((y - y0).abs()) > hr;
                 let last = step == steps;
                 if cap[j] > 0 && (last || (away && (rng.below(best as u64) as i64) < cap[j])) {
-                    arriving[j] += 1;
+                    arrive(j);
                     break;
                 }
             }
         }
         alive -= leaving;
         // Where the cover gives it no capacity, none that stay live the day.
-        next[i] = if k > 0 { alive } else { 0 };
+        stay(i, if k > 0 { alive } else { 0 });
     }
-    for i in 0..cells {
-        next[i] += arriving[i];
-    }
-    next
 }
+
+/// A field's last few states in a spin-up, under one scale on its sources (the oldest first, the latest last), and
+/// whether they have closed into a round: the state after the latest is the oldest again.
+#[derive(Default)]
+struct Round {
+    scale: Option<i64>,
+    states: Vec<Vec<i64>>,
+    closed: bool,
+}
+
+/// How many of a field's last states a spin-up keeps to find a round among.
+const ROUND_KEPT: usize = 8;
 
 /// Nature's spin-up: `days` stepped before the run, over the land as it is, with no succession (as `step_day` with no
 /// covers' succession would, day by day, exactly), but kept dense throughout. Returns the species that went extinct.
 pub fn spin_up(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureState, first_day: i64, days: i64, randomness: &Randomness) -> Vec<Id> {
     let mut fields: Vec<Vec<i64>> = cat.fields.iter().map(|f| dense(st.fields.get(&f.id), ground, f.baseline)).collect();
-    let mut pops: Vec<Vec<i64>> = cat.species.iter().map(|sp| dense(st.populations.get(&sp.id), ground, 0)).collect();
+    let mut pops: Vec<Spread> = cat.species.iter().map(|sp| Spread::of(dense(st.populations.get(&sp.id), ground, 0))).collect();
     let mut gone = vec![];
     // (The land doesn't change in a spin-up: each species' capacity, once.)
     let caps: Vec<Capacity> = cat.species.iter().map(|sp| capacity(sp, ground, land)).collect();
     // (And what each field's sources add to each cell.)
     let sources: Vec<Vec<i64>> = cat.fields.iter().map(|f| field_sources(f, ground, land)).collect();
+    // (All a field's day takes from which day it is, is the scale on its sources. So a field that comes back, under
+    // one scale, to what it was a few days before goes round the same few states for as long as the scale stays: they
+    // are kept and those days aren't worked out again. A field that has settled is the round of one.)
+    let mut rounds: Vec<Round> = cat.fields.iter().map(|_| Round::default()).collect();
     for day in first_day..first_day + days {
         for (k, f) in cat.fields.iter().enumerate() {
-            fields[k] = step_field_from(f, ground, &sources[k], std::mem::take(&mut fields[k]), day);
+            let scale = source_scale(f, day);
+            let round = &mut rounds[k];
+            if round.scale != Some(scale) {
+                *round = Round { scale: Some(scale), ..Round::default() };
+            }
+            if round.closed {
+                // (The oldest kept is the next of the round.)
+                round.states.rotate_left(1);
+                fields[k].clone_from(round.states.last().expect("a round has a state"));
+                continue;
+            }
+            let next = step_field_from(f, ground, &sources[k], std::mem::take(&mut fields[k]), day);
+            match round.states.iter().position(|was| *was == next) {
+                Some(at) => {
+                    round.states.drain(..at);
+                    round.states.rotate_left(1);
+                    round.closed = true;
+                }
+                None => {
+                    if round.states.len() == ROUND_KEPT {
+                        round.states.remove(0);
+                    }
+                    round.states.push(next.clone());
+                }
+            }
+            fields[k] = next;
         }
-        let values: BTreeMap<Id, Vec<i64>> = cat.fields.iter().zip(&fields).map(|(f, v)| (f.id.clone(), v.clone())).collect();
+        let values: Vec<(&str, &[i64])> = cat.fields.iter().zip(&fields).map(|(f, v)| (f.id.as_str(), v.as_slice())).collect();
         for (k, sp) in cat.species.iter().enumerate() {
             if st.extinct.contains_key(&sp.id) {
                 continue;
             }
             let mut rng = randomness.stream(&["nature", &sp.id, &day.to_string()]);
-            let next = step_species_with(sp, ground, land, &caps[k], &pops[k], &values, &mut rng);
-            if next.iter().all(|x| *x == 0) && pops[k].iter().any(|x| *x > 0) {
+            let had_any = !pops[k].living.is_empty();
+            pops[k].day(sp, ground, &caps[k], &values, &mut rng);
+            if pops[k].living.is_empty() && had_any {
                 st.extinct.insert(sp.id.clone(), day);
                 gone.push(sp.id.clone());
             }
-            pops[k] = next;
         }
     }
     for (f, v) in cat.fields.iter().zip(&fields) {
@@ -501,7 +654,7 @@ pub fn spin_up(cat: &Catalogue, ground: &Ground, land: &Land, st: &mut NatureSta
         if m.is_empty() { st.fields.remove(&f.id); } else { st.fields.insert(f.id.clone(), m); }
     }
     for (sp, v) in cat.species.iter().zip(&pops) {
-        let m = sparse(v, ground, 0);
+        let m = sparse(&v.dense, ground, 0);
         if m.is_empty() { st.populations.remove(&sp.id); } else { st.populations.insert(sp.id.clone(), m); }
     }
     gone

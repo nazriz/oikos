@@ -15,6 +15,7 @@ use oikos_core::canon;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 pub const CONTRACTS_VERSION: &str = "0.8";
 
@@ -462,7 +463,8 @@ pub struct World {
     pub accounts: Vec<AccountCfg>,
     pub structures: Vec<StructureCfg>,
     pub occupancy: Vec<OccupancyCfg>,
-    pub records: Vec<Record>,
+    /// (Shared: the state's record store holds the same records, not copies.)
+    pub records: Vec<Arc<Record>>,
     /// Holdings at the start (phase B).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub holdings: Vec<HoldingCfg>,
@@ -662,6 +664,11 @@ pub enum ParticipantKind {
     System,
 }
 
+/// No channels (for a shared list of them).
+pub fn no_channels(channels: &Arc<Vec<Channel>>) -> bool {
+    channels.is_empty()
+}
+
 /// What a participant is, and how it perceives and is run (the orchestrator reads the controller).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -676,13 +683,14 @@ pub struct ParticipantCfg {
     pub owner: Option<Id>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// Personal channels (persons only): what it perceives of its own life.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub channels: Vec<Channel>,
+    /// Personal channels (persons only): what it perceives of its own life. (Shared, as its controller and framing
+    /// are: the state's participant holds the same ones, not copies.)
+    #[serde(default, skip_serializing_if = "no_channels")]
+    pub channels: Arc<Vec<Channel>>,
     /// Opaque to the kernel.
-    pub controller: Value,
+    pub controller: Arc<Value>,
     /// Opaque to the kernel.
-    pub framing: Value,
+    pub framing: Arc<Value>,
     /// What happens after an opt-out: absent or "vacant" means it never acts again (and its positions
     /// fall vacant); a code stand-in means it carries on (the orchestrator runs the stand-in).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -946,19 +954,23 @@ pub struct Caps {
 /// embedded in the log header; `hash` is its config hash.
 #[derive(Debug, Clone)]
 pub struct LoadedConfig {
-    pub config: Config,
-    pub canonical: Value,
+    /// (Shared with the world made from it, which keeps it for the run.)
+    pub config: Arc<Config>,
+    /// The config as it was given, in canonical JSON: what its hash is of, and what the log's header carries.
+    pub canonical: Vec<u8>,
     pub hash: String,
 }
 
 pub fn load(v: Value) -> Result<LoadedConfig, String> {
     canon::check_integers(&v).map_err(|e| e.to_string())?;
     crate::contracts::check(&crate::contracts::contracts().config, &v).map_err(|e| format!("config {e}"))?;
-    // (Read from the value where it is: a large world's config isn't copied to be read.)
-    let config = Config::deserialize(&v).map_err(|e| format!("config does not match contract: {e}"))?;
+    let canonical = canon::canonical_value(&v).map_err(|e| e.to_string())?;
+    // (Read out of the value, which is given up as it's read: a large world's config is held once, not as its JSON
+    // too. Its canonical bytes are all that's kept of how it was given.)
+    let config = Config::deserialize(v).map_err(|e| format!("config does not match contract: {e}"))?;
     validate(&config)?;
-    let hash = canon::hash_with_domain(canon::DOMAIN_CONFIG, &canon::canonical_value(&v).map_err(|e| e.to_string())?);
-    Ok(LoadedConfig { config, canonical: v, hash })
+    let hash = canon::hash_with_domain(canon::DOMAIN_CONFIG, &canonical);
+    Ok(LoadedConfig { config: Arc::new(config), canonical, hash })
 }
 
 /// Places form one tree over the ground: ids unique, one root, each other place within an existing parent (no cycles)
@@ -1358,7 +1370,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
 
     let entities: BTreeMap<&str, &EntityCfg> = w.entities.iter().map(|e| (e.id.as_str(), e)).collect();
     let participants: BTreeMap<&str, &ParticipantCfg> = c.participants.iter().map(|p| (p.id.as_str(), p)).collect();
-    let records: BTreeMap<&str, &Record> = w.records.iter().map(|r| (r.id.as_str(), r)).collect();
+    let records: BTreeMap<&str, &Record> = w.records.iter().map(|r| (r.id.as_str(), &**r)).collect();
     let entity = |id: &str| entities.get(id).copied().ok_or_else(|| format!("unknown entity {id:?}"));
     let detailed = detailed_rects(&w.places);
     let cell_exists = |id: &str| cell_xy(id).is_some_and(|(x, y)| cell_in(&detailed, x, y));

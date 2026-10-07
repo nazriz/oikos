@@ -348,10 +348,11 @@ pub enum ParticipantStatus {
 pub struct ParticipantDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub channels: Vec<Channel>,
-    pub controller: Value,
-    pub framing: Value,
+    /// (Its channels, controller and framing are shared with the config they came from.)
+    #[serde(default, skip_serializing_if = "crate::config::no_channels")]
+    pub channels: Arc<Vec<Channel>>,
+    pub controller: Arc<Value>,
+    pub framing: Arc<Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_opt_out: Option<Value>,
     /// A system's lanes (acts at once); absent: one.
@@ -615,6 +616,11 @@ impl State {
 
     /// Store a record, giving it the next sequence number.
     pub fn store(&mut self, record: Record) {
+        self.store_shared(Arc::new(record));
+    }
+
+    /// `store`, for a record held elsewhere too (the config's, at the start): the same one is kept, not a copy.
+    pub fn store_shared(&mut self, record: Arc<Record>) {
         match &record.body {
             crate::blocks::RecordBody::Agreement { terms } => {
                 for p in &terms.parties {
@@ -634,7 +640,7 @@ impl State {
         self.counters.record_seq += 1;
         let seq = self.counters.record_seq;
         self.record_order.push_back(record.id.clone());
-        self.records.insert(record.id.clone(), Stored { seq, record: Arc::new(record) });
+        self.records.insert(record.id.clone(), Stored { seq, record });
     }
 
     /// The quantity of a kind held by an entity at a place (0 if none).

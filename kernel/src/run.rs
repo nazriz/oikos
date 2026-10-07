@@ -115,8 +115,8 @@ impl<W: Write> Run<W> {
         }
         let loaded = config::load(config).map_err(RunError::Config)?;
         let kernel = Kernel::new(&loaded).map_err(RunError::Config)?;
-        // (The header is made without its config, which is then put in where it stands: a large world's config is
-        // written to the log from the one copy there is.)
+        // (The header is made without its config, whose canonical bytes are then written where it stands: a large
+        // world's config goes to the log from the bytes its hash was taken of, and is held as JSON nowhere.)
         let header = Header {
             contracts: CONTRACTS_VERSION.into(),
             kernel: identity,
@@ -126,11 +126,13 @@ impl<W: Write> Run<W> {
             initial_state_hash: kernel.state_hash().map_err(|e| RunError::Config(e.to_string()))?,
             canary: loaded.config.meta.canary.clone(),
         };
-        let mut body = serde_json::to_value(&header).expect("header serializes");
+        let body = serde_json::to_value(&header).expect("header serializes");
+        let Value::Object(members) = &body else { unreachable!("a header is an object") };
         let (anchor_every, checkpoint_every) = (loaded.config.log.anchor_every_entries, loaded.config.log.checkpoint_every);
-        body["config"] = loaded.canonical;
+        let mut bytes = Vec::with_capacity(loaded.canonical.len() + 512);
+        canon::write_object(members, &mut bytes, |key, x, out| if key == "config" { out.extend_from_slice(&loaded.canonical) } else { canon::write_value(x, out) });
         let mut log = LogWriter::new(out, anchors, anchor_every);
-        log.append(0, Kind::Header, body)?;
+        log.append_canonical(0, Kind::Header, &bytes)?;
         Ok(Run { checkpoint_every, kernel, log, ended: false, observed: None })
     }
 

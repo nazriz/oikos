@@ -5,5 +5,6 @@
 #![deny(clippy::float_arithmetic, clippy::float_cmp)]
 
 pub mod canon;
+mod canon_ser;
 pub mod money;
 pub mod rng;
