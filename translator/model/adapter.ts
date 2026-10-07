@@ -5,6 +5,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { join, resolve } from "node:path";
 import type { LlmAdapter, LlmRequest, LlmResponse } from "@oikos/participants/llm";
+import { calls } from "@oikos/participants";
 import { decode, inputOf } from "./encode";
 import { pieces } from "./export";
 
@@ -35,6 +36,65 @@ export function programOf(input: string, ps: { at: [number, number] }[], steps: 
   }
 }
 
+/** A form as it is shown (`- name, to=office, id record: fields a (text, required), b (one of x | y), …`): its
+ * fields, which must be filled in, and which take one of a few values. */
+export function formsShown(forms: string[]): Map<string, { fields: Set<string>; required: string[]; oneOf: Map<string, string[]> }> {
+  const out = new Map<string, { fields: Set<string>; required: string[]; oneOf: Map<string, string[]> }>();
+  for (const line of forms) {
+    const m = /^- ([^,]+), .*?: fields (.*)$/.exec(line);
+    if (!m) continue;
+    const f = { fields: new Set<string>(), required: [] as string[], oneOf: new Map<string, string[]>() };
+    for (const x of m[2]!.matchAll(/([^\s,()]+) \(([^)]*)\)/g)) {
+      f.fields.add(x[1]!);
+      if (/(^|, )required$/.test(x[2]!)) f.required.push(x[1]!);
+      const one = /^one of (.*?)(, required)?$/.exec(x[2]!);
+      if (one) f.oneOf.set(x[1]!, one[1]!.split(" | "));
+    }
+    out.set(m[1]!, f);
+  }
+  return out;
+}
+
+/** What is wrong with a program's forms as against the forms shown, if anything: `unknown_form` where one is none of
+ * them by name (the refusal the call language has for that); `unclear` where one fills in a field that isn't its own,
+ * leaves a required field out, or gives a field that takes one of a few values something else. Only what the forms'
+ * own lines say: a draft that fails could not be handed in, so nothing is lost by not offering it. (A program with
+ * no form, or with no forms shown to check against, has nothing wrong.) */
+export function formsMisfit(program: string, forms: string[]): "unknown_form" | "unclear" | undefined {
+  if (!program.includes("form(")) return undefined;
+  const shownForms = formsShown(forms);
+  if (!shownForms.size) return undefined;
+  let p: calls.Program;
+  try {
+    p = calls.parseProgram(program);
+  } catch {
+    return "unclear";
+  }
+  if ("none" in p) return undefined;
+  const said = (v: calls.Value | undefined) => (v && "id" in v ? v.id : v && "text" in v ? v.text : undefined);
+  const wrong = (c: calls.Call): "unknown_form" | "unclear" | undefined => {
+    for (const v of Object.values(c.args)) {
+      const inner = "call" in v ? wrong(v.call) : undefined;
+      if (inner) return inner;
+    }
+    if (c.fn !== "form") return undefined;
+    const f = shownForms.get(said(c.args.form) ?? "");
+    if (!f) return "unknown_form";
+    for (const [k, v] of Object.entries(c.args)) {
+      if (k === "form" || k === "to") continue;
+      if (!f.fields.has(k)) return "unclear";
+      const one = f.oneOf.get(k);
+      if (one && !one.includes(said(v) ?? "")) return "unclear";
+    }
+    return f.required.every((k) => k in c.args) ? undefined : "unclear";
+  };
+  for (const l of p.lines) {
+    const w = wrong(l.call);
+    if (w) return w;
+  }
+  return undefined;
+}
+
 export class DecideAdapter implements LlmAdapter {
   provider = "decide";
   private proc?: ChildProcess;
@@ -43,7 +103,7 @@ export class DecideAdapter implements LlmAdapter {
   private queue: Promise<unknown> = Promise.resolve();
   /** Each answer's sureness and time, in the order asked (for whoever measures). */
   answers: { sure: number; ms: number; program: string }[] = [];
-  constructor(public model: string, private o: { dir?: string; threshold?: number } = {}) {}
+  constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean } = {}) {}
 
   private start(): void {
     const dir = this.o.dir ?? join(process.env.OIKOS_TRANSLATOR_MODELS ?? resolve(HERE, "../../runs/translator-model"), this.model);
@@ -88,6 +148,9 @@ export class DecideAdapter implements LlmAdapter {
     const a = await this.ask({ pieces: ps.map((p) => p.text), breaks, at: ps.map((p) => p.at) });
     let program = programOf(input, ps, a.steps);
     if (a.sure < (this.o.threshold ?? 0)) program = "none(unclear)";
+    // (A form that can't be one of the forms shown is not offered, however sure the model is.)
+    const misfit = this.o.unchecked ? undefined : formsMisfit(program, forms);
+    if (misfit) program = `none(${misfit})`;
     this.answers.push({ sure: a.sure, ms: a.ms, program });
     return { program, sure: a.sure, ms: a.ms };
   }

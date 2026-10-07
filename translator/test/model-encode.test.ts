@@ -1,7 +1,7 @@
 // A program as decisions and copies (translator/model/encode.ts): every kind of value comes back exactly.
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
-import { programOf, shown } from "../model/adapter";
+import { formsMisfit, formsShown, programOf, shown } from "../model/adapter";
 import { asWord, decode, encode, vocabulary, type Span } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
 
@@ -94,4 +94,26 @@ test("a call's arguments are written in the order the request says them, what it
   const e = encode({ request, forms: [], program: 'money(amount="$5", from=acc-mine, to=c0412)', spans });
   expect(e.steps).toEqual(["fn:money", "arg:from", "const:acc-mine", "arg:to", ["id", 4, 9], "arg:amount", ["text", 10, 12], ")", "eos"]);
   expect(decode(e.input, e.steps)).toBe('money(amount="$5", from=acc-mine, to=c0412)');
+});
+
+test("a form that can't be one of the forms shown is not offered: none of them by name is an unknown form; a field not its own, a required one left out or a value it can't take is unclear", () => {
+  const forms = [
+    "- council_proposal, to=city, id form-council-proposal: fields affects (one of tenants | development | neither), kind (one of law | budget | other, required), parks (amount), proposal (text, required)",
+    "- amend_tenancy, to=city, id form-amend-tenancy: fields affects (one of tenants | development | neither), notice (duration), tenant_notice (duration)",
+  ];
+  const f = formsShown(forms).get("council_proposal")!;
+  expect([...f.fields]).toEqual(["affects", "kind", "parks", "proposal"]);
+  expect(f.required).toEqual(["kind", "proposal"]);
+  expect(f.oneOf.get("kind")).toEqual(["law", "budget", "other"]);
+  expect(formsMisfit('form(form=council_proposal, kind=law, affects=tenants, proposal="A rule.")', forms)).toBeUndefined();
+  expect(formsMisfit('form(form=amend_tenancy, to=city, notice="90 days")', forms)).toBeUndefined();
+  expect(formsMisfit('form(form=notice, notice="60 days")', forms)).toBe("unknown_form");
+  expect(formsMisfit('form(form=council_proposal, kind=law)', forms)).toBe("unclear"); // the proposal's text is required
+  expect(formsMisfit('form(form=council_proposal, kind=tenants, proposal="A rule.")', forms)).toBe("unclear"); // not one of its kinds
+  expect(formsMisfit('form(form=amend_tenancy, staff="$5")', forms)).toBe("unclear"); // no field of this form
+  expect(formsMisfit('form(form=council_proposal, kind=law, proposal="A rule.")\nmessage(to=council-clerk, text="put it to a ballot")', forms)).toBeUndefined();
+  // Nothing to check against, or nothing to check: passes.
+  expect(formsMisfit('form(form=anything, x="1")', [])).toBeUndefined();
+  expect(formsMisfit('money(amount="$5", to=c0412)', forms)).toBeUndefined();
+  expect(formsMisfit("none(unknown_form)", forms)).toBeUndefined();
 });

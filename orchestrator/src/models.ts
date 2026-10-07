@@ -49,7 +49,7 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "codex" ? new CodexCliAdapter(model) // ("model@effort": the effort is part of the model's name, so the log records it)
     : provider === "claude-code" ? new ClaudeCodeAdapter(model) // ("model@effort", as for codex)
-    : provider === "decide" ? new DecideAdapter(model, env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}) // our own trained model (translator/model)
+    : provider === "decide" ? new DecideAdapter(model, { ...(env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}), ...(env.OIKOS_DECIDE_UNCHECKED ? { unchecked: true } : {}) }) // our own trained model (translator/model)
     : provider === "ollama" ? new OpenAICompatibleAdapter("ollama", model, { baseUrl: o.baseUrl ?? "http://localhost:11434/v1" })
     : provider === "local" ? new OpenAICompatibleAdapter("local", model, { baseUrl: o.baseUrl ?? (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })() })
     : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, codex, claude-code, ollama or local`); })();
