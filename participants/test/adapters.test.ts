@@ -252,6 +252,10 @@ test("Claude Code: one `claude -p` per call with our system prompt in place of i
     { type: "tool_use", id: "claude-code-2", name: "do", input: { what: "Tell the clerk." } },
   ]);
   expect(r.usage).toEqual({ input_tokens: 4, output_tokens: 300, cache_read_tokens: 2900, cache_write_tokens: 120, reported_cost_microusd: 10000 });
+  // The model's own tool-use markup instead of the object: the same uses, read as it meant them (pilot 10: one answer in nine).
+  const markup = '\n<invoke name="look">\n<parameter name="report">finance/who</parameter>\n<parameter name="named">["c0003"]</parameter>\n<parameter name="limit">15</parameter>\n</invoke>\n<invoke name="write">\n<parameter name="to">["bank"]</parameter>\n<parameter name="text">Who instructed it?\nPlease say.</parameter>\n</invoke>\n<invoke name="x">\n</invoke>';
+  expect(answerOf(markup, ["look", "write", "do"])).toEqual({ tool: "look", input_json: '{"report":"finance/who","named":["c0003"],"limit":15}', also: [{ tool: "write", input_json: '{"to":["bank"],"text":"Who instructed it?\\nPlease say."}' }] });
+  expect(answerOf('<invoke name="x">\n</invoke>', ["look"])).toBeUndefined();
   // An answer naming a tool that isn't one is no answer; with no tools, the words are.
   expect(answerOf('{"tool":"pay","input_json":"{}"}', ["do"])).toBeUndefined();
   expect(answerOf("Plain words.", [])).toEqual({ text: "Plain words." });

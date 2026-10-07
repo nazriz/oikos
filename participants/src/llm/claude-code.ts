@@ -62,10 +62,38 @@ export function claudeCodeSystem(req: LlmRequest): string {
 export function answerOf(said: string, tools: string[]): { tool?: string; input_json?: string; also?: { tool?: string; input_json?: string }[]; text?: string } | undefined {
   if (!tools.length) return { text: said.slice(0, 4000) };
   const o: any = leadingObject(said.trim().replace(/^```(?:json)?\s*/i, ""));
-  if (!o || typeof o.tool !== "string" || !tools.includes(o.tool)) return undefined;
+  if (!o || typeof o.tool !== "string" || !tools.includes(o.tool)) return invoked(said, tools);
   const input = (v: unknown) => (typeof v === "string" ? v : JSON.stringify(v ?? {}));
   const also = Array.isArray(o.also) ? o.also.filter((u: any) => u && typeof u.tool === "string" && tools.includes(u.tool)).map((u: any) => ({ tool: u.tool, input_json: input(u.input_json) })) : [];
   return { tool: o.tool, input_json: input(o.input_json), also, ...(typeof o.text === "string" && o.text ? { text: o.text } : {}) };
+}
+
+/** An answer written as the model's own tool-use markup (`<invoke name="look"><parameter name="report">…</parameter>
+ * </invoke>`, one after another) instead of the object asked for: the same uses, read as it meant them. In pilot 10 one
+ * seat answer in nine came so, and unread it ended the sitting with nothing done. A parameter's value is what stands
+ * between its tags: a list, an object, a number or true/false where it is written as one, else its text. A use of a
+ * tool that isn't one of the seat's is left out; with none left there is no answer. */
+export function invoked(said: string, tools: string[]): { tool?: string; input_json?: string; also?: { tool?: string; input_json?: string }[]; text?: string } | undefined {
+  const uses: { tool: string; input_json: string }[] = [];
+  for (const m of said.matchAll(/<invoke name="([^"]+)">([\s\S]*?)<\/invoke>/g)) {
+    if (!tools.includes(m[1]!)) continue;
+    const input: { [k: string]: unknown } = {};
+    for (const p of m[2]!.matchAll(/<parameter name="([^"]+)">([\s\S]*?)<\/parameter>/g)) {
+      const v = p[2]!;
+      let value: unknown = v;
+      if (/^\s*(?:[\[{]|-?\d+(?:\.\d+)?\s*$|true\s*$|false\s*$)/.test(v)) {
+        try {
+          value = JSON.parse(v);
+        } catch {
+          // not data after all: its text
+        }
+      }
+      input[p[1]!] = value;
+    }
+    uses.push({ tool: m[1]!, input_json: JSON.stringify(input) });
+  }
+  if (!uses.length) return undefined;
+  return { tool: uses[0]!.tool, input_json: uses[0]!.input_json, also: uses.slice(1) };
 }
 
 export class ClaudeCodeAdapter implements LlmAdapter {

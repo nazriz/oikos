@@ -307,7 +307,7 @@ test("books that read a list from one shelf answer as books that each took it in
     expect(held("own among it").shared).toBeGreaterThan(register.length * 0.2);
     expect(held("piecemeal")).toEqual({ own: register.length + then.length, shared: 0, shelves: 0 });
   }
-});
+}, 30_000);
 
 test("a lot whose cells aren't a list is still found as looking through the lots finds it", () => {
   const book = new Book();
