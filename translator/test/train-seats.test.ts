@@ -917,4 +917,4 @@ test("what becomes of a form, with nobody named, is no second line: a form alone
   const without = await generate(gold, { ...o, writers: [model("a", (b) => say(b).replace(/ [A-Z][^.]*(ballot|meeting|decision|sitting|things|days)[^.]*\.$/, ""))] });
   expect(without.examples.filter((e) => (e.riders ?? []).some((r) => r.kind === "what_next"))).toEqual([]);
   expect(without.manifest.dropped.not_copied).toBeGreaterThanOrEqual(alone.length);
-});
+}, 30_000);

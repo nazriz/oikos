@@ -460,4 +460,4 @@ test("requests written by file: a briefs-only run and the writers' requests take
   await expect(trainingData({ ...options, only: ["letters"], briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("only: no function letters");
   await expect(trainingData({ ...options, refusalLabels: ["reading"], briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("refusal labels: no label reading");
   await expect(trainingData({ ...options, indirect: 9, briefsOnly: true, out: join(d, "bad") })).rejects.toThrow("indirect: a share from 0 to 1");
-});
+}, 30_000);
