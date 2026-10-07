@@ -2279,10 +2279,9 @@ export const citizen: BehaviourModule = {
         // (Planned when a wake begins; woken because an act of ours is done, we carry on with the plan, and plan afresh
         // only once it's done: the stepper.)
         if (plannedAt !== obs.t && (obs.woke_for !== "done" || todo.length === 0)) {
-          // Papers about land of ours that we haven't read up on: the register first (the answer comes at once, with
-          // the next observation, and the plan is made knowing it).
+          // Papers about land of ours that we haven't read up on: the register, in the same look as the boards where
+          // one is made (the answer comes at once, with the next observation, and the plan is made knowing it).
           const register = registerLooks(obs.t);
-          if (register.length) return { type: "look", looks: register };
           const acc = ownBanked(obs, me);
           const usual = acc ? (householdIncome() > 0 ? Math.floor((householdIncome() * p.rent_share_bps) / 10_000) : Math.floor(acc.balance / p.savings_rent_months)) : 0;
           if (cheaperThan && (home || obs.t >= cheaperThan.until)) cheaperThan = null;
@@ -2301,7 +2300,7 @@ export const citizen: BehaviourModule = {
             leadFound.homes = [];
             leadFound.jobs = [];
             looking = "leads";
-            return { type: "look", looks };
+            return { type: "look", looks: [...register, ...looks] };
           }
           // Hunting? Look at what's on offer (the next step, at once, has the results).
           const looks: LookRequest[] = [];
@@ -2327,8 +2326,9 @@ export const citizen: BehaviourModule = {
             found.jobs = [];
             found.petitions = [];
             looking = "market";
-            return { type: "look", looks }; // the results arrive with the next observation, and are planned with
+            return { type: "look", looks: [...register, ...looks] }; // the results arrive with the next observation, and are planned with
           }
+          if (register.length) return { type: "look", looks: register };
           lookedAt = obs.t;
           looking = null;
           // (What the last wake didn't get to comes first: our state already counts on it.)

@@ -24,13 +24,15 @@ const street = (who: string[]) => [{ cell: "cell.3.4", x: 3, y: 4, structure: { 
  * and keeps every look made of it or of the boards. */
 function register(records: any[]) {
   const asked: { channel: string; query?: any }[] = [];
+  const rounds: string[][] = []; // each look made, as the channels it asked through
   const shows: { [channel: string]: (r: any) => boolean } = { lots: (r) => r.kind === "lot", titles: (r) => r.record === "claim", dealings: (r) => r.record === "claim_transfer" || r.record === "claim_release" };
   const field = (r: any, f: string) => (f === "id" ? r.id : f === "claim" ? r.claim : f.startsWith("about.") ? r.about?.[f.slice(6)] : undefined);
   return {
-    asked,
+    asked, rounds,
     of: (channel: string) => asked.filter((l) => l.channel === channel).map((l) => l.query?.where?.[0]?.value),
     looked: (looks: { channel: string; query?: any }[]) => {
       asked.push(...looks);
+      rounds.push(looks.map((l) => l.channel));
       return Object.fromEntries(looks.filter((l) => shows[l.channel]).map((l) => [l.channel,
         records.filter((r) => shows[l.channel]!(r) && (l.query?.where ?? []).every((c: any) => c.op === "=" && field(r, c.field) === c.value)).sort((a, b) => a.at - b.at).slice(0, l.query?.limit ?? 20)]));
     },
@@ -46,6 +48,8 @@ test("an owner from the start knows their title unasked, looks up the plan of it
   await p.wake(DAY, { records: [title("title-7", "c1", "lot-7")], balance: 500_000, street: street(["c1"]), in: HOME, looked: reg.looked });
   expect(reg.of("lots")).toEqual(["lot-7"]);
   expect(reg.of("titles")).toEqual([]);
+  // (One look: the plan is asked for with the glance at the boards, not in a look of its own before it.)
+  expect(reg.rounds).toEqual([["lots", "homes", "jobs", "petitions"]]);
   expect(reg.asked.find((l) => l.channel === "lots")!.query).toEqual({ where: [{ field: "id", op: "=", value: "lot-7" }], limit: 1 });
   // From then on they have a home (no hunt for one to rent), and never ask for the plan again.
   for (const day of [8, 15, 40]) {
@@ -70,7 +74,7 @@ test("a title passed to them is read in the register, with the dealings in it, b
   // The transfer arrives: the title and its dealings in one look, then the plan of the lot it names.
   from = reg.asked.length;
   await p.wake(8 * DAY, { records: [passed], balance: 500_000, street: street(["c1"]), in: HOME, looked: reg.looked });
-  expect(reg.asked.slice(from, from + 3).map((l) => [l.channel, l.query.where[0]])).toEqual([
+  expect(reg.asked.slice(from).filter((l) => ["lots", "titles", "dealings"].includes(l.channel)).map((l) => [l.channel, l.query.where[0]])).toEqual([
     ["titles", { field: "id", op: "=", value: "title-7" }], ["dealings", { field: "claim", op: "=", value: "title-7" }], ["lots", { field: "id", op: "=", value: "lot-7" }]]);
   // Theirs now: no more hunting, and nothing asked twice.
   from = reg.asked.length;
