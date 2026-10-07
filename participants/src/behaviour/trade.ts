@@ -15,7 +15,7 @@
 import * as C from "../calls";
 import type { Observation, Offer, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
-import { because, type Book, DAY, pay, say, type Step, usd } from "./common";
+import { because, type Book, DAY, Latest, pay, say, type Step, usd } from "./common";
 import { receipts } from "./firms";
 
 /** An order, as the seller reads it. */
@@ -23,10 +23,15 @@ export interface Order { id: string; seller: string; buyer: string; kind: string
   /** The days the order is for, as the buyer says (a fortnight's shopping): served over that time. */
   forDays?: number }
 
+const goodsLists = new Latest("price_list", (r) => r.data?.goods);
+/** A seller's standing offer, if its latest price list that is one makes one (a list of one kind of goods). */
+const offerLists = new Latest("price_list", (r) => r.offer);
+export const offerOf = (book: Book, seller: string) => offerLists.of(book, seller)?.offer;
+
 /** A seller's current prices for goods (its latest standing price list), the account it's paid into, the least it
  * sells in one order (a wholesaler's minimum), and where it is (a shop's premises, for collection). */
 export function goodsPrices(book: Book, seller: string): { prices: { [kind: string]: number }; account?: string; min_order?: number; at?: string } {
-  const list = book.open("price_list").filter((r) => r.speaks_for === seller && r.data?.goods).sort((a, b) => b.at - a.at)[0];
+  const list = goodsLists.of(book, seller);
   return { prices: (list?.data?.goods as { [kind: string]: number }) ?? {}, account: list?.data?.account, min_order: list?.data?.min_order, at: list?.data?.at };
 }
 
