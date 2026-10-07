@@ -68,6 +68,8 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
 
 `--model claude-code/<model> --budget DOLLARS` (for example `claude-code/claude-sonnet-5-5`, or `…@low` to name the effort) runs calls through Claude Code's non-interactive mode (`claude -p`), signed in with a Claude plan. Anthropic's support page says a paid plan has a monthly Agent SDK credit that `claude -p` draws on, in dollars at API rates, refreshed each billing cycle and not carried over; when it is spent, calls stop unless the account has usage credits switched on (https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan, read 2026-10-07). Pulling the plan's sign-in token out to call the API from our own code is not allowed; running `claude -p` is what the credit is for.
 
+**What it was seen to draw on (Naz, 2026-10-07, from his account's usage page, on a Max 5x plan):** the plan's ordinary usage, the same allowance his own Claude Code sessions use, not a separate credit. So a pilot on Claude seats competes with whoever else is using the plan, and a plan limit reached stops both. The support page's separate monthly credit was not what happened here.
+
 **Setup, once:** Claude Code installed and signed in (`claude`, then `/login`). Keep usage credits off on the account unless spending past the monthly credit is meant.
 
 **How it runs:**
