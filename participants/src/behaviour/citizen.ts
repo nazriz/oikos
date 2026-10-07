@@ -1504,7 +1504,9 @@ export const citizen: BehaviourModule = {
           // town's cheapest (everyone short going there at once overwhelms it) and not one that's failed us. If not,
           // what came back is spent on the next trip: it was meant for goods we didn't get, not saved.
           const untried = trip && trip.tried.size < p.beta ? shops.filter((x) => !trip!.tried.has(x.shop)) : [];
-          const next = untried.length ? untried.find((x) => x.shop === mind.learned("shop").choose(ctx.rng(`retry-${d.order}`), untried.map((u) => ({ key: u.shop, value: 0 })), mind.person.temperament.openness).key) : undefined;
+          // (Chosen once: the draw is this order's own, the same however often it's made, so not once per shop looked at.)
+          const chosen = untried.length ? mind.learned("shop").choose(ctx.rng(`retry-${d.order}`), untried.map((u) => ({ key: u.shop, value: 0 })), mind.person.temperament.openness).key : undefined;
+          const next = untried.find((x) => x.shop === chosen);
           const retried = !!next && buy(next, Math.min(short, Math.floor((short * (priceAt(d.seller)?.price ?? next.price)) / next.price)), `${d.seller} could serve ${d.delivered} of the ${d.ordered} we wanted: trying ${next.shop} for the rest.`, d.order);
           if (!retried && d.refund > 0) deferred += d.refund;
         }
@@ -1847,7 +1849,7 @@ export const citizen: BehaviourModule = {
     };
     const lotOf = (obs: Observation, structure: string) => {
       const cell = channels.cells(obs).find((c) => c.structure?.structure === structure)?.cell;
-      return cell ? book.open("lot").find((l) => ((l.data?.cells as string[]) ?? []).includes(cell))?.id : undefined;
+      return cell ? book.lotOver(cell)?.id : undefined;
     };
     /** Put a lot of ours with a house on it up for sale, at its valuation. */
     const sell = (obs: Observation, lot: string, leaveAfter: boolean): boolean => {

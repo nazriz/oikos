@@ -16,12 +16,193 @@ type Claim = Extract<Record, { record: "claim" }>;
 /** What a claim can be looked up by (`Book.claimsBy`): who holds it, who it's against, or what it's about. */
 export type ClaimKey = "holder" | "counterparty" | "object";
 const claimKey: { [K in ClaimKey]: (c: Claim) => unknown } = { holder: (c) => c.holder, counterparty: (c) => c.counterparty, object: (c) => (c.about as { object?: unknown } | undefined)?.object };
-/** Beyond this many values asked about under one key, a book keeps every value's claims rather than those asked for. */
-const CLAIM_VALUES_KEPT_ONE_BY_ONE = 8;
 
-/** Everything a participant has perceived so far, indexed. */
+const NONE: readonly never[] = Object.freeze([]) as readonly never[];
+/** What goes on a shelf. `least`: a list of at least this many public records, shown in one look, is put on a shelf
+ * that every book shown the same list reads from (a town's register of lots: one list, and a place in it for each
+ * reader, not a copy each); a shorter one saves little and is one more place for the book to look. `most`: a book
+ * reads from at most this many shelves, and keeps what it is shown after that itself. Nothing a book answers depends
+ * on either (a test may set them, to have shelves made of short lists). */
+export const SHELF = { least: 256, most: 8 };
+
+/**
+ * Records in the order they were seen, with what is kept so as not to look through them each time: by id, by record
+ * type, by statement kind, and (made when first asked for, and kept up from then on) claims by who holds them, who
+ * they're against and what they're about, and lots by the cells they cover. A book's own pages are these; so is a
+ * shelf, which is the same for every book that reads from it and is never added to once made.
+ */
+class Pages {
+  readonly list: Record[] = [];
+  private readonly place = new Map<string, number>(); // id -> where in `list`
+  private readonly types = new Map<string, Record[]>();
+  private readonly kinds = new Map<string, StatementRecord[]>();
+  private readonly claims: { [K in ClaimKey]?: Map<unknown, Claim[]> } = {};
+  /** cell -> the lots that cover it, in order; false: a lot's cells weren't a list, so lots are looked through one by one. */
+  private over?: Map<string, StatementRecord[]> | false;
+  /** On a shelf: the records that do something to a book that takes them in (a withdrawal, a signature, a statement
+   * that replaces another...), in order, each with the record it says it replaces if that is earlier on this shelf. */
+  readonly acts: { r: Record; replaces?: Record }[] = [];
+  /** On a shelf: the ids it has in common with another shelf (worked out once for the two). */
+  private readonly common = new WeakMap<Pages, readonly string[]>();
+
+  constructor(readonly shelf: boolean) {}
+
+  get(id: string): Record | undefined {
+    const i = this.place.get(id);
+    return i === undefined ? undefined : this.list[i];
+  }
+
+  has(id: string): boolean {
+    return this.place.has(id);
+  }
+
+  /** Where a record stands in the order (none: not here). */
+  placeOf(id: string): number | undefined {
+    return this.place.get(id);
+  }
+
+  /** One more record (not one that is here already). */
+  add(r: Record): void {
+    this.place.set(r.id, this.list.length);
+    this.list.push(r);
+    const typed = this.types.get(r.record);
+    if (typed) typed.push(r);
+    else this.types.set(r.record, [r]);
+    if (r.record === "claim") for (const key in this.claims) {
+      const by = this.claims[key as ClaimKey]!;
+      const value = claimKey[key as ClaimKey](r);
+      const list = by.get(value);
+      if (list) list.push(r);
+      else by.set(value, [r]);
+    }
+    if (r.record === "statement") {
+      const list = this.kinds.get(r.kind);
+      if (list) list.push(r);
+      else this.kinds.set(r.kind, [r]);
+      if (r.kind === "lot" && this.over !== undefined) this.lotSeen(r);
+    }
+    if (this.shelf && acts(r)) this.acts.push({ r, ...(r.record === "statement" && typeof r.data?.replaces === "string" ? { replaces: this.get(r.data.replaces) } : {}) });
+  }
+
+  /** Records of a type, in order. (Not to be changed by whoever asks: nor is any list given out here.) */
+  ofType(type: string): readonly Record[] {
+    return this.types.get(type) ?? NONE;
+  }
+
+  /** Statements of a kind, in order. */
+  ofKind(kind: string): readonly StatementRecord[] {
+    return this.kinds.get(kind) ?? NONE;
+  }
+
+  /** The claims whose holder, counterparty or object is this, in order. */
+  claimsBy(key: ClaimKey, value: unknown): readonly Claim[] {
+    let by = this.claims[key];
+    if (!by) {
+      by = this.claims[key] = new Map();
+      const of = claimKey[key];
+      for (const c of this.ofType("claim") as readonly Claim[]) {
+        const v = of(c);
+        const l = by.get(v);
+        if (l) l.push(c);
+        else by.set(v, [c]);
+      }
+    }
+    return by.get(value) ?? NONE;
+  }
+
+  private lotSeen(lot: StatementRecord): void {
+    const cells: unknown = lot.data?.cells;
+    if (cells === undefined || cells === null || this.over === false) return;
+    if (!Array.isArray(cells)) {
+      this.over = false;
+      return;
+    }
+    const over: Map<string, StatementRecord[]> = this.over ?? (this.over = new Map());
+    for (const cell of new Set(cells as string[])) {
+      const lots = over.get(cell);
+      if (lots) lots.push(lot);
+      else over.set(cell, [lot]);
+    }
+  }
+
+  /** The lots that cover a cell, in order; false: to be found by looking through the lots (`ofKind("lot")`). */
+  lotsOver(cell: string): readonly StatementRecord[] | false {
+    if (this.over === undefined) {
+      this.over = new Map();
+      for (const lot of this.ofKind("lot")) this.lotSeen(lot);
+    }
+    return this.over === false ? false : this.over.get(cell) ?? NONE;
+  }
+
+  /** The ids this shelf and another have in common. */
+  commonWith(other: Pages): readonly string[] {
+    let ids = this.common.get(other);
+    if (!ids) {
+      const [few, many] = this.list.length <= other.list.length ? [this, other] : [other, this];
+      ids = few.list.filter((r) => many.has(r.id)).map((r) => r.id);
+      this.common.set(other, ids);
+    }
+    return ids;
+  }
+}
+
+/** Does taking a record in do something to a book beyond the record being there (`Book.mark`)? */
+const acts = (r: Record): boolean =>
+  r.record === "claim_release" || r.record === "withdrawal" || r.record === "signature" || r.record === "notice" ||
+  (r.record === "statement" && (typeof r.data?.replaces === "string" || !!r.practice || !!r.assertion));
+
+/** The shelves made so far, by the record each begins with (for as long as that record is held by anyone). */
+const SHELVES = new WeakMap<Record, Pages[]>();
+
+/** Part of what a book has seen: pages of its own, or a shelf, less what the book had seen before it was shown the shelf. */
+type Part = { pages: Pages; skipped?: Set<string>; skippedRecords?: Record[] };
+
+/** A list put together from more than one part, and what it was put together from (the number of parts, and the
+ * length of the last part's list: the earlier parts don't change). */
+type Joined<T> = { parts: number; last: number; list: readonly T[] };
+
+/** The records a book has seen, by id (what `Book.records` is: read as a map is read). */
+class Seen {
+  constructor(private readonly parts: Part[]) {}
+
+  /** The record of an id, as first seen. */
+  get(id: string): Record | undefined {
+    for (const part of this.parts) {
+      const r = part.pages.get(id);
+      if (r) return r;
+    }
+    return undefined;
+  }
+
+  has(id: string): boolean {
+    for (const part of this.parts) if (part.pages.has(id)) return true;
+    return false;
+  }
+
+  get size(): number {
+    let n = 0;
+    for (const part of this.parts) n += part.pages.list.length - (part.skipped?.size ?? 0);
+    return n;
+  }
+
+  /** Every record, in the order seen. */
+  *values(): IterableIterator<Record> {
+    for (const part of this.parts) for (const r of part.pages.list) if (!part.skipped?.has(r.id)) yield r;
+  }
+}
+
+/**
+ * Everything a participant has perceived so far, indexed. What it answers depends only on what it has seen and in
+ * what order. How it is held does not show: records it was shown one by one are on its own pages; a long list shown
+ * in one look (a register) is on a shelf, the same shelf for every book shown that list, and the book keeps only what
+ * differs for it (what it had seen before, what it has seen withdrawn).
+ */
 export class Book {
-  readonly records = new Map<string, Record>();
+  /** What it has seen, in order: its own pages, and the shelves it reads from. Only the last part, if its own, is added to. */
+  private readonly parts: Part[] = [];
+  private own?: Pages; // the last part's pages, if they are its own
+  private shelves = 0;
+  readonly records = new Seen(this.parts);
   readonly withdrawn = new Set<string>();
   /** When each record seen to be withdrawn (or replaced) stopped standing. */
   readonly withdrawnAt = new Map<string, number>();
@@ -30,20 +211,15 @@ export class Book {
   readonly signatures = new Map<string, Set<string>>(); // agreement -> parties who signed
   readonly notices = new Map<string, { as: string; at: number }[]>(); // agreement -> notices
   readonly signedTimes = new Map<string, number[]>(); // agreement -> signature times
-  private readonly byKind = new Map<string, StatementRecord[]>(); // statement kind -> statements, in the order seen
-  // Kept as records arrive, so asking never rescans the whole history (docs/reliability.md, performance):
-  // statement kind -> those not withdrawn, in the order seen: for the kinds asked for so far (made from `byKind` the
-  // first time, kept up from then on). A citizen's book holds the town's whole register of lots, and seldom asks for it.
-  private readonly standing = new Map<string, Map<string, StatementRecord>>();
-  private readonly standingList = new Map<string, StatementRecord[]>(); // the same, as a list: made when asked for, dropped when the kind's standing statements change
-  /** cell -> the lots seen that cover it, in the order seen (made when first asked for, and kept up from then on);
-   * false: a lot's cells weren't a list, so lots are looked through one by one. */
-  private lotsOver?: Map<string, StatementRecord[]> | false;
-  private readonly byRecord = new Map<string, Record[]>(); // record type (agreement, claim...) -> records, in the order seen
-  /** Claims by a key's value, in the order seen, for the values asked about so far (`claimsBy`): kept up as claims
-   * arrive. `all`: for every value (once many have been asked about). A town's whole register of titles is in a
-   * citizen's book, and it asks only about its own. */
-  private readonly claimsKept: { [K in ClaimKey]?: { all: boolean; by: Map<unknown, Claim[]> } } = {};
+  // Kept so asking never rescans the whole history (docs/reliability.md, performance). Lists put together from more
+  // than one part, by statement kind and by record type: for those asked for, and again only when they have grown.
+  private readonly kindsJoined = new Map<string, Joined<StatementRecord>>();
+  private readonly typesJoined = new Map<string, Joined<Record>>();
+  /** statement kind -> how many times a statement of the kind seen was found withdrawn (none: every one seen stands). */
+  private readonly gone = new Map<string, number>();
+  /** statement kind -> those not withdrawn, in the order seen, for the kinds asked for: a list that is never changed,
+   * and what it was made from (every statement of the kind, how many there were, and `gone`). */
+  private readonly standing = new Map<string, { of: readonly StatementRecord[]; n: number; gone: number; list: readonly StatementRecord[] }>();
   /** Claims seen to be released (by a `claim_release`). */
   readonly released = new Set<string>();
   private readonly withPractice = new Map<string, StatementRecord>(); // statements carrying a practice, not withdrawn
@@ -81,50 +257,8 @@ export class Book {
     const fresh: Record[] = [];
     this.now = obs.t;
     for (const [id, r] of Object.entries(obs.readings ?? {})) this.readings.set(id, r);
-    for (const r of channels.records(obs)) {
-      if (this.records.has(r.id)) continue;
-      this.records.set(r.id, r);
-      fresh.push(r);
-      const typed = this.byRecord.get(r.record);
-      if (typed) typed.push(r);
-      else this.byRecord.set(r.record, [r]);
-      if (r.record === "claim") this.claimSeen(r);
-      if (r.record === "claim_release") this.released.add(r.claim);
-      if (r.record === "withdrawal") this.takeDown(r.withdraws, r.at);
-      // A statement that says it replaces an earlier one of the same kind from whoever it speaks for (an amended law
-      // names the law it replaces, in its words too): the earlier one no longer stands for this reader, whether or not
-      // its withdrawal is among what it's shown. (A plain repeal reaches it as the withdrawal itself: a channel that
-      // shows statements of a kind shows them being taken down by whoever they speak for.)
-      if (r.record === "statement" && typeof r.data?.replaces === "string") {
-        const old = this.records.get(r.data.replaces);
-        if (old?.record === "statement" && old.kind === r.kind && !!old.speaks_for && old.speaks_for === r.speaks_for) {
-          this.replacedBy.set(old.id, r.id);
-          this.takeDown(old.id, r.at);
-        }
-      }
-      if (r.record === "signature") {
-        const s = this.signatures.get(r.agreement) ?? new Set();
-        s.add(r.as);
-        this.signatures.set(r.agreement, s);
-        this.signedTimes.set(r.agreement, [...(this.signedTimes.get(r.agreement) ?? []), r.at]);
-      }
-      if (r.record === "statement") {
-        const list = this.byKind.get(r.kind);
-        if (list) list.push(r);
-        else this.byKind.set(r.kind, [r]);
-        if (r.kind === "lot" && this.lotsOver !== undefined) this.lotSeen(r);
-        if (!this.withdrawn.has(r.id)) {
-          const open = this.standing.get(r.kind);
-          if (open) {
-            open.set(r.id, r);
-            this.standingList.delete(r.kind);
-          }
-          if (r.practice) this.withPractice.set(r.id, r);
-          if (r.assertion) this.withAssertion.set(r.id, r);
-        }
-      }
-      if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
-    }
+    // (Channel by channel, in the order `channels.records` gives them.)
+    for (const ch of Object.values(obs.channels)) if (ch.kind === "records") this.take(ch.records, fresh);
     const dir = channels.directory(obs);
     if (dir && dir.positions !== this.lastDirectory) {
       this.lastDirectory = dir.positions;
@@ -137,11 +271,174 @@ export class Book {
     return fresh;
   }
 
+  /**
+   * A list of records as shown in one look: each one not seen before is taken in, in order. A long list is read from a
+   * shelf where it can be: the shelf made already that begins where the list does and runs as the list runs, or a new
+   * one. Either way the book has seen exactly what it would have, taking them one by one: a record it had seen before
+   * is passed over, on the shelf as in the list. (Only public records go on a shelf: what one reader alone is shown
+   * would be on no other reader's list.)
+   */
+  private take(list: readonly Record[], fresh: Record[]): void {
+    const n = list.length;
+    let i = 0;
+    while (i < n) {
+      if (n - i < SHELF.least || this.shelves >= SHELF.most) {
+        for (; i < n; i++) this.see(list[i]!, fresh);
+        break;
+      }
+      const r = list[i]!;
+      if (r.visible_to !== "public") {
+        this.see(r, fresh);
+        i++;
+        continue;
+      }
+      // The longest shelf beginning with this record that the list goes on to run the length of.
+      let fit: { pages: Pages; skipped?: Set<string>; next: number } | undefined;
+      for (const pages of SHELVES.get(r) ?? []) {
+        if (fit && pages.list.length <= fit.pages.list.length) continue;
+        const skipped = this.seenOn(pages);
+        const next = this.runs(pages, skipped, list, i);
+        if (next !== undefined) fit = { pages, skipped, next };
+      }
+      if (!fit) {
+        // None: a new shelf, of the public records from here to the first record that isn't public and is new to
+        // this book (one it has seen is passed over).
+        const pages = new Pages(true);
+        let k = i;
+        for (; k < n; k++) {
+          const b = list[k]!;
+          if (b.visible_to !== "public") {
+            if (this.records.has(b.id)) continue;
+            break;
+          }
+          if (!pages.has(b.id)) pages.add(b);
+        }
+        if (pages.list.length < SHELF.least) {
+          for (; i < k; i++) this.see(list[i]!, fresh);
+          continue;
+        }
+        const made = SHELVES.get(r);
+        if (made) made.push(pages);
+        else SHELVES.set(r, [pages]);
+        fit = { pages, skipped: this.seenOn(pages), next: k };
+      }
+      this.shelve(fit.pages, fit.skipped, fresh);
+      i = fit.next;
+    }
+  }
+
+  /** The ids on a shelf that this book has seen already (none: undefined). */
+  private seenOn(pages: Pages): Set<string> | undefined {
+    let seen: Set<string> | undefined;
+    for (const part of this.parts) {
+      if (part.pages.shelf) {
+        const common = part.pages.commonWith(pages);
+        if (common.length) for (const id of common) (seen ??= new Set()).add(id);
+      } else if (part.pages.list.length <= pages.list.length) {
+        for (const r of part.pages.list) if (pages.has(r.id)) (seen ??= new Set()).add(r.id);
+      } else for (const r of pages.list) if (part.pages.has(r.id)) (seen ??= new Set()).add(r.id);
+    }
+    return seen;
+  }
+
+  /**
+   * Does a list, from `from`, run as a shelf does for this book: the records of the list that are new to the book, in
+   * order, being the shelf's records that are new to the book, in order, to the shelf's end? Where the list has got to
+   * when the shelf ends, if so.
+   */
+  private runs(pages: Pages, skipped: Set<string> | undefined, list: readonly Record[], from: number): number | undefined {
+    const on = pages.list;
+    let i = from;
+    for (let j = 0; j < on.length; ) {
+      const s = on[j]!;
+      if (i < list.length && list[i] === s) {
+        i++;
+        j++;
+      } else if (skipped?.has(s.id)) j++; // seen before, and not in the list here
+      else if (i < list.length) {
+        // In the list and not next on the shelf: nothing to the book if it has seen it (before, or earlier in this list).
+        const b = list[i]!;
+        const at = pages.placeOf(b.id);
+        if ((at !== undefined && at < j) || this.records.has(b.id)) i++;
+        else return undefined;
+      } else return undefined;
+    }
+    return i;
+  }
+
+  /** A shelf's records taken in: as each would have been one by one, less those seen before. */
+  private shelve(pages: Pages, skipped: Set<string> | undefined, fresh: Record[]): void {
+    // (A statement on the shelf that this book saw withdrawn before it saw the statement.)
+    if (this.withdrawn.size <= pages.list.length) {
+      for (const id of this.withdrawn) {
+        const r = pages.get(id);
+        if (r?.record === "statement" && !skipped?.has(id)) this.gone.set(r.kind, (this.gone.get(r.kind) ?? 0) + 1);
+      }
+    } else for (const r of pages.list) if (r.record === "statement" && this.withdrawn.has(r.id) && !skipped?.has(r.id)) this.gone.set(r.kind, (this.gone.get(r.kind) ?? 0) + 1);
+    const before = this.parts.length;
+    this.parts.push({ pages, ...(skipped ? { skipped } : {}) });
+    this.own = undefined;
+    this.shelves++;
+    if (skipped) {
+      for (const r of pages.list) if (!skipped.has(r.id)) fresh.push(r);
+    } else for (const r of pages.list) fresh.push(r);
+    for (const act of pages.acts) {
+      if (skipped?.has(act.r.id)) continue;
+      // (What it replaces: as the book had seen it by then, before this shelf or earlier on it.)
+      let old: Record | undefined;
+      if (act.r.record === "statement" && typeof act.r.data?.replaces === "string") {
+        for (let p = 0; p < before && !old; p++) old = this.parts[p]!.pages.get(act.r.data.replaces);
+        old ??= act.replaces;
+      }
+      this.mark(act.r, old);
+    }
+  }
+
+  /** One record, taken in if it hasn't been seen before. */
+  private see(r: Record, fresh: Record[]): void {
+    if (this.records.has(r.id)) return;
+    if (!this.own) {
+      this.own = new Pages(false);
+      this.parts.push({ pages: this.own });
+    }
+    this.own.add(r);
+    fresh.push(r);
+    if (r.record === "statement" && this.withdrawn.has(r.id)) this.gone.set(r.kind, (this.gone.get(r.kind) ?? 0) + 1);
+    if (acts(r)) this.mark(r, r.record === "statement" && typeof r.data?.replaces === "string" ? this.records.get(r.data.replaces) : undefined);
+  }
+
+  /** What a record does to the book on being taken in, beyond being there. `old`: the record it says it replaces, if seen by then. */
+  private mark(r: Record, old: Record | undefined): void {
+    if (r.record === "claim_release") this.released.add(r.claim);
+    if (r.record === "withdrawal") this.takeDown(r.withdraws, r.at);
+    // A statement that says it replaces an earlier one of the same kind from whoever it speaks for (an amended law
+    // names the law it replaces, in its words too): the earlier one no longer stands for this reader, whether or not
+    // its withdrawal is among what it's shown. (A plain repeal reaches it as the withdrawal itself: a channel that
+    // shows statements of a kind shows them being taken down by whoever they speak for.)
+    if (r.record === "statement" && old?.record === "statement" && old.kind === r.kind && !!old.speaks_for && old.speaks_for === r.speaks_for) {
+      this.replacedBy.set(old.id, r.id);
+      this.takeDown(old.id, r.at);
+    }
+    if (r.record === "signature") {
+      const s = this.signatures.get(r.agreement) ?? new Set();
+      s.add(r.as);
+      this.signatures.set(r.agreement, s);
+      this.signedTimes.set(r.agreement, [...(this.signedTimes.get(r.agreement) ?? []), r.at]);
+    }
+    if (r.record === "statement" && !this.withdrawn.has(r.id)) {
+      if (r.practice) this.withPractice.set(r.id, r);
+      if (r.assertion) this.withAssertion.set(r.id, r);
+    }
+    if (r.record === "notice") this.notices.set(r.agreement, [...(this.notices.get(r.agreement) ?? []), { as: r.as, at: r.at }]);
+  }
+
   private takeDown(id: string, at: number) {
-    this.withdrawn.add(id);
+    if (!this.withdrawn.has(id)) {
+      this.withdrawn.add(id);
+      const w = this.records.get(id);
+      if (w?.record === "statement") this.gone.set(w.kind, (this.gone.get(w.kind) ?? 0) + 1);
+    }
     if (!this.withdrawnAt.has(id)) this.withdrawnAt.set(id, at);
-    const w = this.records.get(id);
-    if (w?.record === "statement" && this.standing.get(w.kind)?.delete(w.id)) this.standingList.delete(w.kind);
     this.withPractice.delete(id);
     this.withAssertion.delete(id);
   }
@@ -159,9 +456,38 @@ export class Book {
     return this.withdrawn.has(id) && !this.current(id);
   }
 
-  /** Every statement of a kind seen, withdrawn or not, in the order seen. */
-  all(kind: string): StatementRecord[] {
-    return this.byKind.get(kind) ?? [];
+  /** A list from each part, less what the part passes over, one after another: the one list where only one part has
+   * any, and otherwise a list put together when first asked for and again when the last part's has grown. */
+  private joined<T extends Record>(kept: Map<string, Joined<T>> | undefined, key: string, pick: (pages: Pages) => readonly T[], is: (r: Record) => boolean): readonly T[] {
+    const parts = this.parts;
+    if (parts.length === 0) return NONE;
+    if (parts.length === 1) return pick(parts[0]!.pages);
+    const last = pick(parts[parts.length - 1]!.pages).length;
+    const had = kept?.get(key);
+    if (had && had.parts === parts.length && had.last === last) return had.list;
+    let only: readonly T[] | undefined, several: T[] | undefined;
+    for (const part of parts) {
+      let list = pick(part.pages);
+      if (!list.length) continue;
+      if (part.skipped) {
+        const passed = (part.skippedRecords ??= [...part.skipped].map((id) => part.pages.get(id)!));
+        if (passed.some(is)) list = list.filter((r) => !part.skipped!.has(r.id));
+        if (!list.length) continue;
+      }
+      if (!only) only = list;
+      else {
+        several ??= only.slice();
+        for (const r of list) several.push(r);
+      }
+    }
+    const list = several ?? only ?? NONE;
+    kept?.set(key, { parts: parts.length, last, list });
+    return list;
+  }
+
+  /** Every statement of a kind seen, withdrawn or not, in the order seen. (Not to be changed by whoever asks.) */
+  all(kind: string): readonly StatementRecord[] {
+    return this.joined(this.kindsJoined, kind, (pages) => pages.ofKind(kind), (r) => r.record === "statement" && r.kind === kind);
   }
 
   /** Statements of a kind that are still standing (not withdrawn), in the order seen. */
@@ -170,29 +496,16 @@ export class Book {
     return this.standingOf(kind).slice();
   }
 
-  private lotSeen(lot: StatementRecord): void {
-    const cells: unknown = lot.data?.cells;
-    if (cells === undefined || cells === null || this.lotsOver === false) return;
-    if (!Array.isArray(cells)) {
-      this.lotsOver = false;
-      return;
-    }
-    const over: Map<string, StatementRecord[]> = this.lotsOver ?? (this.lotsOver = new Map());
-    for (const cell of new Set(cells as string[])) {
-      const lots = over.get(cell);
-      if (lots) lots.push(lot);
-      else over.set(cell, [lot]);
-    }
-  }
-
   /** The standing lot (a statement of kind "lot") that covers a cell: of several, the first seen. */
   lotOver(cell: string): StatementRecord | undefined {
-    if (this.lotsOver === undefined) {
-      this.lotsOver = new Map();
-      for (const lot of this.all("lot")) this.lotSeen(lot);
+    for (const part of this.parts) {
+      const lots = part.pages.lotsOver(cell);
+      // (A lot the part passes over needs no leaving out: it was seen in an earlier part, which has answered if it stands.)
+      const stands = (l: StatementRecord) => !this.withdrawn.has(l.id);
+      const lot = lots === false ? part.pages.ofKind("lot").find((l) => stands(l) && (l.data?.cells as string[] | undefined)?.includes(cell)) : lots.find(stands);
+      if (lot) return lot;
     }
-    if (this.lotsOver === false) return this.open("lot").find((l) => (l.data?.cells as string[] | undefined)?.includes(cell));
-    return this.lotsOver.get(cell)?.find((l) => !this.withdrawn.has(l.id));
+    return undefined;
   }
 
   /** Statements carrying a practice (a gathering: docs/design/ai-citizens.md 2b), still standing, in the order seen. */
@@ -205,60 +518,41 @@ export class Book {
     return [...this.withAssertion.values()];
   }
 
-  private claimSeen(c: Claim): void {
-    for (const key in this.claimsKept) {
-      const kept = this.claimsKept[key as ClaimKey]!;
-      const value = claimKey[key as ClaimKey](c);
-      const list = kept.by.get(value);
-      if (list) list.push(c);
-      else if (kept.all) kept.by.set(value, [c]);
-    }
-  }
-
   /** The claims seen whose holder, counterparty or object (what it's about) is this, in the order seen: the same as
    * looking through every claim seen, without doing so each time. (Not to be changed by whoever asks.) */
   claimsBy(key: ClaimKey, value: string): readonly Claim[] {
-    const kept = (this.claimsKept[key] ??= { all: false, by: new Map() });
-    const list = kept.by.get(value);
-    if (list || kept.all) return list ?? [];
-    const of = claimKey[key];
-    if (kept.by.size >= CLAIM_VALUES_KEPT_ONE_BY_ONE) {
-      // Asked about many: every value's claims, in one pass (those kept already are made again, the same).
-      kept.all = true;
-      kept.by.clear();
-      for (const c of this.ofType("claim")) {
-        const v = of(c);
-        const l = kept.by.get(v);
-        if (l) l.push(c);
-        else kept.by.set(v, [c]);
-      }
-      return kept.by.get(value) ?? [];
-    }
-    const found = this.ofType("claim").filter((c) => of(c) === value);
-    kept.by.set(value, found);
-    return found;
+    return this.joined<Claim>(undefined, "", (pages) => pages.claimsBy(key, value), (r) => r.record === "claim" && claimKey[key](r) === value);
   }
 
-  /** A kind's standing statements, as `open` gives them, without the copy: the same list until they change. Not to be
-   * changed (or sorted) by whoever asks. */
+  /** A kind's standing statements, as `open` gives them, without the copy: the same list until they change, and
+   * another once they have. Not to be changed (or sorted) by whoever asks. */
   standingOf(kind: string): readonly StatementRecord[] {
-    let list = this.standingList.get(kind);
-    if (!list) {
-      let open = this.standing.get(kind);
-      if (!open) {
-        open = new Map();
-        for (const r of this.all(kind)) if (!this.withdrawn.has(r.id)) open.set(r.id, r);
-        this.standing.set(kind, open);
-      }
-      list = [...open.values()];
-      this.standingList.set(kind, list);
-    }
+    const all = this.all(kind);
+    const gone = this.gone.get(kind) ?? 0;
+    const had = this.standing.get(kind);
+    if (had && had.of === all && had.n === all.length && had.gone === gone) return had.list;
+    // (Every one stands: the list of them all, where that list won't change; a copy where it is the book's own
+    // pages' list, which is added to.)
+    const list = gone ? all.filter((r) => !this.withdrawn.has(r.id)) : this.own && all === this.own.ofKind(kind) ? all.slice() : all;
+    this.standing.set(kind, { of: all, n: all.length, gone, list });
     return list;
   }
 
-  /** Records of a type (agreement, claim, notice...), in the order seen: rather than every record ever seen. */
-  ofType<T extends Record["record"]>(type: T): Extract<Record, { record: T }>[] {
-    return (this.byRecord.get(type) ?? []) as Extract<Record, { record: T }>[];
+  /** Records of a type (agreement, claim, notice...), in the order seen: rather than every record ever seen. (Not to
+   * be changed by whoever asks.) */
+  ofType<T extends Record["record"]>(type: T): readonly Extract<Record, { record: T }>[] {
+    return this.joined(this.typesJoined, type, (pages) => pages.ofType(type), (r) => r.record === type) as readonly Extract<Record, { record: T }>[];
+  }
+
+  /** How it holds what it has seen (for tests and measuring; nothing it answers depends on it): records on its own
+   * pages, and records it reads from shelves it shares. */
+  held(): { own: number; shared: number; shelves: number } {
+    let own = 0, shared = 0;
+    for (const part of this.parts) {
+      if (part.pages.shelf) shared += part.pages.list.length - (part.skipped?.size ?? 0);
+      else own += part.pages.list.length;
+    }
+    return { own, shared, shelves: this.shelves };
   }
 
   signedBy(agreement: string, party: string): boolean {
@@ -302,25 +596,39 @@ export class Book {
   }
 }
 
+const sameList = (a: readonly unknown[], b: readonly unknown[]): boolean => {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+};
+
 /**
  * For each speaker, its latest standing statement of a kind that passes a test (of several made at the same time, the
  * first seen): what sorting the kind's standing statements for that speaker, newest first, puts first. Worked out for
  * every speaker in one pass, and again only when the kind's standing statements change: a shopper comparing every
- * shop's prices doesn't look through every price list once per shop.
+ * shop's prices doesn't look through every price list once per shop. And once for the books whose standing statements
+ * are the same ones in the same order (a town's shoppers, shown the same lists): the answer is theirs in common.
  */
 export class Latest {
   private readonly kept = new WeakMap<Book, { of: readonly StatementRecord[]; by: Map<string | undefined, StatementRecord> }>();
+  /** The last few worked out, for whichever books. */
+  private readonly lately: { of: readonly StatementRecord[]; by: Map<string | undefined, StatementRecord> }[] = [];
   constructor(private readonly kind: string, private readonly test: (r: StatementRecord) => unknown) {}
 
   of(book: Book, speaker: string | undefined): StatementRecord | undefined {
     const standing = book.standingOf(this.kind);
     let kept = this.kept.get(book);
     if (kept?.of !== standing) {
-      const by = new Map<string | undefined, StatementRecord>();
-      for (const r of standing) {
-        if (!this.test(r)) continue;
-        const best = by.get(r.speaks_for);
-        if (!best || r.at > best.at) by.set(r.speaks_for, r);
+      let by = this.lately.find((x) => sameList(x.of, standing))?.by;
+      if (!by) {
+        by = new Map<string | undefined, StatementRecord>();
+        for (const r of standing) {
+          if (!this.test(r)) continue;
+          const best = by.get(r.speaks_for);
+          if (!best || r.at > best.at) by.set(r.speaks_for, r);
+        }
+        this.lately.unshift({ of: standing, by });
+        if (this.lately.length > 4) this.lately.pop();
       }
       kept = { of: standing, by };
       this.kept.set(book, kept);
