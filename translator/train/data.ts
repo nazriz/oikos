@@ -77,7 +77,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.9.0";
+export const DATA_VERSION = "0.9.1";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -1268,7 +1268,7 @@ const ROLES: { [fn: string]: { [arg: string]: string } } = {
 };
 /** How a claim's kind is said, where the request doesn't use the word for it. */
 const CLAIM_SAID: { [position: string]: string } = {
-  right: "\"has the right to\", \"is entitled to\"", liberty: "\"may\", \"is permitted to\", \"is free to\"", power: "\"has the power to\", \"is empowered to\"", immunity: "\"is immune from\", \"cannot be made to\", \"is exempt from\"",
+  right: "\"has the right to\", \"is entitled to\"", liberty: "\"may\", \"is permitted to\", \"is free to\"; or, as an office does that gives leave, say the giving of it: \"grant … the permit to\", \"approve …'s application to\", \"give … leave to\", \"license … to\" (an office that grants a permit puts that liberty on record: it is this call)", power: "\"has the power to\", \"is empowered to\"", immunity: "\"is immune from\", \"cannot be made to\", \"is exempt from\"",
 };
 
 /** A call's value as a sentence holds it: an id or a text as written, a word with spaces for underscores, a list as "a, b and c". */
