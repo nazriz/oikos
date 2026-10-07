@@ -350,3 +350,157 @@ test("a first report says each thing once: what the report of now repeats word f
   expect(first.split("## Survey of the town").length).toBe(2);
   expect(first.split("You hold a post").length).toBe(2);
 });
+
+// Fewer calls and fewer words for the same office (participant 0.8.0; pilot 10): looks kept ready for every sitting, no
+// turn when nothing came of looking into whole reports, and a notebook added to or changed in part.
+const bill = (id: string) => ({ id, record: "statement", kind: "invoice", author: "works", at: 0, text: `Invoice ${id}.`, visible_to: "public" });
+const cityBooks = (balance = 500) => ({ kind: "accounts", accounts: [{ account: "acc-city", holder: "city", custodian: "bank", balance }], transactions: [] });
+/** A report after a look at "mayor/files": what was found there (nothing, if none), beside the town's books. */
+const looked = (t: number, found: object[], more: object = {}, balance = 500) => ({ ...obs(t), channels: { "mayor/files": { kind: "records", records: found, search: true }, "mayor/books": cityBooks(balance) }, ...more }) as unknown as Observation;
+const books = (t: number) => withChannels(t, { "mayor/books": cityBooks() });
+const office = { ...seat, sessions: { start: 9 * HOUR, end: 17 * HOUR, days: 7 } };
+
+test("a look kept ready for every sitting is looked up as each sitting opens, with no turn taken, and set out with the report; until it says no longer", async () => {
+  const { p, calls, notes } = harness([
+    [use("a", "look", { report: "mayor/files", current_only: true, each_sitting: true })],
+    [use("d", "done_for_now", { days: 1 })],
+    [use("b", "look", { report: "mayor/files", each_sitting: false }), use("w", "write", { to: ["clerk"], text: "Paid.", as: "mayor" })],
+    [use("d2", "done_for_now", { days: 1 })],
+    [use("d3", "done_for_now", { days: 1 })],
+  ], office);
+  const theLook = { type: "look", looks: [{ channel: "mayor/files", query: { standing: true, limit: 20 } }] };
+  // It asks once: the look is made now, and it's told it is kept.
+  expect(await p.step(books(9 * HOUR), ctx)).toEqual(theLook);
+  await p.step(looked(9 * HOUR, [bill("rec.6")]), ctx);
+  expect(resultsOf(calls[1]!).a).toContain("## The town's files: what you looked up (1 found)\n- [rec.6] invoice from works");
+  expect(resultsOf(calls[1]!).a.endsWith("\n\n(From now on this is looked up for you at the start of every sitting, and set out with your report.)")).toBe(true);
+  expect(notes.find((n) => n.look_each_sitting)).toEqual({ look_each_sitting: { asked: { report: "mayor/files", current_only: true }, kept: 1 } });
+  // The next sitting: the same look, made before it's asked anything; then one call, shown the report and what was found.
+  expect(await p.step(books(DAY + 9 * HOUR), ctx)).toEqual(theLook);
+  expect(calls.length).toBe(2);
+  expect(await p.step(looked(DAY + 9 * HOUR, [bill("rec.7")]), ctx)).toMatchObject({ type: "message", text: "Paid." });
+  expect(calls.length).toBe(3);
+  expect(calls[2]!.messages.length).toBe(1);
+  const first = shown(calls[2]!);
+  expect(first).toContain('## Looked up for you, as at every sitting: "The town\'s files" (mayor/files), what\'s current\n## The town\'s files: what you looked up (1 found)\n- [rec.7] invoice from works');
+  // What the opening report and the look's both say is said once.
+  expect(first.split("## Mayor: Books").length).toBe(2);
+  expect(first.split("You hold a post").length).toBe(2);
+  // (A mock's code brain reads the observations themselves: the one the sitting opened on is among them.)
+  expect(calls[2]!.context.missed.map((o: any) => o.t)).toEqual([DAY + 9 * HOUR]);
+  // It says no longer (naming only the report): nothing is looked up for that, and it's told.
+  await p.step(obs(DAY + 9 * HOUR + 60), ctx);
+  expect(resultsOf(calls[3]!).b).toBe('No longer looked up for you at each sitting: "The town\'s files" (mayor/files), what\'s current.');
+  // The sitting after: no look before the call.
+  await p.step(books(2 * DAY + 9 * HOUR), ctx);
+  expect(calls.length).toBe(5);
+  expect(shown(calls[4]!)).not.toContain("Looked up for you");
+  // Nothing it reads names the machinery.
+  for (const c of calls) for (const machinery of ["kernel", "translator", "resolver", "block", "channel", "refusal", "provenance", "variable", "query", "token", "cache", "simulat"]) expect(`${JSON.stringify(c.messages)}\n${JSON.stringify(c.tools)}`.toLowerCase()).not.toContain(machinery);
+});
+
+test("looks kept ready: at most six; one it makes two sittings running is said to be one it could keep; a failed call at an opening loses nothing looked up", async () => {
+  const many = Array.from({ length: 7 }, (_, k) => use(`l${k}`, "look", { report: "mayor/files", find: [{ field: "kind", value: `kind-${k}` }], each_sitting: true }));
+  const a = harness([many, [use("d", "done_for_now", { days: 1 })]], office);
+  await a.p.step(books(9 * HOUR), ctx);
+  for (let k = 1; k <= 7; k++) await a.p.step(looked(9 * HOUR, []), ctx);
+  expect(resultsOf(a.calls[1]!).l5).toContain("(From now on this is looked up for you");
+  expect(resultsOf(a.calls[1]!).l6).toContain("(Not kept for every sitting: 6 are looked up for you at each already. Have one of them no longer looked up first.)");
+  // The same look at two sittings running, not kept: it's told it could be.
+  const b = harness([[use("a", "look", { report: "mayor/files", find: [{ field: "from", value: "bank" }] })], [use("d", "done_for_now", { days: 1 })], [use("a2", "look", { report: "mayor/files", find: [{ field: "from", value: "bank" }] })]], office);
+  await b.p.step(books(9 * HOUR), ctx);
+  await b.p.step(looked(9 * HOUR, [bill("rec.1")]), ctx);
+  expect(resultsOf(b.calls[1]!).a).not.toContain("each_sitting");
+  await b.p.step(books(DAY + 9 * HOUR), ctx);
+  await b.p.step(looked(DAY + 9 * HOUR, [bill("rec.1")]), ctx);
+  expect(resultsOf(b.calls[3]!).a2).toContain("(You looked this up at your last sitting too. It can be set out for you at the start of every sitting without your asking: look at it with each_sitting.)");
+  // The call at an opening fails: what was looked up for it is shown by the call that goes through, with the report.
+  const f = harness([[use("a", "look", { report: "mayor/files", each_sitting: true })], [use("d", "done_for_now", { days: 1 })], "fail", [use("d2", "done_for_now", { days: 1 })]], office);
+  await f.p.step(books(9 * HOUR), ctx);
+  await f.p.step(looked(9 * HOUR, [bill("rec.1")]), ctx);
+  await f.p.step(books(DAY + 9 * HOUR), ctx);
+  await expect(f.p.step(looked(DAY + 9 * HOUR, [bill("rec.2")]), ctx)).rejects.toThrow("no answer within 180 s");
+  expect(await f.p.step(books(DAY + 10 * HOUR), ctx)).toMatchObject({ type: "look" });
+  await f.p.step(looked(DAY + 10 * HOUR, [bill("rec.3")]), ctx);
+  expect(f.calls.length).toBe(4);
+  expect(shown(f.calls[3]!)).toContain("Invoice rec.2.");
+  expect(shown(f.calls[3]!)).toContain("Invoice rec.3.");
+});
+
+test("nothing came of looking into whole reports: no turn is taken to say so; the sitting ends, it's back as it last arranged, and told at its next", async () => {
+  const { p, calls, notes } = harness([
+    [use("d", "done_for_now", { days: 3 })],
+    [use("a", "look", { report: "mayor/files", current_only: true }), use("n", "notebook", { add: "Looked on day 4." })],
+    [use("d2", "done_for_now", {})],
+  ], office);
+  expect(await p.step(books(9 * HOUR), ctx)).toEqual({ type: "wait", until: DAY + 9 * HOUR });
+  await p.step(books(3 * DAY + 9 * HOUR), ctx);
+  // The look finds nothing, and nothing else has come: no call. Back after three days, as it last gave.
+  expect(await p.step(looked(3 * DAY + 9 * HOUR, []), ctx)).toEqual({ type: "wait", until: 4 * DAY + 9 * HOUR });
+  expect(calls.length).toBe(2);
+  expect(notes.find((n) => n.no_turn)).toEqual({ no_turn: { looks_that_found_nothing: 1, back_after_days: 3 } });
+  expect(await p.step(books(4 * DAY + 9 * HOUR), ctx)).toEqual({ type: "wait", until: 6 * DAY + 9 * HOUR });
+  expect(calls.length).toBe(2);
+  // At its next sitting: that the sitting ended there, what the look showed, and its notebook as it left it.
+  await p.step(books(6 * DAY + 9 * HOUR), ctx);
+  const next = shown(calls[2]!);
+  expect(next).toContain("When you were last here, there was nothing in what you looked into, so the sitting ended there.");
+  expect(next).toContain("## The town's files: what you looked up (0 found)\nNothing found.");
+  expect(next).toContain("Your notebook: Looked on day 4.\n(16 of the 4000 characters it holds are used.)");
+
+  // A turn follows whenever something came of it: something found; a letter in; money moved; something to find named
+  // (that nothing was found answers a question); another act beside the look.
+  const turn = async (first: ContentBlock[], result: Observation) => {
+    const h = harness([first], office);
+    await h.p.step(books(9 * HOUR), ctx);
+    for (const u of first.slice(1)) if (u.type === "tool_use" && u.name !== "notebook") await h.p.step(books(9 * HOUR), ctx);
+    await h.p.step(result, ctx);
+    return h.calls.length;
+  };
+  const whole = use("a", "look", { report: "mayor/files" });
+  expect(await turn([whole], looked(9 * HOUR, []))).toBe(1);
+  expect(await turn([whole], looked(9 * HOUR, [bill("rec.9")]))).toBe(2);
+  expect(await turn([whole], looked(9 * HOUR, [], { inbox: [{ from: "clerk", t: 0, text: "A word." }] }))).toBe(2);
+  expect(await turn([whole], looked(9 * HOUR, [], {}, 400))).toBe(2);
+  expect(await turn([use("a", "look", { report: "mayor/files", find: [{ field: "from", value: "bank" }] })], looked(9 * HOUR, []))).toBe(2);
+  expect(await turn([use("w", "write", { to: ["clerk"], text: "Anything in?", as: "mayor" }), whole], looked(9 * HOUR, []))).toBe(2);
+});
+
+test("the notebook is added to, or changed where a passage stands, without writing it all out; what wouldn't fit isn't put in, and it's told", async () => {
+  const { editNotebook } = await import("../src/llm/participant");
+  expect(editNotebook("", { add: "Day 1: nothing owing." })).toMatchObject({ text: "Day 1: nothing owing.", problems: [] });
+  expect(editNotebook("Day 1: nothing owing.", { add: "Day 2: one invoice." }).text).toBe("Day 1: nothing owing.\nDay 2: one invoice.");
+  // A passage changed, and one struck out; then the addition: in that order, whatever order they were written in.
+  expect(editNotebook("Waiting on the bank. Budget: none yet.", { add: "Asked again.", change: [{ from: "none yet", to: "adopted day 9" }, { from: "Waiting on the bank. ", to: "" }] }).text).toBe("Budget: adopted day 9.\nAsked again.");
+  // Written afresh, as before: everything is replaced (and then added to, if that's asked too).
+  expect(editNotebook("Old.", { text: "New.", add: "And this." }).text).toBe("New.\nAnd this.");
+  // A passage that isn't there, or is there twice: not changed, and said; the rest of the use is done.
+  const e = editNotebook("Paid the works. Paid the works twice.", { change: [{ from: "Paid the clerk", to: "x" }, { from: "Paid the works", to: "x" }, { from: "twice", to: "once" }, { to: "nothing" }] });
+  expect(e.text).toBe("Paid the works. Paid the works once.");
+  expect(e.problems).toEqual(['it doesn\'t say "Paid the clerk" (a passage to change is given word for word)', 'it says "Paid the works" more than once (give more of the passage)', "a change couldn't be read (it gives a passage as it stands, and what it should say instead)"]);
+  // The limit: nothing is put in that doesn't fit, and nothing is cut to make room.
+  const full = "a".repeat(3990);
+  const over = editNotebook(full, { add: "0123456789 and more" });
+  expect(over.text).toBe(full);
+  expect(over.problems).toEqual(['there wasn\'t room to add "0123456789 and more": it holds 4000 characters and has 3990, so 9 are free (strike something out, or write it afresh, shorter)']);
+  expect(editNotebook(full, { add: "123456789" }).text.length).toBe(4000);
+  expect(editNotebook(`${full}bbbbbbbbbb`, { change: [{ from: "bbbbbbbbbb", to: "ccccccccccc" }] }).problems).toEqual(['changing "bbbbbbbbbb" would make it 4001 characters, and it holds 4000']);
+  expect(editNotebook("Kept.", {}).read).toBe(false);
+
+  // Through a sitting: said in the same sitting if a turn follows, and it's recorded; the notebook it's shown next is as left.
+  const { p, calls, notes } = harness([
+    [use("n", "notebook", { text: full }), use("w", "write", { to: ["clerk"], text: "Hello.", as: "mayor" })],
+    [use("n2", "notebook", { add: "0123456789 and more" }), use("n3", "notebook", { change: [{ from: "aaaaaaaaaa", to: "b" }] }), use("n4", "notebook", { change: [{ from: full, to: "Short." }], add: "Day 2." }), use("w2", "write", { to: ["clerk"], text: "Again.", as: "mayor" })],
+    [use("d", "done_for_now", {})],
+  ]);
+  await p.step(obs(9 * HOUR), ctx);
+  await p.step(obs(9 * HOUR + 60), ctx);
+  await p.step(obs(9 * HOUR + 120), ctx);
+  const r = resultsOf(calls[2]!);
+  expect(r.n2).toBe('Notebook not updated: there wasn\'t room to add "0123456789 and more": it holds 4000 characters and has 3990, so 9 are free (strike something out, or write it afresh, shorter). It still says what it said before.');
+  expect(r.n3).toContain("Notebook not updated: it says \"aaaaaaaaaa\" more than once");
+  expect(r.n4).toBe("Notebook updated.");
+  expect(notes.filter((n) => n.notebook_not_changed).length).toBe(2);
+  await p.step(obs(8 * DAY), ctx);
+  expect(shown(calls[3]!)).toContain("Your notebook: Short.\nDay 2.\n(13 of the 4000 characters it holds are used.)\n");
+});

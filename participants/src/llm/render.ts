@@ -389,6 +389,10 @@ export interface RenderOptions {
   looked?: Map<string, Looked>;
 }
 
+/** What a look that finds nothing says: of papers looked up, and of a report with nothing new in it. */
+export const NOTHING_FOUND = "Nothing found.";
+export const NOTHING_NEW = "Nothing new there since you last looked.";
+
 /** What's new since the participant last looked. */
 export function renderObservation(obs: Observation, o: RenderOptions = {}): string {
   whole = false;
@@ -421,7 +425,7 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
         whole = false;
       }
       const limit = asked?.limit ?? 20;
-      out.push("", `## ${title(id)}: what you looked up (${lines.length} found)`, ...(lines.length ? lines.map((l) => `- ${l}`) : ["Nothing found."]));
+      out.push("", `## ${title(id)}: what you looked up (${lines.length} found)`, ...(lines.length ? lines.map((l) => `- ${l}`) : [NOTHING_FOUND]));
       if (lines.length >= limit) out.push(`(There may be more: at most ${limit} were asked for. Ask for more at once, or say more closely what to find.)`);
       continue;
     }
@@ -442,7 +446,7 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       const fresh = ch.records.filter((r) => !onFile.has(r.id));
       if (fresh.length === 0) {
         // It looked, and there was nothing: said, not left for it to work out from a report that isn't there.
-        if (asked) out.push("", `## ${title(id)}`, "Nothing new there since you last looked.");
+        if (asked) out.push("", `## ${title(id)}`, NOTHING_NEW);
         continue;
       }
       const before = cuts;

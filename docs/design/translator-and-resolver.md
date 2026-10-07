@@ -830,7 +830,7 @@ Everything above was built as designed. Building it also settled these details.
 - **Occupancy** fills the slot only when a building has one kind of space; `count` defaults to 1.
 
 **Seats and the orchestrator:**
-- **The language seat's tools** are `do`, `confirm`, `write`, `done_for_now`, `notebook` and `opt_out`. The contract's actions (`propose`, `sign`, `message`, `wait`, `opt_out`) are underneath.
+- **The language seat's tools** are `do`, `confirm`, `write`, `done_for_now`, `notebook`, `opt_out` and, where it has reports to look into, `look` (a look can be kept ready for every sitting; the notebook can be added to or changed in part: decisions log, 2026-10-08). The contract's actions (`propose`, `sign`, `message`, `wait`, `opt_out`) are underneath.
 - **Opt-out wording** (§14): honest under the `simulation` framing ("stop taking part in this study"); under other framings, a neutral "stop, permanently". The latter is provisional until VISION §15 settles it.
 - **Reports** use channel titles, never repeat what's on file, total and tally, and tell outcomes as "Done: …" or "… couldn't be done: *reason*". The reason is a plain sentence for the refusal; the kernel's detail text (ids, cents, the grammar of acts) stays in the log. The test suite checks that no machinery word ever appears in what a seat reads.
 - **The translator's instructions** are the language's syntax, a function list generated from the contract, and examples. They contain nothing about how any world works.
