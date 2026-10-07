@@ -35,9 +35,12 @@ export const CLAUDE_CODE_LIMITED = /usage[ _-]?limit|rate[ _-]?limit|too many re
  * `timeoutMs`. Injectable for tests. */
 export type ClaudeCodeRunner = (args: string[], stdin: string, cwd: string, timeoutMs: number) => Promise<{ code: number; stdout: string; stderr: string; timedOut?: boolean }>;
 
-/** (Without ANTHROPIC_API_KEY: with one set, Claude Code would bill that key and not the plan.) */
+/** (Without ANTHROPIC_API_KEY: with one set, Claude Code would bill that key and not the plan. And without what a
+ * Claude Code session sets for the commands it runs, CLAUDECODE, CLAUDE_CODE_… and CLAUDE_EFFORT among them: a run
+ * started from inside such a session must be the run it would be from a plain terminal, with its own effort and
+ * counted as its own.) */
 export const spawnClaudeCode: ClaudeCodeRunner = (args, stdin, cwd, timeoutMs) => {
-  const { ANTHROPIC_API_KEY: _, ...env } = process.env;
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k !== "ANTHROPIC_API_KEY" && !/^CLAUDE(CODE$|_CODE_|_PID$|_EFFORT$)/.test(k)));
   return runBounded(["claude", ...args], stdin, cwd, timeoutMs, undefined, undefined, env);
 };
 
