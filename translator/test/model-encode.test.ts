@@ -84,14 +84,16 @@ test("a model's steps over pieces come to a program, and steps no program is mad
   expect(programOf(input, ps, ["fn:money", "arg:to"])).toBe("none(unclear)");
 });
 
-test("a call's arguments are written in the order the request says them, what it doesn't spell first", () => {
+test("a call's arguments are written by name, or (asked for) in the order the request says them, what it doesn't spell first", () => {
   const request = "Pay c0412 $5 for the fence.";
   const spans: Span[] = [
     { arg: "amount", value: "$5", how: "copy", at: [10, 12] },
     { arg: "to", value: "c0412", how: "copy", at: [4, 9] },
     { arg: "from", value: "acc-mine", how: "implied" },
   ];
-  const e = encode({ request, forms: [], program: 'money(amount="$5", from=acc-mine, to=c0412)', spans });
+  const byName = encode({ request, forms: [], program: 'money(amount="$5", from=acc-mine, to=c0412)', spans: spans.map((x) => ({ ...x })) }, "name");
+  expect(byName.steps).toEqual(["fn:money", "arg:amount", ["text", 10, 12], "arg:from", "const:acc-mine", "arg:to", ["id", 4, 9], ")", "eos"]);
+  const e = encode({ request, forms: [], program: 'money(amount="$5", from=acc-mine, to=c0412)', spans }, "said");
   expect(e.steps).toEqual(["fn:money", "arg:from", "const:acc-mine", "arg:to", ["id", 4, 9], "arg:amount", ["text", 10, 12], ")", "eos"]);
   expect(decode(e.input, e.steps)).toBe('money(amount="$5", from=acc-mine, to=c0412)');
 });

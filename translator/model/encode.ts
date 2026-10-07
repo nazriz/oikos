@@ -26,9 +26,11 @@ export const asWord = (s: string): string => s.trim().toLowerCase().replace(/^th
 
 export class NotEncodable extends Error {}
 
-/** The order a call's arguments are written in: as the request says them (`said`), or by name (`name`: how the
- * models before data-11 were trained; a model answers either way, the steps say which argument each is). */
-export const ORDER: "said" | "name" | "text_last" = process.env.OIKOS_ENCODE_ORDER === "name" ? "name" : process.env.OIKOS_ENCODE_ORDER === "text_last" ? "text_last" : "said";
+/** The order a call's arguments are written in: by name (`name`, the default: of the three it is the one whose models
+ * do best on what seats really write, docs/decisions.md 2026-10-08), as the request says them (`said`), or by name
+ * with long copied texts last (`text_last`). A model answers in the order it was trained in; decoding takes any. */
+export type Order = "name" | "said" | "text_last";
+export const ORDER: Order = process.env.OIKOS_ENCODE_ORDER === "said" ? "said" : process.env.OIKOS_ENCODE_ORDER === "text_last" ? "text_last" : "name";
 /** A copied text this long or longer is a long one (`text_last`: by name, the long texts after everything else, so
  * that no argument waits behind a copy of several hundred characters, and which argument comes next is still known
  * by its name). */
@@ -40,7 +42,7 @@ const FORM_ARGS = new Set(["form", "to"]);
 const fixedArgs = (fn: string): Set<string> | undefined => (fn === "form" ? FORM_ARGS : calls.ARGS[fn]?.allowed);
 
 /** The steps of an example's program. Throws NotEncodable where a value is neither a span nor marked implied. */
-export function encode(e: { request: string; forms: string[]; program: string; spans?: Span[] }): Encoded {
+export function encode(e: { request: string; forms: string[]; program: string; spans?: Span[] }, order: Order = ORDER): Encoded {
   const input = inputOf(e.request, e.forms);
   const p = calls.parseProgram(e.program);
   if ("none" in p) return { input, steps: [`none:${p.none}`, "eos"] };
@@ -89,9 +91,8 @@ export function encode(e: { request: string; forms: string[]; program: string; s
     const call = (c: calls.Call, prefix: string) => {
       steps.push(`fn:${c.fn}`);
       const fixed = fixedArgs(c.fn);
-      // Each argument's steps, then the arguments in the order the request says them (ORDER): what the request
-      // doesn't spell first, by name; then each by where its value first stands. The writer then goes through the
-      // request once, and closing the call is what follows the last thing said, not a count kept by name.
+      // Each argument's steps, then the arguments in the order asked for. By name unless told otherwise; `said`:
+      // what the request doesn't spell first, by name, then each by where its value first stands.
       const parts: { name: string; from: number; long: boolean; steps: Step[] }[] = [];
       for (const k of Object.keys(c.args).sort()) {
         const before = steps.length;
@@ -108,8 +109,8 @@ export function encode(e: { request: string; forms: string[]; program: string; s
         const long = mine.some((x) => typeof x !== "string" && x[0] === "text" && x[2] - x[1] >= LONG);
         parts.push({ name: k, from: said.length ? Math.min(...said) : -1, long, steps: mine });
       }
-      if (ORDER === "said") parts.sort((a, b) => a.from - b.from || (a.name < b.name ? -1 : 1));
-      if (ORDER === "text_last") parts.sort((a, b) => Number(a.long) - Number(b.long) || (a.name < b.name ? -1 : 1));
+      if (order === "said") parts.sort((a, b) => a.from - b.from || (a.name < b.name ? -1 : 1));
+      if (order === "text_last") parts.sort((a, b) => Number(a.long) - Number(b.long) || (a.name < b.name ? -1 : 1));
       for (const part of parts) steps.push(...part.steps);
       steps.push(")");
     };
