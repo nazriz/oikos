@@ -239,6 +239,38 @@ test("the notebook, used alongside an action, carries to the next wake; every to
   expect(firsts.length).toBeGreaterThan(1);
 }, 300_000);
 
+test("a look a seat keeps ready is made as each sitting opens, by the seat itself and with no call for it; its notebook is added to", async () => {
+  let n = 0;
+  const firsts: string[] = [];
+  const adapter = new MockAdapter("mock", {
+    participant: (req: LlmRequest) => {
+      const first = req.messages[0]!;
+      if (req.messages.length === 1) firsts.push(typeof first.content === "string" ? first.content : "");
+      const k = ++n;
+      // Once: its filings, the latest five, from now on at every sitting; a note added at each sitting after.
+      if (k === 1) return [{ type: "tool_use", id: `u${k}`, name: "look", input: { report: "mayor/city-business", limit: 5, each_sitting: true } }];
+      return [...(req.messages.length === 1 ? [{ type: "tool_use" as const, id: `u${k}n`, name: "notebook", input: { add: `Sitting ${firsts.length}.` } }] : []),
+        { type: "tool_use", id: `u${k}`, name: "done_for_now", input: { days: 1 } }];
+    },
+    translator: () => [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)" } }],
+    debrief: () => [{ type: "text", text: "Thanks." }],
+  });
+  const s = await run("kept-look", town(), 5 * DAY, { adapter });
+  const log = lines(s.logPath);
+  const looks = log.filter((e) => e.kind === "command" && e.body.command === "look" && e.body.participant === "mayor-system");
+  const calls = log.filter((e) => e.kind === "annotation" && e.body.annotation === "usage" && e.body.purpose === "participant" && e.body.subject === "mayor-system");
+  // One look when it asked, and one as each later sitting opened: each the same look, through the participant API.
+  expect(firsts.length).toBeGreaterThan(2);
+  expect(looks.length).toBe(firsts.length);
+  expect(new Set(looks.map((e) => JSON.stringify(e.body.looks))).size).toBe(1);
+  // One call a sitting after the first (which took a second, to be shown what the look found).
+  expect(calls.length).toBe(firsts.length + 1);
+  expect(firsts[0]).not.toContain("Looked up for you");
+  for (const f of firsts.slice(1)) expect(f).toContain('## Looked up for you, as at every sitting: "Correspondence and filings concerning the town" (mayor/city-business)\n## Correspondence and filings concerning the town: what you looked up (5 found)');
+  // The notebook grows by what's added.
+  expect(firsts.at(-1)).toContain(`Your notebook: ${Array.from({ length: firsts.length - 2 }, (_, k) => `Sitting ${k + 2}.`).join("\n")}\n(`);
+}, 300_000);
+
 test("after the council adopts a budget, the clerk's report says so (it sees what it publishes)", async () => {
   let calls = 0, asked = false;
   const seen: string[] = [];

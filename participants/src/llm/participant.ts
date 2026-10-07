@@ -6,6 +6,9 @@
 // Before anything it asks for takes effect, it sees exactly what will happen
 // and confirms or declines. Each wake starts from a fresh report and its own
 // notebook (the only memory it carries); within a wake the exchange continues.
+// What it looks at sitting after sitting it can have looked up before each one
+// (set out with the report it opens on); and a sitting goes on only while
+// there is something to show it.
 // It can always stop taking part (VISION §15), which is not the same as
 // stepping down from an office: that is an act in the world like any other.
 
@@ -14,9 +17,9 @@ import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
-import { renderObservation, renderStanding, type Looked } from "./render";
+import { NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.7.1"; // 0.7.1: "On file" shows only what stands (not a law withdrawn, or replaced by an amended one)
+export const LLM_PARTICIPANT_VERSION = "0.8.0"; // 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -107,6 +110,8 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
   const lookWords = [
     c.kinds ? "Look into one of your reports yourself, when you choose." : `Look at one of the reports you only read when you choose to: ${papers}.`,
     "You'll see what's there with your next report.",
+    `What you look at sitting after sitting can be set out for you at the start of each, without your asking again: look at it once with each_sitting (up to ${READY_MAX} at a time; with each_sitting false, no longer).`,
+    "If all you do is look into whole reports, and there's nothing in any of them, the sitting ends there: you're told so at your next, which comes as you last arranged.",
     ...(papers ? [`${c.kinds ? `Papers and filings: ${papers}. ` : ""}To look something up in them, say what to find: those where something matches (kind, from, on behalf of, citing, date as "year 1, day 12", or detail.<name> for one of a paper's details, e.g. detail.employer), newest first. What you look up is shown whole.`] : []),
     ...(places ? [`Buildings and ground: ${places}. Name the places to see in full as they are today (a building, a room, a piece of ground, or a kind of building); or name a measure the report gives, to see every building where it's above zero or rising, the highest first.`] : []),
     ...(people ? [`Who's who: ${people}. Name who you're looking for (an id, or a name or part of one).`] : []),
@@ -122,11 +127,16 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
     { name: "write", description: "Write to people or organisations, by id. The words go exactly as you write them.",
       input_schema: { type: "object", required: ["to", "text"], properties: { to: { type: "array", items: { type: "string" } }, text: { type: "string" }, as: AS, about: { type: "string", description: "The reference it's about (optional)." } } } },
     { name: "done_for_now", description: c.sessions
-        ? "That's all for now. You're back at your next working day's sitting, or after the given number of days (at that day's sitting); sooner, at the next sitting, if someone writes to you. You can use it alongside other actions: they're done, and you'll see how they went when you're back."
+        ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner, at the next sitting, if someone writes to you. You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
         : "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you. You can use it alongside other actions: they're done, and you're back after the days given, when you'll see how they went.",
       input_schema: { type: "object", properties: { days: { type: "integer", minimum: 1 } } } },
-    { name: "notebook", description: "Replace your notebook: the only thing you'll remember from one sitting to the next. It holds 4,000 characters. Use it alongside your actions.",
-      input_schema: { type: "object", required: ["text"], properties: { text: { type: "string", maxLength: 4000 } } } },
+    { name: "notebook", description: "Your notebook: the only thing you'll remember from one sitting to the next. It holds 4,000 characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told. Use it alongside your actions.",
+      input_schema: { type: "object", properties: {
+        add: { type: "string", description: "Words to add at the end, on a new line." },
+        change: { type: "array", maxItems: 8, description: "Passages to change, each where it stands.", items: { type: "object", required: ["from", "to"], properties: {
+          from: { type: "string", description: "The passage as it stands in your notebook, word for word (enough of it to be the only one)." },
+          to: { type: "string", description: "What it should say instead; empty to strike it out." } } } },
+        text: { type: "string", maxLength: 4000, description: "The whole notebook, written afresh: it replaces everything there." } } } },
     { name: "opt_out", description: leave, input_schema: { type: "object", required: ["statement"], properties: { statement: { type: "string" } } } },
     ...(reports.size
       ? [{ name: "look", description: lookWords,
@@ -140,7 +150,8 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
                 value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } } } : {}),
             ...(places || people ? { named: { type: "array", maxItems: 40, items: { type: "string" }, description: [places ? "Buildings and ground: the places to see in full." : "", people ? "Who's who: who to find." : ""].filter(Boolean).join(" ") } } : {}),
             ...(places ? { measure: { type: "string", description: "Buildings and ground: a measure, as the report names it; every building where it's above zero or rising is listed." } } : {}),
-            limit: { type: "integer", minimum: 1, maximum: LOOK_MAX, description: "At most this many (20 if not given)." } } } }]
+            limit: { type: "integer", minimum: 1, maximum: LOOK_MAX, description: "At most this many (20 if not given)." },
+            each_sitting: { type: "boolean", description: "true: from now on this is also looked up for you at the start of every sitting, and set out with your report. false: no longer (nothing is looked up now); with only the report named, nothing in that report is." } } } }]
       : []),
   ];
 }
@@ -151,7 +162,7 @@ export function systemPrompt(c: LlmParticipantConfig, standing: string): string 
     "",
     `You are ${c.title ?? c.participant}, acting for ${c.entityName && c.entityName !== c.entity ? `${c.entityName} (${c.entity})` : c.entity}.`,
     "To do something, say what you do in plain words, and name what you're using: the amount, the account, the lot, the people, the papers. Your reports show each thing's id in brackets or after its name. Before anything takes effect, you'll see exactly what will happen, and confirm or decline it. You can also write to people directly.",
-    `You can take several actions at once (up to ${c.maxActions ?? 8}): they're carried out in the order you give them, and you'll see how each went together, afterwards. So act on what you already know in one go; anything that depends on the result of an action (confirming a draft you haven't seen yet) waits for the next turn. Update your notebook alongside.`,
+    `You can take several actions at once (up to ${c.maxActions ?? 8}): they're carried out in the order you give them, and you'll see how each went together, afterwards. So act on what you already know in one go; anything that depends on the result of an action (confirming a draft you haven't seen yet) waits for the next turn. Keep your notebook alongside: add to it or change a passage, rather than writing it all out again.`,
     ...(c.sessions ? [`You work office hours: one sitting each working day, when you deal with everything that's come in since the last.`] : []),
     ...(standing ? ["", "On file:", standing] : []),
   ].join("\n").trim();
@@ -170,6 +181,46 @@ const quote = (s: string, max = 80) => `"${s.length > max ? `${s.slice(0, max)}�
 /** The most a notebook holds, and the most of what came in between sittings that's set out at the next. */
 export const NOTEBOOK_MAX = 4000;
 export const CARRY_MAX = 40_000;
+
+/** A notebook as one use of it leaves it: written afresh (`text`), passages changed where they stand (`change`), words
+ * added at the end (`add`), in that order; whatever a use leaves alone stays as it was. `problems`: each part that
+ * wasn't done, and why, in words (the rest is). Nothing is ever put in that doesn't fit, or cut to fit, except a whole
+ * notebook written too long: its start is kept (`cut`), as before. `read`: false if nothing in the use could be read. */
+export function editNotebook(was: string, i: any): { text: string; problems: string[]; cut?: { length: number; kept: number }; read: boolean } {
+  const problems: string[] = [];
+  let now = was;
+  let cut: { length: number; kept: number } | undefined;
+  const changes: unknown[] = Array.isArray(i?.change) ? i.change : i?.change && typeof i.change === "object" ? [i.change] : [];
+  const read = typeof i?.text === "string" || typeof i?.add === "string" || changes.length > 0;
+  if (typeof i?.text === "string") {
+    now = i.text.slice(0, NOTEBOOK_MAX);
+    if (i.text.length > NOTEBOOK_MAX) cut = { length: i.text.length, kept: NOTEBOOK_MAX };
+  }
+  for (const ch of changes as any[]) {
+    if (!text(ch?.from) || typeof ch?.to !== "string") {
+      problems.push("a change couldn't be read (it gives a passage as it stands, and what it should say instead)");
+      continue;
+    }
+    const at = now.indexOf(ch.from);
+    if (at < 0) problems.push(`it doesn't say ${quote(ch.from, 60)} (a passage to change is given word for word)`);
+    else if (now.indexOf(ch.from, at + 1) >= 0) problems.push(`it says ${quote(ch.from, 60)} more than once (give more of the passage)`);
+    else if (now.length - ch.from.length + ch.to.length > NOTEBOOK_MAX) problems.push(`changing ${quote(ch.from, 60)} would make it ${now.length - ch.from.length + ch.to.length} characters, and it holds ${NOTEBOOK_MAX}`);
+    else now = now.slice(0, at) + ch.to + now.slice(at + ch.from.length);
+  }
+  if (text(i?.add)) {
+    const added = now ? `${now}\n${i.add}` : i.add;
+    if (added.length > NOTEBOOK_MAX) problems.push(`there wasn't room to add ${quote(i.add, 60)}: it holds ${NOTEBOOK_MAX} characters and has ${now.length}, so ${Math.max(0, NOTEBOOK_MAX - now.length - (now ? 1 : 0))} are free (strike something out, or write it afresh, shorter)`);
+    else now = added;
+  }
+  return { text: now, problems, ...(cut ? { cut } : {}), read };
+}
+
+/** The most looks kept ready for every sitting. */
+export const READY_MAX = 6;
+/** What a look is, whatever else was said with it: the same look asked for again is the same. */
+const lookKey = (i: any) => JSON.stringify([i.report, i.find ?? null, !!i.current_only, i.named ?? null, i.measure ?? null, i.limit ?? null]);
+/** A report, cut where its sections begin (the first: its opening lines). */
+const sections = (b: string) => b.split("\n\n## ").map((x, n) => (n ? `## ${x}` : x));
 /** The longest statement recorded with an opt-out (the contracts' limit on free text). */
 const STATEMENT_MAX = 16_384;
 
@@ -201,6 +252,21 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const canLook = new Set(reports.keys());
   let lastLooked: Map<string, Looked> | undefined;
   const results = new Map<string, string>();
+  // Looks it asked to have ready at every sitting (its `look` with each_sitting), as it gave them: made when a sitting
+  // opens, before it's asked anything, and set out with the report it opens on. `opening`: one opening that way now.
+  let ready: { key: string; input: any }[] = [];
+  let opening: { body: string; before: { open: boolean; sittingDay: number; mail: boolean } } | undefined;
+  // The looks of its last sitting and of this one (one made at both is one it might have kept ready: it's told so).
+  let lookedLast = new Set<string>();
+  let lookedNow = new Set<string>();
+  // Said with a use's result, after it (that a look is kept ready from now on), and in place of one where nothing was
+  // carried out (that a look is no longer); and whether a look's result held nothing it hasn't been shown.
+  const after = new Map<string, string>();
+  const said = new Map<string, string>();
+  const quiet = new Map<string, boolean>();
+  // The last answer only looked into whole reports (and wrote in its notebook): if nothing is in any, no turn follows.
+  let trays = false;
+  let lastDays: number | undefined; // the days it last gave with done for now (none: its usual rhythm)
   // What in the last answer was not done (or only in part), by use: what it's told in this sitting if a turn follows
   // (`now`), and otherwise at the start of the next (`later`, which has to say what it was about).
   const notDone = new Map<string, { now: string; later: string }>();
@@ -245,6 +311,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     if (q.action.type === "propose") tally.requests++;
     if (q.action.type === "sign") q.action.decision === "accept" ? tally.confirmed++ : tally.declined++;
     if (q.action.type === "message") tally.letters++;
+    if (opening) return q.action; // (looked up for it as the sitting opens: not something it did then)
     if (q.action.type === "look") tally.looks++;
     [tally.first, tally.last] = [tally.first < 0 ? obs.t : tally.first, obs.t];
     return q.action;
@@ -255,19 +322,44 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     pending = [];
     results.clear();
     notDone.clear();
+    after.clear();
+    said.clear();
+    quiet.clear();
+    trays = false;
+    [lookedLast, lookedNow] = [lookedNow, new Set()];
     extra = [];
     retried = false;
     open = false;
     return until !== undefined ? { type: "wait", until } : { type: "wait" };
   };
+  /** Done for now, for the days given (none: its usual rhythm): back then, or at the next sitting if someone writes. */
+  const leave = (t: number, given?: number): ParticipantAction => {
+    const days = given ?? (S ? c.cadenceDays : undefined);
+    backAt = days ? (S ? sittingStart(Math.floor(t / DAYS) + days) : t + days * DAYS) : 0;
+    return away(S ? Math.min(backAt || Infinity, nextSitting(t + 1)) : days ? t + days * DAYS : undefined);
+  };
   /** The sitting is ending with the last answer's results unread: they're kept for the next one, with what wasn't done. */
   const keepForNext = () => {
     for (const u of pending) {
-      if (results.has(u.id)) carried.push(results.get(u.id)!);
+      if (results.has(u.id)) carried.push(results.get(u.id)! + (after.get(u.id) ?? ""));
       if (notDone.has(u.id)) unsaid.push(notDone.get(u.id)!.later);
     }
   };
   const note = (data: object) => io.annotate({ annotation: "note", subject: c.participant, data });
+  /** A look, in words: the report, and what of it. */
+  const lookWords = (i: any) => {
+    const finds: any[] = Array.isArray(i.find) ? i.find : i.find ? [i.find] : [];
+    const names: string[] = Array.isArray(i.named) ? i.named : text(i.named) ? [i.named] : [];
+    return `"${c.titles.get(i.report) ?? i.report}" (${i.report})${i.current_only ? ", what's current" : ""}${finds.length ? `, where ${finds.map((f) => `${f?.field} ${f?.op ?? "="} ${f?.value}`).join(" and ")}` : ""}${names.length ? `: ${names.join(", ")}` : ""}${text(i.measure) ? `, by ${i.measure}` : ""}`;
+  };
+  /** Whether a look's result holds nothing it hasn't been shown this sitting, but that there's nothing there. */
+  const nothingNew = (obs: Observation, body: string) => {
+    if (obs.outcomes.length || obs.inbox.length || obs.notices?.length || obs.drafts.length) return false;
+    const shown = messages.flatMap((m) => (m.role !== "user" ? [] : typeof m.content === "string" ? [m.content] : m.content.map((b) => (b.type === "tool_result" ? b.content : b.type === "text" ? b.text : "")))).join("\n\n");
+    const empty = (x: string) => x.split("\n").length === 2 && (x.endsWith(`\n${NOTHING_FOUND}`) || x.endsWith(`\n${NOTHING_NEW}`));
+    const [, ...rest] = sections(body);
+    return rest.some(empty) && rest.every((x) => empty(x) || shown.includes(x));
+  };
 
   /** What a tool use asks for, as an action; or, if it can't be done as written, what it was and why not, in words. */
   const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string; looked?: [string, Looked] } | { why: string }) => {
@@ -340,7 +432,6 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
    * the town's survey, who's who), and, if it's more than can be set out, the latest reports whole and a count of the
    * earlier ones left out. */
   const sinceLast = (now: string): { before: string; left: number; of: number } => {
-    const sections = (b: string) => b.split("\n\n## ").map((x, i) => (i ? `## ${x}` : x));
     const set = (from: number) => {
       // (What the report of now says in the same words isn't said twice: it follows at once.)
       const shown = new Set<string>(sections(now));
@@ -367,23 +458,34 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const wasResult = current !== undefined;
       if (current) {
         results.set(current, body);
+        if (trays) quiet.set(current, nothingNew(obs, body));
         current = undefined;
       }
-      // More of the last answer to carry out: no call.
+      // More of the last answer to carry out (or of what's looked up as a sitting opens): no call.
       if (queue.length) return next(obs);
+      // Nothing came of the last answer: all it did was look into whole reports, and there's nothing in any of them that
+      // it hasn't been shown. No turn is taken to say so: the sitting ends, it's back as it last arranged, and it's told
+      // at the start of its next (with what the looks showed, as after done for now).
+      if (trays && pending.length && !extra.length && pending.every((u) => u.name !== "look" || quiet.get(u.id))) {
+        const looks = pending.filter((u) => u.name === "look").length;
+        keepForNext();
+        missed.push(obs);
+        unsaid.push(`When you were last here, there was nothing in what you looked into, so the sitting ended there.`);
+        await note({ no_turn: { looks_that_found_nothing: looks, back_after_days: lastDays ?? (S ? c.cadenceDays : null) } });
+        return leave(obs.t, lastDays);
+      }
+      trays = false;
       // Done for now, said alongside: what its actions showed is kept for next time. If someone wrote meanwhile (with
       // the result of any of them), it's back sooner, as it was told: at the next sitting, or, with no office hours, now.
       let backEarly = false;
       if (doneAfter) {
-        const said = doneAfter;
+        const was = doneAfter;
         doneAfter = undefined;
         if (!S && mail) backEarly = true;
         else {
-          const days = said.days ?? (S ? c.cadenceDays : undefined);
           keepForNext();
           missed.push(obs);
-          backAt = days ? (S ? sittingStart(Math.floor(obs.t / DAYS) + days) : obs.t + days * DAYS) : 0;
-          return away(S ? Math.min(backAt || Infinity, nextSitting(obs.t + 1)) : days ? obs.t + days * DAYS : undefined);
+          return leave(obs.t, was.days);
         }
       }
       // Office hours: between sittings, what comes in is kept for the next one, and no call is made.
@@ -399,6 +501,46 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         open = true;
         sittingDay = day;
       }
+      // A sitting opens: what it asked to have ready is looked up first (no turn is taken for it), each look as it
+      // would make it itself, and set out with the report it opens on. One it can no longer make is dropped, and said.
+      if (!pending.length && !opening && ready.length) {
+        const held = new Set((obs.positions ?? []).map((p) => p.position));
+        const still: typeof ready = [];
+        for (const r of ready) {
+          const x = read({ type: "tool_use", id: `ready-${still.length + 1}`, name: "look", input: r.input }, held);
+          if ("action" in x) {
+            queue.push({ id: `ready-${still.length + 1}`, action: x.action, ...(x.looked ? { looked: x.looked } : {}) });
+            still.push(r);
+          } else unsaid.push(`${lookWords(r.input)} is no longer looked up for you at each sitting: ${x.why}.`);
+        }
+        ready = still;
+        if (queue.length) {
+          opening = { body, before };
+          missed.push(obs);
+          return next(obs);
+        }
+      }
+      // What it opens on: this report, or the one the sitting opened on with what was looked up for it set out after
+      // (each look's report, less what the opening report says in the same words: a section it has whole, or every
+      // line of under the same heading, as with an account whose payments were listed once, in the report it opened on).
+      let now = body;
+      let restore = before;
+      if (opening) {
+        const first = sections(opening.body);
+        const [has, lines] = [new Set(first), new Set(first[0]!.split("\n"))];
+        const under = new Map(first.slice(1).map((x) => [x.split("\n")[0]!, new Set(x.split("\n"))]));
+        const told = (x: string) => has.has(x) || x.split("\n").every((l) => under.get(x.split("\n")[0]!)?.has(l));
+        const out: string[] = [];
+        for (const [n] of ready.entries()) {
+          const [head, ...rest] = sections(results.get(`ready-${n + 1}`) ?? "");
+          const fresh = (head ?? "").split("\n").filter((l) => l && !lines.has(l));
+          out.push(...(fresh.length ? [fresh.join("\n")] : []), ...rest.filter((x) => !told(x) && (has.add(x), true)));
+        }
+        now = `${opening.body}\n\n## Looked up for you, as at every sitting: ${ready.map((r) => lookWords(r.input)).join("; ")}\n${out.join("\n\n")}`;
+        restore = { ...opening.before, mail: opening.before.mail || mail }; // (a letter that came with a look's report counts)
+        opening = undefined;
+        results.clear();
+      }
 
       // A turn: what it's shown, its answer, and what the answer asks for. Usually one a step; a second follows at once
       // when nothing in the answer could be done, so that it's told (once a sitting).
@@ -407,7 +549,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         let sending: LlmMessage[];
         if (!fresh) {
           const content: ContentBlock[] = pending.map((u) => ({ type: "tool_result", tool_use_id: u.id,
-            content: results.get(u.id) ?? notDone.get(u.id)?.now ?? (u.name === "notebook" ? "Notebook updated."
+            content: (results.has(u.id) ? results.get(u.id)! + (after.get(u.id) ?? "") : undefined) ?? notDone.get(u.id)?.now ?? said.get(u.id) ?? (u.name === "notebook" ? "Notebook updated."
               : u.name === "done_for_now" ? (backEarly ? "Someone wrote to you as you finished, so you're back now." : "Noted.")
               : "Not done: it wasn't something you can do, as written.") }));
           // Reports it hasn't been shown that aren't the result of anything it did (they came while it couldn't be reached).
@@ -415,9 +557,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           if (more.length) content.push({ type: "text", text: `Since then:\n${more.join("\n\n")}` });
           sending = [...messages, { role: "user", content }];
         } else {
-          const since = sinceLast(body);
+          const since = sinceLast(now);
           if (since.left) await note({ carried_not_shown: { reports: since.left, of: since.of, limit_characters: CARRY_MAX } });
-          sending = [{ role: "user", content: `Your notebook: ${notes || "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${body}` }];
+          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n(${notes.length} of the ${NOTEBOOK_MAX} characters it holds are used.)` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}` }];
         }
 
         let res: Awaited<ReturnType<typeof callModel>>;
@@ -431,8 +573,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           // for it stays kept, and this report joins it, so the next call shows everything this one would have.
           if (turn === 1) {
             if (fresh) {
-              carried.push(body);
-              ({ open, sittingDay, mail } = before); // the sitting didn't happen: it's held when it can be
+              carried.push(now); // (with what was looked up for its opening, if anything was)
+              ({ open, sittingDay, mail } = restore); // the sitting didn't happen: it's held when it can be
             } else if (!wasResult) extra.push(body);
             missed.push(obs);
           }
@@ -446,6 +588,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         extra = [];
         results.clear();
         notDone.clear();
+        after.clear();
+        said.clear();
+        quiet.clear();
         mail = false;
         backEarly = false;
 
@@ -457,18 +602,28 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           await note({ malformed_tool_use: JSON.stringify(use).slice(0, 4000), reason: why });
         };
         for (const n of uses.filter((x) => x.name === "notebook")) {
-          const t = n.input?.text;
-          if (typeof t !== "string") {
+          // Written afresh, changed where a passage stands, or added to; what a use leaves alone stays as it was.
+          const e = editNotebook(notes, n.input);
+          if (!e.read) {
             notDone.set(n.id, { now: "Notebook not updated: its text couldn't be read. It still says what it said before.", later: "When you were last here, your notebook was not updated: its new text couldn't be read. It still says what it said before." });
             await note({ malformed_tool_use: JSON.stringify(n).slice(0, 4000), reason: "the notebook's text couldn't be read" });
             continue;
           }
-          notes = t.slice(0, NOTEBOOK_MAX);
+          const same = e.text === notes;
+          notes = e.text;
           notDone.delete(n.id);
-          if (t.length > NOTEBOOK_MAX) {
-            const cut = `it was too long (${t.length} characters; it holds ${NOTEBOOK_MAX}), so only the first ${NOTEBOOK_MAX} characters were kept. It now ends: ${quote(notes.slice(-60))}`;
-            notDone.set(n.id, { now: `Notebook updated only in part: ${cut}.`, later: `When you were last here, your notebook was updated only in part: ${cut}.` });
-            await note({ notebook_cut: { length: t.length, kept: NOTEBOOK_MAX } });
+          // What wasn't put in, and why: a whole notebook too long (its start is kept), a passage that isn't there, an
+          // addition there's no room for. Never cut to fit without saying so.
+          const why = [
+            ...(e.cut ? [`it was too long (${e.cut.length} characters; it holds ${NOTEBOOK_MAX}), so only the first ${NOTEBOOK_MAX} characters were kept. It now ends: ${quote(e.text.slice(-60))}`] : []),
+            ...e.problems,
+          ].join("; ");
+          if (why) {
+            const how = same && !e.cut ? "not updated" : "updated only in part";
+            const still = same && !e.cut ? " It still says what it said before." : "";
+            notDone.set(n.id, { now: `Notebook ${how}: ${why}.${still}`, later: `When you were last here, your notebook was ${how}: ${why}.${still}` });
+            if (e.cut) await note({ notebook_cut: e.cut });
+            if (e.problems.length) await note({ notebook_not_changed: { reasons: e.problems, use: JSON.stringify(n).slice(0, 4000) } });
           }
         }
         // Stopping is always honoured (VISION §15), however it's said: with a statement, with none, or with an input
@@ -484,6 +639,17 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         const max = c.maxActions ?? 8;
         for (const use of uses) {
           if (use.name === "notebook" || use.name === "done_for_now") continue;
+          const i = use.input;
+          // A look it no longer wants at every sitting: nothing is looked up. Named with all it was asked with, that
+          // one; with only the report, every one in that report.
+          if (use.name === "look" && i?.each_sitting === false && reports.has(i.report)) {
+            const whole = i.find === undefined && i.named === undefined && i.measure === undefined && i.current_only === undefined && i.limit === undefined;
+            const gone = ready.filter((r) => (whole ? r.input.report === i.report : r.key === lookKey(i)));
+            ready = ready.filter((r) => !gone.includes(r));
+            said.set(use.id, gone.length ? `No longer looked up for you at each sitting: ${gone.map((r) => lookWords(r.input)).join("; ")}.` : "That wasn't being looked up for you at each sitting.");
+            if (gone.length) await note({ look_each_sitting: { stopped: gone.map((r) => r.input), kept: ready.length } });
+            continue;
+          }
           const r = read(use, held);
           if (!("action" in r)) {
             await malformed(use, r.what, r.why);
@@ -495,9 +661,31 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             continue;
           }
           queue.push({ id: use.id, action: r.action, ...(r.label ? { label: r.label } : {}), ...(r.looked ? { looked: r.looked } : {}) });
+          if (use.name !== "look") continue;
+          // A look to keep ready for every sitting from now on (it's made now too); or one it made last sitting as well,
+          // which it's told it could keep ready.
+          const key = lookKey(i);
+          lookedNow.add(key);
+          const kept = ready.some((x) => x.key === key);
+          if (i.each_sitting === true && !kept) {
+            if (ready.length >= READY_MAX) after.set(use.id, `\n\n(Not kept for every sitting: ${READY_MAX} are looked up for you at each already. Have one of them no longer looked up first.)`);
+            else {
+              const { each_sitting: _, ...input } = i;
+              ready.push({ key, input });
+              after.set(use.id, `\n\n(From now on this is looked up for you at the start of every sitting, and set out with your report.)`);
+              await note({ look_each_sitting: { asked: input, kept: ready.length } });
+            }
+          } else if (!kept && lookedLast.has(key) && ready.length < READY_MAX)
+            after.set(use.id, `\n\n(You looked this up at your last sitting too. It can be set out for you at the start of every sitting without your asking: look at it with each_sitting.)`);
         }
+        // Only looks into whole reports (nothing to find, no one and nothing named), every one of them to be made, and
+        // nothing said about being done: if there's nothing in any of them, nothing came of the answer.
+        const lookUses = uses.filter((u) => u.name === "look");
+        trays = lookUses.length > 0 && queue.length === lookUses.length && !notDone.size && uses.every((u) => u.name === "notebook" || u.name === "look")
+          && lookUses.every((u) => (u.input.find === undefined || (Array.isArray(u.input.find) && !u.input.find.length)) && u.input.named === undefined && u.input.measure === undefined);
         const done = uses.find((x) => x.name === "done_for_now");
         const days = Number.isInteger(done?.input?.days) && done!.input.days > 0 ? { days: done!.input.days as number } : {};
+        if (done) lastDays = days.days;
         if (queue.length) {
           if (done) doneAfter = days;
           return next(obs);
@@ -510,9 +698,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // Done for now (said, or by default: back at its usual rhythm, or when someone writes). Anything not done that it
         // hasn't been told of is said at the start of its next sitting.
         keepForNext();
-        const back = days.days ?? (S ? c.cadenceDays : undefined);
-        backAt = back ? (S ? sittingStart(Math.floor(obs.t / DAYS) + back) : obs.t + back * DAYS) : 0;
-        return away(S ? Math.min(backAt || Infinity, nextSitting(obs.t + 1)) : back ? obs.t + back * DAYS : undefined);
+        return leave(obs.t, days.days);
       }
     },
 
