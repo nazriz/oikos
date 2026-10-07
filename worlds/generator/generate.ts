@@ -264,8 +264,15 @@ export function generate(spec: TownSpec): any {
   const records: any[] = law.records.filter((r) => r.id !== "law-tax");
   // Every lot is on the registry: a record naming its cells. Ownership is a claim about a lot.
   for (const p of parcels) records.push({ id: p.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "lot", text: `Lot ${p.id.slice(4)}.`, data: { cells: [p.cell] } });
-  const own = (lot: string, holder: string) =>
-    records.push({ id: `title-${lot}`, record: "claim", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", position: "right", holder, about: { kind: "ownership", object: lot, includes: ["exclude", "use", "sell", "build"] } });
+  // (Each lot's title, the first made for it, and each cell's lot: found without looking through every record or lot.)
+  const titleOf = new Map<string, any>();
+  const lotAt = new Map<string, string>();
+  for (const q of parcels) if (!lotAt.has(q.cell)) lotAt.set(q.cell, q.id);
+  const own = (lot: string, holder: string) => {
+    const title = { id: `title-${lot}`, record: "claim", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", position: "right", holder, about: { kind: "ownership", object: lot, includes: ["exclude", "use", "sell", "build"] } };
+    records.push(title);
+    if (!titleOf.has(lot)) titleOf.set(lot, title);
+  };
   // A home is a unit (a space) in a building.
   const homes: { structure: string; space: string; type: string; landlord: string; rent: number; bedrooms: number }[] = [];
   const units = spec.apartment_units ?? V.rents_per_month.apartment_units;
@@ -384,8 +391,10 @@ export function generate(spec: TownSpec): any {
   }
   // The utilities' sites (world-expansion 6.1): the water works beside the river (it draws from it), a substation.
   if (UT) {
-    const k = order.findIndex((q, i) => i >= cursor && q.y === spec.grid.h - 2);
-    if (k < 0) throw new Error("no lot beside the river for the water works");
+    // (The row beside the river, or, where that row is a street or is taken, the nearest row to it with a lot free.)
+    let k = -1;
+    for (let y = spec.grid.h - 2; y >= 0 && k < 0; y--) k = order.findIndex((q, i) => i >= cursor && q.y === y);
+    if (k < 0) throw new Error("no lot free for the water works");
     [order[cursor], order[k]] = [order[k]!, order[cursor]!];
     const worksLot = site(), substationLot = site();
     structures.push({ id: "water-works", at: cellOf.get(worksLot), type: "works", built_by: "builder" }, { id: "substation", at: cellOf.get(substationLot), type: "substation", built_by: "builder" });
@@ -394,7 +403,7 @@ export function generate(spec: TownSpec): any {
     entities.push({ id: "water-corp", kind: "utility", name: `${spec.name} Water` }, { id: "energy-co", kind: "utility", name: "Energy retailer" });
   }
   for (const lot of [...roadLots].sort()) structures.push({ id: `road-${lot.slice(4)}`, at: cellOf.get(lot), type: "road", built_by: "builder" });
-  for (const p of parcels) if (!records.some((r) => r.id === `title-${p.id}`)) own(p.id, "city");
+  for (const p of parcels) if (!titleOf.has(p.id)) own(p.id, "city");
   // ---- elections: the electors enrolled at the start, and the law that has them elect the mayor (world-expansion 3) ----
   const E = V.elections && spec.elections !== false ? V.elections : undefined;
   if (E) {
@@ -659,8 +668,8 @@ export function generate(spec: TownSpec): any {
     // Owner-occupiers (world-expansion 6.2): a house its household owns (its lot's title theirs), outright or with a
     // mortgage still being repaid to the bank (by the household head's age).
     if (OW && houseTypes.some((x) => x.id === home.type) && ownPick.below(10_000) < OW.house_owner_bps) {
-      const lot = parcels.find((q) => q.cell === structures.find((x) => x.id === home.structure)!.at)!.id;
-      const title = records.find((r) => r.id === `title-${lot}`)!;
+      const lot = lotAt.get(structures.find((x) => x.id === home.structure)!.at)!;
+      const title = titleOf.get(lot)!;
       title.holder = lh;
       const head = h.members.find((m) => m.id === lh)!;
       const age = Math.floor(-head.born_at / YEAR);

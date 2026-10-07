@@ -32,7 +32,7 @@ import type { Rng } from "../rng";
 import * as C from "../calls";
 import { because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member } from "./household";
-import { Deliveries, goodsPrices, order } from "./trade";
+import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { ownerOf } from "./institutions";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
@@ -447,7 +447,7 @@ export const citizen: BehaviourModule = {
     const findOwnHome = (obs: Observation) => {
       const street = obs.channels.street;
       if (!isLeaseholder() || street?.kind !== "sites") return;
-      const titles = new Set([...book.ofType("claim").filter((c: any) => c.about?.kind === "ownership" && c.holder === me).map((c: any) => c.about.object),
+      const titles = new Set([...book.claimsBy("holder", me).filter((c: any) => c.about?.kind === "ownership").map((c: any) => c.about.object),
         ...book.ofType("claim_transfer").filter((r: any) => r.to === me).map((r: any) => (book.records.get(r.claim) as any)?.about?.object).filter(Boolean)]);
       for (const lot of titles) {
         if (ownerOf(book, lot) !== me) continue;
@@ -455,7 +455,7 @@ export const citizen: BehaviourModule = {
         const st = street.cells.find((c) => cells.has(c.cell) && c.structure)?.structure;
         const space = st?.spaces.find((sp) => sp.kind === "dwelling" && sp.occupants?.includes(me))?.space;
         if (!st || !space) continue;
-        const title = book.ofType("claim").find((c: any) => c.about?.kind === "ownership" && c.about?.object === lot) as any;
+        const title = book.claimsBy("object", lot).find((c: any) => c.about?.kind === "ownership") as any;
         const loan = book.ofType("agreement").find((r: any) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(me) && book.inForce(r.id) && String(r.terms.text ?? "").includes(space)) as any;
         const repay = loan ? cents(loan.terms.commitments.find((c: any) => c.who === me)?.does?.outcome?.money?.amount ?? 0) : 0;
         home = { agreement: title?.id ?? lot, space, structure: st.structure, landlord: me, rent: repay, movedIn: true, owned: true };
@@ -1427,7 +1427,7 @@ export const citizen: BehaviourModule = {
         }
       }
       // What's recorded against us to pay (rates on a home we own, a fine): paid when we can, keeping a month's essentials.
-      for (const c of book.ofType("claim") as any[]) {
+      for (const c of book.claimsBy("counterparty", me) as readonly any[]) {
         if (c.counterparty !== me || c.position !== "right" || !["rates", "rates_interest", "fine"].includes(c.about?.kind) || billsPaid.has(c.id)) continue;
         const amount = cents(c.about.amount ?? 0);
         const to = c.about.account;
@@ -1519,7 +1519,7 @@ export const citizen: BehaviourModule = {
           lastShop = t;
           const budget = Math.min(acc.balance, Math.floor((monthly() * since) / MONTH) + carried + deferred);
           // Which shop: the mind's decision among the shops' offers, each for what the trip's budget buys there.
-          const offerOf = (shop: string) => book.open("price_list").filter((l) => l.speaks_for === shop && l.offer).sort((a, b) => b.at - a.at)[0]?.offer;
+          const offerOf = (shop: string) => shopOffer(book, shop);
           // Those we know who shop there count as others going there.
           const heard = newsNow(t);
           const options = shops.map((x) => {
@@ -1836,7 +1836,7 @@ export const citizen: BehaviourModule = {
     let nextBuyChance = ctx.rng("buy-day").below(30) * DAY;
     let soldAndGoing: number | null = null; // when we'd sold up to leave (we go at a later wake, with what's left)
     const soldLots = new Set<string>();
-    const titleOf = (lot: string) => book.ofType("claim").find((c: any) => c.about?.kind === "ownership" && c.about?.object === lot) as any;
+    const titleOf = (lot: string) => book.claimsBy("object", lot).find((c: any) => c.about?.kind === "ownership") as any;
     const valuationOf = (lot: string) => book.open("valuation").filter((v) => v.data?.lot === lot).sort((a, b) => b.at - a.at)[0]?.data?.value as number | undefined;
     const mortgageFor = (space: string) => book.ofType("agreement").find((r: any) => r.record === "agreement" && r.terms.template === "loan" && r.terms.parties.includes(me) && book.inForce(r.id) && String(r.terms.text ?? "").includes(space)) as any;
     /** The house on a lot (from the street), and its dwelling. */
@@ -1996,7 +1996,7 @@ export const citizen: BehaviourModule = {
           say("enforcement_request", `Request to enforce order ${o.id}: ${usd(unpaid)} unpaid.`, { to: [tr.entity], visible: [me, tr.entity], basis: o.id, data: { order: o.id, unpaid } })));
       }
       const acc = ownBanked(obs, me);
-      for (const c of book.ofType("claim") as any[]) {
+      for (const c of book.claimsBy("holder", me) as readonly any[]) {
         if (c.holder !== me || c.about?.kind !== "debt" || !c.counterparty || pursued.has(c.id) || t - c.at < tr.apply_after_days * DAY) continue;
         pursued.add(c.id);
         const owed = cents(c.about.amount) - (settledToUs.get(c.id) ?? 0);

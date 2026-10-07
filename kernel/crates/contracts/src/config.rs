@@ -954,7 +954,8 @@ pub struct LoadedConfig {
 pub fn load(v: Value) -> Result<LoadedConfig, String> {
     canon::check_integers(&v).map_err(|e| e.to_string())?;
     crate::contracts::check(&crate::contracts::contracts().config, &v).map_err(|e| format!("config {e}"))?;
-    let config: Config = serde_json::from_value(v.clone()).map_err(|e| format!("config does not match contract: {e}"))?;
+    // (Read from the value where it is: a large world's config isn't copied to be read.)
+    let config = Config::deserialize(&v).map_err(|e| format!("config does not match contract: {e}"))?;
     validate(&config)?;
     let hash = canon::hash_with_domain(canon::DOMAIN_CONFIG, &canon::canonical_value(&v).map_err(|e| e.to_string())?);
     Ok(LoadedConfig { config, canonical: v, hash })

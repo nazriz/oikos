@@ -11,6 +11,14 @@ import { evaluate } from "../law";
 export const DAY = 86_400;
 export const MONTH = 30 * DAY;
 
+type Claim = Extract<Record, { record: "claim" }>;
+
+/** What a claim can be looked up by (`Book.claimsBy`): who holds it, who it's against, or what it's about. */
+export type ClaimKey = "holder" | "counterparty" | "object";
+const claimKey: { [K in ClaimKey]: (c: Claim) => unknown } = { holder: (c) => c.holder, counterparty: (c) => c.counterparty, object: (c) => (c.about as { object?: unknown } | undefined)?.object };
+/** Beyond this many values asked about under one key, a book keeps every value's claims rather than those asked for. */
+const CLAIM_VALUES_KEPT_ONE_BY_ONE = 8;
+
 /** Everything a participant has perceived so far, indexed. */
 export class Book {
   readonly records = new Map<string, Record>();
@@ -24,8 +32,20 @@ export class Book {
   readonly signedTimes = new Map<string, number[]>(); // agreement -> signature times
   private readonly byKind = new Map<string, StatementRecord[]>(); // statement kind -> statements, in the order seen
   // Kept as records arrive, so asking never rescans the whole history (docs/reliability.md, performance):
-  private readonly standing = new Map<string, Map<string, StatementRecord>>(); // statement kind -> those not withdrawn, in the order seen
+  // statement kind -> those not withdrawn, in the order seen: for the kinds asked for so far (made from `byKind` the
+  // first time, kept up from then on). A citizen's book holds the town's whole register of lots, and seldom asks for it.
+  private readonly standing = new Map<string, Map<string, StatementRecord>>();
+  private readonly standingList = new Map<string, StatementRecord[]>(); // the same, as a list: made when asked for, dropped when the kind's standing statements change
+  /** cell -> the lots seen that cover it, in the order seen (made when first asked for, and kept up from then on);
+   * false: a lot's cells weren't a list, so lots are looked through one by one. */
+  private lotsOver?: Map<string, StatementRecord[]> | false;
   private readonly byRecord = new Map<string, Record[]>(); // record type (agreement, claim...) -> records, in the order seen
+  /** Claims by a key's value, in the order seen, for the values asked about so far (`claimsBy`): kept up as claims
+   * arrive. `all`: for every value (once many have been asked about). A town's whole register of titles is in a
+   * citizen's book, and it asks only about its own. */
+  private readonly claimsKept: { [K in ClaimKey]?: { all: boolean; by: Map<unknown, Claim[]> } } = {};
+  /** Claims seen to be released (by a `claim_release`). */
+  readonly released = new Set<string>();
   private readonly withPractice = new Map<string, StatementRecord>(); // statements carrying a practice, not withdrawn
   private readonly withAssertion = new Map<string, StatementRecord>(); // statements put forward to be believed, not withdrawn
   /** participant -> the person it acts as (from a directory). */
@@ -68,6 +88,8 @@ export class Book {
       const typed = this.byRecord.get(r.record);
       if (typed) typed.push(r);
       else this.byRecord.set(r.record, [r]);
+      if (r.record === "claim") this.claimSeen(r);
+      if (r.record === "claim_release") this.released.add(r.claim);
       if (r.record === "withdrawal") this.takeDown(r.withdraws, r.at);
       // A statement that says it replaces an earlier one of the same kind from whoever it speaks for (an amended law
       // names the law it replaces, in its words too): the earlier one no longer stands for this reader, whether or not
@@ -90,10 +112,13 @@ export class Book {
         const list = this.byKind.get(r.kind);
         if (list) list.push(r);
         else this.byKind.set(r.kind, [r]);
+        if (r.kind === "lot" && this.lotsOver !== undefined) this.lotSeen(r);
         if (!this.withdrawn.has(r.id)) {
           const open = this.standing.get(r.kind);
-          if (open) open.set(r.id, r);
-          else this.standing.set(r.kind, new Map([[r.id, r]]));
+          if (open) {
+            open.set(r.id, r);
+            this.standingList.delete(r.kind);
+          }
           if (r.practice) this.withPractice.set(r.id, r);
           if (r.assertion) this.withAssertion.set(r.id, r);
         }
@@ -116,7 +141,7 @@ export class Book {
     this.withdrawn.add(id);
     if (!this.withdrawnAt.has(id)) this.withdrawnAt.set(id, at);
     const w = this.records.get(id);
-    if (w?.record === "statement") this.standing.get(w.kind)?.delete(w.id);
+    if (w?.record === "statement" && this.standing.get(w.kind)?.delete(w.id)) this.standingList.delete(w.kind);
     this.withPractice.delete(id);
     this.withAssertion.delete(id);
   }
@@ -141,8 +166,33 @@ export class Book {
 
   /** Statements of a kind that are still standing (not withdrawn), in the order seen. */
   open(kind: string): StatementRecord[] {
-    const open = this.standing.get(kind);
-    return open ? [...open.values()] : [];
+    // (A copy: whoever asks may sort it.)
+    return this.standingOf(kind).slice();
+  }
+
+  private lotSeen(lot: StatementRecord): void {
+    const cells: unknown = lot.data?.cells;
+    if (cells === undefined || cells === null || this.lotsOver === false) return;
+    if (!Array.isArray(cells)) {
+      this.lotsOver = false;
+      return;
+    }
+    const over: Map<string, StatementRecord[]> = this.lotsOver ?? (this.lotsOver = new Map());
+    for (const cell of new Set(cells as string[])) {
+      const lots = over.get(cell);
+      if (lots) lots.push(lot);
+      else over.set(cell, [lot]);
+    }
+  }
+
+  /** The standing lot (a statement of kind "lot") that covers a cell: of several, the first seen. */
+  lotOver(cell: string): StatementRecord | undefined {
+    if (this.lotsOver === undefined) {
+      this.lotsOver = new Map();
+      for (const lot of this.all("lot")) this.lotSeen(lot);
+    }
+    if (this.lotsOver === false) return this.open("lot").find((l) => (l.data?.cells as string[] | undefined)?.includes(cell));
+    return this.lotsOver.get(cell)?.find((l) => !this.withdrawn.has(l.id));
   }
 
   /** Statements carrying a practice (a gathering: docs/design/ai-citizens.md 2b), still standing, in the order seen. */
@@ -153,6 +203,57 @@ export class Book {
   /** Statements put forward to be believed (an `assertion`: a teaching, a report, a promise), not withdrawn. */
   assertions(): StatementRecord[] {
     return [...this.withAssertion.values()];
+  }
+
+  private claimSeen(c: Claim): void {
+    for (const key in this.claimsKept) {
+      const kept = this.claimsKept[key as ClaimKey]!;
+      const value = claimKey[key as ClaimKey](c);
+      const list = kept.by.get(value);
+      if (list) list.push(c);
+      else if (kept.all) kept.by.set(value, [c]);
+    }
+  }
+
+  /** The claims seen whose holder, counterparty or object (what it's about) is this, in the order seen: the same as
+   * looking through every claim seen, without doing so each time. (Not to be changed by whoever asks.) */
+  claimsBy(key: ClaimKey, value: string): readonly Claim[] {
+    const kept = (this.claimsKept[key] ??= { all: false, by: new Map() });
+    const list = kept.by.get(value);
+    if (list || kept.all) return list ?? [];
+    const of = claimKey[key];
+    if (kept.by.size >= CLAIM_VALUES_KEPT_ONE_BY_ONE) {
+      // Asked about many: every value's claims, in one pass (those kept already are made again, the same).
+      kept.all = true;
+      kept.by.clear();
+      for (const c of this.ofType("claim")) {
+        const v = of(c);
+        const l = kept.by.get(v);
+        if (l) l.push(c);
+        else kept.by.set(v, [c]);
+      }
+      return kept.by.get(value) ?? [];
+    }
+    const found = this.ofType("claim").filter((c) => of(c) === value);
+    kept.by.set(value, found);
+    return found;
+  }
+
+  /** A kind's standing statements, as `open` gives them, without the copy: the same list until they change. Not to be
+   * changed (or sorted) by whoever asks. */
+  standingOf(kind: string): readonly StatementRecord[] {
+    let list = this.standingList.get(kind);
+    if (!list) {
+      let open = this.standing.get(kind);
+      if (!open) {
+        open = new Map();
+        for (const r of this.all(kind)) if (!this.withdrawn.has(r.id)) open.set(r.id, r);
+        this.standing.set(kind, open);
+      }
+      list = [...open.values()];
+      this.standingList.set(kind, list);
+    }
+    return list;
   }
 
   /** Records of a type (agreement, claim, notice...), in the order seen: rather than every record ever seen. */
@@ -198,6 +299,33 @@ export class Book {
 
   entitiesOfKind(kind: string): string[] {
     return [...this.entityKind].filter(([, k]) => k === kind).map(([e]) => e).sort();
+  }
+}
+
+/**
+ * For each speaker, its latest standing statement of a kind that passes a test (of several made at the same time, the
+ * first seen): what sorting the kind's standing statements for that speaker, newest first, puts first. Worked out for
+ * every speaker in one pass, and again only when the kind's standing statements change: a shopper comparing every
+ * shop's prices doesn't look through every price list once per shop.
+ */
+export class Latest {
+  private readonly kept = new WeakMap<Book, { of: readonly StatementRecord[]; by: Map<string | undefined, StatementRecord> }>();
+  constructor(private readonly kind: string, private readonly test: (r: StatementRecord) => unknown) {}
+
+  of(book: Book, speaker: string | undefined): StatementRecord | undefined {
+    const standing = book.standingOf(this.kind);
+    let kept = this.kept.get(book);
+    if (kept?.of !== standing) {
+      const by = new Map<string | undefined, StatementRecord>();
+      for (const r of standing) {
+        if (!this.test(r)) continue;
+        const best = by.get(r.speaks_for);
+        if (!best || r.at > best.at) by.set(r.speaks_for, r);
+      }
+      kept = { of: standing, by };
+      this.kept.set(book, kept);
+    }
+    return kept.by.get(speaker);
   }
 }
 
@@ -551,7 +679,7 @@ export function cellsOf(book: Book, lot: string): string[] {
 
 /** The standing lot a cell is in, if the registry has one. */
 export function lotOf(book: Book, cell: string): string | undefined {
-  return book.open("lot").find((l) => (l.data?.cells as string[] | undefined)?.includes(cell))?.id;
+  return book.lotOver(cell)?.id;
 }
 
 /** A state variable's value today, as perceived: its value on the day seen, plus its daily change since, within its

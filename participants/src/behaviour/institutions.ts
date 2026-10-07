@@ -18,7 +18,8 @@ import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 /** Who the registry says owns a lot: the latest standing ownership claim, following transfers. */
 export function ownerOf(book: Book, lot: string): string | undefined {
   let holder: string | undefined;
-  const titles = standingClaims([...book.ofType("claim"), ...book.ofType("claim_release"), ...book.ofType("withdrawal")]).filter((c) => c.about?.kind === "ownership" && c.about?.object === lot);
+  // (Standing: recorded, and not released or withdrawn, as `standingClaims` reads the registry.)
+  const titles = book.claimsBy("object", lot).filter((c) => c.about?.kind === "ownership" && !book.released.has(c.id) && !book.withdrawn.has(c.id));
   for (const c of titles) holder = c.holder;
   // A transfer counts if the holder made it, or whoever issued the title (the land registry: a death's transmission, say).
   for (const r of book.ofType("claim_transfer")) {

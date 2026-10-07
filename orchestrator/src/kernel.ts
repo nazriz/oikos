@@ -65,6 +65,15 @@ function parseReply(line: string): any {
   return reply;
 }
 
+/** A value and everything in it, never to be changed again. */
+function frozen<T>(v: T): T {
+  if (v && typeof v === "object" && !Object.isFrozen(v)) {
+    for (const x of Object.values(v)) frozen(x);
+    Object.freeze(v);
+  }
+  return v;
+}
+
 /** What a request is, for the profile: its op, and for a command which one. */
 const opOf = (req: any): string => (req.op === "command" ? req.command?.command ?? "command" : req.op ?? "?");
 
@@ -77,6 +86,11 @@ export class Kernel {
   /** The stdio transport's queue: the exchange before this one (its requests written, its replies read). */
   private turn: Promise<unknown> = Promise.resolve();
   private decoder = new TextDecoder();
+  /** Every record the engine has handed over, by id. A record never changes once made, and one record is shown to many
+   * (a register of lots, to everyone who reads it): the engine hands each over whole once and by its id from then on
+   * (`record_refs`, kernel/src/protocol.rs), so it's read once, and everyone it's shown to has the same one (which is
+   * why it's frozen: what one reader did to it, every other would see). */
+  private records = new Map<string, object>();
   /** Called before each request is sent (the run's breadcrumbs, D59). */
   onRequest?: (req: any) => void;
   /** How the engine runs: in this process, or as a subprocess. */
@@ -97,15 +111,43 @@ export class Kernel {
     }
   }
 
+  /** A request as it's sent: a run is started asking for records by reference. */
+  private sent(req: object): object {
+    return (req as { op?: unknown }).op === "start" ? { ...req, record_refs: true } : req;
+  }
+
+  /** A reply as its reader gets it: in an observation's records channels, each record handed over before (its id, a
+   * string) is the record itself again. */
+  private whole(reply: any): any {
+    const channels = reply?.observation?.channels;
+    if (!channels) return reply;
+    // (Those handed over whole are kept first: the same record may come whole in one channel and by its id in another.)
+    const lists: (string | { id: string })[][] = [];
+    for (const path in channels) {
+      const records = channels[path].records;
+      if (!records?.length) continue;
+      lists.push(records);
+      for (const r of records) if (typeof r !== "string") this.records.set(r.id, frozen(r));
+    }
+    for (const records of lists) for (let i = 0; i < records.length; i++) {
+      const r = records[i]!;
+      if (typeof r !== "string") continue;
+      const had = this.records.get(r);
+      if (!had) throw new KernelDied(`the engine referred to a record it never handed over (${r})`);
+      records[i] = had as { id: string };
+    }
+    return reply;
+  }
+
   /** One request in-process: the same line in, the same line out. */
   private local(req: object): any {
     if (this.dead) throw new KernelDied(this.dead);
     const t0 = performance.now();
-    const line = JSON.stringify(req);
+    const line = JSON.stringify(this.sent(req));
     const t1 = performance.now();
     const raw = this.session!.request(line);
     const t2 = performance.now();
-    const reply = parseReply(raw);
+    const reply = this.whole(parseReply(raw));
     const p = (this.profile[opOf(req)] ??= { n: 0, encode: 0, engine: 0, decode: 0 });
     p.n++;
     p.encode += t1 - t0;
@@ -118,7 +160,7 @@ export class Kernel {
    * the stream, so a request written while another's reply is awaited would take that reply (or wait for ever). */
   private exchange(reqs: object[]): Promise<any[]> {
     const ops = reqs.map(opOf);
-    const lines = reqs.map((r) => JSON.stringify(r));
+    const lines = reqs.map((r) => JSON.stringify(this.sent(r)));
     const mine = this.turn.then(async () => {
       try {
         this.proc!.stdin.write(lines.join("\n") + "\n");
@@ -136,7 +178,7 @@ export class Kernel {
         p.n++;
         p.engine += dt;
       }
-      return raw.map(parseReply);
+      return raw.map((line) => this.whole(parseReply(line)));
     });
     this.turn = mine.catch(() => {});
     return mine;

@@ -18,6 +18,7 @@ use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Observation {
@@ -104,7 +105,8 @@ pub enum ChannelData {
     Accounts { accounts: Vec<AccountItem>, transactions: Vec<Transaction> },
     Holdings { holdings: Vec<HoldingItem> },
     Records {
-        records: Vec<Record>,
+        /// (The state's own records, shared: a record is immutable once made, and one is shown to many.)
+        records: Vec<Arc<Record>>,
         /// Set when these are a search's results (what matches now), not what's new since the last look.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         search: Option<bool>,
@@ -356,6 +358,8 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&s
 #[derive(Debug, Default)]
 pub struct RecordIndex {
     indexed: usize,
+    /// The records in the order they were made (record with seq q is `by_seq[q - 1]`): the state's own, shared.
+    by_seq: Vec<Arc<Record>>,
     by_record: BTreeMap<&'static str, Vec<u64>>,
     by_kind: BTreeMap<String, Vec<u64>>,
     by_entity: BTreeMap<String, Vec<u64>>,
@@ -385,9 +389,12 @@ type AccountsByEntity = ((u64, usize), BTreeMap<Id, Vec<Id>>);
 
 impl RecordIndex {
     fn catch_up(&mut self, st: &State) {
+        // (Records are only ever added: an index that has seen more than the state holds was built from another world.)
+        assert!(self.indexed <= st.record_order.len(), "the record index is ahead of the state it's asked about");
         for i in self.indexed..st.record_order.len() {
             let stored = &st.records[&st.record_order[i]];
             let (seq, rec) = (stored.seq, &*stored.record);
+            self.by_seq.push(stored.record.clone());
             self.by_record.entry(rec.body.kind_name()).or_default().push(seq);
             if let crate::blocks::RecordBody::Statement { kind, offer, practice, assertion, registry, adico, formal, .. } = &rec.body {
                 self.by_kind.entry(kind.clone()).or_default().push(seq);
@@ -733,8 +740,6 @@ type Built = (Observation, Vec<(Id, Look)>, Vec<Id>);
 fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mode: Mode, only: Option<&str>, requested: &[LookRequest]) -> Built {
     index.catch_up(st);
     let p = &st.participants[participant];
-    // Record with seq q is the q-th made.
-    let at_seq = |q: u64| &*st.records[&st.record_order[(q - 1) as usize]].record;
 
     let mut channels = BTreeMap::new();
     let mut looks = vec![];
@@ -820,10 +825,12 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                         Some(sc) => index.placed(sc, from),
                         None => index.candidates(filter, want.as_ref(), from).unwrap_or_else(|| (from + 1..=st.record_order.len() as u64).collect()),
                     };
+                    // Record with seq q is the q-th made.
+                    let by_seq = &index.by_seq;
                     ChannelData::Records {
                         records: seqs
                             .into_iter()
-                            .map(at_seq)
+                            .map(|q| &by_seq[(q - 1) as usize])
                             .filter(|r| can_see(st, r, &me) && placed_ok(st, r, &me, scope.as_ref()) && matches(st, r, filter, want.as_ref(), true))
                             .cloned()
                             .collect(),
@@ -963,9 +970,9 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
 /// A search through a records channel: records the participant may see that match the channel's filter
 /// and the query, now. Standing records only if asked; ordered as asked (newest first by default);
 /// at most `limit` (default 20).
-fn search(st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, area: Option<&Scope>, q: &Query) -> Vec<Record> {
+fn search(st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, area: Option<&Scope>, q: &Query) -> Vec<Arc<Record>> {
     let want: Option<BTreeSet<&str>> = filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me } else { e.as_str() }).collect());
-    let at_seq = |seq: u64| &*st.records[&st.record_order[(seq - 1) as usize]].record;
+    let at_seq = |seq: u64| &index.by_seq[(seq - 1) as usize];
     let seqs: Vec<u64> = if let Some(sc) = area {
         let mut v = index.placed(sc, 0);
         if q.standing == Some(true) {
@@ -981,7 +988,7 @@ fn search(st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, 
         v
     };
     let conditions = q.conditions.as_deref().unwrap_or(&[]);
-    let mut hits: Vec<(u64, &Record)> = seqs
+    let mut hits: Vec<(u64, &Arc<Record>)> = seqs
         .into_iter()
         .map(|seq| (seq, at_seq(seq)))
         .filter(|(_, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want.as_ref(), false) && conditions.iter().all(|c| holds(r, c)))

@@ -52,6 +52,7 @@
  "orchestrator/test/word-of-mouth.test.ts": 38.8,
  "participants/test/adapters.test.ts": 4.6,
  "participants/test/bank.test.ts": 0.1,
+ "participants/test/book.test.ts": 0.3,
  "participants/test/boundaries.test.ts": 0,
  "participants/test/citizen-civic.test.ts": 0.4,
  "participants/test/citizen-household.test.ts": 0.1,
