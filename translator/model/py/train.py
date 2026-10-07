@@ -196,7 +196,7 @@ def score(model: Translator, items: list[dict], device: torch.device) -> dict:
     total = {"positive": 0, "refusal": 0}
     results = []
     for i in items:
-        steps, sure = model.translate(single(i["f"], device))
+        steps, sure, _ = model.translate(single(i["f"], device))
         if "tokens" in i:
             steps = to_pieces(i["tokens"], i["row"]["at"], steps)
         ok = steps == i["row"]["steps"]

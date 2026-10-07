@@ -197,14 +197,18 @@ class Translator(nn.Module):
         return total / (choice != -100).sum()
 
     @torch.no_grad()
-    def translate(self, f: dict[str, torch.Tensor]) -> tuple[list, float]:
-        """One request, greedily: its steps (a choice's name, or [kind, first piece, last piece]) and how sure the
-        model is of the whole (the product of every decision's probability)."""
+    def translate(self, f: dict[str, torch.Tensor]) -> tuple[list, float, dict]:
+        """One request, greedily: its steps (a choice's name, or [kind, first piece, last piece]), how sure the
+        model is of the whole (the product of every decision's probability), and that sureness in its parts: of what
+        it chose (`choices`: the function, each argument, where the call closes), of where each copied id, word or
+        field stands (`places`), of where each copied text begins and ends (`texts`), and its least sure decision."""
         pad = torch.zeros(1, f["line"].shape[1], dtype=torch.bool, device=f["line"].device)
         read = self.read(f, pad)
         prev, starts, ends = [self.n_choices], [0], [0]
         steps: list = []
         sure = 0.0
+        parts = {"choices": 0.0, "places": 0.0, "texts": 0.0}
+        least = 0.0
         for _ in range(self.cfg.max_steps):
             dev = read.device
             inputs = self.step_inputs(read, torch.tensor([prev], device=dev), torch.tensor([starts], device=dev), torch.tensor([ends], device=dev))
@@ -212,6 +216,8 @@ class Translator(nn.Module):
             p = F.log_softmax(self.choose(state)[0, 0], -1)
             c = int(p.argmax())
             sure += float(p[c])
+            parts["choices"] += float(p[c])
+            least = min(least, float(p[c]))
             if c >= self.first_pointer:
                 kind = torch.tensor([[c - self.first_pointer]], device=dev)
                 ps = F.log_softmax(self.start_scores(state, kind, read, pad)[0, 0], -1)
@@ -219,6 +225,8 @@ class Translator(nn.Module):
                 pe = F.log_softmax(self.end_scores(state, kind, torch.tensor([[a]], device=dev), read, pad)[0, 0], -1)
                 z = int(pe.argmax())
                 sure += float(ps[a]) + float(pe[z])
+                parts["texts" if POINTERS[c - self.first_pointer] == "text" else "places"] += float(ps[a]) + float(pe[z])
+                least = min(least, float(ps[a]), float(pe[z]))
                 steps.append([POINTERS[c - self.first_pointer], a, z])
                 prev, starts, ends = prev + [c], starts + [a], ends + [z]
             else:
@@ -229,4 +237,4 @@ class Translator(nn.Module):
                     if name.startswith("none:"):
                         steps.append("eos")
                     break
-        return steps, math.exp(sure)
+        return steps, math.exp(sure), {**{k: math.exp(v) for k, v in parts.items()}, "least": math.exp(least)}

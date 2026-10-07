@@ -61,14 +61,14 @@ def main() -> None:
             if len(t.ids) > cfg.max_tokens:
                 answer(ask_back | {"read": len(t.ids)})
                 continue
-            steps, sure = model.translate({k: v.unsqueeze(0) for k, v in t.features().items()})
-            answer({"steps": to_pieces(t, r["at"], steps), "sure": sure, "ms": round(1000 * (time.perf_counter() - t0), 2), "read": len(t.ids)})
+            steps, sure, parts = model.translate({k: v.unsqueeze(0) for k, v in t.features().items()})
+            answer({"steps": to_pieces(t, r["at"], steps), "sure": sure, "parts": parts, "ms": round(1000 * (time.perf_counter() - t0), 2), "read": len(t.ids)})
         elif len(r["pieces"]) > cfg.max_pieces:
             answer(ask_back)
         else:
             f = {k: v.unsqueeze(0) for k, v in features(r["pieces"], r.get("breaks", []), cfg).items()}
-            steps, sure = model.translate(f)
-            answer({"steps": steps, "sure": sure, "ms": round(1000 * (time.perf_counter() - t0), 2), "read": len(r["pieces"])})
+            steps, sure, parts = model.translate(f)
+            answer({"steps": steps, "sure": sure, "parts": parts, "ms": round(1000 * (time.perf_counter() - t0), 2), "read": len(r["pieces"])})
 
 
 if __name__ == "__main__":

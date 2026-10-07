@@ -102,7 +102,7 @@ export class DecideAdapter implements LlmAdapter {
   private buffer = "";
   private queue: Promise<unknown> = Promise.resolve();
   /** Each answer's sureness and time, in the order asked (for whoever measures). */
-  answers: { sure: number; ms: number; program: string }[] = [];
+  answers: { sure: number; ms: number; program: string; parts?: { choices: number; places: number; texts: number; least: number } }[] = [];
   constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean } = {}) {}
 
   private start(): void {
@@ -151,7 +151,7 @@ export class DecideAdapter implements LlmAdapter {
     // (A form that can't be one of the forms shown is not offered, however sure the model is.)
     const misfit = this.o.unchecked ? undefined : formsMisfit(program, forms);
     if (misfit) program = `none(${misfit})`;
-    this.answers.push({ sure: a.sure, ms: a.ms, program });
+    this.answers.push({ sure: a.sure, ms: a.ms, program, ...(a.parts ? { parts: a.parts } : {}) });
     return { program, sure: a.sure, ms: a.ms };
   }
 
