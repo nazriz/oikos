@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.35.7",
+  "version": "0.36.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {

@@ -153,6 +153,13 @@ sources); this list is for the architecture and design ideas.
 | Offending as a choice weighed against the chance and cost of being caught | Becker, G. S. (1968), "Crime and punishment: an economic approach", *Journal of Political Economy* 76(2), 169–217 | The chance of taking falls with the chance of being caught one reckons |
 | Routine activity: crime needs a motivated offender, a suitable target, and no capable guardian | Cohen, L. E. & Felson, M. (1979), "Social change and crime rate trends: a routine activity approach", *American Sociological Review* 44(4), 588–608 | Taking only where one is, from goods there (work), in need |
 
+## How a death comes to be known (docs/behaviour/deaths.md; docs/decisions.md, 2026-10-08)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| How long people who die alone at home lie before they are found: counted, by bands of days | National Police Agency of Japan, people who died alone at home in 2025 (76,941: 28,398 found the same or next day, 15,865 in 2 to 3 days, 10,456 in 4 to 7, 22,222 after 8 or more, of them 7,148 after a month or more and 208 after a year or more). Read 2026-10-08 in a press summary of the agency's release, not in its own tables **(to confirm)** | The profile's `life.found_alone_after`; when the police call at a home that has stood empty since a death (`police.ts`) |
+| A doctor notifies the registrar of a death within 48 hours; the funeral director registers it within 7 days of the burial or cremation | Births, Deaths and Marriages Victoria, "Legal requirements: doctors" and "Legal requirements: funeral directors" (under the Births, Deaths and Marriages Registration Act 1996 (Vic)); read 2026-10-08 | Why those who share a home report with no waiting time added; the gap to registration itself is left out (deaths.md) |
+
 ## The translator's own model (translator/model; docs/design/translator-and-resolver.md §16.10)
 
 | Idea | Citation | Used in |

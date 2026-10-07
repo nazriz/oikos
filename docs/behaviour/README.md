@@ -52,6 +52,7 @@ Rules every module follows (so re-runs are reproducible):
 | `utility.water` | a water corporation: draws the town's use from the river each day (restrictions when it can't), bills owners quarterly | [utilities.md](utilities.md) |
 | `utility.energy` | an energy retailer: buys from the grid, supplies its customers (emitting the grid's greenhouse gas), bills them monthly | [utilities.md](utilities.md) |
 | `police.station` | the police: officers by establishment, reports investigated (finding who with a chance), charges to the tribunal | [crime.md](crime.md) |
+| (a death made known) | those who share a home report a death there; someone with nobody at home is found by their landlord or the police; in the citizen's, the landlord's and the police's modules | [deaths.md](deaths.md) |
 | (floods) | the river over its banks, buildings flooded and their people to the relief centre | [floods.md](floods.md) |
 | `tribunal.member` | a tribunal's member: lists applications, tells both sides, and on the day decides on the record under the laws in force (a rent increase invalid or valid; a debt ordered paid) | [justice.md](justice.md) |
 | `tribunal.registrar` | a tribunal's registrar: enforces an unpaid order to pay by a garnishee order to the debtor's bank | [justice.md](justice.md) |

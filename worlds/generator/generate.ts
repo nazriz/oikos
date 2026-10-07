@@ -1013,9 +1013,15 @@ export function generate(spec: TownSpec): any {
     const officers = Math.max(1, Math.ceil((CR.police_per_1000 * everyone.length) / 1000));
     const stationCell = structures.find((x) => x.id === "police-station")!.at;
     accounts.push({ id: "acc-police", holder: "police", custodian: "bank", balance: 6 * CR.officer_wage_per_fortnight * officers });
-    office("police-oic", "police", "Officer in charge", "officer_in_charge", [{ id: "books", kind: "accounts" }, mine("police-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [stationCell], occupants: "names" }],
+    // (And who calls at a home nobody has been in or out of since someone died there: they look at the town's homes when
+    // they ask to, and report such a death to the registry after the time the profile says it takes to be found;
+    // docs/behaviour/deaths.md.)
+    const found = V.life.found_alone_after;
+    office("police-oic", "police", "Officer in charge", "officer_in_charge", [{ id: "books", kind: "accounts" }, mine("police-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [stationCell], occupants: "names" },
+      ...(found ? [{ id: "homes", title: "The town's homes, called at", kind: "sites", area: { place: "town" }, occupants: "names", on_request: true }] : [])],
       code("police.station", { building: "police-station", workplace: "police-station/workplace.1", account: "acc-police", officers, wage: CR.officer_wage_per_fortnight, period: 14 * DAY,
-        working_day: WORKING_DAY, task_seconds: CR.investigation_hours * HOUR, tribunal: "tribunal", ...look }));
+        working_day: WORKING_DAY, task_seconds: CR.investigation_hours * HOUR, tribunal: "tribunal", ...look,
+        ...(found ? { homes_channel: "homes", registry: "city", found_after: found } : {}) }));
     office("outside-police-funding", "outside", "Police funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
       code("world.grants", { account: "acc-outside", to: "police", to_account: "acc-police", per_resident_per_year: Math.ceil(((CR.officer_wage_per_fortnight * officers * 365) / 14) / Math.max(1, homes.length)) }));
   }

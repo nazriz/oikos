@@ -22,6 +22,9 @@ export interface Profile {
       injury: unknown;
       birth: { ages: [number, number]; gestation_days: number; female_bps: number };
       work_injury_bps: { factory: number; shop: number };
+      /** How long after dying at home with nobody there a person is found: the share of such deaths found within so many
+       * days, band by band (docs/behaviour/deaths.md). */
+      found_alone_after?: { within_days: number; bps: number }[];
       /** Deaths care could prevent: the share of each age's deaths that's treatable, carried by an illness band. */
       treatable?: { share_bps_by_age: { from: number; bps: number }[]; band: string };
     };
