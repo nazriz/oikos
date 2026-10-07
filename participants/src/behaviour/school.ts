@@ -7,6 +7,7 @@
 
 import * as C from "../calls";
 import type { SiteStructure } from "../contracts";
+import { basesOf } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, DAY, outOfTime, say, type Step } from "./common";
 import { Staffing, stepper } from "./firms";
@@ -88,7 +89,7 @@ export const principal: BehaviourModule = {
             say(ok ? "school_place" : "school_decline", ok ? `A place at the school, in ${room}.` : "No place: not of school age.", { to: [who], visible: [who, me], basis: r.id, data: ok ? { classroom: room, building: p.building } : {} })));
         }
         for (const [who, place] of placed) if (!pupils.has(who) && !certified.has(who)) {
-          const e = book.records.get(place.basis ?? "") as any;
+          const e = book.records.get(basesOf(place)[0] ?? "") as any;
           pupils.set(who, { since: place.at, years_before: Number(e?.data?.years_before ?? 0), born_at: e ? Number(e.data?.born_at) : undefined });
         }
 

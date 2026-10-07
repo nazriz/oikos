@@ -387,7 +387,7 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/OpaqueObject"
         },
         "basis": {
-          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Basis"
         },
         "speaks_for": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
@@ -420,7 +420,7 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
         },
         "basis": {
-          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Basis"
         },
         "speaks_for": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
@@ -449,7 +449,7 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
         },
         "basis": {
-          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Basis"
         },
         "speaks_for": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
@@ -473,7 +473,7 @@
       "properties": {
         "basis": {
           "description": "What the agreement cites as its basis (e.g. a permit).",
-          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Basis"
         },
         "block": {
           "const": "propose_agreement"
@@ -574,7 +574,7 @@
         },
         "basis": {
           "description": "What the statement claims its authority rests on (a vote, a constitution, a delegation).",
-          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Basis"
         },
         "addressed_to": {
           "type": "array",
@@ -631,7 +631,7 @@
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Text"
         },
         "basis": {
-          "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Basis"
         },
         "speaks_for": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/IdOrRef"

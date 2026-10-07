@@ -47,6 +47,8 @@ const written = (v: Exclude<calls.Value, { call: calls.Call } | { json: unknown 
 /** A value as it's compared: what it names or states, not how it's spelled. */
 function valueSig(fn: string, key: string, v: calls.Value, c: Compared): string | Sig {
   if ("call" in v) return callSig(v.call, c);
+  // One basis has one form (contracts, Basis): a list of one record is that record.
+  if ("json" in v && key === "basis" && Array.isArray(v.json) && v.json.length === 1 && typeof v.json[0] === "string") return `text:${plain(unbracketed(v.json[0]))}`;
   if ("json" in v) return `json:${canonicalJson(lowered(v.json))}`;
   if (written(v).trim() === WILD) return WILD;
   const s = unbracketed(written(v));

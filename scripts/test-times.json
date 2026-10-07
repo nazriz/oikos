@@ -1,6 +1,7 @@
 {
  "contracts/test/contracts.test.ts": 0.8,
  "docs/research/cel-check/cel-check.test.ts": 0.3,
+ "orchestrator/test/basis.test.ts": 2,
  "orchestrator/test/batch.test.ts": 36.5,
  "orchestrator/test/building.test.ts": 48.9,
  "orchestrator/test/clinic-school.test.ts": 86.3,

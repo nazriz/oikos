@@ -18,6 +18,12 @@ export const MEASURE_VERSION = "0.4.0";
 const QUERY_DIR = join(import.meta.dir, "../queries");
 
 /** Each table: how it's made from `raw` (the log, one row per entry) for one run. `$run` is the run id. */
+/** What a record rests on (`r` is the record): one record, or a list of two or more (contracts, records: Basis). The
+ * `records` table has the one cited first as `basis`, as it always had, and all of them in the order cited as `bases`
+ * (an empty list where it cites nothing). */
+const BASIS_FIRST = `coalesce(json_extract_string(r, '$.basis[0]'), json_extract_string(r, '$.basis'))`;
+const BASIS_ALL = `(case json_type(r, '$.basis') when 'ARRAY' then from_json(json_extract(r, '$.basis'), '["VARCHAR"]') when 'VARCHAR' then [json_extract_string(r, '$.basis')] else []::VARCHAR[] end)`;
+
 const TABLES: { [name: string]: string } = {
   runs: `
     select $run as run_id,
@@ -142,12 +148,12 @@ const TABLES: { [name: string]: string } = {
     from buildings b join numbered u on u.type = b.type`,
   records: `
     select $run as run_id, seq, t, json_extract_string(r, '$.id') as id, json_extract_string(r, '$.record') as record, json_extract_string(r, '$.kind') as kind, json_extract_string(r, '$.author') as author, json_extract_string(r, '$.in_position') as in_position,
-      json_extract_string(r, '$.speaks_for') as speaks_for, (json_extract_string(r, '$.at'))::BIGINT as "at", json_extract_string(r, '$.basis') as basis, json_extract_string(r, '$.place') as place,
-      json_extract_string(r, '$.terms.template') as template, json_extract_string(r, '$.withdraws') as withdraws, r as body
+      json_extract_string(r, '$.speaks_for') as speaks_for, (json_extract_string(r, '$.at'))::BIGINT as "at", ${BASIS_FIRST} as basis, json_extract_string(r, '$.place') as place,
+      json_extract_string(r, '$.terms.template') as template, json_extract_string(r, '$.withdraws') as withdraws, r as body, ${BASIS_ALL} as bases
     from (select seq, t, json_extract(body, '$.record') as r from raw where kind = 'event' and json_extract_string(body, '$.event') = 'recorded')
     union all
-    select $run, 0, 0, json_extract_string(r, '$.id'), json_extract_string(r, '$.record'), json_extract_string(r, '$.kind'), json_extract_string(r, '$.author'), json_extract_string(r, '$.in_position'), json_extract_string(r, '$.speaks_for'), (json_extract_string(r, '$.at'))::BIGINT, json_extract_string(r, '$.basis'), json_extract_string(r, '$.place'),
-      json_extract_string(r, '$.terms.template'), json_extract_string(r, '$.withdraws'), r
+    select $run, 0, 0, json_extract_string(r, '$.id'), json_extract_string(r, '$.record'), json_extract_string(r, '$.kind'), json_extract_string(r, '$.author'), json_extract_string(r, '$.in_position'), json_extract_string(r, '$.speaks_for'), (json_extract_string(r, '$.at'))::BIGINT, ${BASIS_FIRST}, json_extract_string(r, '$.place'),
+      json_extract_string(r, '$.terms.template'), json_extract_string(r, '$.withdraws'), r, ${BASIS_ALL}
     from (select unnest(from_json(json_extract(body, '$.config.world.records'), '["JSON"]')) as r from raw where kind = 'header')`,
   commands: `
     select $run as run_id, seq, t, json_extract_string(body, '$.command') as command, json_extract_string(body, '$.participant') as participant, json_extract_string(body, '$.as') as "as", body

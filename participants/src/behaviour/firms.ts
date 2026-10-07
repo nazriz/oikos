@@ -15,7 +15,7 @@
 import { cents, smallestNow } from "../money";
 import * as C from "../calls";
 import type { Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
-import { channels } from "../contracts";
+import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
@@ -322,7 +322,7 @@ export const landlord: BehaviourModule = {
         // (its signing; for a lease that renews one of ours, the end of that one's term, which the old lease's rent
         // covers until). Everything the tenant ever paid us, set against this lease's dues alone, would let someone
         // on a renewed lease stop paying for as long as they had paid before.
-        const since = Math.max(book.signedAt(a.id)!, (a.basis && renewsAt.get(a.basis)) || 0);
+        const since = Math.max(book.signedAt(a.id)!, 0, ...basesOf(a).map((b) => renewsAt.get(b) || 0));
         const due = t < since ? 0 : Math.floor((t - since) / MONTH) + 1;
         let owed = 0;
         for (let k = 0; k < due; k++) owed += rentAt(a, since + k * MONTH);
@@ -603,9 +603,9 @@ export class Staffing {
     const t = obs.t;
     const me = this.me;
     // Genesis standing orders for existing staff (what each withholds: the agreed wage less what it pays).
-    for (const r of book.open("request")) if (r.speaks_for === me && r.basis && !this.orders.has(r.basis)) {
-      this.orders.set(r.basis, r.id);
-      const a = book.records.get(r.basis);
+    for (const r of book.open("request")) for (const b of r.speaks_for === me ? basesOf(r) : []) if (b && !this.orders.has(b)) {
+      this.orders.set(b, r.id);
+      const a = book.records.get(b);
       const gross = a?.record === "agreement" ? cents(commitmentOf(a, me).outcome?.money?.amount ?? 0) : 0;
       const net = cents(r.data?.outcome?.money?.amount ?? 0);
       if (gross > net && net > 0) this.withholds.set(r.id, gross - net);
@@ -983,7 +983,7 @@ export class WindingUp {
     const paid: string[] = [];
     // Debts recorded against us and still unpaid (a lender's claim on a loan in default, unpaid wages, a fine), oldest first.
     const debts = this.debts(book);
-    const inDefault = new Set(debts.map((d) => d.basis));
+    const inDefault = new Set(debts.flatMap((d) => basesOf(d)));
     for (const d of debts) {
       const amount = Math.min(left, cents(d.about.amount));
       const holderAccount = d.about?.account ?? creditorAccount(book, d.holder!);

@@ -1671,7 +1671,7 @@ pub fn validate(c: &Config) -> Result<(), String> {
         for e in r.entities_named().into_iter().chain(r.visibility_entities()) {
             entity(e).map_err(|x| format!("record {}: {x}", r.id))?;
         }
-        for other in r.body.records_referenced().into_iter().chain(r.basis.as_deref()) {
+        for other in r.body.records_referenced().into_iter().chain(r.basis.iter().flat_map(|b| b.ids()).map(String::as_str)) {
             if !records.contains_key(other) {
                 return Err(format!("record {} references unknown record {other}", r.id));
             }

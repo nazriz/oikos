@@ -1104,6 +1104,10 @@ export function styleBrief(style: string, g: Gold, rand: () => number, o: { indi
   if (style === "cited") {
     const p = calls.parseProgram(g.program);
     const lines = "none" in p ? [] : p.lines;
+    // (An act may rest on several records, basis as a list: then each is cited, in the order the call has them, which
+    // is the order the translator is to copy them in.)
+    const several = lines.some((l) => { const b = l.call.args.basis; return !!b && "json" in b && Array.isArray(b.json) && b.json.length > 1; });
+    if (several) return { style, instruction: `${base} The records the call cites (what it rests on, answers or settles) are the ones to word that way: every one of them, those it rests on in the order the call lists them, and no other record is mentioned.`, riders: [] };
     if (lines.some((l) => ABSORBS_A_RECORD.some((k) => k in l.call.args))) return { style, instruction: `${base} The record the call cites (what it rests on, answers or settles) is the one to word that way, and no other record is mentioned.`, riders: [] };
     const form = formOf(g.program);
     const couldCite = lines.some((l) => ABSORBS_A_RECORD.some((k) => calls.ARGS[l.call.fn]?.allowed?.has(k))) || (g.forms ?? []).some((f) => f.form === form?.form && Object.values(f.fields).some((x) => x.type === "record"));

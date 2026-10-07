@@ -18,6 +18,23 @@
         }
       ]
     },
+    "Basis": {
+      "description": "What the record says it rests on, as stored: one record's id, or a list of two or more in the order they were cited (none twice). One basis has one form: a single record is never stored as a list of one.",
+      "anyOf": [
+        {
+          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+          },
+          "minItems": 2,
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      ]
+    },
     "RecordBase": {
       "type": "object",
       "required": [
@@ -70,7 +87,7 @@
           ]
         },
         "basis": {
-          "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+          "$ref": "#/$defs/Basis"
         },
         "in_position": {
           "description": "The position the author made it in (absent: as itself). The record is then the position's organisation's.",

@@ -1,0 +1,33 @@
+{
+  "lines": [
+    {
+      "call": {
+        "fn": "money",
+        "args": {
+          "to": {
+            "id": "acc-landfill"
+          },
+          "amount": {
+            "text": "3,187.73"
+          },
+          "from": {
+            "id": "acc-city"
+          },
+          "for": {
+            "text": "disposal of waste"
+          },
+          "settles": {
+            "id": "rec.28337"
+          },
+          "basis": {
+            "json": [
+              "rec.11904",
+              "rec.16123",
+              "rec.25150"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

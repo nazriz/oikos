@@ -4,6 +4,7 @@ import { calls } from "@oikos/participants";
 import { formsMisfit, formsShown, programOf, shown } from "../model/adapter";
 import { asWord, decode, encode, vocabulary, type Span } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
+import { copies, goldText, literals, spansIn, strayIds, styleBrief } from "../train/data";
 
 const at = (request: string, value: string, from = 0): [number, number] => {
   const i = request.indexOf(value, from);
@@ -37,6 +38,20 @@ test("a program is rebuilt exactly from choices and spans: ids, quoted text, a w
   cases.push({ request: r, forms, program: "form(charge_to=acc-c2739, form=festival_application, parcel=lot-15-31, to=pos.355)", spans: [
     { arg: "charge_to", value: "acc-c2739", how: "copy", at: at(r, "acc-c2739") }, { arg: "form", value: "festival_application", how: "choice", at: at(r, "festival application") },
     { arg: "parcel", value: "lot-15-31", how: "copy", at: at(r, "lot-15-31") }, { arg: "to", value: "pos.355", how: "copy", at: at(r, "pos.355") }] });
+  // An act resting on several records: basis as a list, each record a span of the request, in the order cited (which
+  // is not the order of their ids, nor need it be the order they stand in beside the other arguments).
+  r = "Pay invoice rec.28337: $3,187.73 from acc-city to acc-outside for disposal of waste, citing dockets rec.11904, rec.16123, rec.21887 and rec.25703, within the services budget rec.25150.";
+  cases.push({ request: r, forms: [], program: 'money(amount="$3,187.73", basis=["rec.11904","rec.16123","rec.21887","rec.25703","rec.25150"], for="disposal of waste", from=acc-city, settles=rec.28337, to=acc-outside)', spans: [
+    { arg: "amount", value: "$3,187.73", how: "copy", at: at(r, "$3,187.73") }, ...["rec.11904", "rec.16123", "rec.21887", "rec.25703", "rec.25150"].map((x): Span => ({ arg: "basis", value: x, how: "copy", at: at(r, x) })),
+    { arg: "for", value: "disposal of waste", how: "copy", at: at(r, "disposal of waste") }, { arg: "from", value: "acc-city", how: "copy", at: at(r, "acc-city") },
+    { arg: "settles", value: "rec.28337", how: "copy", at: at(r, "rec.28337") }, { arg: "to", value: "acc-outside", how: "copy", at: at(r, "acc-outside") }] });
+  r = "Under permit rec.512 and the council's resolution rec.498, have builder put up a hall on lot-02 for $410,000 from acc-city. Then post a notice that says so, resting on rec.498 and rec.512.";
+  cases.push({ request: r, forms: [], program: 'structure(basis=["rec.512","rec.498"], by=builder, from=acc-city, on=lot-02, price="$410,000", type=hall)\nstatement(basis=["rec.498","rec.512"], kind=notice, text="so")', spans: [
+    { arg: "basis", value: "rec.512", how: "copy", line: 0, at: at(r, "rec.512") }, { arg: "basis", value: "rec.498", how: "copy", line: 0, at: at(r, "rec.498") },
+    { arg: "by", value: "builder", how: "copy", line: 0, at: at(r, "builder") }, { arg: "from", value: "acc-city", how: "copy", line: 0, at: at(r, "acc-city") }, { arg: "on", value: "lot-02", how: "copy", line: 0, at: at(r, "lot-02") },
+    { arg: "price", value: "$410,000", how: "copy", line: 0, at: at(r, "$410,000") }, { arg: "type", value: "hall", how: "choice", line: 0, at: at(r, "hall") },
+    { arg: "basis", value: "rec.498", how: "copy", line: 1, at: at(r, "rec.498", r.indexOf("resting")) }, { arg: "basis", value: "rec.512", how: "copy", line: 1, at: at(r, "rec.512", r.indexOf("resting")) },
+    { arg: "kind", value: "notice", how: "choice", line: 1, at: at(r, "notice") }, { arg: "text", value: "so", how: "copy", line: 1, at: at(r, "so", r.indexOf("says")) }] });
   cases.push({ request: "Make the board approve the plan.", forms: [], program: "none(not_yours)", spans: [] });
   const all = cases.map((c) => encode(c));
   cases.forEach((c, i) => {
@@ -46,6 +61,10 @@ test("a program is rebuilt exactly from choices and spans: ids, quoted text, a w
     expect(exported).toBeDefined();
     expect(decode(all[i]!.input, stepsOf(exported, exported.steps))).toBe(canonical(c.program));
   });
+  // A list of bases is the list's two marks around a span for each record, in the order cited: nothing new to choose.
+  const payment = all[cases.findIndex((c) => c.program.startsWith('money(amount="$3,187.73"'))]!;
+  const from = payment.steps.indexOf("arg:basis");
+  expect(payment.steps.slice(from + 1, from + 8).map((s) => (typeof s === "string" ? s : payment.input.slice(s[1], s[2])))).toEqual(["[", "rec.11904", "rec.16123", "rec.21887", "rec.25703", "rec.25150", "]"]);
   // Every step is a choice from a closed set or a span: no step carries a value of the request's.
   const closed = vocabulary(all);
   for (const s of closed) expect(/^(fn|arg|none|bind|var|const|key):|^[\[\]{})]$|^eos$/.test(s)).toBe(true);
@@ -77,6 +96,12 @@ test("a model's steps over pieces come to a program, and steps no program is mad
   expect(ps.map((p) => p.text)).toEqual(["Pay", "c0412", "$", "5", "."]);
   expect(programOf(input, ps, ["fn:money", "arg:amount", ["text", 2, 3], "arg:to", ["id", 1, 1], ")", "eos"])).toBe('money(amount="$5", to=c0412)');
   expect(programOf(input, ps, ["none:not_yours", "eos"])).toBe("none(not_yours)");
+  // Several bases, as a model points at them over pieces: a list of spans, each a record's id whole.
+  const cited = "Publish a notice under rec.7 and rec.12: Closed.";
+  const cps = pieces(cited);
+  const piece = (text: string) => cps.findIndex((p) => p.text === text);
+  expect(programOf(cited, cps, ["fn:statement", "arg:basis", "[", ["text", piece("7") - 2, piece("7")], ["text", piece("12") - 2, piece("12")], "]", "arg:kind", ["word", piece("notice"), piece("notice")], "arg:text", ["text", piece("Closed"), piece("Closed")], ")", "eos"]))
+    .toBe('statement(basis=["rec.7","rec.12"], kind=notice, text="Closed")');
   // A reader with tokens of its own can point at a mark that is none of the input (piece -1), or past the end.
   expect(programOf(input, ps, ["fn:money", "arg:to", ["id", -1, 1], ")", "eos"])).toBe("none(unclear)");
   expect(programOf(input, ps, ["fn:money", "arg:to", ["id", 1, 9], ")", "eos"])).toBe("none(unclear)");
@@ -118,4 +143,39 @@ test("a form that can't be one of the forms shown is not offered: none of them b
   expect(formsMisfit('form(form=anything, x="1")', [])).toBeUndefined();
   expect(formsMisfit('money(amount="$5", to=c0412)', forms)).toBeUndefined();
   expect(formsMisfit("none(unknown_form)", forms)).toBeUndefined();
+});
+
+test("the data pipeline's own spans for a list of bases: each record found where the request cites it, and the example rebuilt exactly", () => {
+  const request = "As finance officer [finance], pay invoice [rec.28337]: $3,187.73 from [acc-city] to [acc-outside] for disposal of waste, citing dockets [rec.11904], [rec.16123], [rec.21887] and [rec.25703], within the services budget [rec.25150].";
+  const program = 'money(amount="$3,187.73", basis=["rec.11904","rec.16123","rec.21887","rec.25703","rec.25150"], for="disposal of waste", from=acc-city, settles=rec.28337, to=acc-outside)';
+  // Every id of the program is copied from the request, and the request names none the program lacks.
+  expect(literals(calls.parseProgram(program))).toEqual(expect.arrayContaining(["rec.11904", "rec.16123", "rec.21887", "rec.25703", "rec.25150", "rec.28337"]));
+  expect(copies(request, program)).toBe(true);
+  expect(copies(request.replace("[rec.21887] and ", ""), program)).toBe(false);
+  expect(strayIds(request, program, { riders: [{ kind: "capacity", text: "As finance officer [finance]" }] })).toEqual([]);
+  expect(strayIds(request, program.replace('"rec.21887",', ""), { riders: [{ kind: "capacity", text: "As finance officer [finance]" }] })).toEqual(["rec.21887"]);
+  // Each basis is a span of its own, none ambiguous, standing in the request in the order the list has them.
+  const spans = spansIn(request, program);
+  const cited = spans.filter((x) => x.arg === "basis");
+  expect(cited.map((x) => [x.value, x.how, request.slice(x.at![0], x.at![1]), (x as { ambiguous?: boolean }).ambiguous])).toEqual(
+    ["rec.11904", "rec.16123", "rec.21887", "rec.25703", "rec.25150"].map((id) => [id, "copy", id, undefined]));
+  expect(cited.map((x) => x.at![0])).toEqual(cited.map((x) => x.at![0]).slice().sort((a, b) => a - b));
+  expect(spans.find((x) => x.arg === "settles")).toMatchObject({ value: "rec.28337", how: "copy" });
+  // As steps, and back; as pieces, and back.
+  const e = encode({ request, forms: [], program, spans });
+  expect(decode(e.input, e.steps)).toBe(canonical(program));
+  const exported = row("x", "positive", e)!;
+  expect(decode(e.input, stepsOf(exported, exported.steps))).toBe(canonical(program));
+  // A record cited twice over two lines (once in each list) is placed with its own line's values.
+  const two = "Have builder put up a hall on lot-02 for $410,000 from acc-city under permit rec.512 and resolution rec.498. Publish a notice saying \"Works begin.\" under resolution rec.498 and permit rec.512.";
+  const both = 'structure(basis=["rec.512","rec.498"], by=builder, from=acc-city, on=lot-02, price="$410,000", type=hall)\nstatement(basis=["rec.498","rec.512"], kind=notice, text="Works begin.")';
+  const e2 = encode({ request: two, forms: [], program: both, spans: spansIn(two, both) });
+  expect(decode(e2.input, e2.steps)).toBe(canonical(both));
+  const second = spansIn(two, both).filter((x) => x.arg === "basis" && x.line === 1);
+  expect(second.map((x) => x.at![0] > two.indexOf("Publish"))).toEqual([true, true]);
+  // One basis has one form in gold too: a list of one is written bare.
+  expect(goldText(calls.parseProgram('statement(basis=["rec.498"], kind=notice, text="Works begin.")'))).toBe('statement(basis=rec.498, kind=notice, text="Works begin.")');
+  expect(goldText(calls.parseProgram(both))).toBe(canonical(both));
+  // Asked for in the cited style, a program resting on several is told to cite each, in order.
+  expect(styleBrief("cited", { program: both } as Parameters<typeof styleBrief>[1], () => 0.5).instruction).toContain("every one of them, those it rests on in the order the call lists them");
 });

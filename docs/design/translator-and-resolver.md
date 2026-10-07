@@ -816,6 +816,7 @@ Everything above was built as designed. Building it also settled these details.
 - **Commitments are nested calls:** `we_do=occupancy(…)` and `they_do=money(…, every="monthly")`. They become outcomes (§9.2), and a nested `every` becomes the commitment's `every`.
 - **An offered agreement is signed on the offerer's side,** as a real offer is.
 - **`money` takes `basis`** (a rent request cites its lease) **and `per_request`** (a bank's transfer names the request it carries out).
+- **`basis` is one record or a list** (2026-10-08): `basis=rec.412`, or `basis=["rec.412","rec.4019"]` for an act that rests on several (a permit and a budget line; the dockets behind a payment), passed on in the order given. The resolver writes one record bare and drops a repeat, so one basis has one form; in a list, a name bound on an earlier line is that line's record. The record acted on (`settles`, `withdraw`, `sign`, the form) is not also a basis.
 - **Records are in the seat's own entity's name** (`speaks_for`) unless `for` says otherwise.
 - **Variable names start with a letter,** because the block-level `ref` they map to must.
 - **Durations may be zero** (`first="0 days"`: the first rent payment is due at once).

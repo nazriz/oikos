@@ -14,8 +14,17 @@ export interface RecordBase {
   speaks_for?: Id;
   at: number;
   visible_to: Visibility;
-  basis?: Id;
+  /** What it says it rests on: one record, or two or more in the order cited (records: Basis). Read it with
+   * `basesOf` and `cites`, which take either form. */
+  basis?: Id | Id[];
 }
+
+/** The records a record says it rests on, in the order cited (none: an empty list). */
+export const basesOf = (r: { basis?: Id | Id[] } | undefined): Id[] => (r?.basis === undefined ? [] : typeof r.basis === "string" ? [r.basis] : r.basis);
+/** The records a record (or an act about to make one) cites, as they are said: "rec.4", "rec.4 and rec.9", "rec.4, rec.9 and rec.12". */
+export const citedWords = (r: { basis?: Id | Id[] } | undefined): string => { const b = basesOf(r); return b.length < 2 ? (b[0] ?? "") : `${b.slice(0, -1).join(", ")} and ${b[b.length - 1]}`; };
+/** Whether a record cites this one as a basis (alone, or among several). */
+export const cites = (r: { basis?: Id | Id[] } | undefined, record: Id | undefined): boolean => record !== undefined && basesOf(r).includes(record);
 
 export type Record =
   | (RecordBase & { record: "claim"; position: "right" | "liberty" | "power" | "immunity"; holder: Id; counterparty?: Id; about: Json })

@@ -2,6 +2,9 @@
 // worked examples (docs/design/translator-and-resolver.md §4).
 
 import { expect, test } from "bun:test";
+import Ajv2020 from "ajv/dist/2020";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { calls, formatMoney, type Currency } from "@oikos/participants";
 import BLOCKS from "../../contracts/blocks.schema.json";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
@@ -325,4 +328,60 @@ test("a label written as ordinary words is that label (a kind, a role, a templat
   expect(r.ok && r.blocks[0]).toMatchObject({ block: "publish", kind: "supplementary_evidence_statement" });
   const e = resolve(calls.parseProgram('entity(kind="Land Trust", name="River Land Trust")'), town(), () => undefined, "mayor");
   expect(e.ok && e.blocks[0]).toMatchObject({ block: "create_entity", kind: "land_trust" });
+});
+
+test("an act may rest on several records: basis as a list goes through in the order given, on every act that takes one", () => {
+  // (The engine's resolver has the same cases: kernel/crates/resolver/src/resolve.rs.)
+  const blocks = (src: string) => { const r = run(src, town(), "mayor"); if (!r.ok) throw new Error(r.questions.join(" ")); return r.blocks; };
+  // A payment from an account someone else keeps: the request to its keeper cites them all.
+  expect(blocks('money(to=acc-greenco, amount="$2,150", from=acc-city, settles=rec.640, basis=["rec.611","rec.627","rec.305"])')[0]).toMatchObject({ block: "publish", kind: "request", basis: ["rec.611", "rec.627", "rec.305"] });
+  // A building someone else puts up: the offered agreement does.
+  expect(blocks('structure(type=park, on=lot-00, by=greenco, price="$60,000", from=acc-city, basis=["rec.512","rec.498"])')[0]).toMatchObject({ block: "propose_agreement", basis: ["rec.512", "rec.498"] });
+  expect(blocks('agreement(with=greenco, terms="Mowing, weekly.", basis=["rec.9","rec.3"])')[0]).toMatchObject({ block: "propose_agreement", basis: ["rec.9", "rec.3"] });
+  expect(blocks('claim(position=liberty, holder=greenco, about={"action":"build","object":"lot-00"}, basis=["law-planning","rec.861"])')).toEqual([
+    { block: "record_claim", position: "liberty", holder: "greenco", about: { action: "build", object: "lot-00" }, speaks_for: "city", basis: ["law-planning", "rec.861"] }]);
+  expect(blocks('claim(release=rec.70, basis=["rec.71","rec.72"])')[0]).toMatchObject({ block: "release_claim", basis: ["rec.71", "rec.72"] });
+  expect(blocks('claim(transfer=rec.70, to=greenco, basis=["rec.71","rec.72"])')[0]).toMatchObject({ block: "transfer_claim", basis: ["rec.71", "rec.72"] });
+  expect(blocks('statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.741"])')[0]).toMatchObject({ block: "publish", kind: "notice", basis: ["rec.733", "rec.741"] });
+  expect(blocks('statement(withdraw=rec.50, basis=["rec.733","rec.741"])')[0]).toMatchObject({ block: "withdraw", record: "rec.50", basis: ["rec.733", "rec.741"] });
+  // One record is written one way: bare, as it always was; a list of one is that record, and one cited twice is cited once.
+  const one = blocks('statement(kind=notice, text="The pool closes.", basis=rec.733)');
+  expect(one[0]!.basis).toBe("rec.733");
+  expect(blocks('statement(kind=notice, text="The pool closes.", basis=["rec.733"])')).toEqual(one);
+  expect(blocks('statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.733"])')).toEqual(one);
+  expect(blocks('statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.741","rec.733"])')[0]!.basis).toEqual(["rec.733", "rec.741"]);
+  // What an earlier line of the program makes can be among them, by the name it was bound to.
+  expect(blocks('t = entity(kind=trust, name="River Land Trust")\nstatement(kind=charter, text="Its charter.", basis=["rec.5","t"])')[1]!.basis).toEqual(["rec.5", "$t"]);
+  // A name in the list is someone or something the participant knows, or a question; data that names nothing is a question.
+  const asks = (src: string) => { const r = run(src, town(), "mayor"); return r.ok ? [] : r.questions; };
+  expect(asks('statement(kind=notice, text="x", basis=["rec.733","the parks budget"])')).toEqual(['You don\'t know of anyone or anything called "the parks budget" (for basis).']);
+  expect(asks('statement(kind=notice, text="x", basis=[])')).toEqual(["basis should name at least one record."]);
+  expect(asks('statement(kind=notice, text="x", basis=[1,2])')).toEqual(["basis should be a record, or a list of records."]);
+  expect(asks('statement(kind=notice, text="x", basis={"permit":"rec.1"})')).toEqual(["basis should be a record, or a list of records."]);
+  expect(asks(`statement(kind=notice, text="x", basis=${JSON.stringify(Array.from({ length: 65 }, (_, i) => `rec.${i + 1}`))})`)).toEqual(["That cites more records than one act can: 64 at most."]);
+  // Every act it comes to is one the contract takes.
+  const ajv = new Ajv2020({ strict: true, strictRequired: false });
+  for (const f of ["common", "blocks", "records", "world-config", "participant-api", "outcomes", "module"]) ajv.addSchema(JSON.parse(readFileSync(join(import.meta.dir, `../../contracts/${f}.schema.json`), "utf8")));
+  const valid = ajv.getSchema("urn:oikos:contracts:0.8:blocks#/$defs/Block")!;
+  for (const src of ['money(to=acc-greenco, amount="$2,150", from=acc-city, basis=["rec.611","rec.305"])', 'claim(release=rec.70, basis=["rec.71","rec.72"])', 'statement(withdraw=rec.50, basis=["rec.733"])', 'structure(type=park, on=lot-00, by=greenco, price="$60,000", from=acc-city, basis=["rec.512","rec.498"])'])
+    for (const b of blocks(src)) expect([src, valid(b), valid.errors]).toEqual([src, true, null]);
+  // The preview says each of them.
+  const p = new Preview(town());
+  expect(p.of(blocks('statement(kind=notice, text="The pool closes.", basis=["rec.733","rec.741"])'))).toContain("citing rec.733 and rec.741.");
+  expect(p.of(blocks('claim(release=rec.70, basis=["rec.71","rec.72","rec.73"])'))).toContain("citing rec.71, rec.72 and rec.73.");
+});
+
+test("the payment pilot 10 lost (a finance seat's, citing four dockets and a budget) now resolves, to a request that cites all five", () => {
+  // The call as the translator wrote it (runs/pilot-10/town-1000.seed2.jsonl, draft.finance-system.2, t 5216402),
+  // which came back "basis should name something, not data" until the dockets were moved into the payment's purpose.
+  const call = 'money(amount="$3,187.73", basis=["rec.11904","rec.16123","rec.21887","rec.25703","rec.25150"], for="disposal of waste", from=acc-city, settles=rec.28337, to=acc-outside)';
+  const r = run(call, town(), "mayor");
+  if (!r.ok) throw new Error(r.questions.join(" "));
+  expect(r.blocks).toEqual([{
+    block: "publish", kind: "request", speaks_for: "city", addressed_to: ["bank"], visible_to: ["city", "bank"],
+    text: "Please pay $3,187.73 from acc-city to acc-outside, for disposal of waste.",
+    data: { outcome: { money: { from: "acc-city", to: "acc-outside", amount: "318773", for: "disposal of waste", settles: "rec.28337" } } },
+    basis: ["rec.11904", "rec.16123", "rec.21887", "rec.25703", "rec.25150"],
+  }]);
+  expect(new Preview(town()).of(r.blocks)).toContain("citing rec.11904, rec.16123, rec.21887, rec.25703 and rec.25150.");
 });

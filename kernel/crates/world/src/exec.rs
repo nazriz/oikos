@@ -11,7 +11,7 @@
 //! (through a position it has) can create or fill its own positions, as only a
 //! bank can move the money it keeps.
 
-use crate::blocks::{AgreementTerms, Block, Id, Record, RecordBody, Visibility};
+use crate::blocks::{AgreementTerms, Basis, BasisArg, Block, Id, Record, RecordBody, Visibility};
 use crate::canon::MAX_SAFE;
 use crate::money::{Money, MAX_MONEY};
 use crate::config::{check_channels, footprint_cells, split_space, Channel, ParticipantKind, Severity, BOUNDARY, PERSON, SELF};
@@ -726,6 +726,13 @@ impl<'a> Exec<'a> {
         x.as_deref().map(|v| self.r(v)).transpose()
     }
 
+    /// What a block cites as its basis, as the record will hold it: each one resolved, in the order written, and one
+    /// that comes to the same record as an earlier one (a name bound in this action, and its id) kept once.
+    fn cited(&self, basis: &Option<BasisArg>) -> R<Option<Basis>> {
+        let Some(b) = basis else { return Ok(None) };
+        Ok(Basis::of(b.ids().iter().map(|x| self.r(x)).collect::<R<Vec<_>>>()?))
+    }
+
     fn bind(&mut self, name: &Option<String>, id: &str) -> R<()> {
         if let Some(n) = name {
             if self.refs.insert(n.clone(), id.to_string()).is_some() {
@@ -1286,7 +1293,7 @@ impl<'a> Exec<'a> {
 
     /// Make and store a record authored by the acting participant, in its capacity. Checks only that
     /// everything it references exists.
-    fn new_record(&mut self, body: RecordBody, speaks_for: Option<Id>, visible_to: Option<Visibility>, basis: Option<Id>) -> R<Id> {
+    fn new_record(&mut self, body: RecordBody, speaks_for: Option<Id>, visible_to: Option<Visibility>, basis: Option<Basis>) -> R<Id> {
         let visible_to = match visible_to {
             Some(Visibility::Only(ids)) => Visibility::only(ids.iter().map(|i| self.r(i)).collect::<R<Vec<_>>>()?),
             Some(v) => v,
@@ -1306,7 +1313,7 @@ impl<'a> Exec<'a> {
         for e in rec.entities_named().into_iter().chain(rec.visibility_entities()) {
             self.entity_exists(e)?;
         }
-        if let Some(b) = &rec.basis {
+        for b in rec.basis.iter().flat_map(Basis::ids) {
             self.record_of_kind(b, "any")?;
         }
         self.st.store(rec.clone());
@@ -1868,27 +1875,27 @@ impl<'a> Exec<'a> {
 
             Block::RecordClaim { position, holder, counterparty, about, basis, speaks_for, visible_to, bind } => {
                 let body = RecordBody::Claim { position: *position, holder: self.r(holder)?, counterparty: self.ro(counterparty)?, about: about.clone() };
-                let id = self.new_record(body, self.ro(speaks_for)?, visible_to.clone(), self.ro(basis)?)?;
+                let id = self.new_record(body, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }
 
             Block::TransferClaim { claim, to, basis, speaks_for, visible_to, bind } => {
                 let claim = self.r(claim)?;
                 self.record_of_kind(&claim, "claim")?;
-                let id = self.new_record(RecordBody::ClaimTransfer { claim, to: self.r(to)? }, self.ro(speaks_for)?, visible_to.clone(), self.ro(basis)?)?;
+                let id = self.new_record(RecordBody::ClaimTransfer { claim, to: self.r(to)? }, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }
 
             Block::ReleaseClaim { claim, basis, speaks_for, visible_to, bind } => {
                 let claim = self.r(claim)?;
                 self.record_of_kind(&claim, "claim")?;
-                let id = self.new_record(RecordBody::ClaimRelease { claim }, self.ro(speaks_for)?, visible_to.clone(), self.ro(basis)?)?;
+                let id = self.new_record(RecordBody::ClaimRelease { claim }, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }
 
             Block::ProposeAgreement { terms, basis, speaks_for, visible_to, bind } => {
                 let terms = self.resolve_terms(terms)?;
-                let id = self.new_record(RecordBody::Agreement { terms }, self.ro(speaks_for)?, visible_to.clone(), self.ro(basis)?)?;
+                let id = self.new_record(RecordBody::Agreement { terms }, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }
 
@@ -1928,14 +1935,14 @@ impl<'a> Exec<'a> {
                     addressed_to,
                     place: place.clone(),
                 };
-                let id = self.new_record(body, self.ro(speaks_for)?, visible_to.clone(), self.ro(basis)?)?;
+                let id = self.new_record(body, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }
 
             Block::Withdraw { record, text, basis, speaks_for, visible_to, bind } => {
                 let record = self.r(record)?;
                 self.record_of_kind(&record, "any")?;
-                let id = self.new_record(RecordBody::Withdrawal { withdraws: record, text: text.clone() }, self.ro(speaks_for)?, visible_to.clone(), self.ro(basis)?)?;
+                let id = self.new_record(RecordBody::Withdrawal { withdraws: record, text: text.clone() }, self.ro(speaks_for)?, visible_to.clone(), self.cited(basis)?)?;
                 self.bind(bind, &id)
             }
 

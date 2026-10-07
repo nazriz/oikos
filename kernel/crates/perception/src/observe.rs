@@ -585,7 +585,8 @@ fn field(r: &Record, f: &str) -> Option<Value> {
         "at" => Some(Value::from(r.at)),
         "author" => Some(Value::from(r.author.as_str())),
         "speaks_for" => r.speaks_for.as_deref().map(Value::from),
-        "basis" => r.basis.as_deref().map(Value::from),
+        // (Of several, the one cited first: what a search orders by. Whether one is cited at all is `holds`.)
+        "basis" => r.basis.as_ref().map(|b| Value::from(b.first())),
         _ => {
             if let Some(p) = f.strip_prefix("data.") {
                 match &r.body {
@@ -616,6 +617,10 @@ fn compare(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
 
 fn holds(r: &Record, c: &crate::config::Condition) -> bool {
     use std::cmp::Ordering::*;
+    // A record resting on several: it equals a record if it cites it anywhere, and differs from one it cites nowhere.
+    if let ("basis", Some(b), CmpOp::Eq | CmpOp::Ne, Some(want)) = (c.field.as_str(), &r.basis, c.op, c.value.as_str()) {
+        return b.cites(want) == (c.op == CmpOp::Eq);
+    }
     let Some(v) = field(r, &c.field) else { return false };
     let Some(o) = compare(&v, &c.value) else { return false };
     match c.op {

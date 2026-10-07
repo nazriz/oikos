@@ -8,7 +8,7 @@
 // confirmed (the 2026-10-05 audit: the preview left a statement's `adico` and `formal` out). The test changes every
 // field of every kind of act and expects the preview to change.
 
-import { formatMoney, type Block } from "@oikos/participants";
+import { citedWords, formatMoney, type Block } from "@oikos/participants";
 import { ruleWords } from "@oikos/participants/llm";
 import type { Knowledge } from "./knowledge";
 
@@ -79,7 +79,7 @@ export class Preview {
   /** The sentence for an act, and which of its fields the sentence says. */
   private sentence(b: Block, next?: Block): [string, string[]] {
     const named = (x: any) => (x.speaks_for && this.k.entityOf(x.speaks_for) !== this.me ? ` in the name of ${this.who(x.speaks_for)}` : "");
-    const citing = (x: any, lead = ", citing ") => (x.basis ? `${lead}${x.basis}` : "");
+    const citing = (x: any, lead = ", citing ") => (x.basis ? `${lead}${citedWords(x)}` : "");
     const RECORD = ["speaks_for", "visible_to", "basis"]; // said by `named`, `seenBy` and `citing`, on the acts that make a record
     switch (b.block) {
       case "publish": {

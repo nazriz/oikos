@@ -1,0 +1,28 @@
+{
+  "block": "publish",
+  "kind": "request",
+  "speaks_for": "city",
+  "addressed_to": [
+    "bank"
+  ],
+  "visible_to": [
+    "city",
+    "bank"
+  ],
+  "text": "Please pay 318,773 from acc-city to acc-landfill, for disposal of waste.",
+  "data": {
+    "outcome": {
+      "money": {
+        "from": "acc-city",
+        "to": "acc-landfill",
+        "amount": "318773",
+        "for": "disposal of waste",
+        "settles": "rec.28337"
+      }
+    }
+  },
+  "basis": [
+    "rec.11904",
+    "rec.11904"
+  ]
+}

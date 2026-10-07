@@ -13,7 +13,7 @@ arg      := KEY "=" value
 value    := ID                    e.g.  lot-00-00   cell.3.4   apts-3/dwelling.2   acc-city   rec.412
           | NAME                  a variable bound on an earlier line of the same program
           | STRING                "…"  copied text: amounts, durations, free text
-          | JSON                  {…} or […]: structured data (integers only), for statement data and claim contents
+          | JSON                  {…} or […]: structured data (integers only), for statement data and claim contents; a list of ids (["a","b"]) where an argument takes several
           | call                  a nested call: an agreement's commitments (we_do, they_do)
 ```
 
@@ -56,7 +56,7 @@ Each function names a physical outcome. The resolver decides nothing on the part
 **Common argument meanings:**
 - `for`: whose name the act is in (`speaks_for`); records are in the name of the entity it acts for unless `for` says otherwise. On `money`, `for` is the payment's purpose (its memo).
 - `visible`: `public`, or ids.
-- `basis`: a record the act cites.
+- `basis`: the records the act cites in support of itself (what it is done under, and the papers that back it), in the order cited: one record bare (`basis=rec.412`), or several as a list (`basis=["rec.412","rec.4019"]`; at most 64). A list of one is that record alone, and one named twice is cited once: one basis has one form (blocks and records: Basis). A record that is the thing acted on (the invoice a payment `settles`, the record a statement withdraws, the form filled in) is not also a basis.
 
 ## Examples
 
