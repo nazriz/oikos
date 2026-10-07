@@ -93,7 +93,7 @@ export async function callModel(io: LlmIO, req: LlmRequest, seenSystems: Set<str
   } finally {
     if (io.budget) io.budget.reservedMicroUsd = (io.budget.reservedMicroUsd ?? 0) - worst;
   }
-  const cost = costMicroUsd(price, res.usage)!;
+  const cost = Math.max(costMicroUsd(price, res.usage)!, Math.ceil(res.usage.reported_cost_microusd ?? 0));
   if (io.budget) io.budget.spentMicroUsd += cost;
   await io.annotate({
     annotation: "usage", purpose: req.purpose, subject: req.subject, provider: adapter.provider, model: adapter.model,

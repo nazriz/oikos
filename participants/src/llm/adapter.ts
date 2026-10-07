@@ -47,6 +47,9 @@ export interface Usage {
   output_tokens: number;
   cache_read_tokens?: number;
   cache_write_tokens?: number;
+  /** What the provider itself says the call cost, where it says (Claude Code does): recorded as the call's cost where
+   * it is more than the tokens come to at the price on file, so a spending limit holds against what is really drawn. */
+  reported_cost_microusd?: number;
 }
 
 export interface LlmResponse {

@@ -220,3 +220,48 @@ test("a text written with its line breaks as themselves is read as the model mea
   const res = await adapter.complete({ purpose: "participant", subject: "x", system: "s", messages: [{ role: "user", content: "hi" }], tools: [{ name: "notebook", description: "", input_schema: {} }], maxTokens: 100 });
   expect(res.content).toEqual([{ type: "tool_use", id: "codex-1", name: "notebook", input: { text: 'Day 11.\nRates: 295 valued,\tnone levied.\nNext: "review" the draft.' } }]);
 });
+
+test("Claude Code: one `claude -p` per call with our system prompt in place of its own and no tools of its own; the object it answers with becomes tool uses; tokens, cached ones too, from the result; a limit stops the run", async () => {
+  const { ClaudeCodeAdapter, answerOf, claudeCodeSystem } = await import("../src/llm/claude-code");
+  const { UsageLimitReached } = await import("../src/llm/call");
+  const seen: { args: string[]; stdin: string; system: string }[] = [];
+  const result = (said: string, extra: object = {}) => JSON.stringify({ type: "result", is_error: false, num_turns: 1, result: said, total_cost_usd: 0.01, usage: { input_tokens: 4, output_tokens: 300, cache_read_input_tokens: 2900, cache_creation_input_tokens: 120 }, ...extra });
+  const answers = ["Here is what I do.", '```json\n{"tool":"do","input_json":"{\\"what\\":\\"Publish a notice.\\"}","also":[{"tool":"do","input_json":{"what":"Tell the clerk."}}],"text":""}\n```'];
+  const runner = async (args: string[], stdin: string) => {
+    seen.push({ args, stdin, system: await Bun.file(args[args.indexOf("--system-prompt-file") + 1]!).text() });
+    return { code: 0, stderr: "", stdout: result(answers[seen.length - 1]!) };
+  };
+  const r = await new ClaudeCodeAdapter("claude-sonnet-5-5@low", runner).complete(req);
+  // The first answer was words, not the object: asked again.
+  expect(seen.length).toBe(2);
+  const a = seen[1]!;
+  for (const f of ["-p", "--no-session-persistence", "--strict-mcp-config", "--disable-slash-commands"]) expect(a.args).toContain(f);
+  expect(a.args.slice(a.args.indexOf("--model"), a.args.indexOf("--model") + 2)).toEqual(["--model", "claude-sonnet-5-5"]);
+  expect(a.args.slice(a.args.indexOf("--effort"), a.args.indexOf("--effort") + 2)).toEqual(["--effort", "low"]);
+  expect(a.args.slice(a.args.indexOf("--tools"), a.args.indexOf("--tools") + 2)).toEqual(["--tools", ""]);
+  expect(a.args).not.toContain("--json-schema");
+  // What is the same call after call (the instructions and the tools) is the system prompt; the conversation is not in it.
+  expect(a.system).toBe(claudeCodeSystem(req));
+  expect(a.system).toContain("You are the mayor.");
+  expect(a.system).toContain("- do:");
+  expect(a.system).not.toContain("[used do:");
+  expect(a.stdin).toContain("[used do:");
+  expect(a.stdin).not.toContain("You are the mayor.");
+  expect(r.content).toEqual([
+    { type: "tool_use", id: "claude-code-1", name: "do", input: { what: "Publish a notice." } },
+    { type: "tool_use", id: "claude-code-2", name: "do", input: { what: "Tell the clerk." } },
+  ]);
+  expect(r.usage).toEqual({ input_tokens: 4, output_tokens: 300, cache_read_tokens: 2900, cache_write_tokens: 120, reported_cost_microusd: 10000 });
+  // An answer naming a tool that isn't one is no answer; with no tools, the words are.
+  expect(answerOf('{"tool":"pay","input_json":"{}"}', ["do"])).toBeUndefined();
+  expect(answerOf("Plain words.", [])).toEqual({ text: "Plain words." });
+  // Never the object: after the attempts, its words.
+  const words = await new ClaudeCodeAdapter("claude-sonnet-5-5", async () => ({ code: 0, stderr: "", stdout: result("I would rather not.") }), { attempts: 2 }).complete(req);
+  expect(words.content).toEqual([{ type: "text", text: "I would rather not." }]);
+  // The plan's limit: the run stops, to be resumed.
+  const limited = async () => ({ code: 1, stderr: "", stdout: result("Claude usage limit reached. Your limit will reset at 3pm.", { is_error: true }) });
+  await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", limited).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
+  // Any other failure is an error, with what it said.
+  const failing = async () => ({ code: 1, stdout: "", stderr: "not signed in" });
+  await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", failing, { attempts: 1 }).complete(req)).rejects.toThrow("not signed in");
+});

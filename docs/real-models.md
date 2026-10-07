@@ -15,6 +15,7 @@ oikos run worlds/town.yaml --seeds 1 --set mayor=llm --model anthropic/claude-so
   - `ollama/…`, a local open-weight model behind Ollama (`http://localhost:11434/v1` by default);
   - `local/… --base-url URL`, any other OpenAI-compatible server (vLLM, LM Studio);
   - `codex/…`, OpenAI models through the Codex CLI and a ChatGPT subscription (below).
+  - `claude-code/…`, Anthropic models through Claude Code and a Claude plan's monthly credit (below).
 - Keys are read from the environment and never logged.
 
 ## What guards it
@@ -62,6 +63,26 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
 - **The subscription's usage limits apply** (per few hours). The mock-LLM mayor makes about 130 calls a simulated year: fine for a pilot, not for batches. When Codex says the limit is reached, the run stops cleanly, as at a spending limit, and says to resume it once the limit resets (`oikos resume <log>`: every answer up to the stop is served from the log).
 - **The model version isn't pinned** as an API's is, so runs are less reproducible.
 - **Tested only against a stand-in:** no real `codex exec` has been run from here.
+
+## A Claude plan, through Claude Code
+
+`--model claude-code/<model> --budget DOLLARS` (for example `claude-code/claude-sonnet-5-5`, or `…@low` to name the effort) runs calls through Claude Code's non-interactive mode (`claude -p`), signed in with a Claude plan. Anthropic's support page says a paid plan has a monthly Agent SDK credit that `claude -p` draws on, in dollars at API rates, refreshed each billing cycle and not carried over; when it is spent, calls stop unless the account has usage credits switched on (https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan, read 2026-10-07). Pulling the plan's sign-in token out to call the API from our own code is not allowed; running `claude -p` is what the credit is for.
+
+**Setup, once:** Claude Code installed and signed in (`claude`, then `/login`). Keep usage credits off on the account unless spending past the monthly credit is meant.
+
+**How it runs:**
+- Each call is one `claude -p`: no tools of its own, no settings, skills or servers, no session kept, in an empty temporary directory, and without `ANTHROPIC_API_KEY` (with one set, Claude Code would bill the key).
+- Our system prompt replaces Claude Code's own (`--system-prompt-file`), so unlike Codex nothing sits under the seat's instructions. The tools and how to answer go with it, because they are the same call after call; the conversation goes in on stdin.
+- The answer is one JSON object in the shape the Codex adapter's schema has, asked for in words. An answer that isn't one is asked for again, then taken as words.
+- Tokens come from the result, cached ones too. Claude Code caches what repeats (the system prompt and tools) for an hour by itself.
+
+**What it costs, and the spending limit:**
+- It is priced as `anthropic/<model>` in `orchestrator/prices.json`, and needs `--budget` like any priced model.
+- Claude Code also says what each call cost, and that is more than its token counts come to at the published price: in the first smoke run (three simulated days, one mayor, five calls) $0.24 by its count against $0.09 by ours. Why is not known (thinking that is billed but not counted as output is my guess). The call's recorded cost is the larger of the two, so the limit holds against what Claude Code says is drawn.
+- `OIKOS_CLAUDE_CODE_LOG=<file>` adds each call's counts and reported cost to a file (never the prompt or the answer).
+- Forcing the answer's shape with `--json-schema` was tried and dropped: Claude Code then takes two to four turns of the model for one answer ($0.046 against $0.022 on one seat-sized call).
+
+**Caveats:** the plan's limits apply, and when Claude Code says a limit is reached the run stops cleanly to be resumed, as with Codex. What the account is really charged is on the account's usage page, not in our log: check the two against each other before trusting a projection.
 
 ## Pilots (directional testing, not evidence)
 

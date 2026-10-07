@@ -46,8 +46,8 @@ function collect(stream: ReadableStream<Uint8Array>): { text: () => string; done
  * it's still there `graceMs` later it's killed (KILL); and `drainMs` after that we stop waiting, for it and for its
  * output (something it started may still hold the pipes open), and return what came. So a stuck child can't hang a call.
  */
-export async function runBounded(cmd: string[], stdin: string, cwd: string, timeoutMs: number, graceMs = 5000, drainMs = 1000): Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean }> {
-  const p = Bun.spawn(cmd, { cwd, stdin: new Blob([stdin]), stdout: "pipe", stderr: "pipe" });
+export async function runBounded(cmd: string[], stdin: string, cwd: string, timeoutMs: number, graceMs = 5000, drainMs = 1000, env?: Record<string, string | undefined>): Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean }> {
+  const p = Bun.spawn(cmd, { cwd, stdin: new Blob([stdin]), stdout: "pipe", stderr: "pipe", ...(env ? { env } : {}) });
   const out = collect(p.stdout);
   const err = collect(p.stderr);
   let timedOut = false;
@@ -101,7 +101,7 @@ export function answerSchema(toolNames: string[]): object {
   };
 }
 
-function transcript(messages: LlmMessage[]): string {
+export function transcript(messages: LlmMessage[]): string {
   const part = (b: ContentBlock) =>
     b.type === "text" ? b.text : b.type === "tool_use" ? `[used ${b.name}: ${JSON.stringify(b.input)}]` : `[result of ${b.tool_use_id}: ${b.content}]`;
   return messages.map((m) => `${m.role === "user" ? "USER" : "YOU"}:\n${typeof m.content === "string" ? m.content : m.content.map(part).join("\n")}`).join("\n\n");
@@ -182,35 +182,42 @@ export class CodexCliAdapter implements LlmAdapter {
       } catch {
         answer = { text: readFileSync(last, "utf8").slice(0, 4000) };
       }
-      const content: ContentBlock[] = [];
-      if (answer.text) content.push({ type: "text", text: answer.text });
-      for (const u of [{ tool: answer.tool, input_json: answer.input_json }, ...(answer.also ?? [])]) {
-        if (!u.tool) continue;
-        let input: any;
-        try {
-          input = JSON.parse(u.input_json ?? "{}");
-        } catch {
-          // A line break or a tab written as itself inside a text (not as \n): the commonest way a long notebook
-          // comes back unreadable (the stress run of 2026-10-06: six of a finance officer's notebooks in two days).
-          // Each is written as its escape, and what the model wrote is read as it meant it.
-          try {
-            input = JSON.parse(controlsEscaped(u.input_json ?? ""));
-            content.push({ type: "tool_use", id: `codex-${++this.calls}`, name: u.tool, input });
-            continue;
-          } catch {
-            // not that: below
-          }
-          // A whole object followed by stray characters (pilot 7d: a notebook's text, then "}]}],"): the object, as the
-          // model wrote it. Anything else is recorded as it came, and treated as malformed.
-          input = leadingObject(u.input_json ?? "") ?? { _unparsed: u.input_json };
-        }
-        content.push({ type: "tool_use", id: `codex-${++this.calls}`, name: u.tool, input });
-      }
+      const content = answerContent(answer, () => `codex-${++this.calls}`);
       return { content, usage };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   }
+}
+
+/** An answer in `answerSchema`'s shape, as content blocks: its words, then each tool use with its input read from the
+ * JSON the model wrote (and, where that is not quite JSON, read as the model meant it). */
+export function answerContent(answer: { tool?: string; input_json?: string; also?: { tool?: string; input_json?: string }[]; text?: string }, nextId: () => string): ContentBlock[] {
+  const content: ContentBlock[] = [];
+  if (answer.text) content.push({ type: "text", text: answer.text });
+  for (const u of [{ tool: answer.tool, input_json: answer.input_json }, ...(answer.also ?? [])]) {
+    if (!u.tool) continue;
+    let input: any;
+    try {
+      input = JSON.parse(u.input_json ?? "{}");
+    } catch {
+      // A line break or a tab written as itself inside a text (not as \n): the commonest way a long notebook
+      // comes back unreadable (the stress run of 2026-10-06: six of a finance officer's notebooks in two days).
+      // Each is written as its escape, and what the model wrote is read as it meant it.
+      try {
+        input = JSON.parse(controlsEscaped(u.input_json ?? ""));
+        content.push({ type: "tool_use", id: nextId(), name: u.tool, input });
+        continue;
+      } catch {
+        // not that: below
+      }
+      // A whole object followed by stray characters (pilot 7d: a notebook's text, then "}]}],"): the object, as the
+      // model wrote it. Anything else is recorded as it came, and treated as malformed.
+      input = leadingObject(u.input_json ?? "") ?? { _unparsed: u.input_json };
+    }
+    content.push({ type: "tool_use", id: nextId(), name: u.tool, input });
+  }
+  return content;
 }
 
 /** JSON text with the control characters inside its strings written as their escapes (a raw line break as \n), and

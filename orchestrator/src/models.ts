@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DecideAdapter } from "../../translator/model/adapter";
-import { AnthropicAdapter, CodexCliAdapter, OpenAICompatibleAdapter, type Budget, type LlmAdapter, type Price } from "@oikos/participants/llm";
+import { AnthropicAdapter, ClaudeCodeAdapter, CodexCliAdapter, OpenAICompatibleAdapter, type Budget, type LlmAdapter, type Price } from "@oikos/participants/llm";
 
 /** Providers whose calls cost nothing per call: local models (your compute), and the Codex CLI on a ChatGPT subscription (flat rate; its usage limits apply). */
 export const LOCAL_PROVIDERS = ["ollama", "local", "codex", "decide"];
@@ -33,6 +33,9 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
   const prices = priceTable();
   const local = LOCAL_PROVIDERS.includes(provider);
   if (local) prices[name] = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
+  // Claude Code on a Claude plan draws on the plan's monthly credit, at the model's published API price:
+  // it is priced as that model (and needs a spending limit like any other), whatever effort is named with it.
+  if (provider === "claude-code" && prices[`anthropic/${model.split("@")[0]}`]) prices[name] = prices[`anthropic/${model.split("@")[0]}`]!;
   if (!prices[name]) throw new Error(`no published price for ${name} in orchestrator/prices.json: add it (with its source) before using this model`);
   if (!local && o.budgetUsd === undefined) throw new Error(`a spending limit is required for ${name}: add --budget <dollars per run>`);
   const budget = o.budgetUsd !== undefined ? { limitMicroUsd: Math.round(o.budgetUsd * 1e6), spentMicroUsd: 0 } : undefined;
@@ -45,9 +48,10 @@ export function chooseModel(name: string, o: { budgetUsd?: number; baseUrl?: str
     provider === "anthropic" ? new AnthropicAdapter(model, { apiKey: need("ANTHROPIC_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "openai" ? new OpenAICompatibleAdapter("openai", model, { apiKey: need("OPENAI_API_KEY"), ...(o.baseUrl ? { baseUrl: o.baseUrl } : {}) })
     : provider === "codex" ? new CodexCliAdapter(model) // ("model@effort": the effort is part of the model's name, so the log records it)
+    : provider === "claude-code" ? new ClaudeCodeAdapter(model) // ("model@effort", as for codex)
     : provider === "decide" ? new DecideAdapter(model, env.OIKOS_DECIDE_THRESHOLD ? { threshold: Number(env.OIKOS_DECIDE_THRESHOLD) } : {}) // our own trained model (translator/model)
     : provider === "ollama" ? new OpenAICompatibleAdapter("ollama", model, { baseUrl: o.baseUrl ?? "http://localhost:11434/v1" })
     : provider === "local" ? new OpenAICompatibleAdapter("local", model, { baseUrl: o.baseUrl ?? (() => { throw new Error("local/<model> needs --base-url (an OpenAI-compatible server)"); })() })
-    : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, codex, ollama or local`); })();
+    : (() => { throw new Error(`unknown provider "${provider}": anthropic, openai, codex, claude-code, ollama or local`); })();
   return { adapter, prices, ...(budget ? { budget } : {}) };
 }

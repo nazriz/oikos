@@ -8,4 +8,5 @@ export * from "./words";
 export * from "./anthropic";
 export * from "./openai";
 export * from "./codex";
+export * from "./claude-code";
 export * from "./consult";
