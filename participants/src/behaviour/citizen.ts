@@ -26,7 +26,7 @@
 
 import { cents } from "../money";
 import type { Eligibility, LookRequest, Observation, ParticipantAction, Record, SiteStructure, StatementRecord } from "../contracts";
-import { channels } from "../contracts";
+import { basesOf, channels, cites } from "../contracts";
 import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
@@ -472,7 +472,7 @@ export const citizen: BehaviourModule = {
         if (r.terms.template === "lease" && !home) {
           const lt = leaseTerms(r, me);
           const landlord = r.terms.parties.find((x) => x !== me)!;
-          const order = book.all("request").find((x) => x.record === "statement" && x.kind === "request" && x.basis === r.id && x.speaks_for === me)?.id;
+          const order = book.all("request").find((x) => x.record === "statement" && x.kind === "request" && cites(x, r.id) && x.speaks_for === me)?.id;
           home = { agreement: r.id, space: lt.space!, structure: lt.structure!, landlord, rent: lt.rent, order, movedIn: true };
         }
         if (r.terms.template === "employment" && !job) {
@@ -551,7 +551,7 @@ export const citizen: BehaviourModule = {
         // (A home's price, paid us for one we're selling, and a mortgage's principal aren't income: they're the home's.)
         if (selling?.listing === "pending") selling.listing = book.open("property_for_sale").find((r) => r.speaks_for === me && r.data?.lot === selling!.lot)?.id ?? "pending";
         if (selling?.listing && selling.listing !== "pending" && !selling.listings.includes(selling.listing)) selling.listings.push(selling.listing);
-        const sale = selling?.listings.length ? book.open("property_purchase").find((r) => selling!.listings.includes(r.basis ?? "") && r.data?.account === tx.from) : undefined;
+        const sale = selling?.listings.length ? book.open("property_purchase").find((r) => basesOf(r).some((b) => selling!.listings.includes(b)) && r.data?.account === tx.from) : undefined;
         if (sale && selling) {
           selling.buyer ??= sale.speaks_for;
           selling.buyerAccount ??= tx.from;
@@ -912,7 +912,7 @@ export const citizen: BehaviourModule = {
       for (const r of fresh) {
         if (r.record !== "agreement" || !r.terms.parties.includes(me) || book.signedBy(r.id, me)) continue;
         const other = r.terms.parties.find((x) => x !== me)!;
-        if (r.terms.template === "lease" && home && isLeaseholder() && r.basis === home.agreement && r.terms.parties.includes(home.landlord)) {
+        if (r.terms.template === "lease" && home && isLeaseholder() && cites(r, home.agreement) && r.terms.parties.includes(home.landlord)) {
           // A new lease for the home we have, as the old one runs out: signed if we can bear its rent (moving costs
           // too), its rent paid on the old one's days from the first after the old ends; the old order stops after its
           // last payment.
@@ -1894,7 +1894,7 @@ export const citizen: BehaviourModule = {
       } else if (s?.listing && s.listing !== "pending" && !s.sold) {
         // (A purchase answering any listing we made of it: until 2026-10-05 only the current one, and a buyer whose
         // mortgage came through as we relisted for less paid us, and got nothing.)
-        const buy = s.buyer ? undefined : book.open("property_purchase").filter((r) => s.listings.includes(r.basis ?? "") && (r.addressed_to ?? []).includes(me)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))[0];
+        const buy = s.buyer ? undefined : book.open("property_purchase").filter((r) => basesOf(r).some((b) => s.listings.includes(b)) && (r.addressed_to ?? []).includes(me)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))[0];
         if (buy) {
           s.buyer = buy.speaks_for;
           s.buyerAccount = String(buy.data?.account);
@@ -1922,7 +1922,7 @@ export const citizen: BehaviourModule = {
         const fig = book.open("loan_payout").find((r) => r.data?.loan === s.loan && (r.addressed_to ?? []).includes(me));
         if (fig) {
           const amount = cents(fig.data?.amount ?? 0);
-          const order = book.all("request").find((r) => r.record === "statement" && r.kind === "request" && r.basis === s.loan && r.speaks_for === me && !book.withdrawn.has(r.id));
+          const order = book.all("request").find((r) => r.record === "statement" && r.kind === "request" && cites(r, s.loan) && r.speaks_for === me && !book.withdrawn.has(r.id));
           steps.push(because(`Paying our mortgage off (${usd(amount)}), and stopping its repayments.`,
             pay(String(fig.data?.account), amount, { from: acc.account, for: `Paying off ${s.loan}.`, settles: s.loan }), ...(order ? [withdraw(order.id, "Mortgage paid off.")] : [])));
           if (s.leaveAfter) soldAndGoing = t;
@@ -2169,7 +2169,7 @@ export const citizen: BehaviourModule = {
       for (const r of book.ofType("agreement")) {
         if (r.record !== "agreement" || r.id === home?.agreement || r.id === job?.agreement || !r.terms.parties.includes(me) || !book.inForce(r.id)) continue;
         if (!r.terms.termination?.some((x) => x.party === me)) continue;
-        for (const o of book.all("request")) if (o.record === "statement" && o.basis === r.id && o.speaks_for === me && !book.withdrawn.has(o.id)) s.push(withdraw(o.id, "Leaving town."));
+        for (const o of book.all("request")) if (o.record === "statement" && cites(o, r.id) && o.speaks_for === me && !book.withdrawn.has(o.id)) s.push(withdraw(o.id, "Leaving town."));
         s.push(notice(r.id, "Leaving town."));
       }
       s.push(say("departure", `${me} has left town.`));

@@ -8,7 +8,7 @@
 import { cents, smallestNow } from "../money";
 import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
-import { channels } from "../contracts";
+import { basesOf, channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team } from "./common";
 import { Staffing, stepper } from "./firms";
@@ -58,7 +58,7 @@ export const mayorCode: BehaviourModule = {
       (obs) => {
         for (const r of book.absorb(obs)) {
           if (!ours(r)) continue;
-          if (r.basis) acted.add(r.basis);
+          for (const b of basesOf(r)) acted.add(b);
           if (r.record === "statement" && r.kind === "permit_application" && r.data?.structure_type === p.park_type) parkYear = Math.max(parkYear, Math.floor(r.at / YEAR));
           if (r.record === "statement" && r.kind === "permit_application" && r.data?.structure_type === p.road_type) roadsAsked.push({ at: r.at, id: r.id });
         }
@@ -145,8 +145,8 @@ export const mayorCode: BehaviourModule = {
         for (const inv of book.open("invoice")) {
           if (handled.has(inv.id) || acted.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           handled.add(inv.id);
-          const ag = book.records.get(inv.basis ?? "");
-          if (ag?.record === "agreement" && ours(ag)) {
+          const ag = basesOf(inv).map((b) => book.records.get(b)).find((x) => x?.record === "agreement" && ours(x));
+          if (ag) {
             steps.push(because("An invoice for work we commissioned: approving it in writing, as the payments procedure requires.", say("approval", `Approved: pay invoice ${inv.id}.`, { to: [me], basis: inv.id, data: { invoice: inv.id } })));
           }
         }
@@ -824,7 +824,7 @@ function schedules(book: Book, me: string): { schedule: StatementRecord; s: LawS
 
 /** Is this proposal made on one of the town's amendment forms? (A form made proposal's basis is its form.) */
 function amendment(book: Book, me: string, prop: StatementRecord | undefined): Amendment | undefined {
-  const form = prop?.basis ? book.records.get(prop.basis) : undefined;
+  const form = basesOf(prop).map((b) => book.records.get(b)).find((x) => x?.record === "statement" && x.kind === "form");
   if (!prop || form?.record !== "statement" || form.kind !== "form" || form.speaks_for !== me || typeof form.data?.amends !== "string") return undefined;
   const found = schedules(book, me).find((x) => x.schedule.id === form.data.amends);
   if (!found) return undefined;

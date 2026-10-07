@@ -84,9 +84,11 @@ export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: str
 
 class Resolver {
   private refs = new Set<string>();
+  /** The names the program's own lines bind (`refs` also holds the ones made up here). */
+  private bound = new Set<string>();
   private n = 0;
   constructor(private k: Knowledge, program: { lines: calls.Line[] }, private readonly me: string) {
-    for (const l of program.lines) if (l.bind) this.refs.add(l.bind);
+    for (const l of program.lines) if (l.bind) this.refs.add(l.bind), this.bound.add(l.bind);
   }
 
   /** An amount as the world writes its money. */
@@ -125,6 +127,35 @@ class Resolver {
       throw new Ask(`You don't know of anyone or anything called "${named}" (for ${what}).`);
     }
     throw new Ask(`${what} should name something, not ${"json" in v ? "data" : "a call"}.`);
+  }
+  /** What the act cites: one record as any id is written, or a list of records, passed on in the order given. In a
+   * list, a name bound on a line of the program is that line's record, and anything not written as an id is a name
+   * the participant knows. One cited twice is kept where it first stands, and a list of one is that record alone
+   * (one basis has one form: contracts, Basis). */
+  private basis(c: Call): { basis?: string | string[] } {
+    const v = this.raw(c, "basis");
+    if (v === undefined || !("json" in v)) {
+      const one = this.id(c, "basis");
+      return one === undefined ? {} : { basis: one };
+    }
+    if (!Array.isArray(v.json) || !v.json.every((x) => typeof x === "string")) throw new Ask("basis should be a record, or a list of records.");
+    const out: string[] = [];
+    for (const x of v.json as string[]) {
+      const ref = this.bound.has(x) ? x : undefined;
+      let id: string;
+      if (ref !== undefined) id = `$${ref}`;
+      else if (/^[a-z0-9_.:\/-]+$/.test(x)) id = x;
+      else {
+        const found = this.k.byName(x);
+        if (found.length === 0) throw new Ask(`You don't know of anyone or anything called "${x}" (for basis).`);
+        if (found.length > 1) throw new Ask(`More than one basis is called "${x}": ${found.join(", ")}. Which one?`);
+        id = found[0]!;
+      }
+      if (!out.includes(id)) out.push(id);
+    }
+    if (out.length === 0) throw new Ask("basis should name at least one record.");
+    if (out.length > 64) throw new Ask("That cites more records than one act can: 64 at most.");
+    return { basis: out.length === 1 ? out[0]! : out };
   }
   private need(c: Call, key: string, question: string): string {
     const x = this.id(c, key);
@@ -324,7 +355,7 @@ class Resolver {
       block: "publish", kind: "request", speaks_for: this.me, addressed_to: [keeper], visible_to: [this.me, keeper],
       text: `Please pay ${this.sum(out.amount)} from ${from} to ${out.to}${every ? ` every ${Math.round(every / 86_400)} days` : ""}${out.for ? `, for ${out.for}` : ""}.`,
       data: { outcome: { money: { from, ...out } }, ...(every ? { every } : {}), ...(first !== undefined ? { first } : {}) },
-      ...(this.id(c, "basis") ? { basis: this.id(c, "basis") } : {}), ...(bind ? { ref: bind } : {}),
+      ...this.basis(c), ...(bind ? { ref: bind } : {}),
     }];
   }
 
@@ -353,7 +384,7 @@ class Resolver {
     if (!by) throw new Ask(`Who should ${place}?`);
     const type = remove ? undefined : this.need(c, "type", "What should be built?");
     const on = remove ? undefined : this.need(c, "on", "On which lot or cell?");
-    const basis = this.id(c, "basis");
+    const basis = this.basis(c);
     if (this.k.entityOf(by) === this.me) {
       // Building it yourself (phase B): the materials come from your own holding where you keep them (`materials_at`),
       // and the building work is work (`work`); demolition begins, and its work follows.
@@ -370,7 +401,7 @@ class Resolver {
     const ref = bind ?? this.fresh("offer");
     return [
       {
-        block: "propose_agreement", speaks_for: this.me, ref, ...(basis ? { basis } : {}),
+        block: "propose_agreement", speaks_for: this.me, ref, ...basis,
         terms: {
           template: "construction", parties: [this.me, builder],
           commitments: [
@@ -499,7 +530,7 @@ class Resolver {
   }
 
   private claim(c: Call, bind?: string): Block[] {
-    const common = { ...this.speaksFor(c), ...(this.id(c, "basis") ? { basis: this.id(c, "basis") } : {}), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) };
+    const common = { ...this.speaksFor(c), ...this.basis(c), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) };
     const release = this.id(c, "release");
     if (release) return [{ block: "release_claim", claim: release, ...common }];
     const transfer = this.id(c, "transfer");
@@ -549,7 +580,7 @@ class Resolver {
     const ref = bind ?? this.fresh("offer");
     return [
       {
-        block: "propose_agreement", ref, speaks_for: me, ...(this.id(c, "basis") ? { basis: this.id(c, "basis") } : {}),
+        block: "propose_agreement", ref, speaks_for: me, ...this.basis(c),
         ...(this.visible(c) ? { visible_to: this.visible(c) } : {}),
         terms: { ...(this.label(c, "template") ? { template: this.label(c, "template") } : {}), parties: [me, other], commitments, ...(term ? { term } : {}), ...(then ? { then } : {}), ...(termination.length ? { termination } : {}), ...(text ? { text } : {}) },
       },
@@ -558,7 +589,7 @@ class Resolver {
   }
 
   private statement(c: Call, bind?: string): Block[] {
-    const common = { ...this.speaksFor(c), ...(this.id(c, "basis") ? { basis: this.id(c, "basis") } : {}), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) };
+    const common = { ...this.speaksFor(c), ...this.basis(c), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) };
     const withdraw = this.id(c, "withdraw");
     if (withdraw) return [{ block: "withdraw", record: withdraw, ...(this.str(c, "text") ? { text: this.str(c, "text") } : {}), ...common }];
     const kind = this.label(c, "kind");

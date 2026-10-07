@@ -4,6 +4,7 @@
 // order. Nothing happens because of an order unless someone acts on it: the parties obey it or not, and an unpaid
 // order to pay is enforced by the registrar, who orders the debtor's bank to pay from what it holds (a garnishee order).
 
+import { cites } from "../contracts";
 import { cents } from "../money";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
 import { because, Book, breaches, noting, DAY, say, type Step, usd } from "./common";
@@ -57,7 +58,7 @@ export const member: BehaviourModule = {
           const a = book.records.get(id) as any;
           if (!a) continue;
           const kind = String(a.data.kind), applicant = a.speaks_for as string, against = String(a.data.against);
-          const answer = book.open("tribunal_response").filter((r) => r.basis === id && r.speaks_for === against).sort((x, y) => y.at - x.at)[0];
+          const answer = book.open("tribunal_response").filter((r) => cites(r, id) && r.speaks_for === against).sort((x, y) => y.at - x.at)[0];
           const order = (finding: string, text: string, data: object, why: string) => steps.push(because(why,
             say("tribunal_order", `Order on application ${id}: ${text}`, { to: [applicant, against], visible: [applicant, against, me], basis: id, data: { application: id, kind, applicant, against, finding, ...data } })));
           if (kind === "rent_increase") {
