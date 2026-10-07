@@ -198,6 +198,7 @@ fn leave_spaces(s: &Statics, st: &mut State, sid: &str, who: Option<&str>, only:
     settle(s, st, sid);
     let mut left: Vec<(Id, Id)> = vec![];
     if let Some(m) = st.occupancy.get_mut(sid) {
+        let m = Arc::make_mut(m);
         for (space, bodies) in m.iter_mut() {
             if !leaves(space, bodies) {
                 continue;

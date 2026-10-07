@@ -41,8 +41,9 @@ pub struct State {
     pub closed_accounts: Map<Id, ClosedAccount>,
     pub cells: Map<Id, Cell>,
     pub structures: Map<Id, Structure>,
-    /// structure -> space -> the bodies in it
-    pub occupancy: Map<Id, BTreeMap<Id, BTreeSet<Id>>>,
+    /// structure -> space -> the bodies in it. (Each structure's behind an `Arc`, as accounts are, and each space's
+    /// departures below: a move copies the one changed, not the 64 of the tree node it's in.)
+    pub occupancy: Map<Id, Arc<BTreeMap<Id, BTreeSet<Id>>>>,
     /// body -> the structures it's in (in any space), in id order: derived from `occupancy` and kept with it (`enter`,
     /// `left_space`), never serialised, so the state and its hash are unchanged. For finding where someone is without
     /// looking through every building (`structures_of`).
@@ -50,7 +51,7 @@ pub struct State {
     pub whereabouts: Map<Id, BTreeSet<Id>>,
     /// space -> its last few departures (who left, why, when): what those who can see who's there also see.
     #[serde(default, skip_serializing_if = "Map::is_empty")]
-    pub departures: Map<Id, Vec<Departure>>,
+    pub departures: Map<Id, Arc<Vec<Departure>>>,
     pub records: Map<Id, Stored>,
     /// Each agreement's signatures and notices, as they're made: derived from the records (never serialised, so the
     /// state and its hash are unchanged), for reading agreements by their terms without scanning every record.
@@ -231,12 +232,12 @@ impl State {
     /// Note that someone left a space (keeping the last few).
     pub fn record_departure(&mut self, space: &str, occupant: &str, reason: crate::events::VacateReason) {
         let t = self.t;
-        let mut list = self.departures.get(space).cloned().unwrap_or_default();
+        let mut list = self.departures.get(space).map(|l| (**l).clone()).unwrap_or_default();
         list.push(Departure { occupant: occupant.into(), reason, at: t });
         if list.len() > DEPARTURES_KEPT {
             list.remove(0);
         }
-        self.departures.insert(space.into(), list);
+        self.departures.insert(space.into(), Arc::new(list));
     }
 }
 
@@ -687,7 +688,7 @@ impl State {
 
     /// Put a body into a space of a structure (the only way into `occupancy`, so `whereabouts` keeps step).
     pub fn enter(&mut self, sid: &str, space: &str, body: &str) {
-        self.occupancy.entry(sid.to_string()).or_default().entry(space.to_string()).or_default().insert(body.to_string());
+        Arc::make_mut(self.occupancy.entry(sid.to_string()).or_default()).entry(space.to_string()).or_default().insert(body.to_string());
         self.whereabouts.entry(body.to_string()).or_default().insert(sid.to_string());
     }
 
