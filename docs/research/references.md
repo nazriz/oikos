@@ -164,6 +164,12 @@ sources); this list is for the architecture and design ideas.
 | Fine-tuning a pretrained encoder at a lower rate than the layers added on top of it | Howard, J. & Ruder, S. (2018), "Universal language model fine-tuning for text classification", *ACL* (discriminative fine-tuning) **(to confirm)** | `py/train.py`: `--encoder-lr` for the encoder, `--lr` for the writer and heads |
 | Fitting one temperature on held-out data so stated confidence matches how often answers are right (to confirm: not built yet) | Guo, C., Pleiss, G., Sun, Y. & Weinberger, K. Q. (2017), "On calibration of modern neural networks", *ICML* | Planned for the threshold below which the model asks back |
 
+## What an act rests on (contracts: Basis; docs/decisions.md, 2026-10-08)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A payment is passed on its supporting documents together (the order, the record of receipt, the invoice) and on the authority to spend (the appropriation), each cited on the voucher | The three-way match and the payment voucher of accounts-payable and public-finance practice: e.g. Romney, M. & Steinbart, P., *Accounting Information Systems*, Pearson (the expenditure cycle) **(to confirm)**; International Federation of Accountants, *Handbook of International Public Sector Accounting Pronouncements* (on appropriations as authority to spend) **(to confirm)** | `basis` as one record or several, in the order cited (blocks and records: `Basis`); the translator's rule that every record cited in support is a basis and the record acted on is not |
+
 ## Running large towns (docs/decisions.md, 2026-10-08; participants/src/behaviour/common.ts)
 
 | Idea | Citation | Used in |

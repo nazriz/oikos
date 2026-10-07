@@ -83,6 +83,14 @@ export const CASES: Case[] = [
   { id: "pilot-buy-building", request: "Buy one finished park on town lot [lot-01] from GreenCo [greenco] for $97,500 out of [acc-city].",
     expect: ['structure(type=park, on=lot-01, by=greenco, price="$97,500", from=acc-city)'] },
 
+  // An act resting on several records (seen; added 2026-10-08, when basis became one record or a list): every record
+  // cited in support, in the order given; the record acted on (an invoice settled) is not one of them.
+  { id: "pay-several-bases", request: "Pay GreenCo's invoice rec.640: $2,150 from acc-city to acc-greenco for mowing, on work dockets rec.611 and rec.627 and within the parks budget rec.305.",
+    expect: ['money(to=acc-greenco, amount="$2,150", from=acc-city, for="mowing", settles=rec.640, basis=["rec.611","rec.627","rec.305"])'] },
+  { id: "build-several-bases", request: "Have Millbrook Builders [builder] put up a hall on lot-02 for $410,000 from acc-city, under permit rec.512 and the council's resolution rec.498.",
+    expect: ['structure(type=hall, on=lot-02, by=builder, price="$410,000", from=acc-city, basis=["rec.512","rec.498"])'] },
+  { id: "notice-several-bases", request: 'Publish a notice: "The pool closes for repairs from day 200." It rests on the council\'s decision rec.733 and the inspector\'s report rec.741.',
+    expect: ['statement(kind=notice, text="The pool closes for repairs from day 200.", basis=["rec.733","rec.741"])', 'statement(kind=notice, text="The pool closes for repairs from day 200.", visible=public, basis=["rec.733","rec.741"])'] },
   // Added 2026-10-02 as held-out cases, phrased as the pilots' mayors wrote; seen since 2026-10-05 (above).
   // money
   { id: "ho-pay-words", was_held_out: true, request: "Please transfer $2,500 from acc-city to Millbrook Builders for the footpath.",
