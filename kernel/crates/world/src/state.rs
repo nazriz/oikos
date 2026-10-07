@@ -743,6 +743,29 @@ impl State {
 pub struct GroundCache {
     pub epoch: u64,
     pub trips: std::sync::Mutex<Map<(Id, Id), (u64, i64)>>,
+    /// What entering each cell costs, as of an epoch (travel.rs): the same for every trip until the ground changes.
+    pub costs: std::sync::Mutex<Option<(u64, Arc<CellCosts>)>>,
+}
+
+/// What entering each cell of the ground costs a traveller (seconds), over the rectangle the cells lie in: none where
+/// there's no cell.
+#[derive(Debug, Default)]
+pub struct CellCosts {
+    pub x0: i64,
+    pub y0: i64,
+    pub w: i64,
+    pub h: i64,
+    pub seconds: Vec<Option<i64>>,
+}
+
+impl CellCosts {
+    pub fn at(&self, x: i64, y: i64) -> Option<i64> {
+        let (dx, dy) = (x - self.x0, y - self.y0);
+        if dx < 0 || dy < 0 || dx >= self.w || dy >= self.h {
+            return None;
+        }
+        self.seconds[(dy * self.w + dx) as usize]
+    }
 }
 impl GroundCache {
     /// The ground has changed: every trip is worked out afresh.
@@ -761,7 +784,11 @@ impl GroundCache {
 }
 impl Clone for GroundCache {
     fn clone(&self) -> Self {
-        GroundCache { epoch: self.epoch, trips: std::sync::Mutex::new(self.trips.lock().map(|t| t.clone()).unwrap_or_default()) }
+        GroundCache {
+            epoch: self.epoch,
+            trips: std::sync::Mutex::new(self.trips.lock().map(|t| t.clone()).unwrap_or_default()),
+            costs: std::sync::Mutex::new(self.costs.lock().map(|c| c.clone()).unwrap_or_default()),
+        }
     }
 }
 impl PartialEq for GroundCache {

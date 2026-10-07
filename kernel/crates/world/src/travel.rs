@@ -2,10 +2,11 @@
 //! over the cells between, each cell costing what its cover says (a road quicker, water slower) or the world's default.
 //! Physics only: where anyone goes, and why, is theirs.
 
-use crate::state::State;
+use crate::state::{CellCosts, State};
 use crate::statics::Statics;
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, BTreeMap};
+use std::collections::BinaryHeap;
+use std::sync::Arc;
 
 /// How far around the two ends a path may wander (cells).
 const MARGIN: i64 = 8;
@@ -28,28 +29,56 @@ pub fn seconds(s: &Statics, st: &State, from: &str, to: &str) -> i64 {
     secs
 }
 
+/// What entering each cell costs, by its cover (a road quicker, water slower) or the world's default: worked out for
+/// the whole ground once, and again when the ground changes (a path asks it of every cell it might cross).
+fn costs(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelCfg) -> Arc<CellCosts> {
+    if let Ok(kept) = st.ground.costs.lock() {
+        if let Some((_, costs)) = kept.as_ref().filter(|(epoch, _)| *epoch == st.ground.epoch) {
+            return costs.clone();
+        }
+    }
+    // (A path finds a cell by the id its place has: a cell is where its id says, whatever else it says.)
+    let placed = |id: &str| crate::config::cell_xy(id).filter(|(x, y)| crate::config::cell_id(*x, *y) == id);
+    let (mut x0, mut y0, mut x1, mut y1) = (i64::MAX, i64::MAX, i64::MIN, i64::MIN);
+    for (x, y) in st.cells.keys().filter_map(|id| placed(id)) {
+        (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+    }
+    let mut costs = CellCosts::default();
+    if x0 <= x1 && y0 <= y1 {
+        costs = CellCosts { x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1, seconds: vec![None; ((x1 - x0 + 1) * (y1 - y0 + 1)) as usize] };
+        for (id, c) in st.cells.iter() {
+            let Some((x, y)) = placed(id) else { continue };
+            let building = c.structure.as_ref().and_then(|x| st.structures.get(x));
+            let cover = oikos_nature::cover_of(&s.config.catalogue, c.terrain.as_deref(), building.map(|b| s.types.get(&b.structure_type).and_then(|t| t.cover.as_deref())));
+            costs.seconds[((y - y0) * costs.w + (x - x0)) as usize] = Some(*travel.by_cover.get(&cover).unwrap_or(&travel.seconds_per_cell));
+        }
+    }
+    let costs = Arc::new(costs);
+    if let Ok(mut kept) = st.ground.costs.lock() {
+        *kept = Some((st.ground.epoch, costs.clone()));
+    }
+    costs
+}
+
 /// The quickest path's time, worked out.
 fn path(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelCfg, from: &str, to: &str) -> i64 {
     let (Some(a), Some(b)) = (st.structures.get(from), st.structures.get(to)) else { return 0 };
     let (Some((ax, ay)), Some((bx, by))) = (crate::config::cell_xy(&a.at), crate::config::cell_xy(&b.at)) else { return 0 };
-    let cost = |x: i64, y: i64| -> Option<i64> {
-        let id = crate::config::cell_id(x, y);
-        let c = st.cells.get(&id)?;
-        let building = c.structure.as_ref().and_then(|x| st.structures.get(x));
-        let cover = oikos_nature::cover_of(&s.config.catalogue, c.terrain.as_deref(), building.map(|b| s.types.get(&b.structure_type).and_then(|t| t.cover.as_deref())));
-        Some(*travel.by_cover.get(&cover).unwrap_or(&travel.seconds_per_cell))
-    };
+    let costs = costs(s, st, travel);
     let (x0, x1, y0, y1) = (ax.min(bx) - MARGIN, ax.max(bx) + MARGIN, ay.min(by) - MARGIN, ay.max(by) + MARGIN);
-    // Dijkstra: the cost of a path is what entering each cell on it takes.
-    let mut best: BTreeMap<(i64, i64), i64> = BTreeMap::new();
+    // Dijkstra: the cost of a path is what entering each cell on it takes. (The best found so far, for each cell of
+    // the rectangle the path may wander in.)
+    let w = x1 - x0 + 1;
+    let slot = |x: i64, y: i64| ((y - y0) * w + (x - x0)) as usize;
+    let mut best: Vec<Option<i64>> = vec![None; (w * (y1 - y0 + 1)) as usize];
     let mut heap = BinaryHeap::new();
-    best.insert((ax, ay), 0);
+    best[slot(ax, ay)] = Some(0);
     heap.push(Reverse((0i64, ax, ay)));
     while let Some(Reverse((d, x, y))) = heap.pop() {
         if (x, y) == (bx, by) {
             return d;
         }
-        if best.get(&(x, y)).is_some_and(|&b| b < d) {
+        if best[slot(x, y)].is_some_and(|b| b < d) {
             continue;
         }
         for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
@@ -57,10 +86,10 @@ fn path(s: &Statics, st: &State, travel: &oikos_contracts::config::TravelCfg, fr
             if nx < x0 || nx > x1 || ny < y0 || ny > y1 {
                 continue;
             }
-            let Some(c) = cost(nx, ny) else { continue };
+            let Some(c) = costs.at(nx, ny) else { continue };
             let nd = d.saturating_add(c.max(0));
-            if best.get(&(nx, ny)).is_none_or(|&b| nd < b) {
-                best.insert((nx, ny), nd);
+            if best[slot(nx, ny)].is_none_or(|b| nd < b) {
+                best[slot(nx, ny)] = Some(nd);
                 heap.push(Reverse((nd, nx, ny)));
             }
         }

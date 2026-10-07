@@ -80,8 +80,13 @@ fn full(data: &ChannelData) -> View {
     v
 }
 
-fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
+/// (Returns how many records were handed over by reference.)
+fn check_run(params: &WorldParams, ops: &[Op]) -> Result<usize, TestCaseError> {
     let mut run = Run::start(world(params), "perception", Vec::new(), None).unwrap();
+    // (As for a host that keeps the records it's handed: checked below.)
+    run.refer_to_records();
+    let mut handed: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+    let mut referred = 0;
     let mut views: BTreeMap<(String, String), View> = BTreeMap::new();
     let mut looks = 0;
     // What each participant's seat knows, taken in two ways (see below).
@@ -98,6 +103,22 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
         prop_assert_eq!(&obs, &before, "encoding an observation changed it");
         let plain = oikos_kernel::canon::canonical(&obs).unwrap();
         prop_assert_eq!(String::from_utf8_lossy(&observed.canonical), String::from_utf8_lossy(&plain), "participant {}'s observation as delivered isn't its canonical JSON", participant);
+        // And as a host that keeps the records it's handed gets it: each record whole the first time it's shown to
+        // anyone and by its id from then on, which, the records put back, is the same observation.
+        let mut wire: serde_json::Value = serde_json::from_slice(observed.wire.as_ref().expect("a host that keeps records is handed a form of its own")).unwrap();
+        let lists = || wire["channels"].as_object().into_iter().flat_map(|m| m.iter()).filter_map(|(path, ch)| Some((path.clone(), ch.get("records")?.as_array()?.clone())));
+        for (_, records) in lists().collect::<Vec<_>>() {
+            for r in records.iter().filter(|r| r.is_object()) {
+                let id = r["id"].as_str().unwrap().to_string();
+                prop_assert!(handed.insert(id.clone(), r.clone()).is_none(), "record {} was handed over whole twice", id);
+            }
+        }
+        for (path, records) in lists().collect::<Vec<_>>() {
+            referred += records.iter().filter(|r| r.is_string()).count();
+            let whole: Vec<serde_json::Value> = records.iter().map(|r| r.as_str().map_or_else(|| r.clone(), |id| handed.get(id).cloned().unwrap_or_else(|| panic!("record {id} referred to before it was handed over")))).collect();
+            wire["channels"][&path]["records"] = serde_json::Value::Array(whole);
+        }
+        prop_assert_eq!(wire, serde_json::from_slice::<serde_json::Value>(&plain).unwrap(), "participant {}'s observation by reference, its records put back, isn't the observation", participant);
         let (whole, apart) = known.entry(participant.clone()).or_default();
         whole.absorb(&serde_json::to_value(&obs).unwrap());
         apart.absorb_with(&observed.value, &observed.shown);
@@ -124,7 +145,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<(), TestCaseError> {
         }
     }
     let _ = looks;
-    Ok(())
+    Ok(referred)
 }
 
 proptest! {
@@ -141,7 +162,8 @@ fn many_looks_over_a_long_run() {
     let mut runner = proptest::test_runner::TestRunner::deterministic();
     let ops = proptest::collection::vec(op_strategy(), 400..401).new_tree(&mut runner).unwrap().current();
     let with_looks: Vec<Op> = ops.into_iter().flat_map(|o| [o, Op::Observe { actor: 0 }, Op::Observe { actor: 3 }, Op::Observe { actor: 6 }]).collect();
-    check_run(&default_params(), &with_looks).unwrap();
+    let referred = check_run(&default_params(), &with_looks).unwrap();
+    assert!(referred > 0, "no record was shown to a second seat: handing records over by reference went unchecked");
 }
 
 /// Closing an account the participant has seen reaches its view (random runs rarely manage an empty account to close).

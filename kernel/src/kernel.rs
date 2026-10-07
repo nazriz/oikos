@@ -34,6 +34,9 @@ pub struct Observed {
     pub canonical: Vec<u8>,
     pub value: Value,
     pub shown: BTreeMap<Id, Shown>,
+    /// The observation as it's handed to a host that asked for records by reference (`Kernel::refer_to_records`):
+    /// as `canonical`, with each record the host has been handed before written as its id alone. Absent otherwise.
+    pub wire: Option<Vec<u8>>,
 }
 
 /// Records and cells of ground as they're delivered: each one's canonical bytes, and what it adds to a seat's
@@ -42,34 +45,59 @@ pub struct Observed {
 /// cover it. So each is encoded once, not once per observer. Derived from what's delivered; never part of the state.
 #[derive(Default)]
 pub struct Delivered {
-    /// record id -> the record it was made from (to be sure it's the same one), its canonical bytes, what it adds
-    records: BTreeMap<Id, (Arc<Record>, Arc<[u8]>, Arc<RecordFacts>)>,
+    /// Each record shown, by where it is in memory (it's kept here, so nothing else can come to be there): its
+    /// canonical bytes and what it adds. A record is immutable once made, and an observation shows the state's own.
+    records: BTreeMap<usize, Shared>,
     /// cell id -> the cell as it was last shown (the latest few ways: with its occupants named and without, say),
     /// each with its canonical bytes and what it adds. Used only for a cell that's equal to one of them, field for
     /// field: the bytes are what encoding it again would give.
     cells: BTreeMap<Id, Vec<(SiteCell, Arc<[u8]>, Arc<CellFacts>)>>,
+    /// For a host that asked for records by reference: record id -> the record it was last handed whole under that
+    /// id (where it is in memory). A record is handed over whole the first time, and by its id from then on: one
+    /// record is shown to many seats (a register of lots, to everyone who reads it), and the host reads it once.
+    handed: Option<BTreeMap<Id, usize>>,
+}
+
+/// A record as it's delivered.
+struct Shared {
+    record: Arc<Record>,
+    bytes: Arc<[u8]>,
+    facts: Arc<RecordFacts>,
+    /// The host has been handed it whole, and holds it under its id still.
+    handed: bool,
 }
 
 /// How many ways a cell was last shown are kept.
 const CELL_WAYS: usize = 4;
 
 impl Delivered {
-    /// A record an observation of this state shows (a copy of the state's own record of that id).
-    fn record(&mut self, st: &State, r: &Record) -> Result<(Arc<[u8]>, Arc<RecordFacts>), canon::CanonError> {
-        let stored = st.records.get(&r.id);
-        if let (Some((made_from, bytes, facts)), Some(s)) = (self.records.get(&r.id), stored) {
-            if Arc::ptr_eq(made_from, &s.record) {
-                return Ok((bytes.clone(), facts.clone()));
-            }
+    /// A record an observation shows: its canonical bytes, what it adds, and where it's kept here.
+    fn record(&mut self, r: &Arc<Record>) -> Result<(Arc<[u8]>, Arc<RecordFacts>, usize), canon::CanonError> {
+        let at = Arc::as_ptr(r) as usize;
+        if let Some(shared) = self.records.get(&at) {
+            return Ok((shared.bytes.clone(), shared.facts.clone(), at));
         }
-        let v = serde_json::to_value(r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
+        let v = serde_json::to_value(&**r).map_err(|e| canon::CanonError::Serialize(e.to_string()))?;
         let bytes: Arc<[u8]> = canon::canonical_value(&v)?.into();
         let facts = Arc::new(RecordFacts::of(&v));
-        // (Kept only for the state's own record of that id: as every record an observation shows is.)
-        if let Some(s) = stored.filter(|s| *s.record == *r) {
-            self.records.insert(r.id.clone(), (s.record.clone(), bytes.clone(), facts.clone()));
+        self.records.insert(at, Shared { record: r.clone(), bytes: bytes.clone(), facts: facts.clone(), handed: false });
+        Ok((bytes, facts, at))
+    }
+
+    /// Writes a record for a host that keeps what it's handed: whole the first time, its id from then on.
+    fn hand_over(&mut self, at: usize, bytes: &[u8], out: &mut Vec<u8>) {
+        let (Some(handed), Some(shared)) = (self.handed.as_mut(), self.records.get_mut(&at)) else { return out.extend_from_slice(bytes) };
+        if shared.handed {
+            return canon::write_string(&shared.record.id, out);
         }
-        Ok((bytes, facts))
+        shared.handed = true;
+        out.extend_from_slice(bytes);
+        // (Another record handed over under this id before, if that could be: the host no longer holds it.)
+        if let Some(was) = handed.insert(shared.record.id.clone(), at).filter(|was| *was != at) {
+            if let Some(other) = self.records.get_mut(&was) {
+                other.handed = false;
+            }
+        }
     }
 
     /// A cell as a sites channel shows it.
@@ -89,14 +117,14 @@ impl Delivered {
 
 /// What was taken out of a channel while the rest of its observation is encoded.
 enum Taken {
-    Records(Vec<Record>),
+    Records(Vec<Arc<Record>>),
     Cells(Vec<SiteCell>),
 }
 
 impl Observed {
     /// An observation of this state, in JSON. (Its records and cells are taken out while the rest is encoded, and put
     /// back: it's left as it was.)
-    pub fn of(obs: &mut Observation, st: &State, delivered: &mut Delivered) -> Result<Observed, canon::CanonError> {
+    pub fn of(obs: &mut Observation, delivered: &mut Delivered) -> Result<Observed, canon::CanonError> {
         let mut taken: Vec<(Id, Taken)> = vec![];
         for (path, ch) in obs.channels.iter_mut() {
             match ch {
@@ -106,8 +134,9 @@ impl Observed {
             }
         }
         let value = serde_json::to_value(&*obs).map_err(|e| canon::CanonError::Serialize(e.to_string()));
-        // By channel path: the member taken out, and its elements' canonical bytes, in order.
-        let mut bytes: BTreeMap<&str, (&str, Vec<Arc<[u8]>>)> = BTreeMap::new();
+        // By channel path: the member taken out, and its elements' canonical bytes, in order (each record with where
+        // it's kept in `delivered`: what a host can be handed by reference).
+        let mut bytes: Elements = BTreeMap::new();
         let mut shown: BTreeMap<Id, Shown> = BTreeMap::new();
         let mut failed = None;
         for (path, what) in &taken {
@@ -116,9 +145,9 @@ impl Observed {
             match what {
                 Taken::Records(records) => {
                     for r in records {
-                        match delivered.record(st, r) {
-                            Ok((b, f)) => {
-                                list.push(b);
+                        match delivered.record(r) {
+                            Ok((b, f, at)) => {
+                                list.push((Some(at), b));
                                 facts.records.push(f);
                             }
                             Err(e) => failed = Some(e),
@@ -129,7 +158,7 @@ impl Observed {
                     for c in cells {
                         match delivered.cell(c) {
                             Ok((b, f)) => {
-                                list.push(b);
+                                list.push((None, b));
                                 facts.cells.push(f);
                             }
                             Err(e) => failed = Some(e),
@@ -138,34 +167,26 @@ impl Observed {
                 }
             }
         }
+        let mut wire = None;
         let written = match (value, failed) {
             (Err(e), _) | (_, Some(e)) => Err(e),
             (Ok(value), None) => canon::check_integers(&value)
                 .and_then(|()| {
                     let Value::Object(top) = &value else { return Err(canon::CanonError::Serialize("an observation is not an object".into())) };
-                    let mut out = Vec::with_capacity(1024 + bytes.values().flat_map(|(_, list)| list).map(|b| b.len() + 1).sum::<usize>());
                     // The observation's own canonical form, with what was taken out of each channel written from its
                     // elements' bytes where its (empty) member stands.
-                    canon::write_object(top, &mut out, |key, x, out| match (key, x) {
-                        ("channels", Value::Object(channels)) => canon::write_object(channels, out, |path, ch, out| match (bytes.get(path), ch) {
-                            (Some((member, list)), Value::Object(ch)) => canon::write_object(ch, out, |key, x, out| {
-                                if key == *member {
-                                    out.push(b'[');
-                                    for (i, b) in list.iter().enumerate() {
-                                        if i > 0 {
-                                            out.push(b',');
-                                        }
-                                        out.extend_from_slice(b);
-                                    }
-                                    out.push(b']');
-                                } else {
-                                    canon::write_value(x, out);
-                                }
-                            }),
-                            _ => canon::write_value(ch, out),
-                        }),
-                        _ => canon::write_value(x, out),
-                    });
+                    let mut out = Vec::with_capacity(1024 + bytes.values().flat_map(|(_, list)| list).map(|(_, b)| b.len() + 1).sum::<usize>());
+                    write_with(top, &mut out, &bytes, &mut |_, b, out| out.extend_from_slice(b));
+                    // For a host that takes records by reference: the same, with each record it has been handed
+                    // already written as its id.
+                    if delivered.handed.is_some() {
+                        let mut line = Vec::with_capacity(1024);
+                        write_with(top, &mut line, &bytes, &mut |at, b, out| match at {
+                            Some(at) => delivered.hand_over(at, b, out),
+                            None => out.extend_from_slice(b),
+                        });
+                        wire = Some(line);
+                    }
                     Ok(out)
                 })
                 .map(|canonical| (canonical, value)),
@@ -179,8 +200,37 @@ impl Observed {
             }
         }
         let (canonical, value) = written?;
-        Ok(Observed { canonical, value, shown })
+        Ok(Observed { canonical, value, shown, wire })
     }
+}
+
+/// By channel path: the member taken out of the channel (`records` or `cells`), and its elements in order: each one's
+/// canonical bytes, and for a record, where it's kept in `Delivered`.
+type Elements<'a> = BTreeMap<&'a str, (&'a str, Vec<(Option<usize>, Arc<[u8]>)>)>;
+
+/// An observation's canonical form, with what was taken out of each channel written, element by element, where its
+/// (empty) member stands: `element` writes one (a record's place in `Delivered`, its bytes).
+fn write_with(top: &serde_json::Map<String, Value>, out: &mut Vec<u8>, elements: &Elements, element: &mut dyn FnMut(Option<usize>, &[u8], &mut Vec<u8>)) {
+    canon::write_object(top, out, |key, x, out| match (key, x) {
+        ("channels", Value::Object(channels)) => canon::write_object(channels, out, |path, ch, out| match (elements.get(path), ch) {
+            (Some((member, list)), Value::Object(ch)) => canon::write_object(ch, out, |key, x, out| {
+                if key == *member {
+                    out.push(b'[');
+                    for (i, (id, b)) in list.iter().enumerate() {
+                        if i > 0 {
+                            out.push(b',');
+                        }
+                        element(*id, b, out);
+                    }
+                    out.push(b']');
+                } else {
+                    canon::write_value(x, out);
+                }
+            }),
+            _ => canon::write_value(ch, out),
+        }),
+        _ => canon::write_value(x, out),
+    });
 }
 
 pub struct Kernel {
@@ -196,9 +246,16 @@ impl Kernel {
         Ok(Kernel { world: oikos_world::World::new(loaded)?, index: Default::default(), delivered: Default::default() })
     }
 
+    /// From now on, an observation's JSON has a second form (`Observed::wire`) for a host that keeps the records it's
+    /// handed: a record it has had before is written there as its id alone. What's observed, hashed and logged is the
+    /// same either way.
+    pub fn refer_to_records(&mut self) {
+        self.delivered.handed.get_or_insert_with(BTreeMap::new);
+    }
+
     /// An observation this kernel returned (of the state as it is), in JSON.
     pub fn observed(&mut self, obs: &mut Observation) -> Result<Observed, canon::CanonError> {
-        Observed::of(obs, self.world.state(), &mut self.delivered)
+        Observed::of(obs, &mut self.delivered)
     }
 
     pub fn state(&self) -> &State {

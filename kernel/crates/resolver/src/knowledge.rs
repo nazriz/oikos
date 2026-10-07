@@ -4,6 +4,7 @@
 
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct AccountFact {
@@ -45,10 +46,10 @@ pub struct Knowledge {
     pub held: BTreeSet<String>,
     pub structures: BTreeMap<String, StructureFact>,
     pub cells: BTreeMap<String, CellFact>,
-    /// lot -> its cells.
-    pub lots: BTreeMap<String, Vec<String>>,
-    /// Forms seen, by id (their statement records).
-    pub forms: BTreeMap<String, Value>,
+    /// lot -> its cells. (Shared with every seat that has seen the lot: a register of lots is shown to many.)
+    pub lots: BTreeMap<Arc<str>, Arc<[String]>>,
+    /// Forms seen, by id (their statement records; shared likewise).
+    pub forms: BTreeMap<Arc<str>, Arc<Value>>,
     pub entity: String,
     pub t: i64,
     /// How the world's money is written (its config's first currency): how the resolver reads and writes amounts.
@@ -65,9 +66,9 @@ pub struct RecordFacts {
     /// An entity's declaration: the entity, and its name.
     declares: Option<(String, String)>,
     /// A form: its id, and the record itself.
-    form: Option<(String, Value)>,
+    form: Option<(Arc<str>, Arc<Value>)>,
     /// A lot: its id, and its cells.
-    lot: Option<(String, Vec<String>)>,
+    lot: Option<(Arc<str>, Arc<[String]>)>,
     /// Someone asking to be paid names where the money should go: who, and the account.
     stated: Option<(String, String)>,
 }
@@ -85,9 +86,9 @@ impl RecordFacts {
             }
         }
         if kind == "statement" {
-            let id = s(&r["id"]).unwrap_or_default().to_string();
+            let id: Arc<str> = s(&r["id"]).unwrap_or_default().into();
             match s(&r["kind"]) {
-                Some("form") => facts.form = Some((id, r.clone())),
+                Some("form") => facts.form = Some((id, Arc::new(r.clone()))),
                 Some("lot") => {
                     if let Some(cells) = r["data"]["cells"].as_array() {
                         facts.lot = Some((id, cells.iter().filter_map(|c| c.as_str().map(String::from)).collect()));
@@ -134,8 +135,8 @@ impl CellFacts {
 /// what its records add (a records channel), or its cells (a sites channel).
 #[derive(Debug, Clone, Default)]
 pub struct Shown {
-    pub records: Vec<std::sync::Arc<RecordFacts>>,
-    pub cells: Vec<std::sync::Arc<CellFacts>>,
+    pub records: Vec<Arc<RecordFacts>>,
+    pub cells: Vec<Arc<CellFacts>>,
 }
 
 fn set_ordered(v: &mut Vec<(String, String)>, k: &str, val: &str) {
@@ -244,7 +245,7 @@ impl Knowledge {
     fn learn(&mut self, facts: &RecordFacts) {
         if let Some(w) = &facts.withdraws {
             self.withdrawn.insert(w.clone());
-            self.lots.remove(w);
+            self.lots.remove(w.as_str());
         }
         if let Some((e, n)) = &facts.declares {
             set_ordered(&mut self.names, e, n);
@@ -353,7 +354,7 @@ impl Knowledge {
 
     /// Standing forms (their records).
     pub fn standing_forms(&self) -> Vec<&Value> {
-        self.forms.values().filter(|f| !self.withdrawn.contains(f["id"].as_str().unwrap_or_default())).collect()
+        self.forms.values().map(|f| &**f).filter(|f| !self.withdrawn.contains(f["id"].as_str().unwrap_or_default())).collect()
     }
 
     /// The standing form, by its name or its record's id, published by an institution a participant, position or

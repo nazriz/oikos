@@ -3,7 +3,9 @@
 //! participant API are); kept deliberately small.
 //!
 //! Requests:
-//!   {"op":"start","config":{..},"run_id":"..","log_path":"..","anchors_path":".."}
+//!   {"op":"start","config":{..},"run_id":"..","log_path":"..","anchors_path":"..","record_refs":true?}
+//!     (record_refs: the host keeps every record it's handed, so in an observation's records channels a record it
+//!     has been handed before is written as its id, a string, in place of the record)
 //!   {"op":"command","command":{..}}        -> {"ok":true,"seq":n,"events":[..],"observation":{..}?}
 //!   {"op":"check","participant":"..","as":".."?,"blocks":[..]} -> {"ok":true,"check":{"ok":..,"refusal":..}}
 //!   {"op":"view","participant":".."}      -> {"ok":true,"observation":{..}} (the full picture; not logged)
@@ -128,12 +130,14 @@ fn command(session: &mut Session, req: &Value) -> Result<String, String> {
     if let Some(s) = sched.as_mut() {
         s.note(Some(r.kernel().state()), events.as_array().map(Vec::as_slice).unwrap_or_default(), r.kernel().t());
     }
-    let mut line = Vec::with_capacity(observed.as_ref().map_or(0, |o| o.canonical.len()) + 256);
+    // (For a host that keeps the records it's handed, those it has had before are written as their ids.)
+    let written = observed.as_ref().map(|o| o.wire.as_ref().unwrap_or(&o.canonical));
+    let mut line = Vec::with_capacity(written.map_or(0, |w| w.len()) + 256);
     line.extend_from_slice(b"{\"events\":");
     serde_json::to_writer(&mut line, &events).map_err(|e| e.to_string())?;
-    if let Some(o) = &observed {
+    if let Some(w) = written {
         line.extend_from_slice(b",\"observation\":");
-        line.extend_from_slice(&o.canonical);
+        line.extend_from_slice(w);
     }
     line.extend_from_slice(format!(",\"ok\":true,\"seq\":{}}}", resp.seq).as_bytes());
     String::from_utf8(line).map_err(|e| e.to_string())
@@ -153,7 +157,11 @@ fn handle(session: &mut Session, req: &Value) -> Result<Value, String> {
             None => None,
         };
         let config = req.get("config").cloned().ok_or("missing config")?;
-        let r = Run::start(config, str_field("run_id")?, BufWriter::new(log), anchors).map_err(|e| e.to_string())?;
+        let mut r = Run::start(config, str_field("run_id")?, BufWriter::new(log), anchors).map_err(|e| e.to_string())?;
+        // A host that keeps the records it's handed asks for each one whole once, and by its id from then on.
+        if req.get("record_refs").and_then(Value::as_bool) == Some(true) {
+            r.refer_to_records();
+        }
         let reply = json!({ "ok": true, "seq": 0, "head": r.head(), "t": r.kernel().t() });
         *types = req["config"]["catalogue"]["structure_types"].as_array().into_iter().flatten().filter_map(|t| Some((t["id"].as_str()?.to_string(), t.clone()))).collect();
         *currency = oikos_resolver::calls::Currency::from_config(&req["config"]["world"]["currencies"][0]);
