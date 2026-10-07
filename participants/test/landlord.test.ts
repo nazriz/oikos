@@ -83,3 +83,39 @@ test("a tenant on a renewed lease who stops paying gets notice after two unpaid 
   expect(notices[0]!.t).toBeGreaterThanOrEqual(END + 2 * MONTH);
   expect(notices[0]!.t).toBeLessThan(END + 2 * MONTH + WEEK);
 });
+
+test("a letting office is shown its own titles and looks up the plan of each of its lots, once, before it plans (nobody is shown the register)", () => {
+  const m = landlord.create(ctx({ develop: false, renew: false, spend_share_bps: 0, upkeep_share_bps: 0, base_rent: { house: RENT }, register: { lots: "lots" } }));
+  const plans: { [lot: string]: string[] } = { "lot-1": ["c1"], "lot-2": ["c2"] };
+  const title = (lot: string, holder = ME) => ({ id: `own-${lot}`, at: 0, author: "genesis", record: "claim", position: "right", holder, about: { kind: "ownership", object: lot }, visible_to: "public" });
+  const cells = ["s1", "s2", "s3"].map((s, i) => ({ cell: `c${i + 1}`, structure: { structure: s, type: "house", complete: true, spaces: [{ space: `${s}/home`, kind: "dwelling", capacity: 6, count: 0, attrs: { bedrooms: 2 } }] } }));
+  const asked: string[] = [];
+  const listed: string[] = [];
+  const wake = (t: number, records: any[]) => {
+    let o: any = { t, entity: ME, woke_for: "cadence", outcomes: [], readings: {}, channels: { mine: { kind: "records", records }, sites: { kind: "sites", cells },
+      bank: { kind: "accounts", accounts: [{ account: "acc-landlord", holder: ME, custodian: "bank", currency: "AUD", balance: "100000000" }], transactions: [] } } };
+    for (let i = 0; i < 50; i++) {
+      const a: any = m.step(o, undefined as any);
+      if (a.type === "wait") break;
+      if (a.type === "look") {
+        expect(a.looks).toHaveLength(1);
+        expect(a.looks[0].channel).toBe("lots");
+        expect(a.looks[0].query).toEqual({ where: [{ field: "id", op: "=", value: a.looks[0].query.where[0].value }], limit: 1 });
+        const lot = a.looks[0].query.where[0].value as string;
+        asked.push(lot);
+        o = { ...o, outcomes: [], channels: { ...o.channels, mine: { kind: "records", records: [] }, lots: { kind: "records", search: true, records: plans[lot] ? [{ id: lot, at: 0, author: "genesis", record: "statement", kind: "lot", speaks_for: "city", visible_to: "public", text: lot, data: { cells: plans[lot] } }] : [] } } };
+        continue;
+      }
+      listed.push(...[...String(a.call).matchAll(/"structure":"([\w-]+)"/g)].map((x) => x[1]!));
+      o = { ...o, woke_for: "done", outcomes: [{ action: "call", t, status: "ok" }], channels: { ...o.channels, mine: { kind: "records", records: [] } } };
+    }
+  };
+  // Its two titles, and one that is somebody else's: the plans of its own two are looked up, then its homes are listed.
+  wake(0, [title("lot-1"), title("lot-2"), title("lot-3", "landlord-2")]);
+  expect(asked).toEqual(["lot-1", "lot-2"]);
+  expect([...new Set(listed)].sort()).toEqual(["s1", "s2"]);
+  // Later wakes ask nothing more; a title with no plan in the register is asked about once.
+  wake(WEEK, [title("lot-9")]);
+  wake(2 * WEEK, []);
+  expect(asked).toEqual(["lot-1", "lot-2", "lot-9"]);
+});

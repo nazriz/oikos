@@ -138,6 +138,15 @@ sources); this list is for the architecture and design ideas.
 | Sellers cut their asking price the longer a home is on the market | Merlo, A. & Ortalo-Magné, F. (2004), "Bargaining over residential real estate: evidence from England", *Journal of Urban Economics* 56(2), 192–216 **(to confirm)** | A home unsold after a month is relisted for less, down to a floor |
 | Lending above 80% of a home's value as higher risk (a 20% deposit, or mortgage insurance) | APRA, *Prudential Practice Guide APG 223: Residential Mortgage Lending* **(to confirm)** | The bank's `max_lvr_bps`; buyers' `deposit_bps` |
 
+## What each seat knows, and what it looks up (docs/decisions.md, 2026-10-08, "Nobody has the land register by heart"; docs/behaviour/ownership.md)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Title by registration: the register, not a chain of deeds, says who owns land; it is public and is searched folio by folio, for a fee | Torrens, R. R. (1859), *The South Australian System of Conveyancing by Registration of Title*; Transfer of Land Act 1958 (Vic), s 27 (the Register) and s 114 (searches) **(to confirm)**; Land Use Victoria, title and plan searches (LANDATA) **(to confirm)** | Citizens', landlords' and the builder's `lots`, `titles` and `dealings` channels are shown on request and searched by a lot's or a title's id; no fee is charged (left out) |
+| A buyer's conveyancer searches the title before settlement and confirms registration after | Consumer Affairs Victoria, "Conveyancing and transferring land ownership" **(to confirm)** | A person passed a title looks up the title and the dealings in it before treating the land as theirs (`citizen.ts` `registerLooks`, `holderOf`); the search before paying is left out |
+| People have limited attention, and inform themselves when it is worth their while | Simon, H. A. (1955), "A behavioral model of rational choice", *Quarterly Journal of Economics* 69(1), 99–118; Sims, C. A. (2003), "Implications of rational inattention", *Journal of Monetary Economics* 50(3), 665–690 **(to confirm)** | The rule the change follows: a seat is shown what someone in its position would be sent, and searches for the rest when a decision needs it (D43's attention, applied to the registers) |
+| An employer gives the employees an enterprise agreement covers access to it | Fair Work Act 2009 (Cth), s 180 (pre-approval steps: access and explanation for the employees covered) **(to confirm)** | A person in work reads the agreements at their own workplace when they plan (`citizen.ts`, `work_board`); nobody is shown every workplace's |
+
 ## Roads and weather (docs/behaviour/daily-round.md, weather.md)
 
 | Idea | Citation | Used in |

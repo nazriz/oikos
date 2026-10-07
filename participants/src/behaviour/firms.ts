@@ -14,7 +14,7 @@
 
 import { cents, smallestNow } from "../money";
 import * as C from "../calls";
-import type { Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
+import type { LookRequest, Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
@@ -28,9 +28,13 @@ import { because, between, Book, breaches, noting, callAction, usd, cellsOf, com
  * id, whether a day's work was done): what it returns is done next. A step refused because the world changed in the
  * same moment (D58) is undone by its own `then`; the rest of the plan goes on, each step tried as it comes.
  */
-/** `until`: when to wake next with nothing left to do (the time it asks for), if not on its cadence. */
-export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observation) => Step[], until?: (obs: Observation) => number | undefined) {
+/** `until`: when to wake next with nothing left to do (the time it asks for), if not on its cadence.
+ * `looks`: what it needs to look up before it plans (a search through a channel of its own that is shown only on
+ * request: a register, say): asked first, the answer comes with the next observation, and it is asked again until it
+ * needs nothing more (so it must not ask twice for what a look didn't find). */
+export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observation) => Step[], until?: (obs: Observation) => number | undefined, looks?: (obs: Observation) => LookRequest[]) {
   let todo: Step[] = [];
+  let carried: Step[] = []; // what followed from our last act, kept over a look
   let plannedAt = -1;
   /** A day's work (a step with a `work` call) left undone when the day's over is dropped, not carried: it spent that day's
    * hours. Its `then` hears it wasn't done, as if refused, so the module puts back what it counted on (an order served). */
@@ -38,7 +42,8 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
   let sent: Step | undefined;
   return {
     step(obs: Observation): ParticipantAction {
-      const follow: Step[] = [];
+      const follow: Step[] = carried;
+      carried = [];
       const o = sent ? obs.outcomes.at(-1) : undefined;
       if (sent?.then && o) follow.push(...(sent.then(o) ?? []));
       sent = undefined;
@@ -47,6 +52,11 @@ export function stepper(absorb: (obs: Observation) => void, plan: (obs: Observat
       // docs/design/rebuild.md 6.3), never planning again what's still to do. With nothing left, it's a new moment: we
       // plan afresh (what's due now may not have been when the wake began).
       if (plannedAt !== obs.t && (obs.woke_for !== "done" || todo.length === 0)) {
+        const ask = looks?.(obs) ?? [];
+        if (ask.length) {
+          carried = follow;
+          return { type: "look", looks: ask };
+        }
         // What a wake didn't get to (it allows only so many actions) is done first at the next: a module's state already
         // counts on it (a price it holds as published, a payment as made), so it's never dropped, but for a day's work
         // once the day's over.
@@ -80,7 +90,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.12.2",
+  version: "0.13.0",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -118,11 +128,26 @@ export const landlord: BehaviourModule = {
       // Offering the sitting tenant a new lease as one that ends with its term runs out (placeholder: landlords mostly
       // do). A lease that runs on after its term needs none.
       renew: true,
+      // The land register, where this world keeps one to look things up in: our channel onto its plans of lots. (None:
+      // whatever plans we know are those we're shown.)
+      register: null as { lots: string } | null,
     },
     ctx.params,
   );
     const me = ctx.entity;
     const book = new Book();
+    // Our titles are our own papers; the plan of each lot is looked up in the register, once.
+    const planAsked = new Set<string>();
+    const ownLotsNow = () => book.ofType("claim").flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object as string] : [])).sort();
+    const plansToRead = (): LookRequest[] => {
+      if (!p.register) return [];
+      for (const lot of ownLotsNow()) {
+        if (book.records.has(lot) || planAsked.has(lot)) continue;
+        planAsked.add(lot);
+        return [{ channel: p.register.lots, query: { where: [{ field: "id", op: "=", value: lot }], limit: 1 } }];
+      }
+      return [];
+    };
     // The homes we own: each a unit (a dwelling space) in a finished building on one of our lots.
     const owned: { structure: string; type: string; space: string; bedrooms?: number }[] = [];
     const received = new Map<string, { t: number; amount: number }[]>(); // tenant account -> each payment received, and when
@@ -162,7 +187,7 @@ export const landlord: BehaviourModule = {
       if (!acc) return [];
       // What we own: the lots our ownership records name, the cells they cover (seen through our own sites),
       // and the homes (dwelling units) in finished buildings on them, including anything we've since built.
-      const ownLots = book.ofType("claim").flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object as string] : [])).sort();
+      const ownLots = ownLotsNow();
       const ownCells = new Set(ownLots.flatMap((l) => cellsOf(book, l)));
       const sites = channels.cells(obs).filter((c) => ownCells.has(c.cell));
       owned.length = 0;
@@ -493,7 +518,7 @@ export const landlord: BehaviourModule = {
         steps.push(because(`The tribunal has found our notice of rent increase ${n.id} invalid: withdrawing it; the rent stays as it was.`, withdraw(n.id, `Withdrawn: found invalid by the tribunal (${o.id}).`)));
       }
       return steps;
-    }), { beliefs: (): Belief[] => leasesHeld() }));
+    }, undefined, plansToRead), { beliefs: (): Belief[] => leasesHeld() }));
   },
 };
 

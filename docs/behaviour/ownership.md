@@ -27,6 +27,35 @@ been given the median loan. No bank would have lent it.)
 - **Leaving town:** an owner who'd leave (out of work and broke, as a tenant would) sells first (below), and goes once
   it's sold and the mortgage is paid off.
 
+## What an owner knows, and what is looked up (citizen 0.36.0, generator 0.24.0)
+
+Nobody has the land register by heart (Naz, 2026-10-08: "no entity should have a god like view of anything"). Until
+0.36.0 every citizen was shown every lot and every title in the town, and every dealing in them, as they were made. Now a
+person knows their own papers, and looks the rest up where it is kept:
+
+| | Rule | Source |
+|---|---|---|
+| **Their own papers** | A title they hold, a transfer of a title to them or by them, a valuation of their lot, the rates recorded against them: each reaches them as a record that names them (their `mine` channel), unasked. | A registered proprietor holds (or can call for) their own title; rates and valuation notices are sent to the owner |
+| **The register** | Three channels shown only on request: `lots` (the plan of each lot: its cells), `titles` (claims) and `dealings` (transfers and releases of claims). Each is searched, never read through: a lot or a title by its own id, the dealings in a title by the title they name. The register is public, as before: anyone can search it, nobody is sent it. | A Torrens register is public and is searched folio by folio, for a fee: Land Use Victoria's title search; Transfer of Land Act 1958 (Vic) s 27 (the Register), s 114 (searches) (to confirm) |
+| **The plan of their lot** | The first time they plan with a title that is theirs whose lot they have never seen the plan of, they look that lot up (one search). Their home is then the dwelling they live in on a lot of theirs, as before. | A title refers to a plan of subdivision; the plan is a separate search (to confirm) |
+| **A title that came from someone else** | When a transfer to them has arrived that they haven't read up on (a home bought, land inherited), they look up the title it names and the dealings in that title (one look: two searches), and read them in the order made: the title is theirs if each transfer in the chain was made by whoever held it then, or by whoever issued the title (the registry, passing on a dead owner's land). Then the plan of its lot, as above. | A purchaser's conveyancer searches the title before settlement and confirms registration after it (Consumer Affairs Victoria, "Conveyancing"; Law Institute of Victoria contract of sale, general conditions) (to confirm) |
+| **When** | At the start of a plan (the weekly plan, or the first wake), before anything is decided; the answer comes at once, and the plan is made knowing it. Each thing is asked once; a title is asked about again only when something new passes it to them. | — |
+| **The lot under their own home** | The one their title names (before: the register searched for the lot over the building's cell). | — |
+
+So a buyer still pays on the listing's word, and learns the home is theirs when the transfer reaches them and the register
+bears it out; an heir learns what they've inherited the same way. Nothing else about owning, buying or selling changed.
+
+**Parameters:** `register` (`{ lots, titles, dealings }`: the person's channels onto the register; none: they know of
+the register only what they are shown, as in a world that shows it); `search_limit` (20: the most dealings one search
+of a title reads; a title dealt in more often than that reads as not theirs, which a world with such titles should
+raise).
+
+**Leaves out:** the search fee (a title search costs a few tens of the currency's units in Victoria: nobody is charged
+here, and the registry does no work for it: the search is the kernel's, mechanical); a search *before* buying (a
+conveyancer would search before the buyer pays; here the old behaviour is kept, and a listing by someone who doesn't own
+the home would take the buyer's money: no code seat lists what it doesn't own); and an heir's view of an inherited
+house: they sell it only if they can see it from where they live or work (`street`), which was already so.
+
 ## Buying and selling (citizen 0.32.0, bank.lending 0.3.0)
 
 No contract change: a listing, a purchase and a sale are statements, the money is payments, and the title passes by the

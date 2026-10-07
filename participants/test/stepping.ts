@@ -82,7 +82,10 @@ export const standingOrder = (id: string, at: number, who: string, to: string, a
 
 export interface Woken { records?: any[]; inbox?: any[]; balance?: number; transactions?: any[]; petitions?: any[]; homes?: any[]; jobs?: any[]; readings?: { [id: string]: object }; street?: any[]; in?: string; woke_for?: string;
   /** The world's answer to an act, if it isn't simply done: a refusal's code. */
-  refuse?: (calls: Said[]) => string | undefined }
+  refuse?: (calls: Said[]) => string | undefined;
+  /** What a look finds through channels shown only on request, other than the boards (a register): the test's world
+   * is told each look the person makes, and answers with the records found, by channel. */
+  looked?: (looks: { channel: string; query?: any }[]) => { [channel: string]: any[] } | void }
 
 /**
  * A townsperson run by `citizen.default`, woken on hand-built observations. Each wake: what's new to them (records,
@@ -120,7 +123,8 @@ export function person(citizen: { create: (ctx: any) => any }, params: object = 
         const a: any = await m.step(obs, undefined);
         if (a.type === "wait") break;
         if (a.type === "look") {
-          obs = { ...obs, outcomes: [], inbox: [], channels: channels([], true) };
+          const found = w.looked?.(a.looks) ?? {};
+          obs = { ...obs, outcomes: [], inbox: [], channels: { ...channels([], true), ...Object.fromEntries(Object.entries(found).map(([ch, records]) => [ch, { kind: "records", search: true, records }])) } };
           continue;
         }
         const calls = callsOf(a, t);

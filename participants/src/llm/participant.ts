@@ -70,7 +70,7 @@ export function lookable(c: LlmParticipantConfig): Map<string, "records" | "site
 /** What a participant calls the places in a paper it can search by, and what the participant API calls them (which it
  * may use too): it reads "from", "citing" and dates in its reports, never the store's field names (principle 14). */
 const FIELD_WORDS: { [said: string]: string } = { from: "author", "on behalf of": "speaks_for", on_behalf_of: "speaks_for", citing: "basis", date: "at" };
-const FIELD = /^(record|kind|at|author|speaks_for|basis|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
+const FIELD = /^(id|record|kind|at|author|speaks_for|basis|claim|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
 /** The most a look brings at once (papers found: the participant API's own limit on a search is higher, 200; what's
  * found is shown whole, so this is what keeps one look a readable size). */
 const LOOK_MAX = 50;

@@ -577,7 +577,13 @@ pub use oikos_world::kernel::known_field;
 fn field(r: &Record, f: &str) -> Option<Value> {
     let path = |v: &Value, p: &str| p.split('.').try_fold(v, |v, k| v.get(k)).cloned();
     match f {
+        "id" => Some(Value::from(r.id.as_str())),
         "record" => Some(Value::from(r.body.kind_name())),
+        // (The claim a transfer or a release names: how a register is asked what has become of one title.)
+        "claim" => match &r.body {
+            crate::blocks::RecordBody::ClaimTransfer { claim, .. } | crate::blocks::RecordBody::ClaimRelease { claim } => Some(Value::from(claim.as_str())),
+            _ => None,
+        },
         "kind" => match &r.body {
             crate::blocks::RecordBody::Statement { kind, .. } => Some(Value::from(kind.as_str())),
             _ => None,
@@ -978,7 +984,22 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
 fn search(st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, area: Option<&Scope>, q: &Query) -> Vec<Arc<Record>> {
     let want: Option<BTreeSet<&str>> = filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me } else { e.as_str() }).collect());
     let at_seq = |seq: u64| &index.by_seq[(seq - 1) as usize];
-    let seqs: Vec<u64> = if let Some(sc) = area {
+    // A search for one record by its id reads that record, not the register it is in (the same answer: every other
+    // condition is still asked of it below).
+    let named = q.conditions.iter().flatten().find_map(|c| match (&c.op, c.field.as_str(), &c.value) {
+        (CmpOp::Eq, "id", Value::String(id)) => Some(id.as_str()),
+        _ => None,
+    });
+    let seqs: Vec<u64> = if let Some(id) = named {
+        let one: Vec<u64> = st.records.get(id).map(|x| x.seq).into_iter().collect();
+        match area {
+            Some(sc) => index.placed(sc, 0).into_iter().filter(|q| one.contains(q)).collect(),
+            None => one,
+        }
+        .into_iter()
+        .filter(|&seq| q.standing != Some(true) || index.is_standing(at_seq(seq), seq))
+        .collect()
+    } else if let Some(sc) = area {
         let mut v = index.placed(sc, 0);
         if q.standing == Some(true) {
             v.retain(|&seq| index.is_standing(at_seq(seq), seq));

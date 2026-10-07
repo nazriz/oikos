@@ -42,7 +42,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.23.0";
+export const GENERATOR_VERSION = "0.24.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -912,12 +912,13 @@ export function generate(spec: TownSpec): any {
       // The world market's demand for the town's goods, split among the factories by the size of their works (each
       // factory's export customers).
       buys: { goods: { unit_price: WORLD.goods_export, per_month: exportUnits, from: exportShares } } }));
-  // The foreman knows the registry's lots and goes to see the ground, to know where on a lot a building goes.
+  // The foreman looks up in the register the plan of a lot it is asked to build on (nobody has the register by heart),
+  // and goes to see the ground, to know where on a lot a building goes.
   // It sees its crew at the yard, its supplier's prices and what it holds.
-  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, priceLists, lawBook, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } },
+  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, priceLists, lawBook, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true },
     { id: "ground", kind: "sites", area: "all", every: 7 * DAY }, { id: "yard", kind: "sites", area: [cellOf.get(yardLot)], occupants: "names" }],
     code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", industry: "construction", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS,
-      workplace: "builder-yard/workplace.1", max_crew: CREW.capacity, ...look }));
+      workplace: "builder-yard/workplace.1", max_crew: CREW.capacity, register: { lots: "lots" }, ...look }));
   const laws = { id: "laws", kind: "records", match: { statement_kinds: ["law", "charter"] } };
   office("planning", "city", "Planning officer", "planning_officer",
     [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
@@ -1072,9 +1073,12 @@ export function generate(spec: TownSpec): any {
   for (const l of landlords) {
     // (A town lot is a cell; a block of the landscape, many.)
     const theirCells = records.filter((r) => r.record === "claim" && r.holder === l).flatMap((r) => cellOf.has(r.about.object) ? [cellOf.get(r.about.object)!] : (L?.lots.find((x) => x.id === r.about.object)?.cells ?? []));
-    office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "own-sites", kind: "sites", area: theirCells.length ? theirCells : "all", occupants: "names" }, deaths, lawBook],
+    office(`${l}-office`, l, "Letting office", undefined, [{ id: "books", kind: "accounts" }, mine(), forms, priceLists,
+      // (Its titles are its own papers, through `mine`; the plan of each lot it looks up in the register. It sees its
+      // own buildings and who lives in them; with no land, no building.)
+      { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true }, ...(theirCells.length ? [{ id: "own-sites", kind: "sites", area: theirCells, occupants: "names" }] : []), deaths, lawBook],
       code("firm.landlord", { base_rent: { apartments: units.map((u) => ({ bedrooms: u.bedrooms, rent: u.rent })), ...Object.fromEntries(houseTypes.map((h) => [h.id, [{ bedrooms: h.bedrooms, rent: h.rent }]])) }, shop_accounts: shopAccounts, outside_account: "acc-outside",
-        city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000,
+        city: "city", city_account: "acc-city", builder: "builder", compliance_bps: spec.landlord_compliance_bps ?? 10_000, register: { lots: "lots" },
         // Their practice: reviewing rents as often as the law allows here, with the notice it asks (the law itself is a record).
         rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days, ...(V.tenancy.after_fixed_term ? { after_term: V.tenancy.after_fixed_term } : {}) }));
   }
@@ -1106,14 +1110,18 @@ export function generate(spec: TownSpec): any {
   const street = { id: "street", title: "Around you", kind: "sites", area: { near: 0 } };
   // Shops' prices (and others'), and what they hold and where (their shopping).
   const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street, { id: "prices", kind: "records", match: { statement_kinds: ["price_list", "property_for_sale"] } }, { id: "belongings", kind: "holdings" }, lawBook,
-    // Enterprise agreements (a rise at work).
-    { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] } },
+    // Enterprise agreements, looked up: a person reads their own workplace's when they plan (nobody is shown every
+    // workplace's).
+    { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] }, on_request: true },
     // Gatherings: whatever holds one, in whatever words (a statement having a practice); and what groups teach.
     { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { has: ["assertion"] } },
     // Elections and the local paper (world-expansion 3).
     ...(E ? [{ id: "elections", kind: "records", match: { statement_kinds: ["election_notice", "ballot", "electoral_roll", "ballot_result", "nomination", "news"] } }] : []),
-    // The land register (world-expansion 6.2): the lots, and who holds them (a home of one's own).
-    ...(OW ? [{ id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "titles", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release"] } }] : [])];
+    // The land register (world-expansion 6.2), looked up, never shown unasked (nobody has the register by heart): the
+    // plan of a named lot, a title, and the dealings in a title (its transfers and releases), each a search. A title
+    // of one's own, and its passing to or from one, come through `mine` (docs/behaviour/ownership.md).
+    ...(OW ? [{ id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true }, { id: "titles", kind: "records", match: { records: ["claim"] }, on_request: true },
+      { id: "dealings", kind: "records", match: { records: ["claim_transfer", "claim_release"] }, on_request: true }] : [])];
   // A venture a citizen may start (docs/behaviour/entry.md): a shop, in premises bought from a closed firm. Its founder
   // holds its Manager position, which sees what a shop's manager sees and runs a shop's rules; "{...}" is filled in.
   const shopVenture = {
@@ -1135,6 +1143,7 @@ export function generate(spec: TownSpec): any {
       care: { entity: "clinic", waiting: "clinic-centre/waiting.1", seek_bps: HE.seek_care_bps, severities: [...new Set(HE.treats.map((x) => x.severity).filter((x): x is string => !!x))], off_work: HE.off_work_severities, wait_days: 2 } } : {}),
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),
     ...(HZ ? { relief: "town-hall/hall.1" } : {}),
+    ...(OW ? { register: { lots: "lots", titles: "titles", dealings: "dealings" } } : {}), work_board: "work",
     ...(OW?.market ? { market: { buy_bps: OW.market.buy_bps_per_month, deposit_bps: OW.market.deposit_bps, costs_bps: OW.market.costs_bps, mortgage_months: OW.market.mortgage_months, relist_days: OW.market.relist_days, cut_bps: OW.market.cut_bps, floor_bps: OW.market.floor_bps,
       bedrooms_by_type: Object.fromEntries(houseTypes.map((h) => [h.id, h.bedrooms])) } } : {}),
     ...(CR ? { crime: { take_bps: CR.take_bps_per_month_in_need, caught_bps: CR.caught_bps_reckoned, quantity: CR.take_quantity } } : {}),

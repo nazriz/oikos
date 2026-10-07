@@ -159,3 +159,61 @@ fn a_channel_can_show_whatever_is_offered_whatever_it_is_called() {
     let r = run.done(&rb_act("mayor", json!([{"block": "publish", "kind": "notice", "speaks_for": "city", "text": "Join us.", "offer": {"take_up": "join", "gives": "belonging"}}])));
     assert!(r.is_err(), "the contract refuses an offer stating its meaning");
 }
+
+#[test]
+fn a_register_is_searched_for_a_named_record_and_for_what_became_of_a_title() {
+    // Bob is shown no land register by default: its lots, its titles and the dealings in them are each looked up, by
+    // a lot's own id, by what a title is about, and by the title a transfer or a release names.
+    let mut c = riverbend();
+    let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
+    for (id, m) in [("lots", json!({"statement_kinds": ["lot"]})), ("titles", json!({"records": ["claim"]})), ("dealings", json!({"records": ["claim_transfer", "claim_release"]}))] {
+        bob["channels"].as_array_mut().unwrap().push(json!({"id": id, "kind": "records", "match": m, "on_request": true}));
+    }
+    let mut run = Run::start(c, "attention-register", Vec::new(), None).unwrap();
+    let found = |run: &mut Run<Vec<u8>>, looks: serde_json::Value| -> std::collections::BTreeMap<String, Vec<String>> {
+        let looks = serde_json::from_value(looks).unwrap();
+        let o = run.command(&Command::Look { participant: "bob-self".into(), only: None, looks }).unwrap().observation.unwrap();
+        let mut got = std::collections::BTreeMap::new();
+        for ch in ["lots", "titles", "dealings"] {
+            if let Some(ChannelData::Records { records, search, .. }) = o.channels.get(ch) {
+                assert!(search.is_some());
+                got.insert(ch.to_string(), records.iter().map(|r| r.id.clone()).collect());
+            }
+        }
+        got
+    };
+    let o = run.command(&Command::Observe { participant: "bob-self".into(), only: None }).unwrap().observation.unwrap();
+    assert!(["lots", "titles", "dealings"].iter().all(|ch| !o.channels.contains_key(*ch)), "none of the register comes unasked");
+    // Alice passes her lot to carol, and carol to devco; the city's title to p00 is released.
+    let first = post(&mut run, "alice-self", json!([{"block": "transfer_claim", "claim": "title-p11", "to": "carol", "ref": "t"}]));
+    let second = post(&mut run, "carol-self", json!([{"block": "transfer_claim", "claim": "title-p11", "to": "devco", "ref": "t"}]));
+    let released = post(&mut run, "mayor", json!([{"block": "release_claim", "claim": "title-p00", "speaks_for": "city", "ref": "r"}]));
+    // One look: the lot by its id, its title by what it is about, the dealings in that title.
+    let got = found(&mut run, json!([
+        {"channel": "lots", "query": {"where": [{"field": "id", "op": "=", "value": "p11"}]}},
+        {"channel": "titles", "query": {"where": [{"field": "about.object", "op": "=", "value": "p11"}]}},
+        {"channel": "dealings", "query": {"where": [{"field": "claim", "op": "=", "value": "title-p11"}], "order": {"field": "at"}}}]));
+    assert_eq!(got["lots"], vec!["p11".to_string()]);
+    assert_eq!(got["titles"], vec!["title-p11".to_string()]);
+    assert_eq!(got["dealings"].len(), 2);
+    assert!(got["dealings"].contains(&first) && got["dealings"].contains(&second));
+    // A title by its own id; a release is found by the title it names; a statement names no claim.
+    let got = found(&mut run, json!([
+        {"channel": "titles", "query": {"where": [{"field": "id", "op": "=", "value": "title-p00"}]}},
+        {"channel": "dealings", "query": {"where": [{"field": "claim", "op": "=", "value": "title-p00"}]}},
+        {"channel": "lots", "query": {"where": [{"field": "claim", "op": "=", "value": "title-p00"}]}}]));
+    assert_eq!(got["titles"], vec!["title-p00".to_string()]);
+    assert_eq!(got["dealings"], vec![released]);
+    assert!(got["lots"].is_empty());
+    // By id, only what the channel shows and the other conditions allow: a title isn't found among the lots, nor one
+    // that fails another condition, nor a record there is none of.
+    let got = found(&mut run, json!([
+        {"channel": "lots", "query": {"where": [{"field": "id", "op": "=", "value": "title-p11"}]}},
+        {"channel": "titles", "query": {"where": [{"field": "id", "op": "=", "value": "title-p11"}, {"field": "about.object", "op": "=", "value": "p00"}]}},
+        {"channel": "dealings", "query": {"where": [{"field": "id", "op": "=", "value": "nothing"}]}}]));
+    assert!(got.values().all(|v| v.is_empty()), "{got:?}");
+    // Every id but one (the long way, through the register): the lots a plain reading gives, less that one.
+    let got = found(&mut run, json!([{"channel": "lots", "query": {"where": [{"field": "id", "op": "!=", "value": "p11"}], "limit": 50}}]));
+    assert_eq!(got["lots"].len(), 5);
+    assert!(!got["lots"].contains(&"p11".to_string()));
+}

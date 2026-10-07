@@ -119,7 +119,7 @@ Perception comes only through channels, plus the participant's inbox and the out
 
 **Position (D44):** a channel can look **near** where its entity is (the cells of the buildings its body occupies); when the body moves, the whole of the new surroundings replaces the old.
 
-**Attention (D43):** a channel with `on_request` is perceived only when asked, with a `look`. A look through a records channel can be a **search**: records still standing, conditions on named fields, an order and a limit. The matching is mechanical.
+**Attention (D43):** a channel with `on_request` is perceived only when asked, with a `look`. A look through a records channel can be a **search**: records still standing, conditions on named fields, an order and a limit. The matching is mechanical. A search's fields: `record`, `kind`, `at`, `author`, `speaks_for`, `basis`, `data.<path>`, `about.<path>`; and (proposed 2026-10-08, for sign-off: docs/decisions.md, "Nobody has the land register by heart") `id`, a record's own, and `claim`, the claim a transfer or a release names, so that a register can be asked for one named record and for what became of one title instead of being shown whole.
 
 **Every participant can always opt out of the study** (VISION §15; D38), which is not resigning an office; `on_opt_out` says whether its positions then fall vacant or a code stand-in carries on. Every framing records its disclosure and a mandatory reason.
 

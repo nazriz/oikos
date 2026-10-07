@@ -1,6 +1,6 @@
 {
   "name": "firm.landlord",
-  "version": "0.12.2",
+  "version": "0.13.0",
   "doc": "docs/behaviour/firms.md",
   "params": {
     "after_term": {
@@ -137,6 +137,11 @@
     "outside_account": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "register": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
     },
     "renew": {
       "schema": {
