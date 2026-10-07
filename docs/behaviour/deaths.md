@@ -1,6 +1,7 @@
 # How a death comes to be known (D54; revised 2026-10-08)
 
-**Source:** `citizen.ts` (`citizen.default` v0.36.0: `seeDeathAtHome`), `firms.ts` (`firm.landlord` v0.12.3),
+**Source:** `citizen.ts` (`citizen.default` v0.36.1: `seeDeathAtHome`, and the child's word), `household.ts`
+(`SAYING.died`), `firms.ts` (`firm.landlord` v0.12.3),
 `police.ts` (`police.station` v0.2.0), `common.ts` (`stoodEmpty`), `institutions.ts` (`city.registry`). Figures: the
 profile's `life.found_alone_after`, with its source. What follows a registration (the estate, wages, the lease, children
 in care) is in [households.md](households.md) and [institutions.md](institutions.md).
@@ -27,6 +28,7 @@ how long a dead person goes on being treated as alive.
 | | Rule | Basis |
 |---|---|---|
 | **Sharing the home** | A person sees who has left their home and why, whenever they are awake in it (the kernel shows a space's last five departures to those in the building). At every wake at home, not only when they plan their week, an adult looks for a household member who left by dying. Of the surviving adults at home at that moment, the first in the household's list reports it to the registry (who died, the partner, the children, which of them are adults) and writes the household's new record without them; the others do nothing but stop paying their share of the rent to a dead leaseholder. One who comes home later finds the household's record already changed, and reports nothing. Seeing a death makes that wake's plan the week's full plan (the lease may have passed to them). | Those who live with someone know first; a doctor has 48 hours. No waiting time is added: see "Leaves out" |
+| **Only a child at home** | A child old enough for school (any child, in a world with no school) who sees someone of the household die at home, with no adult of the household there, tells the first of its surviving adults, once, in the household's own words ("… has died at home, …"). The adult told reports it as if they had seen it, from wherever they are, and, if they never knew where the household had come to live, goes there. With no adult of the household left, the child asks child protection for help, as before. | A child calls the parent who is out. Found 2026-10-08: a family new to town whose leaseholder died the day after moving in, before telling her partner where the home was; he stayed at his work, the child came and went, and nobody reported it |
 | **Nobody else at home: how anyone can tell** | From outside, a home nobody lives in any more is one that is empty and that nobody has gone into or out of for a day (`stoodEmpty`). Where people share a home, one of them comes or goes within a day (the daily round), and it is theirs to report: only they can say who the family is, and an estate reported by anyone else passes to the town. So the landlord and the police report only a death in a home that has stood empty for a day since. | — (a day: the round's own rhythm, not a place's figure) |
 | **A tenant, by the landlord** | A landlord sees who is in the homes it owns (its office's sight of its own buildings). At its weekly look, and whenever else it is woken, a tenant who left by dying, in a home that has stood empty, and not yet registered: reported to the registry. | An owner's inspection. Kept from before; it now waits for the home to stand empty |
 | **Anyone, by the police** | Each day they work, the police look at the town's homes (a channel they see only when they ask to). A death in a home that has stood empty is theirs to call at: when is drawn once for each such person from `found_alone_after` (the share found within 1, 3, 7, 30 and 365 days; any moment within the band drawn), counted from the death. When that time has come, at the next day's work, an officer with an hour free (`call_seconds`) calls, and the death is reported to the registry as found there, unless it has been registered since. A world with no police has nobody to do this. | Japan's National Police Agency, 2025 (to confirm); the hour is a placeholder |
@@ -69,6 +71,8 @@ for this alone; a model holding the office could ask for it at any time. See "Re
   registration). The police's calls are at homes only.
 - **Who really calls:** relatives, friends and neighbours missing someone (people's ties are in the world; nobody
   acts on not having seen someone). With them, the police would be called rather than look.
+- **A home with only children too young for school in it** and the household's adults away: nobody tells anyone, and
+  the home is not empty, so nobody outside calls either. Not seen in these runs.
 - **The housemate asleep.** Someone at home when a housemate dies learns of it the next time they are woken (leaving
   for work, usually within hours; over a weekend, up to two days), not at that moment: nothing wakes a person for
   what happens beside them.

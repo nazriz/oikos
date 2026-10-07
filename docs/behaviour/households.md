@@ -95,6 +95,7 @@ How a death comes to be known, by those at home and for someone with nobody at h
 - Of the surviving adults at home, the first in the household's list reports it to the registry: who died, the partner, the children, and which of them are adults.
 - They also write the household's new record, without them. If the dead person held the lease, the partner takes it over, or else the eldest adult. The new leaseholder starts looking for a home, because the lease was in the dead person's name and the landlord will give notice.
 - Anyone paying their share of the rent to the dead leaseholder stops.
+- A child at home with no adult of the household there tells the first of its surviving adults, who reports it from wherever they are.
 - A child whose household has no adult left asks child protection for help, and is taken into care.
 
 ## What's not here yet (recorded, not built)

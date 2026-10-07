@@ -102,8 +102,11 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   expect(heldLease.some((who) => records.some((r) => r.data.leaseholder !== who && !r.data.members.some((m: any) => m.person === who)))).toBe(true);
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own) and moving into a home still being left.
-  // (And an act its doer died in the middle of: it comes to nothing when its time is up. Only theirs: anyone else
-  // refused for no longer acting would be a fault.)
+  // (And, as the households test allows with the daily round: an act its doer died in the middle of, which comes to
+  // nothing when its time is up, here only theirs, since anyone else refused for no longer acting would be a fault;
+  // and a partner gone to work while a conception was under way, "isn't near". Both turned up when the run became a
+  // different one, 2026-10-08.)
   const diedDoing = (e: any) => e.code === "participant_inactive" && diedAt.has(String(e.participant).replace(/-self$/, "")) && e.t >= diedAt.get(String(e.participant).replace(/-self$/, ""))!;
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "flooded"].includes(e.code) && !diedDoing(e)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
+  const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "flooded"].includes(e.code) && !diedDoing(e) && !partnerGone(e)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
 }, 300_000);

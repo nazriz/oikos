@@ -79,6 +79,7 @@ export const SAYING = {
   leaving: () => "We're leaving town.",
   share: (cents: number, account: string) => `Your share of the rent is ${sum(cents)} a month, paid to ${account}.`,
   pay: (cents: number) => `My pay is now ${sum(cents)} a month.`,
+  died: (person: string, space: string) => `${person} has died at home, ${space}.`,
 };
 
 export type Heard =
@@ -86,7 +87,8 @@ export type Heard =
   | { kind: "moveOut"; from: string }
   | { kind: "leaving" }
   | { kind: "share"; cents: number; account: string }
-  | { kind: "pay"; cents: number };
+  | { kind: "pay"; cents: number }
+  | { kind: "died"; person: string; space: string };
 
 /** An amount heard, if it's written as we write one. */
 function heardSum(s: string): number | undefined {
@@ -104,6 +106,7 @@ export function hear(text: string): Heard | undefined {
   if ((m = /^We've got (\S+)\. Time to move in\.$/.exec(text))) return { kind: "moveIn", space: m[1]! };
   if ((m = /^Our tenancy at (\S+) has ended\. Time to move out\.$/.exec(text))) return { kind: "moveOut", from: m[1]! };
   if (text === SAYING.leaving()) return { kind: "leaving" };
+  if ((m = /^(\S+) has died at home, (\S+)\.$/.exec(text))) return { kind: "died", person: m[1]!, space: m[2]! };
   let n: number | undefined;
   if ((m = /^Your share of the rent is (.+) a month, paid to (\S+)\.$/.exec(text)) && (n = heardSum(m[1]!)) !== undefined) return { kind: "share", cents: n, account: m[2]! };
   if ((m = /^My pay is now (.+) a month\.$/.exec(text)) && (n = heardSum(m[1]!)) !== undefined) return { kind: "pay", cents: n };
