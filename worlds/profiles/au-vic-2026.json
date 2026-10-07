@@ -505,17 +505,35 @@
         "from_age": 22
       }
     },
-    "wealth_quintile_shares_bps": [
-      70,
-      480,
-      1130,
-      2050,
-      6280
-    ],
-    "outside_ownership_bps": {
-      "factory": 8000,
-      "shop": 2000,
-      "landlord": 3000
+    "firm_ownership": {
+      "forms_bps": {
+        "factory": { "closely_held": 0, "outside": 0, "widely_held": 10000 },
+        "shop": { "closely_held": 8000, "outside": 2000, "widely_held": 0 },
+        "landlord": { "closely_held": 7000, "outside": 3000, "widely_held": 0 }
+      },
+      "closely_held": {
+        "households_bps": [8500, 1200, 300],
+        "owner_wealth_fifth_bps": [100, 200, 400, 800, 8500]
+      },
+      "widely_held": { "outside_bps": 8000, "fund_bps_of_local": 7200 },
+      "direct_holders": {
+        "by_wealth_fifth_bps": [800, 2500, 3500, 5000, 7200],
+        "firms_held": [1, 4]
+      },
+      "fund": {
+        "member_bps": 8400,
+        "pension_every_days": 30,
+        "drawdown_bps_by_age": [
+          { "from": 0, "bps": 400 },
+          { "from": 65, "bps": 500 },
+          { "from": 75, "bps": 600 },
+          { "from": 80, "bps": 700 },
+          { "from": 85, "bps": 900 },
+          { "from": 90, "bps": 1100 },
+          { "from": 95, "bps": 1400 }
+        ],
+        "cost_bps_of_income": 1500
+      }
     },
     "industry": {
       "factory_labour_share_bps": 2000,
@@ -836,8 +854,11 @@
     "retiree_savings": "Placeholder: savings at retirement, $150,000-350,000, around typical superannuation balances at 65-69 (to confirm against ATO or ASFA figures).",
     "support.pension": "Age Pension, single, maximum rate with supplements: $1,200.90 a fortnight from 20 March 2026 (Department of Social Services, rates from 20 March 2026). Couples' rates and means tests left out.",
     "support.unemployment": "JobSeeker Payment, single, no children: $808.70 a fortnight from 20 March 2026 (Department of Social Services). From age 22 (younger people are on Youth Allowance, left out). Means test left out.",
-    "wealth_quintile_shares_bps": "Shares of household net worth by wealth quintile, lowest to highest: 0.7%, 4.8%, 11.3%, 20.5%, 62.8% (ABS, Household Income and Wealth, Australia, 2019-20).",
-    "outside_ownership_bps": "Placeholder: the share of a firm owned from outside the town (a factory mostly by companies elsewhere; a shop mostly locally; landlords partly by outside investors). To source.",
+    "firm_ownership.forms_bps": "How the firms of each kind are held (docs/behaviour/firm-ownership.md). Shops and landlords are small businesses, held closely: 97.4% of Australian businesses have fewer than 20 employees, and of those that employ anyone 92.6% do (ABS, Counts of Australian Businesses, July 2022 to June 2026, released 18 August 2026); about two-thirds of businesses are family businesses (KPMG and Family Business Australia surveys, 67%; to confirm); rented homes are owned by individual investors, about 70% of them with one property (RBA Bulletin, May 2026, Insights from New Data on Australian Housing Investors). Placeholders, to source: the share of shops (20%) and of landlords (30%) owned from outside the town (a chain's branch; an investor living elsewhere), carried over from the figure this replaces; factories all widely held (a works of 40 is a medium business: 2.4% of businesses have 20 to 199 employees; how many regional ones are family companies, to source).",
+    "firm_ownership.closely_held": "households_bps: a placeholder (one owning household 85%, two 12%, three 3%), shaped by partnerships being 7.0% of businesses and sole proprietors 30.1% (ABS, Counts of Australian Businesses, June 2026); the number of households behind a company or trust, to source. owner_wealth_fifth_bps: households in the highest fifth of wealth held 85% of the value of business assets (RBA Bulletin, April 2009, The Composition and Distribution of Household Wealth in Australia, from HILDA 2006); the split of the other 15% among the lower fifths is a placeholder.",
+    "firm_ownership.widely_held": "outside_bps: a placeholder carried over from the figure this replaces (a factory is mostly owned by companies and investors elsewhere), to source. fund_bps_of_local: households' superannuation reserves were 4,433.1 billion dollars and their shares and other equity 1,749.5 billion at June 2026, 72% and 28% of the two together (ABS, Australian National Accounts: Finance and Wealth, June quarter 2026); a liberty: not all of superannuation is in shares, and households' equity includes unlisted businesses.",
+    "firm_ownership.direct_holders": "by_wealth_fifth_bps: households holding shares directly, by fifth of wealth: 8% of the lowest, 25% of the second, 72% of the highest, 38% of all (RBA Bulletin, April 2009, from HILDA 2006; 34% of all in 2010, RBA Bulletin, March 2012; 38% of adults held listed investments in 2023, ASX Australian Investor Study 2023); the third and fourth fifths (35%, 50%) are placeholders chosen so that the five average 38%. firms_held: a placeholder (one to four companies each), to source.",
+    "firm_ownership.fund": "member_bps: 84% of households held superannuation in 2014 (RBA Bulletin, June 2016, Household Wealth in Australia: Evidence from the 2014 HILDA Survey); of households, used here of adults (to confirm per person). pension_every_days: an account-based pension is paid monthly, quarterly, half-yearly or yearly, as the member chooses (Moneysmart, Account-based pensions); monthly here. drawdown_bps_by_age: the least a pension must pay of the balance a year: 4% under 65, 5% at 65 to 74, 6% at 75 to 79, 7% at 80 to 84, 9% at 85 to 89, 11% at 90 to 94, 14% from 95 (Moneysmart, Account-based pensions). cost_bps_of_income: derived: fees of about 1.1% of assets a year (Productivity Commission, Superannuation: Assessing Efficiency and Competitiveness, 2018; to confirm) over a yearly return of 7.4% (APRA, Quarterly superannuation statistics, March 2026) is about 15% of what a fund's holdings earn.",
     "industry": "Placeholders to confirm: manufacturing's compensation of employees and intermediate inputs as shares of output (about 20% and 67%, ABS, Australian National Accounts: Input-Output Tables); retail trade's purchases of goods and wages as shares of sales (about 70% and 14%, ABS, Australian Industry).",
     "prices": "Placeholders: an item of goods worth $100 at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs $2.50 a kg; building materials $1.25 a kg (docs/behaviour/building.md).",
     "ordinary_hours_per_week": "Maximum ordinary hours for a full-time employee, 38 a week (Fair Work Act 2009, s 62, the National Employment Standards).",

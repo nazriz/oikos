@@ -61,6 +61,7 @@
  "participants/test/council.test.ts": 0.1,
  "participants/test/drafting.test.ts": 0.1,
  "participants/test/elections.test.ts": 0.1,
+ "participants/test/fund.test.ts": 0.1,
  "participants/test/household.test.ts": 0.1,
  "participants/test/landlord.test.ts": 0.1,
  "participants/test/law.test.ts": 0.2,

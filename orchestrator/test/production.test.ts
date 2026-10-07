@@ -94,10 +94,38 @@ test("goods are made from inputs by workers' hours, exported within each factory
   expect(asked.length).toBeGreaterThan(0);
   const register = config.world.records.find((r: any) => r.id === `shareholders-${asked[0].speaks_for}`).data.holders as { account: string; shares: number }[];
   const first = asked[0].data.payments as { to: string; amount: string }[];
-  const [a, b] = [register[0]!, register[1]!];
-  const [pa, pb] = [a, b].map((h) => Number(first.find((m) => m.to === h.account)?.amount)) as [number, number];
-  expect(Math.abs(pa / pb - a.shares / b.shares)).toBeLessThan(0.01);
+  // (Until 2026-10-08 the first two holders were compared, to within 1%: every household held shares in every
+  // factory, in large equal lots. A factory's holders are now the outside world, the retirement fund and a few
+  // households with holdings of very different sizes (docs/behaviour/firm-ownership.md), so every holder is checked,
+  // and exactly: each is paid its share of one amount, rounded down.)
+  expect(register.length).toBeGreaterThan(2);
+  expect(register.map((h) => h.account)).toContain("acc-outside");
+  expect(register.map((h) => h.account)).toContain("acc-fund");
+  const paid = register.map((h) => ({ shares: h.shares, got: Number(first.find((m) => m.to === h.account)?.amount ?? 0) }));
+  expect(first.length).toBe(paid.filter((p) => p.got > 0).length);
+  for (const a of paid) for (const b of paid) expect(Math.abs(a.got * b.shares - b.got * a.shares)).toBeLessThan(Math.max(a.shares, b.shares));
   for (const r of asked.filter((x) => x.at < 170 * DAY)) expect(ev.filter((e) => e.event === "transfer" && e.per_instruction === r.id).length).toBe(r.data.payments.length);
+  // The retirement fund (docs/behaviour/firm-ownership.md), paid by the factories as any holder is: it pays its
+  // costs to its administrator outside, and its members by one instruction a period, which the bank carries out
+  // line by line: a pension to members of the retirement age only, never to anyone not on its register.
+  const retirementAge = JSON.parse(readFileSync(join(root, `worlds/profiles/${base.profile}.json`), "utf8")).values.retirement_age as number;
+  const born = new Map<string, number>(config.world.records.find((r: any) => r.kind === "fund_members").data.members.map((m: any) => [m.account, m.born_at]));
+  const pensions = recs.filter((r) => r.kind === "request" && r.speaks_for === "fund" && Array.isArray(r.data?.payments));
+  expect(pensions.length).toBeGreaterThan(0);
+  for (const r of pensions) {
+    for (const p of r.data.payments as { to: string; for: string }[]) {
+      expect(born.has(p.to)).toBe(true);
+      if (p.for === "Pension.") expect(Math.floor((r.at - born.get(p.to)!) / (365 * DAY))).toBeGreaterThanOrEqual(retirementAge);
+    }
+    if (r.at < 170 * DAY) expect(ev.filter((e) => e.event === "transfer" && e.per_instruction === r.id).length).toBe(r.data.payments.length);
+  }
+  const costs = recs.filter((r) => r.kind === "request" && r.speaks_for === "fund" && r.data?.outcome?.money?.to === "acc-outside");
+  expect(costs.length).toBeGreaterThan(0);
+  // What it has paid out and still holds is what the factories paid it: it is given nothing else, and spends nothing else.
+  const fundIn = ev.filter((e) => e.event === "transfer" && e.to === "acc-fund");
+  expect(fundIn.every((e) => String(e.from).startsWith("acc-factory-"))).toBe(true);
+  const fundOut = ev.filter((e) => e.event === "transfer" && e.from === "acc-fund").reduce((x, e) => x + Number(e.amount), 0);
+  expect(fundOut).toBeLessThanOrEqual(fundIn.reduce((x, e) => x + Number(e.amount), 0));
 }, 300_000);
 
 test("Lengnick: with too little demand a factory lets workers go and stops making; with plenty it hires", async () => {
