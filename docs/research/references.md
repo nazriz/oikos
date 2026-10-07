@@ -163,3 +163,9 @@ sources); this list is for the architecture and design ideas.
 | A small pretrained encoder, fine-tuned, as the reader (the second arm) | He, P., Gao, J. & Chen, W. (2023), "DeBERTaV3: improving DeBERTa using ELECTRA-style pre-training with gradient-disentangled embedding sharing", *ICLR*; the published model `microsoft/deberta-v3-xsmall` (MIT licence, read 2026-10-06) | `py/train.py --encoder`, `py/model.py` (`Config.encoder`), `py/tokens.py` |
 | Fine-tuning a pretrained encoder at a lower rate than the layers added on top of it | Howard, J. & Ruder, S. (2018), "Universal language model fine-tuning for text classification", *ACL* (discriminative fine-tuning) **(to confirm)** | `py/train.py`: `--encoder-lr` for the encoder, `--lr` for the writer and heads |
 | Fitting one temperature on held-out data so stated confidence matches how often answers are right (to confirm: not built yet) | Guo, C., Pleiss, G., Sun, Y. & Weinberger, K. Q. (2017), "On calibration of modern neural networks", *ICML* | Planned for the threshold below which the model asks back |
+
+## Running large towns (docs/decisions.md, 2026-10-08; participants/src/behaviour/common.ts)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| Values that are the same are held once and found again by what they are made of (hash consing; the flyweight) | Goto, E. (1974), "Monocopy and associative algorithms in extended Lisp", Technical Report 74-03, University of Tokyo **(to confirm)**; Gamma, E., Helm, R., Johnson, R. & Vlissides, J. (1994), *Design Patterns*, Addison-Wesley (Flyweight) | A book's shelves: a list shown whole to many readers is one shelf, found by its records, with each reader's differences beside it (`Book`, `Pages`) |
