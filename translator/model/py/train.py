@@ -246,6 +246,9 @@ def main() -> None:
     fixed = random.Random(7)
     val_pool = form_lines(val_rows)
     val_known = prepare([with_forms(r, val_pool, fixed) for r in val_rows], model, tokenizer, left_out["validation_forms_known"])
+    # A second validation set where the data has one (validation-real.jsonl: requests written in real situations and
+    # kept out of training): the first is all generated requests, and has risen while the tests fell.
+    real = prepare(load(data / "validation-real.jsonl"), model, tokenizer, {}) if (data / "validation-real.jsonl").exists() else None
     params = sum(p.numel() for p in model.parameters())
     print(f"{params / 1e6:.2f}M parameters; {len(train)} training and {len(val)} validation examples; {device}", flush=True)
     steps_total = a.epochs * ((len(train) + a.batch - 1) // a.batch)
@@ -307,6 +310,10 @@ def main() -> None:
             s = score(model, val, device)
             k = score(model, val_known, device)
             line.update({"validation_right": s["right"], "of": s["of"], "by_kind": s["by_kind"], "with_forms_known": k["right"]})
+            if real is not None:
+                r = score(model, real, device)
+                line.update({"real_right": r["right"], "real_of": r["of"], "real_by_kind": r["by_kind"]})
+                (out / "validation-real.jsonl").write_text("\n".join(json.dumps(x) for x in r["results"]) + "\n")
             if s["right"] + k["right"] > best:
                 best = s["right"] + k["right"]
                 (out / "validation-forms-known.jsonl").write_text("\n".join(json.dumps(r) for r in k["results"]) + "\n")
