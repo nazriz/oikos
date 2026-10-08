@@ -24,7 +24,7 @@ import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
 import { costReport } from "./cost";
 import { chooseModel } from "./models";
 import { KernelDied, KernelLogFailed, kernelBinary } from "./kernel";
-import { clearForFreshRun, compressLog, isLog, isStoppedLog, logsOf, realModelIn } from "./logs";
+import { clearForFreshRun, compressLog, currentLogs, isLog, isStoppedLog, logsOf, realModelIn } from "./logs";
 import { logToResume, recordedCalls, prepareResume, Serving } from "./resume";
 import { ORCHESTRATOR_VERSION, runWorld, RunStuck, type RunOptions, type RunSummary } from "./run";
 import type { LlmAdapter } from "@oikos/participants/llm";
@@ -175,6 +175,44 @@ export async function runOne(o: { world?: string; seed?: number; town?: number; 
   const rec: RunRecord = { ...s, seed: Number(config.seed), ...(o.town !== undefined && !o.resume ? { town: o.town } : {}), wallMs: Math.round(performance.now() - t0) };
   writeFileSync(join(out, `${runId}.summary.json`), JSON.stringify(rec, null, 2));
   return rec;
+}
+
+/**
+ * What a batch does once its runs are over, done again for a folder whose run was resumed: the folder's measures and
+ * its cost report (cost.txt, cost.json) are made anew from its runs' current logs, so that they are the whole run's and
+ * not what it had cost at its first stop; and a run that got to its end has its log compressed, as a finished run's is.
+ * A run that stopped again is measured as far as it got and left plain (its resume command names that file). What
+ * fails here is said and never undoes the run. (2026-10-09: a resumed pilot's cost.txt said no model had been called,
+ * against 18.54 recorded in its log, and its log stayed 175 MB plain.)
+ */
+export async function afterResume(rec: RunRecord, o: { translatorModel?: string; measure?: boolean; compress?: boolean; log?: (line: string) => void } = {}): Promise<{ logPath: string; costText?: string; problems: string[] }> {
+  const out = resolve(rec.logPath, "..");
+  const problems: string[] = [];
+  let costText: string | undefined;
+  if (o.measure !== false) {
+    try {
+      const measureDir = join(out, "measure");
+      const logs = currentLogs(out).filter((f) => /\.seed\d+\.jsonl(\.zst)?$/.test(f));
+      rmSync(measureDir, { recursive: true, force: true });
+      await exportLogs(logs, measureDir);
+      const cost = await costReport(measureDir, { translatorModel: o.translatorModel });
+      writeFileSync(join(out, "cost.txt"), `${cost.text}\n`);
+      writeFileSync(join(out, "cost.json"), JSON.stringify({ ...cost, text: undefined }, null, 2));
+      costText = cost.text;
+    } catch (e) {
+      problems.push(`measuring the resumed run: ${(e as Error).message}`);
+    }
+  }
+  let logPath = rec.logPath;
+  if (o.compress !== false && !rec.stopped && logPath.endsWith(".jsonl")) {
+    try {
+      logPath = await compressLog(logPath);
+    } catch (e) {
+      problems.push(`compressing ${logPath}: ${(e as Error).message}`);
+    }
+  }
+  for (const p of problems) o.log?.(`  ! ${p}`);
+  return { logPath, ...(costText !== undefined ? { costText } : {}), problems };
 }
 
 /** The `--set`s that make a town's world: the batch's own, then the spec's seed set to the town's. */

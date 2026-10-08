@@ -119,7 +119,7 @@
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { exportLogs, queries, query, runQuery, table } from "@oikos/measure";
-import { loadWorld, resumeCommand, runBatch, runName, runOne, type StopSignal } from "./batch";
+import { afterResume, loadWorld, resumeCommand, runBatch, runName, runOne, type StopSignal } from "./batch";
 import { MockAdapter, mockPolicies, PRICES } from "@oikos/participants/llm";
 import { costReport } from "./cost";
 import { currentLogs } from "./logs";
@@ -230,7 +230,11 @@ try {
     const o = { until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
       model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url") };
     const r = await runOne({ resume: positional()[0]!, ...o, stop: stopOnSignal() });
-    console.log(`${r.runId}: resumed to ${(r.t / (365 * 86_400)).toFixed(2)} years; the stopped run's files are kept as ${r.runId}.stopped-<n>.*; ${r.logPath}`);
+    // What a batch does after its runs, done again for this folder: its cost report is the whole run's, and a run that
+    // got to its end has its log compressed (--no-measure and --no-compress leave either out).
+    const done = await afterResume(r, { translatorModel: o.translatorModel, measure: !has("no-measure"), compress: !has("no-compress"), log: console.log });
+    console.log(`${r.runId}: resumed to ${(r.t / (365 * 86_400)).toFixed(2)} years; the stopped run's files are kept as ${r.runId}.stopped-<n>.*; ${done.logPath}`);
+    if (done.costText) console.log(`\n${done.costText}`);
     if (r.stopped) console.log(`${r.runId}: STOPPED again at day ${Math.floor(r.t / 86_400)}, not finished: ${r.stopped.why}\n  resume it with: ${resumeCommand(r.logPath, o)}`);
   } else if (cmd === "measure" && positional()[0]) {
     const dir = await measureDir(positional()[0]!);

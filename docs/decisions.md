@@ -3201,6 +3201,14 @@ See the design note, §16.
   - **Not verified:** a real model's second answer under the new words (two cases seen under the old ones, one of which dropped its acts).
   - **Revisit if** second answers still come back as `done_for_now` alone: then the first answer's readable parts could be said back to it.
 
+- **A resumed pilot's record is whole** (2026-10-09; live check 2, finding 14; `orchestrator/src/run.ts`, `batch.ts` (`afterResume`), `cli.ts`, `pilot-state.ts`, `pilot-report.ts`, `scripts/pilot-queue.ts`; tests `orchestrator/test/run-housekeeping.test.ts`, `pilot-queue.test.ts`).
+  - **Cost and the log.** The cost report and the compressing of a finished log were a batch's last steps, and `oikos resume` is not a batch: a resumed pilot kept the `cost.txt` of its first stop ("No model calls ... 0.00" against 18.54 recorded) and a plain log of 175 MB. A resume now does both for its folder: measures and cost from the run's current log, the log compressed if the run got to its end. The pilot report gives the whole run's recorded cost and calls from the log (which, for a resumed run, holds every part).
+  - **Debriefs.** A debrief that met a usage limit, or got no answer, was noted `debrief_skipped` and the run ended as done: pilot 1's planning seat was never debriefed. Now such a run stops at its end, to be resumed ("a debrief could not be asked ..."), the queue does not take it for done, and the resumed run asks the debriefs not yet given (the failed call is asked again, not served as the same failure). Only a run out of its own spending limit skips one. The pilot report says first when a debrief was never given (pilot 1's log: "NOT A FINISHED PILOT: a debrief was not given: planning-system").
+  - **Waiting at a limit.** The queue asked every twenty minutes through a limit whose message said "try again at 6:58 AM". It reads the time (a time of day, or "in 2 hours") and waits until then and a minute more, at most twelve hours; with nothing readable, the usual wait. A run stopped with its model not answering is waited for the same way, and left after six waits with no progress.
+  - **Contracts:** none.
+  - **Not verified:** the Claude plan's own wording of when a limit lifts beyond the forms seen ("resets at 5pm", "will reset at 3pm"); a time given in another zone than the machine's.
+  - **Revisit if** a limit's message gives a time the reader takes wrongly (it would wait up to twelve hours): then cap the wait lower, or go back to asking.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.

@@ -1087,9 +1087,21 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     try {
       await d.controller.debrief(debriefText(d.part));
     } catch (e) {
-      // Out of budget, or the model failed after its retries (D59): the debrief is skipped, and that's recorded.
       if (!(e instanceof SpendingLimitReached) && !(e instanceof ModelCallFailed)) throw e;
-      await k.request({ op: "annotate", annotation: { annotation: "note", subject: d.part.id, data: { debrief_skipped: e.message } } });
+      // Out of the run's own budget: the debrief is skipped, and that's recorded (the run is over unless someone raises it).
+      if (e.name === "SpendingLimitReached") {
+        await k.request({ op: "annotate", annotation: { annotation: "note", subject: d.part.id, data: { debrief_skipped: e.message } } });
+        continue;
+      }
+      // The model could not be asked just now (a provider's limit, or no answer after its retries): the run is not
+      // over for those in it. It stops here to be resumed, and the debriefs not yet given are asked then: one lost
+      // this way used to be skipped for good in a run marked done (VISION section 15.3; 2026-10-09). The call that
+      // failed is asked again by the resumed run, not served to it as the same failure.
+      stopped = `a debrief could not be asked (${d.part.id}: ${String(e.message).slice(0, 400)}): the run stops here, at its end, with debriefs still to give; resume it to ask them (oikos resume <log>)`;
+      stoppedBy = e instanceof ModelCallFailed ? "ModelUnreachable" : e.name;
+      await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { stopped, by: stoppedBy, debriefs_deferred: "a debrief could not be asked: those not yet given are asked when the run is resumed", ...(roundFailures ? { failed_calls_to_ask_again: roundFailures } : {}) } } });
+      log(`${o.runId}: ${stopped}`);
+      break;
     }
   }
   // A resumed run says so at the end (not the start, so that up to where the old run stopped, the two logs are the same).
