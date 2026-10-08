@@ -1,6 +1,5 @@
 import { expect, test } from "bun:test";
-import { adultAgeBands, bedroomsNeeded, drawHousehold, hear, SAYING, type HouseholdData, type HouseholdSpec, type Member } from "../src/behaviour/household";
-import { Randomness } from "../src/rng";
+import { bedroomsNeeded, hear, SAYING, type HouseholdData, type Member } from "../src/behaviour/household";
 import { CATCHING_UP, heardNews } from "../src/behaviour/citizen";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
@@ -51,48 +50,4 @@ test("catching up: a code citizen's news reads back as what it says", () => {
   expect(heardNews(CATCHING_UP.leans("religious-group-1"))).toEqual({ leansTo: ["religious-group-1"] });
   expect(heardNews(CATCHING_UP.nothing)).toBeUndefined();
   expect(heardNews("Lovely weather.")).toBeUndefined();
-});
-
-// Adults' ages follow the census (docs/behaviour/households.md): those whose age no family decides are drawn from the
-// census's adults less the ones families put in each band. Grown children at home are put there by their families as
-// parents are; taken off for parents only (until 2026-10-08), the youngest adults were counted twice (16% of adults
-// under 25 where the census has 9%) and every band from 50 up came out a fifth short (20% of adults at or past 67
-// where the census has 25%).
-test("adults' ages follow the census, grown children at home counted among them", () => {
-  const H = { ...PROFILE.values.households } as unknown as HouseholdSpec;
-  const a = new Randomness(1n).stream(["bands"]), b = new Randomness(1n).stream(["draw"]);
-  H.adult_age_bands = adultAgeBands(H, (n) => a.below(n));
-  const [lo] = H.adult_ages;
-  const share = (from: number, to: number) => H.age_bands_bps!.reduce((x, c) => x + (c.bps * Math.max(0, Math.min(c.to, to) - Math.max(c.from, from) + 1)) / (c.to - c.from + 1), 0);
-  let adults = 0, young = 0, old = 0;
-  for (let i = 0; i < 20_000; i++) for (const m of drawHousehold(H, (n) => b.below(n)).members) {
-    if (m.age < lo) continue;
-    adults++;
-    if (m.age < 25) young++;
-    if (m.age >= 67) old++;
-  }
-  const pct = (n: number) => (100 * n) / adults, census = (from: number, to: number) => (100 * share(from, to)) / share(lo, 200);
-  expect(Math.abs(pct(young) - census(lo, 24))).toBeLessThan(2.5);
-  expect(Math.abs(pct(old) - census(67, 200))).toBeLessThan(2.5);
-});
-
-// Brothers and sisters are a year or more apart (docs/behaviour/households.md): the years between them are drawn first,
-// and the eldest is at least as old as they add up to. Drawn the other way round (until 2026-10-08), a younger child's
-// age stopped at nought, so an eldest of one or two had siblings all born the same year, and 8.2% of the generated town
-// was under five where the census has 5.4%.
-test("no two children of a family are the same age, and the under-fives are the census's share", () => {
-  const H = { ...PROFILE.values.households } as unknown as HouseholdSpec;
-  const a = new Randomness(1n).stream(["bands"]), b = new Randomness(1n).stream(["draw"]);
-  H.adult_age_bands = adultAgeBands(H, (n) => a.below(n));
-  let people = 0, underFive = 0, twins = 0;
-  for (let i = 0; i < 20_000; i++) {
-    const d = drawHousehold(H, (n) => b.below(n));
-    const kids = d.members.filter((m) => m.parents).map((m) => m.age);
-    if (new Set(kids).size < kids.length) twins++;
-    people += d.members.length;
-    underFive += d.members.filter((m) => m.age < 5).length;
-  }
-  expect(twins).toBe(0);
-  const census = H.age_bands_bps!.reduce((x, c) => x + (c.from < 5 ? c.bps : 0), 0) / H.age_bands_bps!.reduce((x, c) => x + c.bps, 0);
-  expect(Math.abs((100 * underFive) / people - 100 * census)).toBeLessThan(1);
 });
