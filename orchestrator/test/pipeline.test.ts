@@ -146,7 +146,7 @@ test("the steps ran: situations to writers, requests to two readers, examples wh
   const examples = rows(join(out1, "lanes/train/label/examples.jsonl"));
   expect(examples.find((e) => e.request.includes("under permit rec.30"))?.program).toBe('money(amount="40", basis=["rec.30","rec.35"], from=acc-town, to=acc-ac)');
   expect(examples.every((e) => e.spans?.length || e.kind === "refusal")).toBe(true);
-  expect(first.agreement["train"]["money"].agreed).toBeGreaterThan(0);
+  expect(first.agreement["train"]!["money"]!.agreed).toBeGreaterThan(0);
   expect(plainReport(first)).toContain("basis joined in");
 });
 
