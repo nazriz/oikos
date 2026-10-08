@@ -2,7 +2,7 @@
   "id": "in-tn-2026",
   "place": "A small town of a few thousand people in Tamil Nadu, India",
   "as_of": "2026-10",
-  "about": "Every place-specific figure the town generator uses for a small Tamil Nadu town, with its source; where none was found or opened, the source says so (a PLACEHOLDER or 'to confirm'). Pay and pension are monthly in India and the structure counts fortnights. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+  "about": "Every place-specific figure the town generator uses for a small town in Tamil Nadu, India, with its source; where none was found or opened, the source says so (a PLACEHOLDER or 'to confirm'). NOT REPRESENTED YET (the profile structure cannot hold them): informal and own-account work (about nine in ten of India's workers; self-employment earnings and casual labour are read for wages only, and every job here is an employee's job), joint and extended families (they are drawn as 2-3 unrelated adults, so households are smaller than the census's), and the means test on the old-age pension (it is paid to everyone from 60, though in India only the poor are entitled). Also not represented: monthly pay periods (pay is counted in fortnights), the free block of electricity, the tax rebate and cess, and storms concentrated in the northeast monsoon. The census used is 2011, fifteen years old. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
   "values": {
     "currency": {
       "code": "INR",
@@ -18,11 +18,11 @@
       ]
     },
     "households": {
-      "lone_bps": 700,
-      "group_bps": 2900,
-      "couple_bps": 1100,
-      "couple_children_bps": 4400,
-      "one_parent_bps": 900,
+      "lone_bps": 466,
+      "group_bps": 3134,
+      "couple_bps": 1000,
+      "couple_children_bps": 4600,
+      "one_parent_bps": 800,
       "children_couple": [
         4000,
         4800,
@@ -35,7 +35,7 @@
       ],
       "same_sex_couple_bps": 0,
       "lone_parent_female_bps": 8500,
-      "adult_female_bps": 5000,
+      "adult_female_bps": 5015,
       "child_male_bps": 5324,
       "adult_ages": [
         18,
@@ -59,7 +59,7 @@
         {
           "from": 5,
           "to": 9,
-          "bps": 690
+          "bps": 610
         },
         {
           "from": 10,
@@ -69,72 +69,72 @@
         {
           "from": 15,
           "to": 19,
-          "bps": 709
+          "bps": 680
         },
         {
           "from": 20,
           "to": 24,
-          "bps": 795
+          "bps": 720
         },
         {
           "from": 25,
           "to": 29,
-          "bps": 860
+          "bps": 760
         },
         {
           "from": 30,
           "to": 34,
-          "bps": 860
+          "bps": 790
         },
         {
           "from": 35,
           "to": 39,
-          "bps": 849
+          "bps": 810
         },
         {
           "from": 40,
           "to": 44,
-          "bps": 817
+          "bps": 800
         },
         {
           "from": 45,
           "to": 49,
-          "bps": 752
+          "bps": 750
         },
         {
           "from": 50,
           "to": 54,
-          "bps": 698
+          "bps": 680
         },
         {
           "from": 55,
           "to": 59,
-          "bps": 580
+          "bps": 610
         },
         {
           "from": 60,
           "to": 64,
-          "bps": 400
+          "bps": 510
         },
         {
           "from": 65,
           "to": 69,
-          "bps": 320
+          "bps": 400
         },
         {
           "from": 70,
           "to": 74,
-          "bps": 220
+          "bps": 290
         },
         {
           "from": 75,
           "to": 79,
-          "bps": 130
+          "bps": 200
         },
         {
           "from": 80,
           "to": 84,
-          "bps": 60
+          "bps": 130
         },
         {
           "from": 85,
@@ -472,26 +472,26 @@
       ]
     },
     "wages_per_fortnight": {
-      "shop": 637985,
-      "factory": 692300,
-      "construction": 845000
+      "shop": 594260,
+      "factory": 761860,
+      "construction": 803400
     },
     "rents_per_month": {
       "apartment_units": [
         {
           "bedrooms": 1,
           "count": 3,
-          "rent": 300000
+          "rent": 500000
         },
         {
           "bedrooms": 2,
           "count": 7,
-          "rent": 450000
+          "rent": 650000
         },
         {
           "bedrooms": 3,
           "count": 2,
-          "rent": 600000
+          "rent": 800000
         }
       ],
       "house_types": [
@@ -499,20 +499,20 @@
           "id": "house",
           "bedrooms": 3,
           "share_bps": 5500,
-          "rent": 650000
+          "rent": 770000
         },
         {
           "id": "large-house",
           "bedrooms": 4,
           "share_bps": 4500,
-          "rent": 850000
+          "rent": 950000
         }
       ]
     },
     "spending": {
       "saving_bps": 800,
       "wealth_effect_bps_per_year": 300,
-      "essentials_per_month": 237600,
+      "essentials_per_month": 326800,
       "shops_known": 7,
       "shop_search_bps_per_month": 2500
     },
@@ -671,8 +671,8 @@
       "cost_bps_of_income": 50
     },
     "industry": {
-      "factory_labour_share_bps": 1000,
-      "factory_input_share_bps": 7500,
+      "factory_labour_share_bps": 700,
+      "factory_input_share_bps": 8370,
       "retail_purchases_share_bps": 8000,
       "retail_labour_share_bps": 600
     },
@@ -713,7 +713,7 @@
         "rate": 5
       }
     ],
-    "labour_force_participation_bps": 6500,
+    "labour_force_participation_bps": 6120,
     "tenancy": {
       "rent_review_months": 12,
       "rent_increase_notice_days": 90,
@@ -782,11 +782,11 @@
       }
     },
     "credit": {
-      "cash_rate_bps": 525,
+      "cash_rate_bps": 550,
       "funding_spread_bps": 100,
       "lending_rate_bps": {
         "person": 1300,
-        "organisation": 900
+        "organisation": 861
       },
       "serviceability_buffer_bps": 0,
       "max_repayment_share_bps": {
@@ -988,7 +988,7 @@
       }
     },
     "ownership": {
-      "house_owner_bps": 6500,
+      "house_owner_bps": 5745,
       "mortgage_bps_by_age": [
         {
           "from": 18,
@@ -1030,7 +1030,7 @@
       },
       "energy": {
         "kwh_per_household_per_day": 4,
-        "price_per_kwh": 470,
+        "price_per_kwh": 181,
         "supply_per_day": 0,
         "grid_price_per_kwh": 350,
         "grid_emissions_g_per_kwh": 710
@@ -1105,7 +1105,7 @@
         5,
         17
       ],
-      "students_per_teacher": 17,
+      "students_per_teacher": 23,
       "school_days_per_year": 210,
       "hours_per_day": 6,
       "teacher_wage_per_fortnight": 2077000,
@@ -1294,9 +1294,9 @@
   },
   "sources": {
     "currency": "Indian rupees, in paise: written with the rupee sign before the amount (\"₹1,234.56\"), or in words as rupees and paise (paisa singular, paise plural). ISO 4217: INR, two decimal places. Coinage Act 2011 (Government of India): the rupee is divided into 100 paise. The Indian grouping of digits (₹1,23,456, lakhs and crores) is not expressible: amounts are written in the western grouping.",
-    "households": "Household kinds are PLACEHOLDERS: the Census of India 2011 (household tables HH-01 and HH-11, Tamil Nadu: average household size 3.6) and NFHS-5 (Tamil Nadu, 2019-21) count households by size and head, but the household-type tables could not be opened here (to confirm: Registrar General and Census Commissioner, Census 2011, Houselisting tables, Tamil Nadu). Estimated shares: lone person 7%, couple alone 11%, couple with children 44%, one parent 9% (mostly widows), and 'group' 29% standing for extended and joint households (grandparents, in-laws, siblings' families), which the structure can only draw as 2-3 unrelated adults (a gap). children_couple and children_one_parent: placeholders shaped by Tamil Nadu's total fertility rate of 1.8 (NFHS-5, state fact sheet, 2019-21). same_sex_couple_bps: 0, because no count exists (the census does not record them); an absence of data, not a claim. lone_parent_female_bps 85%: placeholder (widowhood and desertion). adult_female_bps 50%: placeholder (Census 2011 sex ratio of Tamil Nadu, 996 females per 1,000 males; to confirm). child_male_bps: from NFHS-5 Tamil Nadu sex ratio at birth for births in the last five years, 878 females per 1,000 males (IIPS, NFHS-5 State Fact Sheet Compendium Phase II, Tamil Nadu, indicator 4: 1000/1878 = 53.2% male); a small-sample survey figure that is probably more skewed than the registered one (to confirm against SRS). mother_age_at_first_birth [20, 28]: placeholder around a median of about 23 (NFHS-5; to confirm). adult_ages, group_size, child_max_age: structure bounds, as in the other profile. Children at home are drawn to 24, a simplification: in India unmarried children stay home and many married sons stay with their parents.",
-    "households.age_bands_bps": "Registrar General of India, SRS Statistical Report 2020, Tamil Nadu (Statements 4-7): 0-4 years 5.6% of the population; under 15, 19.1%; 15-59, 69.2%; 60 and over, 11.7% (urban Tamil Nadu 12.8%). The 5-year splits inside those totals (5-9 and 10-14; each 5-year group within 15-59 and within 60+) are placeholders shaped by a typical age pyramid and scaled to the SRS totals. These are 2020 figures, not projected to 2026, when the older groups will be larger (National Commission on Population, Population Projections for India and States 2011-2036, gives Tamil Nadu 77.58 million in 2026; its age tables could not be opened, to confirm). 85 and over is taken to 99.",
-    "fertility_per_10000": "Registrar General of India, SRS Statistical Report 2020, Statement 21 (ASFRs, Tamil Nadu, 2020): births per 1,000 women of 5.6, 86.0, 123.7, 54.3, 15.0, 3.5 and 0.5 at 15-19, 20-24, 25-29, 30-34, 35-39, 40-44 and 45-49, times 10 (configs are integers). The total fertility rate these give is 1.4 (the report's figure for Tamil Nadu); NFHS-5 gives 1.8 for 2019-21.",
+    "households": "Census of India 2011 (the last census; 15 years old), Table HH-01 'Normal households by household size', Tamil Nadu (DDW-HH01-3300-2011.XLS, opened): 18,462,231 households; urban Tamil Nadu 8,954,366 households of 34,493,120 people (mean 3.85); one-person households 4.66% of urban households (5.89% of all). lone_bps 466 is that figure. The Census 2011 tables do not publish households by type (nuclear, joint, couple, one parent): couple_bps, couple_children_bps, one_parent_bps and group_bps (which stands for extended and joint households, the rest of the households after the lone ones) are PLACEHOLDERS shaped by the size table (14% of urban households have 2 members, 19% have 3, 31% have 4). The structure can draw extended households only as 2-3 unrelated adults (a gap), so generated households are smaller than the census's mean of 3.85. children_couple and children_one_parent: placeholders shaped by Tamil Nadu's total fertility rate (1.54 for 2021-25, National Commission on Population, Technical Group, Population Projections for India and States 2011-2036, Table 17A, opened). same_sex_couple_bps 0: the census does not record them (an absence of data). lone_parent_female_bps 85%: placeholder. adult_female_bps: the projected sex ratio of Tamil Nadu in 2026, 1,006 females per 1,000 males (Technical Group projections, Table T-17, opened): 1006/2006. child_male_bps: NFHS-5 Tamil Nadu sex ratio at birth for births in the last five years, 878 females per 1,000 males (IIPS, NFHS-5 State Fact Sheet Compendium Phase II, Tamil Nadu, indicator 4, opened: 1000/1878 = 53.2% male); a small-sample survey figure, probably more skewed than the registered one. mother_age_at_first_birth [20, 28]: placeholder around a median of about 23 (NFHS-5; not read). adult_ages, group_size, child_max_age: structure bounds. Children at home are drawn to 24, a simplification.",
+    "households.age_bands_bps": "National Commission on Population (Ministry of Health and Family Welfare), Report of the Technical Group on Population Projections 2011-2036 (July 2020), Table 19, Tamil Nadu, 1 March 2026, person: 0-4 5.6%, 5-9 6.1, 10-14 6.6, 15-19 6.8, 20-24 7.2, 25-29 7.6, 30-34 7.9, 35-39 8.1, 40-44 8.0, 45-49 7.5, 50-54 6.8, 55-59 6.1, 60-64 5.1, 65-69 4.0, 70-74 2.9, 75-79 2.0, 80 and over 1.8 (opened from an archived copy of the PDF, a web.archive.org capture of nhm.gov.in). The report's last group is 80+: it is split 1.3% for 80-84 and 0.5% for 85-99, a placeholder split. 2026 total 77.546 million; 0-14 18.3%, 60+ 15.8%. A projection from the 2011 census, not a count; SRS Statistical Report 2020 (Tamil Nadu: under 15, 19.1%; 60+, 11.7%, opened) is the check.",
+    "fertility_per_10000": "Registrar General of India, SRS Statistical Report 2020, Statement 21 (ASFRs, Tamil Nadu, 2020): births per 1,000 women of 5.6, 86.0, 123.7, 54.3, 15.0, 3.5 and 0.5 at 15-19, 20-24, 25-29, 30-34, 35-39, 40-44 and 45-49, times 10 (configs are integers). The total fertility rate these give is 1.4 (the report's figure for Tamil Nadu); NFHS-5 gives 1.8 for 2019-21. (The Technical Group projection, Table 17A, has Tamil Nadu's total fertility rate at 1.54 for 2021-25 and 1.52 for 2026-30.)",
     "life.qx_per_100000": "Registrar General and Census Commissioner of India, SRS Based Abridged Life Tables 2016-20, Tamil Nadu (total-population table, male and female nqx), read from the published PDF (censusindia.gov.in, catalog 44377, SRS-Abridged_Life_Tables_2016-2020.pdf): e.g. 0-1: 0.01942 male, 0.01785 female; 60-65: 0.08768, 0.06150; 80-85: 0.37019, 0.34437. Single-year probabilities per 100,000 are derived by spreading each interval's probability evenly in hazard (annual q = 1-(1-nqx)^(1/n)). Ages 85-100 are NOT published (the table ends at 85+): they extend the 80-84 hazard with a Gompertz slope of 9% a year, capped at 0.6 a year (a PLACEHOLDER). Life expectancy at birth in the table: 71.0 male, 75.5 female (73.2 total). The urban table is a little better (75.8 total); the state total is used.",
     "life.illness": "PLACEHOLDER carried over from the other profile (no age-specific hospitalisation rates for Tamil Nadu were found). A source for India is NSS 75th round, Social Consumption: Health (2017-18), which gives hospitalisation rates by age and state (to source).",
     "life.injury": "PLACEHOLDER carried over unchanged (no figure for Tamil Nadu was found); NSS 75th round (2017-18) gives hospitalisation by cause including injuries (to source). Severity split: placeholder.",
@@ -1305,30 +1305,30 @@
     "life.found_alone_after": "How long after dying at home alone a person is found. No figure for India was found. Japan's is used, as in the other profile, the one country found to count it: National Police Agency of Japan, people who died alone at home in 2025 (76,941), found within a day 28,398; 2-3 days 15,865; 4-7 days 10,456; 8 days or more 22,222 (read as reported in the press, to confirm). A PLACEHOLDER for a local figure: in India's joint households a person dying alone is rarer and probably found sooner.",
     "life.work_injury_bps": "PLACEHOLDER carried over unchanged from the other profile (serious claims per million hours): no Indian figure was found. India's factory injury statistics (Directorate General Factory Advice Service and Labour Institutes) and ESIC data exist (to source); injury in informal work is hardly recorded.",
     "ordinary_hours_per_week": "Tamil Nadu Shops and Establishments Act 1947 and the Factories Act 1948 (s 51): at most 48 hours a week (to confirm the Tamil Nadu section; the Occupational Safety, Health and Working Conditions Code 2020, in force since 21 November 2025, keeps 48 hours; to confirm).",
-    "wages_per_fortnight": "Pay in India is monthly; the structure counts fortnights, so a monthly figure is x 12 / 26. Shop: Tamil Nadu Labour Department, minimum wage for Shops and Establishments from 1 April 2026 (notification Z3/3459/2026 of 18 February 2026), Zone D, support workers (peon, helper, shop assistant): basic plus variable dearness allowance, ₹13,823 a month, as summarised by a compliance site (dcpsol.com, 'Latest Minimum Wages for Shops and Establishments in Tamil Nadu'); the notification itself was not opened (to confirm). That is ₹6,379.85 a fortnight. Small shops often pay less (informal). Factory: PLACEHOLDER, about ₹15,000 a month for a regular manufacturing worker (the PLFS 2023-24 reports average earnings of regular wage or salaried workers by state and industry; not opened, to confirm). Construction: PLACEHOLDER, ₹650 a day x 13 working days a fortnight (casual labour in construction; Tamil Nadu Construction Workers Welfare Board and PLFS 2023-24 casual wage rates; not opened, to confirm).",
-    "rents_per_month": "PLACEHOLDERS, to source: monthly rents of ₹3,000, ₹4,500 and ₹6,000 for 1-3 bedroom flats and ₹6,500 and ₹8,500 for houses of 3 and 4 bedrooms in a small Tamil Nadu town, estimated at about one fortnight's shop wage for a 3-bedroom house (the ratio the other profile's rents have to wages). Sources to use: NSS 78th round, Multiple Indicator Survey (2020-21), rent paid by renter households; Census 2011, tenure and rent tables (Tamil Nadu); listings. The apartment mix and house shares are placeholders. Most rents in India are informal, set by agreement.",
+    "wages_per_fortnight": "Pay in India is monthly; the structure counts fortnights, so a monthly figure is x 12 / 26 (annual / 26). Shop: MoSPI, Annual Survey of Unincorporated Sector Enterprises (ASUSE) 2023-24, urban Tamil Nadu, trade: annual emoluments per hired worker ₹154,509 (all hired workers; formal ₹315,188, informal ₹140,552, 97% of hired workers being informal), via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08; ₹154,509 / 26 = ₹5,943 a fortnight. The legal minimum for shop and establishment support workers is higher, ₹13,823 a month from 1 April 2026 (Tamil Nadu Labour Department notification Z3/3459/2026 of 18 February 2026, as transcribed by dcpsol.com, opened; the Labour Department's own pages could not be reached: labour.tn.gov.in and tn.gov.in time out), so small shops pay below the minimum, as the survey shows. Factory: MoSPI, Annual Survey of Industries 2023-24, Tamil Nadu, all factories (sum over 2-digit NIC groups, opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08): wages and salary of workers ₹98,081 crore over 4,951,351 workers = ₹16,507 a month, ₹7,619 a fortnight. Construction: MoSPI, PLFS calendar year 2024, urban Tamil Nadu, average daily wage earnings from casual labour other than public works, ₹617.71 (person; male ₹682.05), via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08; x 13 working days a fortnight. (PLFS 2024 regular wage or salary, urban Tamil Nadu, person: ₹24,423 a month; male ₹26,675; female ₹19,894; self-employment gross earnings urban ₹22,664 a month, the own-account work the structure does not hold.)",
+    "rents_per_month": "Anchor: MoSPI, Household Consumption Expenditure Survey 2023-24, urban Tamil Nadu, average monthly per capita expenditure on rent (actual rent, without imputation) ₹805.47 (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08). Census 2011, Table HL-04, Tamil Nadu (opened): of 8,929,104 urban households, 3,590,179 (40.2%) are rented. A renting household's rent is then 805.47 x 3.85 persons / 0.402 = about ₹7,700 a month. That is the average over all of urban Tamil Nadu, Chennai and Coimbatore included, so it overstates a small town's rents; no small-town rent table was found. The 3-bedroom house is set at that anchor (₹7,700) and the other sizes (₹5,000, ₹6,500 and ₹8,000 for 1-3 bedroom flats; ₹9,500 for 4 bedrooms) are PLACEHOLDERS around it. The apartment mix and house shares are placeholders.",
     "spending.saving_bps": "PLACEHOLDER, 8%: India's household sector saved about 18% of gross national disposable income in 2022-23, mostly in physical assets (housing, gold), and about 5% of GDP in financial assets (MoSPI, National Accounts Statistics; RBI, Handbook of Statistics on the Indian Economy; not opened, to confirm). A small-town household's saving out of income is taken as a figure in between.",
     "spending.wealth_effect_bps_per_year": "PLACEHOLDER carried over unchanged from the other profile: about 3 paise of consumption a year per rupee of wealth (Dvornak & Kohler 2003, RBA RDP 2003-07, an Australian estimate; no Indian estimate found). A model's figure, not this place's.",
-    "spending.essentials_per_month": "PLACEHOLDER, ₹2,376 a person a month: the monthly per capita consumption expenditure of the poorest 5% of urban India (MoSPI, Household Consumption Expenditure Survey 2023-24 factsheet; recalled from the press note, not opened, to confirm). It stands for what a person spends however little comes in.",
+    "spending.essentials_per_month": "MoSPI, Household Consumption Expenditure Survey 2023-24, urban Tamil Nadu: average monthly per capita consumption expenditure of the poorest 5% of people, ₹3,268 (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08; all urban Tamil Nadu ₹8,165, richest 5% ₹21,239). It stands for what a person spends however little comes in.",
     "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections). Not a figure of this place: a model's, kept until a survey of shoppers is found.",
     "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1: 0.25 a month). A model's figure, not this place's.",
-    "savings_by_age": "PLACEHOLDER: an adult's cash and deposits (not gold, chit funds, provident fund, or property), by age: the 10th, 25th, 50th, 75th and 90th percentiles. The other profile's placeholders scaled by half the ratio of the two shop wages (1.51), because Indian households hold less of their wealth in bank deposits (RBI, All India Debt and Investment Survey 2019 gives household assets by type; not opened, to confirm).",
+    "savings_by_age": "PLACEHOLDER percentiles: an adult's cash and deposits (not gold, chit funds, provident fund, or property), by age. The other profile's placeholders scaled by half the ratio of the two shop wages. Check against the survey mean: MoSPI, All India Debt and Investment Survey (NSS 77th round, assets as on 30 June 2018), urban Tamil Nadu: average value of deposits etc. ₹115,228 a household (and ₹1,642,964 of all assets, loans outstanding ₹103,239; opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08). The survey gives household means, not adults' percentiles by age.",
     "retiree_savings": "PLACEHOLDER: savings at retirement, about 2.25 to 5.25 lakh rupees, the other profile's placeholder scaled by 1.5. Most workers in India have no provident fund or pension (informal work); the EPFO and National Pension System are to be used to source this.",
     "retirement_age": "60: the age at which Tamil Nadu's government servants retire (Government of Tamil Nadu order of 2021 raising it from 59; to confirm) and at which the Indira Gandhi National Old Age Pension starts (National Social Assistance Programme guidelines). Self-employed and informal workers carry on working past it (gap).",
-    "support.pension": "Indira Gandhi National Old Age Pension Scheme, Tamil Nadu: ₹1,200 a month for destitute persons (below the poverty line) aged 60 and over, made up of the Centre's ₹200 (60-79) or ₹500 (80 and over) and the State's top-up to ₹1,200 since August 2023 (Deccan Herald, 'Tamil Nadu enhances monthly pension for elders to Rs 1,200'; IMPRI, 'Tamil Nadu's Old Age Pension Scheme: Tracing Its Evolution Under the IGNOAPS Framework'; cra.tn.gov.in/about_schemes.php; as found by search, the pages not fully read, to confirm). It is means-tested to the poor; the structure pays every person from the age, so this overstates coverage (gap). Paid monthly, so every_days is 30.",
+    "support.pension": "Eligibility and the Centre's part: Ministry of Rural Development, National Social Assistance Programme (nsap.nic.in, archived copy of 2025, opened): under the Indira Gandhi National Old Age Pension Scheme, BPL persons aged 60 or above are entitled to a monthly pension of ₹200 up to 79 years of age and ₹500 thereafter. Tamil Nadu's total: ₹1,200 a month under all its social-security pensions from August 2023 (Deccan Herald, 22 July 2023, 'Tamil Nadu enhances monthly pension for elders to Rs 1,200', opened; the Revenue/Social Welfare Department's order could not be reached: tn.gov.in times out). It is means-tested to the poor; the structure pays every person from the age, so this overstates coverage (gap). Paid monthly, so every_days is 30.",
     "support.unemployment": "None: India has no general unemployment benefit (the Employees' State Insurance scheme's Atal Beemit Vyakti Kalyan Yojana pays only some insured workers, and the rural employment guarantee gives up to 100 days of paid work a household, ₹319 a day in Tamil Nadu in 2024-25, which is work, not a transfer: Ministry of Rural Development, as reported; to confirm). The amount is 0, the closest the structure allows. Women heads of household in Tamil Nadu receive ₹1,000 a month (Kalaignar Magalir Urimai Thogai, from September 2023; to confirm): not expressible (gap).",
-    "firm_ownership": "PLACEHOLDERS throughout, to source. Shops and landlords are held closely, as proprietorships and family firms: the National Sample Survey Office's survey of unincorporated non-agricultural enterprises (NSS 73rd round, 2015-16) found proprietary and partnership enterprises to be nearly all of them (to confirm). Factories in a small town are mostly family-owned small firms, with some branches of larger companies. Households holding shares directly: a small share of Indians hold equities (SEBI investor survey 2015: about 2% of households invest in the securities market; NSE Market Pulse; neither opened, to confirm); the shares by wealth fifth are guesses summing to a small total. The number of owners and owner wealth weights: guesses.",
+    "firm_ownership": "PLACEHOLDERS throughout, to source. Shops and landlords are held closely, as proprietorships and family firms: the National Sample Survey Office's survey of unincorporated non-agricultural enterprises (NSS 73rd round, 2015-16) found proprietary and partnership enterprises to be nearly all of them (to confirm). Factories in a small town are mostly family-owned small firms, with some branches of larger companies. Households holding shares directly: a small share of Indians hold equities (SEBI investor survey 2015: about 2% of households invest in the securities market; NSE Market Pulse; neither opened, to confirm); the shares by wealth fifth are guesses summing to a small total. The number of owners and owner wealth weights: guesses. Evidence for closely held shops: MoSPI, ASUSE 2023-24, urban Tamil Nadu, trade (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08): of 1,000 unincorporated establishments, 985 are proprietary and 14 partnerships; it does not count companies, so the shares here are not read from it.",
     "retirement_fund": "PLACEHOLDERS; used only by a world that asks for a retirement fund. The Employees' Provident Fund Organisation (EPFO) and National Pension System stand for it. member_bps 12%: EPFO's active contributors are about 7 crore against a workforce of some 60 crore (EPFO annual report; PLFS; to confirm). cost_bps_of_income 0.5%: EPFO's administrative charge of 0.5% of wages (Employees' Provident Funds Scheme 1952, para 38; to confirm). share_bps_of_local: a guess. drawdown_bps_by_age: carried over from the other profile (account-based pensions are an Australian design); EPF pays most members a lump sum, not a pension (gap).",
-    "industry": "PLACEHOLDERS, to confirm: Annual Survey of Industries (MoSPI): manufacturing wages and total emoluments are about 10-11% of gross output and materials and fuels about 75% (recalled, not opened). Retail: purchases about 80% of sales and wages about 6% for small shops (placeholder; no source found).",
+    "industry": "Factory: MoSPI, Annual Survey of Industries 2023-24, Tamil Nadu, all factories (sum over 2-digit NIC groups, opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08): wages and salaries including employer's contribution ₹2.17 lakh crore are 7.0% of total output of ₹30.99 lakh crore; total inputs ₹25.94 lakh crore are 83.7% of output (materials 67.4%, fuels the rest). Retail: PLACEHOLDERS, purchases about 80% of sales and wages about 6% for small shops (no source found: the ASUSE gives GVA per worker for trade, not a wage share of sales; to compute).",
     "prices": "PLACEHOLDERS: an item of goods worth ₹300 at world prices (the unit the town counts in), scaled from the other profile's unit by the ratio of the two shop wages (3.02); imports 10% dearer; inputs ₹7.50 a kg; building materials ₹3 a kg (cement about ₹7 a kg, bricks ₹2 to ₹3; Tamil Nadu retail prices not sourced).",
-    "labour_force_participation_bps": "PLACEHOLDER: the share of working-age adults (18 to 59) in the labour force, about 65%: PLFS 2023-24 (MoSPI) reports for Tamil Nadu a high male rate and a female rate under half (the state tables were not opened; to confirm). Those outside it (studying, caring) don't look for work.",
+    "labour_force_participation_bps": "MoSPI, Periodic Labour Force Survey, calendar year 2024, urban Tamil Nadu, usual status (PS+SS), persons aged 15-59: labour force participation rate 61.2% (male 84.8%, female 38.3%); aged 15 and over: 54.5%; worker population ratio 15+ 52.4%; unemployment rate 15+ 3.8% (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08).",
     "tenancy": "Tamil Nadu Regulation of Rights and Responsibilities of Landlords and Tenants Act 2017: rent is revised by agreement, typically once a year (11-month agreements are customary), and a landlord gives three months' notice in writing of a revision (to confirm the sections, and whether the Act is in force as written). A tenant who stays on after the term holds over month to month (to confirm).",
     "values": "PLACEHOLDER carried over unchanged: Schwartz's ten basic values, in the pan-cultural order found across 56 nations (Schwartz & Bardi 2001, 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32). Indian samples tend to rank tradition, conformity and security higher; not adjusted (to source, e.g. World Values Survey India wave).",
     "industrial_action": "Industrial Relations Code 2020 (in force from 21 November 2025; to confirm), s 62: no worker in an industrial establishment may strike without notice within 60 days before striking, and not within 14 days of giving it (taken here as 14 days' notice). No strike ballot is required, so the turnout and approval thresholds are 0 (the structure has no 'no ballot' form). Employees on strike are not paid ('no work, no pay'; to confirm the section).",
     "world_price_process": "PLACEHOLDER carried over unchanged: world prices move each month by a mean-reverting random process (sd of the monthly move in basis points; the share of a gap from the base kept each month). To estimate from India's Wholesale Price Index (Office of the Economic Adviser, by commodity).",
-    "credit.cash_rate_bps": "Reserve Bank of India policy repo rate, 5.25% (after the December 2025 cut). The October 2026 policy decision (5-7 October 2026) could not be confirmed: search results conflicted over whether it held at 5.25% or moved to 5.50% (to confirm).",
+    "credit.cash_rate_bps": "Reserve Bank of India, Monetary Policy Statement 2026-27, Resolution of the Monetary Policy Committee, 5 to 7 October 2026 (press release, rbi.org.in, opened 2026-10-08): the MPC voted unanimously to raise the policy repo rate by 25 bps to 5.50 per cent (standing deposit facility 5.25, marginal standing facility and Bank Rate 5.75) and changed the stance to calibrated tightening. (An earlier version of this profile had 5.25, the rate before the meeting.)",
     "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for its funding.",
-    "credit.lending_rate_bps": "PLACEHOLDERS, to confirm: personal loans about 13% a year; loans to small businesses about 9% (RBI, weighted average lending rate on fresh rupee loans of scheduled commercial banks, Handbook of Statistics; not opened).",
+    "credit.lending_rate_bps": "organisation: RBI, press release 'Lending and Deposit Rates of Scheduled Commercial Banks - September 2026' (30 September 2026, opened): the weighted average lending rate on fresh rupee loans of scheduled commercial banks was 8.61 per cent in August 2026 (8.96 per cent on outstanding loans); all sectors, not small businesses only (the sector tables are in a PDF that could not be fetched). person: PLACEHOLDER, 13%, personal loans; the sector tables are to be read.",
     "credit.serviceability_buffer_bps": "0: India has no serviceability buffer rule like Australia's (the APRA buffer); the RBI leaves the affordability test to the lender (fixed-obligation-to-income ratio). The closest the structure allows is none.",
     "credit.max_repayment_share_bps": "Placeholders: the most of a borrower's monthly income a lender lets repayments take (people 45%, the fixed-obligation-to-income ratio of 40-50% banks commonly apply to salaried personal loans, not sourced; organisations 20% of what comes in).",
     "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
@@ -1337,7 +1337,7 @@
     "credit.reserve": "Placeholder: the cash the bank's lending office keeps back and doesn't lend, ₹302,000 (the other profile's placeholder scaled by the ratio of shop wages, 3.02). To source.",
     "opening": "Placeholders, to source: what each organisation holds on the first day, scaled from the other profile's placeholders by the ratio of the two shop wages (3.02): the bank's own funds ₹1.51 million; the town ₹6.04 million; the builder ₹906,000; each landlord ₹1.81 million; a shop ₹90,600 where its working capital isn't worked out from its stock and wages; a factory ₹1.21 million; and the least an adult in the labour force has saved (₹3,000).",
     "town_finance": "Placeholders, scaled from the other profile's by 3.02: the town's yearly parks line ₹453,000; the payment its procedure needs the mayor's written approval over, ₹151,000 (a town panchayat's financial delegation; Tamil Nadu Town Panchayats Act 1998; to source).",
-    "public_finance.income_tax": "Income-tax Act and Finance Act 2025, new tax regime (the default) for FY 2026-27 (as found on bankbazaar.com, 'Income Tax Slabs and Rates for FY 2026-27'; the Act not opened, to confirm): nil to ₹4 lakh; 5% to ₹8 lakh; 10% to ₹12 lakh; 15% to ₹16 lakh; 20% to ₹20 lakh; 25% to ₹24 lakh; 30% above. NOT EXPRESSED: the section 87A rebate (no tax at all up to ₹12 lakh of income), the standard deduction (₹75,000), and the 4% health and education cess on the tax (the structure's levy is a share of income, not of tax, so it is 0). In effect no one in a small town pays income tax, which is near the truth: only a small share of Indians do.",
+    "public_finance.income_tax": "Ministry of Finance, Union Budget 2026-27, Explanatory Memorandum to the Finance Bill (indiabudget.gov.in/doc/memo.pdf, opened) and the Finance Bill 2026 (opened): rates of income tax for an individual for tax year 2026-27 under the new regime (section 202 of the Income-tax Act 2025): nil to ₹4,00,000; 5% to ₹8,00,000; 10% to ₹12,00,000; 15% to ₹16,00,000; 20% to ₹20,00,000; 25% to ₹24,00,000; 30% above. Health and Education Cess at 4% of the tax (with surcharge) in all cases. NOT EXPRESSED: that cess (the structure's levy is a share of income, not of tax, so levy_bps is 0), the rebate that makes income up to ₹12 lakh tax-free, and the standard deduction. In effect no one in a small town pays income tax, which is near the truth: only a small share of Indians do.",
     "public_finance.grants_per_resident_per_year": "PLACEHOLDER, ₹1,500 a resident a year: Tamil Nadu's devolution to local bodies on the State Finance Commission's recommendation and Union grants under the Fifteenth Finance Commission (not opened, to source).",
     "public_finance.rates_per_resident_per_year": "PLACEHOLDER, ₹1,000 a resident a year of property tax and other own revenue; Indian municipalities' own revenue per head is small (RBI, Report on Municipal Finances; not opened, to confirm). Sets the town's opening rate in the rupee.",
     "public_finance.rates_instalments": "Tamil Nadu District Municipalities Act 1920 and Town Panchayats Act 1998: property tax is payable half-yearly (by 30 September and 31 March; to confirm the sections).",
@@ -1364,12 +1364,12 @@
     "groups.leave_notice_days": "Placeholder: a member may leave a club or congregation at once.",
     "groups.kinds.teaching": "What a group asks people to hold, in its words: content for belief to attach to. The congregation's stands for the town's faiths together (Hindu, Christian and Muslim; one congregation per town is a simplification), worded as belief in a divine power because they are not one doctrine.",
     "groups.kinds.held_at_start_bps": "97%: the share of Indians who believe in God (Pew Research Center, 'Religion in India: Tolerance and Segregation', 2021; to confirm). Census of India 2011, Tamil Nadu: Hindus 87.6%, Christians 6.1%, Muslims 5.9% (to confirm). At the start, the congregation's members hold its teaching strongly, and others up to this share hold it less.",
-    "elections": "Tamil Nadu Panchayats and Municipalities Acts: local bodies are elected for five years, by first-past-the-post in single-member wards; the town panchayat's chairperson is chosen by the councillors (Tamil Nadu State Election Commission, urban local body elections of 19 February 2022). This town elects its leader directly (a liberty). turnout: 74.68% in town panchayats at the 2022 urban local body elections (State Election Commission, as reported by The News Minute, 'TN urban polls: Overall voter turnout 60.7%'; the SEC's tables not opened, to confirm). Voting is not compulsory. stand_bps: placeholder, 2%. news_readers_bps: placeholder (Reuters Institute Digital News Report: India, to source).",
-    "health": "The clinic stands for the town's health system (a primary health centre or taluk hospital, and the private clinics and hospital it refers to; a liberty: a town of a few thousand has a primary health centre, not a hospital). doctors_per_1000: 130,898 registered allopathic doctors in Tamil Nadu (Ministry of Health and Family Welfare, reply in Parliament, 2024, as found by search) at 80% availability (the Ministry's own assumption) over 77.58 million people (National Commission on Population, Population Projections for India and States 2011-2036, Tamil Nadu 2026): 1.35 per 1,000 (neither opened, to confirm). doctor_wage_per_fortnight: PLACEHOLDER, about ₹85,000 a month for an Assistant Surgeon in the Tamil Nadu Medical Services (pay matrix plus dearness allowance; to source). consult_minutes, seek_care_bps, treats and off_work_severities: placeholders carried over (the conditions here are hospital-level; in India much care is out of pocket at private providers and the poorest delay care: gap).",
-    "education": "school_ages: children start Class 1 at five or six and the Right of Children to Free and Compulsory Education Act 2009 makes school compulsory from 6 to 14; the town's school runs to Class 12, at 17 (Tamil Nadu School Education Department). students_per_teacher: 17 for Tamil Nadu in 2023-24 (UDISE+ 2023-24, Department of School Education and Literacy, Ministry of Education; primary 20, upper primary 18, secondary 11, higher secondary 33; as summarised by educationforallinindia.com, not opened, to confirm). school_days_per_year: 210 working days (Tamil Nadu School Education Department's academic calendar; to confirm). hours_per_day: about 6 (placeholder; Tamil Nadu schools run about 9:20 to 4:00). teacher_wage_per_fortnight: PLACEHOLDER, about ₹45,000 a month for a government school teacher (Tamil Nadu pay scales plus dearness allowance; to source). attainment: shaped by NFHS-5 Tamil Nadu: women literate 84.0%, men 90.7%; women with 10 or more years of schooling 56.6%, men 59.1% (IIPS, NFHS-5 State Fact Sheet, Tamil Nadu, indicators 14-17); the split between levels is a placeholder (to source from PLFS 2023-24, general educational level, Tamil Nadu), as years of schooling. return_per_year_bps: about 8% (Duraisamy 2002, 'Changes in returns to education in India, 1983-94', Economics of Education Review 21; estimates run 6-10%; to confirm), taken as productivity (Mincer 1974) and applied linearly in the time a task takes. max_years: the skill scale's top (placeholder).",
+    "elections": "Tamil Nadu Panchayats and Municipalities Acts: local bodies are elected for five years, by first-past-the-post in single-member wards; the town panchayat's chairperson is chosen by the councillors (Tamil Nadu State Election Commission, urban local body elections of 19 February 2022). This town elects its leader directly (a liberty). turnout: 74.68% in town panchayats at the 2022 urban local body elections (State Election Commission, as reported by The News Minute, 'TN urban polls: Overall voter turnout 60.7%'; The News Minute's article of 20 February 2022 was opened and says the town panchayats recorded 74.68% and the municipalities 68.22%, citing the Tamil Nadu State Election Commission; the SEC's own site (tnsec.tn.gov.in) could not be reached). Voting is not compulsory. stand_bps: placeholder, 2%. news_readers_bps: placeholder (Reuters Institute Digital News Report: India, to source).",
+    "health": "The clinic stands for the town's health system (a primary health centre or taluk hospital, and the private clinics and hospital it refers to; a liberty: a town of a few thousand has a primary health centre, not a hospital). doctors_per_1000: 130,898 registered allopathic doctors in Tamil Nadu (Ministry of Health and Family Welfare, reply in Parliament, 2024, as found by search) at 80% availability (the Ministry's own assumption) over 77.546 million people (Technical Group on Population Projections 2011-2036, Tamil Nadu, 1 March 2026, Table T-17, opened): 1.35 per 1,000 (neither opened, to confirm). doctor_wage_per_fortnight: PLACEHOLDER, about ₹85,000 a month for an Assistant Surgeon in the Tamil Nadu Medical Services (pay matrix plus dearness allowance; to source). consult_minutes, seek_care_bps, treats and off_work_severities: placeholders carried over (the conditions here are hospital-level; in India much care is out of pocket at private providers and the poorest delay care: gap).",
+    "education": "school_ages: children start Class 1 at five or six and the Right of Children to Free and Compulsory Education Act 2009 makes school compulsory from 6 to 14; the town's school runs to Class 12, at 17 (Tamil Nadu School Education Department). students_per_teacher: 23 for Tamil Nadu in 2024-25 (UDISE+ 2024-25, Ministry of Education, opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08; 24 in 2023-24; by level, 2024-25: primary 20, upper primary 18, secondary 12, higher secondary 21). school_days_per_year: 210 working days (Tamil Nadu School Education Department's academic calendar; to confirm). hours_per_day: about 6 (placeholder; Tamil Nadu schools run about 9:20 to 4:00). teacher_wage_per_fortnight: PLACEHOLDER, about ₹45,000 a month for a government school teacher (Tamil Nadu pay scales plus dearness allowance; to source). attainment: shaped by NFHS-5 Tamil Nadu: women literate 84.0%, men 90.7%; women with 10 or more years of schooling 56.6%, men 59.1% (IIPS, NFHS-5 State Fact Sheet, Tamil Nadu, indicators 14-17); the split between levels is a placeholder (to source from PLFS 2023-24, general educational level, Tamil Nadu), as years of schooling. return_per_year_bps: about 8% (Duraisamy 2002, 'Changes in returns to education in India, 1983-94', Economics of Education Review 21; estimates run 6-10%; to confirm), taken as productivity (Mincer 1974) and applied linearly in the time a task takes. max_years: the skill scale's top (placeholder).",
     "round": "Working hours 9 to 5, six days a week (Tamil Nadu Shops and Establishments Act: 48 hours over six days; a liberty: the actual day is often 9 to 7 with a long break; not modelled); school 9 to 4 (placeholder; Tamil Nadu schools run about 9:20 to 4:00). Travel: off the roads, a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997); on a road, about 3 seconds (a two-wheeler or auto-rickshaw at about 30 km/h in a town; most small-town trips are by two-wheeler, bicycle or on foot; placeholder); slower across water, wetland and bush (placeholders). Roads: the town builds toward buildings more than three cells (75 m) from one (placeholder), within a roads budget scaled from the other profile's by the ratio of shop wages (3.02).",
-    "ownership": "house_owner_bps: PLACEHOLDER, 65%: Census 2011 (Houselisting tables, tenure status) gives roughly 70% owned in urban Tamil Nadu and more in rural (not opened, to confirm); flats here are all rented (a liberty). mortgage_bps_by_age: PLACEHOLDER; few Indian homeowners hold a mortgage (most build in stages from savings and family loans); NSS 78th round (2020-21) and RBI data on housing loans are to be used (to source). mortgage_payment_per_month: PLACEHOLDER, ₹8,000 (about a ₹9 lakh loan over 15 years at 8%). mortgage_rate_bps: PLACEHOLDER, 8.0%, the order of banks' home-loan rates after the 2025 repo cuts (to confirm). mortgage_years_left: placeholder. market: deposit_bps 10%: the RBI's loan-to-value ceiling is 90% for home loans up to ₹30 lakh (RBI Master Circular on Housing Finance, 2022; to confirm); costs_bps 9%: Tamil Nadu stamp duty of 7% and registration fee of 2% (Registration Department, Tamil Nadu; to confirm); mortgage_months 240: placeholder; buy_bps_per_month, relist_days, cut_bps and floor_bps: placeholders carried over (Merlo and Ortalo-Magne 2004).",
-    "utilities": "Water: PLACEHOLDER, 70 litres a person a day, the Tamil Nadu Water Supply and Drainage Board's supply norm for a town panchayat (TWAD Board design norms; recalled, not opened, to confirm); tariff PLACEHOLDERS ₹5 a kilolitre and ₹150 a quarter of service charges (many Tamil Nadu town panchayats charge a flat monthly fee; to source); bills go to owners. The river's inflow, flow and losses are placeholders carried over, sized so a small town's draw is a small share of a modest river's water. Energy (electricity): a Tamil Nadu household uses about 4 kWh a day (PLACEHOLDER; TNPDCL consumer data to source); the first 100 units each two months are free for all domestic consumers, 200 free for those under 500 units a billing period, then ₹4.70 a unit for 201-400 and ₹6.30 for 401-500 (Tamil Nadu Electricity Regulatory Commission tariff order of 27 March 2025 and the Government's free-units scheme, as summarised by verified.realestate and the TNERC order, not fully opened, to confirm). The free block cannot be expressed: price_per_kwh is the 201-400 slab rate, so a typical household is charged for units it would get free (gap); supply_per_day 0 (no fixed charge for domestic tariff IA; to confirm). grid_price_per_kwh: PLACEHOLDER; TNPDCL's cost of supply is above its domestic tariff and the State pays the gap as a subsidy (₹173 billion to TNPDCL in 2026-27, powerline.net.in, 1 May 2026): not expressible, so the retailer's purchase price is placed below its sale price (gap). grid_emissions_g_per_kwh: 710 g, about India's grid average emission factor (Central Electricity Authority, CO2 Baseline Database for the Indian Power Sector, about 0.71-0.73 t/MWh; not opened, to confirm).",
+    "ownership": "house_owner_bps: Census of India 2011, Table HL-04 'Households by ownership status of the census houses', Tamil Nadu (opened): of 8,929,104 urban households 5,130,112 (57.5%) own their house, 3,590,179 (40.2%) rent (rural: 90.5% own); a census town is urban, so the urban share is used. Flats here are all rented (a liberty). mortgage_bps_by_age: PLACEHOLDER; few Indian homeowners hold a mortgage (most build in stages from savings and family loans); NSS 78th round (2020-21) and RBI data on housing loans are to be used (to source). mortgage_payment_per_month: PLACEHOLDER, ₹8,000 (about a ₹9 lakh loan over 15 years at 8%). mortgage_rate_bps: PLACEHOLDER, 8.0%, the order of banks' home-loan rates after the 2025 repo cuts (to confirm). mortgage_years_left: placeholder. market: deposit_bps 10%: the RBI's loan-to-value ceiling is 90% for home loans up to ₹30 lakh (RBI Master Circular on Housing Finance, 2022; to confirm); costs_bps 9%: Tamil Nadu stamp duty of 7% and registration fee of 2% (Registration Department, Tamil Nadu; to confirm); mortgage_months 240: placeholder; buy_bps_per_month, relist_days, cut_bps and floor_bps: placeholders carried over (Merlo and Ortalo-Magne 2004).",
+    "utilities": "Water: PLACEHOLDER, 70 litres a person a day, the Tamil Nadu Water Supply and Drainage Board's supply norm for a town panchayat (TWAD Board design norms; recalled, not opened, to confirm); tariff PLACEHOLDERS ₹5 a kilolitre and ₹150 a quarter of service charges (many Tamil Nadu town panchayats charge a flat monthly fee; to source); bills go to owners. The river's inflow, flow and losses are placeholders carried over, sized so a small town's draw is a small share of a modest river's water. Energy (electricity): a Tamil Nadu household uses about 4 kWh a day (PLACEHOLDER; TNPDCL consumer data to source); Tamil Nadu Electricity Regulatory Commission, Order on tariff subsidy for FY 2025-26 (27 March 2025; archived copy of tnerc.tn.gov.in, opened): for domestic LT tariff I-A from 1 July 2024, a consumer using up to 500 units in two months pays nothing for the first 100 units, 235 paise a unit for 101-200, 470 paise for 201-400, and 630 paise for 401-500, the Government of Tamil Nadu paying the rest of the approved tariff (480 paise a unit and more) as a subsidy. The free block cannot be expressed: price_per_kwh 181 paise is the average a household using 4 kWh a day (244 units in a two-month bill) pays under the schedule below: first 100 units nil, 101-200 units 235 paise, 201-400 units 470 paise: (100 x 2.35 + 44 x 4.70) / 244 = 1.81 rupees (derived; a household using less pays less, and many pay nothing); supply_per_day 0 (the fixed charge of ₹107 per kW per month for domestic consumers is met by the Government's subsidy in the same order). grid_price_per_kwh: PLACEHOLDER; TNPDCL's cost of supply is above its domestic tariff and the State pays the gap as a subsidy (₹173 billion to TNPDCL in 2026-27, powerline.net.in, 1 May 2026): not expressible, so the retailer's purchase price is placed below its sale price (gap). grid_emissions_g_per_kwh: 710 g, about India's grid average emission factor (Central Electricity Authority, CO2 Baseline Database for the Indian Power Sector, about 0.71-0.73 t/MWh; not opened, to confirm).",
     "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: Tamil Nadu gets about 52-55% of its rain in the Northeast Monsoon (October to December), about 30-32% in the Southwest Monsoon (June to September), November the wettest month (India Meteorological Department normals; Tamil Nadu agricultural university summaries for Thanjavur, as found by search; the monthly normals were not opened, to confirm). The month-by-month split (October 19%, November 21%, December 13%; June 5%, July 6%, August 9%, September 11%; January to May 16% together) is a PLACEHOLDER shaped on those shares; river flow is taken to follow rain. storm_*: PLACEHOLDERS: a heavy-rain spell (cyclone or depression, as in November 2015, December 2023, November 2024) in about one month in ten; the structure's storm chance is the same every month, but in Tamil Nadu it comes in October to December (a gap). drought_*: PLACEHOLDERS: about one year in ten starts a drought of six to eighteen months at 40% of usual inflow (the Northeast Monsoon failed badly in 2016-17; to source). Heatwaves: PLACEHOLDERS: summer is April to June, heat waves are rarer on the coast but hit the interior; three to five days, about one summer week in 17. Heat units and heat illness: carried over from the other profile (its source is Victorian, not Indian). warning_lead_days: IMD's early warnings a couple of days ahead (placeholder).",
     "hazards": "Floods (world-expansion 7.3), PLACEHOLDERS carried over, sized against the river as modelled: it spills over its banks past 12,000 kL a cell, 30% of the excess a day; a building floods with water above 300 kL on its cell; wetland (tanks; Tamil Nadu has tens of thousands of irrigation tanks) soaks up 500 kL a cell a day. Tamil Nadu's recorded floods: Chennai 2015, Cauvery delta 2018 (Cyclone Gaja), Thoothukudi and Tirunelveli December 2023, Cyclone Fengal 2024 (Tamil Nadu State Disaster Management Authority; to source). Councils run relief centres: here the town hall.",
     "crime": "Crime (world-expansion 7.2), deliberately rare and driven by circumstance only (need and opportunity, and the chance of being caught: Becker 1968; Cohen and Felson 1979), never by any group. take_bps_per_month_in_need, caught_bps_reckoned and take_quantity: placeholders. detection_bps: PLACEHOLDER carried over, 20% (National Crime Records Bureau, Crime in India, Tamil Nadu theft chargesheeting rate; not opened, to source). police_per_1000: PLACEHOLDER, 1.5: about 150 police per 100,000 people in Tamil Nadu (Bureau of Police Research and Development, Data on Police Organisations; not opened, to confirm). officer_wage_per_fortnight: PLACEHOLDER, about ₹30,000 a month for a Grade I police constable (Tamil Nadu Police pay matrix plus dearness allowance; to confirm). investigation_hours: placeholder.",
@@ -1381,72 +1381,82 @@
     {
       "what": "total_fertility_rate",
       "value": 1.4,
-      "source": "Registrar General of India, SRS Statistical Report 2020, Tamil Nadu: total fertility rate 1.4 (NFHS-5, 2019-21: 1.8)"
+      "source": "Registrar General of India, SRS Statistical Report 2020, Tamil Nadu: 1.4 (opened); NFHS-5 2019-21: 1.8; Technical Group projection 2021-25: 1.54"
     },
     {
       "what": "life_expectancy_at_birth_years_male",
       "value": 71.0,
-      "source": "Registrar General and Census Commissioner of India, SRS Based Abridged Life Tables 2016-20, Tamil Nadu: 71.0 male (75.5 female, 73.2 total)"
+      "source": "Registrar General and Census Commissioner of India, SRS Based Abridged Life Tables 2016-20, Tamil Nadu: 71.0 (opened)"
     },
     {
       "what": "life_expectancy_at_birth_years_female",
       "value": 75.5,
-      "source": "Registrar General and Census Commissioner of India, SRS Based Abridged Life Tables 2016-20, Tamil Nadu"
-    },
-    {
-      "what": "population_under_15_pct",
-      "value": 19.1,
-      "source": "Registrar General of India, SRS Statistical Report 2020, Statement 5, Tamil Nadu (NFHS-5, 2019-21: 21.0%)"
+      "source": "Registrar General and Census Commissioner of India, SRS Based Abridged Life Tables 2016-20, Tamil Nadu: 75.5 (opened)"
     },
     {
       "what": "population_60_plus_pct",
-      "value": 11.7,
-      "source": "Registrar General of India, SRS Statistical Report 2020, Statement 7, Tamil Nadu (urban 12.8%)"
+      "value": 15.8,
+      "source": "National Commission on Population, Technical Group, Population Projections 2011-2036, Table T-17, Tamil Nadu 2026 (opened); SRS 2020 count: 11.7%"
+    },
+    {
+      "what": "population_under_15_pct",
+      "value": 18.3,
+      "source": "National Commission on Population, Technical Group, Population Projections 2011-2036, Table T-17, Tamil Nadu 2026 (opened); SRS 2020 count: 19.1%"
+    },
+    {
+      "what": "employment_to_population_pct",
+      "value": 52.4,
+      "source": "MoSPI, PLFS calendar year 2024, urban Tamil Nadu, persons aged 15 and over, worker population ratio, usual status (opened via the eSankhyiki data server)"
+    },
+    {
+      "what": "unemployment_rate_pct",
+      "value": 3.8,
+      "source": "MoSPI, PLFS calendar year 2024, urban Tamil Nadu, persons aged 15 and over, usual status (opened via the eSankhyiki data server)"
+    },
+    {
+      "what": "participation_rate_pct",
+      "value": 54.5,
+      "source": "MoSPI, PLFS calendar year 2024, urban Tamil Nadu, persons aged 15 and over, usual status (opened via the eSankhyiki data server)"
+    },
+    {
+      "what": "avg_regular_wage_rupees_per_month_urban",
+      "value": 24423,
+      "source": "MoSPI, PLFS calendar year 2024, urban Tamil Nadu, average wage or salary earnings in the preceding month from regular wage or salaried employment, persons (opened via the eSankhyiki data server)"
+    },
+    {
+      "what": "avg_casual_wage_rupees_per_day_urban",
+      "value": 618,
+      "source": "MoSPI, PLFS calendar year 2024, urban Tamil Nadu, casual labour other than public works, persons (opened via the eSankhyiki data server)"
+    },
+    {
+      "what": "renting_households_pct_urban",
+      "value": 40.2,
+      "source": "Census of India 2011, Table HL-04, Tamil Nadu urban: 3,590,179 of 8,929,104 households rented (opened)"
     },
     {
       "what": "voter_turnout_local_elections_pct",
       "value": 74.68,
-      "source": "Tamil Nadu State Election Commission, urban local body elections of 19 February 2022, town panchayats, as reported by The News Minute, 'TN urban polls: Overall voter turnout 60.7%, Greater Chennai Corp lowest at 43.59%' (to confirm against the SEC's tables)"
+      "source": "Tamil Nadu State Election Commission, town panchayats, 19 February 2022, as reported by The News Minute, 20 February 2022 (opened)"
+    },
+    {
+      "what": "pupil_teacher_ratio",
+      "value": 23,
+      "source": "Ministry of Education, UDISE+ 2024-25, Tamil Nadu (opened via the eSankhyiki data server)"
     },
     {
       "what": "women_with_10_plus_years_schooling_pct",
       "value": 56.6,
-      "source": "IIPS, NFHS-5 State Fact Sheet, Tamil Nadu (2019-21), indicator 16 (women aged 15-49; men 59.1%)"
-    },
-    {
-      "what": "population_in_households_with_electricity_pct",
-      "value": 99.3,
-      "source": "IIPS, NFHS-5 State Fact Sheet, Tamil Nadu (2019-21), indicator 7"
+      "source": "IIPS, NFHS-5 State Fact Sheet, Tamil Nadu (2019-21), indicator 16 (opened)"
     },
     {
       "what": "infant_mortality_per_1000_births",
       "value": 18.6,
-      "source": "IIPS, NFHS-5 State Fact Sheet, Tamil Nadu (2019-21), indicator 26 (the SRS abridged life table 2016-20 gives 18.7 from the 0-1 nqx of 0.01866)"
-    },
-    {
-      "what": "pupil_teacher_ratio",
-      "value": 17,
-      "source": "Department of School Education and Literacy, UDISE+ 2023-24, Tamil Nadu (as summarised by educationforallinindia.com; to confirm)"
-    },
-    {
-      "what": "employment_to_population_pct",
-      "value": 55.0,
-      "source": "PLACEHOLDER (estimated, not read): the share of the Tamil Nadu population aged 15 and over in work, about 55% (PLFS 2023-24, MoSPI, state worker-population ratio; the table was not opened, to confirm)"
-    },
-    {
-      "what": "unemployment_rate_pct",
-      "value": 4.0,
-      "source": "PLACEHOLDER (estimated, not read): the unemployment rate for Tamil Nadu, usual status, aged 15 and over, about 3-5% in recent PLFS rounds (MoSPI; the tables were not opened, to confirm)"
-    },
-    {
-      "what": "informal_employment_share_pct",
-      "value": 88.0,
-      "source": "PLACEHOLDER (estimated, not read): about 90% of India's workers are informal (PLFS 2023-24; ILO and IHD, India Employment Report 2024; Tamil Nadu's own share is probably lower; not opened, to confirm). The town's worlds have no informal economy to measure it against (gap)"
+      "source": "IIPS, NFHS-5 State Fact Sheet, Tamil Nadu (2019-21), indicator 26 (opened)"
     },
     {
       "what": "old_age_pension_monthly_rupees",
       "value": 1200,
-      "source": "Government of Tamil Nadu, Indira Gandhi National Old Age Pension Scheme as enhanced from August 2023 (Deccan Herald; IMPRI; as found by search, to confirm)"
+      "source": "Deccan Herald, 22 July 2023, Tamil Nadu's enhanced monthly pension (opened)"
     }
   ]
 }
