@@ -14,7 +14,7 @@ import { channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
 import { refusalText } from "../llm/words";
 import * as C from "../calls";
-import { because, Book, callAction, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd } from "./common";
+import { because, Book, callAction, Letters, message, pay, PAYEE_DIED, PAYMENT_FAILED, type Step, usd, Asked, whoWrote } from "./common";
 
 interface Payment { instruction: string; from: string; to: string; amount: number; due: number; settles?: string }
 
@@ -71,13 +71,18 @@ export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
   keeps: [
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
+    { what: "accounts", why: "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct." },
   ],
-  version: "0.12.0",
+  version: "0.13.0", // 0.13.0: main's 0.12.0 (it honours a hold, and lists a customer's standing instructions) with this branch's look-up of who wrote and the payment due before its order was withdrawn
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
   create(ctx: ParticipantContext) {
     const verifyAuthor = ctx.params.verify_author ?? true;
+    // Where it looks up who wrote an instruction (its channel onto who's who: nobody is shown it; none: it knows of
+    // writers only what it is shown).
+    const who: string | undefined = ctx.params.who;
+    const asked = new Asked();
     const reviewAll: boolean = ctx.params.review_all ?? false; // go through every standing order at every plan (the long way: for checking the short one)
     const maxBatch = Math.min(32, ctx.params.max_batch ?? 32);
     const done = new Set<string>(); // one-off instructions handled
@@ -91,7 +96,8 @@ export const bankPaymentSystem: BehaviourModule = {
     const standing = new Map<string, StatementRecord>();
     // A standing order is gone through again when it's next due, not at every plan: going through one that isn't due
     // does nothing unless what the bank's checks read has changed since (the accounts it keeps and whose they are, the
-    // signatories it has been told of, the directory: `changed` below), and then every one is gone through, as before.
+    // signatories it has been told of, whom it has learnt the writers are: `changed` below), and then every one is gone
+    // through, as before.
     // `byDue` holds each order under its next due time (an entry is stale once that has moved on); `undated` the
     // orders with no due time yet (never got as far as being due: refused, or not their holder's), gone through at
     // every plan as they always were.
@@ -129,7 +135,10 @@ export const bankPaymentSystem: BehaviourModule = {
       let byId: Map<string, (typeof kept)[number]> | undefined;
       const custody = () => (byId ??= new Map(kept.map((a) => [a.account, a])));
       // Has what the checks read changed since the last plan?
-      const signatoryLists = book.standingOf("signatories"), directory = channels.directory(obs)?.positions;
+      // (Who's who as far as it has been shown or has looked up: who wrote an order it could not place before may be
+      // known now. Looked up, a writer is learnt before their instruction is first read, so nothing is gone through
+      // again for it: the count below moves only where a directory is shown.)
+      const signatoryLists = book.standingOf("signatories"), directory = who ? undefined : channels.directory(obs)?.positions;
       const changed = reviewAll || !read || read.signatories !== signatoryLists || read.directory !== directory || read.accounts.length !== kept.length || kept.some((a, i) => a.account !== read!.accounts[i] || a.holder !== read!.holders[i]);
       if (changed) read = { accounts: kept.map((a) => a.account), holders: kept.map((a) => a.holder), signatories: signatoryLists, directory };
       const all = book.all("request");
@@ -374,6 +383,11 @@ export const bankPaymentSystem: BehaviourModule = {
         book.absorb(obs);
         letters.take(obs, book);
         if (queuedAt !== obs.t && (obs.woke_for !== "done" || queue.length === 0)) { // (a wake's payments, planned when it begins or its plan is done: the stepper)
+          // Who wrote the instructions it is about to read for the first time: looked up first, each writer once
+          // (docs/behaviour/bank-payment-system.md, "Who wrote it"). The answers come at once, and it plans knowing them.
+          // (And who wrote a hold it is about to read: a hold is its customer's instruction too.)
+          const whom = whoWrote(book, asked, who, [...book.all("request").slice(cursor), ...book.all("hold").slice(holdCursor)].filter((r) => (r.addressed_to ?? []).includes(obs.entity!)));
+          if (whom.length) return { type: "look", looks: whom };
           // Payments a busy moment didn't get to (a wake allows only so many actions) are made first at the next: they're
           // already counted as due (a one-off as handled, a standing order's next date moved on), so never dropped.
           queue = [...queue, ...plan(obs)];
@@ -393,7 +407,7 @@ export const bankPaymentSystem: BehaviourModule = {
         if (refusals.length) return callAction(because("Telling account holders about requests we couldn't carry out.", ...refusals.splice(0, 32)));
         if (holdNotes.length) return callAction(because("Answering instructions to hold standing payments: what is held and from when, or that there is nothing of theirs by that reference.", ...holdNotes.splice(0, 32)));
         // (Who wrote: the organisation of the position written in, or the participant's person, from the directory.)
-        replies.push(...letters.answer(({ participant, as }) => accountReport(obs, as ? book.positions.get(as)?.entity : book.participantPerson.get(participant)),
+        replies.push(...letters.answer(({ participant, as, entity }) => accountReport(obs, entity ?? (as ? book.positions.get(as)?.entity : book.participantPerson.get(participant))),
           "A letter to the bank: answering with the writer's own accounts and latest payments."));
         if (replies.length) return callAction(replies.shift()!);
         if (opens.length) return callAction(because("Opening accounts people asked for.", ...opens.splice(0, 32)));

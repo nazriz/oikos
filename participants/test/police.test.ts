@@ -1,6 +1,6 @@
-// The police station (docs/behaviour/deaths.md), on what it's shown alone: someone who has died at home with nobody
-// there to say so is reported by the police, once the home has stood empty for a day and the time it takes to be found
-// has passed; a home somebody lives in is left to those who live there.
+// The police station (docs/behaviour/deaths.md), on what it's shown alone: it is shown nobody's home. Asked to call at
+// one (a neighbour who has seen nobody come out), an officer goes there, and whoever is found dead there is reported
+// to the registry; a home nobody asked about is never gone to.
 
 import { expect, test } from "bun:test";
 import { station } from "../src/behaviour/police";
@@ -13,7 +13,7 @@ inCurrency(PROFILE.values.currency);
 const ME = "police";
 const AS = { participant: "police-oic-system", position: "police-oic" };
 const PARAMS = { building: "police-station", workplace: "police-station/workplace.1", account: "acc-police", officers: 1, wage: 380_000, tribunal: "tribunal",
-  homes_channel: "homes", registry: "city" };
+  calls_channel: "calls", registry: "city" };
 const genesis = signed(employment("job-1", 0, ME, "officer-1", 380_000));
 const premises = { kind: "sites", as_of: 0, cells: [{ cell: "c0", structure: { structure: "police-station", type: "station", complete: true,
   spaces: [{ space: "police-station/workplace.1", kind: "workplace", capacity: 10, count: 1, occupants: ["officer-1"] }] } }] };
@@ -21,61 +21,55 @@ const home = (n: number, occupants: string[], left: { occupant: string; reason: 
   spaces: [{ space: `house-${n}/dwelling.1`, kind: "dwelling", capacity: 6, count: occupants.length, occupants, left }] } });
 const books = { kind: "accounts", accounts: [{ account: "acc-police", holder: ME, custodian: "bank", currency: "AUD", balance: "100000000" }], transactions: [] };
 
-/** A station woken once a day until `until`: `homes(t)` is the town's homes as a look at them then shows them, and
- * `records(t)` what's new. Returns each death it reported, with the day. */
-function days(until: number, found_after: object[], homes: (t: number) => any[], records: (t: number) => any[] = () => []) {
-  const m = station.create(context(AS.participant, ME, { ...PARAMS, found_after }, { position: AS.position }));
+const request = (id: string, t: number, n: number, since: number) => statement(id, t, "welfare_check_request", { speaks_for: "neighbour-1", addressed_to: [ME], visible_to: [ME, "neighbour-1"], data: { space: `house-${n}/dwelling.1`, structure: `house-${n}`, since } });
+
+/** A station woken once a day until `until`, shown `records(t)` as they come; when it sets out for a home, what is
+ * there (`homes`) is shown it at its next wake, as a visit's finding. Returns where it went, and each death reported. */
+function days(until: number, homes: (t: number) => any[], records: (t: number) => any[] = () => []) {
+  const m = station.create(context(AS.participant, ME, PARAMS, { position: AS.position }));
   const reported: { day: number; who: string; found_at: string }[] = [];
+  const went: { day: number; places: string[] }[] = [];
   const ids = { n: 0 };
-  let seen: any = { kind: "sites", as_of: -1, cells: [] };
+  let back: any;
   for (let d = 0; d <= until; d++) {
     const t = d * DAY + 10 * 3600;
-    // (What it sees of the homes is what its last look showed; a wake ends with the day's look.)
-    const w = wake(m, t, { books, mine: { kind: "records", records: [...(d === 0 ? genesis : []), ...records(t)] }, premises, homes: seen }, { entity: ME, as: AS, ids });
+    const calls = back ? { calls: back } : {};
+    back = undefined;
+    const w = wake(m, t, { books, mine: { kind: "records", records: [...(d === 0 ? genesis : []), ...records(t)] }, premises, ...calls }, { entity: ME, as: AS, ids });
     for (const c of w.of("statement", "death_notification")) reported.push({ day: d, who: c.args.data.deceased, found_at: c.args.data.found_at });
-    seen = { kind: "sites", as_of: t, cells: homes(t) };
+    for (const l of w.looks.filter((x: any) => x.visit)) {
+      went.push({ day: d, places: l.visit.places });
+      const cells = homes(t).filter((c) => l.visit.places.includes(c.structure.structure));
+      back = { kind: "sites", as_of: t + 3600, visited: true, cells, seen_at: Object.fromEntries(cells.map((c) => [c.cell, t + 3600])), fresh: cells.map((c) => c.cell) };
+    }
   }
-  return reported;
+  return { reported, went };
 }
 
-test("someone who died with nobody at home is reported once the home has stood empty and the time to be found has passed", () => {
+test("asked to call at a home, an officer goes there, and whoever is found dead is reported to the registry", () => {
   const died = 2 * DAY + 3 * 3600;
-  // Found within 5 to 6 days, every one: the report comes at the first day's work after that, and not before.
-  const band = [{ within_days: 5, bps: 0 }, { within_days: 6, bps: 10_000 }];
-  const reported = days(12, band, (t) => [home(1, t < died ? ["ann"] : [], t < died ? [] : [{ occupant: "ann", reason: "died", at: died }])]);
-  expect(reported.length).toBe(1);
-  expect(reported[0]!.who).toBe("ann");
-  expect(reported[0]!.found_at).toBe("house-1/dwelling.1");
-  // Died early on day 2; found between 5 and 6 days on, so the time comes on day 7 or 8: reported at that day's work
-  // (the home was seen standing empty long before).
-  expect(reported[0]!.day).toBeGreaterThanOrEqual(7);
-  expect(reported[0]!.day).toBeLessThanOrEqual(8);
+  const town = (t: number) => [home(1, t < died ? ["ann"] : [], t < died ? [] : [{ occupant: "ann", reason: "died", at: died }]), home(2, [], [{ occupant: "cy", reason: "died", at: DAY }])];
+  // A neighbour asks on day 5, and another the day after about the same silence.
+  const { reported, went } = days(12, town, (t) => (Math.floor(t / DAY) === 5 ? [request("ask-1", t, 1, died)] : Math.floor(t / DAY) === 6 ? [request("ask-2", t, 1, died)] : []));
+  // They go the day they are asked, to that home alone, once; what they find comes when they are back.
+  expect(went).toEqual([{ day: 5, places: ["house-1"] }]);
+  expect(reported).toEqual([{ day: 6, who: "ann", found_at: "house-1/dwelling.1" }]);
 });
 
-test("found at once in the figures, the police still come only after the home has stood empty for a day", () => {
-  const died = 2 * DAY + 3 * 3600;
-  const reported = days(8, [{ within_days: 0, bps: 10_000 }], (t) => [home(1, t < died ? ["ann"] : [], t < died ? [] : [{ occupant: "ann", reason: "died", at: died }])]);
-  expect(reported.map((r) => r.who)).toEqual(["ann"]);
-  // Day 2's look is seven hours after the death: too soon to tell. Day 3's shows a day's stillness; reported on day 4.
-  expect(reported[0]!.day).toBe(4);
-});
-
-test("a home somebody lives in is left to them: no report while anyone is there, or has been in or out within a day", () => {
-  const died = 2 * DAY + 3 * 3600;
-  // Bob lives with Ann: at home at every look.
-  const shared = days(20, [{ within_days: 1, bps: 10_000 }], (t) => [home(1, ["bob"], t < died ? [] : [{ occupant: "ann", reason: "died", at: died }])]);
-  expect(shared).toEqual([]);
-  // Bob out at work at every look, but leaving home each morning: never a day's stillness.
-  const commuting = days(20, [{ within_days: 1, bps: 10_000 }], (t) => [home(1, [], t < died ? [] : [{ occupant: "ann", reason: "died", at: died }, { occupant: "bob", reason: "left", at: t - 2 * 3600 }])]);
-  expect(commuting).toEqual([]);
-});
-
-test("a death registered meanwhile (the landlord found them) is not reported again", () => {
-  const died = 2 * DAY + 3 * 3600;
-  const reported = days(12, [{ within_days: 5, bps: 0 }, { within_days: 6, bps: 10_000 }],
-    (t) => [home(1, t < died ? ["ann"] : [], t < died ? [] : [{ occupant: "ann", reason: "died", at: died }])],
-    (t) => (Math.floor(t / DAY) === 5 ? [statement("reg-1", t, "death_registration", { data: { deceased: "ann", reported_by: "landlord-1" } })] : []));
+test("nobody asks: nobody is called at, whoever has died there", () => {
+  const { reported, went } = days(20, () => [home(1, [], [{ occupant: "ann", reason: "died", at: DAY }])]);
+  expect(went).toEqual([]);
   expect(reported).toEqual([]);
+});
+
+test("a call that finds nobody dead reports nothing; a death known to be registered is not reported again", () => {
+  const empty = days(8, () => [home(1, [], [{ occupant: "ann", reason: "left", at: DAY }])], (t) => (Math.floor(t / DAY) === 3 ? [request("ask-1", t, 1, DAY)] : []));
+  expect(empty.went.length).toBe(1);
+  expect(empty.reported).toEqual([]);
+  const known = days(8, () => [home(1, [], [{ occupant: "ann", reason: "died", at: DAY }])],
+    (t) => (Math.floor(t / DAY) === 3 ? [request("ask-1", t, 1, DAY), statement("reg-1", t, "death_registration", { data: { deceased: "ann", reported_by: "landlord-1" } })] : []));
+  expect(known.went.length).toBe(1);
+  expect(known.reported).toEqual([]);
 });
 
 test("the profile's bands are shares that add up, in rising days", () => {

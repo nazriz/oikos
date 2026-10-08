@@ -1,6 +1,7 @@
-# `city.electoral_office` (v0.3.1): the town's elections
+# `city.electoral_office` (v0.5.0): elections to the town's offices
 
-**Source:** `participants/src/behaviour/elections.ts`. A position of the town's (`entity: city`), run by code here; a
+**Source:** `participants/src/behaviour/elections.ts`. A position of the electoral commission's (a body of its own,
+`electoral-commission`, since 2026-10-08: see "A body of its own"; until then the town's), run by code here; a
 person or a model could hold it. Design: docs/design/world-expansion.md §3.1. The voters are citizens
 (docs/behaviour/citizen.md, "Elections"); the incumbent is the mayor (docs/behaviour/government.md).
 
@@ -21,6 +22,23 @@ preferential vote is a ranking (`a>b>c`).
 | **The roll and the ballot** | At the close: the `electoral_roll` (who may vote; the office's own record, for the town's eyes only since 0.4.0: see "Who sees the roll") and a `ballot` for `electorate: "roll"`, listing the candidates, open for `voting_days` (14) up to polling day. | — |
 | **The count** | On polling day: each elector's last formal vote (a ranking of at least one candidate; others are informal) made while the ballot was open (0.3.1: one made before it opened, or at or after its close, isn't counted), counted by instant runoff (the last-placed candidate is out, their ballots go to the next preference still standing, until one has a majority). Under `plurality`, only first preferences count, for one round. | Instant runoff, as in Victoria's single-member elections |
 | **The result** | A public `ballot_result` with the winner, the rounds, formal votes, electors and turnout. The winner is appointed to the office. The next election is a term later. | — |
+
+## A body of its own (electoral office 0.5.0, council clerk 0.8.0, citizen 0.40.0, generator 0.32.0)
+
+Until 2026-10-08 the electoral office was an office of the town. Every enrolment was addressed to the town, so every
+office of the town (the mayor's, finance, works, the rates office) was shown every elector's enrolment among the
+town's own papers: the roll, in all but name (docs/no-god-view.md). In the profile's place the roll is the state
+commission's, and it is closed: the commission "must ensure that the register of electors is not available for public
+inspection" (Electoral Act 2002 (Vic) ss 21, 28, 32: docs/behaviour/knowing.md, section 1).
+
+| | Rule | Basis |
+|---|---|---|
+| **The commission** | The electoral office is an office of the electoral commission. Electors enrol with it, candidates nominate to it, and votes are for its eyes only (`electoral_body` on a citizen, `electoral` on the code mayor). The town's offices are shown none of it. | Electoral Act 2002 (Vic) s 21 |
+| **Deaths and departures** | The registrar of deaths sends it every entry, as of right (`feeds`); someone leaving town tells it (`tell_on_leaving`). | "The registrar of births, deaths and marriages sends the electoral commission a list of registered deaths each month" (Electoral Act 2002 (Vic) s 26) |
+| **Seating the winner** | The commission declares the result (`ballot_result`, public: the office, the winner). It cannot fill an office of the town's: the town does. The council clerk seats whoever the commission declares elected (`electoral` on the clerk; an office of the town is filled by the town's own act). With `seats: true` (the default, for a world where the electoral office is the town's own) the office appoints the winner itself, as before. | A returning officer declares the result; the council's chief executive swears the councillor in (Local Government Act 2020 (Vic): to confirm the sections, not opened) |
+
+The winner takes office when the clerk next wakes (it wakes daily): up to a day after the declaration, where before
+it was in the same act.
 
 ## Who sees the roll (electoral office 0.4.0, citizen 0.37.0, generator 0.25.0)
 

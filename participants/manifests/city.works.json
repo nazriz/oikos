@@ -1,6 +1,6 @@
 {
   "name": "city.works",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "doc": "docs/behaviour/services.md",
   "params": {
     "collect_every_days": {
@@ -61,6 +61,13 @@
       "schema": {
         "type": "string",
         "description": "what the work is (its postings say)"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "inspections": {
+      "schema": {
+        "type": "string"
       },
       "default": "",
       "source": "placeholder"
@@ -145,6 +152,13 @@
       "default": "works crew",
       "source": "placeholder"
     },
+    "round": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
     "staff_line": {
       "schema": {
         "type": "string"
@@ -201,5 +215,11 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "keeps": [
+    {
+      "what": "service_address",
+      "why": "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built."
+    }
+  ]
 }

@@ -1690,6 +1690,90 @@
               "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
             }
           }
+        },
+        {
+          "description": "Someone set out to look at places (a look with `visit`): busy with it from `starts`, there and back by `done`.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "participant",
+            "channel",
+            "places",
+            "starts",
+            "done"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "visit_started"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "participant": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "as": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "channel": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ChannelPath"
+            },
+            "places": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "minItems": 1,
+              "maxItems": 16
+            },
+            "starts": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+            },
+            "done": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+            }
+          }
+        },
+        {
+          "description": "They looked: what was at those places is theirs to see at their next observation.",
+          "type": "object",
+          "required": [
+            "event",
+            "cause",
+            "participant",
+            "channel",
+            "places"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "const": "visited"
+            },
+            "cause": {
+              "description": "seq of the command entry that caused this event.",
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+            },
+            "participant": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "as": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+            },
+            "channel": {
+              "$ref": "urn:oikos:contracts:0.8:common#/$defs/ChannelPath"
+            },
+            "places": {
+              "type": "array",
+              "items": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Id"
+              },
+              "minItems": 1,
+              "maxItems": 16
+            }
+          }
         }
       ]
     },
@@ -1730,7 +1814,9 @@
         "counter_census",
         "taken",
         "flooded",
-        "flood_receded"
+        "flood_receded",
+        "visit_started",
+        "visited"
       ]
     },
     "RefusalCode": {

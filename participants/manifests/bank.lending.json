@@ -1,6 +1,6 @@
 {
   "name": "bank.lending",
-  "version": "0.3.1",
+  "version": "0.4.1",
   "doc": "docs/behaviour/credit.md",
   "params": {
     "arrears_days": {
@@ -109,6 +109,14 @@
       },
       "default": 5000000,
       "source": "placeholder"
+    },
+    "who": {
+      "schema": {
+        "type": "string",
+        "description": "its channel onto who's who, where it looks up what kind of applicant it has (\"\": it knows what it is shown)"
+      },
+      "default": "",
+      "source": "placeholder"
     }
   },
   "perceives": [],
@@ -117,6 +125,10 @@
     {
       "what": "request",
       "why": "The bank's own files: its customers' instructions, among them the repayments of the loans this office made."
+    },
+    {
+      "what": "accounts",
+      "why": "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it."
     }
   ]
 }

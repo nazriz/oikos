@@ -111,7 +111,9 @@ export type ParticipantAction =
   | { type: "look"; looks: LookRequest[] }
   | { type: "opt_out"; statement: string };
 
-/** Look through a channel now (attention); a records channel can be searched (contracts/participant-api.schema.json, Query). */
+/** Look through a channel now (attention); a records channel can be searched (contracts/participant-api.schema.json, Query).
+ * A register asked of its keeper must be searched by naming its subject; a directory is looked up (`who`); a place
+ * is gone to (`visit`), which takes the looker's time (docs/design/knowing.md). */
 export interface LookRequest {
   channel: Id;
   query?: {
@@ -120,6 +122,11 @@ export interface LookRequest {
     order?: { field: string; desc?: boolean };
     limit?: number;
   };
+  /** A look-up in a directory: one entity (with `role`: that organisation's positions of that role), one participant,
+   * one position, or a name. */
+  who?: { entity: Id; role?: string } | { participant: Id } | { position: Id } | { name: string };
+  /** Going to look: the places gone to (buildings, or cells of ground), in order. */
+  visit?: { places: Id[] };
 }
 
 export interface Outcome {
@@ -132,6 +139,8 @@ export interface Outcome {
   surveyed?: { of: Id; cells: { [cell: string]: number } };
   /** What an investigation found (crime), for the one who investigated only: whether goods were taken as said, and who. */
   investigated?: { from: Id; at: Id; kind: Id; taken: boolean; taker: Id | null };
+  /** Work done on a building: the building as those who did it left it (they were there), for the one whose work it was. */
+  seen?: SiteStructure[];
 }
 
 /** A message: `from` the participant, `as` the position it wrote in, `from_entity` who acted (the person, or the
@@ -144,7 +153,11 @@ export interface Transaction { t: number; from: Id; to: Id; amount: string; curr
 /** A space in a building: its kind and attributes (the world's vocabulary), how many bodies it holds at most, how many
  * are in it, and who (in the capacity's own buildings, or where its channel shows names). */
 export interface Departure { occupant: Id; reason: "left" | "removed" | "demolition" | "departed" | "died" | "flooded"; at: number }
-export interface SiteSpace { space: Id; kind: string; capacity: number; attrs?: Json; count: number; occupants?: Id[]; left?: Departure[] }
+export interface SiteSpace { space: Id; kind: string; capacity: number; attrs?: Json; count: number; occupants?: Id[]; left?: Departure[];
+  /** From outside (who is there can't be told): when someone was last seen leaving. Never who; a death inside is not seen. */
+  seen_leaving?: number;
+  /** From outside: when someone was last seen going in. Never who. */
+  seen_entering?: number }
 /** A state variable as perceived (phase B): its value on a day, its change each whole day since, and its bounds. */
 export interface VariableView { value: number; as_of_day: number; per_day: number; min: number; max: number }
 export interface SiteStructure { structure: Id; type: Id; at: Id; w: number; h: number; built_by?: Id; complete: boolean; completes_at?: number; coming_down?: boolean; variables?: { [id: Id]: VariableView }; spaces: SiteSpace[] }
@@ -165,7 +178,8 @@ export type ChannelData =
   | { kind: "accounts"; accounts: { account: Id; holder: Id; custodian: Id; currency: string; balance: string; closed?: true }[]; transactions: Transaction[] }
   | { kind: "holdings"; holdings: HoldingItem[] }
   | { kind: "records"; records: Record[]; search?: true; whole?: true }
-  | { kind: "sites"; as_of: number; cells: SiteCell[]; whole?: true }
+  | { kind: "sites"; as_of: number; cells: SiteCell[]; whole?: true; /** What a visit found: the places gone to, as they were at `as_of`. */ visited?: true;
+      /** Places gone to, as a participant's view keeps them (its memory of them): when each cell was last seen, and the cells its latest visit saw. */ seen_at?: { [cell: Id]: number }; fresh?: Id[] }
   | { kind: "directory"; entities: { entity: Id; kind: string; name: string; participant?: Id }[]; positions: PositionItem[] };
 
 /**

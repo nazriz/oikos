@@ -30,7 +30,7 @@ import { basesOf, channels, cites } from "../contracts";
 import { DECISIONS, params, wait, type Belief, type BehaviourModule, type ConsultAnswer, type DecisionRecord, type ParticipantContext } from "../module";
 import type { Rng } from "../rng";
 import * as C from "../calls";
-import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
+import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.41.1",
+  version: "0.42.0", // 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -190,12 +190,18 @@ export const citizen: BehaviourModule = {
       leave_after_jobless_days: 180,
       // Civic life (docs/behaviour/citizen.md "Elections and news"): enrolling, judging the town's government, standing
       // and voting; reading the local paper. Placeholders, but the turnout and readership the world gives (its profile).
-      electoral_town: null as string | null, // where we enrol and vote (the world says; none: no elections)
+      electoral_town: null as string | null, // the town whose government we elect (the world says; none: no elections)
+      electoral_body: null as string | null, // with whom we enrol, nominate and vote, where that is not the town itself (the world says)
       paper: null as string | null, // the local paper, whose news we read (the world says; none: no paper, and nothing is read as news)
       // School (docs/behaviour/education.md): the school children of its ages go to (the world says; none: no school).
       school: null as { entity: string; building: string; ages: [number, number] } | null,
       // Whom we tell when we leave town for good (the world gives them; none: our leaving is said to nobody in particular).
       tell_on_leaving: [] as string[],
+      // A home next to ours that someone went into and has not come out of, with nobody in it (docs/behaviour/deaths.md):
+      // whom we ask to call there (the police), the channel that shows us the buildings next to where we are, and how
+      // long such a silence goes before anybody remarks on it (shares within so many days: the world's figures). None:
+      // we remark on nothing.
+      welfare: null as { police: string; channel: string; found_after: { within_days: number; bps: number }[] } | null,
       // Health (docs/behaviour/health.md): the clinic and its waiting room; the share who go when something's wrong of a
       // kind it sees; and the conditions nobody works with (the world says; none: no clinic).
       care: null as { entity: string; waiting: string; seek_bps: number; severities: string[]; off_work: string[]; wait_days: number } | null,
@@ -499,6 +505,11 @@ export const citizen: BehaviourModule = {
     // A death at home we were told of by a child of the household (nobody grown was there to see it), and, as that
     // child, whose death we have told someone of.
     const toldDead: { person: string; space: string }[] = [];
+    // Homes we have wondered about (someone went in and never came out; a neighbour in our building who died and whose
+    // home has stood empty): when the silence will have gone on long enough to ask, and those we have asked about.
+    const wondered = new Map<string, { space: string; structure: string; at: string; since: number; due: number }>();
+    const askedAbout = new Set<string>();
+    let nextDoorAsOf = -1;
     const toldOf = new Set<string>();
     // Children: those we already knew of (from the start), a pregnancy's due date, and when we next think about it.
     let knownChildren: Set<string> | null = null;
@@ -771,6 +782,66 @@ export const citizen: BehaviourModule = {
     // it the next time they are awake there, leaving in the morning or coming in (docs/behaviour/deaths.md). Until
     // 2026-10-08 it was seen only in a full plan, made while the death was still among the home's last few departures,
     // which a household's own comings and goings push out within a day or two.
+    /** How long a silence in a home goes before anybody remarks on it: a band by its share, then any moment in it. The
+     * draw is the home's, not ours (whoever lives beside it would wait as long): `chance`. */
+    const remarkedAfter = (key: string): number => {
+      const bands = p.welfare?.found_after ?? [];
+      const total = bands.reduce((n, b) => n + b.bps, 0);
+      if (total <= 0) return 0;
+      const rng = (ctx.chance ?? ctx.rng)(`unremarked-${key}`);
+      let x = rng.below(total);
+      let from = 0;
+      for (const b of bands) {
+        if (x < b.bps) return from * DAY + rng.below(Math.max(1, (b.within_days - from) * DAY));
+        x -= b.bps;
+        from = b.within_days;
+      }
+      return from * DAY;
+    };
+    // The homes beside us (docs/behaviour/deaths.md, "Nobody else at home"). From outside a home shows how many are in
+    // it and when anyone was last seen going in or coming out, never who. One that someone went into after anyone last
+    // left, with nobody in it now, holds someone who has not come out. In our own building we know our neighbours by
+    // name, and see that one has died and their home stood empty since. Either way, when the silence has gone on as
+    // long as such a silence goes unremarked, an adult asks the police to call (once for each).
+    const wonderNextDoor = (obs: Observation): Step | undefined => {
+      const w = p.welfare;
+      if (!w || !obs.body || obs.t - obs.body.born_at < ADULT_YEARS * year) return undefined;
+      const t = obs.t;
+      const ourHome = home?.space ?? livingAt;
+      const wonder = (key: string, space: string, structure: string, at: string, since: number) => {
+        // (Never before nobody has been in or out for a day: where people share a home one of them comes or goes within
+        // a day, and it is theirs to say who has died.)
+        if (!wondered.has(key) && !askedAbout.has(key)) wondered.set(key, { space, structure, at, since, due: since + Math.max(DAY, remarkedAfter(key)) });
+      };
+      const next = obs.channels[w.channel];
+      if (next?.kind === "sites" && next.as_of !== nextDoorAsOf) {
+        nextDoorAsOf = next.as_of;
+        const still = new Set<string>();
+        for (const c of next.cells) for (const sp of c.structure?.spaces ?? []) {
+          if (sp.kind !== "dwelling" || sp.occupants !== undefined || sp.count > 0 || sp.seen_entering === undefined || sp.seen_entering <= (sp.seen_leaving ?? -1)) continue;
+          const key = `${sp.space}@${sp.seen_entering}`;
+          still.add(key);
+          wonder(key, sp.space, c.structure!.structure, c.structure!.at, sp.seen_entering);
+        }
+        // (Someone has come out of it, or gone in, since: nothing to wonder at. One we know by name is kept.)
+        for (const key of [...wondered.keys()]) if (!key.startsWith("died:") && !still.has(key)) wondered.delete(key);
+      }
+      const street = obs.channels.street;
+      if (street?.kind === "sites") for (const c of street.cells) for (const sp of c.structure?.spaces ?? []) {
+        if (sp.kind !== "dwelling" || sp.space === ourHome || sp.occupants === undefined || !stoodEmpty(sp, t)) continue;
+        for (const l of sp.left ?? []) if (l.reason === "died" && !household?.members.some((m) => m.person === l.occupant)) wonder(`died:${l.occupant}`, sp.space, c.structure!.structure, c.structure!.at, l.at);
+      }
+      // (One at a time: it is written at once, apart from the week's plan; another that is due is written at the next wake.)
+      for (const [key, x] of [...wondered].sort(([a], [b]) => (a < b ? -1 : 1))) {
+        if (t < x.due) continue;
+        wondered.delete(key);
+        askedAbout.add(key);
+        return because(`Nobody has been seen at ${x.space} for ${Math.max(1, Math.round((t - x.since) / DAY))} days, and whoever went in has not come out: asking the police to call there.`,
+          say("welfare_check_request", `Nobody has been seen at ${x.space} for some days. Please call there.`, { to: [w.police], data: { space: x.space, structure: x.structure, at: x.at, since: x.since } }));
+      }
+      return undefined;
+    };
+
     const seeDeathAtHome = (obs: Observation): Step[] => {
       const steps: Step[] = [];
       const street = obs.channels.street;
@@ -926,6 +997,8 @@ export const citizen: BehaviourModule = {
           if (!childrenNow.some((c) => c.person === k.person)) childrenNow.push({ person: k.person, born_at: k.born_at, sex: k.sex } as Member);
           const where = home?.movedIn ? home.space : livingAt;
           if (where) steps.push(because("Our baby is born: bringing them home.", C.call("occupancy", { in: where, who: k.person })));
+          // (And registered, as a birth must be: docs/behaviour/institutions.md.)
+          if (p.registry) steps.push(because("Our baby is born: registering the birth.", say("birth_notification", `A child was born to ${me}.`, { to: [p.registry], data: { child: k.person, born_at: k.born_at, mother: me } })));
           if (household && k.sex) {
             const partner = household.couples.find((c) => c.includes(me))?.find((x) => x !== me);
             const father = partner && household.members.find((m) => m.person === partner && m.sex === "male")?.person;
@@ -2301,11 +2374,12 @@ export const citizen: BehaviourModule = {
     const civic = (obs: Observation, t: number, steps: Step[]) => {
       if (!p.electoral_town || !obs.body || t - obs.body.born_at < ADULT_YEARS * year) return;
       const town = p.electoral_town;
+      const electoral = p.electoral_body ?? town;
       // On the roll: enrolled at the start, or now (of age, or new to town), once.
       if (enrolled === null) enrolled = book.all("enrolment").some((r) => r.speaks_for === me);
       if (!enrolled) {
         enrolled = true;
-        steps.push(because("Of voting age (or new to town) and not on the roll: enrolling, as the law requires.", say("enrolment", `Enrolment: ${me}.`, { to: [town], visible: [me, town], data: { born_at: obs.body.born_at } })));
+        steps.push(because("Of voting age (or new to town) and not on the roll: enrolling, as the law requires.", say("enrolment", `Enrolment: ${me}.`, { to: [electoral], visible: [me, electoral], data: { born_at: obs.body.born_at } })));
       }
       // Approval of the town's government, weekly: our own fortunes (retrospective, economic voting) and our anger at the
       // town, remembered over about half a year; and what we read of it in the paper.
@@ -2334,7 +2408,7 @@ export const citizen: BehaviourModule = {
         const top = (Object.keys(mind.person.values) as Value[]).sort((a, b) => zValue(b) - zValue(a) || (a < b ? -1 : 1)).slice(0, 2);
         const platform = `Standing for ${n.data?.office}: for ${top.join(" and ")}.`;
         steps.push(because(`An election: standing for office (drive ${drive.toFixed(2)}; we think the town is run ${approval >= 0 ? "well enough" : "badly"}).`,
-          say("nomination", platform, { to: [town], visible: "public", data: { office: n.data?.office, name: me, values: top }, assertion: { that: platform } })));
+          say("nomination", platform, { to: [electoral], visible: "public", data: { office: n.data?.office, name: me, values: top }, assertion: { that: platform } })));
       }
       // Voting: on a ballot open to the roll, if we're on it, once; nearly everyone, where voting is compulsory. A ranking:
       // the incumbent by our approval, a challenger by how well their platform speaks to our values.
@@ -2356,7 +2430,7 @@ export const citizen: BehaviourModule = {
         }).sort((x, y) => y.score - x.score || (x.key < y.key ? -1 : 1));
         if (!scores.length) continue;
         decided.push({ t, domain: "vote", strategy: "deliberate", choice: scores[0]!.key, options: scores });
-        steps.push(because(`Voting: ranking the ${scores.length} candidates (our approval of the town's government: ${approval}).`, vote(b.id, scores.map((x) => x.number).join(">"), [town])));
+        steps.push(because(`Voting: ranking the ${scores.length} candidates (our approval of the town's government: ${approval}).`, vote(b.id, scores.map((x) => x.number).join(">"), [electoral])));
       }
     };
 
@@ -2407,11 +2481,15 @@ export const citizen: BehaviourModule = {
 
     return {
       /** Our job and home, as we have them (truth audits). */
-      beliefs: (): Belief[] => departed ? [] : [
+      // (Someone leaving has given notice on everything and holds nothing more to be true of the town; found
+      // 2026-10-08: one who took a job and left in the same wake, with a step still queued behind the leaving, was
+      // never marked gone, and a letter weeks later woke them still believing in the job.)
+      beliefs: (): Belief[] => departed || leaving ? [] : [
         ...(job ? [{ of: "agreement" as const, agreement: job.agreement, in_force: true }] : []),
         ...(home && !home.owned ? [{ of: "agreement" as const, agreement: home.agreement, in_force: true }] : []),
       ],
       step(obs): ParticipantAction | Promise<ParticipantAction> {
+        if (leaving && obs.body && !obs.body.present) departed = true; // gone from the world: nothing more is ours to do
         if (departed) return wait(ctx.world.runEnd + DAY);
         absorb(obs);
         // (Taken out of the world with our household, or gone from it: nothing more here.)
@@ -2461,6 +2539,12 @@ export const citizen: BehaviourModule = {
         const mournedBefore = mourned.size;
         todo.push(...seeDeathAtHome(obs).filter((s) => s.length));
         if (mourned.size > mournedBefore) nextPlanAt = Math.min(nextPlanAt, obs.t);
+        // A silent home beside us, when the silence has gone on long enough: asked about now, as an act of its own (it
+        // is no part of the week's plan, and makes none).
+        if (todo.length === 0) {
+          const wonder = wonderNextDoor(obs);
+          if (wonder) return callAction(wonder);
+        }
         // The daily round: a wake that's only for going somewhere (one we asked for, our cadence, or a move done), with
         // nothing left to do and no full plan due, just takes us where we belong.
         if (p.round && obs.t < nextPlanAt && todo.length === 0 && obs.woke_for !== "news" && obs.woke_for !== "start" && !(practiceWake !== null && obs.t >= practiceWake)) {

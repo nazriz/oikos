@@ -913,15 +913,13 @@
             {
               "id": "mine",
               "kind": "records",
-              "match": {
-                "involving": [
-                  "self"
-                ]
-              }
+              "way": "mine",
+              "match": {}
             },
             {
               "id": "notices",
               "kind": "records",
+              "way": "published",
               "match": {
                 "statement_kinds": [
                   "law"
@@ -951,15 +949,13 @@
             {
               "id": "mine",
               "kind": "records",
-              "match": {
-                "involving": [
-                  "self"
-                ]
-              }
+              "way": "mine",
+              "match": {}
             },
             {
               "id": "notices",
               "kind": "records",
+              "way": "published",
               "match": {
                 "statement_kinds": [
                   "law"
@@ -989,15 +985,13 @@
             {
               "id": "mine",
               "kind": "records",
-              "match": {
-                "involving": [
-                  "self"
-                ]
-              }
+              "way": "mine",
+              "match": {}
             },
             {
               "id": "notices",
               "kind": "records",
+              "way": "published",
               "match": {
                 "statement_kinds": [
                   "law"
@@ -1029,6 +1023,7 @@
             {
               "id": "laws",
               "kind": "records",
+              "way": "published",
               "match": {
                 "records": [
                   "statement"
@@ -1044,21 +1039,21 @@
             {
               "id": "city-business",
               "kind": "records",
-              "match": {
-                "involving": [
-                  "self"
-                ]
-              }
+              "way": "mine",
+              "match": {}
             },
             {
               "id": "town",
               "kind": "sites",
-              "area": "all",
-              "every": 604800
+              "way": "visit",
+              "on_request": true,
+              "title": "The town, gone to"
             },
             {
               "id": "who",
-              "kind": "directory"
+              "kind": "directory",
+              "way": "ask",
+              "on_request": true
             }
           ],
           "holder": "mayor-system"
@@ -1076,6 +1071,7 @@
             {
               "id": "laws",
               "kind": "records",
+              "way": "published",
               "match": {
                 "records": [
                   "statement"
@@ -1091,13 +1087,11 @@
             {
               "id": "invoices",
               "kind": "records",
+              "way": "mine",
               "match": {
                 "records": [
                   "statement",
                   "claim"
-                ],
-                "involving": [
-                  "self"
                 ]
               }
             }
@@ -1116,6 +1110,7 @@
             {
               "id": "laws",
               "kind": "records",
+              "way": "published",
               "match": {
                 "records": [
                   "statement"
@@ -1131,6 +1126,7 @@
             {
               "id": "applications",
               "kind": "records",
+              "way": "mine",
               "match": {
                 "statement_kinds": [
                   "permit_application"
@@ -1140,7 +1136,9 @@
             {
               "id": "land",
               "kind": "sites",
-              "area": "all"
+              "way": "visit",
+              "on_request": true,
+              "title": "The town, gone to"
             }
           ],
           "role_module": {
@@ -1157,6 +1155,7 @@
             {
               "id": "laws",
               "kind": "records",
+              "way": "published",
               "match": {
                 "records": [
                   "statement"
@@ -1172,6 +1171,7 @@
             {
               "id": "permits",
               "kind": "records",
+              "way": "mine",
               "match": {
                 "records": [
                   "claim"
@@ -1180,14 +1180,10 @@
             },
             {
               "id": "river-patrol",
+              "title": "The river bank, gone to",
               "kind": "sites",
-              "area": [
-                "cell.0.1",
-                "cell.1.1",
-                "cell.2.1",
-                "cell.3.1"
-              ],
-              "every": 1209600
+              "way": "visit",
+              "on_request": true
             }
           ],
           "role_module": {
@@ -1207,13 +1203,11 @@
             {
               "id": "instructions",
               "kind": "records",
+              "way": "mine",
               "match": {
                 "statement_kinds": [
                   "request",
                   "court_order"
-                ],
-                "involving": [
-                  "self"
                 ]
               }
             }
@@ -1235,6 +1229,7 @@
             {
               "id": "laws",
               "kind": "records",
+              "way": "published",
               "match": {
                 "records": [
                   "statement"
@@ -1250,21 +1245,21 @@
             {
               "id": "our-business",
               "kind": "records",
-              "match": {
-                "involving": [
-                  "self"
-                ]
-              }
+              "way": "mine",
+              "match": {}
             },
             {
               "id": "land",
               "kind": "sites",
-              "area": "all",
-              "every": 2592000
+              "way": "visit",
+              "on_request": true,
+              "title": "The town, gone to"
             },
             {
               "id": "who",
-              "kind": "directory"
+              "kind": "directory",
+              "way": "ask",
+              "on_request": true
             }
           ],
           "role_module": {
@@ -1284,13 +1279,11 @@
             {
               "id": "contracts",
               "kind": "records",
+              "way": "mine",
               "match": {
                 "records": [
                   "agreement",
                   "signature"
-                ],
-                "involving": [
-                  "self"
                 ]
               }
             }
@@ -1301,6 +1294,97 @@
           "holder": "builder-system"
         }
       ],
+      "knowing": {
+        "published": [
+          {
+            "what": "law",
+            "why": "The law in force is promulgated to everyone it binds."
+          },
+          {
+            "what": "charter",
+            "why": "The town's charter is public, as its laws are."
+          },
+          {
+            "what": "procedure",
+            "why": "A public body's adopted procedures are published with its laws."
+          },
+          {
+            "what": "organisation",
+            "why": "A public body's organisation is published with its laws."
+          },
+          {
+            "what": "notice",
+            "why": "A public notice is put up for everyone."
+          },
+          {
+            "what": "has:offer",
+            "why": "An offer made to the public is put before the public."
+          },
+          {
+            "what": "has:formal",
+            "why": "A rule with a formal condition is published with the law."
+          }
+        ],
+        "keepers": [
+          {
+            "entity": "city",
+            "what": "lot",
+            "why": "The town registry makes the plan of each lot: the register of land is its own.",
+            "answers": [
+              {
+                "by": "id",
+                "most": 1
+              }
+            ]
+          },
+          {
+            "entity": "city",
+            "what": "records:claim",
+            "why": "The town registry keeps the register of titles: title is by its registration.",
+            "answers": [
+              {
+                "by": "id",
+                "most": 1
+              },
+              {
+                "by": "about.object",
+                "most": 20
+              }
+            ]
+          },
+          {
+            "entity": "city",
+            "what": "records:claim_transfer",
+            "why": "The town registry keeps the dealings in each title it registers.",
+            "answers": [
+              {
+                "by": "claim",
+                "most": 20
+              },
+              {
+                "by": "id",
+                "most": 1
+              }
+            ]
+          },
+          {
+            "entity": "city",
+            "what": "records:claim_release",
+            "why": "The town registry keeps the releases of each title it registers.",
+            "answers": [
+              {
+                "by": "claim",
+                "most": 20
+              },
+              {
+                "by": "id",
+                "most": 1
+              }
+            ]
+          }
+        ],
+        "visit_seconds": 1800
+      },
       "caps": {
         "max_created_entities": 50
       },

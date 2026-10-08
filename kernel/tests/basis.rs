@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 fn town() -> Run<Vec<u8>> {
     let mut c = riverbend();
     let bob = c["participants"].as_array_mut().unwrap().iter_mut().find(|s| s["id"] == "bob-self").unwrap();
-    bob["channels"].as_array_mut().unwrap().push(json!({"id": "board", "kind": "records", "match": {"statement_kinds": ["notice"]}, "on_request": true}));
+    bob["channels"].as_array_mut().unwrap().push(json!({"id": "board", "kind": "records", "way": "published", "match": {"statement_kinds": ["notice"]}, "on_request": true}));
     Run::start(c, "basis", Vec::new(), None).unwrap()
 }
 

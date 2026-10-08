@@ -7,7 +7,6 @@ mod common;
 use common::*;
 use serde_json::{json, Value};
 use oikos_kernel::events::{EventBody, RefusalCode};
-use oikos_kernel::observe::ChannelData;
 use oikos_kernel::run::Run;
 use oikos_kernel::Command;
 
@@ -88,8 +87,7 @@ fn wear_rises_by_the_day_and_with_occupants_and_mending_lowers_it_exactly() {
     act(&mut run, "developer-system", Some("developer"), json!([{"block": "work", "task": "mend", "units": 2, "at": "s-shop", "performers": ["carol"], "on": "s-house"}])).unwrap();
     assert_eq!(wear(&run, "s-house"), 0);
     // Seen with its trend: a look shows the value on a day and the rate, and today's value follows from them.
-    let o = run.command(&Command::Observe { participant: "mayor-system".into(), only: None }).unwrap().observation.unwrap();
-    let ChannelData::Sites { cells, .. } = &o.channels["mayor/town"] else { panic!() };
+    let cells = go_and_see(&mut run, "mayor-system", "mayor/town", &["s-house"]);
     let v = &cells.iter().find(|c| c.cell == "cell.1.1").unwrap().structure.as_ref().unwrap().variables.as_ref().unwrap()["wear"];
     assert_eq!((v.value, v.per_day, v.min, v.max), (0, 1, 0, 10_000));
 }

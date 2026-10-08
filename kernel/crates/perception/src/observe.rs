@@ -11,7 +11,7 @@
 //! Channel paths: a personal channel is its id; a position's is `<position>/<channel>`.
 
 use crate::blocks::{Id, Record};
-use crate::config::{cell_id, Area, Channel, ChannelKind, CmpOp, LookRequest, Occupants, ParticipantKind, Query, RecordFilter, SELF};
+use crate::config::{cell_id, Area, Channel, ChannelKind, CmpOp, LookRequest, Occupants, ParticipantKind, Query, RecordFilter, Way, Who, SELF};
 use crate::geo::{within, Rect};
 use crate::state::{Look, Message, Outcome, ParticipantStatus, State, Transaction};
 use crate::statics::Statics;
@@ -120,6 +120,9 @@ pub enum ChannelData {
         /// As for records: the whole of the new surroundings, in place of the old.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         whole: Option<bool>,
+        /// Set when this is what a visit found: the places gone to, as they were at `as_of` (docs/design/knowing.md).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        visited: Option<bool>,
     },
     Directory { entities: Vec<EntityItem>, positions: Vec<PositionItem> },
 }
@@ -146,75 +149,7 @@ pub struct AccountItem {
     pub closed: Option<bool>,
 }
 
-/// A cell of ground, and the building standing on it (repeated on every cell of its footprint).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SiteCell {
-    pub cell: Id,
-    pub x: i64,
-    pub y: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub terrain: Option<String>,
-    /// (One building's is shared by the cells it stands on: built once for a look, not once for each cell.)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub structure: Option<Arc<SiteStructure>>,
-    /// Nature: conspicuous species anyone there would notice (never how many).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub seen: Vec<Id>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SiteStructure {
-    pub structure: Id,
-    #[serde(rename = "type")]
-    pub structure_type: Id,
-    /// Its corner cell, and footprint.
-    pub at: Id,
-    pub w: i64,
-    pub h: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub built_by: Option<Id>,
-    pub complete: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub completes_at: Option<i64>,
-    /// Being brought down (phase B).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub coming_down: Option<bool>,
-    /// Its state variables (phase B): wear, and the like, each as a value as of a day, with its rate now and its
-    /// bounds. Seen with its trend, the way wear shows how fast it's coming on: the value on any later day follows
-    /// (until something about the building changes, which is then seen afresh). No daily re-sending of every building.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub variables: Option<BTreeMap<Id, VariableView>>,
-    pub spaces: Vec<SiteSpace>,
-}
-
-/// A state variable as perceived: its value on `as_of_day`, how much it changes each whole day since (at the
-/// building's present occupancy), and its bounds. Today's value: value + per_day x (days since), within bounds.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VariableView {
-    pub value: i64,
-    pub as_of_day: i64,
-    pub per_day: i64,
-    pub min: i64,
-    pub max: i64,
-}
-
-/// A space in a building: what it is (the world's vocabulary), how many bodies it holds at most,
-/// and who is in it where that can be told (the capacity's own buildings, or a channel that
-/// shows names); otherwise how many.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SiteSpace {
-    pub space: Id,
-    pub kind: String,
-    pub capacity: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attrs: Option<Value>,
-    pub count: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub occupants: Option<Vec<Id>>,
-    /// Its last few departures (who left, why, when), where the channel shows who's there.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub left: Option<Vec<crate::state::Departure>>,
-}
+pub use crate::sites::{SiteCell, SiteSpace, SiteStructure, VariableView};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntityItem {
@@ -313,7 +248,7 @@ fn taken_down<'a>(st: &'a State, rec: &Record) -> Option<&'a crate::state::Store
 /// Does a channel's filter show this record? `news`: what a look delivers, where a statement being taken down is
 /// news to whoever is shown statements like it: its withdrawal passes the filter's `statement_kinds` and `has` if
 /// the statement does (a book of laws shows a law's repeal). A search finds the records themselves, as they are.
-fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&str>>, news: bool) -> bool {
+fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&Want>, news: bool) -> bool {
     if f.records.as_ref().is_some_and(|k| !k.iter().any(|x| x == rec.body.kind_name())) {
         return false;
     }
@@ -341,12 +276,37 @@ fn matches(st: &State, rec: &Record, f: &RecordFilter, want: Option<&BTreeSet<&s
             _ => return false,
         }
     }
-    if let Some(want) = want {
-        if !involved(st, rec_itself).iter().any(|e| want.contains(e.as_str())) {
-            return false;
+    match want {
+        // Its own: a record that involves it.
+        Some(Want::Involving(want)) => involved(st, rec_itself).iter().any(|e| want.contains(e.as_str())),
+        // A named publisher's: what it put out itself (it speaks for them, or one of theirs wrote it).
+        Some(Want::From(from)) => rec_itself.speaks_for.as_deref().is_some_and(|e| from.contains(e)) || st.author_entity(rec_itself).is_some_and(|e| from.contains(e.as_str())),
+        None => true,
+    }
+}
+
+/// Whose records a channel shows, where its way says: its own (`mine`: those involving its entity), or what named
+/// publishers put out (`published`, `from`).
+enum Want<'a> {
+    Involving(BTreeSet<&'a str>),
+    From(BTreeSet<&'a str>),
+}
+
+impl<'a> Want<'a> {
+    fn of(way: Way, from: Option<&'a Vec<Id>>, me: &'a str) -> Option<Want<'a>> {
+        match (way, from) {
+            (Way::Mine, _) => Some(Want::Involving([me].into_iter().collect())),
+            (Way::Published, Some(from)) => Some(Want::From(from.iter().map(|e| if e == SELF { me } else { e.as_str() }).collect())),
+            _ => None,
         }
     }
-    true
+
+    /// The entities whose records are candidates (a superset: the full filter still decides).
+    fn entities(&self) -> &BTreeSet<&'a str> {
+        match self {
+            Want::Involving(w) | Want::From(w) => w,
+        }
+    }
 }
 
 /// A lookup of records by record kind, statement kind and involved entity,
@@ -539,7 +499,7 @@ impl RecordIndex {
     }
 
     /// Sequence numbers above `after` that might match the filter, in order.
-    fn candidates(&self, f: &RecordFilter, want: Option<&BTreeSet<&str>>, after: u64) -> Option<Vec<u64>> {
+    fn candidates(&self, f: &RecordFilter, want: Option<&Want>, after: u64) -> Option<Vec<u64>> {
         fn tail(v: &[u64], after: u64) -> &[u64] {
             &v[v.partition_point(|&q| q <= after)..]
         }
@@ -551,7 +511,7 @@ impl RecordIndex {
             options.push(k.iter().filter_map(|x| self.by_kind.get(x)).map(|v| tail(v, after)).collect());
         }
         if let Some(w) = want {
-            options.push(w.iter().filter_map(|e| self.by_entity.get(*e)).map(|v| tail(v, after)).collect());
+            options.push(w.entities().iter().filter_map(|e| self.by_entity.get(*e)).map(|v| tail(v, after)).collect());
         }
         // A statement must carry every field `has` names, so those carrying any one of them are enough to look through.
         for h in f.has.iter().flatten() {
@@ -622,7 +582,7 @@ impl RecordIndex {
         let keep = || self.scopes.write().unwrap_or_else(|e| e.into_inner());
         match area {
             Area::All(_) => Scope::Everywhere,
-            Area::Cells(cs) => {
+            Area::Cells(cs) | Area::Premises(crate::config::Premises { premises: cs }) => {
                 if let Some(cells) = known().listed_cells.get(cs) {
                     return Scope::Cells(cells.clone());
                 }
@@ -710,9 +670,10 @@ impl RecordIndex {
     }
 }
 
-/// Does any of the capacities a participant would observe in have a directory?
+/// Does any of the capacities a participant would observe in have a directory it is shown? (One that is only looked
+/// up in, which is every directory a valid world has, is answered from the state as asked: nothing is kept ready.)
 fn has_directory(st: &State, participant: &str, only: Option<&str>) -> bool {
-    capacities(st, participant).iter().filter(|cap| only.is_none_or(|o| o == cap.key)).any(|cap| cap.channels.iter().any(|ch| matches!(ch.kind, ChannelKind::Directory)))
+    capacities(st, participant).iter().filter(|cap| only.is_none_or(|o| o == cap.key)).any(|cap| cap.channels.iter().any(|ch| matches!(ch.kind, ChannelKind::Directory { way } if way != Way::Ask)))
 }
 
 /// A field a search can use. Purely mechanical: names a place in a record, and never says what it means.
@@ -726,6 +687,11 @@ fn field(r: &Record, f: &str) -> Option<Value> {
         // (The claim a transfer or a release names: how a register is asked what has become of one title.)
         "claim" => match &r.body {
             crate::blocks::RecordBody::ClaimTransfer { claim, .. } | crate::blocks::RecordBody::ClaimRelease { claim } => Some(Value::from(claim.as_str())),
+            _ => None,
+        },
+        // (Who holds a claim: how a register is asked for one holder's titles, by those it answers that to.)
+        "holder" => match &r.body {
+            crate::blocks::RecordBody::Claim { holder, .. } => Some(Value::from(holder.as_str())),
             _ => None,
         },
         "kind" => match &r.body {
@@ -772,6 +738,10 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
         return b.cites(want) == (c.op == CmpOp::Eq);
     }
     let Some(v) = field(r, &c.field) else { return false };
+    // A list: it equals a value it holds, and differs from one it does not (a plan's cells: which lot is this cell on).
+    if let (Value::Array(items), CmpOp::Eq | CmpOp::Ne) = (&v, c.op) {
+        return items.iter().any(|x| compare(x, &c.value) == Some(Equal)) == (c.op == CmpOp::Eq);
+    }
     let Some(o) = compare(&v, &c.value) else { return false };
     match c.op {
         CmpOp::Eq => o == Equal,
@@ -783,75 +753,8 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
     }
 }
 
-/// The buildings a sites channel has shown so far in one look, each as it shows it (the same for every cell a
-/// building stands on).
-type Shown = Vec<(Id, Arc<SiteStructure>)>;
-
-fn site_cell(s: &Statics, st: &State, id: &Id, c: &crate::state::Cell, me: &str, names: bool, shown: &mut Shown) -> SiteCell {
-    SiteCell {
-        cell: id.clone(),
-        x: c.x,
-        y: c.y,
-        terrain: c.terrain.clone(),
-        seen: st.nature.as_deref().map_or(vec![], |n| {
-            s.config.catalogue.species.iter().filter(|sp| sp.conspicuous && n.populations.get(&sp.id).is_some_and(|m| m.get(id).is_some_and(|x| *x > 0))).map(|sp| sp.id.clone()).collect()
-        }),
-        structure: c.structure.as_ref().map(|sid| {
-            if let Some((_, structure)) = shown.iter().rev().find(|(shown, _)| shown == sid) {
-                return structure.clone();
-            }
-            let x = &st.structures[sid];
-            let f = s.types[&x.structure_type].footprint;
-            let occ = st.occupancy.get(sid);
-            // Who is in a building: known in one's own, and where the channel shows names; otherwise how many.
-            let known = names || occ.is_some_and(|m| m.values().any(|b| b.contains(me)));
-            let structure = Arc::new(SiteStructure {
-                structure: sid.clone(),
-                structure_type: x.structure_type.clone(),
-                at: x.at.clone(),
-                w: f.w,
-                h: f.h,
-                built_by: x.built_by.clone(),
-                complete: x.complete,
-                completes_at: x.completes_at,
-                coming_down: x.demolition.is_some().then_some(true),
-                variables: {
-                    let occupants = occ.map_or(0, |m| m.values().map(|b| b.len()).sum::<usize>()) as i64;
-                    let v: BTreeMap<Id, VariableView> = s
-                        .config
-                        .catalogue
-                        .variables
-                        .iter()
-                        .filter_map(|c| {
-                            let (value, as_of_day) = *x.variables.get(&c.id)?;
-                            let per_day = c.per_day.saturating_add(c.per_occupant_per_day.saturating_mul(occupants));
-                            Some((c.id.clone(), VariableView { value, as_of_day, per_day, min: c.min, max: c.max }))
-                        })
-                        .collect();
-                    (!v.is_empty()).then_some(v)
-                },
-                spaces: s.spaces[&x.structure_type]
-                    .iter()
-                    .map(|(local, spec)| {
-                        let space = format!("{sid}/{local}");
-                        let bodies = occ.and_then(|m| m.get(&space));
-                        SiteSpace {
-                            kind: spec.kind.clone(),
-                            capacity: spec.capacity,
-                            attrs: spec.attrs.clone(),
-                            count: bodies.map_or(0, |b| b.len()) as u32,
-                            occupants: known.then(|| bodies.map(|b| b.iter().cloned().collect()).unwrap_or_default()),
-                            left: known.then(|| st.departures.get(&space).map(|l| (**l).clone())).flatten(),
-                            space,
-                        }
-                    })
-                    .collect(),
-            });
-            shown.push((sid.clone(), structure.clone()));
-            structure
-        }),
-    }
-}
+use crate::sites::{site_cell, Shown};
+pub use crate::sites::site_structure;
 
 /// How an observation is built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -934,15 +837,40 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
             let path = format!("{}{}", cap.prefix, ch.id);
             let asked = requested.iter().find(|l| l.channel == path);
             let area = match &ch.kind {
-                ChannelKind::Records { area, .. } => area.as_ref(),
-                ChannelKind::Sites { area, .. } => Some(area),
+                ChannelKind::Records { area, .. } | ChannelKind::Sites { area, .. } => area.as_ref(),
                 _ => None,
             };
             // A search: what matches now, within what the capacity may see; its cursor for changes is untouched.
-            if let (Some(LookRequest { query: Some(q), .. }), ChannelKind::Records { filter, .. }) = (asked, &ch.kind) {
+            if let (Some(LookRequest { query: Some(q), .. }), ChannelKind::Records { way, filter, from, of, by, .. }) = (asked, &ch.kind) {
                 let scope = area.map(|a| index.scope(s, st, a, &me));
-                channels.insert(path, ChannelData::Records { records: search(st, index, &me, filter, scope.as_ref(), q), search: Some(true), whole: None });
+                let want = Want::of(*way, from.as_ref(), &me);
+                // How many one answer gives is the keeper's to say, and a board's how many one reading takes in.
+                let most = match way {
+                    Way::Ask => {
+                        let named = q.conditions.iter().flatten().find(|c| c.op == CmpOp::Eq && by.iter().flatten().any(|f| f == &c.field)).map(|c| c.field.as_str());
+                        named.map(|f| s.config.knowing.answer_most(of.as_deref().unwrap_or(""), filter, f))
+                    }
+                    Way::Published if from.is_none() => s.config.knowing.board_most(filter),
+                    _ => None,
+                };
+                channels.insert(path, ChannelData::Records { records: search(st, index, &me, filter, want.as_ref(), scope.as_ref(), q, most), search: Some(true), whole: None });
                 continue;
+            }
+            // What is only ever answered, never shown (docs/design/knowing.md): a register asked of its keeper and a
+            // board (a search, above); a directory looked up (one answer); a place gone to (the world's: it takes the
+            // looker's time, and what it finds comes when it ends).
+            match &ch.kind {
+                ChannelKind::Directory { way: Way::Ask } => {
+                    // (Several look-ups through it in one look: each answered, the answers together.)
+                    let whom: Vec<&Who> = requested.iter().filter(|l| l.channel == path).filter_map(|l| l.who.as_ref()).collect();
+                    if !whom.is_empty() {
+                        channels.insert(path, looked_up(st, &whom));
+                    }
+                    continue;
+                }
+                ChannelKind::Sites { way: Way::Visit, .. } | ChannelKind::Records { way: Way::Ask, .. } => continue,
+                ChannelKind::Records { way: Way::Published, filter, from: None, .. } if s.config.knowing.board_most(filter).is_some() => continue,
+                _ => {}
             }
             if mode == Mode::Look && ch.on_request == Some(true) && asked.is_none() {
                 continue; // perceived only when asked
@@ -1006,9 +934,9 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         .collect();
                     ChannelData::Holdings { holdings }
                 }
-                ChannelKind::Records { filter, .. } => {
+                ChannelKind::Records { way, filter, from: publishers, .. } => {
                     let from = after.unwrap_or(0);
-                    let want: Option<BTreeSet<&str>> = filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == SELF { me.as_str() } else { e.as_str() }).collect());
+                    let want = Want::of(*way, publishers.as_ref(), &me);
                     let seqs = match &scope {
                         Some(sc) => index.placed(sc, from),
                         None => index.candidates(filter, want.as_ref(), from).unwrap_or_else(|| (from + 1..=st.record_order.len() as u64).collect()),
@@ -1031,7 +959,8 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                     let mut shown: Shown = vec![];
                     ChannelData::Sites {
                         as_of: st.t,
-                        cells: match scope.as_ref().unwrap() {
+                        visited: None,
+                        cells: match scope.as_ref().expect("a map that is not a visit has an area (the contract)") {
                             // (Every cell: read as they're walked, not looked up again one by one.)
                             Scope::Everywhere => st.cells.iter().filter(|(_, c)| changed(c.changed)).map(|(id, c)| site_cell(s, st, id, c, &me, names, &mut shown)).collect(),
                             // A scope that's much of the ground (a whole place) is walked beside the state's cells,
@@ -1057,7 +986,7 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
                         whole,
                     }
                 }
-                ChannelKind::Directory => {
+                ChannelKind::Directory { .. } => {
                     let entity = |(id, e): (&Id, &crate::state::Entity)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) };
                     let position = |(id, x): (&Id, &crate::state::Position)| PositionItem {
                         position: id.clone(),
@@ -1161,11 +1090,67 @@ fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: 
     (obs, looks, drained)
 }
 
+/// How many entries one look-up returns at most (the holders of one office, those of one name).
+pub const LOOKED_UP_MAX: usize = 20;
+
+/// Look-ups in the directory (docs/design/knowing.md, section 7), each answered with the one entity, participant or
+/// position named, whoever goes by exactly a name (an entity's name or id; a position's title, role or id; the person
+/// a participant of that id acts as), or an organisation's positions of one role. Never more than `LOOKED_UP_MAX` to
+/// one look-up, in id order.
+fn looked_up(st: &State, whom: &[&Who]) -> ChannelData {
+    let (mut entities, mut positions) = (BTreeMap::new(), BTreeMap::new());
+    for who in whom {
+        let ChannelData::Directory { entities: es, positions: ps } = looked_up_one(st, who) else { continue };
+        entities.extend(es.into_iter().map(|e| (e.entity.clone(), e)));
+        positions.extend(ps.into_iter().map(|p| (p.position.clone(), p)));
+    }
+    ChannelData::Directory { entities: entities.into_values().collect(), positions: positions.into_values().collect() }
+}
+
+fn looked_up_one(st: &State, who: &Who) -> ChannelData {
+    let entity = |id: &Id, e: &crate::state::Entity| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) };
+    let position = |id: &Id, x: &crate::state::Position| PositionItem {
+        position: id.clone(),
+        entity: x.entity.clone(),
+        title: x.title.clone(),
+        role: x.role.clone(),
+        holder: x.holder.clone(),
+        held_by: x.holder.as_ref().and_then(|h| {
+            let hp = st.participants.get(h)?;
+            match &hp.person {
+                Some(person) => st.entities.get(person).map(|e| e.name.clone()),
+                None => hp.def.title.clone(),
+            }
+        }),
+    };
+    let (mut entities, mut positions) = (vec![], vec![]);
+    match who {
+        Who { entity: Some(e), role: Some(role), .. } => {
+            positions.extend(st.positions.iter().filter(|(_, x)| &x.entity == e && x.role.as_ref() == Some(role)).take(LOOKED_UP_MAX).map(|(id, x)| position(id, x)));
+        }
+        Who { entity: Some(e), .. } => entities.extend(st.entities.get_key_value(e).map(|(id, x)| entity(id, x))),
+        Who { participant: Some(p), .. } => {
+            let person = st.participants.get(p).and_then(|x| x.person.as_ref());
+            entities.extend(person.and_then(|e| st.entities.get_key_value(e)).map(|(id, x)| entity(id, x)));
+        }
+        Who { position: Some(p), .. } => positions.extend(st.positions.get_key_value(p).map(|(id, x)| position(id, x))),
+        Who { name: Some(name), .. } => {
+            // (A name is matched whole, whatever its capitals; an id, a role, exactly.)
+            let same = |a: &str| a.eq_ignore_ascii_case(name);
+            let person = st.participants.get(name).and_then(|x| x.person.as_ref());
+            entities.extend(st.entities.iter().filter(|(id, e)| *id == name || same(&e.name) || person == Some(*id)).take(LOOKED_UP_MAX).map(|(id, e)| entity(id, e)));
+            positions.extend(st.positions.iter().filter(|(id, x)| *id == name || x.title.as_deref().is_some_and(same) || x.role.as_ref() == Some(name)).take(LOOKED_UP_MAX).map(|(id, x)| position(id, x)));
+        }
+        _ => {}
+    }
+    ChannelData::Directory { entities, positions }
+}
+
 /// A search through a records channel: records the participant may see that match the channel's filter
 /// and the query, now. Standing records only if asked; ordered as asked (newest first by default);
 /// at most `limit` (default 20).
-fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, area: Option<&Scope>, q: &Query) -> Vec<Arc<Record>> {
-    let want: Option<BTreeSet<&str>> = filter.involving.as_ref().map(|inv| inv.iter().map(|e| if e == "self" { me } else { e.as_str() }).collect());
+#[allow(clippy::too_many_arguments)]
+fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want: Option<&Want>, area: Option<&Scope>, q: &Query, most: Option<u32>) -> Vec<Arc<Record>> {
     let at_seq = |seq: u64| &index.by_seq[(seq - 1) as usize];
     // A search for one record by its id reads that record, not the register it is in (the same answer: every other
     // condition is still asked of it below).
@@ -1192,7 +1177,7 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, area
     } else if q.standing == Some(true) {
         index.standing(filter)
     } else {
-        let mut v = index.candidates(filter, want.as_ref(), 0).unwrap_or_else(|| (1..=st.record_order.len() as u64).collect());
+        let mut v = index.candidates(filter, want, 0).unwrap_or_else(|| (1..=st.record_order.len() as u64).collect());
         v.reverse();
         v
     };
@@ -1200,7 +1185,7 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, area
     let mut hits: Vec<(u64, &Arc<Record>)> = seqs
         .into_iter()
         .map(|seq| (seq, at_seq(seq)))
-        .filter(|(_, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want.as_ref(), false) && conditions.iter().all(|c| holds(r, c)))
+        .filter(|(_, r)| can_see(st, r, me) && placed_ok(st, r, me, area) && matches(st, r, filter, want, false) && conditions.iter().all(|c| holds(r, c)))
         .collect();
     if let Some(o) = &q.order {
         // Records without the field sort last; ties keep newest first.
@@ -1214,5 +1199,6 @@ fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, area
             (None, None) => sb.cmp(sa),
         });
     }
-    hits.into_iter().take(q.limit.unwrap_or(20) as usize).map(|(_, r)| r.clone()).collect()
+    let limit = q.limit.unwrap_or(20).min(most.unwrap_or(u32::MAX));
+    hits.into_iter().take(limit as usize).map(|(_, r)| r.clone()).collect()
 }

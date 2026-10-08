@@ -547,6 +547,9 @@ impl Kernel {
         let wanted: Vec<&(Id, Option<Id>)> = self.planned[from..to]
             .iter()
             .filter(|(p, only)| st.participants.get(p).is_some_and(|x| only.as_ref().is_none_or(|o| if o == crate::config::SELF { x.kind == crate::config::ParticipantKind::Person } else { st.positions.contains_key(o) })))
+            // (What a visit found comes with its looker's next observation, put in as it is delivered: one waiting on
+            // that is built when asked for, not made ready.)
+            .filter(|(p, only)| !oikos_world::World::visited_waiting(st, p, only.as_deref()))
             .filter(|(p, _)| seen.insert(p.as_str()))
             .collect();
         if wanted.len() < self.worth_sharing {
@@ -615,7 +618,17 @@ impl Kernel {
     pub fn apply_prechecked(&mut self, cmd: &Command) -> Result<Output, ProtocolError> {
         match cmd {
             Command::Observe { participant, only } => Ok(self.observe(participant, only.as_deref(), &[])),
-            Command::Look { participant, only, looks } => Ok(self.observe(participant, only.as_deref(), looks)),
+            Command::Look { participant, only, looks } => {
+                // Visits begin (the world's: they take the looker's time); the rest is perceived now. (A visit begun
+                // is on its looker's timeline: nothing made ready is kept.)
+                let mut events = self.world.begin_visits(participant, looks);
+                if !events.is_empty() {
+                    self.unplan();
+                }
+                let mut out = self.observe(participant, only.as_deref(), looks);
+                events.append(&mut out.events);
+                Ok(Output { events, ..out })
+            }
             // An act begun changes nothing an observation shows (it takes its actor's time, and takes effect when
             // time moves on): what was made ready stands.
             Command::Act { .. } => Ok(Output { events: self.world.apply_prechecked(cmd)?.events, observation: None, observed: None }),
@@ -641,15 +654,29 @@ impl Kernel {
         // something asked for is built now, and whatever was made ready for the participant is let go.
         let ready = self.take_ready(participant, only).filter(|_| looks.is_empty());
         if let Some(Ready { obs, looks, drained, encoded, hash }) = ready {
-            let (outcomes, inbox) = self.world.deliver(participant, only, looks, drained);
-            debug_assert!(outcomes == obs.outcomes && inbox == obs.inbox, "what was waiting for {participant} isn't what was delivered to it");
+            let (outcomes, inbox, visits) = self.world.deliver(participant, only, looks, drained);
+            debug_assert!(outcomes == obs.outcomes && inbox == obs.inbox && visits.is_empty(), "what was waiting for {participant} isn't what was delivered to it");
             self.from_ready += 1;
             let observed = encoded.deliver(&self.delivered, self.handed.as_mut());
             return Output { events: vec![Timed::new(self.world.t(), EventBody::Observation { participant: participant.into(), observation_hash: hash })], observation: Some(obs), observed: Some(observed) };
         }
         let (obs, seen, drained) = observe::observe(self.world.statics(), self.world.state(), &mut self.index, participant, only, looks);
-        let (outcomes, inbox) = self.world.deliver(participant, only, seen, drained);
+        let (outcomes, inbox, visits) = self.world.deliver(participant, only, seen, drained);
         let mut obs = Observation { outcomes, inbox, ..obs };
+        // What its visits found, through the channel each was asked through (a later one over an earlier).
+        for v in visits {
+            match obs.channels.get_mut(&v.channel) {
+                Some(ChannelData::Sites { as_of, cells, .. }) => {
+                    *as_of = v.as_of;
+                    cells.retain(|c| !v.cells.iter().any(|n| n.cell == c.cell));
+                    cells.extend(v.cells);
+                    cells.sort_by(|a, b| a.cell.cmp(&b.cell));
+                }
+                _ => {
+                    obs.channels.insert(v.channel, ChannelData::Sites { as_of: v.as_of, cells: v.cells, whole: None, visited: Some(true) });
+                }
+            }
+        }
         // A lean log keeps no observation hashes (the log's `detail`): hashing a whole observation is much of the cost.
         if self.world.statics().config.log.detail.as_deref() == Some("lean") {
             return Output { events: vec![], observation: Some(obs), observed: None };

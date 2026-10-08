@@ -53,6 +53,9 @@ pub struct Exec<'a> {
     /// A survey's estimates, for the actor alone (nature).
     pub surveyed: Option<Value>,
     pub investigated: Option<Value>,
+    /// The buildings worked on by people sent to them, in the order first worked on (what they see is made when the
+    /// act is done).
+    pub worked_on: Vec<Id>,
 }
 
 pub struct ExecResult {
@@ -60,6 +63,8 @@ pub struct ExecResult {
     pub created: BTreeMap<String, Id>,
     pub surveyed: Option<Value>,
     pub investigated: Option<Value>,
+    /// The buildings worked on, each as those who worked on it left it (for the actor alone).
+    pub seen: Vec<crate::sites::SiteStructure>,
 }
 
 /// Can this participant act now? (Active, or opted out with a stand-in carrying on.)
@@ -88,14 +93,17 @@ pub fn exec_action(s: &Statics, st: &mut State, participant: &str, position: Opt
         }
         None => p.person.clone().ok_or_else(|| refuse(RefusalCode::NotInPosition, format!("{participant} is a system: it acts only in a position")))?,
     };
-    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None };
+    let mut ex = Exec { s, st, participant, position, entity, action, refs: BTreeMap::new(), events: vec![], surveyed: None, investigated: None, worked_on: vec![] };
     for (i, b) in blocks.iter().enumerate() {
         ex.block(b, i).map_err(|mut r| {
             r.block.get_or_insert(i);
             r
         })?;
     }
-    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated })
+    // Those who did the work were there: each building worked on, as it is when the act is done (one brought down
+    // by it leaves nothing to see).
+    let seen = ex.worked_on.iter().filter(|sid| ex.st.structures.contains_key(*sid)).map(|sid| crate::sites::site_structure(ex.s, ex.st, sid, &ex.entity, false)).collect();
+    Ok(ExecResult { events: ex.events, created: ex.refs, surveyed: ex.surveyed, investigated: ex.investigated, seen })
 }
 
 // ---------------- life: shared by acts and scheduled effects ----------------
@@ -679,6 +687,7 @@ pub fn scheduled(s: &Statics, st: &mut State, item: Scheduled) -> Vec<Timed> {
         }
         // (Acts in progress are the kernel's to apply: Kernel::advance.)
         Sched::Act { .. } => vec![],
+        Sched::Visit { participant, position, channel, places, cells, names } => crate::sites::end(s, st, &participant, position.as_deref(), &channel, places, &cells, names),
         Sched::BirthDue { parents, name, template } => {
             let Some(b) = st.body(&parents[0]) else { return vec![] };
             if !b.alive {
@@ -1026,6 +1035,7 @@ impl<'a> Exec<'a> {
                 }
             }
         }
+        let someone_there = !who.is_empty();
         self.emit(EventBody::Worked { task: task.into(), units, at: at.clone(), on: on.clone(), performers: who, labour: total, by: self.participant.into() });
         if let (Some(bodies), Some(ob)) = (&bodies, &on_body) {
             for b in bodies {
@@ -1047,6 +1057,9 @@ impl<'a> Exec<'a> {
             let taker = found.as_ref().filter(|_| rng.below(10_000) < chance as u64).map(|x| x.by.clone());
             self.investigated = Some(serde_json::json!({ "from": from, "at": at, "kind": iv.kind, "taken": found.is_some(), "taker": taker }));
         }
+        // Those who did it were there: what the building is like as they leave it is theirs to know (a demolition's
+        // last day leaves nothing to see). Work nobody is named as doing sends nobody: nothing is seen.
+        let worked_on_building = someone_there && bodies.is_none() && on.is_some() && self.st.structures.contains_key(&target);
         if task == TASK_BUILD {
             let needed = self.s.types[&self.st.structures[&target].structure_type].build_labour;
             let s = self.st.structures.get_mut(&target).unwrap();
@@ -1055,7 +1068,7 @@ impl<'a> Exec<'a> {
             if s.labour_done >= needed && s.completes_at.is_none() {
                 s.complete = true;
                 self.st.touch_structure(&target);
-                self.emit(EventBody::StructureCompleted { structure: target });
+                self.emit(EventBody::StructureCompleted { structure: target.clone() });
             } else {
                 self.st.touch_structure(&target);
             }
@@ -1068,6 +1081,11 @@ impl<'a> Exec<'a> {
                 self.bring_down(&target);
             } else {
                 self.st.touch_structure(&target);
+            }
+        }
+        if worked_on_building && self.st.structures.contains_key(&target) {
+            if !self.worked_on.contains(&target) {
+                self.worked_on.push(target.clone());
             }
         }
         Ok(())
@@ -1183,15 +1201,25 @@ impl<'a> Exec<'a> {
         Ok(at)
     }
 
-    fn check_new_channels(&self, owner: &str, channels: &[Channel]) -> R<()> {
-        check_channels(owner, channels, &|e| self.st.entities.contains_key(e), &|c| self.st.cells.contains_key(c), &|p| {
-            self.s.config.world.places.iter().any(|x| x.id == p)
-        })
-        .map_err(|e| refuse(RefusalCode::UnknownEntity, e))
+    /// A new position's channels are held to what the world's own are (docs/design/knowing.md): no whole view can be
+    /// made during a run that couldn't be written in the world's config.
+    fn check_new_channels(&self, owner: &str, organisation: &str, channels: &[Channel]) -> R<()> {
+        // (Premises change hands during a run: a shop's are bought by whoever founds the next one there, while the old
+        // firm's seat names them still. So a new office's are held to a building or two, not to being nobody else's.)
+        let seat = crate::config::Seat {
+            organisation: Some(organisation),
+            knowing: &self.s.config.knowing,
+            premises_most: Some(crate::config::NEW_PREMISES_MAX),
+            entity_exists: &|e| self.st.entities.contains_key(e),
+            cell_exists: &|c| self.st.cells.contains_key(c),
+            place_exists: &|p| self.s.config.world.places.iter().any(|x| x.id == p),
+            premises_of: &|_| None,
+        };
+        check_channels(owner, channels, &seat).map_err(|e| refuse(RefusalCode::UnknownEntity, e))
     }
 
     fn new_position(&mut self, entity: &str, title: &Option<String>, role: &Option<String>, channels: &[Channel], role_module: &Option<Value>, holder: Option<Id>) -> R<Id> {
-        self.check_new_channels("the position", channels)?;
+        self.check_new_channels("the position", entity, channels)?;
         let id = self.st.mint("pos");
         let c = self.st.stamp();
         self.st.add_position(

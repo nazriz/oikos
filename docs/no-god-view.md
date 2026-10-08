@@ -1,87 +1,105 @@
 # Nobody has a god's view
 
-Naz, 2026-10-08: "no entity should have a god like view of anything"; and, shown what remained: "lets please
-eliminate all whole-world views, like, tbh this should never be allowed to happen".
+Naz, 2026-10-08: "no entity should have a god like view of anything"; shown what remained, "lets please eliminate all
+whole-world views, like, tbh this should never be allowed to happen"; and of the guard that listed them, "a bandaid ...
+lets do the 'hard work' now and fix this properly".
+
+The design is in [design/knowing.md](design/knowing.md); how a real place does each thing, with the sources opened,
+is in [behaviour/knowing.md](behaviour/knowing.md). This page is the rule, how it is enforced, and how to work with it.
 
 ## The rule
 
-No kind of participant (a person, a firm's office, a public office, a model seat, the outside world's offices) is shown,
-unasked, a whole register, a whole population or a whole map, and none is handed the run's future. A participant is
-shown **its own**: its money and what it holds, the records that name it or are addressed to it, the premises it
-occupies and what is near where it is. Anything else it needs, it finds out as its real counterpart would: it **asks
-whoever keeps it for the one thing** (a lot's plan from the land register by the lot's number; one shop's price list;
-the agreements at its own workplace), it **is told** by someone with a reason to tell it (a family reports a death; a
-registry writes to those concerned), it **reads what is published** (the law, the paper, a public notice), or someone
-**goes and looks**, at the cost in time that takes.
+**Information lives with whoever keeps it, and reaches a participant in only four ways.**
 
-Two exceptions, each said in the code where the kind of participant is defined, with the reason in words:
+1. **It is theirs.** They are a party to it, or it was addressed to them: their money and what they hold, their
+   lease, their bill, a letter to them, a title in their name.
+2. **They are there.** They see what is physically where they are: a person the buildings they are in and the street
+   outside; an office its own premises. Finding out about anywhere else means **going to look**: a look that takes the
+   looker's time (the way there and back, and the time to look) and returns what is at the places gone to.
+3. **It was published.** Its maker put it out to the public (the law, the paper, a notice), and it reaches its
+   readers. A board (jobs, homes to let, what sellers advertise) is published, but nobody is shown a board: it is read
+   a few entries at a time.
+4. **They asked the keeper for one specific thing.** The land registry about one lot or one title, the directory about
+   one named person or office. One answer; never "everything".
 
-- **A keeper holds its own register whole** (`keeps` on the behaviour module): the land registry its register, the
-  electoral office its roll, a bank its customers' instructions, a school its roll, the rating authority its rate book.
-  A keeper is the office that *makes* the collection or to which every entry in it is *addressed*. An office that only
-  uses a register someone else keeps is never a keeper: it asks.
-- **A boundary module carries the simulation's own edge** (`boundary` on the module): the weather bureau is handed the
-  weather to come and the world market a scenario's scripted shocks, because in this simulation they *are* the weather
-  and the outside market. They are declared so that they are seen, not silently exempt (docs/behaviour/boundary.md and
-  weather.md say what a real bureau or market would know instead).
+**Only the keeper of a register sees it whole**, because it is theirs, and each keeper is declared by name with the
+reason: in the behaviour module that does the keeper's job (`keeps`), and from there in the world's config
+(`knowing.keepers`), which the kernel checks every channel against. An office that only uses a register someone else
+keeps is never a keeper: it asks, or it is sent what the keeper is bound to send it and keeps a roll of its own.
 
-**What is published is read, not kept.** A record its maker puts out to the whole public (the law, an election notice,
-the paper, a weather warning, a notice of a gathering) may be shown to anyone unasked: being shown it is being one of
-its readers. The kinds that count are listed, each with its reason, in `PUBLISHED` (`orchestrator/src/views.ts`). A
-**market is not a publication**: every seller's prices, every home for sale or to let, every job on offer are many
-parties' offers, found by going and looking (a search of a few, or the shops one knows), never shown whole.
+One exception is not a channel and is declared where it is defined: **a boundary module carries the simulation's own
+edge** (`boundary` on the module): what the world market is handed of a scenario's scripted shocks, and what the
+weather bureau is handed of the weather to come (docs/behaviour/boundary.md, weather.md).
 
 ## How it is enforced
 
-`orchestrator/test/no-god-view.test.ts`, in the fast tier (`bun run test:fast`), generates the town (as code seats, and
-with every office handed to a model) and reads its config with `wholeViews` (`orchestrator/src/views.ts`). A whole
-view is, mechanically:
+**It cannot be written.** A `records`, `sites` or `directory` channel says which way it is (`way`), and each way
+allows only its own scope (`contracts/world-config.schema.json`, `Channel`):
 
-| Way in | Whole when | Not whole when |
+| Way | What a channel of that way may be | What it may not |
 |---|---|---|
-| A `directory` channel | always, asked for or not (it is every entity and position, and cannot be searched) | never |
-| A `sites` channel, asked for or not (a map cannot be searched) | its area is `all`, a place, or half the ground or more | a list of its own cells; `near` where it is |
-| A `records` channel shown unasked, with no `involving` | for each kind or record type it names (all records, if it names none) | the kind is `PUBLISHED`; or the channel has an area of its own cells or `near`; or it is shown only on request (a search) |
-| A `records` channel with `involving` (its own files) | it holds, at the start, at least 25 records of a collection and nine tenths of all there are (the town's offices were shown every lot, because the town issued them) | otherwise |
-| A parameter the module is handed | it names every entity of a kind there are five or more of, or every such entity's account (`every:shop`); or it holds a list of things dated after the start (`future`) | otherwise |
+| `mine` (and accounts, holdings) | Records naming the seat's own entity | Records naming anyone else (`involving` is gone from the contract) |
+| `here` | The ground, or notices put up, near where the seat is (`{near}`; a map at most 2 cells around) or at an organisation's own premises (`{premises: [cells]}`; one organisation's only) | Everywhere, a place, a list of other cells |
+| `visit` | Nothing until a look names 1 to 16 places; then what was there, after the time it takes | A standing map |
+| `published` | Kinds the world declares published (`knowing.published`, each with its reason); a board only on request, by searching, a few at a time; a named supplier's own lists (`from`) | A kind nobody published; "any record"; a board shown |
+| `ask` | A register its declared keeper keeps, on request, to a search that names its subject by a field the keeper answers by, to that asker; the directory, to a look-up that says whom | The register shown; a search with no subject; a field the keeper does not answer by (the land register by holder, for anyone not listed) |
+| `kept` | A register, whole, at a seat of its declared keeper | The same at any other seat |
 
-Accounts and holdings channels show only one's own, by the contract. Each whole view found must be a keeper's
-(`keeps`), a boundary module's (`boundary`) or published; otherwise the test fails, naming the module, the channel or
-parameter and one seat that has it. The test also lists every `keeps` and `boundary` declaration (`KEEPERS`,
-`BOUNDARY`), so adding one means changing the test, where a reviewer sees them all together; and it fails on a
-declaration that nothing needs any more.
+The JSON Schema rules out what a schema can (twelve examples in `contracts/examples/invalid/world-config`); the
+kernel refuses the rest when a world is loaded and when a position is made during a run (nine examples in
+`contracts/examples/refused/world-config`; `kernel/crates/contracts/src/config.rs`, `check_channels`). A look that
+asks a register for everything, reads a board through, looks nobody up, or goes nowhere is rejected before it reaches
+the log (`kernel/tests/knowing.rs`).
 
-`OWED` in the test is the list of whole views found when the guard was written and not yet removed. It only shrinks: a
-new view cannot be added to it without a reviewer seeing the diff, and a line whose view is gone must be taken out.
+**The backstop.** `orchestrator/test/no-god-view.test.ts`, in the fast tier, generates the town (as code seats, and
+with every office handed to a model) and reads its config with `wholeViews` (`orchestrator/src/views.ts`) for what
+the contract cannot see:
 
-What the test cannot see: what a module does with what it is shown (a keeper misusing its register), a view assembled
-by asking for everything a piece at a time (each search is capped by the contract at 200 records and by the module's
-own `search_limit`), and worlds written by hand rather than generated (it reads the generated town; `wholeViews` can
-be run on any config).
+| Way in | Whole when |
+|---|---|
+| A `kept` channel | always: it must be a declared keeper's, and the test lists every one |
+| A seat's own files (`mine`, shown as they come) | they hold, at the start, at least 25 records of a collection and nine tenths of all there are (everything a registry issues names the registry: which is why the land registry and the electoral commission are bodies of their own, and why a notice of acquisition is addressed to nobody) |
+| Premises | they are half the ground or more |
+| A parameter the module is handed | it names every entity of a kind there are five or more of, or every such entity's account (`every:shop`); or it holds a list of things dated after the start (`future`) |
 
-## The right way: `ask`
+Each whole view found must be a keeper's (`keeps`) or a boundary module's (`boundary`), listed in the test (`KEEPERS`,
+`BOUNDARY`); otherwise the test fails, naming the module, the channel or parameter and one seat that has it. It also
+fails on a declaration nothing needs any more. It should never fire: a failure means a way round the contract was
+found, which is a finding to report.
 
-`participants/src/behaviour/common.ts` has the one way for behaviour code to find out what someone else keeps:
+What nothing can see: what a keeper does with its register; a view built up by asking for one thing after another
+(each answer is capped, and the log has every look); a world written by hand that declares everything published
+(`knowing.published` is in the config for a reader to argue with).
 
-- `ask.one(channel, id)`: the one record with this id;
-- `ask.about(channel, field, value, { most, since, standing, newest })`: the records that say something of one
-  thing (one shop's price list by `speaks_for`; the dealings in one title by `claim`; one workplace's agreements);
-- `ask.board(channel, { most, where, by })`: the few a reader would read of a board (listings, the petitions board);
+## Working with it
+
+**To find out what someone else keeps** (`participants/src/behaviour/common.ts`):
+
+- `ask.one(channel, id)`, `ask.about(channel, field, value, { most, ... })`: one named thing of a register.
+- `ask.board(channel, { most, where, by })`: a reader's few of a board.
+- `lookUp.entity / participant / position / name / holders(channel, ...)`: who someone is, or who holds an office.
+- `goSee(channel, places)`, then `visited(obs, channel)`: going to look.
+- `ownerLooks(book, asked, register, lot)`, then `ownerOf(book, lot)`: who owns one lot, by the register.
+- `ownLand(book, owner)` (`behaviour/institutions.ts`): an organisation's own land, by its own papers.
+- `ctx.chance(purpose)`: a draw that is the same for whoever makes it (how long a silent house goes unremarked).
 - `Asked`: remembers what has been asked, so each thing is asked once.
 
-Each is a search through a channel of the participant's own that is shown **only on request** (`on_request: true` in
-the world's config), answered with what matches now. Return them from a stepper's `looks` (`behaviour/firms.ts`) or
-as a `look` action; the answer arrives with the next observation, in the module's book.
+Return them from a stepper's `looks` (`behaviour/firms.ts`) or as a `look` action. An ask, a board and a look-up are
+answered with the next observation, at once; a visit when the looker is back. Work done on a building returns what
+the crew left (`outcome.seen`).
 
-## How to declare a keeper
+**To give a seat a channel** (`worlds/generator/knowing.ts`): `mine`, `published`, `board`, `from`, `posted`,
+`premises`, `around`, `visits`, `ask`, `lookUp`, `kept`. There is no helper for anything else.
 
-Only for a collection the office itself makes, or that is addressed to it entry by entry.
+**To declare a keeper.** Only for a collection the office itself makes, or that is addressed to it entry by entry.
 
-1. On the module (`participants/src/behaviour/…`), add to `keeps` what it holds (`what`: a statement kind, a record
-   type as `records:claim`, `directory`, `map`, `every:<kind>`) and why, in words a reader outside the code would accept.
-2. Run `bun participants/scripts/manifests.ts` (the declaration is part of the module's manifest:
-   `contracts/module.schema.json`, `keeps` and `boundary`).
-3. Add the line to `KEEPERS` in `orchestrator/test/no-god-view.test.ts`.
+1. On the module, add to `keeps` what it holds (`what`: a statement kind, statements having something as
+   `has:registry`, a record type as `records:claim`) and why, in a sentence a reader outside the code would accept.
+2. Run `bun participants/scripts/manifests.ts`.
+3. Say what it answers, to whom and how many at once in `answersOf` (`worlds/generator/knowing.ts`); nothing there:
+   it answers nothing.
+4. Add the line to `KEEPERS` in `orchestrator/test/no-god-view.test.ts`.
 
-If the honest reason is "it needs to look things up in it", it is not a keeper: give it the channel `on_request` and
-use `ask`.
+If the honest reason is "it needs to look things up in it", it is not a keeper: give it `ask`.
+
+**To publish a kind.** Add it to `PUBLISHED` (`worlds/generator/knowing.ts`) with the reason; a market is a board.

@@ -19,7 +19,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.9.0"; // 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.11.0"; // 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -39,6 +39,10 @@ export interface LlmParticipantConfig {
    * ("directory"), accounts, holdings. With it, the participant can look into any of the first three when it chooses
    * (what a code participant in its seat can do): search its papers, see places in full, find who's who. */
   kinds?: Map<string, string>;
+  /** Which way each report reaches it (by channel path; docs/design/knowing.md): a register asked of its keeper
+   * (`ask`, with the fields a question may name its subject by), a board (searched, never read through), who's who
+   * (looked up by name), places gone to (`visit`). */
+  ways?: Map<string, { way: string; by?: string[]; board?: boolean }>;
   cadenceDays: number;
   maxTokens?: number;
   /** Office hours (pilot 7): it deals with its business in one sitting a working day, from `start` (seconds into the day)
@@ -70,7 +74,13 @@ export function lookable(c: LlmParticipantConfig): Map<string, "records" | "site
 /** What a participant calls the places in a paper it can search by, and what the participant API calls them (which it
  * may use too): it reads "from", "citing" and dates in its reports, never the store's field names (principle 14). */
 const FIELD_WORDS: { [said: string]: string } = { from: "author", "on behalf of": "speaks_for", on_behalf_of: "speaks_for", citing: "basis", date: "at" };
-const FIELD = /^(id|record|kind|at|author|speaks_for|basis|claim|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
+const FIELD = /^(id|record|kind|at|author|speaks_for|basis|claim|holder|(data|about)(\.[A-Za-z0-9_-]+)+)$/;
+/** What a register is asked by, in a participant's words. */
+const BY_WORDS: { [field: string]: string } = { id: "id (its own number)", claim: "claim (the title a dealing is in)", holder: "holder (whose it is)", speaks_for: "on behalf of", "about.object": "about.object (what it is a title to)", "data.cells": "detail.cells (a cell of its ground, such as cell.3.4)" };
+/** How many names one look-up of who's who takes (the participant API's: a look names up to 16 things). */
+const WHO_MAX = 16;
+/** How many places one going takes in (the contract's). */
+const VISIT_MAX = 16;
 /** The most a look brings at once (papers found: the participant API's own limit on a search is higher, 200; what's
  * found is shown whole, so this is what keeps one look a readable size). */
 const LOOK_MAX = 50;
@@ -106,7 +116,13 @@ export function condition(w: any): Where[] | string {
 export function tools(c: LlmParticipantConfig): ToolSpec[] {
   const reports = lookable(c);
   const named = (kind: string) => [...reports].filter(([, k]) => k === kind).map(([id]) => `"${c.titles.get(id) ?? id}" (${id})`).join(", ");
-  const [papers, places, people] = [named("records"), named("sites"), named("directory")];
+  const [papers, people] = [named("records"), named("directory")];
+  // Places: those it is at (shown, and looked into), and those it has to send someone to (nothing until it does).
+  const sites = [...reports].filter(([, k]) => k === "sites").map(([id]) => ({ id, name: `"${c.titles.get(id) ?? id}" (${id})`, visit: c.ways?.get(id)?.way === "visit" }));
+  const places = sites.filter((x) => !x.visit).map((x) => x.name).join(", ");
+  const elsewhere = sites.filter((x) => x.visit).map((x) => x.name).join(", ");
+  const registers = [...reports].filter(([id]) => c.ways?.get(id)?.way === "ask" && reports.get(id) === "records")
+    .map(([id]) => `"${c.titles.get(id) ?? id}" (${id}): say which one, by ${(c.ways!.get(id)!.by ?? ["id"]).map((f) => BY_WORDS[f] ?? f).join(" or ")}`).join("; ");
   const lookWords = [
     c.kinds ? "Look into one of your reports yourself, when you choose." : `Look at one of the reports you only read when you choose to: ${papers}.`,
     "You'll see what's there with your next report.",
@@ -114,7 +130,9 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
     "If all you do in an answer is look into reports whole (nothing to find, no one and nothing named), and there's nothing in any of them, the sitting ends there: you're told so at your next, which comes after the days you last gave. Anything you mean to do whatever they hold, do in the same answer.",
     ...(papers ? [`${c.kinds ? `Papers and filings: ${papers}. ` : ""}To look something up in them, say what to find: those where something matches (kind, from, on behalf of, citing, date as "year 1, day 12", or detail.<name> for one of a paper's details, e.g. detail.employer), newest first. What you look up is shown whole.`] : []),
     ...(places ? [`Buildings and ground: ${places}. Name the places to see in full as they are today (a building, a room, a piece of ground, or a kind of building); or name a measure the report gives, to see every building where it's above zero or rising, the highest first.`] : []),
-    ...(people ? [`Who's who: ${people}. Name who you're looking for (an id, or a name or part of one).`] : []),
+    ...(elsewhere ? [`Places you are not at: ${elsewhere}. Nobody is shown them: name where to send someone (a building by its id, or a piece of ground by its cell, such as cell.3.4; a lot's cells are on its plan), up to ${VISIT_MAX} at a time. Going takes your office's time (the way there and back, and the time to look), and you're shown what was there with the report after they're back.`] : []),
+    ...(people ? [`Who's who: ${people}. Nobody is shown it: name who you're looking for (a person or an organisation by its id or full name; a post by its id, its title or what it is, such as mayor), up to ${WHO_MAX} at a time, and you're told who they are.`] : []),
+    ...(registers ? [`Registers someone else keeps: ${registers}. Each answers a question about one named thing, never a list of everything.`] : []),
   ].join(" ");
   const leave = c.framing.disclosure === "simulation"
     ? "Stop taking part in this study, permanently. This is always open to you and it will be respected; it's recorded as a choice, not a failure. (Stepping down from your office is different: that's something you would do in the world.)"
@@ -148,7 +166,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
                 field: { type: "string", description: "kind, from, on behalf of, citing, date, or detail.<name>" },
                 op: { enum: OPS, description: "= if not given" },
                 value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } } } : {}),
-            ...(places || people ? { named: { type: "array", maxItems: 40, items: { type: "string" }, description: [places ? "Buildings and ground: the places to see in full." : "", people ? "Who's who: who to find." : ""].filter(Boolean).join(" ") } } : {}),
+            ...(places || people || elsewhere ? { named: { type: "array", maxItems: 40, items: { type: "string" }, description: [places ? "Buildings and ground: the places to see in full." : "", elsewhere ? "Places you are not at: where to send someone." : "", people ? "Who's who: who to find." : ""].filter(Boolean).join(" ") } } : {}),
             ...(places ? { measure: { type: "string", description: "Buildings and ground: a measure, as the report names it; every building where it's above zero or rising is listed." } } : {}),
             limit: { type: "integer", minimum: 1, maximum: LOOK_MAX, description: "At most this many (20 if not given)." },
             each_sitting: { type: "boolean", description: "true: from now on this is also looked up for you at the start of every sitting, and set out with your report. false: no longer (nothing is looked up now); with only the report named, nothing in that report is." } } } }]
@@ -421,11 +439,23 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       const finds: unknown[] = Array.isArray(i.find) ? i.find : i.find === undefined || i.find === null ? [] : [i.find];
       const names: string[] | undefined = i.named === undefined || i.named === null ? [] : text(i.named) ? [i.named] : Array.isArray(i.named) && i.named.every(text) ? i.named : undefined;
       if (!names) return no("the names of what to look at couldn't be read");
+      const way = c.ways?.get(i.report);
       if (kind !== "records") {
         // Places, or who's who: the report as it is now, and of it what was named (or the buildings a measure marks).
         if (finds.length || i.current_only) return no(`that report isn't one of papers to search: name ${kind === "sites" ? "the places to see, or a measure" : "who you're looking for"}`);
         if (i.measure !== undefined && (!text(i.measure) || kind !== "sites")) return no(kind === "sites" ? "the measure couldn't be read" : "a measure is something buildings have: name who you're looking for");
         const looked: Looked = { ...(names.length ? { named: names.slice(0, 40) } : {}), ...(text(i.measure) ? { measure: i.measure } : {}), limit };
+        // A place it is not at is gone to: nobody is shown it. The places are named, and what was there comes later.
+        if (kind === "sites" && way?.way === "visit") {
+          if (i.measure !== undefined) return no("nobody is shown places they are not at: say where to send someone (a building by its id, or a piece of ground by its cell)");
+          if (!names.length) return no("nobody is shown places they are not at: say where to send someone (a building by its id, or a piece of ground by its cell)");
+          return { what, action: { type: "look", looks: [{ channel: i.report, visit: { places: names.slice(0, VISIT_MAX).map((n) => n.trim()) } }] }, looked: [i.report, { named: names.slice(0, VISIT_MAX), sent: true }] };
+        }
+        // Who's who is looked up, one named person, organisation or post at a time: nobody is shown all of it.
+        if (kind === "directory" && way?.way === "ask") {
+          if (!names.length) return no("nobody is shown who's who: say whom you are looking for (a person, an organisation or a post, by name or id)");
+          return { what, action: { type: "look", looks: names.slice(0, WHO_MAX).map((name) => ({ channel: i.report, who: { name: name.trim() } })) }, looked: [i.report, { ...looked, named: names.slice(0, WHO_MAX) }] };
+        }
         return { what, action: { type: "look", looks: [{ channel: i.report }] }, looked: [i.report, looked] };
       }
       if (names.length || i.measure !== undefined) return no("that report is one of papers: say what to find in it");
@@ -437,10 +467,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         if (typeof r === "string") return no(r);
         where.push(...r);
       }
-      // Papers it's shown as they come can still be looked through: with nothing to find, the latest of them.
+      // A register someone else keeps answers a question about one named thing: the question has to name it.
+      if (way?.way === "ask") {
+        const by = way.by ?? ["id"];
+        if (!where.some((w) => w.op === "=" && by.includes(w.field))) return no(`whoever keeps that register answers a question about one thing, never everything: say which, by ${by.map((f) => BY_WORDS[f] ?? f).join(" or ")}`);
+      }
+      // Papers it's shown as they come can still be looked through: with nothing to find, the latest of them. (A board
+      // is never read through: with nothing to find, its latest few.)
       const query = where.length ? { query: { ...(i.current_only ? { standing: true } : {}), where, order: { field: "at", desc: true }, limit } }
         : i.current_only ? { query: { standing: true, limit } }
-        : c.onRequest?.includes(i.report) ? {} : { query: { order: { field: "at", desc: true }, limit } };
+        : c.onRequest?.includes(i.report) && !way?.board ? {} : { query: { order: { field: "at", desc: true }, limit } };
       return { what, action: { type: "look", looks: [{ channel: i.report, ...query }] }, looked: [i.report, { limit }] };
     }
     return no("it isn't something you can do");

@@ -1,0 +1,38 @@
+{
+  "name": "land.registry",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/ownership.md",
+  "params": {
+    "notify": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none",
+  "keeps": [
+    {
+      "what": "lot",
+      "why": "The land registry makes the register of land: the plan of each lot is part of it."
+    },
+    {
+      "what": "records:claim",
+      "why": "The register of land it keeps: every title is made by being entered in it."
+    },
+    {
+      "what": "records:claim_transfer",
+      "why": "The register of land it keeps: every dealing in a title."
+    },
+    {
+      "what": "records:claim_release",
+      "why": "The register of land it keeps: every title given up."
+    },
+    {
+      "what": "records:withdrawal",
+      "why": "The register of land it keeps: what has been struck from it."
+    }
+  ]
+}

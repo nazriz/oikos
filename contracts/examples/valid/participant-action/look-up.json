@@ -1,0 +1,18 @@
+{
+  "type": "look",
+  "looks": [
+    {
+      "channel": "who",
+      "who": {
+        "entity": "city",
+        "role": "councillor"
+      }
+    },
+    {
+      "channel": "who",
+      "who": {
+        "name": "Ada"
+      }
+    }
+  ]
+}

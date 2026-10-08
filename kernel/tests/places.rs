@@ -8,12 +8,11 @@ use common::*;
 use serde_json::{json, Value};
 use oikos_kernel::blocks::Block;
 use oikos_kernel::events::{EventBody, RefusalCode};
-use oikos_kernel::observe::ChannelData;
 use oikos_kernel::run::Run;
 use oikos_kernel::Command;
 
 /// The test world, set on a 1000 x 1000 plane: a summarised region holding the (detailed) town, a detailed village
-/// far away across it, and summarised farmland. The mayor looks at each place.
+/// far away across it, and summarised farmland.
 fn region() -> Value {
     let mut c = world(&default_params());
     c["world"]["ground"]["w"] = json!(1000);
@@ -24,21 +23,7 @@ fn region() -> Value {
         {"id": "village", "kind": "village", "within": "region", "area": {"x": 900, "y": 900, "w": 3, "h": 2}, "detailed": true},
         {"id": "farmland", "kind": "farmland", "within": "region", "area": {"x": 100, "y": 100, "w": 500, "h": 500}, "detailed": false},
     ]);
-    let mayor = c["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "mayor").unwrap();
-    let chans = mayor["channels"].as_array_mut().unwrap();
-    for place in ["village", "region", "farmland"] {
-        chans.push(json!({"id": format!("see-{place}"), "kind": "sites", "area": {"place": place}}));
-    }
     c
-}
-
-/// One look (a first look delivers everything each channel covers; later looks, only changes: D42).
-fn cells_seen(run: &mut Run<Vec<u8>>) -> impl Fn(&str) -> Vec<String> {
-    let o = run.command(&Command::Observe { participant: "mayor-system".into(), only: None }).unwrap().observation.unwrap();
-    move |channel| match &o.channels[&format!("mayor/{channel}")] {
-        ChannelData::Sites { cells, .. } => cells.iter().map(|c| c.cell.clone()).collect(),
-        other => panic!("{other:?}"),
-    }
 }
 
 fn build(run: &mut Run<Vec<u8>>, at: &str) -> Result<(), RefusalCode> {
@@ -61,15 +46,21 @@ fn only_detailed_places_have_cells_and_building_happens_only_there() {
 }
 
 #[test]
-fn a_channel_sees_a_places_detailed_cells() {
+fn a_place_is_seen_by_going_to_its_detailed_cells_and_no_seat_is_given_a_map_of_one() {
+    // Until 2026-10-08 a channel could show a whole place (`area: {"place": ...}`), and this test gave the mayor the
+    // village, the region and the farmland to look at. A map of a place is a whole view and can no longer be written
+    // (docs/design/knowing.md): the world is refused.
+    let mut c = region();
+    let mayor = c["positions"].as_array_mut().unwrap().iter_mut().find(|p| p["id"] == "mayor").unwrap();
+    mayor["channels"].as_array_mut().unwrap().push(json!({"id": "see-village", "kind": "sites", "way": "here", "area": {"place": "village"}}));
+    assert!(Run::start(c, "places", Vec::new(), None).is_err(), "a map of a place is not a channel");
+    // What is still true of places: a detailed place has cells that can be gone to, far away as it is; summarised
+    // land has none.
     let mut run = Run::start(region(), "places", Vec::new(), None).unwrap();
-    let seen = cells_seen(&mut run);
-    let village = seen("see-village");
-    assert_eq!(village.len(), 6);
-    assert!(village.iter().all(|c| c.starts_with("cell.90")), "{village:?}");
-    // The region's cells are where it's detailed: the town and the village, found without walking a million cells.
-    assert_eq!(seen("see-region").len(), 18);
-    assert!(seen("see-farmland").is_empty(), "summarised land has no cells to see");
+    let village = go_and_see(&mut run, "mayor-system", "mayor/town", &["cell.900.900", "cell.902.901"]);
+    assert_eq!(village.iter().map(|c| c.cell.as_str()).collect::<Vec<_>>(), ["cell.900.900", "cell.902.901"]);
+    let looks = serde_json::from_value(json!([{"channel": "mayor/town", "visit": {"places": ["cell.300.300"]}}])).unwrap();
+    assert!(run.command(&Command::Look { participant: "mayor-system".into(), only: None, looks }).is_err(), "summarised land has no cells to go to");
 }
 
 #[test]

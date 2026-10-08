@@ -28,6 +28,9 @@ export interface Profile {
       /** Deaths care could prevent: the share of each age's deaths that's treatable, carried by an illness band. */
       treatable?: { share_bps_by_age: { from: number; bps: number }[]; band: string };
     };
+    /** Who knows what (docs/behaviour/knowing.md): how long looking at one place gone to takes; what a search of the
+     * land register costs (recorded; nobody is charged yet). */
+    knowing?: { visit_seconds: number; /** How long reading one meter takes someone who has gone to it. */ meter_read_seconds?: number; title_search_fee?: number; index_search_fee?: number };
     /** The working week a full-time wage is pay for, in hours: what people here work, not a legal ceiling above it. The
      * generator spreads it over the days of the week people work, and reckons an hour's pay from it. */
     ordinary_hours_per_week: number;

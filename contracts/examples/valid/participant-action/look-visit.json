@@ -1,0 +1,14 @@
+{
+  "type": "look",
+  "looks": [
+    {
+      "channel": "elsewhere",
+      "visit": {
+        "places": [
+          "s-shop",
+          "cell.3.1"
+        ]
+      }
+    }
+  ]
+}

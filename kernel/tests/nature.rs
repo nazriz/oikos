@@ -8,7 +8,6 @@ mod common;
 use common::*;
 use serde_json::{json, Value};
 use oikos_kernel::events::{EventBody, RefusalCode};
-use oikos_kernel::observe::ChannelData;
 use oikos_kernel::run::Run;
 use oikos_kernel::Command;
 
@@ -139,8 +138,8 @@ fn a_survey_is_work_whose_estimate_only_the_surveyor_sees() {
 fn passers_by_see_a_conspicuous_species_but_not_how_many() {
     let mut run = start(&nature_world());
     advance(&mut run, DAY + 3600);
-    let o = run.command(&Command::Observe { participant: "mayor-system".into(), only: None }).unwrap().observation.unwrap();
-    let ChannelData::Sites { cells, .. } = &o.channels["mayor/town"] else { panic!() };
+    // (Whoever goes there sees it: nobody is shown ground they are not on.)
+    let cells = go_and_see(&mut run, "mayor-system", "mayor/town", &["cell.3.1", "cell.2.1", "cell.1.0"]);
     let river = cells.iter().find(|c| c.cell == "cell.3.1").unwrap();
     assert_eq!(river.seen, vec!["heron".to_string()]);
     assert!(cells.iter().all(|c| !c.seen.contains(&"frog".to_string())), "frogs aren't conspicuous");

@@ -1,6 +1,6 @@
 {
   "name": "world.statistics",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "adverts": {
@@ -19,6 +19,14 @@
       "unit": "days",
       "default": 30,
       "source": "placeholder"
+    },
+    "population": {
+      "schema": {
+        "type": "integer",
+        "description": "how many lived in the town at the last census (a count; none: no estimate is published)"
+      },
+      "default": 0,
+      "source": "how many lived in the town at the last census (a count; none: no estimate is published)"
     },
     "sample": {
       "schema": {

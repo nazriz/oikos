@@ -90,7 +90,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.13.3",
+  version: "0.13.4", // 0.13.4: main's 0.13.3 (the builder's answer read with the week's post; what is owed counted before building or asking) with a certified copy of a registration made on someone else's report counting as the registration
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -324,7 +324,8 @@ export const landlord: BehaviourModule = {
       // has, and only where nobody else lives: the home empty, and nobody in or out of it for a day (those who share a
       // home report a death themselves, and say who the family is, which we can't; docs/behaviour/deaths.md). Once
       // registered: give notice on their lease, as it allows (the household may apply for a home again).
-      const registered = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
+      // (Registered, as far as we have been told: the entry sent to us, or a certified copy of one made on someone else's report.)
+      const registered = new Set([...book.all("death_registration"), ...book.all("death_certificate")].map((r) => r.data?.deceased as string));
       const tenants = new Map(active.map((a) => [tenantOf(a) as string, a]));
       for (const site of sites) for (const sp of site.structure?.spaces ?? []) for (const l of sp.left ?? []) {
         if (l.reason !== "died" || !tenants.has(l.occupant) || registered.has(l.occupant) || handled.has(`died-${l.occupant}`)) continue;

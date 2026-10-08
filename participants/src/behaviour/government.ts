@@ -10,10 +10,10 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team } from "./common";
+import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX } from "./common";
 import { Staffing, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
-import { ownerOf } from "./institutions";
+import { ownLand } from "./institutions";
 
 const YEAR = 365 * DAY;
 
@@ -29,7 +29,7 @@ const YEAR = 365 * DAY;
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
-  version: "0.10.0",
+  version: "0.11.0", // 0.11.0: knows the town's land from the town's own papers and goes to see a lot before applying to build on it; nominates to the electoral body; no longer shown a survey of the town or the land register
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -40,6 +40,12 @@ export const mayorCode: BehaviourModule = {
       // before we build toward it, a road a time.
       road_budget: 0, road_type: "road", road_within: 3,
       stands_again: true, // false: it doesn't stand at the next election (retiring)
+      // Who runs the election for this office: where a nomination is lodged (none: with the town itself).
+      electoral: "",
+      // Going to look (docs/design/knowing.md, section 8): the channel the office sends someone to a lot through before
+      // it relies on what the town's papers say of it (none: the papers are taken as they are), and how many days a
+      // sight of a lot is good for.
+      visits: "", sight_days: 30,
     }, ctx.params);
     need(p, ["builder"], "city.mayor_code");
     const book = new Book();
@@ -48,6 +54,24 @@ export const mayorCode: BehaviourModule = {
     let parkYear = -1;
     const roadsAsked: { at: number; id: string }[] = []; // our applications for roads (the office's record)
     let roadWait = 0;
+    // Ground we have sent someone to see: when, and whether anything stood there. And what is to be seen before the
+    // next plan relies on it.
+    const wentAt = new Map<string, number>();
+    const stoodFree = new Map<string, boolean>();
+    let toSee: string[] = [];
+    const notAsPapered = new Set<string>(); // lots our papers showed free, and going there showed otherwise
+    /** A lot of ours as we may rely on it: true (seen free lately), false (seen built on), or undefined (to be gone to:
+     * its ground is queued to be seen). Without a way to go and look, the papers are taken as they are. */
+    const seenFree = (cells: string[], t: number): boolean | undefined => {
+      if (!p.visits) return true;
+      const stale = cells.filter((c) => (wentAt.get(c) ?? -Infinity) < t - p.sight_days * DAY);
+      if (stale.length) {
+        if (!toSee.length) toSee = stale.slice(0, VISIT_MAX);
+        return undefined;
+      }
+      return cells.every((c) => stoodFree.get(c));
+    };
+    const xy = (cell: string) => { const [, x, y] = cell.split("."); return { x: Number(x), y: Number(y) }; };
     const handled = new Set<string>();
     // The office's own records: made in this position (whoever held it then), or by this participant as itself.
     const ours = (r: { author: string; in_position?: string }) => (ctx.position ? r.in_position === ctx.position : r.author === ctx.participant);
@@ -56,6 +80,10 @@ export const mayorCode: BehaviourModule = {
     const acted = new Set<string>();
     return stepper(
       (obs) => {
+        if (p.visits) for (const c of visited(obs, p.visits)) {
+          wentAt.set(c.cell, obs.t);
+          stoodFree.set(c.cell, !c.structure);
+        }
         for (const r of book.absorb(obs)) {
           if (!ours(r)) continue;
           for (const b of basesOf(r)) acted.add(b);
@@ -73,7 +101,7 @@ export const mayorCode: BehaviourModule = {
           handled.add(n.id);
           const platform = "Standing again: keeping the town's services running, its parks built and its budget balanced.";
           steps.push(because("An election for this office: nominating, as the incumbent.",
-            say("nomination", `Nomination for ${ctx.position}: the incumbent. ${platform}`, { to: [me], visible: "public", data: { office: ctx.position, name: "the incumbent mayor", incumbent: true, values: ["security", "benevolence"] }, assertion: { that: platform } })));
+            say("nomination", `Nomination for ${ctx.position}: the incumbent. ${platform}`, { to: [p.electoral || me], visible: "public", data: { office: ctx.position, name: "the incumbent mayor", incumbent: true, values: ["security", "benevolence"] }, assertion: { that: platform } })));
         }
         // The annual budget, for each year that has none adopted: tabled at the year's start (or on taking office), and
         // again every 45 days until the council adopts one.
@@ -94,37 +122,45 @@ export const mayorCode: BehaviourModule = {
         // The builder's published price for a park (none published: nothing to plan with).
         const price = publishedPrice(book, p.builder, p.park_type) ?? 0;
         if (budget && budget.data?.year === year + 1 && parkYear !== year && price > 0 && price <= (budget.data?.lines?.parks ?? 0)) {
-          const cells = channels.cells(obs);
-          const free = new Set(cells.filter((c) => !c.structure).map((c) => c.cell));
-          const lot = [...new Set(cells.filter((c) => free.has(c.cell)).map((c) => lotOf(book, c.cell)).filter((l): l is string => !!l))]
-            .sort()
-            .find((l) => ownerOf(book, l) === me && cellsOf(book, l).every((c) => free.has(c)));
-          if (lot) {
+          // A lot of the town's own with nothing on it, by the town's asset register (the first by its number); gone to
+          // before we apply, since the register is paper.
+          const lot = ownLand(book, me).find((x) => x.structures.length === 0 && x.cells.length > 0 && !notAsPapered.has(x.lot));
+          const free = lot ? seenFree(lot.cells, t) : undefined;
+          if (lot && free === false) notAsPapered.add(lot.lot);
+          if (lot && free) {
             parkYear = year;
             // The planning office's published form, like anyone else.
-            steps.push(because(`The adopted budget has ${usd(budget.data?.lines?.parks ?? 0)} for parks and ${lot} is free: applying for a permit for a park, as anyone would.`, C.call("form", { to: me, form: "permit_application", lot, structure_type: p.park_type })));
+            steps.push(because(`The adopted budget has ${usd(budget.data?.lines?.parks ?? 0)} for parks and ${lot.lot} is free (our asset register says so, and we have been to see): applying for a permit for a park, as anyone would.`, C.call("form", { to: me, form: "permit_application", lot: lot.lot, structure_type: p.park_type })));
           }
         }
-        // Roads: a building further than `road_within` cells from any road, and room in the year's roads budget: a road on
-        // the town's free lot beside the network that comes nearest it (one at a time, permit first, as anyone).
+        // Roads: a building we know of further than `road_within` cells from any of the town's roads, and room in the
+        // year's roads budget: a road on the town's free lot beside the network that comes nearest it (one at a time,
+        // permit first, as anyone). The buildings we know of are the town's own and those we have had notice of being
+        // built; the roads are the town's assets; where each is, its address says.
         const roadPrice = p.road_budget ? publishedPrice(book, p.builder, p.road_type) ?? 0 : 0;
         const roadsThisYear = roadsAsked.filter((r) => Math.floor(r.at / YEAR) === year).length;
         const pending = roadsAsked.some((r) => !book.open("permit_decision").some((d) => d.data?.application === r.id) && t - r.at < 30 * DAY);
         if (budget && budget.data?.year === year + 1 && roadPrice > 0 && !pending && t >= roadWait && (roadsThisYear + 1) * roadPrice <= (budget.data?.lines?.roads ?? 0)) {
-          const cells = channels.cells(obs);
-          const roads = cells.filter((c) => c.structure?.type === p.road_type);
+          const land = ownLand(book, me);
+          const roads = land.filter((x) => x.structures.some((st) => st.type === p.road_type)).flatMap((x) => x.cells.map(xy));
           const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-          const far = roads.length ? cells.filter((c) => c.structure && c.structure.type !== p.road_type && Math.min(...roads.map((r) => dist(r, c))) > p.road_within)
-            .sort((a, b) => (a.structure!.structure < b.structure!.structure ? -1 : 1))[0] : undefined;
+          const known = new Map<string, { x: number; y: number }>();
+          for (const x of land) for (const st of x.structures) if (st.type !== p.road_type && x.cells[0]) known.set(st.structure, xy(x.cells[0]));
+          for (const n of book.open("building_notice")) if (typeof n.data?.structure === "string" && typeof n.data?.at === "string" && n.data?.structure_type !== p.road_type) known.set(n.data.structure, xy(n.data.at));
+          for (const n of book.open("building_notice")) if (typeof n.data?.removes === "string") known.delete(n.data.removes);
+          const far = roads.length ? [...known].filter(([, c]) => Math.min(...roads.map((r) => dist(r, c))) > p.road_within).sort(([a], [b]) => (a < b ? -1 : 1))[0] : undefined;
           if (far) {
             const nextTo = (c: { x: number; y: number }) => roads.some((r) => dist(r, c) === 1);
-            const site = cells.filter((c) => !c.structure && nextTo(c)).map((c) => ({ c, lot: lotOf(book, c.cell) }))
-              .filter((x): x is { c: typeof x.c; lot: string } => !!x.lot && ownerOf(book, x.lot) === me && cellsOf(book, x.lot).length === 1)
-              .sort((a, b) => dist(a.c, far) - dist(b.c, far) || (a.lot < b.lot ? -1 : 1))[0];
-            if (site && dist(site.c, far) < Math.min(...roads.map((r) => dist(r, far)))) {
-              roadWait = t + 7 * DAY; // (until our application is on the record)
-              steps.push(because(`${far.structure!.structure} is ${Math.min(...roads.map((r) => dist(r, far)))} cells from the nearest road (we build toward anything further than ${p.road_within}), and the roads budget has room: applying for a permit for a road on ${site.lot}, toward it.`,
-                C.call("form", { to: me, form: "permit_application", lot: site.lot, structure_type: p.road_type })));
+            const site = land.filter((x) => x.structures.length === 0 && x.cells.length === 1 && !notAsPapered.has(x.lot) && nextTo(xy(x.cells[0]!))).map((x) => ({ lot: x.lot, cell: x.cells[0]!, c: xy(x.cells[0]!) }))
+              .sort((a, b) => dist(a.c, far[1]) - dist(b.c, far[1]) || (a.lot < b.lot ? -1 : 1))[0];
+            if (site && dist(site.c, far[1]) < Math.min(...roads.map((r) => dist(r, far[1])))) {
+              const free = seenFree([site.cell], t);
+              if (free === false) notAsPapered.add(site.lot);
+              if (free) {
+                roadWait = t + 7 * DAY; // (until our application is on the record)
+                steps.push(because(`${far[0]} is ${Math.min(...roads.map((r) => dist(r, far[1])))} cells from the nearest road (we build toward anything further than ${p.road_within}), and the roads budget has room: applying for a permit for a road on ${site.lot}, toward it.`,
+                  C.call("form", { to: me, form: "permit_application", lot: site.lot, structure_type: p.road_type })));
+              }
             }
           }
         }
@@ -182,6 +218,15 @@ export const mayorCode: BehaviourModule = {
         }
         return steps;
       },
+      undefined,
+      // Ground the plan needs seen before it relies on it: someone is sent (it takes the office's time), and the plan
+      // is made again when they are back.
+      () => {
+        if (!p.visits || !toSee.length) return [];
+        const go = toSee;
+        toSee = [];
+        return [goSee(p.visits, go)];
+      },
     );
   },
 };
@@ -203,15 +248,22 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
-  version: "0.6.1",
+  version: "0.8.0", // 0.8.0: seats whoever the electoral body declares elected to an office of the town
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ vote_days: 14 }, ctx.params);
+    const p = params({ vote_days: 14,
+      who: "", // its channel onto who's who, where it looks up its council's members ("": it knows them as it is shown them)
+      members_role: "councillor", members_every_days: 30,
+      // The body that runs elections to the town's offices, where it is not the town's own: the clerk seats whoever
+      // it declares elected (none: whoever runs the election seats the winner).
+      electoral: "" }, ctx.params);
     const book = new Book();
+    const seated = new Set<string>();
     const balloted = new Set<string>();
     const closed = new Set<string>();
     const letters = new Letters();
+    let membersAsked = -Infinity;
     return stepper(
       (obs) => {
         book.absorb(obs);
@@ -222,7 +274,15 @@ export const councilClerk: BehaviourModule = {
         const t = obs.t;
         const steps: Step[] = [];
         // The council's members are its councillor positions: a vote counts when made in one (one per position; the latest).
+        // (As the clerk last looked them up: its own council's list of members, below.)
         const councillors = new Set((channels.directory(obs)?.positions ?? []).filter((x) => x.role === "councillor" && x.entity === me).map((x) => x.position));
+        // An election declared by the electoral body: whoever it declares elected takes the office (the town's own act:
+        // an office of the town is filled by the town).
+        if (p.electoral) for (const r of book.open("ballot_result")) {
+          if (seated.has(r.id) || r.speaks_for !== p.electoral || typeof r.data?.office !== "string" || typeof r.data?.winner !== "string") continue;
+          seated.add(r.id);
+          steps.push(because(`The electoral body has declared ${r.data.winner} elected to ${r.data.office}: seating them.`, C.call("position", { appoint: r.data.office, to: r.data.winner })));
+        }
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);
@@ -290,6 +350,14 @@ export const councilClerk: BehaviourModule = {
             `A law proposed on that form stands as its words: no rule is set down with it for acts to be checked against.${amendable(book, me, true)}`;
         }));
         return steps;
+      },
+      undefined,
+      // Its council's members: the holders of the town's councillor posts, looked up (nobody is shown who's who), at
+      // its first wake and again every so often, as a council's own list of members is kept up.
+      (obs) => {
+        if (!p.who || obs.t - membersAsked < p.members_every_days * DAY) return [];
+        membersAsked = obs.t;
+        return [lookUp.holders(p.who, obs.entity!, p.members_role)];
       },
     );
   },
@@ -634,7 +702,8 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
-  version: "0.2.3",
+  keeps: [{ what: "service_address", why: "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built." }],
+  version: "0.3.0", // 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -648,13 +717,25 @@ export const works: BehaviourModule = {
       wear: "wear", maintain_task: "maintain", maintain_labour: 0, maintain_per_unit: 0, maintain_over: 0, // wear worth a crew's time above this
       staff_line: "staff", landfill: "", kind: "waste", dispose_every_days: 7,
       depot_channel: "depot", // the channel that shows the depot, with who's there by name
+      // Who knows what (docs/behaviour/services.md, "Who knows what"): the office's round, the addresses it collects
+      // from (a register it keeps itself; none: it collects from nowhere), and the channel it sends someone through
+      // to inspect an asset of the town's it has not seen (none: an asset is seen only by the crew that works on it).
+      round: "", inspections: "",
     }, ctx.params);
     need(p, ["depot", "workplace", "landfill"], "city.works");
     const me = ctx.entity;
     const book = new Book();
     const letters = new Letters();
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed" });
-    const seen = new Map<string, SiteStructure | undefined>(); // cell -> what we last saw there (perception is changes)
+    // Each building as we last saw it: as the crew that worked on it left it, or as whoever we sent to inspect it found it.
+    const known = new Map<string, SiteStructure>();
+    const addresses = new Set<string>(); // the round: the addresses we collect from (buildings)
+    const notHomes = new Set<string>(); // called at, and nothing there to collect from: off the round
+    // What a round learns of each address: what the crew left there and when, and how fast it has been filling (what
+    // they found, over the days since they were last there). A bin is seen when it is emptied, not between.
+    const leftThere = new Map<string, { value: number; at: number }>();
+    const fills = new Map<string, number>(); // per day
+    const inspecting = new Set<string>(); // assets someone has been sent to inspect
     let depotView: SiteStructure | undefined; // the depot, as its own channel shows it (who's there, by name)
     let atDepot = 0; // what's been collected and is held at the depot (holdings are seen as they change)
     const collectedAt = new Map<string, number>(); // home (a building) -> when we last collected from it
@@ -672,7 +753,12 @@ export const works: BehaviourModule = {
         book.absorb(obs);
         staffing.absorb(obs);
         letters.take(obs, book);
-        for (const c of channels.cells(obs)) seen.set(c.cell, c.structure);
+        // The round: our own register of addresses, and homes we have had notice of since (told of the work as it began).
+        const reg = p.round ? obs.channels[p.round] : undefined;
+        if (reg?.kind === "records") for (const r of reg.records) if (r.record === "statement" && r.kind === "service_address" && typeof r.data?.structure === "string") addresses.add(r.data.structure);
+        // What the crew left where it worked, and what an inspection found.
+        for (const o of obs.outcomes) for (const st of o.seen ?? []) known.set(st.structure, st);
+        if (p.inspections) for (const c of visited(obs, p.inspections)) if (c.structure) known.set(c.structure.structure, c.structure);
         for (const h of channels.holdings(obs)) if (h.at === p.depot && h.kind === p.kind) atDepot = Number(h.quantity);
         const depot = obs.channels[p.depot_channel];
         if (depot?.kind === "sites") for (const c of depot.cells) if (c.structure?.structure === p.depot) depotView = c.structure;
@@ -683,7 +769,16 @@ export const works: BehaviourModule = {
         const year = Math.floor(t / YEAR) + 1;
         const budget = book.open("budget").filter((b) => b.data?.year === year).sort((a, b) => b.at - a.at)[0];
         const line = budget ? cents(budget.data?.lines?.[p.staff_line] ?? 0) : 0;
-        const buildings = [...new Map([...seen.values()].filter((st): st is SiteStructure => !!st).map((st) => [st.structure, st])).values()];
+        // The town's own buildings (its asset register and the notices since), and new buildings anywhere it has had
+        // notice of: one that is not the town's joins the round, and leaves it if the crew finds nothing to collect.
+        const land = ownLand(book, me);
+        const assets = land.flatMap((x) => x.structures.map((st) => st.structure));
+        const own = new Set(assets);
+        for (const n of book.open("building_notice")) {
+          if (typeof n.data?.structure === "string" && !own.has(n.data.structure) && !notHomes.has(n.data.structure)) addresses.add(n.data.structure);
+          if (typeof n.data?.removes === "string") { addresses.delete(n.data.removes); known.delete(n.data.removes); }
+        }
+        for (const s of addresses) if (!knownSince.has(s)) knownSince.set(s, t);
         const room = depotView?.spaces.find((sp) => sp.space === p.workplace);
         // The crew the staff line pays for (none adopted yet: the crew we have), within the depot's room.
         const workers = staffing.workers(book, t);
@@ -734,12 +829,24 @@ export const works: BehaviourModule = {
           // (a round's work in steps of up to 30 homes).
           const round: { on: string; call: C.Call; before?: number; full: boolean; fit: number; of: number }[] = [];
           if (p.collect_labour > 0 && p.collect_per_unit > 0) {
-            const due = buildings.filter((b) => b.variables?.[p.waste] && (complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= p.collect_every_days * DAY - DAY / 2))
+            const due = [...addresses].sort().map((structure) => ({ structure, st: known.get(structure) }))
+              .filter((b) => complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= p.collect_every_days * DAY - DAY / 2)
               .sort((a, b) => Number(complained.has(b.structure)) - Number(complained.has(a.structure)) || (collectedAt.get(a.structure) ?? -1) - (collectedAt.get(b.structure) ?? -1) || (a.structure < b.structure ? -1 : 1));
             for (const b of due) {
+              // An address the crew has been to and found nothing kept of waste at: not a home; off the round.
+              if (b.st && !b.st.variables?.[p.waste]) {
+                addresses.delete(b.structure);
+                notHomes.add(b.structure);
+                continue;
+              }
               // (Every bin emptied, however little is in it, as a round does: until 2026-10-02 what was under a load was
               // left, so small households' bins never emptied and they complained while the round counted them done.)
-              const units = Math.ceil((variableToday(b.variables![p.waste], t) ?? 0) / p.collect_per_unit);
+              // An address never called at: a first load, and the crew sees what is there; the rest when they are back.
+              const first = !b.st;
+              const was = leftThere.get(b.structure);
+              const expected = (was?.value ?? 0) + ((fills.get(b.structure) ?? 0) * Math.max(0, t - (was?.at ?? t))) / DAY;
+              // (At least a load's call at every address due: the crew goes, and sees.)
+              const units = first ? 1 : Math.max(1, Math.ceil(expected / p.collect_per_unit));
               if (units === 0) {
                 collectedAt.set(b.structure, t);
                 complained.delete(b.structure);
@@ -749,7 +856,7 @@ export const works: BehaviourModule = {
               if (fit <= 0) break;
               const before = collectedAt.get(b.structure);
               spend(fit * p.collect_labour);
-              if (fit === units) {
+              if (fit === units && !first) {
                 collectedAt.set(b.structure, t);
                 complained.delete(b.structure);
               }
@@ -762,7 +869,23 @@ export const works: BehaviourModule = {
             const short = part.filter((x) => !x.full);
             const st = because(`The collection round: ${part.map((x) => x.on).join(", ")}${short.length ? ` (${short.map((x) => `${x.on}: ${x.fit} of ${x.of} loads, the crew's hours used up`).join("; ")})` : ""}.`, ...part.map((x) => x.call));
             st.then = (out) => {
-              if (out.status === "applied") return;
+              if (out.status === "applied") {
+                // What the crew found at each address: what they left, and so what had gathered since they were last there.
+                for (const x of part) {
+                  const v = out.seen?.find((b) => b.structure === x.on)?.variables?.[p.waste];
+                  if (!v) continue;
+                  const after = variableToday(v, t) ?? v.value;
+                  const was = leftThere.get(x.on);
+                  const days = Math.max(1, (t - (was?.at ?? knownSince.get(x.on) ?? t)) / DAY);
+                  // (A bin left empty held no more than the loads sent for, and how much less nobody weighed: taken as
+                  // a load less, or half of the one, so that the next call is for less, and a call that falls short is
+                  // measured by what it leaves.)
+                  const found = after > 0 ? after + x.fit * p.collect_per_unit : x.fit > 1 ? (x.fit - 1) * p.collect_per_unit : Math.floor(p.collect_per_unit / 2);
+                  fills.set(x.on, Math.max(0, (found - (was?.value ?? 0)) / days));
+                  leftThere.set(x.on, { value: after, at: t });
+                }
+                return;
+              }
               for (const x of part) if (x.before === undefined) collectedAt.delete(x.on); else collectedAt.set(x.on, x.before);
               // Someone's day is fuller than our count of it (work elsewhere today): the world's count, from now on.
               const short = outOfTime(out);
@@ -773,7 +896,7 @@ export const works: BehaviourModule = {
           }
           // Maintenance: the most worn of the town's assets, with the hours left.
           if (p.maintain_labour > 0 && p.maintain_per_unit > 0) {
-            const worn = buildings.map((b) => ({ b, wear: variableToday(b.variables?.[p.wear], t) ?? 0 })).filter((x) => x.b.variables?.[p.wear] && x.wear > p.maintain_over)
+            const worn = assets.map((a) => known.get(a)).filter((b): b is SiteStructure => !!b).map((b) => ({ b, wear: variableToday(b.variables?.[p.wear], t) ?? 0 })).filter((x) => x.b.variables?.[p.wear] && x.wear > p.maintain_over)
               .sort((a, b) => b.wear - a.wear || (a.b.structure < b.b.structure ? -1 : 1));
             const upkeep: C.Call[] = [];
             const names: string[] = [];
@@ -788,21 +911,30 @@ export const works: BehaviourModule = {
           }
         }
 
-        for (const b of buildings) if (!knownSince.has(b.structure)) knownSince.set(b.structure, t);
         steps.push(...letters.answer(() => {
-          const homes = buildings.filter((b) => b.variables?.[p.waste]);
           // (A home never collected from is overdue a week after it was first due, not from the beginning of time: pilot 7
           // found every home "a week or more overdue" on the first morning, and the mayor kept asking why.)
-          const overdue = homes.filter((b) => t - (collectedAt.get(b.structure) ?? knownSince.get(b.structure) ?? t) >= (p.collect_every_days + 7) * DAY).map((b) => b.structure);
-          const assets = buildings.filter((b) => b.variables?.[p.wear]).map((b) => `${b.structure} ${Math.round(((variableToday(b.variables![p.wear], t) ?? 0) * 100) / Math.max(1, b.variables![p.wear]!.max))}% worn`);
+          const overdue = [...addresses].sort().filter((s) => t - (collectedAt.get(s) ?? knownSince.get(s) ?? t) >= (p.collect_every_days + 7) * DAY);
+          const state = assets.map((a) => known.get(a)).filter((b): b is SiteStructure => !!b?.variables?.[p.wear]).map((b) => `${b.structure} ${Math.round(((variableToday(b.variables![p.wear], t) ?? 0) * 100) / Math.max(1, b.variables![p.wear]!.max))}% worn`);
+          const unseen = assets.filter((a) => !known.has(a)).length;
           return `Report from the works office: a crew of ${workers.length} (the adopted budget's ${p.staff_line} line, ${usd(line)}, pays for ${target} at ${usd(annual)} a year each). ` +
             `Waste is collected from every home every ${p.collect_every_days} days as the crew's hours allow; ${collectedKg} loads collected so far. ` +
             (overdue.length ? `Homes a week or more overdue: ${overdue.join(", ")}. ` : "No home is overdue. ") +
-            (assets.length ? `The town's assets: ${assets.join(", ")}.` : "");
+            `The round has ${addresses.size} addresses. ` +
+            (state.length ? `The town's assets, as last seen: ${state.slice(0, 60).join(", ")}${state.length > 60 ? `, and ${state.length - 60} more` : ""}.` : "") +
+            (unseen ? ` ${unseen} of the town's assets have not been inspected yet.` : "");
         }));
         return steps;
       },
       p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
+      // An asset of the town's we have never seen (at the start, every one; later, what the town has had built):
+      // someone is sent to inspect it, a visit's worth at a time, once each.
+      () => {
+        if (!p.inspections) return [];
+        const go = ownLand(book, me).flatMap((x) => x.structures.map((st) => st.structure)).filter((a) => !known.has(a) && !inspecting.has(a)).slice(0, VISIT_MAX);
+        for (const a of go) inspecting.add(a);
+        return go.length ? [goSee(p.inspections, go)] : [];
+      },
     ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };

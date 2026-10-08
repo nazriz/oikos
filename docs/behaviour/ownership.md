@@ -78,11 +78,37 @@ shops: a seller once ordered $89,000 of goods with the price of their house).
 Loans in force when it first looks (the world's mortgages) are taken on: their repayments as their terms say, followed
 for arrears and default as any loan.
 
-## The land registry (city.registry 0.4.0)
+## The land registry (land.registry 0.1.0; until 2026-10-08, the town's registrar)
 
-Registering a death, it passes the land the deceased held to their heir (the partner; else the eldest adult child; else
-the town), recording the transfer as the issuer of the titles. A title's transfer counts only if its holder made it, or
-whoever issued the title (`ownerOf`, 2026-10-01; before, any transfer by anyone counted).
+**Who knows what.** The register of land (the plan of each lot, every title, every dealing) is made and kept by the
+land registry: a body of its own (`land-registry`), not the town's. Until 2026-10-08 the town's registrar of deaths
+kept it, and because every title was issued in the town's name, every office of the town was shown every lot and
+title among its own papers (docs/no-god-view.md). In the profile's place the registry is the state's
+(docs/behaviour/knowing.md, section 1).
+
+- **It alone is shown the register whole** (its `keeps`, with the reason).
+- **Anyone else asks it for one thing:** the plan of a lot by the lot's number, or the lot a cell of ground is on (an
+  address); a title by its number, or the titles to one lot; the dealings in one title. The kernel answers a search
+  of the register; the registry does no work for one, and nobody is charged (the fee is in the profile:
+  docs/behaviour/knowing.md, "Leaves out"). Nobody may ask it whose land is whose by naming the holder.
+- **A transmission on death.** The registrar of deaths, registering a death, applies to it
+  (`transmission_application`: who died, and their heir by the law of succession: the partner; else the eldest adult
+  child; else the town). The land registry finds each title the dead person held in its register and enters its
+  transfer to the heir, as the issuer of the titles. A title's transfer counts only if its holder made it, or whoever
+  issued the title (`ownerOf`).
+- **Notices of acquisition.** Each time land changes hands (a sale, a transmission) it tells the bodies that keep a
+  roll of their own from such notices (`notify`: the valuer and the water corporation): `acquisition_notice`, seen by
+  them alone. In the profile's place whoever acquires land gives the notice (to the revenue office, the council and
+  the water authority: docs/behaviour/knowing.md, section 2); here the registry sends it, as an electronic lodgement
+  generates it.
+
+**The town's own land** is the town's own paper: the titles it holds (addressed to nobody else), and its asset
+register (`asset_register`: one document, an entry for each lot it held at the start with its ground and what stood
+on it), kept up by the notices of building work the town is given. `ownLand` (`institutions.ts`) reads the three
+together. It is paper: whoever relies on a lot being free goes to look at it first.
+
+**Leaves out:** the notice to the council (the town's rates follow the valuer's valuations, which name the owner);
+new lots made during a run (none are); a search fee; the days a registration takes.
 
 ## In the small town
 

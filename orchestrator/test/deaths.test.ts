@@ -71,16 +71,21 @@ test("a death is seen, reported, registered, and the world's people act on it", 
     expect(stillThere(d), `${d.person}'s death is reported by someone living there`).toContain(r.data.reported_by);
     expect(r.t - d.t).toBeLessThanOrEqual(3 * DAY);
   }
-  // Someone with nobody at home: found by their landlord or the police, and never before the home has stood empty for
-  // a day (how anyone outside can tell nobody lives there). How long it takes is the profile's (found_alone_after: most
-  // within a week, one in eleven after a month or more), so no floor is set on it here; participants/test/police.test.ts
-  // holds the police to their times.
+  // Someone with nobody at home: found by their landlord, or by the police when a neighbour asks them to call, and
+  // never before nobody has been in or out of the home for a day (how anyone outside can tell nobody lives there: a
+  // neighbour sees when someone last went in, not when they died, so the day is counted from then). How long it takes
+  // is the profile's (found_alone_after: most within a week, one in eleven after a month or more), so no ceiling is
+  // set on it here. The police go only where they were asked to.
+  const asked = new Set(ev.filter((e) => e.event === "recorded" && e.record.kind === "welfare_check_request").map((e) => e.record.data.space as string));
   for (const d of alone) {
     const r = regs.get(d.person);
     if (!r) continue;
     expect(r.data.reported_by).toMatch(/^(police|landlord-\d+)$/);
-    expect(r.t - d.t).toBeGreaterThanOrEqual(DAY);
+    const lastIn = Math.max(...ev.filter((e) => e.event === "occupied" && e.space === homeOf.get(d.person) && e.t <= d.t).map((e) => e.t as number), 0);
+    expect(r.t - lastIn).toBeGreaterThanOrEqual(DAY);
+    if (r.data.reported_by === "police") expect(asked.has(homeOf.get(d.person)!)).toBe(true);
   }
+  for (const v of ev.filter((e) => e.event === "visit_started" && e.participant === "police-oic-system")) expect(v.places.length).toBeGreaterThan(0);
   expect(alone.some((d) => regs.get(d.person)?.data.reported_by === "police")).toBe(true);
 
   const holder = new Map<string, string>([...config.world.accounts.map((a: any) => [a.id, a.holder]), ...ev.filter((e) => e.event === "account_opened").map((e) => [e.account, e.holder])] as [string, string][]);
@@ -137,5 +142,8 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   // different one, 2026-10-08.)
   const diedDoing = (e: any) => e.code === "participant_inactive" && diedAt.has(String(e.participant).replace(/-self$/, "")) && e.t >= diedAt.get(String(e.participant).replace(/-self$/, ""))!;
   const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "flooded"].includes(e.code) && !diedDoing(e) && !partnerGone(e)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
+  // (And, when the run's course changed again on 2026-10-08: someone on their way home, brought there meanwhile by
+  // another of the household moving them in; their own arrival finds them already there.)
+  const broughtMeanwhile = (e: any) => { const m = e.code === "already_present" ? /^(\S+) is already in (\S+)$/.exec(e.detail ?? "") : null; return !!m && ev.some((x) => x.event === "occupied" && x.occupant === m[1] && x.space === m[2] && x.t <= e.t && x.t >= e.t - 3600); };
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "flooded"].includes(e.code) && !diedDoing(e) && !partnerGone(e) && !broughtMeanwhile(e)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
 }, 300_000);

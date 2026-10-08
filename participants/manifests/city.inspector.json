@@ -1,6 +1,6 @@
 {
   "name": "city.inspector",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "compliance_bps": {
@@ -16,6 +16,34 @@
         "type": "integer"
       },
       "default": 5000000,
+      "source": "placeholder"
+    },
+    "register": {
+      "schema": {
+        "type": "object",
+        "description": "the land register, asked about one lot"
+      },
+      "default": {
+        "lots": "lots",
+        "titles": "titles",
+        "dealings": "dealings"
+      },
+      "source": "placeholder"
+    },
+    "sites": {
+      "schema": {
+        "type": "string",
+        "description": "the channel it goes to a site through (a visit)"
+      },
+      "default": "sites",
+      "source": "placeholder"
+    },
+    "valuer": {
+      "schema": {
+        "type": "string",
+        "description": "whom it tells of what was built or brought down (none: nobody)"
+      },
+      "default": "",
       "source": "placeholder"
     }
   },

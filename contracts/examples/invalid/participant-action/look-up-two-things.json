@@ -1,0 +1,12 @@
+{
+  "type": "look",
+  "looks": [
+    {
+      "channel": "who",
+      "who": {
+        "entity": "ada",
+        "position": "registrar"
+      }
+    }
+  ]
+}

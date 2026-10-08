@@ -195,5 +195,10 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   const busy = generate({ ...base, citizens: 120, exports_per_month: 120_000_000 });
   const { cmds: c2 } = await run("busy", busy, 4 * MONTH + DAY);
   const posts = c2.filter((c) => c.participant?.startsWith("factory-") && /Short of this month's headcount .*stock .* was below/.test(c.reasoning ?? ""));
-  expect(posts.length).toBeGreaterThanOrEqual(3);
+  // (Three or more until 2026-10-09, which counted postings, and one works posting twice in a moment counted two. What
+  // is meant is that the headcount sought rises: here a works with nobody seeks one, and with one seeks two. In the
+  // town as now drawn it has stock enough at the end of one month not to post.)
+  expect(posts.length).toBeGreaterThanOrEqual(2);
+  const sought = posts.map((c) => Number(/\(\d+ of (\d+)/.exec(c.reasoning ?? "")?.[1] ?? 0));
+  expect(Math.max(...sought)).toBeGreaterThan(sought[0]!);
 }, 300_000);

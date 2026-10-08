@@ -1,6 +1,6 @@
 {
   "name": "city.electoral_office",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "doc": "docs/behaviour/elections.md",
   "params": {
     "first_poll_day": {
@@ -51,6 +51,13 @@
       "default": "",
       "source": "placeholder"
     },
+    "seats": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": true,
+      "source": "placeholder"
+    },
     "term_days": {
       "schema": {
         "type": "integer",
@@ -62,7 +69,8 @@
     },
     "town": {
       "schema": {
-        "type": "string"
+        "type": "string",
+        "description": "with whom electors enrol and candidates nominate: the electoral body itself"
       },
       "default": "e",
       "source": "placeholder"

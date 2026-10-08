@@ -1,6 +1,6 @@
 {
   "name": "city.mayor_code",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "doc": "docs/behaviour/government.md",
   "params": {
     "builder": {
@@ -9,6 +9,13 @@
       },
       "default": "",
       "required": true,
+      "source": "placeholder"
+    },
+    "electoral": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "environment_budget": {
@@ -83,6 +90,14 @@
       "default": 0,
       "source": "placeholder"
     },
+    "sight_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
     "staff_budget": {
       "schema": {
         "type": "integer"
@@ -96,6 +111,13 @@
         "description": "false: it doesn't stand at the next election (retiring)"
       },
       "default": true,
+      "source": "placeholder"
+    },
+    "visits": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     }
   },

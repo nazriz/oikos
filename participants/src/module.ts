@@ -57,6 +57,10 @@ export interface ParticipantContext {
   consult?: Consult;
   /** A deterministic stream for this participant, this moment and this purpose. */
   rng(purpose: string): Rng;
+  /** A deterministic stream for a purpose alone: the same for whoever draws it. For what is a fact about a thing in the
+   * world and not about who meets it (how long a silent house goes unremarked, whoever remarks on it). Absent where a
+   * context is made by hand: a module then draws its own. */
+  chance?(purpose: string): Rng;
   world: WorldInfo;
   params: { [k: string]: any };
 }

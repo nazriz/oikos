@@ -57,7 +57,7 @@ A first-come-first-served quantity, shared by two factories, made the demand eac
 - exchange rates (one currency);
 - trade policy (tariffs, quotas): these would be laws, as records, applied by an office.
 
-## `world.statistics` (v0.1.0): the statistician
+## `world.statistics` (v0.2.0): the statistician
 
 An office of the outside world's government. Once a month (`every_days`, 30) its collectors read the prices of a sample
 of outlets: one search of what sellers advertise, the first `sample` (200, what one search can read: a placeholder)
@@ -70,6 +70,24 @@ outlets by its own staff, online and from retailers' data (Australian Bureau of 
 Concepts, Sources and Methods*, 2025, "Price collection": "trained and experienced ABS staff", web-scraping, scanner
 data; "87% of the CPI by weight is collected on a monthly basis"; opened 2026-10-08). It is not a keeper of prices and
 is shown none unasked: it goes and reads them, capped at its sample.
+
+**The population estimate (0.2.0).** Each month it publishes how many live in the town (`population_estimate`,
+`{ residents, census, births, arrivals, deaths, departures }`, public): the count at the last census (`population`, a
+number the world gives it; none: no estimate), plus the births registered and the people who have moved in since, less
+the deaths registered and those who said they were leaving. What reaches it: the registry's entries of births and
+deaths (it is one of those sent every entry: docs/behaviour/deaths.md, "Who is told"), a count of each household the
+migration office brings (`arrival`: how many, never who), and the departures of those who tell the outside world's
+offices they are going. It is what anyone who needs "the population" reads: the funders pay by it
+(docs/behaviour/public-finance.md).
+
+**Where the rule comes from:** between censuses a statistics office estimates the resident population from the census
+count, registered births and deaths, and migration (Australian Bureau of Statistics, *National, state and territory
+population* methodology: the estimated resident population is the census base updated by "natural increase" and "net
+overseas and interstate migration"; to confirm: named from memory, not opened). It counts nobody itself between
+censuses.
+
+**Leaves out:** someone who dies and is never registered stays in the estimate; someone who leaves without telling any
+of the outside world's offices does too. The estimate has no error added of its own.
 
 **Leaves out:** weights (a plain mean of outlets); a basket (one index a kind of goods); a sample drawn at random
 (a search returns the oldest standing lists first, so in a town with more outlets than the sample it leans to shops
@@ -131,7 +149,7 @@ For a town's bank, the wider market it funds itself from. It lends what's asked 
 | **When people come** | Monthly, it looks at the town's standing job postings, as someone thinking of moving would. A newcomer expects the mean posted wage times the chance of a job, where the chance is postings ÷ (postings + those competing for them: the town's jobseekers, as the latest published counts of recipients of the payments for those out of work say (0.2.0; every such payment the law has: `jobseekers_payment`, their names with commas between, 0.4.1), and the adults it brought in the last 90 days). Where that beats `outside_monthly_income`, each posting draws a household with probability `response_bps` × the gap (as a share of the outside income). At most 8 households a month. | Harris & Todaro (1970), "Migration, Unemployment and Development: A Two-Sector Analysis", *AER* 60(1): migration responds to the *expected* wage gap, the wage times the probability of employment, so it can go on while there's unemployment. The response rate and the outside income are **placeholders** to calibrate against ABS regional internal migration. |
 | **Who comes** | Households drawn from the same census shares as the town's ([households.md](households.md)) | ABS Census 2021 (a placeholder: movers are younger and more often single than the whole population) |
 | **What they bring** | Each adult carries 1–3 months of `outside_monthly_income` in savings, in their own keeping. It moves from the outside world's account, which may go negative. | Placeholder |
-| **Their paperwork** | It writes the `household` record the newcomers bring (members, couples, who will hold a lease), once it can see their participants in its directory | |
+| **Their paperwork** | It writes the `household` record the newcomers bring (members, couples, who will hold a lease), once it knows how to reach each of them: it looks each newcomer up once they have crossed (0.5.0; nobody is shown who's who, and the answer comes at once) | |
 
 **Once here,** newcomers are ordinary citizens (template `newcomer`, running `citizen.default`; their sex is physical, stated on arrival). They ask the bank for an account, deposit what they brought, and hunt for work and a home. If they can't find a home in 90 days, they leave again.
 

@@ -32,7 +32,12 @@ test("rents are reviewed as landlords practise, within the law as a record says 
   const i = config.world.records.findIndex((r: any) => r.id === "law-rent-increases");
   config.world.records[i] = rentIncreaseLaw(9, 75);
   const law = { months: 9, notice: 75 };
-  const { ev, recs } = await run("rents", config, 15 * MONTH);
+  const { ev, recs, cmds } = await run("rents", config, 15 * MONTH);
+  // (A month in which the bank wrote that the rent could not be paid for want of money is not a month the tenant let
+  // slip: it is one they could not pay, told so, and made up when money came. In the town as drawn since 2026-10-09
+  // one tenant, whose account is filled each month with exactly the rent, is an energy bill short for three months.)
+  const failed = cmds.filter((c) => c.command === "act" && c.participant === "bank-payments-system").map((c) => ({ t: c.t, text: JSON.stringify(c.blocks) })).filter((c) => c.text.includes("failed: insufficient funds"));
+  const short = (order: string, from: number, to: number) => failed.some((c) => c.t >= from && c.t < to && c.text.includes(`(request ${order}) failed: insufficient funds`));
   const increases = recs.filter((r) => r.kind === "rent_increase");
   expect(increases.length).toBeGreaterThan(5);
   const byLease = new Map<string, any[]>();
@@ -48,8 +53,10 @@ test("rents are reviewed as landlords practise, within the law as a record says 
     // The tenant answers (given a week to): a standing order for the new rent, or notice on the lease.
     if (r.at > 15 * MONTH - 7 * DAY) continue;
     const tenant = r.addressed_to[0];
-    // (A tenant who had died alone and not yet been found answers nothing: the landlord, who doesn't know, writes to
-    // them as to anyone. One such, in this town, since people stop work at ages of their own.)
+    // (A tenant who has died answers nothing. A landlord is told of a tenant's death only when it reported it or the
+    // family member reporting held the lease (docs/behaviour/deaths.md, "Who is told"); here, in the town as drawn
+    // since 2026-10-09, a leaseholder's partner reported it, and the landlord reviewed the dead tenant's rent a
+    // fortnight on.)
     if (ev.some((e) => e.event === "person_died" && e.person === tenant && e.t <= r.at + 7 * DAY)) continue;
     const order = recs.find((x) => x.kind === "request" && x.speaks_for === tenant && x.basis === r.data.lease && x.data?.outcome?.money?.amount === String(r.data.rent) && x.at >= r.at);
     const pays = !!order;
@@ -65,7 +72,10 @@ test("rents are reviewed as landlords practise, within the law as a record says 
       const from = order!.data.outcome.money.from; // (the tenant's account: a newcomer's isn't named for them)
       const paid = ev.filter((e) => e.event === "transfer" && e.to === landlordAccount && e.from === from);
       expect(paid.some((e) => e.amount === String(r.data.rent) && e.t >= r.data.from)).toBe(true);
-      for (let at = r.at; at + 31 * DAY <= r.data.from + 31 * DAY; at += 30 * DAY) expect(paid.some((e) => e.t >= at && e.t < at + 31 * DAY)).toBe(true);
+      for (let at = r.at; at + 31 * DAY <= r.data.from + 31 * DAY; at += 30 * DAY) {
+        if (short(order!.id, at, at + 31 * DAY)) expect(paid.some((e) => e.t >= at && e.t < at + 62 * DAY)).toBe(true); // made up within the month after
+        else expect(paid.some((e) => e.t >= at && e.t < at + 31 * DAY)).toBe(true);
+      }
     }
   }
 }, 600_000);

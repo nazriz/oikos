@@ -66,10 +66,11 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   // Turnout near the profile's 83% (voting is compulsory; some don't).
   expect(kept.result.data.turnout_bps).toBeGreaterThan(7000);
   expect(kept.result.data.turnout_bps).toBeLessThan(9500);
-  // The ballot is secret: each vote is for the town's eyes only, and ranks the candidates.
+  // The ballot is secret: each vote is for the electoral body's eyes only (never the town's: the body that runs the
+  // election is its own, since 2026-10-08), and ranks the candidates.
   const votes = kept.recs.filter((r) => r.record === "vote" && r.ballot === kept.result.data.ballot);
   expect(votes.length).toBeGreaterThanOrEqual(kept.result.data.formal);
-  expect(votes.every((v) => JSON.stringify(v.visible_to) === JSON.stringify(["city"]))).toBe(true);
+  expect(votes.every((v) => JSON.stringify(v.visible_to) === JSON.stringify(["electoral-commission"]))).toBe(true);
   expect(votes.some((v) => String(v.choice).includes(">"))).toBe(true);
   // The paper: weekly, in the weeks with something new on the public record (a small town's is thin); each item an
   // assertion about the town, at most five to an edition, the election among them.

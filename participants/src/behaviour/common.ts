@@ -3,7 +3,7 @@
 // its own book of the records relevant to it, as a person would.
 
 import * as C from "../calls";
-import type { Assertion, LookRequest, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord } from "../contracts";
+import type { Assertion, LookRequest, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord, SiteCell } from "../contracts";
 import { channels } from "../contracts";
 import { cents, moneyNow } from "../money";
 import { evaluate } from "../law";
@@ -808,6 +808,81 @@ export const ask = {
   }),
 };
 
+/**
+ * Who's who, looked up one at a time (docs/design/knowing.md, section 7): nobody is shown the directory. A look-up
+ * names one entity, one participant, one position, a name, or an organisation's holders of one office; the answer
+ * comes with the next observation, and the book keeps it (`Book.positions`, `participantPerson`, `entityKind`).
+ */
+export const lookUp = {
+  entity: (channel: string, entity: string): LookRequest => ({ channel, who: { entity } }),
+  participant: (channel: string, participant: string): LookRequest => ({ channel, who: { participant } }),
+  position: (channel: string, position: string): LookRequest => ({ channel, who: { position } }),
+  name: (channel: string, name: string): LookRequest => ({ channel, who: { name } }),
+  /** An organisation's positions of one role (the councillors of the town). */
+  holders: (channel: string, entity: string, role: string): LookRequest => ({ channel, who: { entity, role } }),
+};
+
+/**
+ * Going to look (docs/design/knowing.md, section 8): nobody is shown ground they are not on. A visit names places
+ * (buildings, or cells of ground), at most `VISIT_MAX` in one going; it takes the looker's time (the way there and
+ * back, and the world's time to look at each), and what was there comes when it ends, through the same channel:
+ * `visited(obs, channel)` then has the cells just seen, and the channel keeps everything seen there, with when.
+ */
+export const goSee = (channel: string, places: string[]): LookRequest => ({ channel, visit: { places: places.slice(0, VISIT_MAX) } });
+/** How many places one visit goes to at most (the contract's). */
+export const VISIT_MAX = 16;
+/** The cells a visit just found (this observation brought them), as they were when the looker was there; none otherwise. */
+export function visited(obs: Observation, channel: string): SiteCell[] {
+  const ch = obs.channels[channel];
+  if (ch?.kind !== "sites" || !ch.fresh?.length) return [];
+  const fresh = new Set(ch.fresh);
+  return ch.cells.filter((c) => fresh.has(c.cell));
+}
+
+/**
+ * What to ask the land register next so as to know who owns a lot: the titles to it, and then the dealings in each of
+ * those (each asked once; `asked` remembers). One search of a register is answered to a look, so at most one is
+ * returned for each of the register's channels, and none for a channel already in `used` (what this look is asking
+ * already): return them from a stepper's `looks`, which asks again until there is nothing more to ask. The answers
+ * come with the next observation, into the same book, and `ownerOf` (behaviour/institutions.ts) reads the owner.
+ */
+export function ownerLooks(book: Book, asked: Asked, register: { titles: string; dealings: string }, lot: string, used: Set<string> = new Set(), most = 20): Asking[] {
+  if (asked.since(`titles:${lot}`) < 0) {
+    if (used.has(register.titles)) return [];
+    used.add(register.titles);
+    asked.first(`titles:${lot}`);
+    return [ask.about(register.titles, "about.object", lot, { most })];
+  }
+  for (const c of book.claimsBy("object", lot)) {
+    if (c.about?.kind !== "ownership" || asked.since(`dealings:${c.id}`) >= 0 || used.has(register.dealings)) continue;
+    used.add(register.dealings);
+    asked.first(`dealings:${c.id}`);
+    return [ask.about(register.dealings, "claim", c.id, { most, oldest: true })];
+  }
+  return [];
+}
+
+/** How many look-ups one look carries at most (the contract's: a look names up to 16 channels). */
+export const LOOKS_MAX = 16;
+
+/**
+ * The look-ups that would say for whom each of these records was written (the organisation of the position it was
+ * made in, or its author's person), for those the book cannot say yet: each asked once (`asked` remembers), at most
+ * a look's worth at a time. With no directory to look in (`channel` empty), none.
+ */
+export function whoWrote(book: Book, asked: Asked, channel: string | undefined, records: Iterable<{ author: string; in_position?: string }>): LookRequest[] {
+  const out: LookRequest[] = [];
+  if (!channel) return out;
+  for (const r of records) {
+    if (out.length >= LOOKS_MAX) break;
+    if (r.author === "genesis") continue;
+    if (r.in_position) {
+      if (!book.positions.has(r.in_position) && asked.first(`position:${r.in_position}`)) out.push(lookUp.position(channel, r.in_position));
+    } else if (!book.participantPerson.has(r.author) && asked.first(`participant:${r.author}`)) out.push(lookUp.participant(channel, r.author));
+  }
+  return out;
+}
+
 /** What has been asked for already, so that it is asked once: `asked.first(lot)` is true the first time only. With a
  * time, again once something newer than the last asking calls for it (`asked.since(title) < transfer.at`). */
 export class Asked {
@@ -927,7 +1002,7 @@ export const callAction = (step: Step): ParticipantAction => {
  * answers every one the same way). Office reports aren't answered, so offices never write to each other forever.
  */
 export class Letters {
-  private pending: { id: string; from: string; as?: string }[] = [];
+  private pending: { id: string; from: string; as?: string; entity?: string }[] = [];
   /** Letters in: all but our own, reports (answers to letters), and news of a request of ours from those we asked to
    * carry it out (a bank saying a payment we asked for wasn't made), which isn't a question. A letter about anything
    * else is (pilot 10: a mayor asking the bank about an invoice, by its id, went unanswered). */
@@ -935,14 +1010,15 @@ export class Letters {
     const newsOfOurRequest = (m: Observation["inbox"][number]) => {
       const r = m.re ? book.records.get(m.re) : undefined;
       if (r?.record !== "statement" || r.kind !== "request" || r.speaks_for !== obs.entity) return false;
-      const sender = m.as ? book.positions.get(m.as)?.entity : book.participantPerson.get(m.from);
+      const sender = m.from_entity ?? (m.as ? book.positions.get(m.as)?.entity : book.participantPerson.get(m.from));
       return !!sender && (r.addressed_to ?? []).includes(sender);
     };
-    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ") && !newsOfOurRequest(m)) this.pending.push({ id: m.id, from: m.from, ...(m.as ? { as: m.as } : {}) });
+    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ") && !newsOfOurRequest(m)) this.pending.push({ id: m.id, from: m.from, ...(m.as ? { as: m.as } : {}), ...(m.from_entity ? { entity: m.from_entity } : {}) });
   }
-  /** Each letter answered with the report (which may depend on who wrote: the participant, and the position it wrote in). */
-  answer(report: (from: { participant: string; as?: string }) => string, why = "A letter to our office: answering with our standard report."): Step[] {
-    const out = this.pending.map((m) => because(why, message([m.from], report({ participant: m.from, as: m.as }), m.id)));
+  /** Each letter answered with the report (which may depend on who wrote: the participant, the position it wrote in,
+   * and whom it wrote for, which a letter says of itself). */
+  answer(report: (from: { participant: string; as?: string; entity?: string }) => string, why = "A letter to our office: answering with our standard report."): Step[] {
+    const out = this.pending.map((m) => because(why, message([m.from], report({ participant: m.from, as: m.as, entity: m.entity }), m.id)));
     this.pending = [];
     return out;
   }

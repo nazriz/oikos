@@ -7,11 +7,11 @@
 
 import { amount, cents, smallestNow } from "../money";
 import * as C from "../calls";
-import type { LookRequest, Observation, StatementRecord } from "../contracts";
+import type { LookRequest, Observation, SiteStructure, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { standingClaims } from "../law";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { ask, Asked, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { ask, Asked, goSee, ownerLooks, visited, VISIT_MAX, nextLook, because, Book, prohibitions, holdsOf, noting, cellsOf, commitmentOf, DAY, Letters, lotOf, ownAccount, record, say, sign, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Deliveries, goodsPrices, held, order } from "./trade";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 
@@ -29,19 +29,53 @@ export function ownerOf(book: Book, lot: string): string | undefined {
   return holder;
 }
 
+/** A lot of an organisation's own, as its papers have it: its ground, and what stands on it. */
+export interface OwnLot { lot: string; cells: string[]; structures: { structure: string; type: string }[] }
+
+/**
+ * An organisation's own land as its own papers have it (docs/design/knowing.md, section 8: "the town's own asset
+ * register"): the lots its titles say it holds now; for each, its ground and what stood on it when its asset register
+ * was last made up (`asset_register`: its own document, one entry a lot); and what the notices of building work it
+ * has been given since say was begun or brought down there. Paper, not sight: what stands there today is known by
+ * going to look.
+ */
+export function ownLand(book: Book, owner: string): OwnLot[] {
+  const register = book.open("asset_register").filter((r) => r.speaks_for === owner).sort((a, b) => b.at - a.at)[0];
+  const lots = new Map<string, OwnLot>();
+  for (const a of ((register?.data?.assets ?? []) as { lot: string; cells?: string[]; structure?: string; type?: string }[])) {
+    if (typeof a.lot !== "string") continue;
+    const x = lots.get(a.lot) ?? { lot: a.lot, cells: a.cells ?? [], structures: [] };
+    if (a.structure && a.type) x.structures.push({ structure: a.structure, type: a.type });
+    lots.set(a.lot, x);
+  }
+  // (Land that has come to it since: its titles are its own papers.)
+  for (const c of book.claimsBy("holder", owner)) if (c.about?.kind === "ownership" && typeof c.about.object === "string" && !lots.has(c.about.object)) lots.set(c.about.object, { lot: c.about.object, cells: cellsOf(book, c.about.object), structures: [] });
+  for (const r of book.ofType("claim_transfer")) {
+    const c = r.to === owner ? book.records.get(r.claim) : undefined;
+    if (c?.record === "claim" && c.about?.kind === "ownership" && typeof c.about.object === "string" && !lots.has(c.about.object)) lots.set(c.about.object, { lot: c.about.object, cells: cellsOf(book, c.about.object), structures: [] });
+  }
+  const notices = book.open("building_notice").filter((n) => (n.addressed_to ?? []).includes(owner)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+  for (const n of notices) {
+    const d = n.data ?? {};
+    if (typeof d.removes === "string") for (const x of lots.values()) x.structures = x.structures.filter((st) => st.structure !== d.removes);
+    else if (typeof d.lot === "string" && typeof d.structure === "string" && lots.has(d.lot) && !lots.get(d.lot)!.structures.some((st) => st.structure === d.structure)) lots.get(d.lot)!.structures.push({ structure: d.structure, type: String(d.structure_type ?? "") });
+  }
+  return [...lots.values()].filter((x) => ownerOf(book, x.lot) === owner).sort((a, b) => (a.lot < b.lot ? -1 : 1));
+}
+
 /**
  * city.planning_officer: decides permit applications. For each application it
  * asks whether granting it would breach a prohibition addressed to the office
  * (e.g. "no permit may be granted on the river lots"), by evaluating the
  * law's formal condition on the act of granting. It grants (records a
  * liberty to build) or refuses (publishes the decision), citing the law.
- * It keeps the town's land register (lots, their owners from the registry, and
- * what its survey shows built), and its report lists the town's vacant lots.
+ * It reads the town's own asset register (the lots the town's titles say it holds, and what its
+ * papers say stands on each), and its report lists the town's lots with nothing on them.
  * params: compliance_bps (how often it follows the law; default 10000), town.
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
-  version: "0.8.2",
+  version: "0.9.0", // 0.9.0: the town's land from the town's own papers; no longer shown the land register or a survey of the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -53,13 +87,10 @@ export const planningOfficer: BehaviourModule = {
     const decided = new Set<string>();
     const decided_: { application: string; decision: "granted" | "refused" | "incomplete"; law?: string }[] = [];
     const letters = new Letters();
-    // What the survey last showed on each cell: built or not.
-    const built = new Map<string, boolean>();
     return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
         letters.take(obs, book);
-        for (const c of channels.cells(obs)) built.set(c.cell, !!c.structure);
       },
       (obs) => {
         const me = obs.entity;
@@ -99,11 +130,12 @@ export const planningOfficer: BehaviourModule = {
           // until 2026-10-02 the report said "39 decided: 0 granted, 0 refused", and pilot 7e's mayor asked why.)
           const granted = decided_.filter((d) => d.decision === "granted").length;
           const refused = decided_.filter((d) => d.decision === "refused").map((d) => `${d.application} (${d.law ?? "?"})`);
-          // The land register: the town's lots, and which of them the last survey showed with nothing built.
-          const townLots = book.open("lot").map((l) => l.id).filter((l) => ownerOf(book, l) === p.town).sort();
-          const vacant = townLots.filter((l) => { const cs = cellsOf(book, l); return cs.length > 0 && cs.every((c) => built.get(c) === false); });
+          // The town's asset register: its lots, and which of them its papers show with nothing built (paper, not
+          // sight: whoever relies on a lot goes to look at it).
+          const townLots = ownLand(book, p.town);
+          const vacant = townLots.filter((x) => x.structures.length === 0).map((x) => x.lot);
           const land = townLots.length
-            ? ` The town owns ${townLots.length} lots; ${vacant.length} have nothing built on them${vacant.length ? `: ${vacant.slice(0, 40).join(", ")}${vacant.length > 40 ? `, and ${vacant.length - 40} more` : ""}` : ""}.`
+            ? ` By the town's asset register it owns ${townLots.length} lots; ${vacant.length} have nothing built on them${vacant.length ? `: ${vacant.slice(0, 40).join(", ")}${vacant.length > 40 ? `, and ${vacant.length - 40} more` : ""}` : ""}. (The register is paper: go and see a lot before relying on it.)`
             : "";
           return `Report from the planning office: ${decided.size} applications decided: ${granted} granted, ${refused.length} refused${refused.length ? ` (${refused.join(", ")})` : ""}${decided_.some((d) => d.decision === "incomplete") ? `, ${decided_.filter((d) => d.decision === "incomplete").length} sent back incomplete` : ""}.${land} Apply on the permit application form (form-permit).`;
         }));
@@ -114,60 +146,111 @@ export const planningOfficer: BehaviourModule = {
 };
 
 /**
- * city.inspector: patrols. Through a `sites` channel (whose coverage and
- * refresh interval the world sets) it sees what's built. Anything new that
- * the building law prohibits (evaluated against the permits it knows of,
- * for the lot's registered owner) gets a fine (a claim) and a demolition
- * order. What happens next is up to the owner, and whoever enforces orders.
- * params: fine (cents), compliance_bps (how often it acts on what it finds).
+ * city.inspector: inspects building work it is told of. Whoever builds tells the town when work begins (a building
+ * notice: what, on which lot, where); the inspector goes to that site (a visit: it takes the office's time), asks the
+ * land registry who owns the lot, and judges what it finds against the building law and the permits the town has
+ * granted. A breach gets a fine (a claim) and a demolition order; what happens next is up to the owner, and whoever
+ * enforces orders. It then tells the valuer what was built or brought down (`valuer`), as a council asks for a
+ * supplementary valuation. Work nobody tells the town of is not found: there is no patrol.
+ * params: fine (in the smallest unit of money), compliance_bps (how often it acts on what it finds), the channels it goes and asks through.
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
-  version: "0.5.1",
+  version: "0.6.0", // 0.6.0: goes to the sites it is notified of and asks the registry who owns them; no patrol of the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ fine: 5_000_000, compliance_bps: 10_000 }, ctx.params);
+    const p = params({ fine: 5_000_000, compliance_bps: 10_000,
+      sites: "sites", // the channel it goes to a site through (a visit)
+      register: { lots: "lots", titles: "titles", dealings: "dealings" }, // the land register, asked about one lot
+      valuer: "", // whom it tells of what was built or brought down (none: nobody)
+    }, ctx.params);
     const book = new Book();
-    const known = new Set<string>(); // structures already judged (or standing when we started)
+    const asked = new Asked();
+    const notices: { id: string; lot?: string; at?: string; structure?: string; type?: string; removes?: string; gone?: boolean }[] = [];
+    const taken = new Set<string>();
+    const sitesSeen = new Map<string, SiteStructure | null>(); // structure -> as we found it (null: nothing there)
     const found: string[] = []; // breaches acted on: "structure on lot (law)"
-    let first = true;
+    let inspected = 0;
     const letters = new Letters();
     const report = () =>
-      `Report from the building inspector: ${known.size} buildings on record. ${found.length ? `Breaches found and acted on (a fine and a demolition order each): ${found.join(", ")}.` : "No breaches found."}`;
+      `Report from the building inspector: ${taken.size} notices of building work received, ${inspected} sites inspected. ${found.length ? `Breaches found and acted on (a fine and a demolition order each): ${found.join(", ")}.` : "No breaches found."} We inspect the work we are told of; work nobody tells the town of we don't see.`;
     return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
         letters.take(obs, book);
+        for (const n of book.open("building_notice")) {
+          if (taken.has(n.id) || !(n.addressed_to ?? []).includes(obs.entity)) continue;
+          taken.add(n.id);
+          const d = n.data ?? {};
+          notices.push({ id: n.id, ...(typeof d.lot === "string" ? { lot: d.lot } : {}), ...(typeof d.at === "string" ? { at: d.at } : {}), ...(typeof d.structure === "string" ? { structure: d.structure } : {}),
+            ...(typeof d.structure_type === "string" ? { type: d.structure_type } : {}), ...(typeof d.removes === "string" ? { removes: d.removes } : {}) });
+        }
+        // What a visit found: each site gone to, as it was.
+        const back = visited(obs, p.sites);
+        for (const n of notices) {
+          if (n.gone || !n.structure || sitesSeen.has(n.structure)) continue;
+          const here = back.filter((c) => c.structure?.structure === n.structure || c.cell === n.at);
+          if (here.length) sitesSeen.set(n.structure, here.find((c) => c.structure?.structure === n.structure)?.structure ?? null);
+          // (Gone to, and nothing of it there to be found: it does not stand.)
+          else if (back.length && asked.since(`site:${n.id}`) >= 0 && asked.since(`site:${n.id}`) < obs.t) sitesSeen.set(n.structure, null);
+        }
       },
       (obs) => {
         const me = obs.entity;
-        const buildings = channels.structures(obs);
         const steps: Step[] = [];
-        if (first) {
-          for (const st of buildings) known.add(st.structure);
-          first = false;
-          return [...steps, ...letters.answer(report)];
-        }
         const claims = standingClaims(book.records.values());
-        for (const st of buildings) {
-          if (known.has(st.structure)) continue;
-          known.add(st.structure);
-          // The lot it stands on (its corner cell's), by the registry.
-          const lot = lotOf(book, st.at);
+        for (const n of [...notices]) {
+          // Something brought down: the valuer is told; nothing to inspect.
+          if (n.removes) {
+            notices.splice(notices.indexOf(n), 1);
+            if (p.valuer) steps.push(because(`${n.removes} is being brought down: telling the valuer.`, say("valuation_request", `Supplementary valuation: ${n.removes} has been demolished.`, { to: [p.valuer], basis: n.id, data: { removed: n.removes, ...(n.lot ? { lot: n.lot } : {}) } })));
+            continue;
+          }
+          if (!n.structure || !sitesSeen.has(n.structure)) continue;
+          notices.splice(notices.indexOf(n), 1);
+          inspected++;
+          const st = sitesSeen.get(n.structure);
+          if (!st) continue; // nothing stands there: nothing to judge
+          // The lot it stands on (its corner cell's), and its owner, by the registry.
+          const lot = n.lot ?? lotOf(book, st.at);
           const owner = (lot && ownerOf(book, lot)) ?? st.built_by ?? "unknown";
-          const cells = channels.cells(obs).filter((c) => c.structure?.structure === st.structure).map((c) => c.cell).sort();
-          const act = { block: "construct", lot, at: st.at, cells, structure_type: st.type };
+          const cells = visited(obs, p.sites).filter((c) => c.structure?.structure === st.structure).map((c) => c.cell).sort();
+          const act = { block: "construct", lot, at: st.at, cells: cells.length ? cells : [st.at], structure_type: st.type };
           const breached = prohibitions(book).find((l) => holdsOf(book, l, { block: act, actor: owner, now: obs.t }, claims));
+          if (p.valuer) steps.push(because(`A ${st.type} is being built on ${lot ?? st.at}: asking the valuer for a supplementary valuation.`,
+            say("valuation_request", `Supplementary valuation: a ${st.type} (${st.structure}) on ${lot ?? st.at}.`, { to: [p.valuer], basis: n.id, data: { ...(lot ? { lot } : {}), structure: st.structure, structure_type: st.type } })));
           if (!breached || ctx.rng(`act-${st.structure}`).below(10_000) >= p.compliance_bps) continue;
           found.push(`${st.structure} on ${lot ?? st.at} (${breached.id})`);
-          steps.push(because(`On patrol: ${st.structure} was built in breach of ${breached.id}; fining the owner and ordering it demolished.`,
+          steps.push(because(`Inspected: ${st.structure} is being built in breach of ${breached.id}; fining the owner and ordering it demolished.`,
             record("right", me, { kind: "fine", amount: p.fine, for: `Unpermitted ${st.type} on ${lot ?? st.at} (${st.structure}).` }, { against: owner, basis: breached.id }),
             say("demolition_order", `Order: demolish ${st.structure} on ${lot ?? st.at}, built in breach of ${breached.id}.`, { to: [owner], basis: breached.id, data: { structure: st.structure, lot, law: breached.id } }),
           ));
         }
         steps.push(...letters.answer(report));
         return steps;
+      },
+      undefined,
+      // Before it judges: who owns each lot notified (the registry, asked about the one lot), and the site itself, gone to.
+      (obs) => {
+        // (One search of a register is answered to a look: one for each of its channels now, and the rest as this is
+        // asked again, until there is nothing more to ask.)
+        const looks: LookRequest[] = [];
+        const used = new Set<string>();
+        const go: string[] = [];
+        for (const n of notices) {
+          if (n.removes || !n.structure) continue;
+          const lot = n.lot ?? (n.at ? lotOf(book, n.at) : undefined);
+          if (lot) looks.push(...ownerLooks(book, asked, p.register, lot, used));
+          else if (n.at && !used.has(p.register.lots) && asked.first(`ground:${n.at}`)) {
+            used.add(p.register.lots);
+            looks.push(ask.about(p.register.lots, "data.cells", n.at, { most: 1 }));
+          }
+          // (To the ground notified, where the notice says it: a building may be gone, its ground is always there.)
+          if (!sitesSeen.has(n.structure) && go.length < VISIT_MAX && asked.first(`site:${n.id}`, obs.t)) go.push(n.at ?? n.structure);
+        }
+        if (go.length) looks.push(goSee(p.sites, go));
+        return looks;
       },
     ));
   },
@@ -191,7 +274,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.11.2",
+  version: "0.12.1", // 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -216,6 +299,12 @@ export const builder: BehaviourModule = {
         // The land register, where this world keeps one to look things up in: our channel onto its plans of lots.
         // (None: whatever plans we know are those we're shown.)
         register: null as { lots: string } | null,
+        // Going to look (docs/design/knowing.md, section 8): the channel its foreman goes to a lot or a building
+        // through, before building there or bringing it down (none: it relies on what it is shown).
+        sites: "",
+        // Whom it gives notice of building work to as it begins (the council, whose inspector comes; whoever connects
+        // the services): the world gives them.
+        notify: [] as string[],
       },
       ctx.params,
     );
@@ -223,15 +312,33 @@ export const builder: BehaviourModule = {
     const book = new Book();
     // The plan of a lot a client asks us to build on, looked up in the register when the job comes in, once.
     const planAsked = new Asked();
+    // When we last went to see each cell of ground or building (our own going: what we remember of it is as old as that).
+    const wentAt = new Map<string, number>();
+    /** Where on a lot our foreman goes to look: the first of its cells we have not seen built on (a lot is one place
+     * to go to; a block of many cells is not walked cell by cell). */
+    const groundToSee = (lot: string): string | undefined => cellsOf(book, lot).find((c) => builtCell.get(c) !== true);
     const plansToRead = (obs: Observation): LookRequest[] => {
-      if (!p.register) return [];
+      // (One search of the register is answered to a look, and one going sets out at a time: this is asked again
+      // until there is nothing more to ask.)
+      let plan: LookRequest | undefined, visit: LookRequest | undefined;
       for (const r of book.ofType("agreement")) {
-        if (r.record !== "agreement" || !r.terms.parties.includes(obs.entity)) continue;
-        const lot = commitmentOf(r, obs.entity).outcome?.structure?.on;
-        if (!lot || book.records.has(lot) || !planAsked.first(lot)) continue;
-        return [ask.one(p.register.lots, lot)];
+        if (r.record !== "agreement" || !r.terms.parties.includes(obs.entity) || handled.has(r.id)) continue;
+        const job = commitmentOf(r, obs.entity).outcome?.structure;
+        const lot = job?.on;
+        if (!plan && p.register && lot && !book.records.has(lot) && planAsked.first(lot)) {
+          plan = ask.one(p.register.lots, lot);
+          plansOut.add(lot);
+        }
+        // The foreman goes to the lot (or to what is to come down) once the client has signed, before we take the job
+        // on: what stands there is seen by going, not known.
+        if (visit || !p.sites || !book.signedBy(r.id, r.terms.parties.find((x) => x !== obs.entity) ?? "")) continue;
+        const place = job?.remove ?? (lot ? groundToSee(lot) : undefined);
+        if (place && planAsked.first(`site:${r.id}:${place}`)) {
+          visit = goSee(p.sites, [place]);
+          going.set(r.id, [place]);
+        }
       }
-      return [];
+      return [...(plan ? [plan] : []), ...(visit ? [visit] : [])];
     };
     const staffing = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, workplace: p.workplace || undefined, role: "construction worker", ...(p.industry ? { industry: p.industry } : {}) });
     // What's recorded against us to pay (rates on our yard, a fine), paid as a firm pays its debts (we don't wind up).
@@ -240,8 +347,12 @@ export const builder: BehaviourModule = {
     const letters = new Letters();
     const deliveries = new Deliveries();
     const handled = new Set<string>(); // contracts taken on
+    const going = new Map<string, string[]>(); // contract -> the places its foreman has set out to see
+    const plansOut = new Set<string>(); // lots whose plan we have asked the register for, not yet answered
+    const noPlan = new Set<string>(); // lots the register has no plan of
     const waiting: { agreement: string; client: string; type?: string; on?: string; remove?: string; price?: string }[] = []; // signed, not yet begun
     const builtCell = new Map<string, boolean>(); // what stands on each cell, as we last saw it
+    const finished = new Set<string>(); // buildings our crew has seen finished
     const ourLots = new Set<string>(); // lots with a building job of ours on them, queued or begun
     const projects: { structure: string; task: "build" | "demolish"; left: number }[] = [];
     const typeOf = new Map<string, string>(); // structure -> its kind of building: what we've built, and what we've seen
@@ -260,6 +371,23 @@ export const builder: BehaviourModule = {
         staffing.absorb(obs);
         dues.absorb(obs, ownAccount(obs)?.account);
         letters.take(obs, book);
+        // (The register's answer comes with the observation after we ask: a lot it has no plan of is not on it.)
+        for (const lot of plansOut) if (!book.records.has(lot)) noPlan.add(lot);
+        plansOut.clear();
+        if (p.sites) {
+          const back = visited(obs, p.sites);
+          for (const c of back) {
+            wentAt.set(c.cell, obs.t);
+            if (c.structure) wentAt.set(c.structure.structure, obs.t);
+          }
+          // (A building we went to see that is not there any more: seen, as gone.)
+          if (back.length) for (const places of going.values()) for (const x of places) if (!wentAt.has(x) && !x.startsWith("cell.")) wentAt.set(x, obs.t);
+        }
+        // What our crew left on the sites it worked on today: theirs to know.
+        for (const o of obs.outcomes) for (const st of o.seen ?? []) {
+          typeOf.set(st.structure, st.type);
+          if (st.complete) finished.add(st.structure);
+        }
         for (const d of deliveries.take(book, obs.entity)) {
           const o = orderQty.get(d.order);
           if (!o) continue;
@@ -316,6 +444,16 @@ export const builder: BehaviourModule = {
           const agreed = commitmentOf(r, client).outcome?.money?.amount;
           if (r.terms.template !== "construction" && !(job && agreed !== undefined)) continue;
           if (!book.signedBy(r.id, client)) continue;
+          // (Not before our foreman has been to the lot, or to what is to come down, since the contract was made.)
+          // (A lot the register has no plan of can't be gone to: the job is taken as it was, and fails where it would have.)
+          if (job?.on && !job.remove && p.sites) {
+            // (Seen: a cell of the lot gone to since the contract and found free, or every cell of it seen built on.)
+            const cells = cellsOf(book, job.on);
+            const free = cells.some((c) => builtCell.get(c) === false && (wentAt.get(c) ?? -1) >= r.at);
+            const full = cells.length > 0 && cells.every((c) => builtCell.get(c) === true);
+            if (cells.length ? !free && !full : !!p.register && !noPlan.has(job.on)) continue;
+          }
+          going.delete(r.id);
           // (Not before we know our own price for it: we wait for our supplier's prices, as a firm would.)
           const ours = job?.type ? prices[job.type] : undefined;
           if (job?.type && ours === undefined) continue;
@@ -381,7 +519,8 @@ export const builder: BehaviourModule = {
             const sid = w.remove;
             // Anything of ours being built there stops.
             for (const pr of projects) if (pr.structure === sid && pr.task === "build") pr.left = 0;
-            const s = because(`A demolition contract: starting to bring down ${sid}, and invoicing the price.`, C.call("structure", { remove: sid, by: me }), ...invoice);
+            const s = because(`A demolition contract: starting to bring down ${sid}, and invoicing the price.`, C.call("structure", { remove: sid, by: me }), ...invoice,
+              ...(p.notify.length ? [say("building_notice", `Notice of building work: ${sid} is being demolished, for ${w.client}.`, { to: p.notify, basis: w.agreement, data: { removes: sid, client: w.client } })] : []));
             s.then = (out) => { if (out.status === "applied" && labour > 0) projects.push({ structure: sid, task: "demolish", left: labour }); };
             steps.push(s);
             continue;
@@ -396,10 +535,14 @@ export const builder: BehaviourModule = {
           waiting.splice(waiting.indexOf(w), 1);
           const s = because(`The materials for a ${w.type} on ${w.on} are in the yard: starting it, and invoicing the agreed price.`,
             ["site", C.call("structure", { type: w.type, on: siteOn(w.on), by: me, materials_at: p.yard })], ...invoice);
+          const at = siteOn(w.on);
           s.then = (out) => {
             const sid = out.created?.site;
             if (sid) typeOf.set(sid, w.type!);
             if (sid && x.build_labour > 0) projects.push({ structure: sid, task: "build", left: x.build_labour });
+            // Notice of the work, as it begins: to the council (whose inspector comes) and whoever else the world says.
+            if (sid && p.notify.length) return [because(`Work has begun on a ${w.type} on ${w.on}: giving notice of it.`,
+              say("building_notice", `Notice of building work: a ${w.type} (${sid}) begun on ${w.on}, for ${w.client}.`, { to: p.notify, basis: w.agreement, data: { lot: w.on, at: at.startsWith("cell.") ? at : cellsOf(book, w.on!)[0], structure: sid, structure_type: w.type, client: w.client } }))];
           };
           steps.push(s);
         }
@@ -417,11 +560,10 @@ export const builder: BehaviourModule = {
         // today joins tomorrow.)
         const crew = team(here, (w) => p.working_day - (used.get(w) ?? 0)).who;
         if (day % 7 < p.work_days && crew.length) {
-          const standing = new Set(channels.cells(obs).flatMap((c) => (c.structure ? [c.structure.structure] : [])));
           for (const pr of [...projects]) {
-            // A building finished (its hours done and its time passed), or one that's gone: nothing more to do there.
-            const st = channels.cells(obs).find((c) => c.structure?.structure === pr.structure)?.structure;
-            if (pr.left <= 0 || (pr.task === "build" && st?.complete) || (pr.task === "demolish" && !standing.has(pr.structure))) {
+            // A building finished (its hours done, or seen finished by the crew): nothing more to do there. (One that is
+            // gone is learned by the work on it being refused: below.)
+            if (pr.left <= 0 || (pr.task === "build" && finished.has(pr.structure))) {
               projects.splice(projects.indexOf(pr), 1);
               continue;
             }
@@ -480,6 +622,81 @@ export const builder: BehaviourModule = {
 
 
 /**
+ * land.registry: the body that keeps the register of land (docs/behaviour/ownership.md, "Who knows what"; after a
+ * Torrens registry: title is by registration). The plans of the lots and every title and dealing are its register,
+ * and it alone is shown them whole; anyone else asks it about one lot or one title (the kernel answers a search of
+ * the register: the registry does no work for one). What it does itself:
+ * - a transmission on death: asked by the registrar of deaths, it passes each title the dead person held to the heir
+ *   named, as the body that issued the title may;
+ * - notices: each time land changes hands it tells the bodies that keep a roll of their own from such notices (the
+ *   valuer, the water corporation: `notify`), as whoever acquires land must tell them where the profile is from.
+ */
+export const landRegistry: BehaviourModule = {
+  name: "land.registry",
+  keeps: [
+    { what: "lot", why: "The land registry makes the register of land: the plan of each lot is part of it." },
+    { what: "records:claim", why: "The register of land it keeps: every title is made by being entered in it." },
+    { what: "records:claim_transfer", why: "The register of land it keeps: every dealing in a title." },
+    { what: "records:claim_release", why: "The register of land it keeps: every title given up." },
+    { what: "records:withdrawal", why: "The register of land it keeps: what has been struck from it." },
+  ],
+  version: "0.1.0",
+  doc: "docs/behaviour/ownership.md",
+  cadence: () => DAY,
+  create(ctx: ParticipantContext) {
+    const p = params({
+      // Who is told each time land changes hands (the world gives them; none: nobody is).
+      notify: [] as string[],
+    }, ctx.params);
+    const me = ctx.entity;
+    const book = new Book();
+    const letters = new Letters();
+    const applied = new Set<string>(); // transmission applications dealt with
+    let dealings = 0; // how many transfers of the register we have read
+    let passed = 0;
+    let told = 0;
+    return stepper(
+      (obs) => {
+        book.absorb(obs);
+        letters.take(obs, book);
+      },
+      (obs) => {
+        const steps: Step[] = [];
+        const title = (id: string) => { const c = book.records.get(id); return c?.record === "claim" && c.about?.kind === "ownership" && typeof c.about?.object === "string" ? c : undefined; };
+        // Land that has changed hands since we last looked: a notice to those who keep a roll from such notices.
+        const transfers = book.ofType("claim_transfer");
+        for (const r of transfers.slice(dealings)) {
+          const c = title(r.claim);
+          if (!c || !p.notify.length || ownerOf(book, c.about.object) !== r.to) continue;
+          told++;
+          steps.push(because(`${c.about.object} has passed to ${r.to}: telling ${p.notify.join(", ")}.`,
+            say("acquisition_notice", `Notice of acquisition: ${c.about.object} is now ${r.to}'s.`, { visible: [me, ...p.notify], basis: r.id, data: { lot: c.about.object, owner: r.to, title: c.id } })));
+        }
+        dealings = transfers.length;
+        // A transmission on death: each title the dead person held passes to the heir named.
+        for (const a of book.open("transmission_application")) {
+          if (applied.has(a.id) || !(a.addressed_to ?? []).includes(me)) continue;
+          applied.add(a.id);
+          const who = a.data?.deceased, heir = a.data?.heir;
+          if (typeof who !== "string" || typeof heir !== "string") continue;
+          const held = standingClaims(book.claimsBy("holder", who)).filter((c) => c.about?.kind === "ownership");
+          const lots = new Set<string>([...held.map((c) => c.about.object as string), ...book.ofType("claim_transfer").filter((r) => r.to === who).map((r) => title(r.claim)?.about.object as string).filter(Boolean)]);
+          for (const lot of [...lots].sort()) {
+            if (ownerOf(book, lot) !== who) continue;
+            const t = standingClaims(book.claimsBy("object", lot)).find((c) => c.about?.kind === "ownership");
+            if (!t) continue;
+            passed++;
+            steps.push(because(`${who} held ${lot}, and has died: entering its transmission to their heir, ${heir}.`, C.call("claim", { transfer: t.id, to: heir, basis: a.id })));
+          }
+        }
+        steps.push(...letters.answer(() => `Report from the land registry: ${book.open("lot").length} lots on the register; ${passed} titles passed on a death, ${told} notices of acquisition sent. To know who owns a lot, search the register for the lot or the title.`));
+        return steps;
+      },
+    );
+  },
+};
+
+/**
  * city.registry: the registry of deaths (after a real registry of births, deaths and marriages, where a death is
  * registered from a notification: docs/behaviour/institutions.md). It reads death notifications addressed to the town and, once per death,
  * publishes a public registration with what it was told: who died, who reported it, the partner, the children and
@@ -487,14 +704,7 @@ export const builder: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
-  keeps: [
-    { what: "lot", why: "In this town the registrar also keeps the register of land: it passes a dead owner's titles to their heirs. The plans of the lots are that register's." },
-    { what: "records:claim", why: "The register of land it keeps: every title." },
-    { what: "records:claim_transfer", why: "The register of land it keeps: every dealing in a title." },
-    { what: "records:claim_release", why: "The register of land it keeps: every title given up." },
-    { what: "records:withdrawal", why: "The register of land it keeps: what has been struck from it." },
-  ],
-  version: "0.5.0",
+  version: "0.7.0", // 0.7.0: keeps no register of land: it applies to the land registry for a dead owner's titles to pass; 0.6.0: registers births
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -506,11 +716,15 @@ export const registry: BehaviourModule = {
         // Whom the town writes to when it is left to administer an estate, the death reported by nobody of the family
         // (the banks, the utilities): the world gives them.
         estate_tells: [] as string[],
+        // The land registry: where it applies for a dead owner's land to pass to their heir (none: land is left as it is).
+        land_registry: "",
       },
       ctx.params,
     );
     const book = new Book();
     const registered = new Set<string>();
+    const read = new Set<string>(); // notifications dealt with
+    const born = new Set<string>();
     const letters = new Letters();
     return stepper(
       (obs) => {
@@ -523,7 +737,16 @@ export const registry: BehaviourModule = {
         for (const r of book.all("death_registration")) registered.add(r.data?.deceased);
         for (const n of book.open("death_notification")) {
           const who = n.data?.deceased;
-          if (!who || registered.has(who) || !(n.addressed_to ?? []).includes(me)) continue;
+          if (!who || read.has(n.id) || !(n.addressed_to ?? []).includes(me)) continue;
+          read.add(n.id);
+          // Already registered, and reported again by someone who was not sent the entry (a landlord who has found a
+          // tenant the police reported): they are given a certified copy, as a later informant is told it is done.
+          if (registered.has(who)) {
+            const entry = book.all("death_registration").find((r) => r.data?.deceased === who);
+            if (entry && n.speaks_for && n.speaks_for !== me && !(entry.addressed_to ?? []).includes(n.speaks_for)) steps.push(because(`${who}'s death is reported to us again (by ${n.speaks_for}): it is registered already; sending them a certified copy of the entry.`,
+              say("death_certificate", `Death of ${who}: registered (entry ${entry.id}).`, { to: [n.speaks_for], basis: entry.id, data: { deceased: who, registration: entry.id } })));
+            continue;
+          }
           registered.add(who);
           const d = n.data;
           // The entry is the register's, and nobody is shown the register (docs/no-god-view.md). It is sent to whoever
@@ -537,16 +760,23 @@ export const registry: BehaviourModule = {
             data: { deceased: who, reported_by: n.speaks_for, ...(d.partner ? { partner: d.partner } : {}), children: d.children ?? [], without_adult: d.without_adult ?? [] },
           })));
           // The land the deceased held passes to their heir, as the succession law says (the partner; else the eldest adult
-          // child; else the town), recorded by us as the land registry (a transmission).
+          // child; else the town). The register of land is the land registry's: we apply to it for the transmission, on
+          // the registration, and it finds what the dead person held (we are shown no titles).
           const heir = (d.partner as string | undefined) ?? ((d.adult_children ?? []) as string[])[0] ?? me;
-          for (const lot of book.open("lot")) {
-            const owner = ownerOf(book, lot.id);
-            if (owner !== who) continue;
-            const title = standingClaims(book.ofType("claim")).find((c) => c.about?.kind === "ownership" && c.about?.object === lot.id);
-            if (title) steps.push(because(`${who} held ${lot.id}: passing it to their heir, ${heir}, as the law of succession says.`, C.call("claim", { transfer: title.id, to: heir, basis: n.id })));
-          }
+          if (p.land_registry) steps.push(because(`${who} has died: applying to the land registry for whatever land they held to pass to their heir, ${heir}, as the law of succession says.`,
+            say("transmission_application", `Transmission on death: whatever land ${who} held passes to ${heir}.`, { to: [p.land_registry], basis: n.id, data: { deceased: who, heir } })));
         }
-        steps.push(...letters.answer(() => `Report from the registrar: ${registered.size} deaths registered${registered.size ? ` (${[...registered].sort().join(", ")})` : ""}.`));
+        // A birth reported to us: registered, and the entry sent to whoever reported it and to those sent every entry.
+        for (const n of book.open("birth_notification")) {
+          const child = n.data?.child;
+          if (typeof child !== "string" || born.has(child) || !(n.addressed_to ?? []).includes(me)) continue;
+          born.add(child);
+          const told = [...new Set([n.speaks_for, ...p.feeds].filter((x): x is string => typeof x === "string" && x !== me))];
+          steps.push(because(`A birth is reported to us (${child}, by ${n.speaks_for}): registering it.`, say("birth_registration", `Birth registered: ${child}.`, {
+            basis: n.id, to: told, visible: [me, ...told], data: { child, born_at: n.data?.born_at, mother: n.data?.mother },
+          })));
+        }
+        steps.push(...letters.answer(() => `Report from the registrar: ${born.size ? `${born.size} births and ` : ""}${registered.size} deaths registered${registered.size ? ` (${[...registered].sort().join(", ")})` : ""}.`));
         return steps;
       },
     );

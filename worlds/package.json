@@ -13,6 +13,7 @@
   },
   "exports": {
     "./generator/generate": "./generator/generate.ts",
+    "./generator/knowing": "./generator/knowing.ts",
     "./generator/profile": "./generator/profile.ts",
     "./generator/weather": "./generator/weather.ts",
     "./generator/scenario": "./generator/scenario.ts"

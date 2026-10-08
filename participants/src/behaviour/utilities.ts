@@ -5,16 +5,18 @@
 // owners of homes, quarterly (who pays is the world's: the owner, here); energy its customers, monthly.
 
 import * as C from "../calls";
-import type { SiteStructure } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, lotOf, ownAccount, say, type Step, usd } from "./common";
+import { because, Book, DAY, goSee, ownAccount, say, type Step, usd, variableToday, visited, VISIT_MAX } from "./common";
 import { stepper } from "./firms";
-import { ownerOf } from "./institutions";
 import { Deliveries, goodsPrices, held as heldAt, order } from "./trade";
 
 export const water: BehaviourModule = {
   name: "utility.water",
-  version: "0.1.1",
+  keeps: [
+    { what: "property_roll", why: "Its customer roll: the valuer's roll of each property it supplies is given to it, as valuations are given to a rating authority." },
+    { what: "acquisition_notice", why: "Its customer roll: each notice that land it supplies has changed hands is given to it." },
+  ],
+  version: "0.2.0", // 0.2.0: bills by its customer roll and the meters it reads; draws what the published population uses; no longer shown the town or the land register
   doc: "docs/behaviour/utilities.md",
   cadence: () => DAY,
   firstWake: (ctx) => 6 * 3600 + ctx.rng("first-wake").below(3600),
@@ -25,45 +27,89 @@ export const water: BehaviourModule = {
       litres_per_person_per_day: 0, // what a person uses (the world's figure)
       price_per_kl: 0, service_per_quarter: 0, // the tariff (cents)
       bill_every_days: 91,
-      dwelling: "dwelling",
-      channel: "town", // its view of the town's homes (who lives in each, how many)
+      // Who knows what (docs/behaviour/utilities.md, "Who knows what"): its customer roll (a register it keeps from
+      // what it is given), the meter a home's building carries (a measure of the building, in litres), the channel
+      // its reader goes to the meters through, and how many days before the bills the round of readings begins.
+      roll: "roll", meter: "water_used", meters: "", read_days: 21,
     }, ctx.params);
     need(p, ["works"], "utility.water");
     const me = ctx.entity;
     const book = new Book();
-    const homes = new Map<string, { at: string; residents: number }>(); // home structure -> its corner cell, residents as last seen
-    const used = new Map<string, number>(); // home -> litres used since its last bill
+    // The customer roll: each property we supply, its owner as we were last told, and the buildings on it.
+    const lots = new Map<string, { owner?: string; buildings: Set<string> }>();
+    const lotOfBuilding = new Map<string, string>();
+    const taken = new Set<string>();
+    // Each meter: what it read when last billed, and what it read when last gone to (and when).
+    const billedAt = new Map<string, number>();
+    const reading = new Map<string, { litres: number; at: number }>();
+    const unmetered = new Set<string>(); // gone to, and no meter there: not a home
+    let toRead: string[] = []; // this round's meters still to go to
+    let out = false; // a reader is out
+    let outSince = 0;
     let lastDay = -1;
     let nextBill = p.bill_every_days * DAY;
+    let roundFor = -1; // the bill date the round under way is for
     let restricted = false;
+    const building = (lot: string, structure: string) => {
+      const x = lots.get(lot) ?? { buildings: new Set<string>() };
+      x.buildings.add(structure);
+      lots.set(lot, x);
+      lotOfBuilding.set(structure, lot);
+    };
     return stepper(
       (obs) => {
         book.absorb(obs);
-        const ch = obs.channels[p.channel];
-        if (ch?.kind === "sites") for (const c of ch.cells) {
-          const st = c.structure as SiteStructure | undefined;
-          if (!st || c.cell !== st.at) continue;
-          const dw = st.spaces.filter((sp) => sp.kind === p.dwelling);
-          if (dw.length) homes.set(st.structure, { at: st.at, residents: dw.reduce((a, sp) => a + sp.count, 0) });
+        const roll = obs.channels[p.roll];
+        if (roll?.kind === "records") for (const r of [...roll.records].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
+          if (r.record !== "statement" || taken.has(r.id) || typeof r.data?.lot !== "string") continue;
+          taken.add(r.id);
+          if (r.kind === "property_roll") {
+            lots.set(r.data.lot, { ...(lots.get(r.data.lot) ?? { buildings: new Set<string>() }), ...(typeof r.data.owner === "string" ? { owner: r.data.owner } : {}) });
+            for (const b of (r.data.buildings ?? []) as { structure: string; dwellings?: number }[]) if (b.dwellings) building(r.data.lot, b.structure);
+          } else if (r.kind === "acquisition_notice" && typeof r.data.owner === "string") lots.set(r.data.lot, { ...(lots.get(r.data.lot) ?? { buildings: new Set<string>() }), owner: r.data.owner });
+        }
+        // Notice of building work: a new building is connected (whether it is a home, its meter says when first read);
+        // one brought down is taken off.
+        for (const n of book.open("building_notice")) {
+          if (taken.has(n.id) || !(n.addressed_to ?? []).includes(me)) continue;
+          taken.add(n.id);
+          if (typeof n.data?.removes === "string") {
+            const lot = lotOfBuilding.get(n.data.removes);
+            if (lot) lots.get(lot)?.buildings.delete(n.data.removes);
+            lotOfBuilding.delete(n.data.removes);
+          } else if (typeof n.data?.lot === "string" && typeof n.data?.structure === "string") building(n.data.lot, n.data.structure);
+        }
+        // The reader is back: each meter gone to, as it read.
+        if (p.meters) {
+          const back = visited(obs, p.meters);
+          if (back.length) out = false;
+          for (const c of back) {
+            const st = c.structure;
+            if (!st || !lotOfBuilding.has(st.structure)) continue;
+            const v = st.variables?.[p.meter];
+            if (!v) {
+              if (st.complete) unmetered.add(st.structure);
+              continue;
+            }
+            reading.set(st.structure, { litres: variableToday(v, obs.t) ?? v.value, at: obs.t });
+          }
         }
       },
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
-        // ---- each day: what the town used, drawn from the river ----
+        // ---- each day: what the town uses, drawn from the river ----
+        // (What it uses is what its people use: the statistician's published estimate of how many there are, at the
+        // world's figure a head. Nobody counts them at home.)
         const day = Math.floor(t / DAY);
         if (day !== lastDay) {
           const days = lastDay < 0 ? 1 : day - lastDay;
           lastDay = day;
-          let litres = 0;
-          for (const [h, x] of homes) {
-            const l = x.residents * p.litres_per_person_per_day * days;
-            used.set(h, (used.get(h) ?? 0) + l);
-            litres += l;
-          }
-          const kl = Math.ceil(litres / 1000);
+          const estimate = book.open("population_estimate").sort((a, b) => b.at - a.at)[0];
+          const people = Math.max(0, Math.floor(Number(estimate?.data?.residents) || 0));
+          const kl = Math.ceil((people * p.litres_per_person_per_day * days) / 1000);
           if (kl > 0) {
-            const st = because(`The town used ${kl} kL of water (${days} day${days > 1 ? "s" : ""}): drawing it from the river.`, C.call("work", { task: p.task, units: C.text(String(kl)), at: p.works }));
+            const st = because(`The town of ${people} used about ${kl} kL of water (${days} day${days > 1 ? "s" : ""}): drawing it from the river.`, C.call("work", { task: p.task, units: C.text(String(kl)), at: p.works }));
             st.then = (out) => {
               const dry = out.status !== "applied" && out.refusal?.code === "field_exhausted";
               if (dry && !restricted) {
@@ -78,15 +124,17 @@ export const water: BehaviourModule = {
             steps.push(st);
           }
         }
-        // ---- the quarter's bills: to each home's owner, the service charge and what was used ----
+        // ---- the quarter's bills: to each home's owner, the service charge and what its meter shows was used ----
         const acc = ownAccount(obs);
         if (t >= nextBill && acc) {
           nextBill = t + p.bill_every_days * DAY;
-          for (const [h, x] of [...homes].sort(([a], [b]) => (a < b ? -1 : 1))) {
-            const lot = lotOf(book, x.at);
-            const owner = lot ? ownerOf(book, lot) : undefined;
-            const kl = Math.round((used.get(h) ?? 0) / 1000);
-            used.set(h, 0);
+          for (const [h, lot] of [...lotOfBuilding].sort(([a], [b]) => (a < b ? -1 : 1))) {
+            if (unmetered.has(h)) continue;
+            const owner = lots.get(lot)?.owner;
+            // (A meter not read this quarter is billed the service charge alone; what it shows is billed when it is read.)
+            const read = reading.get(h);
+            const kl = read ? Math.max(0, Math.round((read.litres - (billedAt.get(h) ?? 0)) / 1000)) : 0;
+            if (read) billedAt.set(h, read.litres);
             if (!owner || owner === me) continue;
             const amount = p.service_per_quarter + kl * p.price_per_kl;
             steps.push(because(`The quarter's water bill for ${h}: ${usd(p.service_per_quarter)} service, and ${kl} kL at ${usd(p.price_per_kl)}.`,
@@ -96,8 +144,22 @@ export const water: BehaviourModule = {
         }
         return steps;
       },
-      // (Its daily look in the early morning, when residents are home: not wherever the day has taken them.)
       (obs) => (Math.floor(obs.t / DAY) + 1) * DAY + 6 * 3600,
+      // The round of meter readings before each quarter's bills: the reader goes to a visit's worth of meters at a
+      // time, and to the next when back.
+      (obs) => {
+        if (!p.meters) return [];
+        if (roundFor !== nextBill && obs.t >= nextBill - p.read_days * DAY) {
+          roundFor = nextBill;
+          toRead = [...lotOfBuilding.keys()].filter((h) => !unmetered.has(h)).sort();
+        }
+        // (A reader who found nothing where they went brings nothing back: after two days, the next sets out.)
+        if (out && obs.t - outSince > 2 * DAY) out = false;
+        if (out || !toRead.length) return [];
+        out = true;
+        outSince = obs.t;
+        return [goSee(p.meters, toRead.splice(0, VISIT_MAX))];
+      },
     );
   },
 };
