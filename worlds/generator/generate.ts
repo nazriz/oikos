@@ -42,7 +42,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.28.0";
+export const GENERATOR_VERSION = "0.29.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -526,7 +526,7 @@ export function generate(spec: TownSpec): any {
   const staffCount = new Map<string, number>();
   const U = V.unions;
   const unionPick = rng("union");
-  const unionMembers: { member: string; employer: string }[] = [];
+  const unionMembers: { member: string; employer: string; industry: string }[] = [];
   const monthlyPay = new Map<string, number>();
   const outOfLabourForce = new Set<string>();
   for (const c of everyone.filter((m) => m.adult)) {
@@ -567,7 +567,7 @@ export function generate(spec: TownSpec): any {
     // Union members at the start: the profile's membership rate for the work's industry, dues by standing order.
     if (unionPick.below(10_000) < (U.membership_bps[w.industry] ?? U.membership_bps.other ?? 0)) {
       const mem = `member-${c.id}`;
-      unionMembers.push({ member: c.id, employer: w.employer });
+      unionMembers.push({ member: c.id, employer: w.employer, industry: w.industry });
       records.push({ id: mem, record: "agreement", author: "genesis", at: 0, visible_to: ["union", c.id], terms: {
         template: "membership", parties: ["union", c.id],
         commitments: [{ who: "union", does: { text: `The union represents ${c.id} at work, and bargains for them.` } },
@@ -1109,9 +1109,14 @@ export function generate(spec: TownSpec): any {
   }
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
-  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), votes, { id: "prices", kind: "records", match: { statement_kinds: ["price_list"] } }, { id: "dues", kind: "accounts" }, lawBook,
+  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), votes, { id: "prices", kind: "records", match: { statement_kinds: ["price_index"] } }, { id: "dues", kind: "accounts" }, lawBook,
     { id: "closures", kind: "records", match: { statement_kinds: ["closure"] } }],
-    code("union.organiser", { employers: [...factories, ...shops, "builder"], claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, resignation_notice_days: V.unions.resignation_notice_days, dues_account: "acc-union" }));
+    // (It bargains where its members work, as its register and they tell it: nobody hands it the town's employers.)
+    code("union.organiser", { industries: [...new Set(workplaces.filter((w) => /^(factory|shop)-/.test(w.employer) || w.employer === "builder").map((w) => w.industry))].sort(), claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, resignation_notice_days: V.unions.resignation_notice_days, dues_account: "acc-union" }));
+  // The statistician (the outside world's): prices a sample of outlets each month and publishes the mean, which is what
+  // the union's claims follow.
+  office("outside-statistics", "outside", "Statistician", undefined, [{ id: "adverts", kind: "records", match: { statement_kinds: ["price_list"] }, area: "all", on_request: true }],
+    code("world.statistics", { adverts: "adverts" }));
   office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"], involving: ["self"] } }],
     code("world.disposal", { kind: "waste", price_per_tonne: SV.landfill_levy_per_tonne, account: "acc-outside" }));
   // Rates (docs/behaviour/public-finance.md): the rates officer levies them on the valuer's valuations, under the rating law.
@@ -1192,7 +1197,7 @@ export function generate(spec: TownSpec): any {
     const price = RETAIL_PRICE;
     office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market(...factories, "outside", "builder"), lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
-        suppliers: [...factories, "outside"], price, demand: SHOP.demand, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}) }));
+        suppliers: [...factories, "outside"], price, demand: SHOP.demand, shopfront: true, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}) }));
   }
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = { id: "petitions", kind: "records", match: { statement_kinds: ["petition"] }, on_request: true };
@@ -1201,7 +1206,16 @@ export function generate(spec: TownSpec): any {
   // workplace by name, and elsewhere only how full a place is. It moves with them.
   const street = { id: "street", title: "Around you", kind: "sites", area: { near: 0 } };
   // Shops' prices (and others'), and what they hold and where (their shopping).
-  const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street, { id: "prices", kind: "records", match: { statement_kinds: ["price_list", "property_for_sale"] } }, { id: "belongings", kind: "holdings" }, lawBook,
+  // Nobody is shown every shop's prices (docs/no-god-view.md). A shop's prices are put up at its premises; a person is
+  // shown those within reach of where they live and work, and can look through what sellers advertise (searched) for a
+  // shop they have heard of. Reach: so that a home has about as many shops within it as the profile says a household
+  // deals with (Lengnick's seven), given how many shops the town has for its ground.
+  const shopReach = Math.max(0, Math.ceil((Math.sqrt((V.spending.shops_known * spec.grid.w * spec.grid.h) / Math.max(1, shops.length)) - 3) / 2));
+  const citizenChannels = [{ id: "money", kind: "accounts" }, mine(), homeBoard, jobBoard, petitions, counts, street,
+    { id: "prices", title: "Prices at the shops near you", kind: "records", match: { statement_kinds: ["price_list"] }, area: { near: shopReach } },
+    { id: "adverts", title: "What sellers advertise", kind: "records", match: { statement_kinds: ["price_list"] }, area: "all", on_request: true },
+    { id: "for-sale", title: "Property for sale", kind: "records", match: { statement_kinds: ["property_for_sale"] }, on_request: true },
+    { id: "belongings", kind: "holdings" }, lawBook,
     // Enterprise agreements, looked up: a person reads their own workplace's when they plan (nobody is shown every
     // workplace's).
     { id: "work", kind: "records", match: { statement_kinds: ["enterprise_agreement"] }, on_request: true },
@@ -1223,7 +1237,7 @@ export function generate(spec: TownSpec): any {
     channels: [{ id: "books", kind: "accounts" }, mine(), deaths, lawBook, { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer", "property_for_sale", "property_sold"] } },
       { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: ["{cell}"], occupants: "names" }],
     role_module: { code: "firm.retailer", params: { premises: "{structure}", workplace: "{structure}/workplace.1", industry: "retail", lender: "bank", builder: "builder", max_staff: 6, wage: wages.shop, period: 14 * DAY, working_day: WORKING_DAY,
-      serve_labour: SHOP.serve, suppliers: [...factories, "outside"], price: RETAIL_PRICE, demand: SHOP.demand, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } },
+      serve_labour: SHOP.serve, suppliers: [...factories, "outside"], price: RETAIL_PRICE, demand: SHOP.demand, shopfront: true, founder: "{founder}", capital: "{capital}", listing: "{listing}", bank: "bank", ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } },
   };
   // "population" is who could sign a petition: the adults.
   // (With the clinic: treatable deaths come through illness, and care cuts them; docs/behaviour/life.md.)
@@ -1236,6 +1250,7 @@ export function generate(spec: TownSpec): any {
     ...(UT ? { utilities: { energy: "energy-co" } } : {}),
     ...(HZ ? { relief: "town-hall/hall.1" } : {}),
     ...(OW ? { register: { lots: "lots", titles: "titles", dealings: "dealings" } } : {}), work_board: "work",
+    adverts: "adverts", sale_board: "for-sale", shop_search_bps: V.spending.shop_search_bps_per_month, shops_known: V.spending.shops_known,
     // Whom someone leaving town tells: where they are enrolled, who supplies them, who pays them support or a pension.
     tell_on_leaving: [...(E ? ["city"] : []), ...(UT ? ["energy-co"] : []), "outside", ...(FUND ? [FUND] : [])],
     ...(OW?.market ? { market: { buy_bps: OW.market.buy_bps_per_month, deposit_bps: OW.market.deposit_bps, costs_bps: OW.market.costs_bps, mortgage_months: OW.market.mortgage_months, relist_days: OW.market.relist_days, cut_bps: OW.market.cut_bps, floor_bps: OW.market.floor_bps,

@@ -62,6 +62,7 @@ Rules every module follows (so re-runs are reproducible):
 | `world.disposal` | the outside world's landfill: invoices monthly for what's delivered, at a price a tonne | [services.md](services.md) |
 | `city.rates_officer` | levies rates on the valuer's valuations under the rating law, records them as claims, charges penalty interest on what's overdue | [public-finance.md](public-finance.md) |
 | `world.weather` | the outside world's weather bureau: warns of heavy rain, drought and heatwaves ahead (the weather itself is drawn for the run from the climate) | [weather.md](weather.md) |
+| `world.statistics` | the outside world's statistician: prices a sample of outlets monthly and publishes the mean (a price index) | [boundary.md](boundary.md) |
 | `world.valuer` | the outside world's valuer: values every private property yearly (land, plus the builder's price for its buildings) | [public-finance.md](public-finance.md) |
 | `world.grants` | the outside world's grants to the town: quarterly, per resident | [public-finance.md](public-finance.md) |
 | (payroll) | employers withhold income tax under the published law and pay it over monthly, in `Staffing` | [public-finance.md](public-finance.md) |

@@ -42,7 +42,8 @@ export function held(obs: Observation, at: string, kind: string): number {
 }
 
 /** Publishing (or republishing) a price list: the kinds of goods sold and their unit prices, and where to pay. */
-export function priceList(prices: { [kind: string]: number }, account: string, text: string, extra: { min_order?: number; [k: string]: unknown } = {}, seller?: string): C.Call {
+/** `on`: the cell it is put up on (a shop's prices in its window: seen by those who pass, not sent to the town). */
+export function priceList(prices: { [kind: string]: number }, account: string, text: string, extra: { min_order?: number; [k: string]: unknown } = {}, seller?: string, on?: string): C.Call {
   // With one kind of goods, it's also an offer (docs/design/ai-citizens.md 2a): order, pay the unit price, and the goods
   // are delivered, per unit. (A list of several kinds isn't one offer: those are left as lists for now.)
   const kinds = Object.keys(prices);
@@ -51,7 +52,7 @@ export function priceList(prices: { [kind: string]: number }, account: string, t
     { who: "taker", does: { outcome: { money: { to: account, amount: String(prices[k]), for: k } } }, per: "unit" },
     { who: seller, does: { outcome: { goods: { kind: k, quantity: "1" } } }, per: "unit" },
   ] } } : undefined;
-  return say("price_list", text, { visible: "public", data: { goods: prices, account, ...extra }, ...(offer ? { offer } : {}) });
+  return say("price_list", text, { visible: "public", data: { goods: prices, account, ...extra }, ...(offer ? { offer } : {}), ...(on ? { on } : {}) });
 }
 
 /**

@@ -365,6 +365,51 @@ export const weather: BehaviourModule = {
 };
 
 /**
+ * world.statistics: the statistician the world's government keeps (for a town, an office of a higher government: the
+ * outside world). Once a month its collectors read the prices of a sample of outlets (a search of what sellers
+ * advertise, the first `sample` standing lists that sell to anyone) and it publishes the mean for each kind of goods:
+ * a price index, which is what anyone who needs "prices" reads (a union's claim). Documented in docs/behaviour/boundary.md.
+ */
+export const statistics: BehaviourModule = {
+  name: "world.statistics",
+  version: "0.1.0",
+  doc: "docs/behaviour/boundary.md",
+  cadence: () => DAY,
+  firstWake: () => 0,
+  create(ctx) {
+    const p = params({
+      adverts: "", // its channel onto what sellers advertise, searched (the world must say)
+      sample: 200, // outlets priced a month, at most (placeholder: what one search reads)
+      every_days: 30,
+    }, ctx.params);
+    need(p, ["adverts"], "world.statistics");
+    let next = 0;
+    let read: StatementRecord[] | undefined;
+    return stepper(
+      (obs) => {
+        const ch = obs.channels[p.adverts];
+        if (ch?.kind === "records" && ch.search) read = ch.records as StatementRecord[];
+      },
+      (obs) => {
+        if (!read) return [];
+        const lists = read.filter((r) => r.data?.goods && !r.data?.min_order);
+        read = undefined;
+        next = obs.t + p.every_days * DAY;
+        const by = new Map<string, number[]>();
+        for (const r of lists) for (const [kind, price] of Object.entries(r.data!.goods as { [k: string]: unknown })) if (typeof price === "number") by.set(kind, [...(by.get(kind) ?? []), price]);
+        return [...by].sort(([a], [b]) => (a < b ? -1 : 1)).map(([kind, prices]) => {
+          const mean = Math.round(prices.reduce((x, y) => x + y, 0) / prices.length);
+          return because(`This month's prices of ${kind}, read at ${prices.length} outlets: publishing the mean.`,
+            say("price_index", `Price index, ${kind}: ${usd(mean)} on average at ${prices.length} outlets.`, { visible: "public", data: { kind, mean, outlets: prices.length } }));
+        });
+      },
+      () => next,
+      (obs) => (obs.t >= next && !read ? [ask.board(p.adverts, { most: p.sample })] : []),
+    );
+  },
+};
+
+/**
  * world.valuer: the valuer the world's government keeps (for a town, an office of a higher government: the outside
  * world, D31). Once a year it values every property that someone other than the exempt owns: the lot's land, at the
  * world's land value, plus each building on it at what the builder would charge to build it now (its published

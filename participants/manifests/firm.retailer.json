@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -256,6 +256,13 @@
       },
       "unit": "days",
       "default": 3,
+      "source": "placeholder"
+    },
+    "shopfront": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
       "source": "placeholder"
     },
     "short_days": {

@@ -117,7 +117,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.38.0",
+  version: "0.39.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -159,6 +159,16 @@ export const citizen: BehaviourModule = {
       // (docs/design/ai-citizens.md 3b, 3c): it replaces Lengnick's price and quantity switching rules.
       shop_every_days: 14,
       beta: 5, // shops tried in one trip, at most
+      // How a household comes to know a shop's prices (docs/behaviour/citizen.md, "Which shops a household knows"): it
+      // is shown the prices put up at the shops near where it lives and works; and it looks through what sellers
+      // advertise (`adverts`: its channel onto that, searched; none: it knows what it is shown) for a shop it has
+      // heard of from someone it knows, with this chance a month, or for a few shops when it knows none.
+      adverts: "",
+      shop_search_bps: 2500, // Lengnick 2013, Table 1: the monthly chance of looking at another seller's price (0.25)
+      shops_known: 7, // Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none
+      // Property for sale (docs/behaviour/ownership.md): the channel onto the listings, searched when we're looking to
+      // buy a home or premises (none: we know the listings we're shown).
+      sale_board: "",
       // The mind (docs/design/ai-citizens.md 3): the world's figures for drawing people's values, and its thresholds.
       values: { values: {} } as PopulationValues,
       essentials_units: 10, // goods a household uses in a fortnight, for how well subsistence is met (placeholder)
@@ -283,6 +293,13 @@ export const citizen: BehaviourModule = {
     // Attention: the market is looked at only when hunting, as a search (what's on offer now).
     let lookedAt = -1;
     const found: { homes: StatementRecord[]; jobs: StatementRecord[]; petitions: StatementRecord[] } = { homes: [], jobs: [], petitions: [] };
+    /** Property for sale, as far as we know: what our last look at the listings showed (searched), or, shown listings
+     * unasked, those standing. */
+    let onSale: StatementRecord[] | null = null;
+    let saleAsked = false;
+    const forSaleNow = (): StatementRecord[] => (p.sale_board ? onSale ?? [] : book.open("property_for_sale"));
+    let nextShopSearch = ctx.rng("shop-search-day").below(30) * DAY;
+    const lookedUp = new Set<string>(); // shops whose prices we know from looking them up, not from passing
     let homelessSince: number | null = null;
     let joblessSince: number | null = null;
     let nextSpend = ctx.rng("spend-day").below(30) * DAY;
@@ -626,6 +643,12 @@ export const citizen: BehaviourModule = {
         }
       }
       while (inflows.length && inflows[0]!.t < obs.t - p.income_window_days * DAY) inflows.shift();
+      const ads = p.adverts ? obs.channels[p.adverts] : undefined;
+      if (ads?.kind === "records" && ads.search) for (const r of ads.records) if (r.speaks_for) lookedUp.add(r.speaks_for);
+      const sale = p.sale_board ? obs.channels[p.sale_board] : undefined;
+      // (Only the answer to a look we just made: the channel goes on holding its last answer.)
+      if (saleAsked && sale?.kind === "records" && sale.search) onSale = sale.records as StatementRecord[];
+      saleAsked = false;
       for (const k of ["homes", "jobs", "petitions"] as const) {
         const ch = obs.channels[k];
         if (ch?.kind !== "records" || !ch.search) continue;
@@ -1064,7 +1087,7 @@ export const citizen: BehaviourModule = {
         else if (at !== toldUnion) {
           toldUnion = at;
           steps.push(because(at ? `Telling the union we now work at ${at}.` : "Telling the union we're out of work.",
-            say("membership_update", at ? `I now work at ${at}.` : "I'm no longer in work.", { to: [p.union], visible: [me, p.union], data: { employer: at } })));
+            say("membership_update", at ? `I now work at ${at}.` : "I'm no longer in work.", { to: [p.union], visible: [me, p.union], data: { employer: at, ...(at && industryOf.has(at) ? { industry: industryOf.get(at) } : {}) } })));
         }
       }
       // What joining would mean to someone like us, if the run has the sparse mind (docs/design/ai-citizens.md 4): asked
@@ -1096,7 +1119,7 @@ export const citizen: BehaviourModule = {
         if (!member) decided.push({ t, domain: "membership", strategy: "deliberate", choice: joins ? "join" : "not",
           options: [{ key: "join", score: chance }, { key: "not", score: 10_000 - chance }] });
         if (joins)
-          steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%${saidJoin ? `, thinking what it would mean to me: ${Math.round((saidJoin.join ?? 0) / 1_000)} of 10 against ${Math.round((saidJoin.not ?? 0) / 1_000)} not to` : ""}).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer } })));
+          steps.push(because(`A new job: joining the union (${rate / 100}% of those working in ${industry.replaceAll("_", " ")} do; for me, ${chance / 100}%${saidJoin ? `, thinking what it would mean to me: ${Math.round((saidJoin.join ?? 0) / 1_000)} of 10 against ${Math.round((saidJoin.not ?? 0) / 1_000)} not to` : ""}).`, say("membership_application", "Application to join.", { to: [p.union], visible: [me, p.union], data: { account: acc.account, employer: job.employer, industry } })));
       }
       for (const r of fresh) {
         if (r.record === "agreement" && r.terms.template === "membership" && r.terms.parties.includes(me) && !book.signedBy(r.id, me)) {
@@ -1458,7 +1481,7 @@ export const citizen: BehaviourModule = {
       if (!founded && p.ventures.length && p.found_bps > 0 && t >= nextVenture && !retired && p.in_labour_force) {
         nextVenture = t + MONTH;
         const housing = home?.rent ?? share?.cents ?? 0;
-        const listings = book.open("property_for_sale").filter((l) => p.ventures.some((v) => v.kind === l.data?.type)).sort((a, b) => (a.data.price as number) - (b.data.price as number) || (a.id < b.id ? -1 : 1));
+        const listings = forSaleNow().filter((l) => p.ventures.some((v) => v.kind === l.data?.type)).sort((a, b) => (a.data.price as number) - (b.data.price as number) || (a.id < b.id ? -1 : 1));
         const l = listings.find((x) => acc.balance >= (x.data.price as number) + p.ventures.find((v) => v.kind === x.data.type)!.capital + 3 * (housing + p.essentials));
         // The month's chance (the cited prior), shifted by the person: the open (stimulation, self-direction) and those
         // who value achievement found more often.
@@ -1924,7 +1947,7 @@ export const citizen: BehaviourModule = {
     // ---- homes for sale (docs/behaviour/ownership.md) ----
     type Selling = { lot: string; space?: string; structure: string; bedrooms?: number; price: number; asked: number; /** Every listing we've made of it (a buyer may answer one since replaced by a cheaper). */ listings: string[]; leaveAfter: boolean; listing?: string; buyer?: string; buyerAccount?: string; received: number; sold?: boolean; loan?: string };
     let selling: Selling | null = null;
-    let buying: { listing: string; seller: string; account: string; price: number; lot: string; space: string; structure: string; stage: "applied" | "paid"; since: number; funded?: boolean } | null = null;
+    let buying: { listing: string; seller: string; account: string; price: number; lot: string; space: string; structure: string; stage: "applied" | "paid"; since: number; funded?: boolean; goneSince?: number } | null = null;
     let nextBuyChance = ctx.rng("buy-day").below(30) * DAY;
     let soldAndGoing: number | null = null; // when we'd sold up to leave (we go at a later wake, with what's left)
     const soldLots = new Set<string>();
@@ -2025,9 +2048,13 @@ export const citizen: BehaviourModule = {
         // (Still for sale: the listing we answered, or the seller's later one for the same lot. A home relisted cheaper
         // is the same home, and the seller takes a purchase answering any of its listings; we are shown listings being
         // taken down now, and a relisting must not read as the home gone.)
-        const forSale = book.open("property_for_sale").some((r) => r.id === b.listing || (r.speaks_for === b.seller && r.data?.lot === b.lot));
-        if (declined || !forSale || t - b.since > 60 * DAY) buying = null;
-        else if (b.funded && acc.balance >= b.price) {
+        const forSale = forSaleNow().some((r) => r.id === b.listing || (r.speaks_for === b.seller && r.data?.lot === b.lot));
+        // (Looked up, a home being relisted can be found with no listing standing for a moment, the old one taken down
+        // and the new not yet up: it is gone when a look a day or more later still finds none.)
+        if (forSale) b.goneSince = undefined;
+        else b.goneSince ??= t;
+        if (declined || (!forSale && t - b.goneSince! >= DAY) || t - b.since > 60 * DAY) buying = null;
+        else if (forSale && b.funded && acc.balance >= b.price) {
           b.stage = "paid";
           steps.push(because(`Our mortgage is through: buying ${b.structure} for ${usd(b.price)}.`,
             say("property_purchase", `Purchase of ${b.structure}, as listed.`, { to: [b.seller], visible: [me, b.seller], basis: b.listing, data: { listing: b.listing, account: acc.account } }),
@@ -2047,7 +2074,7 @@ export const citizen: BehaviourModule = {
         nextBuyChance = t + MONTH;
         if (ctx.rng(`buy-${t}`).below(10_000) < m.buy_bps && borrowing.canApply(t)) {
           const rooms = minBedrooms(t);
-          const l = book.open("property_for_sale")
+          const l = forSaleNow()
             .filter((r) => r.data?.type === "home" && r.speaks_for !== me && Number(r.data?.bedrooms ?? rooms) >= rooms && acc.balance * 10_000 >= Number(r.data?.price) * (m.deposit_bps + m.costs_bps))
             .sort((a, b) => Number(a.data?.price) - Number(b.data?.price) || (a.id < b.id ? -1 : 1))[0];
           if (l) {
@@ -2375,6 +2402,29 @@ export const citizen: BehaviourModule = {
           if (lookedAt !== obs.t && acc) {
             if (needHome) looks.push(ask.board("homes", { most: p.search_limit, where: [{ field: "data.rent", op: "<=", value: budget }, ...roomy], by: "data.rent", desc: true }));
             if ((!job || searchingWork) && !retired && p.in_labour_force) looks.push(ask.board("jobs", { most: p.search_limit, by: "data.wage", desc: true }));
+            // The listings of property for sale, when we're looking: waiting on a purchase (the seller's own listings,
+            // to know it still stands), or with this month's chance of buying a home or founding a business coming up.
+            if (p.sale_board) {
+              if (buying) looks.push(ask.about(p.sale_board, "speaks_for", buying.seller, { most: p.search_limit, standing: true }));
+              else if ((p.market && home && !home.owned && !selling && obs.t >= nextBuyChance) || (!founded && p.ventures.length && p.found_bps > 0 && obs.t >= nextVenture && !retired && p.in_labour_force))
+                looks.push(ask.board(p.sale_board, { most: p.search_limit, by: "data.price" }));
+              else onSale = null;
+              saleAsked = looks.some((l) => l.channel === p.sale_board);
+            }
+            // What sellers advertise: a few shops, if we know of none; else, with the month's chance, the prices of a
+            // shop someone we know shops at and we don't; else those of our own shop, if we know it only from looking.
+            if (p.adverts) {
+              const known = new Set(book.standingOf("price_list").map((r) => r.speaks_for));
+              const knowsShop = book.standingOf("price_list").some((r) => r.data?.goods?.[p.goods] !== undefined && !r.data?.min_order);
+              let shop: string | undefined;
+              if (knowsShop && obs.t >= nextShopSearch) {
+                nextShopSearch = obs.t + MONTH;
+                if (ctx.rng(`shop-search-${obs.t}`).below(10_000) < p.shop_search_bps) shop = newsNow(obs.t).map((n) => n.shop).filter((s): s is string => !!s && !known.has(s)).sort()[0];
+              }
+              if (!knowsShop) looks.push(ask.board(p.adverts, { most: p.shops_known, where: [{ field: "data.at", op: ">", value: "" }] }));
+              else if (shop) looks.push(ask.about(p.adverts, "speaks_for", shop, { most: 1, standing: true, newest: true }));
+              else if (favourite && lookedUp.has(favourite)) looks.push(ask.about(p.adverts, "speaks_for", favourite, { most: 1, standing: true, newest: true }));
+            }
             // A glance at the petitions board: what's standing now.
             looks.push(ask.board("petitions", { most: 10 }));
             // And at the notices at work: an enterprise agreement at our own workplace, made since we started there.

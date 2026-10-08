@@ -79,6 +79,30 @@ A citizen doesn't receive the housing or job market. It looks when it needs to, 
 - **Always:** its own records (among them its own titles), money and holdings, the laws, the town's gatherings and teachings, and prices.
 - **The land register** (0.36.0): never shown, searched when a paper of its own calls for it: the plan of a lot it holds, and a title passed to it with the dealings in it ([ownership.md](ownership.md), "What an owner knows").
 
+## Which shops a household knows, and how it finds a home for sale (citizen 0.39.0, retailer 0.7.0, generator 0.29.0)
+
+Nobody has a god's view (docs/no-god-view.md). Until 0.39.0 every person was shown every shop's price list and every
+property for sale, as each was published, and compared every shop in town at every trip.
+
+| | Rule | Source |
+|---|---|---|
+| **A shop's prices are in its window** | A shop puts its price list up at its premises (`shopfront`; the record is placed on its cell). It is seen by those within reach of it, and found by anyone who looks through what sellers advertise. | — |
+| **The shops one passes** | A person is shown the prices put up within `reach` cells of the building they are in (their home; their work, when there). What they have seen they remember. Reach is worked out by the generator so that a home has, on average, as many shops within it as the profile says a household deals with (`spending.shops_known`, 7), given the town's ground and its number of shops. | A household "only ha[s] trading relations with 7 different firms" and knows those firms' prices: Lengnick, M. (2013), "Agent-based macroeconomics: A baseline model", *Journal of Economic Behavior & Organization* 86, section 2 and Table 1 (n = 7), opened 2026-10-08. A model's figure, not this place's: the nearest survey figure found is 4.4 grocery stores a month for a household in the United States (an industry survey as reported in the press: to confirm). Consumers consider "only a small fraction of those available (typically 10%)" (Ding, Gaskin & Hauser 2009, reviewing Hauser & Wernerfelt 1990; opened) |
+| **Word of mouth** | With the profile's chance each month (`spending.shop_search_bps_per_month`, 25%), a person who has heard from someone they know of a shop they don't know (what people say of where they shop: "Word of mouth", below) looks up that shop's prices in what sellers advertise (one search, by the shop). | Lengnick 2013, Table 1: each month, with probability 0.25, a household compares a seller it deals with against one other. His other seller is drawn at random by size; here it is one heard of, since nobody has the list to draw from. No sourced share for how people learn of a new shop was found |
+| **Knowing none** | A person who knows no shop at all (new to town, or with none in reach) looks through what sellers advertise and takes the first `shops_known` that sell from premises. | — (someone new asks around) |
+| **A shop known only by looking** | Its prices are read again at each plan while it is the shop they use (one search); a shop in reach is kept up by being passed. | — |
+| **Choosing among those known** | As before (the mind's choice among the shops' offers; another shop tried when one runs short, up to `beta` a trip), among the shops known. | Lengnick 2013; docs/design/ai-citizens.md 3b |
+| **Property for sale** | The listings are looked at only by someone looking: with the month's chance of buying a home or founding a business coming up, the first `search_limit` (20) standing listings, cheapest first; while a purchase is under way, the seller's own listings, to know the home still stands for sale (relisted, a home can be found with no listing for a moment: it is gone when a look a day later still finds none). Their own listing is their own paper. | Buyers search listings when they are buying: a median of 10 weeks and 7 homes looked at (National Association of Realtors, 2024 *Profile of Home Buyers and Sellers*, as reported by Virginia REALTORS; opened, the report itself is paywalled); 51% found the home they bought by their own online search (to confirm) |
+
+**Parameters.** `adverts`, `sale_board` (the person's channels onto what sellers advertise and onto property for sale;
+none: they know what they are shown, as in a hand-built world), `shop_search_bps` (2500), `shops_known` (7),
+`search_limit` (20).
+
+**What knowing less does** (the 1,000-person month, one seed): everyone still shops (764 buyers before and after), at
+fewer shops (5 at most in the month, where some used 7; 352 used one shop, 231 before); 14% fewer goods are bought
+(21,194 for 24,779), because what a shop cannot serve is less often bought elsewhere (493 second tries for 854); and
+shops' trade is uneven by where they stand (184 to 1,536 goods a shop, where it was 517 to 1,258).
+
 ## Position: what a citizen can see around it (D44)
 
 A citizen sees the lots touching where it lives, works and gathers ("Around you"): what's on each, and how full it is. In its own buildings it sees who's there. The view moves when it moves. It also tells whether it's actually in its workplace before leaving it.

@@ -30,14 +30,17 @@ interface Dispute {
 
 export const organiser: BehaviourModule = {
   name: "union.organiser",
-  version: "0.4.1",
+  version: "0.5.0",
   doc: "docs/behaviour/unions.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
   create(ctx: ParticipantContext) {
     const p = params(
       {
-        employers: [] as string[], // whom it bargains with, where it has members
+        employers: [] as string[], // workplaces it is told of besides (none: it bargains where its members work, as it learns of them)
+        // The industries it organises (its rules of eligibility: the world gives them; none: wherever it has members).
+        // A workplace is one of its own when a member there has said its industry is one of these.
+        industries: [] as string[],
         claim_margin_bps: 0, // claimed over the year's rise in prices (the world's profile)
         accept_share_bps: 5000, // an offer of at least this share of the claim is accepted (placeholder)
         bargain_every_days: 365,
@@ -52,7 +55,7 @@ export const organiser: BehaviourModule = {
         compliance_bps: 10_000, // how often it keeps to the law when the law forbids an action it would take
         stoppage_days: [1, 2, 3] as number[], // each stoppage, longer each time (placeholder)
         between_days: 7, // after a stoppage, an improved offer awaited this long before the next
-        price_kind: "goods", // prices tracked for the claim (shops' price lists)
+        price_kind: "goods", // prices tracked for the claim (the published index of this kind's price)
         dues: 0, // a month, in the smallest unit (the world's profile)
         resignation_notice_days: 0, // a member's notice of resigning, written into each membership (the world's profile; 0: none written)
         dues_account: "",
@@ -64,9 +67,12 @@ export const organiser: BehaviourModule = {
     const disputes = new Map<string, Dispute>(); // employer -> the dispute in hand
     const agreedAt = new Map<string, number>(); // employer -> when it last agreed
     const employerOf = new Map<string, string>(); // member -> their employer, as the union has it
+    const industryAt = new Map<string, string>(); // employer -> its industry, as a member there has said
     const prices: { t: number; mean: number }[] = []; // the mean shop price, monthly
     const handled = new Set<string>();
-    const stagger = new Map(p.employers.map((e, i) => [e, Math.floor(((i + 1) * p.first_claim_days * DAY) / Math.max(1, p.employers.length))]));
+    // When each workplace's first claim is due: those known at our first plan are spread over `first_claim_days`; one
+    // we learn of later (a member starts there, or joins from there), from then.
+    const stagger = new Map<string, number>();
     let offered = false;
     // Where our members work, as we have it (truth audits): each a job in force with that employer.
     const beliefs = (): Belief[] => {
@@ -93,7 +99,10 @@ export const organiser: BehaviourModule = {
           }
         }
         // Members: the register at the start, and those who've joined since (membership agreements in force).
-        for (const r of book.all("membership_register")) for (const m of (r.data?.members as { member: string; employer: string }[]) ?? []) if (!employerOf.has(m.member)) employerOf.set(m.member, m.employer);
+        for (const r of book.all("membership_register")) for (const m of (r.data?.members as { member: string; employer: string; industry?: string }[]) ?? []) if (!employerOf.has(m.member)) {
+          employerOf.set(m.member, m.employer);
+          if (m.industry) industryAt.set(m.employer, m.industry);
+        }
         const inForce = new Set(book.ofType("agreement").filter((r) => r.record === "agreement" && r.terms.template === "membership" && r.terms.parties[0] === me && book.inForce(r.id)).map((r: any) => r.terms.parties[1] as string));
         // Applications to join: a membership offered, its dues by standing order.
         for (const a of book.open("membership_application")) {
@@ -101,6 +110,7 @@ export const organiser: BehaviourModule = {
           handled.add(a.id);
           const who = a.speaks_for!;
           if (typeof a.data?.employer === "string") employerOf.set(who, a.data.employer);
+          if (typeof a.data?.employer === "string" && typeof a.data?.industry === "string") industryAt.set(a.data.employer, a.data.industry);
           if (inForce.has(who)) continue;
           steps.push(because(`${who} asks to join: offering membership, ${smallestNow(p.dues)} a month in dues.`,
             offer(who, { template: "membership", ourNotice: MONTH, ...(p.resignation_notice_days > 0 ? { theirNotice: p.resignation_notice_days * DAY } : {}), we: C.text(`${me} represents ${who} at work, and bargains for them.`) as any,
@@ -111,20 +121,29 @@ export const organiser: BehaviourModule = {
           if (handled.has(u.id) || !(u.addressed_to ?? []).includes(me)) continue;
           handled.add(u.id);
           employerOf.set(u.speaks_for!, typeof u.data?.employer === "string" ? u.data.employer : "");
+          if (typeof u.data?.employer === "string" && typeof u.data?.industry === "string") industryAt.set(u.data.employer, u.data.industry);
         }
         // Employers that have closed (their public notice): nobody to bargain with.
         const closed = new Set(book.open("closure").map((r) => (typeof r.data?.firm === "string" ? r.data.firm : r.speaks_for!)));
         const membersAt = (employer: string) => [...employerOf].filter(([m, e]) => e === employer && inForce.has(m)).map(([m]) => m).sort();
 
-        // Prices: the mean of the shops' published prices, once a month.
+        // Prices: the published index (the statistician's mean of shop prices), as last read, once a month. Nobody is
+        // shown every shop's prices (docs/no-god-view.md).
         if (!prices.length || t - prices.at(-1)!.t >= MONTH) {
-          const lists = book.open("price_list").filter((r) => typeof r.data?.goods?.[p.price_kind] === "number" && !r.data?.min_order);
-          if (lists.length) prices.push({ t, mean: lists.reduce((x, r) => x + (r.data!.goods[p.price_kind] as number), 0) / lists.length });
+          const index = book.open("price_index").filter((r) => r.data?.kind === p.price_kind && typeof r.data?.mean === "number").sort((a, b) => b.at - a.at)[0];
+          if (index) prices.push({ t, mean: index.data!.mean as number });
         }
+        // Workplaces: where our members work, as they have told us, and any we were told of at the start.
+        const ours = (e: string) => !p.industries.length || p.industries.includes(industryAt.get(e) ?? "");
+        const workplaces = [...new Set([...p.employers, ...[...employerOf].filter(([m, e]) => e && inForce.has(m) && ours(e)).map(([, e]) => e)])].sort();
+        const first = stagger.size === 0;
+        workplaces.forEach((e, i) => {
+          if (!stagger.has(e)) stagger.set(e, first ? Math.floor(((i + 1) * p.first_claim_days * DAY) / Math.max(1, workplaces.length)) : t);
+        });
         const yearAgo = [...prices].reverse().find((x) => t - x.t >= 365 * DAY);
         const inflation = yearAgo && prices.length ? Math.round(((prices.at(-1)!.mean - yearAgo.mean) * 10_000) / yearAgo.mean) : 0;
 
-        for (const employer of p.employers) {
+        for (const employer of workplaces) {
           if (closed.has(employer)) {
             if (disputes.delete(employer)) steps.push(because(`${employer} has closed: our dispute there is over.`));
             continue;

@@ -60,7 +60,9 @@ test("an offer too low: a ballot, notice, stoppages without pay, then an agreeme
   // The union bargains only at factory-1, where everyone is a member, and soon; it claims a lot, and settles only for
   // most of it; members all vote, and vote yes.
   const org = config.participants.find((p: any) => p.id === "union-organiser-system").controller.params;
-  Object.assign(org, { employers: ["factory-1"], first_claim_days: 5, claim_margin_bps: 5000, accept_share_bps: 9000 });
+  // (Since union 0.5.0 it bargains wherever members in the industries it organises work, as they tell it, and at any
+  // workplace it is told of besides: here it organises no industry, and is told of factory-1.)
+  Object.assign(org, { employers: ["factory-1"], industries: ["none"], first_claim_days: 5, claim_margin_bps: 5000, accept_share_bps: 9000 });
   const staff = config.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment" && r.terms.parties[0] === "factory-1").map((r: any) => r.terms.parties[1]);
   const register = config.world.records.find((r: any) => r.id === "union-register");
   for (const c of staff) {

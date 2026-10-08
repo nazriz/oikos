@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.6.1",
+  version: "0.7.0",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -65,6 +65,9 @@ export const retailer: BehaviourModule = {
         premises_sale_bps: 5000,
         // A shop just founded (docs/behaviour/entry.md): who founded it, the capital they put in, the property listing it
         // buys its premises from, and its bank. None: a shop that's trading already.
+        // Our prices are put up at our premises (seen by those who live, work or shop near; found by anyone who looks
+        // through what sellers advertise), not sent to the town: docs/behaviour/retailer.md. False: published to all.
+        shopfront: false,
         founder: null as string | null,
         capital: 0,
         listing: null as string | null,
@@ -300,7 +303,7 @@ export const retailer: BehaviourModule = {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our price is now ${usd(price)}.` : "Publishing our price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
-            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises }, me)));
+            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises }, me, p.shopfront ? premisesOf(obs)?.cell : undefined)));
         }
 
         // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----

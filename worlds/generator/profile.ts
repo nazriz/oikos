@@ -34,7 +34,7 @@ export interface Profile {
       apartment_units: { bedrooms: number; count: number; rent: number }[];
       house_types: { id: string; bedrooms: number; share_bps: number; rent: number }[];
     };
-    spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number };
+    spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
     retirement_age: number;
