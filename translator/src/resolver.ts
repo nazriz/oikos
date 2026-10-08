@@ -60,7 +60,7 @@ export function asLabel(s: string): string {
 }
 
 
-/** A length of time in words: whole days where it is whole days ("14 days", "1 day"), seconds otherwise. */
+/** A length of time in words: whole days where it is whole days ("14 days", "1 day"), else hours and minutes; seconds only where nothing rounder fits. */
 export const durationWords = forms.durationWords;
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */

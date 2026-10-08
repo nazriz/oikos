@@ -21,11 +21,11 @@ const bank = () => bankPaymentSystem.create(context("bank-pay-system", "bank", {
 const at = (m: any, t: number, records: any[], balances: { [account: string]: number }) => wake(m, t, { requests: { kind: "records", records }, custody: custody(balances), who }, { entity: "bank" }).said;
 
 test("the words a bank uses for a payment that failed for want of money are the words its readers know it by, and no other note of the bank's reads as one", () => {
-  const note = PAYMENT_FAILED.note("100000 cents", "acc-landlord", "rec.12");
-  expect(note).toBe("Payment of 100000 cents to acc-landlord (request rec.12) failed: insufficient funds.");
+  const note = PAYMENT_FAILED.note("$1,000.00", "acc-landlord", "rec.12");
+  expect(note).toBe("Payment of $1,000.00 to acc-landlord (request rec.12) failed: insufficient funds.");
   expect(PAYMENT_FAILED.is(note)).toBe(true);
   // The bank's other notes about a request: a payment the world refused, and a request it can't carry out.
-  expect(PAYMENT_FAILED.is("Payment of 100000 cents to acc-landlord (request rec.12) couldn't be made: there's no such account.")).toBe(false);
+  expect(PAYMENT_FAILED.is("Payment of $1,000.00 to acc-landlord (request rec.12) couldn't be made: there's no such account.")).toBe(false);
   expect(PAYMENT_FAILED.is("Request rec.12 not carried out: this bank doesn't keep account acc-x.")).toBe(false);
   expect(PAYMENT_FAILED.is("Your application failed.")).toBe(false);
 });
@@ -48,8 +48,8 @@ test("a payment the account can't cover isn't made: the holder is told, once, in
   const so = request("so-1", 0, "c1", 100_000, { every: MONTH, first: 0 });
   // Day 0: $999.99 in the account, a cent short.
   const day0 = at(m, 0, [so], { c1: 99_999 });
-  expect(day0.map((c) => [c.fn, c.args])).toEqual([["message", { to: ["c1"], text: PAYMENT_FAILED.note("100000 cents", "acc-landlord", "so-1"), re: "so-1" }]]);
-  expect(day0[0]!.args.text).toBe("Payment of 100000 cents to acc-landlord (request so-1) failed: insufficient funds.");
+  expect(day0.map((c) => [c.fn, c.args])).toEqual([["message", { to: ["c1"], text: PAYMENT_FAILED.note("$1,000.00", "acc-landlord", "so-1"), re: "so-1" }]]);
+  expect(day0[0]!.args.text).toBe("Payment of $1,000.00 to acc-landlord (request so-1) failed: insufficient funds.");
   // The money arrives the next day: nothing. The missed payment is the payer's to make good, not the bank's to retry.
   expect(at(m, DAY, [], { c1: 900_000 })).toEqual([]);
   expect(at(m, 29 * DAY, [], { c1: 900_000 })).toEqual([]);
@@ -63,7 +63,7 @@ test("a payment the account can't cover isn't made: the holder is told, once, in
 test("a one-off payment that fails is told and done with; and payments due together are met in order while the money lasts", () => {
   const m = bank();
   const once = request("pay-1", DAY, "c1", 70_000);
-  expect(at(m, DAY, [once], { c1: 100 }).map((c) => [c.fn, c.args.text])).toEqual([["message", "Payment of 70000 cents to acc-landlord (request pay-1) failed: insufficient funds."]]);
+  expect(at(m, DAY, [once], { c1: 100 }).map((c) => [c.fn, c.args.text])).toEqual([["message", "Payment of $700.00 to acc-landlord (request pay-1) failed: insufficient funds."]]);
   expect(at(m, 2 * DAY, [], { c1: 900_000 })).toEqual([]);
   // Three one-offs from one account holding enough for the first two (by due time, then request id): the third fails,
   // counted against what the first two leave.
@@ -78,7 +78,7 @@ test("a payment the world refuses is reported to the holder in other words (it \
   const obs = (more: object) => ({ t: DAY, entity: "bank", participant: "bank-pay-system", channels, inbox: [], outcomes: [], woke_for: "cadence", ...more }) as unknown as Observation;
   expect(callsOf(m.step(obs({}), undefined as any) as any).map((c) => c.fn)).toEqual(["money"]);
   const told = callsOf(m.step(obs({ woke_for: "done", outcomes: [{ action: "a", t: DAY, status: "refused", refusal: { code: "unknown_account" } }], channels: { ...channels, requests: { kind: "records", records: [] } } }), undefined as any) as any);
-  expect(told.map((c) => [c.fn, c.args])).toEqual([["message", { to: ["c1"], text: "Payment of 70000 cents to acc-landlord (request pay-1) couldn't be made: there's no such account.", re: "pay-1" }]]);
+  expect(told.map((c) => [c.fn, c.args])).toEqual([["message", { to: ["c1"], text: "Payment of $700.00 to acc-landlord (request pay-1) couldn't be made: there's no such account.", re: "pay-1" }]]);
   expect(PAYMENT_FAILED.is(told[0]!.args.text)).toBe(false);
 });
 
