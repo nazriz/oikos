@@ -1,8 +1,8 @@
 {
  "id": "br-mg-2026",
- "place": "A small town of a few thousand people in the interior of Minas Gerais, Brazil (Cerrado / Atlantic Forest transition)",
+ "place": "A small town (about 4,400 people) in the interior of Minas Gerais, Brazil (Aguanil, Cerrado / Atlantic Forest transition); state figures where no municipal figure exists",
  "as_of": "2026-10",
- "about": "Every place-specific figure the town generator uses for a small town in interior Minas Gerais, Brazil, with its source. State and national statistics stand in for a town where no municipal figure was found; many figures are marked placeholders, with what they were estimated from. Fortnightly wages and payments are the monthly Brazilian figures converted (x 12 / 26) because the structure pays on 14 days. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+ "about": "Every place-specific figure the town generator uses for a small town in interior Minas Gerais, Brazil, with its source. The reference municipality is Aguanil, MG (IBGE code 3100807; 4,357 residents in the 2022 Census; Campo das Vertentes / south-central Minas): its Census 2022 age structure, households, tenure and religion, and its 2024 municipal accounts, are used directly; state (Minas Gerais) figures are used where no municipal figure exists, and national ones where no state figure exists. Fortnightly wages and payments are the monthly Brazilian figures converted (x 12 / 26) because the structure pays on 14 days. Values still marked placeholder say what they were estimated from. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
  "values": {
   "currency": {
    "code": "BRL",
@@ -19,11 +19,11 @@
    ]
   },
   "households": {
-   "lone_bps": 1890,
-   "group_bps": 650,
-   "couple_bps": 2020,
-   "couple_children_bps": 3790,
-   "one_parent_bps": 1650,
+   "lone_bps": 1874,
+   "group_bps": 555,
+   "couple_bps": 2522,
+   "couple_children_bps": 3890,
+   "one_parent_bps": 1159,
    "children_couple": [
     4600,
     3600,
@@ -34,10 +34,10 @@
     3000,
     1400
    ],
-   "same_sex_couple_bps": 100,
-   "lone_parent_female_bps": 8700,
-   "adult_female_bps": 5000,
-   "child_male_bps": 5120,
+   "same_sex_couple_bps": 76,
+   "lone_parent_female_bps": 7930,
+   "adult_female_bps": 4970,
+   "child_male_bps": 5122,
    "adult_ages": [
     18,
     99
@@ -55,92 +55,92 @@
     {
      "from": 0,
      "to": 4,
-     "bps": 578
+     "bps": 505
     },
     {
      "from": 5,
      "to": 9,
-     "bps": 612
+     "bps": 618
     },
     {
      "from": 10,
      "to": 14,
-     "bps": 615
+     "bps": 645
     },
     {
      "from": 15,
      "to": 19,
-     "bps": 664
+     "bps": 586
     },
     {
      "from": 20,
      "to": 24,
-     "bps": 743
+     "bps": 641
     },
     {
      "from": 25,
      "to": 29,
-     "bps": 748
+     "bps": 684
     },
     {
      "from": 30,
      "to": 34,
-     "bps": 750
+     "bps": 620
     },
     {
      "from": 35,
      "to": 39,
-     "bps": 772
+     "bps": 719
     },
     {
      "from": 40,
      "to": 44,
-     "bps": 794
+     "bps": 746
     },
     {
      "from": 45,
      "to": 49,
-     "bps": 678
+     "bps": 664
     },
     {
      "from": 50,
      "to": 54,
-     "bps": 649
+     "bps": 659
     },
     {
      "from": 55,
      "to": 59,
-     "bps": 617
+     "bps": 705
     },
     {
      "from": 60,
      "to": 64,
-     "bps": 544
+     "bps": 654
     },
     {
      "from": 65,
      "to": 69,
-     "bps": 436
+     "bps": 606
     },
     {
      "from": 70,
      "to": 74,
-     "bps": 321
+     "bps": 418
     },
     {
      "from": 75,
      "to": 79,
-     "bps": 215
+     "bps": 282
     },
     {
      "from": 80,
      "to": 84,
-     "bps": 141
+     "bps": 131
     },
     {
      "from": 85,
      "to": 99,
-     "bps": 123
+     "bps": 117
     }
    ]
   },
@@ -430,7 +430,7 @@
      49
     ],
     "gestation_days": 266,
-    "female_bps": 4880
+    "female_bps": 4878
    },
    "treatable": {
     "share_bps_by_age": [
@@ -473,26 +473,26 @@
    ]
   },
   "wages_per_fortnight": {
-   "shop": 74815,
-   "factory": 110769,
-   "construction": 101538
+   "shop": 134215,
+   "factory": 142985,
+   "construction": 133846
   },
   "rents_per_month": {
    "apartment_units": [
     {
      "bedrooms": 1,
      "count": 3,
-     "rent": 55000
+     "rent": 47782
     },
     {
      "bedrooms": 2,
      "count": 7,
-     "rent": 75000
+     "rent": 63709
     },
     {
      "bedrooms": 3,
      "count": 2,
-     "rent": 95000
+     "rent": 79636
     }
    ],
    "house_types": [
@@ -500,20 +500,20 @@
      "id": "house",
      "bedrooms": 3,
      "share_bps": 5500,
-     "rent": 95000
+     "rent": 79636
     },
     {
      "id": "large-house",
      "bedrooms": 4,
      "share_bps": 4500,
-     "rent": 130000
+     "rent": 101934
     }
    ]
   },
   "spending": {
-   "saving_bps": 400,
+   "saving_bps": 653,
    "wealth_effect_bps_per_year": 300,
-   "essentials_per_month": 65000,
+   "essentials_per_month": 36376,
    "shops_known": 7,
    "shop_search_bps_per_month": 2500
   },
@@ -581,7 +581,7 @@
     "from_age": 65
    },
    "unemployment": {
-    "amount": 67766,
+    "amount": 67154,
     "every_days": 30,
     "from_age": 18
    }
@@ -678,47 +678,47 @@
    "retail_labour_share_bps": 1400
   },
   "prices": {
-   "goods_world": 3500,
+   "goods_world": 5500,
    "goods_import_markup_bps": 1000,
-   "inputs_per_kg": 90,
-   "materials_per_kg": 45
+   "inputs_per_kg": 138,
+   "materials_per_kg": 69
   },
   "ordinary_hours_per_week": 44,
   "fertility_per_10000": [
    {
     "from": 15,
-    "rate": 380
+    "rate": 283
    },
    {
     "from": 20,
-    "rate": 740
+    "rate": 635
    },
    {
     "from": 25,
-    "rate": 770
+    "rate": 728
    },
    {
     "from": 30,
-    "rate": 690
+    "rate": 662
    },
    {
     "from": 35,
-    "rate": 420
+    "rate": 424
    },
    {
     "from": 40,
-    "rate": 105
+    "rate": 126
    },
    {
     "from": 45,
-    "rate": 9
+    "rate": 8
    },
    {
     "from": 50,
     "rate": 0
    }
   ],
-  "labour_force_participation_bps": 7200,
+  "labour_force_participation_bps": 7400,
   "tenancy": {
    "rent_review_months": 12,
    "rent_increase_notice_days": 30,
@@ -790,8 +790,8 @@
    "cash_rate_bps": 1375,
    "funding_spread_bps": 300,
    "lending_rate_bps": {
-    "person": 4500,
-    "organisation": 2600
+    "person": 3818,
+    "organisation": 1975
    },
    "serviceability_buffer_bps": 300,
    "max_repayment_share_bps": {
@@ -801,19 +801,19 @@
    "arrears_days": 30,
    "default_days": 90,
    "max_months": 60,
-   "reserve": 3500000
+   "reserve": 5500000
   },
   "opening": {
-   "bank": 17500000,
-   "town": 70000000,
-   "builder": 10500000,
-   "landlord": 21000000,
-   "shop": 1050000,
-   "factory": 14000000,
-   "person_min_savings": 35000
+   "bank": 27500000,
+   "town": 110000000,
+   "builder": 16500000,
+   "landlord": 33000000,
+   "shop": 1650000,
+   "factory": 22000000,
+   "person_min_savings": 55000
   },
   "town_finance": {
-   "parks_per_year": 5250000,
+   "parks_per_year": 8250000,
    "payment_approval_over": 6272559
   },
   "public_finance": {
@@ -832,11 +832,11 @@
       "rate_bps": 2750
      }
     ],
-    "levy_bps": 900,
+    "levy_bps": 830,
     "levy_from": 0
    },
-   "grants_per_resident_per_year": 300000,
-   "rates_per_resident_per_year": 12000,
+   "grants_per_resident_per_year": 584840,
+   "rates_per_resident_per_year": 1554,
    "rates_instalments": 10,
    "rates_due_days": 30,
    "rates_penalty_interest_bps": 1200,
@@ -885,7 +885,7 @@
      "every_days": 7,
      "lasts_minutes": 90,
      "teaching": "There is a God who made the world and cares how we live.",
-     "held_at_start_bps": 8360
+     "held_at_start_bps": 9455
     },
     {
      "kind": "arts",
@@ -918,7 +918,7 @@
    "news_readers_bps": 4000
   },
   "health": {
-   "doctors_per_1000": 1.2,
+   "doctors_per_1000": 0.51,
    "doctor_wage_per_fortnight": 553846,
    "consult_minutes": 30,
    "seek_care_bps": 9000,
@@ -973,27 +973,27 @@
    "roads": {
     "seconds_per_cell": 2,
     "within_cells": 3,
-    "budget_per_resident": 10500
+    "budget_per_resident": 16500
    }
   },
   "ownership": {
-   "house_owner_bps": 7130,
+   "house_owner_bps": 7460,
    "mortgage_bps_by_age": [
     {
      "from": 18,
-     "bps": 2000
+     "bps": 1300
     },
     {
      "from": 45,
-     "bps": 1500
+     "bps": 1000
     },
     {
      "from": 65,
-     "bps": 300
+     "bps": 200
     }
    ],
    "mortgage_payment_per_month": 110000,
-   "mortgage_rate_bps": 1150,
+   "mortgage_rate_bps": 1424,
    "mortgage_years_left": [
     5,
     30
@@ -1019,7 +1019,7 @@
    },
    "energy": {
     "kwh_per_household_per_day": 5,
-    "price_per_kwh": 100,
+    "price_per_kwh": 115,
     "supply_per_day": 50,
     "grid_price_per_kwh": 60,
     "grid_emissions_g_per_kwh": 40
@@ -1027,18 +1027,18 @@
   },
   "climate": {
    "rain_by_month_bps": [
-    16000,
-    14000,
-    14000,
-    10000,
-    7500,
-    6000,
-    5500,
-    5000,
-    5500,
-    8500,
-    12000,
-    15500
+    25364,
+    15458,
+    14070,
+    4736,
+    3756,
+    1718,
+    824,
+    1310,
+    4780,
+    8761,
+    16689,
+    22536
    ],
    "storm_bps_per_month": 800,
    "storm_days": [
@@ -1083,7 +1083,7 @@
    "take_quantity": 5,
    "detection_bps": 1000,
    "investigation_hours": 4,
-   "police_per_1000": 1.9,
+   "police_per_1000": 2.2,
    "officer_wage_per_fortnight": 253846
   },
   "justice": {
@@ -1105,32 +1105,32 @@
    "attainment": [
     {
      "label": "No schooling or primary school not finished",
-     "share_bps": 3730,
+     "share_bps": 3370,
      "years": 5
     },
     {
      "label": "Primary school finished",
-     "share_bps": 810,
+     "share_bps": 790,
      "years": 9
     },
     {
      "label": "Secondary school not finished",
-     "share_bps": 480,
+     "share_bps": 470,
      "years": 10
     },
     {
      "label": "Secondary school finished",
-     "share_bps": 2820,
+     "share_bps": 3040,
      "years": 12
     },
     {
      "label": "Higher education not finished",
-     "share_bps": 420,
+     "share_bps": 360,
      "years": 13
     },
     {
      "label": "Higher education finished",
-     "share_bps": 1740,
+     "share_bps": 1970,
      "years": 16
     }
    ],
@@ -1284,18 +1284,18 @@
  },
  "sources": {
   "currency": "Brazilian real, in centavos: written R$ before the amount, or in words as reais (informally contos) and centavos. ISO 4217: BRL, two decimal places. Words \"conto\" for an informal unit (to confirm usage in Minas Gerais). Brazilians write R$1.234,56 (dot for thousands, comma for decimals); the currency block has no field for that (a structural gap, reported with this profile).",
-  "households.age_bands_bps": "IBGE, Censo Demografico 2022, SIDRA table 9514 (resident population by sex and age group, Minas Gerais, total 20,539,989), fetched from apisidra.ibge.gov.br on 2026-10-08: shares of the population aged 0 to 99, 85-99 summed from the 85-89, 90-94 and 95-99 groups. State figures stand in for a town of a few thousand (a town is older than the state average; not adjusted).",
-  "households.lone_bps": "IBGE, Censo 2022, household arrangements (Agencia IBGE de Noticias, \"Censo 2022: em 12 anos, proporcao de mulheres responsaveis por domicilios avanca e se equipara a de homens\", 2024; reported again in press on the Census release of family arrangements, 2025): one-person households 18.9% (Minas Gerais 18.3%; the national figure is used; to confirm against the SIDRA table).",
-  "households.group_bps": "IBGE, Censo 2022 (same release): households of several people with no spouse, child or step-child, 6.6% (rounded down to 6.5% so that the five types add to 100%; to confirm).",
-  "households.couple_bps": "IBGE, Censo 2022 (same release): couples without children 20.2% of households (to confirm).",
-  "households.couple_children_bps": "IBGE, Censo 2022 (same release): couple with children of both 30.7% plus couple with a child of one spouse 7.2%, 37.9% (to confirm).",
-  "households.one_parent_bps": "IBGE, Censo 2022 (same release): one parent with children 16.5% (to confirm).",
+  "households.age_bands_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo Demografico 2022, table 9514 (resident population by sex and age group), municipality of Aguanil, MG (code 3100807; 4,357 residents; opened 2026-10-08): shares of the population aged 0 to 99; the 85-99 band sums the 85-89, 90-94 and 95-99 groups.",
+  "households.lone_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9879 (private households by type of household unit), Aguanil: 304 one-person households of 1,622 (18.7%). Opened 2026-10-08.",
+  "households.group_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9882 (household composition), Aguanil: 394 households of \"other composition\" less the 304 one-person households = 90 of 1,622 (5.5%), taken as multi-person households with no spouse/child/step-child.",
+  "households.couple_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9882, Aguanil: 409 households of a head and spouse with no children, of 1,622 (25.2%).",
+  "households.couple_children_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9882, Aguanil: head and spouse with a child of both 541 plus with a child of one of them 90 = 631 of 1,622 (38.9%).",
+  "households.one_parent_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9882, Aguanil: head without a spouse, with children or step-children, 188 of 1,622 (11.6%).",
   "households.children_couple": "Placeholder: share of couples with 1, 2 and 3+ children. Not found; estimated as one child most common, from Brazil's fertility of about 1.6 children a woman (IBGE Projecao da Populacao 2024). To replace from Census 2022 tables on children per family (SIDRA).",
   "households.children_one_parent": "Placeholder: share of one-parent households with 1, 2 and 3+ children; estimated as for couples, with fewer children in larger sizes. To replace from Census 2022 tables.",
-  "households.same_sex_couple_bps": "Placeholder: 1.0% of couples; IBGE Census 2022 counted same-sex couples but the share was not retrieved (to confirm; the figure is an order-of-magnitude estimate).",
-  "households.lone_parent_female_bps": "Placeholder: about 87% of one-parent households headed by a woman (estimate from the Census 2022 release on women as household heads; exact share not retrieved; to confirm).",
-  "households.adult_female_bps": "Placeholder: about half (as in the reference profile; the 2022 Census has 51.5% women overall, to confirm).",
-  "households.child_male_bps": "Placeholder: about 51.2% of births male (105 boys per 100 girls, IBGE/SINASC; exact year and figure to confirm).",
+  "households.same_sex_couple_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9881 (spouse of the household head), Minas Gerais: 32,210 same-sex couple households of 4,265,203 couple households (0.76%); the municipality has too few for a rate.",
+  "households.lone_parent_female_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9882 by sex of the head, Aguanil: 149 of 188 one-parent households headed by a woman (79.3%).",
+  "households.adult_female_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9514, Aguanil: women are the stated share of residents aged 20 and over (the 15-19 group is split between adults and children, so ages 20+ are used).",
+  "households.child_male_bps": "IBGE, Projecoes da Populacao, Revisao 2024, table 4 (indicadores implicitos), births 2026, Minas Gerais: 113,416 male and 108,016 female (51.2% male). File opened from ftp.ibge.gov.br/Projecao_da_Populacao/Projecao_da_Populacao_2024/projecoes_2024_tab4_indicadores.xlsx.",
   "households.adult_ages": "Placeholder: bounds of the adult ages drawn from the census bands (as in the reference profile).",
   "households.mother_age_at_first_birth": "Placeholder: the mean age of Brazilian mothers was 27.7 in 2020 (IBGE, Estatisticas do Registro Civil / Projecao da Populacao, reported in the press; to confirm); first births earlier, here 19 to 32.",
   "households.child_max_age": "Placeholder: carried over from the reference profile (children stay in the parental home to 24); Brazilian young adults often stay longer (to confirm).",
@@ -1304,162 +1304,171 @@
   "life.illness": "Placeholder: carried over unchanged from the reference profile (no Brazilian source searched). To replace from Pesquisa Nacional de Saude 2019 (IBGE) morbidity tables.",
   "life.injury": "Placeholder: carried over unchanged from the reference profile (no Brazilian source searched).",
   "life.birth.ages": "Placeholder: carried over (biological window 15 to 49).",
-  "life.birth.gestation_days": "Biology (about 38 weeks from conception), carried over from the reference profile.",
-  "life.birth.female_bps": "Placeholder: 100% minus the male share of births (5,120 bps); see households.child_male_bps.",
+  "life.birth.gestation_days": "Placeholder: biology (about 38 weeks from conception), carried over from the reference profile.",
+  "life.birth.female_bps": "As households.child_male_bps: 48.8% of projected 2026 births in Minas Gerais are female (IBGE Projecoes 2024, tab 4).",
   "life.treatable": "Placeholder: carried over unchanged from the reference profile. To replace from the Ministry of Health, Painel de Mortalidade Evitavel (reducible causes), SIM (to confirm).",
   "life.found_alone_after": "Placeholder: carried over unchanged from the reference profile; no Brazilian source searched.",
   "life.work_injury_bps": "Placeholder estimate: INSS Anuario Estatistico de Acidentes do Trabalho (AEAT) records on the order of 600,000 registered work accidents a year among about 45 million formal workers, near 1.4% (figures from memory; to confirm); factory above and shop below that mean by assumption.",
-  "wages_per_fortnight.shop": "The national minimum wage from 1 January 2026, R$1,621 a month (Decreto no 12.797, 31 December 2025, Diario Oficial da Uniao 24 and 31 December 2025), taken as the shop wage (retail floors in collective agreements in Minas Gerais run a little above; to confirm). Converted to 14 days as monthly x 12 / 26 (a gap: Brazil pays by the month).",
-  "wages_per_fortnight.factory": "Placeholder: R$2,400 a month, estimated at 1.5 times the minimum wage (R$1,621) for an industrial worker in a small interior town. To replace from IBGE, PNAD Continua Anual 2025, rendimento medio do trabalho principal by sector for Minas Gerais (the state mean over all workers was R$3,270 a month in 2025, reported by Itatiaia from IBGE; sector tables not retrieved). Converted to 14 days as x 12 / 26.",
-  "wages_per_fortnight.construction": "Placeholder: R$2,200 a month (about 1.36 times the minimum wage), estimated; to replace from PNAD Continua sector tables or the CBIC / SINAPI labour cost for Minas Gerais. Converted to 14 days as x 12 / 26.",
-  "ordinary_hours_per_week": "Constituicao Federal 1988, art. 7, XIII: normal working hours up to eight a day and 44 a week (a proposed constitutional amendment to shorten the week was being debated; check status in 2026; to confirm).",
-  "rents_per_month": "Placeholder: monthly rent R$550 to R$950 for apartments and R$950 to R$1,300 for houses, estimated for a small interior town in Minas Gerais from typical listings (not sourced; about 30 to 60% of a minimum wage). To replace from IBGE Censo 2022 or POF 2017-18 rent tables for municipalities of under 20,000 people.",
-  "spending.saving_bps": "Placeholder: about 4% of household disposable income saved, a low figure for Brazil (IBGE, Contas Nacionais Trimestrais, Conta Economica Integrada, household sector; exact current figure not retrieved; to confirm).",
+  "wages_per_fortnight.shop": "IBGE, PNAD Continua quarterly, SIDRA table 5442 (average real monthly earnings of employed people, usual main job, by activity group), Minas Gerais, 2nd quarter 2026: commerce and vehicle repair R$2,908 a month (mean, including the self-employed; opened via the SIDRA API 2026-10-08); converted to 14 days as x 12 / 26. Note: a mean, above the minimum wage of R$1,621 and probably above a small town's retail pay.",
+  "wages_per_fortnight.factory": "IBGE, PNAD Continua, SIDRA table 5442, Minas Gerais, 2nd quarter 2026: manufacturing R$3,098 a month (mean; opened 2026-10-08), converted to 14 days (x 12 / 26). (RAIS/CAGED formal-pay tables were not found as open files in the time spent.)",
+  "wages_per_fortnight.construction": "IBGE, PNAD Continua, SIDRA table 5442, Minas Gerais, 2nd quarter 2026: construction R$2,900 a month (mean; opened 2026-10-08), converted to 14 days (x 12 / 26).",
+  "ordinary_hours_per_week": "Constituicao Federal 1988, art. 7, XIII: normal working hours up to eight a day and 44 a week (a proposed constitutional amendment to shorten the week was being debated; check status in 2026; to confirm). (cited from knowledge of the text; not opened in this pass; to confirm)",
+  "rents_per_month": "Derived, not observed: IBGE, Pesquisa de Orcamentos Familiares 2017-18, SIDRA table 6715, Minas Gerais: average monetary rent paid R$92.49 a family a month across all families (opened 2026-10-08); divided by the renting share of occupied dwellings in Minas Gerais, 22.5% (Census 2022, table 9929: 1,693,310 of 7,534,797) = R$411.6 per renting family in 2017-18; times the IPCA from January 2018 to August 2026, 1.548 (Banco Central SGS 433, opened) = R$637 a month (two-bedroom). Other sizes are 0.75x (one bedroom), 1.25x (three bedrooms, house) and 1.6x (four bedrooms): an assumption, not data. Census 2022 did not publish rent amounts; the state mean is used for a small town (likely high).",
+  "spending.saving_bps": "IBGE, POF 2017-18, SIDRA tables 6715 and 6974, Minas Gerais: additions to assets (R$164.72) plus debt repaid (R$143.70) are 6.5% of total family income (R$4,724.29 a month): 653 bps (opened 2026-10-08). 2017-18 survey; the national-accounts household saving rate was not found as open data.",
   "spending.wealth_effect_bps_per_year": "Placeholder: carried over from the reference profile (a modelling rule).",
-  "spending.essentials_per_month": "Placeholder: about R$650 a person a month, near the DIEESE Cesta Basica de Alimentos for Belo Horizonte (DIEESE publishes it monthly; the 2026 figure was not retrieved; to confirm).",
+  "spending.essentials_per_month": "IBGE, POF 2017-18, SIDRA tables 6715 and 6977, Minas Gerais: food spending R$688.51 a family a month (15.7% of total), average family size 2.93, so R$235 a person in 2017-18; times the IPCA 1.548 to August 2026 (Banco Central SGS 433) = R$364 a person (opened 2026-10-08).",
   "spending.shops_known": "Placeholder: carried over from the reference profile.",
   "spending.shop_search_bps_per_month": "Placeholder: carried over from the reference profile.",
   "savings_by_age": "Placeholder: the reference profile's distribution scaled by 0.2 (the ratio of Brazilian to Australian household financial wealth and income is much lower; no Brazilian survey of savings by age retrieved). To replace from IBGE POF 2017-18 or Banco Central do Brasil, Relatorio de Cidadania Financeira.",
   "retirement_age": "Placeholder / closest fit: 65. Under Emenda Constitucional 103/2019 the permanent old-age retirement age is 65 for men and 62 for women (urban workers, INSS); rural workers 60 and 55 (Lei 8.213/1991, art. 48 par. 1); the low-income old-age benefit (BPC/LOAS, Lei 8.742/1993) starts at 65. The profile holds one age; see the report on structural gaps.",
   "retiree_savings": "Placeholder: the reference profile's range scaled by 0.2 (see savings_by_age).",
-  "support.pension": "The old-age benefit at the minimum wage, R$1,621 a month (Decreto 12.797/2025): paid by INSS as aposentadoria por idade or as the low-income BPC (Lei 8.742/1993), starting at 65; most INSS benefits are one minimum wage. Paid every 30 days (a monthly payment; the reference profile pays every 14). Rural pensioners may start at 60 or 55 and the 13th payment is not modelled.",
-  "support.unemployment": "Closest fit: the Bolsa Familia, average benefit about R$677.66 per family in June 2026 (Ministerio do Desenvolvimento e Assistencia Social, reported in the press; primary table not opened; to confirm), paid monthly; from age 18. It is a household-income-tested payment to poor families, not an unemployment payment; seguro-desemprego (3 to 5 instalments, formal workers only) cannot be expressed. See the report on structural gaps.",
+  "support.pension": "Minimum wage R$1,621 a month from 1 January 2026: Decreto no 12.797, 23 December 2025, art. 1 (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2025/decreto/d12797.htm, 2026-10-08), the floor of INSS old-age benefits and of the BPC (Lei 8.742/1993) at 65. Paid every 30 days (a monthly payment; the reference profile pays every 14). The 13th payment is not modelled.",
+  "support.unemployment": "Closest fit, not a match: Bolsa Familia average benefit R$671.54 a family in August 2026 (Ministerio do Desenvolvimento e Assistencia Social, news item \"Bolsa Familia chega a mais de 19,19 milhoes de familias em agosto\", gov.br/mds, read in a search summary; the page itself returned an error when fetched). A household-income-tested payment to poor families, paid monthly; from age 18. Seguro-desemprego cannot be expressed. See the report on structural gaps.",
   "firm_ownership.forms_bps": "Placeholder: in a small interior town almost all shops, rented homes and local factories are owned by a person, family or a few partners (SEBRAE, microempresas e empresas de pequeno porte, 99% of firms; to confirm); outside ownership 10 to 30%; no widely held firms.",
   "firm_ownership.closely_held": "Placeholder: carried over unchanged from the reference profile.",
   "firm_ownership.widely_held": "Placeholder: carried over unchanged from the reference profile.",
   "firm_ownership.direct_holders": "Placeholder: carried over unchanged from the reference profile; direct share ownership is far rarer in Brazil (B3, Perfil dos investidores, about 5 million individuals of 160 million adults; to confirm), so this overstates it.",
   "retirement_fund": "Placeholder, off unless a town asks for it: the general pension is the state's pay-as-you-go INSS; private pension funds (previdencia complementar) cover a small share of workers. member_bps and share_bps_of_local are estimates (5% and 30%); the drawdown and cost figures are carried over from the reference profile.",
   "industry": "Placeholder: carried over from the reference profile (manufacturing labour and input shares, retail purchases and labour shares). To replace from IBGE, Pesquisa Industrial Anual (PIA-Empresa) and Pesquisa Anual de Comercio (PAC), Brazilian national tables, which give wages and intermediate consumption as shares of output.",
-  "prices": "Placeholder: the reference profile's prices scaled by 0.35, the ratio of hourly shop wages (Brazil R$8.5 against Australia $27.8), so that an item is a comparable amount of work: goods R$35 an item at world prices (the unit the town counts in), inputs R$0.90 a kg, building materials R$0.45 a kg.",
-  "labour_force_participation_bps": "Placeholder: 72% of 15-64 year olds. IBGE, PNAD Continua, 2nd quarter 2026: participation rate 62.1% (June 2026) of everyone aged 14 and over; rescaled to working age by assumption.",
-  "tenancy": "Lei do Inquilinato (Lei 8.245/1991): rent may be adjusted once a year (after 12 months) by the contract's index (IGP-M or IPCA); the 30-day notice is a placeholder; a fixed-term lease that runs on without the landlord objecting becomes indeterminate (art. 46 and 56; to confirm the section numbers).",
+  "prices": "Placeholder: the reference profile's prices (goods 100 an item at world prices, inputs 2.50 a kg, building materials 1.25 a kg) scaled by 0.55. Scaled by the ratio of hourly shop wages, 0.55 (Brazil R$15.25 an hour = R$2,908 x 12 / 26 / 88 hours; reference profile 27.81 units), so that an item and a firm's balance are a comparable amount of work. (First scaled by 0.35 on the minimum wage; revised when the sector wage replaced it.)",
+  "labour_force_participation_bps": "Derived estimate: IBGE, PNAD Continua 2nd quarter 2026, Minas Gerais (SIDRA table 4093): participation 64.0% of people aged 14 and over (11.45 million in the labour force of 17.89 million); rescaled to ages 15-64 using the Census 2022 age structure of the state (14.3 million aged 15-64) and an assumed 0.65 million workers aged 65 and over, giving about 74%. The 65+ assumption is not data.",
+  "tenancy": "Lei do Inquilinato (Lei 8.245/1991): rent may be adjusted once a year (after 12 months) by the contract's index (IGP-M or IPCA); the 30-day notice is a placeholder; a fixed-term lease that runs on without the landlord objecting becomes indeterminate (art. 46 and 56; to confirm the section numbers). (cited from knowledge of the text; not opened in this pass; to confirm)",
   "values": "Placeholder: carried over unchanged from the reference profile (Schwartz value means set by assumption). To replace from the World Values Survey wave 7 (Brazil, 2018) or the European Social Survey's Schwartz portrait scales (to confirm).",
-  "industrial_action": "Lei de Greve (Lei 7.783/1989): strikes are allowed after assembly vote and 48 hours' notice (72 hours for essential services); wages for strike days are normally not paid unless negotiated (TST jurisprudence; to confirm). Turnout and pass shares are placeholders carried over.",
+  "industrial_action": "Lei de Greve (Lei 7.783/1989): strikes are allowed after assembly vote and 48 hours' notice (72 hours for essential services); wages for strike days are normally not paid unless negotiated (TST jurisprudence; to confirm). Turnout and pass shares are placeholders carried over. (cited from knowledge of the text; not opened in this pass; to confirm)",
   "world_price_process": "Placeholder: carried over unchanged from the reference profile (volatility and persistence of world prices).",
-  "credit.cash_rate_bps": "Banco Central do Brasil, Copom: the Selic target set at 13.75% a year at the 281st meeting, 16 September 2026 (a 25 basis point cut; reported by the press from the Copom statement; the statement not opened; to confirm).",
+  "credit.cash_rate_bps": "Banco Central do Brasil, SGS series 432 (Selic target): 13.75% a year (opened through api.bcb.gov.br 2026-10-08; the Copom decision of 16 September 2026 was read in press reports).",
   "credit.funding_spread_bps": "Placeholder: 300 basis points over the Selic, a guess for a retail bank's funding cost and intermediation margin. To replace from Banco Central do Brasil, Relatorio de Economia Bancaria (spread medio).",
-  "credit.lending_rate_bps": "Placeholder: persons 45% a year (a blend of personal, overdraft and card credit; rotativo much higher, payroll-deductible consignado near 25%), organisations 26% a year. Estimates from memory of the Banco Central do Brasil, Estatisticas Monetarias e de Credito, average interest rates (SGS); the series were not opened; to confirm.",
+  "credit.lending_rate_bps": "Banco Central do Brasil, SGS series 20716 (average interest rate on credit, individuals, total) August 2026: 38.18% a year (person); series 20715 (legal entities, total): 19.75% a year (organisation). Opened through api.bcb.gov.br 2026-10-08. Unsecured personal credit alone runs near 62% (series 20740).",
   "credit.serviceability_buffer_bps": "Placeholder: carried over from the reference profile.",
-  "credit.max_repayment_share_bps": "Persons: 35% of salary, the legal ceiling on deductions for payroll-deductible loans (Lei 10.820/2003 as amended; some 5 points are reserved for a card; to confirm the current limit). Organisations: placeholder carried over.",
+  "credit.max_repayment_share_bps": "Persons: 35% of salary, the legal ceiling on deductions for payroll-deductible loans (Lei 10.820/2003 as amended; some 5 points are reserved for a card; to confirm the current limit). Organisations: placeholder carried over. (cited from knowledge of the text; not opened in this pass; to confirm)",
   "credit.arrears_days": "Placeholder: 30 days, carried over.",
   "credit.default_days": "Banco Central do Brasil, Resolucao CMN 2.682/1999 (and 4.966/2021): a loan overdue 90 days is treated as impaired (to confirm the current resolution).",
   "credit.max_months": "Placeholder: carried over from the reference profile.",
-  "credit.reserve": "Placeholder: the reference profile's figure scaled by 0.35 (the price ratio). The Banco Central's reserve requirement (compulsorio, 20 to 21% of demand and savings deposits) is a share, not an amount.",
-  "opening": "Placeholders: the reference profile's opening balances scaled by 0.35 (the ratio of Brazilian to Australian hourly wages). To source if a town's starting capital needs to be real.",
-  "town_finance.parks_per_year": "Placeholder: the reference profile's figure scaled by 0.35.",
-  "town_finance.payment_approval_over": "Lei 14.133/2021 (new public procurement law), art. 75, II: direct award without tender for goods and services up to R$62,725.59 as updated for 2025 by Decreto 12.343/2024 (the 2026 update was not retrieved; to confirm), used as the level over which a municipal payment gets more formal approval.",
-  "public_finance.income_tax": "Receita Federal, personal income tax from 1 January 2026, Lei 15.270/2025 (sanctioned 26 November 2025): income up to R$5,000 a month fully exempt through a reducer, a declining reducer between R$5,000.01 and R$7,350 (978.62 - 0.133145 x income), the ordinary table (7.5% to 27.5%) from R$7,350. The profile is annual and expresses it as three steps: 0% to R$60,000 a year, a 40.81% marginal band to R$88,200 (the 27.5% rate plus the phase-out of the reducer, an approximation that ignores the simplified deduction of R$607.20 a month), then 27.5% (to confirm against the Receita Federal table). Federal law, collected by the federal government, not the municipality.",
-  "public_finance.income_tax.levy_bps": "Closest fit, placeholder: the employee's social-security contribution to INSS (7.5%, 9%, 12% and 14% bands up to a monthly ceiling about R$8,400 in 2026; 2026 table not retrieved; to confirm), averaged near 9% for typical wages. It funds the INSS pension, not general revenue; no ceiling can be expressed.",
+  "credit.reserve": "Placeholder: the reference profile's figure scaled by 0.55. The Banco Central's reserve requirement (compulsorio) is a share of deposits, not an amount. Scaled by the ratio of hourly shop wages, 0.55 (Brazil R$15.25 an hour = R$2,908 x 12 / 26 / 88 hours; reference profile 27.81 units), so that an item and a firm's balance are a comparable amount of work. (First scaled by 0.35 on the minimum wage; revised when the sector wage replaced it.)",
+  "opening": "Placeholders: the reference profile's opening balances scaled by 0.55. Scaled by the ratio of hourly shop wages, 0.55 (Brazil R$15.25 an hour = R$2,908 x 12 / 26 / 88 hours; reference profile 27.81 units), so that an item and a firm's balance are a comparable amount of work. (First scaled by 0.35 on the minimum wage; revised when the sector wage replaced it.)",
+  "town_finance.parks_per_year": "Placeholder: the reference profile's figure scaled by 0.55. Scaled by the ratio of hourly shop wages, 0.55 (Brazil R$15.25 an hour = R$2,908 x 12 / 26 / 88 hours; reference profile 27.81 units), so that an item and a firm's balance are a comparable amount of work. (First scaled by 0.35 on the minimum wage; revised when the sector wage replaced it.)",
+  "town_finance.payment_approval_over": "Lei 14.133/2021 (new public procurement law), art. 75, II: direct award without tender for goods and services up to R$62,725.59 as updated for 2025 by Decreto 12.343/2024 (the 2026 update was not retrieved; to confirm), used as the level over which a municipal payment gets more formal approval. (cited from knowledge of the text; not opened in this pass; to confirm)",
+  "public_finance.income_tax": "Lei 15.270/2025, art. 3-A of the personal income tax law (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2025/lei/l15270.htm, 2026-10-08): reduction of the tax so that income up to R$5,000 a month (R$60,000 a year) pays none, and a declining reduction R$978.62 - 0.133145 x income from R$5,000.01 to R$7,350; no reduction above R$7,350. The profile expresses it as three annual steps: 0% to R$60,000, a 40.81% marginal band to R$88,200 (27.5% plus the phase-out), then 27.5%: an approximation (it ignores the monthly simplified deduction of R$607.20). Federal tax; not the municipality's.",
+  "public_finance.income_tax.levy_bps": "INSS employee contribution, 2026: 7.5% to R$1,621, 9% to R$2,902.84, 12% to R$4,354.27, 14% to R$8,475.55 (Portaria Interministerial MPS/MF no 13, 9 January 2026; table read in the gov.br/inss page via search summary). At a R$3,000 wage the contribution is 8.3% (computed here), used as the flat levy. It funds the INSS, not general revenue, and its ceiling cannot be expressed.",
   "public_finance.income_tax.levy_from": "Placeholder: the INSS contribution applies from the first real earned.",
-  "public_finance.grants_per_resident_per_year": "Placeholder: R$3,000 a resident a year. Small municipalities live on transfers: Fundo de Participacao dos Municipios (FPM) and the state's share of ICMS (Tesouro Nacional, Siconfi / Finbra); estimated from memory of per-capita transfers to towns of under 10,000 people; to confirm for a town.",
-  "public_finance.rates_per_resident_per_year": "Placeholder: R$120 a resident a year in property tax (IPTU) and fees; IPTU yields very little in small interior towns (Tesouro Nacional, Finbra; per-capita figure to confirm).",
+  "public_finance.grants_per_resident_per_year": "Tesouro Nacional, SICONFI open API (apidatalake.tesouro.gov.br), DCA-Anexo I-C, Prefeitura Municipal de Aguanil, 2024 (4,362 residents): general-purpose transfers of R$25.51 million = FPM R$18.56 million + ITR R$25,372 + mineral/oil compensations R$1.34 million + the state's share of ICMS, IPVA, IPI and CIDE R$5.58 million, i.e. R$5,849 a resident. Transfers tied to health (SUS) and education (FUNDEB, FNDE), which the generator funds separately for the clinic and school, are left out. Opened 2026-10-08. Total revenue was R$46.1 million (R$10,577 a resident), of which own taxes were R$1.13 million.",
+  "public_finance.rates_per_resident_per_year": "SICONFI DCA-Anexo I-C, Aguanil, 2024: property tax (IPTU) revenue R$67,785 for 4,362 residents = R$15.54 a resident (opened 2026-10-08). Other own taxes (ISS R$366,825, ITBI R$222,683) are not counted here.",
   "public_finance.rates_instalments": "Placeholder: IPTU is typically paid in a lump sum or up to ten monthly instalments, set by each municipality's law.",
   "public_finance.rates_due_days": "Placeholder: carried over.",
   "public_finance.rates_penalty_interest_bps": "Codigo Tributario Nacional (Lei 5.172/1966), art. 161, par. 1: 1% a month on late tax unless the local law says otherwise (many municipalities add a 2% fine); 12% a year (to confirm).",
   "public_finance.rates_exempt_kinds": "Constituicao Federal, art. 150, VI, a: reciprocal immunity of public property from tax; carried over (to confirm that schools and health services are exempt as public bodies).",
   "public_finance.median_house_price": "Placeholder: R$250,000 for a modest house in a small interior town in Minas Gerais, estimated; FipeZap and QuintoAndar do not cover such towns. To replace from IBGE Censo 2022 or ITBI transaction values.",
-  "services.waste_per_person_per_day_g": "ABRELPE, Panorama dos Residuos Solidos no Brasil (2022-2024 editions): about 1.04 kg of household waste per person per day (figure from memory; to confirm).",
+  "services.waste_per_person_per_day_g": "ABRELPE, Panorama dos Residuos Solidos no Brasil (2022-2024 editions): about 1.04 kg of household waste per person per day (figure from memory; to confirm). (cited from knowledge of the text; not opened in this pass; to confirm)",
   "services.landfill_levy_per_tonne": "Closest fit, placeholder: Brazil has no landfill levy; municipalities pay a disposal (tipping) fee to a sanitary landfill, about R$120 a tonne for small towns (estimate; to confirm).",
   "services.council_staff_per_1000": "Placeholder: 10 council staff per 1,000 residents on works and services. Small Brazilian municipalities employ far more in total, including teachers and health workers (IBGE, MUNIC; to confirm).",
   "services.collect_seconds_per_10kg": "Placeholder: carried over from the reference profile.",
   "services.asset_life_years": "Placeholder: carried over from the reference profile.",
   "services.upkeep_hours_per_week_per_asset": "Placeholder: carried over from the reference profile.",
   "services.complain_bps": "Placeholder: carried over from the reference profile.",
-  "unions.membership_bps": "Placeholder: unionisation of employed people in Brazil is about 8 to 9% (IBGE, PNAD Continua, Caracteristicas adicionais do mercado de trabalho, 2022 and 2023: 9.2% in 2022; later figure to confirm); sector splits estimated (public administration highest).",
+  "unions.membership_bps": "Placeholder split by sector (relative sizes assumed). Context: IBGE PNAD Continua table 7106 (opened through the SIDRA API 2026-10-08): 8.0% of employed people in Minas Gerais and 8.8% in Brazil belong to a union; the sector figures here are not scaled to that mean.",
   "unions.dues_per_month": "Placeholder: about R$30 a month (a typical monthly member contribution of about 1% of a low wage). The compulsory union tax was made voluntary by Lei 13.467/2017.",
   "unions.resignation_notice_days": "Placeholder: 0; a member may leave at any time (Lei 13.467/2017 made union dues voluntary; to confirm).",
   "unions.claim_margin_bps": "Placeholder: carried over from the reference profile.",
   "unions.meeting_every_days": "Placeholder: carried over from the reference profile.",
   "unions.teaching": "Placeholder: carried over (text).",
-  "groups.kinds": "Placeholder: carried over from the reference profile (kinds, names and rhythms of groups). Religion's held_at_start_bps: 83.6% of people aged 10 and over are Catholic (56.7%) or evangelical (26.9%) (IBGE, Censo Demografico 2022, Religiao, released June 2025). The names of Brazilian groups (for example a football club) are not changed.",
+  "groups.kinds": "Placeholder: kinds, names and rhythms of groups carried over from the reference profile. Religion held_at_start_bps: IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9537 (people aged 10 and over by religion), Aguanil: 2,673 Catholic and 984 evangelical of 3,868 = 94.6% (Minas Gerais 88.0%, Brazil 83.6%; opened 2026-10-08).",
   "groups.taking_part_bps": "Placeholder: carried over from the reference profile.",
   "groups.leave_notice_days": "Placeholder: carried over from the reference profile.",
   "groups.per_kind_per_1000_people": "Placeholder: carried over from the reference profile.",
-  "elections": "Constituicao Federal art. 29, II and Lei 9.504/1997: a mayor (prefeito) is elected directly for four years, in one round by plurality in municipalities of under 200,000 voters; voting is compulsory from 18 to 70. Municipal elections were held on 6 October 2024; the next is October 2028. Turnout 78.3% is the national first-round figure in 2024 (TSE; abstention about 21.7%; from memory; to confirm); stand_bps and news_readers_bps are placeholders carried over.",
-  "health": "Doctors: placeholder, 1.2 per 1,000 for a small interior town (Brazil has about 2.9 doctors per 1,000 overall, concentrated in capitals: CFM/FMUSP, Demografia Medica no Brasil 2025; to confirm). Wage: placeholder, a salaried SUS municipal doctor R$12,000 a month, converted to 14 days (x 12 / 26). The clinic stands for the Unidade Basica de Saude and the nearest hospital (a liberty). Consultation length, care-seeking and treatment shares are placeholders carried over from the reference profile.",
-  "round": "Placeholder hours: 8 to 17 (an hour for lunch), Monday to Friday, for everyone (many shops open Saturdays; a liberty); school 7 to 12, the usual morning shift (LDB, Lei 9.394/1996: at least four hours a day, 800 hours over 200 days). Travel speeds and road figures are carried over from the reference profile (physics: a 25 m cell on foot in 18 seconds; roads slower than the reference's by assumption), and the roads budget is scaled by 0.35 (placeholder).",
-  "ownership.house_owner_bps": "IBGE, Censo 2022: 71.3% of the 72.5 million private permanent occupied dwellings were owned (72.7% of people lived in owned homes; 20.9% in rented homes). National figure, not for houses only; to confirm for Minas Gerais.",
-  "ownership.mortgage_bps_by_age": "Placeholder: Brazilian home-ownership is mostly outright (houses built over time, inherited), few owners have a mortgage (the Caixa Economica Federal and the SBPE finance a small share); shares by age are estimates.",
+  "health": "Placeholder: doctor wage R$12,000 a month for a salaried municipal doctor converted to 14 days (x 12 / 26); consultation length, care-seeking and treatment shares carried over from the reference profile. The clinic stands for the Unidade Basica de Saude and the nearest hospital (a liberty).",
+  "round": "Placeholder hours: 8 to 17 (an hour for lunch), Monday to Friday, for everyone (many shops open Saturdays; a liberty); school 7 to 12, the usual morning shift (LDB, Lei 9.394/1996: at least four hours a day, 800 hours over 200 days). Travel speeds and road figures are carried over from the reference profile (physics: a 25 m cell on foot in 18 seconds; roads slower than the reference's by assumption), and the roads budget is scaled by 0.55 (placeholder; see prices).",
+  "ownership.house_owner_bps": "IBGE, SIDRA open API (apisidra.ibge.gov.br), Censo 2022 table 9929 (tenure of occupied private dwellings), Aguanil: 1,210 owned of 1,622 (74.6%); 281 rented (17.3%); 106 lent or provided (6.5%).",
+  "ownership.mortgage_bps_by_age": "Level from IBGE Censo 2022 table 9929, Aguanil: 109 of 1,210 owned dwellings are \"owned, still paying\" (9.0%; Minas Gerais 12.0%). The split by age (13%, 10%, 2%) is an assumption shaped to that average; no age cross-tabulation was found.",
   "ownership.mortgage_payment_per_month": "Placeholder: R$1,100 a month, estimated for a modest financed house.",
-  "ownership.mortgage_rate_bps": "Placeholder: about 11.5% a year plus the TR, near Caixa's SBPE rate (Caixa Economica Federal, financiamento imobiliario; current rate not retrieved; to confirm).",
+  "ownership.mortgage_rate_bps": "Banco Central do Brasil, SGS series 20772 (average interest rate, directed-resources credit, individuals, market-rate housing finance), August 2026: 14.24% a year (opened through api.bcb.gov.br 2026-10-08).",
   "ownership.mortgage_years_left": "Placeholder: carried over.",
-  "ownership.market": "Deposit 20% (SBPE financing up to 80% of a house's value; Caixa; to confirm), costs 5% (ITBI of 2 to 3% plus registry and notary fees; to confirm), 360-month term (up to 35 years). Other market parameters (buy rate, relisting, price cuts) are placeholders carried over.",
-  "utilities.water.litres_per_person_per_day": "SNIS, Diagnostico dos Servicos de Agua e Esgotos: about 150 litres per inhabitant per day nationally (2022 figure of about 148; from memory; to confirm).",
+  "ownership.market": "Placeholder: other market parameters (buy rate, relisting, price cuts, floor) carried over from the reference profile.",
+  "utilities.water.litres_per_person_per_day": "SNIS, Diagnostico dos Servicos de Agua e Esgotos: about 150 litres per inhabitant per day nationally (2022 figure of about 148; from memory; to confirm). (cited from knowledge of the text; not opened in this pass; to confirm)",
   "utilities.water.price_per_kl": "Placeholder: R$5.00 a kilolitre of water. Copasa (and Arsae-MG, its regulator) applied a 6.56% adjustment from 22 January 2026; the residential tariff table was not retrieved, so the level is an estimate; to replace from Arsae-MG resolution tables.",
   "utilities.water.service_per_quarter": "Closest fit, placeholder: Copasa bills a minimum monthly charge covering a first block of consumption rather than a service charge; R$60 a quarter here (to replace from the tariff table).",
   "utilities.water.river_inflow_kl_per_cell_per_day": "Placeholder: carried over from the reference profile.",
   "utilities.water.river_decay_bps_per_day": "Placeholder: carried over from the reference profile.",
   "utilities.water.river_flow_bps_per_day": "Placeholder: carried over from the reference profile.",
   "utilities.energy.kwh_per_household_per_day": "Placeholder: about 5 kWh a household a day (about 150 kWh a month; EPE, Anuario Estatistico de Energia Eletrica, residential average near 160 kWh a month; from memory; to confirm). Rounded to an integer.",
-  "utilities.energy.price_per_kwh": "Placeholder: about R$1.00 a kWh including taxes. ANEEL homologated the Cemig Distribuicao annual tariff review on 26 May 2026 (low-voltage average effect +5.21%, overall +6.50%), in force from 28 May 2026; the residential tariff in R$/kWh was not retrieved; to confirm.",
+  "utilities.energy.price_per_kwh": "Cemig Distribuicao residential conventional tariff (B1), from 28 May 2026: R$0.90329 a kWh before taxes on the green flag (TUSD + TE; read on cemig.com.br/valores-e-tarifas/tarifas-vigentes, opened 2026-10-08; resolution number read in a third-party summary as REH 3.589/2026, not confirmed at ANEEL). Grossed up by about 27% for ICMS (18% in Minas Gerais) and PIS/Cofins to R$1.15 a kWh as paid by households; the gross-up is an estimate (third-party calculators give R$1.15 to R$1.20).",
   "utilities.energy.supply_per_day": "Closest fit, placeholder: Brazil bills a minimum \"custo de disponibilidade\" of 30, 50 or 100 kWh a month (single, two or three phase; ANEEL REN 1000/2021) rather than a daily supply charge; R$0.50 a day here.",
   "utilities.energy.grid_price_per_kwh": "Placeholder: R$0.60 a kWh, the credit a small solar generator receives under the compensation system (Lei 14.300/2022; credits against the energy component of the tariff; to confirm).",
   "utilities.energy.grid_emissions_g_per_kwh": "Placeholder: about 40 g of CO2 a kWh, the Brazilian grid being mostly hydro (Ministerio da Ciencia, Tecnologia e Inovacao, Fator medio mensal de emissao do SIN; the 2023 annual average was near 39 g; from memory; to confirm).",
-  "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: the interior of Minas Gerais has a wet season from October to March and a dry season from April to September (INMET, Normais Climatologicas 1991-2020; shape estimated, peak flow in January and lowest in August; to confirm against ANA river-flow series). Storms, droughts and heatwaves are placeholders carried over: the structure has no wet-season weighting (a gap); Minas Gerais has had severe flooding (January 2020, January 2022, S2iD / Defesa Civil records) and a water crisis (the Southeast drought of 2014 to 2016; to confirm). Heat-wave months set to September to March (INMET heat-wave warnings in the dry spring; placeholder).",
+  "climate": "Placeholder: storm, drought, heat-wave, warning and heat-illness figures carried over from the reference profile (no INMET daily-extremes file was opened); the structure has no wet-season weighting of storms. Heat-wave months set to September to March (INMET issues heat-wave warnings in the dry spring; not checked). Brazilian flood records (Defesa Civil / S2iD: Minas Gerais January 2020 and January 2022) were not queried.",
   "hazards": "Placeholder: carried over from the reference profile (river bank capacity, spill and flood thresholds, wetland soak). Flood records for Minas Gerais municipalities: Defesa Civil / S2iD; to source.",
   "crime.take_bps_per_month_in_need": "Placeholder: carried over.",
   "crime.caught_bps_reckoned": "Placeholder: carried over.",
   "crime.take_quantity": "Placeholder: carried over.",
   "crime.detection_bps": "Placeholder: about 10% of thefts solved. The clearance rate for property crime in Brazil is low (Forum Brasileiro de Seguranca Publica, Anuario Brasileiro de Seguranca Publica 2026, released July 2026; no clearance figure retrieved). To replace from the Anuario or Minas Gerais SEJUSP data.",
   "crime.investigation_hours": "Placeholder: carried over.",
-  "crime.police_per_1000": "Placeholder: about 1.9 police a thousand people (the Policia Militar of Minas Gerais has about 40,000 officers for 20.5 million people; from memory; Anuario Brasileiro de Seguranca Publica, efetivo; to confirm). The state police (military for patrol, civil for investigation) stand in for one station.",
+  "crime.police_per_1000": "Forum Brasileiro de Seguranca Publica, Anuario Brasileiro de Seguranca Publica 2026 (read in search summaries; the PDF could not be text-extracted): Minas Gerais military police 37,261 active of 51,669 posts, civil police 8,935 of 16,178 posts: 46,196 officers for 21.32 million people (CFM population) = 2.2 a thousand (state average; a small town has fewer).",
   "crime.officer_wage_per_fortnight": "Placeholder: R$5,500 a month for a military police soldier or corporal in Minas Gerais (estimate; to confirm against the state's Lei de remuneracao), converted to 14 days (x 12 / 26).",
   "justice.hearing_after_days": "Placeholder: about 45 days. The Juizado Especial Civel (Lei 9.099/1995) is the small-claims court for tenancy and consumer disputes up to 40 minimum wages; the Justica do Trabalho handles wage claims; Conselho Nacional de Justica, Justica em Numeros gives times (to source).",
   "justice.pay_within_days": "Placeholder: carried over.",
   "justice.challenge_bps": "Placeholder: carried over.",
   "justice.apply_bps": "Placeholder: carried over; Brazil has a high labour-claims rate (CNJ, Justica em Numeros; to source).",
   "justice.apply_after_days": "Placeholder: carried over.",
-  "education.school_ages": "Constituicao Federal art. 208, I (Emenda Constitucional 59/2009): basic education is compulsory and free from 4 to 17.",
-  "education.students_per_teacher": "Placeholder: 17 students a teacher (INEP, Censo Escolar 2024, alunos por docente in municipal schools; from memory; to confirm).",
-  "education.school_days_per_year": "Lei de Diretrizes e Bases (Lei 9.394/1996), art. 24, I: at least 200 school days a year and 800 hours.",
-  "education.hours_per_day": "LDB art. 34: at least four hours of actual teaching a day in primary school.",
-  "education.teacher_wage_per_fortnight": "The national salary floor (piso) of public basic-education teachers, R$5,130.63 a month for 40 hours a week in 2026 (Ministerio da Educacao, portaria of January 2026, a 5.4% rise from R$4,867.77; reported by the press), converted to 14 days (x 12 / 26).",
-  "education.attainment": "IBGE, PNAD Continua Educacao 2025 (2nd quarter 2025), people aged 25 and over: no schooling 6.0%, primary not finished 31.4%, primary finished 8.1%, secondary not finished 4.8%, secondary finished 28.2%, higher education not finished 4.2%, higher finished 17.4% (sum 100.1%; the first two are merged and shown as 37.3%). Years of schooling: 5 for the first group, 9 for primary, 12 for secondary and 16 for degree are the legal lengths (placeholder for 5, 10 and 13). National figure.",
+  "education.school_ages": "Constituicao Federal art. 208, I (Emenda Constitucional 59/2009): basic education is compulsory and free from 4 to 17. (not opened)",
+  "education.students_per_teacher": "Placeholder: 17 students a teacher (INEP, Censo Escolar; not opened).",
+  "education.school_days_per_year": "Lei de Diretrizes e Bases (Lei 9.394/1996), art. 24, I: at least 200 school days a year and 800 hours. (cited from knowledge of the text; not opened in this pass; to confirm)",
+  "education.hours_per_day": "LDB art. 34: at least four hours of actual teaching a day in primary school. (cited from knowledge of the text; not opened in this pass; to confirm)",
+  "education.teacher_wage_per_fortnight": "Lei 15.437, 18 June 2026, art. 2 (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2026/lei/l15437.htm, 2026-10-08): the national salary floor of public basic-education teachers is R$5,130.63 a month for 40 hours a week (MEC Portaria 82/2026 first fixed it); converted to 14 days (x 12 / 26).",
+  "education.attainment": "IBGE, SIDRA open API (apisidra.ibge.gov.br), PNAD Continua Educacao, table 7189 (people aged 25 and over by level of schooling), Minas Gerais, 2025: no schooling 3.7%, primary not finished 30.0%, primary finished 7.9%, secondary not finished 4.7%, secondary finished 30.4%, higher not finished 3.6%, higher finished 19.7% (the first two merged). Years of schooling: 5 (placeholder), 9 and 12 (legal lengths of primary and secondary school), 10 and 13 (placeholders) and 16.",
   "education.return_per_year_bps": "Placeholder: about 10% a year, carried over from the reference profile; Brazilian estimates of the return to schooling are higher, 10 to 15% (for example Menezes-Filho, various; to confirm).",
   "education.max_years": "Placeholder: carried over.",
-  "nature.cell_m": "A cell is a 25 m lot (as in the reference profile).",
+  "nature.cell_m": "Placeholder: a cell is a 25 m lot (as in the reference profile).",
   "nature.landscape": "Placeholder: the cover around a town in the Cerrado / Atlantic Forest transition of central-south Minas Gerais: pasture and crops about 65%, native forest and savanna woodland (cerradao, mata) 30%, wet meadows (veredas and brejos) 5%. To replace from MapBiomas land-cover collection for the municipality. Block size and woodland patches are placeholders carried over.",
   "nature.covers": "Placeholder: carried over (succession of cover types).",
-  "nature.default_cover": "Carried over.",
-  "nature.cleared_cover": "Carried over.",
-  "nature.river_cover": "Carried over.",
+  "nature.default_cover": "Placeholder: carried over.",
+  "nature.cleared_cover": "Placeholder: carried over.",
+  "nature.river_cover": "Placeholder: carried over.",
   "nature.pollution": "Placeholder: carried over from the reference profile.",
   "nature.survey_hours_per_ha": "Placeholder: carried over.",
   "nature.survey_staff": "Placeholder: carried over.",
-  "nature.spin_up_years": "Carried over: nature is run alone this long before the start.",
+  "nature.spin_up_years": "Placeholder: carried over: nature is run alone this long before the start.",
   "nature.species": "Callithrix penicillata (native to the Cerrado and Atlantic Forest edge). In Cerrado habitats (cerradao and dense cerrado) of the Brazilian Central Plateau: groups of 4 to 11, home range 8.25 to 18.5 ha, density 0.4 to 0.82 individuals a hectare, higher in gallery forest (Miranda and Faria 2001, Brazilian Journal of Biology / Brazilian Journal of Biology 61; found via search, paper not opened; to confirm). Density 0.8 in woodland and riverbank and 0.4 in scrub; growth, mortality and dispersal are placeholders. | Myrmecophaga tridactyla, Vulnerable (IUCN Red List; ICMBio Livro Vermelho 2018; to confirm). Density about 0.2 to 0.4 animals per square kilometre in Cerrado (0.002 to 0.004 per hectare) and a home range of the order of 300 ha (Medri and Mourao 2005 and Cerrado studies; from memory; to confirm). Growth, mortality and dispersal are placeholders (one pup a year; road-kill is a leading cause of death). | Turdus rufiventris (sabia-laranjeira), the national bird of Brazil, common and conspicuous in towns and woodland. Density and home range are placeholders (no source retrieved; a typical passerine territory is about 1 ha). | Caiman latirostris, found in wetlands and rivers of the Atlantic Forest and Cerrado; in Rio Doce State Park, Minas Gerais, an encounter rate of 4.01 individuals a kilometre of water body was recorded (found via search from Brazilian herpetological literature, paper not opened; to confirm). Converted by the cell size to about 1.6 an hectare of riverbank cell (an estimate); the wetland density, home range, growth and mortality are placeholders. IUCN Least Concern (to confirm). Tolerance of pollution is a placeholder.",
-  "fertility_per_10000": "Placeholder: births a year per 10,000 women by 5-year age group, an estimate shaped to Brazil's total fertility rate of 1.57 children a woman in 2023 (IBGE, Projecao da Populacao 2024 / Estatisticas do Registro Civil, as reported in the press; the age-specific rates themselves were not retrieved; to replace from IBGE Projecao da Populacao 2024, taxas especificas de fecundidade). The five-year rates sum to a total fertility of about 1.56."
+  "fertility_per_10000": "IBGE, Projecoes da Populacao, Revisao 2024, table 4 (indicadores implicitos), Minas Gerais, 2026: age-specific fertility rates per woman, 15-19 0.0283, 20-24 0.0635, 25-29 0.0728, 30-34 0.0662, 35-39 0.0424, 40-44 0.0126, 45-49 0.0008 (total fertility rate 1.44). Opened 2026-10-08 (file projecoes_2024_tab4_indicadores.xlsx). 10-14 (0.0011) is not used.",
+  "climate.rain_by_month_bps": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: INMET, Normais Climatologicas do Brasil 1991-2020, monthly accumulated rainfall at Lavras, MG (station 83687), the nearest INMET normals station to Aguanil: Jan 292.4, Feb 178.2, Mar 162.2, Apr 54.6, May 43.3, Jun 19.8, Jul 9.5, Aug 15.1, Sep 55.1, Oct 101.0, Nov 192.4, Dec 259.8 mm (1,383 mm a year); each month as a share of the mean month (file Normal-Climatologica-PREC.xlsx from portal.inmet.gov.br, opened 2026-10-08). Used as the shape of river inflow; real flows lag rain and fall less in the dry season (an assumption not made here).",
+  "health.doctors_per_1000": "doctors_per_1000: 0.51, the ratio for municipalities of up to 5,000 inhabitants in Brazil (CFM / FMUSP, Demografia Medica no Brasil 2025, as reported in press summaries; the PDF could not be text-extracted, so the figure was not read in the report itself; to confirm).",
+  "elections.term_years": "Constituicao Federal art. 29, I: municipal executive and councillors are elected for four years (not opened).",
+  "elections.method": "Lei 9.504/1997 art. 3 par. 2 and CF art. 29, II: a mayor is elected in one round by plurality in municipalities with fewer than 200,000 voters (not opened).",
+  "elections.turnout_bps": "Placeholder: 78.3%, from memory of the national first-round turnout in the 6 October 2024 municipal elections (TSE; abstention about 21.7%); not opened.",
+  "elections.stand_bps": "Placeholder: carried over from the reference profile.",
+  "elections.news_readers_bps": "Placeholder: carried over from the reference profile.",
+  "ownership.market.deposit_bps": "Caixa Economica Federal SBPE: financing up to 80% of a house's value (not opened).",
+  "ownership.market.costs_bps": "Placeholder: 5% (ITBI of 2 to 3% plus registry and notary fees).",
+  "ownership.market.mortgage_months": "Placeholder: 360 months (SBPE terms run to 35 years)."
  },
  "targets": [
   {
    "what": "employment_to_population_pct",
-   "value": 58.8,
-   "source": "IBGE, PNAD Continua, 2nd quarter / June 2026: nivel de ocupacao 58.8% (as reported in IBGE's PNAD Contínua quarterly bulletin, pnact_2026_2tri; summary read through a search result, bulletin not opened; to confirm)"
+   "value": 61.6,
+   "source": "IBGE, PNAD Continua, SIDRA table 4093, Minas Gerais, 2nd quarter 2026: nivel da ocupacao 61.6% of people aged 14 and over (opened via the SIDRA API 2026-10-08). Brazil: 58.8%."
   },
   {
    "what": "unemployment_rate_pct",
-   "value": 5.4,
-   "source": "IBGE, PNAD Continua, 2nd quarter 2026: taxa de desocupacao 5.4% (against 6.1% in the 1st quarter 2026 and 5.8% in the 2nd quarter 2025; read through a search result; to confirm)"
+   "value": 3.8,
+   "source": "IBGE, PNAD Continua, SIDRA tables 4093 and 4099, Minas Gerais, 2nd quarter 2026: taxa de desocupacao 3.8% (opened 2026-10-08). Brazil: 5.4%."
   },
   {
    "what": "participation_rate_pct",
-   "value": 62.1,
-   "source": "IBGE, PNAD Continua, June 2026: taxa de participacao na forca de trabalho 62.1% (62.4% in June 2025; read through a search result; to confirm)"
+   "value": 64.0,
+   "source": "IBGE, PNAD Continua, SIDRA table 4093, Minas Gerais, 2nd quarter 2026: taxa de participacao 64.0% of people aged 14 and over (opened 2026-10-08). Brazil: 62.1% (June 2026)."
   },
   {
    "what": "union_membership_pct",
-   "value": 9.2,
-   "source": "IBGE, PNAD Continua, Caracteristicas adicionais do mercado de trabalho (sindicalizacao), 2022: 9.2% of employed people (figure from memory; later years to confirm)"
+   "value": 8.0,
+   "source": "IBGE, PNAD Continua, SIDRA table 7106, Minas Gerais: 8.0% of employed people aged 14 and over belong to a union (Brazil 8.8%), latest annual release (opened 2026-10-08)."
   },
   {
    "what": "union_membership_pct_of_employees",
-   "value": 9.2,
-   "source": "As union_membership_pct (IBGE, PNAD Continua, 2022; to confirm)"
+   "value": 8.0,
+   "source": "As union_membership_pct (SIDRA table 7106, Minas Gerais; employed people, not only employees)."
   },
   {
    "what": "religious_affiliation_change_pts_per_year",
    "value": -0.26,
-   "source": "Derived: Catholic plus evangelical share of people aged 10 and over fell from 86.7% (65.1 + 21.6) in the 2010 Census to 83.6% (56.7 + 26.9) in 2022 (IBGE, Censo Demografico 2022, Religiao, June 2025): -3.1 points over 12 years; the no-religion share rose from 7.9% to 9.3%"
+   "source": "Derived: Catholic plus evangelical share of people aged 10 and over, Brazil, fell from 86.7% (65.1 + 21.6, Census 2010, from press) to 83.6% (56.7 + 26.9, Census 2022, recomputed from SIDRA table 9537: 100.2 and 47.4 million of 176.6 million) over 12 years: -3.1 points, -0.26 a year."
   }
  ]
 }
