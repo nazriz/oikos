@@ -578,16 +578,33 @@
    7000000
   ],
   "support": {
-   "pension": {
-    "amount": 162100,
-    "every_days": 30,
-    "from_age": 65
-   },
-   "unemployment": {
-    "amount": 67154,
-    "every_days": 30,
-    "from_age": 18
-   }
+   "payments": [
+    {
+     "id": "pension",
+     "name": "Old-age benefit at the minimum wage",
+     "every_days": 30,
+     "who": {
+      "from_age": 65
+     },
+     "amount": {
+      "flat": 162100
+     },
+     "paid_from": "inss"
+    },
+    {
+     "id": "unemployment",
+     "name": "Bolsa Família (the average benefit, as a stand-in)",
+     "every_days": 30,
+     "who": {
+      "from_age": 18,
+      "to_age": 64,
+      "out_of_work": true
+     },
+     "amount": {
+      "flat": 67154
+     }
+    }
+   ]
   },
   "firm_ownership": {
    "forms_bps": {
@@ -721,6 +738,24 @@
     "rate": 0
    }
   ],
+  "labour_force_share_by_age": [
+   {
+    "from": 25,
+    "bps": 8038
+   },
+   {
+    "from": 55,
+    "bps": 6314
+   },
+   {
+    "from": 60,
+    "bps": 4668
+   },
+   {
+    "from": 65,
+    "bps": 1606
+   }
+  ],
   "labour_force_participation_bps": 7400,
   "tenancy": {
    "rent_review_months": 12,
@@ -818,23 +853,59 @@
    "payment_approval_over": 6272559
   },
   "public_finance": {
+   "funds": [
+    {
+     "id": "inss",
+     "name": "INSS (Instituto Nacional do Seguro Social)"
+    }
+   ],
    "income_tax": {
-    "brackets": [
+    "charges": [
      {
-      "from": 0,
-      "rate_bps": 0
+      "id": "income-tax",
+      "name": "Imposto de renda",
+      "schedule": [
+       {
+        "from": 0,
+        "rate_bps": 0
+       },
+       {
+        "from": 6000000,
+        "rate_bps": 4081
+       },
+       {
+        "from": 8820000,
+        "rate_bps": 2750
+       }
+      ]
      },
      {
-      "from": 6000000,
-      "rate_bps": 4081
-     },
-     {
-      "from": 8820000,
-      "rate_bps": 2750
+      "id": "inss",
+      "name": "INSS contribution",
+      "base": {
+       "up_to": 10170660
+      },
+      "schedule": [
+       {
+        "from": 0,
+        "rate_bps": 750
+       },
+       {
+        "from": 1945200,
+        "rate_bps": 900
+       },
+       {
+        "from": 3483408,
+        "rate_bps": 1200
+       },
+       {
+        "from": 5225124,
+        "rate_bps": 1400
+       }
+      ],
+      "paid_to": "inss"
      }
-    ],
-    "levy_bps": 830,
-    "levy_from": 0
+    ]
    },
    "grants_per_resident_per_year": 584840,
    "rates_per_resident_per_year": 1554,
@@ -1324,10 +1395,9 @@
   "spending.shops_known": "Placeholder: carried over from the reference profile.",
   "spending.shop_search_bps_per_month": "Placeholder: carried over from the reference profile.",
   "savings_by_age": "Placeholder: the reference profile's distribution scaled by 0.2 (the ratio of Brazilian to Australian household financial wealth and income is much lower; no Brazilian survey of savings by age retrieved). To replace from IBGE POF 2017-18 or Banco Central do Brasil, Relatorio de Cidadania Financeira.",
-  "retirement_age": "Placeholder / closest fit: 65. Under Emenda Constitucional 103/2019 the permanent old-age retirement age is 65 for men and 62 for women (urban workers, INSS); rural workers 60 and 55 (Lei 8.213/1991, art. 48 par. 1); the low-income old-age benefit (BPC/LOAS, Lei 8.742/1993) starts at 65. The profile holds one age; see the report on structural gaps.",
+  "retirement_age": "Placeholder / closest fit: 65. Under Emenda Constitucional 103/2019 the permanent old-age retirement age is 65 for men and 62 for women (urban workers, INSS); rural workers 60 and 55 (Lei 8.213/1991, art. 48 par. 1); the low-income old-age benefit (BPC/LOAS, Lei 8.742/1993) starts at 65. The profile holds one age; see the report on structural gaps. Since 2026-10-08 people here stop work at ages of their own, drawn from labour_force_share_by_age; this age is still the one the profile's other figures turn on (the retired's savings, the end of the payments for those out of work, a retirement fund's access) and the top of the working ages the measures use. The pension's age is the payment's own (support.payments).",
   "retiree_savings": "Placeholder: the reference profile's range scaled by 0.2 (see savings_by_age).",
-  "support.pension": "Minimum wage R$1,621 a month from 1 January 2026: Decreto no 12.797, 23 December 2025, art. 1 (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2025/decreto/d12797.htm, 2026-10-08), the floor of INSS old-age benefits and of the BPC (Lei 8.742/1993) at 65. Paid every 30 days (a monthly payment; the reference profile pays every 14). The 13th payment is not modelled.",
-  "support.unemployment": "Closest fit, not a match: Bolsa Familia average benefit R$671.54 a family in August 2026 (Ministerio do Desenvolvimento e Assistencia Social, news item \"Bolsa Familia chega a mais de 19,19 milhoes de familias em agosto\", gov.br/mds, read in a search summary; the page itself returned an error when fetched). A household-income-tested payment to poor families, paid monthly; from age 18. Seguro-desemprego cannot be expressed. See the report on structural gaps.",
+  "support.payments": "[The pension:] Minimum wage R$1,621 a month from 1 January 2026: Decreto no 12.797, 23 December 2025, art. 1 (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2025/decreto/d12797.htm, 2026-10-08), the floor of INSS old-age benefits and of the BPC (Lei 8.742/1993) at 65. Paid every 30 days (a monthly payment; the reference profile pays every 14). The 13th payment is not modelled. [The payment to those out of work:] Closest fit, not a match: Bolsa Familia average benefit R$671.54 a family in August 2026 (Ministerio do Desenvolvimento e Assistencia Social, news item \"Bolsa Familia chega a mais de 19,19 milhoes de familias em agosto\", gov.br/mds, read in a search summary; the page itself returned an error when fetched). A household-income-tested payment to poor families, paid monthly; from age 18. Seguro-desemprego cannot be expressed. See the report on structural gaps. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. The pension is paid from the INSS (this note: the floor of INSS old-age benefits). STAND-IN KEPT: the payment to those out of work is still the Bolsa Família average benefit paid flat to anyone out of work, because this note gives the average and not the programme's rule. The rule can now be said: a household's payment (`amount.household`, `per_member`, `per_child`), for households whose declared income a head is under a line (`who.income_under`, per head), claimed by the household's head, whether or not anyone is out of work. The figures (the income line, the sum a family, the sum for each young child) are for the author to add with their source. Seguro-desemprego can now be said too (a share of previous pay, for so many days, on a record of contributions); no figures are in this note.",
   "firm_ownership.forms_bps": "Placeholder: in a small interior town almost all shops, rented homes and local factories are owned by a person, family or a few partners (SEBRAE, microempresas e empresas de pequeno porte, 99% of firms; to confirm); outside ownership 10 to 30%; no widely held firms.",
   "firm_ownership.closely_held": "Placeholder: carried over unchanged from the reference profile.",
   "firm_ownership.widely_held": "Placeholder: carried over unchanged from the reference profile.",
@@ -1336,6 +1406,7 @@
   "industry": "Placeholder: carried over from the reference profile (manufacturing labour and input shares, retail purchases and labour shares). To replace from IBGE, Pesquisa Industrial Anual (PIA-Empresa) and Pesquisa Anual de Comercio (PAC), Brazilian national tables, which give wages and intermediate consumption as shares of output.",
   "prices": "Placeholder: the reference profile's prices (goods 100 an item at world prices, inputs 2.50 a kg, building materials 1.25 a kg) scaled by 0.55. Scaled by the ratio of hourly shop wages, 0.55 (Brazil R$15.25 an hour = R$2,908 x 12 / 26 / 88 hours; reference profile 27.81 units), so that an item and a firm's balance are a comparable amount of work. (First scaled by 0.35 on the minimum wage; revised when the sector wage replaced it.)",
   "labour_force_participation_bps": "Derived estimate: IBGE, PNAD Continua 2nd quarter 2026, Minas Gerais (SIDRA table 4093): participation 64.0% of people aged 14 and over (11.45 million in the labour force of 17.89 million); rescaled to ages 15-64 using the Census 2022 age structure of the state (14.3 million aged 15-64) and an assumed 0.65 million workers aged 65 and over, giving about 74%. The 65+ assumption is not data.",
+  "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, Brazil, national, annual 2025, from IBGE's PNAD Contínua: ages 25 to 54, 80.376%; 55 to 59, 63.138%; 60 to 64, 46.679%; 65 and over, 16.059%. National, not Minas Gerais (no table by age for the region was found); not checked against IBGE (SIDRA)'s own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
   "tenancy": "Lei do Inquilinato (Lei 8.245/1991): rent may be adjusted once a year (after 12 months) by the contract's index (IGP-M or IPCA); the 30-day notice is a placeholder; a fixed-term lease that runs on without the landlord objecting becomes indeterminate (art. 46 and 56; to confirm the section numbers). (cited from knowledge of the text; not opened in this pass; to confirm)",
   "values": "Placeholder: carried over unchanged from the reference profile (Schwartz value means set by assumption). To replace from the World Values Survey wave 7 (Brazil, 2018) or the European Social Survey's Schwartz portrait scales (to confirm).",
   "industrial_action": "Lei de Greve (Lei 7.783/1989): strikes are allowed after assembly vote and 48 hours' notice (72 hours for essential services); wages for strike days are normally not paid unless negotiated (TST jurisprudence; to confirm). Turnout and pass shares are placeholders carried over. (cited from knowledge of the text; not opened in this pass; to confirm)",
@@ -1352,9 +1423,8 @@
   "opening": "Placeholders: the reference profile's opening balances scaled by 0.55. Scaled by the ratio of hourly shop wages, 0.55 (Brazil R$15.25 an hour = R$2,908 x 12 / 26 / 88 hours; reference profile 27.81 units), so that an item and a firm's balance are a comparable amount of work. (First scaled by 0.35 on the minimum wage; revised when the sector wage replaced it.)",
   "town_finance.parks_per_year": "Placeholder: the reference profile's figure scaled by 0.55. Scaled by the ratio of hourly shop wages, 0.55 (Brazil R$15.25 an hour = R$2,908 x 12 / 26 / 88 hours; reference profile 27.81 units), so that an item and a firm's balance are a comparable amount of work. (First scaled by 0.35 on the minimum wage; revised when the sector wage replaced it.)",
   "town_finance.payment_approval_over": "Lei 14.133/2021 (new public procurement law), art. 75, II: direct award without tender for goods and services up to R$62,725.59 as updated for 2025 by Decreto 12.343/2024 (the 2026 update was not retrieved; to confirm), used as the level over which a municipal payment gets more formal approval. (cited from knowledge of the text; not opened in this pass; to confirm)",
-  "public_finance.income_tax": "Lei 15.270/2025, art. 3-A of the personal income tax law (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2025/lei/l15270.htm, 2026-10-08): reduction of the tax so that income up to R$5,000 a month (R$60,000 a year) pays none, and a declining reduction R$978.62 - 0.133145 x income from R$5,000.01 to R$7,350; no reduction above R$7,350. The profile expresses it as three annual steps: 0% to R$60,000, a 40.81% marginal band to R$88,200 (27.5% plus the phase-out), then 27.5%: an approximation (it ignores the monthly simplified deduction of R$607.20). Federal tax; not the municipality's.",
-  "public_finance.income_tax.levy_bps": "INSS employee contribution, 2026: 7.5% to R$1,621, 9% to R$2,902.84, 12% to R$4,354.27, 14% to R$8,475.55 (Portaria Interministerial MPS/MF no 13, 9 January 2026; table read in the gov.br/inss page via search summary). At a R$3,000 wage the contribution is 8.3% (computed here), used as the flat levy. It funds the INSS, not general revenue, and its ceiling cannot be expressed.",
-  "public_finance.income_tax.levy_from": "Placeholder: the INSS contribution applies from the first real earned.",
+  "public_finance.income_tax": "Lei 15.270/2025, art. 3-A of the personal income tax law (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2025/lei/l15270.htm, 2026-10-08): reduction of the tax so that income up to R$5,000 a month (R$60,000 a year) pays none, and a declining reduction R$978.62 - 0.133145 x income from R$5,000.01 to R$7,350; no reduction above R$7,350. The profile expresses it as three annual steps: 0% to R$60,000, a 40.81% marginal band to R$88,200 (27.5% plus the phase-out), then 27.5%: an approximation (it ignores the monthly simplified deduction of R$607.20). Federal tax; not the municipality's. [Was the note on levy_bps:] INSS employee contribution, 2026: 7.5% to R$1,621, 9% to R$2,902.84, 12% to R$4,354.27, 14% to R$8,475.55 (Portaria Interministerial MPS/MF no 13, 9 January 2026; table read in the gov.br/inss page via search summary). At a R$3,000 wage the contribution is 8.3% (computed here), used as the flat levy. It funds the INSS, not general revenue, and its ceiling cannot be expressed. [Was the note on levy_from:] Placeholder: the INSS contribution applies from the first real earned. SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). The income tax keeps the author's three steps (an approximation of the reduction, as said above). UN-FOLDED: the flat levy of 8.3% that stood for the INSS contribution is now the contribution's own table as this note gives it, by slices of a year's pay (twelve times the monthly limits: 7.5% to R$19,452.00, 9% to R$34,834.08, 12% to R$52,251.24, 14% to the ceiling of R$101,706.60, nothing above), paid to the INSS and not to general revenue. The thirteenth salary is not reckoned.",
+  "public_finance.funds": "The named funds and bodies of the higher government that this place's charges on pay are paid to, each kept as an account of the outside world's of its own (the general government's account takes the rest). The INSS: the body the employee contribution is paid to and old-age benefits are paid from (as this profile's notes on the contribution and the pension say).",
   "public_finance.grants_per_resident_per_year": "Tesouro Nacional, SICONFI open API (apidatalake.tesouro.gov.br), DCA-Anexo I-C, Prefeitura Municipal de Aguanil, 2024 (4,362 residents): general-purpose transfers of R$25.51 million = FPM R$18.56 million + ITR R$25,372 + mineral/oil compensations R$1.34 million + the state's share of ICMS, IPVA, IPI and CIDE R$5.58 million, i.e. R$5,849 a resident. Transfers tied to health (SUS) and education (FUNDEB, FNDE), which the generator funds separately for the clinic and school, are left out. Opened 2026-10-08. Total revenue was R$46.1 million (R$10,577 a resident), of which own taxes were R$1.13 million.",
   "public_finance.rates_per_resident_per_year": "SICONFI DCA-Anexo I-C, Aguanil, 2024: property tax (IPTU) revenue R$67,785 for 4,362 residents = R$15.54 a resident (opened 2026-10-08). Other own taxes (ISS R$366,825, ITBI R$222,683) are not counted here.",
   "public_finance.rates_instalments": "Placeholder: IPTU is typically paid in a lump sum or up to ten monthly instalments, set by each municipality's law.",

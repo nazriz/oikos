@@ -1,6 +1,6 @@
 {
   "name": "world.migration",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "households": {
@@ -13,7 +13,7 @@
     "jobseekers_payment": {
       "schema": {
         "type": "string",
-        "description": "the support payment whose published recipients count as jobseekers (\"\": none published)"
+        "description": "the support payments whose published recipients count as jobseekers (several: with commas between; \"\": none published)"
       },
       "default": "",
       "source": "placeholder"

@@ -3,7 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Currency, HouseholdSpec } from "@oikos/participants";
+import type { Charge, Currency, HouseholdSpec, PaymentRule } from "@oikos/participants";
 
 export interface Profile {
   id: string;
@@ -49,8 +49,16 @@ export interface Profile {
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
+    /** The age people here stop work, where the profile gives one age for everyone; with `labour_force_share_by_age`,
+     * the age the profile's other figures by age turn on (the retired's savings, the end of the payments for those out
+     * of work, a retirement fund's access) and the top of the working ages the measures use. */
     retirement_age: number;
     labour_force_participation_bps: number;
+    /** The share of people in the labour force by age band, from the place's labour force survey (bands in order of
+     * age; the first is the reference, the ages before leaving begins): each person in the labour force stops work at
+     * an age drawn so that the shares by age come out as these do (docs/behaviour/citizen.md, "Stopping work"). Left
+     * out: everyone stops at `retirement_age`. */
+    labour_force_share_by_age?: { from: number; bps: number }[];
     /** Tenancy law. A place with no rule on how often a rent may rise or on what notice leaves both figures out (no
      * such law is written); landlords then review rents as often as `rent_review_practice_months` says, if it's given. */
     tenancy: { rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
@@ -73,8 +81,10 @@ export interface Profile {
     /** The town's own money rules: its yearly parks line, and the payment its procedure needs the mayor's approval over. */
     town_finance: { parks_per_year: number; payment_approval_over: number };
     retiree_savings: [number, number];
-    /** Support paid from outside the town. A place with no payment to the unemployed leaves `unemployment` out. */
-    support: { pension: { amount: number; every_days: number; from_age: number }; unemployment?: { amount: number; every_days: number; from_age: number } };
+    /** Support paid from outside the town, as its law's list of payments (docs/behaviour/boundary.md): each says who
+     * qualifies, how much and for how long, and where it is paid from (`paid_from`: one of `public_finance.funds`; left
+     * out: the general government). A place that has no such payment leaves it out of the list. */
+    support: { payments: (Omit<PaymentRule, "payer" | "account"> & { paid_from?: string })[] };
     /** Who owns firms (docs/behaviour/firm-ownership.md). Fifths are of households by wealth, lowest first. */
     firm_ownership: {
       /** Of the firms of each kind, the share held each way: by one household or a few; from outside; widely. */
@@ -98,7 +108,13 @@ export interface Profile {
      * the unit, and the generator checks it's a size the world's whole numbers can carry (docs/profiles.md). */
     prices: { goods_world?: number; goods_import_markup_bps: number; inputs_per_kg: number; materials_per_kg: number };
     public_finance: {
-      income_tax: { brackets: { from: number; rate_bps: number }[]; levy_bps: number; levy_from: number };
+      /** Named funds and bodies of the higher government that charges on pay are paid to (and support may be paid
+       * from), each an account of its own; what names none is the general government's. */
+      funds?: { id: string; name: string }[];
+      /** The tax on pay, as its law's list of charges (docs/behaviour/public-finance.md): each with what it is charged on,
+       * its schedule, its reliefs, and whom it is paid to (`paid_to`: one of `funds`, or "town" for a local tax paid to
+       * the town; left out: the general government). Yearly sums. */
+      income_tax: { charges: (Omit<Charge, "collector" | "account"> & { paid_to?: string })[] };
       grants_per_resident_per_year: number;
       rates_per_resident_per_year: number;
       rates_instalments: number;

@@ -1,4 +1,4 @@
-# `citizen.default` (v0.35.7): the AI citizen in code
+# `citizen.default` (v0.42.0): the AI citizen in code
 
 **Seat:** a townsperson (acts as themselves). **Source:** `participants/src/behaviour/citizen.ts`, with its mind in `participants/src/behaviour/mind.ts` and the sparse mind in `participants/src/llm/consult.ts`. **Design:** [docs/design/ai-citizens.md](../design/ai-citizens.md). **Citations:** [docs/research/references.md](../research/references.md).
 
@@ -38,7 +38,8 @@ It wakes weekly, whenever something names it (an offer, a notice, a message), an
 | **Work** | Unemployed, in the labour force and below retirement age: apply for a posting seen, one a week. Which employer is the mind's: each offer's wage and hours appraised, with what's learned of each employer (one that paid as agreed, or didn't, is remembered; what friends say of theirs counts); employers friends named or work for count as others having gone there. | Search on the postings; the labour-market literature (Dosi et al.) is the planned refinement |
 | **A better job** | In work: looking at the postings every month while unsatisfied (CONSUMAT) or making ends meet (a goal), and otherwise now and then, the more open the more often. It applies only to better-paid postings elsewhere. Offered one: take it, give notice at the old job (the contract's notice), and start once it's worked out. | Replaces Lengnick's (2013) flat monthly chance (π = 0.1) |
 | **Unpaid wages** | Wages that haven't come for a pay period plus five days: resign (ending it now), record the wages owed as a debt against the employer (a claim), and be angry with them. | Employees are creditors for unpaid wages |
-| **Retiring and support** | At the world's retirement age (none unless the world sets one), give notice at work and claim the support the world names for retirees. Out of work below it (and in the labour force), claim support for the unemployed. A claim stops when it no longer fits; a refused one isn't made again until a year older. Support in retirement counts as income that keeps a household in town; support while out of work doesn't, and isn't counted once in work. | The world's support payments, from its profile (docs/behaviour/boundary.md) |
+| **Stopping work** | At the age for it, give notice at work and look for none again. The age is the world's one retirement age (none unless the world sets one); or, where the world gives the share of people in the labour force by age, the person's own (0.41.0: below, "Stopping work"). | The place's labour force survey, by age (its profile) |
+| **Support** | Read the published support law and claim what it lists (0.41.0; docs/behaviour/boundary.md). *A payment for those out of work:* while out of work, looking, and not stopped; the first the law lists that hasn't refused us or run out, and the next when it does (one we draw is kept until an earlier one is granted). *A payment for age (a pension):* from its own age, working or not. *A household's payment:* as the household's head. Where a rule turns on what we know of ourselves, we claim only if we fit, and declare it on the claim: the household's income for a month (wages: ours and what the other adults told us), who lives in it, the children's dates of birth, whether we draw another pension; and a payment that needs a record of contributions is not claimed by someone who has not worked here. A claim stops when it no longer fits. A refused one isn't made again until a year older (as before: so someone under a payment's age still asks once a year and is refused); one refused for want of a record is tried again a month on, and after working. Several payments may be drawn at once. Support that lasts (a pension, a household's payment) counts as income that keeps a household in town; support while out of work doesn't, and isn't counted once in work. | The world's support law, from its profile |
 | **In the labour force** | Some working-age adults aren't: they don't look for work or claim unemployment support. Drawn for everyone at the start (children included, for when they're adults), for newcomers by the migration office, and for children born here at birth (`participation_bps`). | The world's profile |
 | **Spending** | Each shopping trip spends for the time since the last (up to two fortnights), since a trip is made when the citizen is awake, often days after it was due. A month's spending: out of income, what isn't saved (the saving ratio; more while making ends meet) less housing, never below essentials; plus a little out of savings above a buffer of 3 months' income (a wealth effect). Income is a month's worth of what came in over the last 90 days, less refunds. | The household saving ratio; the literature on consumption and wealth; the world's figures from its profile |
 | **Shopping** | Every fortnight, half a month's spending buys goods at a shop, at its listed price, ordered and paid with the order. Which shop is the mind's: each shop's offer appraised for what the budget buys there; the usual shop kept while it serves well and the household is sure of its options; shops friends use count as others going. Each delivery teaches how fully that shop serves. A shortfall is tried at another known shop, chosen by what's learned, up to 5 shops a trip. | Lengnick (2013): a fortnight's worth, β = 5; the mind replaces his ψ and ξ rules. CONSUMAT; EWA |
@@ -130,12 +131,29 @@ Outcomes to measure, never set. The town's figures are in [docs/calibration.md](
 
 Saving is off: it's negative in the first year, and 22–25% over five (target 6.5%).
 
+## Stopping work (0.41.0)
+
+**The rule.** A person in the labour force has an age at which they stop work. At it they give notice and never look for work again. Three ways a world says the age:
+- `retirement_age`: one age for everyone (how every town was until 2026-10-08);
+- `stops_work_at`: this person's own age, or `"never"`, given when the world was made;
+- `stop_work_curve`: the share of people in the labour force by age band, from which someone who was given no age (a newcomer, a child born here) draws theirs, once, from their own randomness.
+
+**From a curve to an age** (`stopsWorkAt`, `participants/src/behaviour/payments.ts`). The curve is the place's labour force survey: bands in order of age, the first the reference (the ages before leaving begins). Of those in the labour force at the reference ages, the share still in it in a later band is that band's share over the reference's. A person is given one number and stops at the start of the first band whose share of the reference is at or below it; someone whose number is under the last band's share never stops. So if 87% are in at 25 to 54 and 61% at 60 to 64, three in ten of those in at 54 have stopped by 60. A share that rises again with age brings nobody back. This is how the age of leaving the labour market is read from participation by age (OECD, the effective age of labour market exit; to confirm).
+
+**What it is not.** The pension's age is the payment's own (the support law). Someone past it may work and draw; someone who stopped before it has no pension until it, and lives on savings and on what others in the household earn (a household with nobody earning and no money left leaves town, by the rule that was already there). Whether a person is in the labour force at all is still the profile's one participation figure; the curve says only how that share falls with age.
+
+**Limits, to be written into any reading of a run.**
+- The age is drawn once and never moves. A steward who changes the pension's age changes who is paid, not who works. That the pension's terms move the age people stop (Gruber and Wise 1999; Stock and Wise 1990; to confirm) is a person weighing an offer's terms: it belongs to the citizen redesign (docs/design/ai-citizens.md).
+- People stop at the start of a band, on a birthday, not spread through it.
+- Where the survey's last band is open (65 and over), nobody is drawn to stop after its start: the share working at those ages is right in all, and too old on average.
+- Nobody enters the labour force with age (a share lower at 20 than at 40 is not used).
+
 ## Parameters (defaults; a world's profile sets the place-specific ones)
 
 - **Homes:** `rent_share_bps` 3300, `rent_bearable_share_bps` 5000, `savings_rent_months` 6, `accept_fewer_bedrooms_after_days` 60, `search_limit` 20
 - **Spending:** `essentials` 40000 (cents a month), `saving_bps` 500, `wealth_effect_bps_per_year` 300, `income_window_days` 90, `buffer_months` 3
 - **Shopping:** `shop_every_days` 14, `beta` 5, `essentials_units` 10
-- **Work and support:** `retirement_age`, `support_from`, `support_kinds`, `in_labour_force`, `participation_bps` (the world's)
+- **Work and support:** `retirement_age`, `stops_work_at`, `stop_work_curve`, `in_labour_force`, `participation_bps` (the world's); what may be claimed is read from the published law
 - **Business:** `ventures` (the world's), `found_bps`
 - **Union:** `union`, `union_join_bps` (the world's), `ballot_turnout_bps` 7000, `strike_vote_yes_bps` 8500
 - **Leaving:** `leave_after_homeless_days` 90, `leave_after_jobless_days` 180

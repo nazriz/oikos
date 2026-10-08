@@ -584,16 +584,19 @@
       52500000
     ],
     "support": {
-      "pension": {
-        "amount": 120000,
-        "every_days": 30,
-        "from_age": 60
-      },
-      "unemployment": {
-        "amount": 0,
-        "every_days": 30,
-        "from_age": 22
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Old age pension",
+          "every_days": 30,
+          "who": {
+            "from_age": 60
+          },
+          "amount": {
+            "flat": 120000
+          }
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -723,6 +726,24 @@
         "rate": 5
       }
     ],
+    "labour_force_share_by_age": [
+      {
+        "from": 25,
+        "bps": 6983
+      },
+      {
+        "from": 55,
+        "bps": 6543
+      },
+      {
+        "from": 60,
+        "bps": 4868
+      },
+      {
+        "from": 65,
+        "bps": 2643
+      }
+    ],
     "labour_force_participation_bps": 6120,
     "tenancy": {
       "rent_review_months": 12,
@@ -821,38 +842,60 @@
     },
     "public_finance": {
       "income_tax": {
-        "brackets": [
+        "charges": [
           {
-            "from": 0,
-            "rate_bps": 0
+            "id": "income-tax",
+            "name": "Income tax",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 0
+              },
+              {
+                "from": 40000000,
+                "rate_bps": 500
+              },
+              {
+                "from": 80000000,
+                "rate_bps": 1000
+              },
+              {
+                "from": 120000000,
+                "rate_bps": 1500
+              },
+              {
+                "from": 160000000,
+                "rate_bps": 2000
+              },
+              {
+                "from": 200000000,
+                "rate_bps": 2500
+              },
+              {
+                "from": 240000000,
+                "rate_bps": 3000
+              }
+            ],
+            "reliefs": [
+              {
+                "none_due_up_to": 120000000
+              }
+            ]
           },
           {
-            "from": 40000000,
-            "rate_bps": 500
-          },
-          {
-            "from": 80000000,
-            "rate_bps": 1000
-          },
-          {
-            "from": 120000000,
-            "rate_bps": 1500
-          },
-          {
-            "from": 160000000,
-            "rate_bps": 2000
-          },
-          {
-            "from": 200000000,
-            "rate_bps": 2500
-          },
-          {
-            "from": 240000000,
-            "rate_bps": 3000
+            "id": "cess",
+            "name": "Health and Education Cess",
+            "base": {
+              "on": "income-tax"
+            },
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 400
+              }
+            ]
           }
-        ],
-        "levy_bps": 0,
-        "levy_from": 0
+        ]
       },
       "grants_per_resident_per_year": 150000,
       "rates_per_resident_per_year": 100000,
@@ -1325,14 +1368,14 @@
     "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1: 0.25 a month). A model's figure, not this place's.",
     "savings_by_age": "PLACEHOLDER percentiles: an adult's cash and deposits (not gold, chit funds, provident fund, or property), by age. The other profile's placeholders scaled by half the ratio of the two shop wages. Check against the survey mean: MoSPI, All India Debt and Investment Survey (NSS 77th round, assets as on 30 June 2018), urban Tamil Nadu: average value of deposits etc. ₹115,228 a household (and ₹1,642,964 of all assets, loans outstanding ₹103,239; opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08). The survey gives household means, not adults' percentiles by age.",
     "retiree_savings": "PLACEHOLDER: savings at retirement, about 2.25 to 5.25 lakh rupees, the other profile's placeholder scaled by 1.5. Most workers in India have no provident fund or pension (informal work); the EPFO and National Pension System are to be used to source this.",
-    "retirement_age": "60: the age at which Tamil Nadu's government servants retire (Government of Tamil Nadu order of 2021 raising it from 59; to confirm) and at which the Indira Gandhi National Old Age Pension starts (National Social Assistance Programme guidelines). Self-employed and informal workers carry on working past it (gap).",
-    "support.pension": "Eligibility and the Centre's part: Ministry of Rural Development, National Social Assistance Programme (nsap.nic.in, archived copy of 2025, opened): under the Indira Gandhi National Old Age Pension Scheme, BPL persons aged 60 or above are entitled to a monthly pension of ₹200 up to 79 years of age and ₹500 thereafter. Tamil Nadu's total: ₹1,200 a month under all its social-security pensions from August 2023 (Deccan Herald, 22 July 2023, 'Tamil Nadu enhances monthly pension for elders to Rs 1,200', opened; the Revenue/Social Welfare Department's order could not be reached: tn.gov.in times out). It is means-tested to the poor; the structure pays every person from the age, so this overstates coverage (gap). Paid monthly, so every_days is 30.",
-    "support.unemployment": "None: India has no general unemployment benefit (the Employees' State Insurance scheme's Atal Beemit Vyakti Kalyan Yojana pays only some insured workers, and the rural employment guarantee gives up to 100 days of paid work a household, ₹319 a day in Tamil Nadu in 2024-25, which is work, not a transfer: Ministry of Rural Development, as reported; to confirm). The amount is 0, the closest the structure allows. Women heads of household in Tamil Nadu receive ₹1,000 a month (Kalaignar Magalir Urimai Thogai, from September 2023; to confirm): not expressible (gap).",
+    "retirement_age": "60: the age at which Tamil Nadu's government servants retire (Government of Tamil Nadu order of 2021 raising it from 59; to confirm) and at which the Indira Gandhi National Old Age Pension starts (National Social Assistance Programme guidelines). Self-employed and informal workers carry on working past it (gap). Since 2026-10-08 people here stop work at ages of their own, drawn from labour_force_share_by_age; this age is still the one the profile's other figures turn on (the retired's savings, the end of the payments for those out of work, a retirement fund's access) and the top of the working ages the measures use. The pension's age is the payment's own (support.payments).",
+    "support.payments": "[The pension:] Eligibility and the Centre's part: Ministry of Rural Development, National Social Assistance Programme (nsap.nic.in, archived copy of 2025, opened): under the Indira Gandhi National Old Age Pension Scheme, BPL persons aged 60 or above are entitled to a monthly pension of ₹200 up to 79 years of age and ₹500 thereafter. Tamil Nadu's total: ₹1,200 a month under all its social-security pensions from August 2023 (Deccan Herald, 22 July 2023, 'Tamil Nadu enhances monthly pension for elders to Rs 1,200', opened; the Revenue/Social Welfare Department's order could not be reached: tn.gov.in times out). It is means-tested to the poor; the structure pays every person from the age, so this overstates coverage (gap). Paid monthly, so every_days is 30. [The payment to those out of work:] None: India has no general unemployment benefit (the Employees' State Insurance scheme's Atal Beemit Vyakti Kalyan Yojana pays only some insured workers, and the rural employment guarantee gives up to 100 days of paid work a household, ₹319 a day in Tamil Nadu in 2024-25, which is work, not a transfer: Ministry of Rural Development, as reported; to confirm). The amount is 0, the closest the structure allows. Women heads of household in Tamil Nadu receive ₹1,000 a month (Kalaignar Magalir Urimai Thogai, from September 2023; to confirm): not expressible (gap). SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. UN-FOLDED: the payment of nought that stood for no payment to the unemployed is gone (this note: India has no general unemployment benefit), so nobody claims one and none is counted. STAND-IN KEPT: the pension is still paid to everyone from 60. It is means-tested to the poor; that can now be said (`who.income_under`: the household's income as the claimant declares it), but this note gives no income line, so none is set. The payment to women heads of household could be said as a household's payment; a rule by sex is not built.",
     "firm_ownership": "PLACEHOLDERS throughout, to source. Shops and landlords are held closely, as proprietorships and family firms: the National Sample Survey Office's survey of unincorporated non-agricultural enterprises (NSS 73rd round, 2015-16) found proprietary and partnership enterprises to be nearly all of them (to confirm). Factories in a small town are mostly family-owned small firms, with some branches of larger companies. Households holding shares directly: a small share of Indians hold equities (SEBI investor survey 2015: about 2% of households invest in the securities market; NSE Market Pulse; neither opened, to confirm); the shares by wealth fifth are guesses summing to a small total. The number of owners and owner wealth weights: guesses. Evidence for closely held shops: MoSPI, ASUSE 2023-24, urban Tamil Nadu, trade (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08): of 1,000 unincorporated establishments, 985 are proprietary and 14 partnerships; it does not count companies, so the shares here are not read from it.",
     "retirement_fund": "PLACEHOLDERS; used only by a world that asks for a retirement fund. The Employees' Provident Fund Organisation (EPFO) and National Pension System stand for it. member_bps 12%: EPFO's active contributors are about 7 crore against a workforce of some 60 crore (EPFO annual report; PLFS; to confirm). cost_bps_of_income 0.5%: EPFO's administrative charge of 0.5% of wages (Employees' Provident Funds Scheme 1952, para 38; to confirm). share_bps_of_local: a guess. drawdown_bps_by_age: carried over from the other profile (account-based pensions are an Australian design); EPF pays most members a lump sum, not a pension (gap).",
     "industry": "Factory: MoSPI, Annual Survey of Industries 2023-24, Tamil Nadu, all factories (sum over 2-digit NIC groups, opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08): wages and salaries including employer's contribution ₹2.17 lakh crore are 7.0% of total output of ₹30.99 lakh crore; total inputs ₹25.94 lakh crore are 83.7% of output (materials 67.4%, fuels the rest). Retail: PLACEHOLDERS, purchases about 80% of sales and wages about 6% for small shops (no source found: the ASUSE gives GVA per worker for trade, not a wage share of sales; to compute).",
     "prices": "PLACEHOLDERS: an item of goods worth ₹300 at world prices (the unit the town counts in), scaled from the other profile's unit by the ratio of the two shop wages (3.02); imports 10% dearer; inputs ₹7.50 a kg; building materials ₹3 a kg (cement about ₹7 a kg, bricks ₹2 to ₹3; Tamil Nadu retail prices not sourced).",
     "labour_force_participation_bps": "MoSPI, Periodic Labour Force Survey, calendar year 2024, urban Tamil Nadu, usual status (PS+SS), persons aged 15-59: labour force participation rate 61.2% (male 84.8%, female 38.3%); aged 15 and over: 54.5%; worker population ratio 15+ 52.4%; unemployment rate 15+ 3.8% (opened via MoSPI eSankhyiki data server (mcp.mospi.gov.in), opened 2026-10-08).",
+    "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, India, national, annual 2025, from MoSPI's Periodic Labour Force Survey: ages 25 to 54, 69.825%; 55 to 59, 65.427%; 60 to 64, 48.675%; 65 and over, 26.431%. National, not urban Tamil Nadu (the series is all India, rural and urban together) (no table by age for the region was found); not checked against MoSPI's own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Tamil Nadu Regulation of Rights and Responsibilities of Landlords and Tenants Act 2017: rent is revised by agreement, typically once a year (11-month agreements are customary), and a landlord gives three months' notice in writing of a revision (to confirm the sections, and whether the Act is in force as written). A tenant who stays on after the term holds over month to month (to confirm).",
     "values": "PLACEHOLDER carried over unchanged: Schwartz's ten basic values, in the pan-cultural order found across 56 nations (Schwartz & Bardi 2001, 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32). Indian samples tend to rank tradition, conformity and security higher; not adjusted (to source, e.g. World Values Survey India wave).",
     "industrial_action": "Industrial Relations Code 2020 (in force from 21 November 2025; to confirm), s 62: no worker in an industrial establishment may strike without notice within 60 days before striking, and not within 14 days of giving it (taken here as 14 days' notice). No strike ballot is required, so the turnout and approval thresholds are 0 (the structure has no 'no ballot' form). Employees on strike are not paid ('no work, no pay'; to confirm the section).",
@@ -1348,7 +1391,7 @@
     "credit.reserve": "Placeholder: the cash the bank's lending office keeps back and doesn't lend, ₹302,000 (the other profile's placeholder scaled by the ratio of shop wages, 3.02). To source.",
     "opening": "Placeholders, to source: what each organisation holds on the first day, scaled from the other profile's placeholders by the ratio of the two shop wages (3.02): the bank's own funds ₹1.51 million; the town ₹6.04 million; the builder ₹906,000; each landlord ₹1.81 million; a shop ₹90,600 where its working capital isn't worked out from its stock and wages; a factory ₹1.21 million; and the least an adult in the labour force has saved (₹3,000).",
     "town_finance": "Placeholders, scaled from the other profile's by 3.02: the town's yearly parks line ₹453,000; the payment its procedure needs the mayor's written approval over, ₹151,000 (a town panchayat's financial delegation; Tamil Nadu Town Panchayats Act 1998; to source).",
-    "public_finance.income_tax": "Ministry of Finance, Union Budget 2026-27, Explanatory Memorandum to the Finance Bill (indiabudget.gov.in/doc/memo.pdf, opened) and the Finance Bill 2026 (opened): rates of income tax for an individual for tax year 2026-27 under the new regime (section 202 of the Income-tax Act 2025): nil to ₹4,00,000; 5% to ₹8,00,000; 10% to ₹12,00,000; 15% to ₹16,00,000; 20% to ₹20,00,000; 25% to ₹24,00,000; 30% above. Health and Education Cess at 4% of the tax (with surcharge) in all cases. NOT EXPRESSED: that cess (the structure's levy is a share of income, not of tax, so levy_bps is 0), the rebate that makes income up to ₹12 lakh tax-free, and the standard deduction. In effect no one in a small town pays income tax, which is near the truth: only a small share of Indians do.",
+    "public_finance.income_tax": "Ministry of Finance, Union Budget 2026-27, Explanatory Memorandum to the Finance Bill (indiabudget.gov.in/doc/memo.pdf, opened) and the Finance Bill 2026 (opened): rates of income tax for an individual for tax year 2026-27 under the new regime (section 202 of the Income-tax Act 2025): nil to ₹4,00,000; 5% to ₹8,00,000; 10% to ₹12,00,000; 15% to ₹16,00,000; 20% to ₹20,00,000; 25% to ₹24,00,000; 30% above. Health and Education Cess at 4% of the tax (with surcharge) in all cases. NOT EXPRESSED: that cess (the structure's levy is a share of income, not of tax, so levy_bps is 0), the rebate that makes income up to ₹12 lakh tax-free, and the standard deduction. In effect no one in a small town pays income tax, which is near the truth: only a small share of Indians do. SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). EXPRESSED NOW, from this note: the rebate that leaves income up to ₹12,00,000 untaxed (no tax is due where the taxable income is that or less), and the Health and Education Cess of 4% of the tax, a charge on the tax. The levy of nought that stood for no levy is gone. Not expressed: the standard deduction (the note gives no figure for it: the field is a deduction, `base.less`), and the marginal relief just above the rebate's line.",
     "public_finance.grants_per_resident_per_year": "PLACEHOLDER, ₹1,500 a resident a year: Tamil Nadu's devolution to local bodies on the State Finance Commission's recommendation and Union grants under the Fifteenth Finance Commission (not opened, to source).",
     "public_finance.rates_per_resident_per_year": "PLACEHOLDER, ₹1,000 a resident a year of property tax and other own revenue; Indian municipalities' own revenue per head is small (RBI, Report on Municipal Finances; not opened, to confirm). Sets the town's opening rate in the rupee.",
     "public_finance.rates_instalments": "Tamil Nadu District Municipalities Act 1920 and Town Panchayats Act 1998: property tax is payable half-yearly (by 30 September and 31 March; to confirm the sections).",

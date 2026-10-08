@@ -34,6 +34,7 @@ import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, D
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
+import { declarationFor, forHousehold, forOutOfWork, stopsWorkAt, supportLaw, type PaymentRule } from "./payments";
 import { Borrowing, loanFor } from "./credit";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
@@ -117,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.41.1", // 0.41.1: main's 0.40.1 (a buyer rounds the deposit up) with 0.41.0
+  version: "0.42.0", // 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -139,10 +140,13 @@ export const citizen: BehaviourModule = {
       wealth_effect_bps_per_year: 300, // consumption a year per unit of wealth
       income_window_days: 90, // income is what came in over this, a month's worth
       buffer_months: 3,
-      // Retiring, and claiming support (docs/behaviour/citizen.md). None unless the world says: no retirement age, no payer.
+      // Stopping work, and claiming support (docs/behaviour/citizen.md). None unless the world says: no age, no payer.
+      // The age at which people here stop work, where the world gives one age for everyone; or this person's own
+      // (`stops_work_at`: an age, or "never"), drawn when the world was made; or, for someone who comes later, the
+      // share of people in the labour force by age it is drawn from (`stop_work_curve`).
       retirement_age: null as number | null,
-      support_from: null as string | null, // who pays support (an entity: in a town, usually the outside world)
-      support_kinds: { retired: "pension", unemployed: "unemployment" } as { retired?: string; unemployed?: string }, // what to claim, when
+      stops_work_at: null as number | "never" | null,
+      stop_work_curve: null as { from: number; bps: number }[] | null,
       in_labour_force: true, // false: not looking for work (studying, caring...), and not claiming support for being out of it
       // A child born here: whether they'll look for work as an adult, at the world's participation (the template for
       // those who won't; "": every child takes `child_template`).
@@ -456,20 +460,26 @@ export const citizen: BehaviourModule = {
     };
     const newsNow = (t: number) => [...toldUs.values()].filter((n) => t - n.t <= p.news_days * DAY);
 
-    // Support paid to us, once our claim is granted (the decision says how much, how often), and whether it's the kind
-    // we claim on retiring.
-    let benefit: { claim: string; payment: string; amount: number; every: number; retired: boolean } | null = null;
-    let claiming: string | null = null; // a claim we've made and not yet heard back on
+    // Support paid to us, by payment, once our claim is granted (the decision says how much, how often), and whether it's
+    // a stopgap while out of work or income that lasts (a pension, a household's payment).
+    const benefits = new Map<string, { claim: string; payment: string; payer: string; amount: number; every: number; lasting: boolean }>();
+    const claiming = new Set<string>(); // claims we've made and not yet heard back on, by payment
     const refusedAt = new Map<string, number>(); // a kind of claim refused, at the age we were: not made again until we're older
-    let retired = false;
+    const refusedOn = new Map<string, number>(); // and when
+    const ranOut = new Set<string>(); // payments whose time ran out, since we last worked
+    let worked = false; // we have held a job here (what a record of contributions is made of)
+    // The age at which we stop work (null: we never do): our own, or drawn from the world's curve, or the world's one age.
+    const stopAge: number | null = p.stops_work_at === "never" ? null : p.stops_work_at ?? (p.stop_work_curve ? stopsWorkAt(p.stop_work_curve, ctx.rng("stops-work").below(10_000)) ?? null : p.retirement_age);
+    let retired = false; // we have stopped work
     const inflows: { t: number; amount: number }[] = []; // money that came in (refunds counted negative), for what our income is
     const wageIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
     // (Support for being out of work isn't income once we're in work: we stop claiming it. Counting it, a household applied
     // for a home only that income could afford, and then couldn't sign.)
-    const benefitIncome = () => (benefit && (benefit.retired || !job) ? Math.floor((benefit.amount * MONTH) / benefit.every) : 0);
+    const supportIncome = (lastingOnly: boolean) => [...benefits.values()].filter((b) => b.lasting || (!lastingOnly && !job)).reduce((x, b) => x + Math.floor((b.amount * MONTH) / b.every), 0);
+    const benefitIncome = () => supportIncome(false);
     const monthlyIncome = () => wageIncome() + benefitIncome();
-    /** Income that keeps a household in town: work, or support in retirement (support while out of work is a stopgap). */
-    const earnedIncome = () => wageIncome() + (benefit?.retired ? benefitIncome() : 0);
+    /** Income that keeps a household in town: work, or support that lasts (support while out of work is a stopgap). */
+    const earnedIncome = () => wageIncome() + supportIncome(true);
 
     // The household (a record the members keep; none: living alone, as the leaseholder of one).
     const year: number = p.year;
@@ -1526,32 +1536,76 @@ export const citizen: BehaviourModule = {
             data: { listing: best.id, account: acc.account, members, household: { people: members.length, bedrooms_needed: household ? bedroomsNeeded(household, t, year, p.occupancy) : 0 } }, basis: best.id })));
         }
       }
-      // Retiring at the world's retirement age: we stop working (giving our employer notice) and claim support.
+      // Stopping work at our age for it (the world's one age, or our own): we give our employer notice.
       const age = obs.body ? Math.floor((t - obs.body.born_at) / year) : 0;
-      if (!retired && p.retirement_age !== null && age >= p.retirement_age) {
+      if (!retired && stopAge !== null && age >= stopAge) {
         retired = true;
         if (job) {
-          steps.push(because(`We've reached the retirement age (${p.retirement_age}): retiring, with the notice our job asks.`, notice(job.agreement, "Retiring.")));
+          steps.push(because(stopAge === p.retirement_age ? `We've reached the retirement age (${p.retirement_age}): retiring, with the notice our job asks.` : `We've reached the age at which we stop work (${stopAge}): retiring, with the notice our job asks.`, notice(job.agreement, "Retiring.")));
         }
       }
-      // Claims for support: once retired, and while out of work. A claim that no longer fits (work found, or retired)
-      // is stopped by saying so.
-      const want = !p.support_from ? null : retired ? p.support_kinds.retired ?? null : !job && p.in_labour_force ? p.support_kinds.unemployed ?? null : null;
-      if (benefit && benefit.payment !== want) {
-        steps.push(because(`Our circumstances have changed (${job ? "working again" : retired ? "retired" : "no longer eligible"}): asking for our ${benefit.payment} payments to stop.`,
-          say("benefit_change", `Please stop payment ${benefit.claim}.`, { to: [p.support_from!], visible: [me, p.support_from!], basis: benefit.claim, data: { claim: benefit.claim, stop: true } })));
-        benefit = null;
+      // Claims for support, as the published law sets the payments out (docs/behaviour/boundary.md): a payment for those
+      // out of work, while out of work and looking (the first the law lists that hasn't refused us or run out); a payment
+      // for age, from its age, working or not; a household's payment, as its head. Where a payment's rule turns on
+      // what we know of ourselves (our household's income and children, another pension), we claim it only if we fit, and
+      // declare those on the claim. A claim that no longer fits is stopped by saying so.
+      const rules: PaymentRule[] = supportLaw(book)?.payments ?? [];
+      if (job) {
+        worked = true;
+        ranOut.clear();
+        for (const r of rules) if (r.who?.record) { refusedAt.delete(r.id); refusedOn.delete(r.id); } // (work is what a record is made of: worth asking again)
       }
-      if (want && !benefit && claiming !== want && !(refusedAt.get(want) === age)) {
-        claiming = want;
-        steps.push(because(retired ? `Retired, at ${age}: claiming ${want} support.` : `Out of work: claiming ${want} support while we look.`,
-          say("benefit_claim", `Claim: ${want}.`, { to: [p.support_from!], visible: [me, p.support_from!], data: { payment: want, account: acc.account, born_at: obs.body?.born_at } })));
+      // A refused claim isn't made again until we're a year older; one that turns on a record of contributions, which
+      // employers send in monthly, is tried again a month on.
+      const blocked = (r: PaymentRule) => (r.who?.record ? refusedOn.has(r.id) && t - refusedOn.get(r.id)! < MONTH : refusedAt.get(r.id) === age);
+      const facts = () => ({
+        household_income: wageIncome() + (isLeaseholder() ? [...memberPay.values()].reduce((x, y) => x + y, 0) : 0),
+        household_members: household?.members.length ?? 1,
+        children_born_at: (household?.members ?? []).filter((m) => ageAt(m, t, year) < ADULT_YEARS).map((m) => m.born_at),
+        other_pension: rules.some((r) => benefits.has(r.id) && !forOutOfWork(r) && !forHousehold(r)),
+      });
+      const fits = (r: PaymentRule): boolean => {
+        const w = r.who ?? {}, f = facts();
+        if (w.record && !worked) return false; // (nobody has reported pay for someone who hasn't worked here)
+        if (w.income_under && (w.income_under.per === "head" ? Math.floor(f.household_income / f.household_members) : f.household_income) >= w.income_under.amount) return false;
+        if (w.no_other_pension && rules.some((o) => o.id !== r.id && benefits.has(o.id) && !forOutOfWork(o) && !forHousehold(o))) return false;
+        if (w.children && f.children_born_at.filter((b) => Math.floor((t - b) / year) < w.children!.under_age).length < w.children.least) return false;
+        return true;
+      };
+      const looking = !job && !retired && p.in_labour_force;
+      const stopgaps = rules.filter(forOutOfWork);
+      // (The first the law lists that we may have; one we already draw is kept until an earlier one is granted.)
+      const preferred = !looking ? undefined : stopgaps.find((r) => claiming.has(r.id)) ?? stopgaps.find((r) => !blocked(r) && !ranOut.has(r.id) && fits(r));
+      const drawn = !looking ? undefined : stopgaps.find((r) => benefits.has(r.id));
+      const wanted = (r: PaymentRule) => (forOutOfWork(r) ? r === preferred || (r === drawn && !(preferred && benefits.has(preferred.id)))
+        : (forHousehold(r) ? isLeaseholder() : true) && age >= (r.who?.from_age ?? 0) && age <= (r.who?.to_age ?? Infinity) && fits(r));
+      for (const b of [...benefits.values()]) {
+        const r = rules.find((x) => x.id === b.payment);
+        if (r && wanted(r)) continue;
+        steps.push(because(`Our circumstances have changed (${job ? "working again" : retired ? "retired" : "no longer eligible"}): asking for our ${b.payment} payments to stop.`,
+          say("benefit_change", `Please stop payment ${b.claim}.`, { to: [b.payer], visible: [me, b.payer], basis: b.claim, data: { claim: b.claim, stop: true } })));
+        benefits.delete(b.payment);
+      }
+      for (const r of rules) {
+        if (!wanted(r) || benefits.has(r.id) || claiming.has(r.id) || blocked(r)) continue;
+        claiming.add(r.id);
+        const declares = declarationFor(r, facts());
+        steps.push(because(forOutOfWork(r) ? `Out of work: claiming ${r.id} support while we look.` : forHousehold(r) ? `Our household may be paid ${r.id} support: claiming it.` : retired ? `Retired, at ${age}: claiming ${r.id} support.` : `At ${age}: claiming ${r.id} support.`,
+          say("benefit_claim", `Claim: ${r.id}.`, { to: [r.payer], visible: [me, r.payer], data: { payment: r.id, account: acc.account, born_at: obs.body?.born_at, ...(declares ? { declares } : {}) } })));
       }
       for (const r of fresh) {
-        if (r.record !== "statement" || r.kind !== "benefit_decision" || !(r.addressed_to ?? []).includes(me)) continue;
-        if (r.data?.granted && claiming && r.data?.payment === claiming) benefit = { claim: r.data.claim, payment: claiming, amount: r.data.amount, every: r.data.every, retired };
-        else if (claiming) refusedAt.set(claiming, age);
-        claiming = null;
+        if (r.record !== "statement" || !(r.addressed_to ?? []).includes(me)) continue;
+        const payment = String(r.data?.payment);
+        if (r.kind === "benefit_end") {
+          // A payment whose time has run out: it isn't claimed again until we've worked.
+          if (benefits.get(payment)?.claim === r.data?.claim) benefits.delete(payment);
+          ranOut.add(payment);
+        }
+        if (r.kind !== "benefit_decision" || !claiming.has(payment)) continue;
+        const rule = rules.find((x) => x.id === payment);
+        if (r.data?.granted) benefits.set(payment, { claim: r.data.claim, payment, payer: rule?.payer ?? r.speaks_for!, amount: r.data.amount, every: r.data.every, lasting: !!rule && !forOutOfWork(rule) });
+        else { refusedAt.set(payment, age); refusedOn.set(payment, t); }
+        claiming.delete(payment);
       }
       // Looking for work: where someone told us about first, then the best-paid posting.
       if ((!job || (searchingWork && !switching)) && !retired && p.in_labour_force) {
@@ -1994,7 +2048,9 @@ export const citizen: BehaviourModule = {
         if (place?.data?.classroom && workday(t, r.work_days) && tod(t) >= r.school_start && tod(t) < r.school_end) return String(place.data.classroom);
         return home_;
       }
-      if (job?.workplace && !offSick && !striking?.out && t < jobEnds(job) && workday(t, r.work_days) && tod(t) >= r.work_start && tod(t) < r.work_end) return job.workplace;
+      // (On strike from the moment we know of the stoppage, not only once we have walked out: someone who learned of it
+      // in the middle of something else went in to work the next morning, until 2026-10-09.)
+      if (job?.workplace && !offSick && !striking && t < jobEnds(job) && workday(t, r.work_days) && tod(t) >= r.work_start && tod(t) < r.work_end) return job.workplace;
       return home_;
     };
     /** The next time where we belong may change: work and school starting or ending, on working days. */
@@ -2399,6 +2455,12 @@ export const citizen: BehaviourModule = {
       }
       if (share?.order) s.push(withdraw(share.order, "Leaving town."));
       if (job) s.push(notice(job.agreement, "Leaving town."));
+      // (A union member in work tells the union they no longer are, as members keep their details up: their membership
+      // runs on for its notice, and until 2026-10-09 the union went on taking them to work there for as long.)
+      if (job && p.union && isMember() && toldUnion !== "") {
+        toldUnion = "";
+        s.push(say("membership_update", "I'm no longer in work.", { to: [p.union], visible: [me, p.union], data: { employer: "" } }));
+      }
       // Everything else of ours that we can end by notice under its terms (memberships): ended, and what we pay under
       // it stopped.
       for (const r of book.ofType("agreement")) {

@@ -608,6 +608,24 @@
       }
     ],
     "retirement_age": 65,
+    "labour_force_share_by_age": [
+      {
+        "from": 25,
+        "bps": 7695
+      },
+      {
+        "from": 55,
+        "bps": 6695
+      },
+      {
+        "from": 60,
+        "bps": 4938
+      },
+      {
+        "from": 65,
+        "bps": 2516
+      }
+    ],
     "labour_force_participation_bps": 6700,
     "tenancy": {
       "rent_review_months": 12,
@@ -709,16 +727,19 @@
       9000000
     ],
     "support": {
-      "pension": {
-        "amount": 640000,
-        "every_days": 61,
-        "from_age": 65
-      },
-      "unemployment": {
-        "amount": 0,
-        "every_days": 14,
-        "from_age": 18
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Pensión para el Bienestar de las Personas Adultas Mayores",
+          "every_days": 61,
+          "who": {
+            "from_age": 65
+          },
+          "amount": {
+            "flat": 640000
+          }
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -819,54 +840,58 @@
     },
     "public_finance": {
       "income_tax": {
-        "brackets": [
+        "charges": [
           {
-            "from": 0,
-            "rate_bps": 192
-          },
-          {
-            "from": 1013512,
-            "rate_bps": 640
-          },
-          {
-            "from": 8602212,
-            "rate_bps": 1088
-          },
-          {
-            "from": 15117620,
-            "rate_bps": 1600
-          },
-          {
-            "from": 17573567,
-            "rate_bps": 1792
-          },
-          {
-            "from": 21040370,
-            "rate_bps": 2136
-          },
-          {
-            "from": 42435398,
-            "rate_bps": 2352
-          },
-          {
-            "from": 66884015,
-            "rate_bps": 3000
-          },
-          {
-            "from": 127692599,
-            "rate_bps": 3200
-          },
-          {
-            "from": 170256798,
-            "rate_bps": 3400
-          },
-          {
-            "from": 510770393,
-            "rate_bps": 3500
+            "id": "income-tax",
+            "name": "ISR",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 192
+              },
+              {
+                "from": 1013512,
+                "rate_bps": 640
+              },
+              {
+                "from": 8602212,
+                "rate_bps": 1088
+              },
+              {
+                "from": 15117620,
+                "rate_bps": 1600
+              },
+              {
+                "from": 17573567,
+                "rate_bps": 1792
+              },
+              {
+                "from": 21040370,
+                "rate_bps": 2136
+              },
+              {
+                "from": 42435398,
+                "rate_bps": 2352
+              },
+              {
+                "from": 66884015,
+                "rate_bps": 3000
+              },
+              {
+                "from": 127692599,
+                "rate_bps": 3200
+              },
+              {
+                "from": 170256798,
+                "rate_bps": 3400
+              },
+              {
+                "from": 510770393,
+                "rate_bps": 3500
+              }
+            ]
           }
-        ],
-        "levy_bps": 0,
-        "levy_from": 0
+        ]
       },
       "grants_per_resident_per_year": 300000,
       "rates_per_resident_per_year": 3884,
@@ -1309,8 +1334,9 @@
     "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1: the probability of searching for a cheaper seller, 0.25 a month; read 2026-10-08). A model's figure, as above.",
     "spending.essentials_per_month": "Derived: ENIGH 2024 Jalisco, food and drink consumed at home 16,005 pesos a quarter per household (INEGI, Encuesta Nacional de Ingresos y Gastos de los Hogares (ENIGH) 2024, presentación de resultados, Jalisco (July 2025), https://www.inegi.org.mx/contenidos/programas/enigh/nc/2024/doc/enigh2024_ns_presentacion_resultados_jal.pdf, page 23), over 3 months and 3.27 members per household (page 5): 1,631 pesos per person per month. What a person spends however little comes in, taken as the food bought for the home.",
     "savings_by_age": "Placeholder: no Mexican distribution of adult cash and deposits by age was found (the ENIF financial inclusion survey, INEGI/CNBV, gives account holding, not balances; to source). Carried over from au-vic-2026's percentiles and scaled by the ratio of the two profiles' shop wages (2.50 pesos per Australian dollar), which assumes Mexican balances relative to wages match Australian ones: surely too high for Mexico, where many adults have no bank account. Drawn between percentiles, and above the 90th up to three times it, as the generator does.",
-    "retirement_age": "Old-age pension (vejez) from 65 under the Ley del Seguro Social (IMSS; cesantía en edad avanzada from 60) and the Pensión para el Bienestar de las Personas Adultas Mayores from 65 (women from 63 in the phase-in of 2025-26; IMSS, https://www.imss.gob.mx/node/1217 and the search digest at https://www.adn40.mx/mexico/2026-07-21/es-oficial-estas-son-las-semanas-cotizadas-obligatorias-para-jubilarte-en-julio-2026/ ; pages not opened: to confirm). One age is used for everyone: 65.",
+    "retirement_age": "Old-age pension (vejez) from 65 under the Ley del Seguro Social (IMSS; cesantía en edad avanzada from 60) and the Pensión para el Bienestar de las Personas Adultas Mayores from 65 (women from 63 in the phase-in of 2025-26; IMSS, https://www.imss.gob.mx/node/1217 and the search digest at https://www.adn40.mx/mexico/2026-07-21/es-oficial-estas-son-las-semanas-cotizadas-obligatorias-para-jubilarte-en-julio-2026/ ; pages not opened: to confirm). One age is used for everyone: 65. Since 2026-10-08 people here stop work at ages of their own, drawn from labour_force_share_by_age; this age is still the one the profile's other figures turn on (the retired's savings, the end of the payments for those out of work, a retirement fund's access) and the top of the working ages the measures use. The pension's age is the payment's own (support.payments).",
     "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to 64) in the labour force, 67%. ENOE Jalisco Q1 2026: participation 56.2% of everyone aged 15 and over (men 72.2%, women 41.6%; INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); the working-age share is higher because the base includes the 65+ and students under 18; the 67% is an estimate from that, to confirm against ENOE's age tables. Those outside it (home-making is 33.6% of the non-active in the 2020 census, studying 42.9%) do not look for work.",
+    "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, Mexico, national, annual 2025, from INEGI's Encuesta Nacional de Ocupación y Empleo: ages 25 to 54, 76.948%; 55 to 59, 66.947%; 60 to 64, 49.378%; 65 and over, 25.157%. National, not Jalisco (no table by age for the region was found); not checked against INEGI's own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Código Civil del Estado de Jalisco, title on leases (arrendamiento): a rent may be raised once a year, by notice, so the tenant can agree or object; a legal extension (prórroga) of up to a year is regulated and rent may rise by up to 10% in it if the landlord shows rents in the zone rose as much (summarised by the search at https://leyes-mx.com/codigo_civil_jalisco/2028.htm ; the article numbers and the notice period were not read: to confirm). rent_review_months 12 follows. rent_increase_notice_days 30 is a PLACEHOLDER (the Code's period was not found). after_fixed_term 'periodic': a tenant who stays on after a fixed term continues month to month (tacit renewal; to confirm in the Code).",
     "values": "Placeholder: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power: 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500. To source for this place: the World Values Survey's Schwartz items for Australia (wave 6), rescaled. Carried over unchanged: a cross-national ordering, not a Mexican measurement; a placeholder for Mexico, to replace with a Mexican survey of Schwartz values (for example the World Values Survey wave 7 for Mexico, or the European Social Survey's Portrait Values Questionnaire if run there) when found.",
     "industrial_action": "Ley Federal del Trabajo (LFT), title 8 (strikes), art 920 fr III: the strike petition (emplazamiento) must give six days' notice in private firms (ten in public services); art 930 and following: the headcount (recuento) of workers decides the strike's legality and only the workers of the firm who attend count. The 2019 labour reform requires a vote of the workers for contract matters. Source of the summary: the search result on arts 920-931 (https://mley.mx/LFT/articulo/920/ and https://mley.mx/LFT/articulo/931/ ; pages not opened: to confirm). notice_days 6 follows. ballot_turnout_bps and ballot_pass_bps (5,000 each: more than half of the workers) follow the rule as summarised (the exact threshold in the strike-legality headcount, art 930 fr II, is a majority of the workers: to confirm). paid_during_action false: strikers are not paid wages (a collective agreement can say otherwise; to confirm).",
@@ -1328,8 +1354,7 @@
     "town_finance.parks_per_year": "Placeholder: the town's yearly parks line; scaled from au-vic-2026's by the shop-wage ratio (2.50).",
     "town_finance.payment_approval_over": "Placeholder: the town's procedure needs the mayor's written approval for any payment over this; scaled from au-vic-2026's by the shop-wage ratio. The municipal council (ayuntamiento) and its treasurer (tesorero) decide this by Ley de Gobierno y la Administración Pública Municipal del Estado de Jalisco; thresholds not found.",
     "retiree_savings": "Placeholder: cash savings at retirement, 30,000 to 90,000 pesos. Most of a worker's retirement wealth is in the individual Afore account (not cash), and a majority never contributed (ENOE Jalisco Q1 2026: 48.6% of the employed are informal; INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); the range is an estimate of what a retiree holds as deposits, to source from ENIF 2024 (INEGI/CNBV) and CONSAR.",
-    "support.pension": "Pensión para el Bienestar de las Personas Adultas Mayores: 6,400 pesos paid every two months in 2026 (up from 6,200 in 2025), universal, from age 65 (https://www.nmas.com.mx/nacional/cuanto-paga-pension-bienestar-2026-nuevo-monto-oficial-aumento-adultos-mayores-mujeres/ and https://expansion.mx/finanzas-personales/2025/12/15/calendario-primeros-pagos-pension-bienestar-2026 ; news reports of the programme's rules, not the DOF/Secretaría de Bienestar text: to confirm). every_days 61 (one two-month period, 365/6). IMSS pensions (cesantía y vejez) are not modelled; only this universal payment is.",
-    "support.unemployment": "NO EQUIVALENT: Mexico has no national unemployment benefit (only Mexico City's seguro de desempleo, and a partial withdrawal from the Afore account, ley del Seguro Social art 191). Amount set to 0 so nobody receives one; from_age 18 and every_days 14 are neutral values. The closest thing the structure allows; listed as a gap. Source: Ley del Seguro Social, art 191 (partial withdrawal for unemployment from the Afore account after 46 days; summarised only, not opened: to confirm).",
+    "support.payments": "[The pension:] Pensión para el Bienestar de las Personas Adultas Mayores: 6,400 pesos paid every two months in 2026 (up from 6,200 in 2025), universal, from age 65 (https://www.nmas.com.mx/nacional/cuanto-paga-pension-bienestar-2026-nuevo-monto-oficial-aumento-adultos-mayores-mujeres/ and https://expansion.mx/finanzas-personales/2025/12/15/calendario-primeros-pagos-pension-bienestar-2026 ; news reports of the programme's rules, not the DOF/Secretaría de Bienestar text: to confirm). every_days 61 (one two-month period, 365/6). IMSS pensions (cesantía y vejez) are not modelled; only this universal payment is. [The payment to those out of work:] NO EQUIVALENT: Mexico has no national unemployment benefit (only Mexico City's seguro de desempleo, and a partial withdrawal from the Afore account, ley del Seguro Social art 191). Amount set to 0 so nobody receives one; from_age 18 and every_days 14 are neutral values. The closest thing the structure allows; listed as a gap. Source: Ley del Seguro Social, art 191 (partial withdrawal for unemployment from the Afore account after 46 days; summarised only, not opened: to confirm). SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. UN-FOLDED: the payment of nought that stood for no payment to the unemployed is gone (this note: Mexico has no national unemployment benefit), so nobody claims one and none is counted. The pension is as it was: universal, every 61 days.",
     "firm_ownership.forms_bps": "Placeholder: how the firms of each kind are held (docs/behaviour/firm-ownership.md). Shops and landlords are small family businesses held closely: ENOE Jalisco Q1 2026: 45.5% of non-agricultural workers are in micro-businesses and 23.5% in small establishments; of the employed, 6.5% are employers and 18.0% are own-account workers (INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); the closely held/outside split is an estimate. Factories: a mix of family firms, branches of firms from elsewhere and a few listed groups; the split 30/50/20 is a placeholder. No source for ownership forms of firms by kind was found.",
     "firm_ownership.closely_held": "Placeholder: the shares with one, two, three owning households (85/12/3), carried over from au-vic-2026 with no Mexican figure; owner_wealth_fifth_bps: closely held firms belong mostly to the richest fifth of households, carried over unchanged.",
     "firm_ownership.widely_held": "Placeholder: the part of a widely held firm held from outside (80%), carried over from au-vic-2026.",
@@ -1337,7 +1362,7 @@
     "retirement_fund": "Placeholder, all of it: the retirement fund's rules were modelled on Australian account-based pensions, and these figures are carried over from au-vic-2026. Mexico's system is the Afores (individual defined-contribution accounts run by private administrators supervised by CONSAR, with a guaranteed minimum pension): a fund of this type exists but its parameters (a pension at the rate of the balance, rising with age) are not Mexico's. Use with a world that asks for one only after replacing from CONSAR statistics. IMSS contribution rates, for reference: retiro 2.0% of salary from the employer, cesantía y vejez employer 3.15% rising to 11.875% by 2030 and 1.125% from the worker, under the 2020 pension reform (https://www.elcontribuyente.mx/indicadores/cuotas-imss/ , summary; not opened).",
     "industry": "Placeholder: carried over from au-vic-2026 (manufacturing's compensation of employees and intermediate inputs as shares of output; retail's purchases of goods and wages as shares of sales; from ABS input-output tables). Mexican equivalents: INEGI, Matriz Insumo-Producto 2018 and Censos Económicos 2024 (value added and remuneration by sector). Not opened. Retail's labour share of 14% is likely higher in a country with low retail wages; unverified.",
     "prices": "Placeholder, all four, scaled so that the town's price level is consistent with its wages (the shop wage here is 2.50 times au-vic-2026's in currency units): an item of goods worth 250 pesos at world prices (the unit the town counts in; au-vic-2026 uses $100); imports 10% dearer (freight and margins); factory inputs 5 pesos a kg; building materials 4 pesos a kg (retail prices of cement, about 4-5 pesos a kg for a 50 kg bag, are the anchor; unverified, to check against the Sistema Nacional de Información de Precios, SNIIM or INEGI's INPC and the construction input price index).",
-    "public_finance.income_tax": "Servicio de Administración Tributaria (SAT), Resolución Miscelánea Fiscal 2026, Anexo 8 (published in the Diario Oficial on 28 December 2025): annual tariff for individuals (Art. 152 LISR): marginal rates 1.92%, 6.40%, 10.88%, 16.00%, 17.92%, 21.36%, 23.52%, 30.00%, 32.00%, 34.00% and 35.00% above lower limits of 0.01, 10,135.12, 86,022.12, 151,176.20, 175,735.67, 210,403.70, 424,353.98, 668,840.15, 1,276,925.99, 1,702,567.98 and 5,107,703.93 pesos (the fixed fees in the tariff equal the cumulated tax of the brackets below, so marginal rates are equivalent), from https://elconta.mx/tablas-y-tarifas-isr-2026-anexo-8-de-la-resolucion-miscelanea-fiscal-2026/ (a tax-practice site reproducing Anexo 8; the DOF text not opened: to confirm). The employment subsidy (subsidio para el empleo) for low incomes and employees' social-security contributions (IMSS worker share) are NOT modelled; there is no Medicare-type levy, so levy_bps is 0. Employers withhold monthly in Mexico; here they withhold on each pay, reckoned as a year's income.",
+    "public_finance.income_tax": "Servicio de Administración Tributaria (SAT), Resolución Miscelánea Fiscal 2026, Anexo 8 (published in the Diario Oficial on 28 December 2025): annual tariff for individuals (Art. 152 LISR): marginal rates 1.92%, 6.40%, 10.88%, 16.00%, 17.92%, 21.36%, 23.52%, 30.00%, 32.00%, 34.00% and 35.00% above lower limits of 0.01, 10,135.12, 86,022.12, 151,176.20, 175,735.67, 210,403.70, 424,353.98, 668,840.15, 1,276,925.99, 1,702,567.98 and 5,107,703.93 pesos (the fixed fees in the tariff equal the cumulated tax of the brackets below, so marginal rates are equivalent), from https://elconta.mx/tablas-y-tarifas-isr-2026-anexo-8-de-la-resolucion-miscelanea-fiscal-2026/ (a tax-practice site reproducing Anexo 8; the DOF text not opened: to confirm). The employment subsidy (subsidio para el empleo) for low incomes and employees' social-security contributions (IMSS worker share) are NOT modelled; there is no Medicare-type levy, so levy_bps is 0. Employers withhold monthly in Mexico; here they withhold on each pay, reckoned as a year's income. SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). One charge, the annual tariff as it was. The levy of nought that stood for no levy is gone. Not expressed, as before: the employment subsidy and the worker's social-security share (the note gives no figures).",
     "public_finance.grants_per_resident_per_year": "Placeholder: federal and state transfers to municipalities (participaciones, Ramo 28, and aportaciones, Ramo 33: FISM and FORTAMUN) per resident: about 3,000 pesos a year is an order-of-magnitude estimate for a small Jalisco municipality; the amounts by municipality are in Jalisco's Ley de Coordinación Fiscal distribution and the Ramo 33 / Ramo 28 estimates for 2024 (e.g. https://www.zapopan.gob.mx/wp-content/uploads/2024/05/Estimaciones_Ramo_33_y_28_2024.pdf , not opened). Participations are 50.3% and aportaciones 37.7% of Jalisco state income in 2022 (INEGI, Finanzas públicas estatales y municipales, through IIEG: https://iieg.gob.mx/ns/wp-content/uploads/2024/05/Ficha-informativa-Finanzas-publicas-estatales-y-municipales-ingresos-2022-20240515.pdf ; search snippet).",
     "public_finance.rates_per_resident_per_year": "Derived, with an assumed input: Jalisco's property tax (predial) tariff in the Ley de Hacienda Municipal del Estado de Jalisco / the municipal Ley de Ingresos applies a marginal rate of 0.0002540 to fiscal values from 0 to 776,142.90 pesos (as published for Guadalajara, https://transparencia.guadalajara.gob.mx/sites/default/files/TasasTarifasImpuestoPredial24.pdf ; a small town's schedule differs, not found); at an ASSUMED fiscal value of 500,000 pesos a dwelling that is 127 pesos a year, over 3.27 residents per household (ENIGH 2024 Jalisco): about 38.8 pesos a resident a year. Predial is a small part of Mexican municipal income; the rest is transfers (above).",
     "public_finance.rates_instalments": "Ley de Hacienda Municipal del Estado de Jalisco: the predial is assessed and paid bimonthly (six payments; the Ley de Ingresos of each municipality adds discounts for paying in advance), per the schedule published by Guadalajara (https://transparencia.guadalajara.gob.mx/sites/default/files/TasasTarifasImpuestoPredial24.pdf ; summary only, not read in full: to confirm).",

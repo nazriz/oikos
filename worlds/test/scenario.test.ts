@@ -112,7 +112,11 @@ test("each scenario changes what it says it changes", () => {
   // Fewer jobs for it, over several towns. (Who has a job is a draw for each person, and the further five in a hundred
   // the slump puts out of work may fall on nobody in one small town: it did in the town drawn from this spec's own
   // seed after the ages fixes of 2026-10-08, 82 jobs either way, where this had been "fewer than the plain town's".)
-  const seeds = [1, 2, 3];
+  // (Twelve towns, not three: a town under the slump is not the plain town with fewer jobs but another draw of it,
+  // because the first person the slump leaves without a job has no pay day drawn, and everyone after them is drawn
+  // differently. So the two differ by chance as well as by the slump: with people stopping work at ages of their
+  // own, three towns came to 262 jobs plain and 267 under the slump; twelve come to 1,055 and 1,011.)
+  const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   const plains = seeds.map((seed) => generate({ ...spec, seed }) as any);
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   expect(sum(seeds.map((seed) => jobs(generate({ ...spec, seed, scenario: "jobs-slump" }))))).toBeLessThan(sum(plains.map(jobs)));

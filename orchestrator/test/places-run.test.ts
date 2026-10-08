@@ -50,7 +50,7 @@ test("a town whose money has no decimal places and whose people retire at 70 run
   const P = structuredClone(loadProfile("jp-akita-2026"));
   expect(P.values.currency.minor_units).toBe(0);
   P.values.retirement_age = 70;
-  P.values.support.pension.from_age = 70;
+  P.values.support.payments.find((r) => r.id === "pension")!.who!.from_age = 70;
   const config = generateFrom(base, P);
   const { s, out } = await run("no-decimals", config, 16 * DAY);
   const m = join(out, "measure");
@@ -83,7 +83,7 @@ test("a town paid monthly, with no payment to the unemployed and no rent or ball
   P.values.health!.doctor_wage_per_pay_period = restate(P.values.health!.doctor_wage_per_pay_period);
   P.values.education!.teacher_wage_per_pay_period = restate(P.values.education!.teacher_wage_per_pay_period);
   P.values.crime!.officer_wage_per_pay_period = restate(P.values.crime!.officer_wage_per_pay_period);
-  delete P.values.support.unemployment;
+  P.values.support.payments = P.values.support.payments.filter((r) => !r.who?.out_of_work);
   delete P.values.services.landfill_levy_per_tonne;
   delete P.values.credit.serviceability_buffer_bps;
   delete P.values.tenancy.rent_review_months;

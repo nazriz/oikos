@@ -1,27 +1,60 @@
 # Public finance: income tax, rates and grants (phase C, stage C4a)
 
 **Source:**
-- `participants/src/behaviour/tax.ts`: the income tax arithmetic;
+- `participants/src/behaviour/tax.ts`: the arithmetic of tax on pay;
 - `Staffing` in `participants/src/behaviour/firms.ts`: payroll;
 - `city.rates_officer` in `participants/src/behaviour/government.ts`;
 - `world.valuer` and `world.grants` in `participants/src/behaviour/world.ts`.
 
 Taxes are laws (records), and the institutions that levy, collect and pay are participants. Nothing in the kernel knows about tax. Every figure comes from the world's profile, with its source (docs/profiles.md). For a town, the higher government that taxes income, values land and pays grants is the outside world (D31).
 
-## Income tax, withheld by employers
+## Tax on pay: a law that is a list of charges, withheld by employers (2026-10-08)
 
-- **The law.** The outside world publishes an income tax law at the start (`law-income-tax`, kind `law`, `data.tax` = `income`). It gives marginal rates on a year's income above each threshold, a levy on the whole of an income from its own threshold, and the account withheld tax is paid into. The generated town's figures are the profile's: Australia's resident rates for 2025–26, and the Medicare levy.
-- **Payroll.** Every employer (factories, shops, the builder, any `Staffing` user) starts a new hire's wages at the agreed wage less what the law says to withhold. It reckons each pay as a year's income, taxes that, and takes a pay period's share, rounded down. The standing order pays the net. Genesis wage orders are written net by the generator.
-- **Paying it over.** Each wage paid by one of its orders adds that order's withholding to what the employer owes. Monthly, the employer pays it over to the law's account with a `withholding_report` to the collector. A firm that can't pay it over just fails to; the collector doesn't chase (yet).
-- **Employees** read the same public law and expect the net: that's how they know their wages came (docs/behaviour/citizen.md, unpaid wages). What they're owed if unpaid is the gross, as the agreement says.
-- **Spending** follows what comes in (docs/behaviour/citizen.md), so tax reaches household budgets through their net pay. The rent-budget rule still reckons on gross income, as rental affordability measures usually do.
+**The law.** The outside world publishes a tax law at the start (`law-income-tax`, kind `law`, `data.tax` = `income`, `data.charges`). It is a list of **charges**, in the law's own order. A place with no charge on pay has no such law, and nothing is withheld. Each charge is data in four parts (`Charge`, `participants/src/behaviour/tax.ts`); every sum is a year's, in the smallest unit of the world's money:
+
+| Part | Says | Forms |
+|---|---|---|
+| `base` | what it is charged on | a year's pay (nothing said); `less`: what is taken off first: an allowance (`amount`, which may taper away: `tapers: { above, bps }`, lost at that share of each unit of pay above a sum), a share of the pay within a least and a most (`share_bps`, `least`, `most`), or what other charges of the law take (`charges: [...]`: contributions deducted before a tax); `up_to`: a ceiling, pay beyond it is not charged; `from`: a threshold, nothing is due on pay below it and all of it is charged from there; `on`: another charge's amount in place of pay (a surcharge on a tax) |
+| `schedule` | the rates | bands of marginal rates (`from`, `rate_bps`); one band from nought is a flat rate; a band may have a rate that rises in a straight line to its end (`rising_to_bps`), and its charge is the area under the line |
+| `reliefs` | what is taken off the charge | a sum (`amount`, which may taper as an allowance does); `none_due_up_to`: nothing is due where what is charged is no more than a sum (a rebate that leaves low incomes untaxed). Never below nought |
+| `collector`, `account` | whom it is paid to | the general government, a named fund or body of it, or the town. In a profile: `paid_to` (one of `public_finance.funds`, or `"town"`; nothing said: the general government) |
+
+A charge may also say `itemised`: the employer's report of it names each worker and their pay in the month. That report is the record a payment that turns on contributions is decided on (docs/behaviour/boundary.md, `world.transfers`).
+
+**The arithmetic** (`chargesOn`, `annualTax`, `withheld`). A charge on a year's pay: nothing if the pay is below `from`; else the pay (or the other charge's amount), held to `up_to`, less the deductions, never below nought; the schedule on that, each band rounded down; less the reliefs. What is withheld from one pay: the pay reckoned as a year's, every charge on that, and a pay period's share of the total, rounded down once. Each charge's part is rounded down and what that leaves over (a unit or two) goes to the first charge that takes anything, so the parts add up to the whole.
+
+**A law in the short form** (`data.brackets`, `levy_bps`, `levy_from`, `account`: how every law was written until 2026-10-08) is read as the two charges it is: marginal rates on a year's pay, and a levy on the whole of a pay from a threshold, both paid into one account. The sums are the same to the smallest unit (tested on a ladder of incomes; and all nine towns ended at the same state with the new arithmetic reading the old laws).
+
+**Payroll** (`Staffing`, `firms.ts`). Every employer (factories, shops, the builder, the town's finance officer) starts a new hire's wages at the agreed wage less what the law's charges withhold. The standing order pays the net. Genesis wage orders are written net by the generator.
+
+**Paying it over.** Each wage paid by one of its orders adds what that order withholds, charge by charge, to what the employer owes. Monthly it pays what it owes into each charge's own account and sends the collector one `withholding_report`: what was owed and paid, under each charge (`data.charges`: `charge`, `to`, `withheld`, `paid`) and, where a charge is itemised, each worker's gross pay since the last report (`data.staff`: `worker`, `gross`). A law whose charges all go to one account, none itemised, is reported as one sum, as before. Short of money, the employer keeps the next pay period's wages, pays the charges in the law's order as far as the money goes, and still owes the rest. The collector doesn't chase (yet).
+
+**Employees** read the same public law and expect the net: that's how they know their wages came (docs/behaviour/citizen.md, unpaid wages). What they're owed if unpaid is the gross, as the agreement says. **The payments office** reads it too, to reckon pay after tax where a payment is a share of net pay.
+
+**Funds.** A named fund or body (`public_finance.funds` in a profile: a pension insurance, a health fund) is, in a town, an account of the outside world's of its own (`acc-outside-<id>`), named in the law's words. It is not an organisation with an office: contributions go into it and the payments the law says it pays come out of it, and like the outside world's own account it is not limited by what the town pays in (a national fund is large next to a town). A world that brings the higher government inside would make each fund an organisation.
+
+**In the nine profiles** (each profile's note on `public_finance.income_tax` says what was moved and what was said for the first time, with its source):
+
+| Profile | Charges | Said truly since 2026-10-08, from the author's note | Still a stand-in or left out |
+|---|---|---|---|
+| au-vic-2026 | income tax; Medicare levy | (the same figures, moved) | the levy's phase-in |
+| mx-jal-2026 | ISR | (the same figures; the levy of nought is gone) | the employment subsidy, the worker's social-security share (no figures in the note) |
+| jp-akita-2026 | income and resident tax; social insurance premiums | the premiums are a charge of their own, paid to social insurance, reported worker by worker | the author's fitted rates stand for the deductions and the two taxes; the premiums are not split |
+| de-ni-2026 | Einkommensteuer; pension, health, care and unemployment insurance | four contributions, each to its own body; the pension and health ceilings | the tariff is the author's steps, not the continuous one; no ceiling for care and unemployment; the solidarity surcharge; the employer's share |
+| us-oh-2026 | federal and state income tax; Social Security; Medicare | FICA's two parts, each to its fund; the wage cap | the municipal income tax (the note gives a range, not this town's rate), school-district taxes, credits |
+| br-mg-2026 | imposto de renda; INSS | the INSS table by slices, with its ceiling, paid to the INSS | the income tax's reduction is the author's three steps |
+| ke-nakuru-2026 | PAYE; health insurance; housing levy; NSSF | the personal relief off the tax; the two levies each to its body; the NSSF contribution (new: it lowers net pay by 6%) | the NSSF earnings limit; contributions deducted before tax; the employer's share |
+| gb-eng-2026 | Income Tax; National Insurance | the allowance as a deduction that tapers away; National Insurance at its two rates on pay above the threshold (it was 8% of the whole of a pay) | employers' National Insurance |
+| in-tn-2026 | income tax; cess | the rebate below 12 lakh; the cess as a charge on the tax | the standard deduction (no figure in the note) |
 
 **Leaves out:**
-- tax on other income (support payments, dividends, rent); the support payments in the generated town are below the tax-free threshold, but dividends and rent aren't;
-- the yearly assessment, refunds and offsets;
-- the levy's phase-in above its threshold;
+- a charge the employer bears on top of the wage (employers' contributions): firms' reckoning of what a worker costs would have to read it;
+- credits paid out as money (a refundable credit, a credit for children), and anything else settled once a year: there is no yearly assessment, so no refunds or offsets;
+- withholding on the year so far (each pay is reckoned as a year's);
+- tax on other income (support payments, dividends, rent);
 - a law that changes during a run (orders keep the withholding they started with);
-- the collector chasing an employer that doesn't pay over.
+- the collector chasing an employer that doesn't pay over;
+- a tax on a small trader's turnover.
 
 ## Rates, on the valuer's valuations
 

@@ -317,6 +317,21 @@ The sources for how a real place does each of these, with what was and was not o
 | A water supplier bills by a meter read on a round | Common practice **(to confirm: no source opened)** | `utility.water` (the `water_used` measure, read by a visit before each quarter's bills) |
 | Estimating the next demand from what was last found, and correcting by what was left over | Exponential smoothing in its plainest form: Brown, R. G. (1956), *Exponential Smoothing for Predicting Demand*, Arthur D. Little **(to confirm: named from memory)**. Used only in spirit: the office keeps one rate an address, replaced each call | `city.works`: how many loads it sends for at each address on its round |
 
+## A payment and a tax as published laws; stopping work from a curve (docs/behaviour/public-finance.md, boundary.md, citizen.md; docs/decisions.md, 2026-10-09)
+
+Each place's own rules and figures are cited in its profile's notes (`worlds/profiles/`), as their authors cite them. Here: the ideas the forms and the mechanisms rest on.
+
+| Idea | Citation | Used in |
+|---|---|---|
+| The share of people in the labour force by age, for nine countries | ILOSTAT, "Labour force participation rate by sex and age (%)", five-year bands, dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019 (the data file opened and the figures read from it, 2026-10-08; national, annual 2025, Kenya 2021; not checked against each national office's own table: **to confirm**) | Each profile's `labour_force_share_by_age` |
+| The same, by five-year band to 75 and over, for the United States | Bureau of Labor Statistics, Current Population Survey, table 3, 2025 annual averages, https://www.bls.gov/cps/cpsaat03.htm (read by a research agent, 2026-10-08, not re-read: **to confirm**) | us-oh-2026's curve above 65 |
+| An age of leaving the labour market read from participation rates by age | OECD, *Pensions at a Glance*, the effective age of labour market exit **(to confirm: not opened)** | `stopsWorkAt`: each person's age of stopping, drawn so the shares by age come out as the survey's |
+| Leaving work bunches at the ages a pension can be claimed; the option value of working on | Gruber, J. and Wise, D. (eds., 1999), *Social Security and Retirement around the World*; Stock, J. and Wise, D. (1990), *Econometrica* 58(5) **(to confirm)** | Not built: left to the citizen redesign (the age is drawn once and does not move with the pension's terms) |
+| Longer or richer insurance lengthens spells out of work; exits at exhaustion | Meyer, B. (1990), *Econometrica* 58(4); Schmieder, J., von Wachter, T. and Bender, S. (2012), *QJE* 127(2); Chetty, R. (2008), *JPE* 116(2) **(to confirm)** | Not built: left to the citizen redesign (a time limit changes income only) |
+| A payment is decided on what the claimant declares and on the payer's own record of contributions | How social insurance and assistance offices work (wage records reported by employers; declared household income) **(to confirm: no single source opened; the rule gives the office nothing it does not keep)** | `world.transfers`: `declares` on a claim; the employers' reports as the contributions book |
+| A tax on pay is several charges, each with its base, rates, reliefs and payee | Each place's law, as its profile's note cites it (a continuous tariff as bands of rising rates: Einkommensteuergesetz §32a, in de-ni-2026's note) | `Charge`, `chargesOn` |
+
+
 
 ## Written directions to an office (docs/behaviour/directions.md; docs/decisions.md, 2026-10-09)
 

@@ -11,6 +11,8 @@ import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
 import { drawHousehold, drawSavings, type HouseholdSpec } from "./household";
 import { yearsOfSchooling, type SchoolingSpec } from "./school";
+import { forAge, supportLaw, type Declared, type PaymentRule } from "./payments";
+import { incomeTaxLaw, withholding } from "./tax";
 
 export const exportDemand: BehaviourModule = {
   name: "world.export_demand",
@@ -217,25 +219,27 @@ export const trade: BehaviourModule = {
 };
 
 /**
- * world.transfers: support paid to people from outside the world (a boundary condition, D31): for a town, a national
- * government's payments. It decides claims for the payment kinds the world names, each with its amount, how often, and
- * the ages it's for; pays those it grants on that schedule until the claimant says to stop, dies (a death
- * registration) or leaves (a departure). It takes the claim's date of birth as stated. Means tests are left out. Every
- * `publish_every_days` (0: never), it publishes how many it pays of each kind (a `support_statistics` statement), as a
- * payments department publishes its recipients by area. Documented in docs/behaviour/boundary.md.
+ * world.transfers: an office that pays support to people (for a town, a higher government's payments office, outside
+ * the world: a boundary condition, D31). It reads the published support law and applies the payments it is the payer
+ * of: who qualifies, how much, for how long (./payments.ts). It decides each claim on what the claim states (a date of
+ * birth, and whatever the payment's rule has the claimant declare), taken as stated, and on its own book: the
+ * employers' reports of contributions addressed to it, which name each worker and their pay. It pays those it grants
+ * on the payment's schedule until the claimant says to stop, dies (a death registration), leaves (a departure), or
+ * the payment's time runs out, which it tells them. Every `publish_every_days` (0: never), it publishes how many it
+ * pays of each kind (a `support_statistics` statement), as a payments department publishes its recipients by area.
+ * Documented in docs/behaviour/boundary.md.
  */
 export const transfers: BehaviourModule = {
   name: "world.transfers",
-  version: "0.2.0",
+  version: "0.3.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
   firstWake: () => 0,
   create(ctx) {
     const p = params(
       {
-        account: "", // the outside's account it pays from and is paid into (the world must say)
+        account: "", // the account it pays from where a payment names none (the world must say)
         year: 365 * DAY,
-        payments: {} as { [kind: string]: { amount: number; every_days: number; from_age: number; to_age?: number } },
         publish_every_days: 0,
       },
       ctx.params,
@@ -245,46 +249,104 @@ export const transfers: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     const decided = new Set<string>();
-    const paying = new Map<string, { person: string; account: string; payment: string; next: number }>(); // claim -> payment
+    type Paying = { person: string; account: string; payment: string; from: string; amount: number; every: number; next: number; until?: number; then?: string };
+    const paying = new Map<string, Paying>(); // claim -> what we pay under it
+    /** The payments we pay: the published law's, where we are the payer (no law: none). */
+    const rules = (): PaymentRule[] => supportLaw(book)?.payments.filter((r) => r.payer === me) ?? [];
+    /** Our book of contributions for one person: the monthly pay employers reported for them, newest first. */
+    const reported = (who: string, since: number) => book.all("withholding_report").filter((r) => (r.addressed_to ?? []).includes(me) && r.at >= since && Array.isArray(r.data?.staff))
+      .sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))
+      .flatMap((r) => (r.data!.staff as { worker: string; gross: number }[]).filter((l) => l.worker === who).map((l) => ({ at: r.at, gross: Math.floor(Number(l.gross) || 0) })));
+    /** A claim under a rule: granted (with the sum and how long), or why not. */
+    const decide = (rule: PaymentRule | undefined, c: StatementRecord, t: number): { ok: true; amount: number; until?: number } | { ok: false; why?: string } => {
+      if (!rule || typeof c.data?.account !== "string" || !Number.isInteger(c.data?.born_at)) return { ok: false };
+      const who = c.speaks_for!;
+      const born = c.data.born_at as number;
+      const age = Math.floor((t - born) / p.year);
+      const w = rule.who ?? {};
+      const said: Declared = c.data?.declares ?? {};
+      if (age < (w.from_age ?? -Infinity) || age > (w.to_age ?? Infinity)) return { ok: false };
+      const members = Math.max(1, Math.floor(Number(said.household_members) || 1));
+      const children = (under: number) => (Array.isArray(said.children_born_at) ? said.children_born_at : []).filter((b) => Number.isInteger(b) && Math.floor((t - b) / p.year) < under).length;
+      const record = w.record || "share_bps" in rule.amount ? reported(who, w.record?.within_months ? t - w.record.within_months * MONTH : -Infinity) : [];
+      if (w.record && record.length < (w.record.months ?? 1)) return { ok: false, why: `contributions are on our record for ${record.length} month${record.length === 1 ? "" : "s"}, and the payment asks for ${w.record.months ?? 1}` };
+      if (w.income_under) {
+        if (!Number.isInteger(said.household_income)) return { ok: false, why: "the claim doesn't state the household's income" };
+        const income = w.income_under.per === "head" ? Math.floor(said.household_income! / members) : said.household_income!;
+        if (income >= w.income_under.amount) return { ok: false, why: `the household's income as stated is not under ${usd(w.income_under.amount)}${w.income_under.per === "head" ? " a head" : ""}` };
+      }
+      if (w.no_other_pension) {
+        if (said.other_pension !== false) return { ok: false, why: "the claim doesn't state that no other pension is paid" };
+        const ours = rules();
+        if ([...paying.values()].some((x) => x.person === who && x.payment !== rule.id && ours.some((r) => r.id === x.payment && forAge(r)))) return { ok: false, why: "we pay the claimant another pension" };
+      }
+      if (w.children && children(w.children.under_age) < w.children.least) return { ok: false, why: `the household as stated has fewer than ${w.children.least} child${w.children.least === 1 ? "" : "ren"} under ${w.children.under_age}` };
+      const a = rule.amount;
+      let amount: number;
+      if ("flat" in a) amount = a.flat;
+      else if ("share_bps" in a) {
+        // Their previous pay for as long as one payment covers: the mean of the monthly pay reported for them (the last
+        // twelve reports at most), before or after what the tax law withholds from such a pay.
+        const last = record.slice(0, 12);
+        if (!last.length) return { ok: false, why: "no pay is on our record for the claimant" };
+        const gross = Math.floor((last.reduce((x, l) => x + l.gross, 0) / last.length) * rule.every_days / 30);
+        const pay = a.of === "net" ? gross - withholding(incomeTaxLaw(book), gross, rule.every_days * DAY) : gross;
+        const most = a.most === undefined ? Infinity : typeof a.most === "number" ? a.most : [...a.most].sort((x, y) => y.from_age - x.from_age).find((b) => b.from_age <= age)?.amount ?? Infinity;
+        amount = Math.min(most, Math.max(a.least ?? 0, Math.floor((pay * (a.with_child_bps !== undefined && children(18) > 0 ? a.with_child_bps : a.share_bps)) / 10_000)));
+      } else amount = a.household + (a.per_member ?? 0) * members + (a.per_child ? a.per_child.amount * children(a.per_child.under_age) : 0);
+      if (!(amount > 0)) return { ok: false, why: "the payment comes to nothing" };
+      const ends = [rule.lasts?.days !== undefined ? t + rule.lasts.days * DAY : Infinity, rule.lasts?.until_age !== undefined ? born + rule.lasts.until_age * p.year : Infinity];
+      const until = Math.min(...ends);
+      return { ok: true, amount, ...(until < Infinity ? { until } : {}) };
+    };
     return stepper(
       (obs) => book.absorb(obs),
       (obs) => {
         const t = obs.t;
         const steps: Step[] = [];
-        // Claims: granted if the claimant's age fits the payment; the first payment one period on.
+        const ours = rules();
+        // Claims: granted if the claimant fits the payment's rule; the first payment one period on.
         for (const c of book.open("benefit_claim").filter((r) => (r.addressed_to ?? []).includes(me) && !decided.has(r.id)).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1))) {
           decided.add(c.id);
           const who = c.speaks_for!;
           const payment = String(c.data?.payment);
-          const rule = p.payments[payment];
+          const rule = ours.find((r) => r.id === payment);
           const age = Number.isInteger(c.data?.born_at) ? Math.floor((t - (c.data!.born_at as number)) / p.year) : -1;
-          const ok = !!rule && typeof c.data?.account === "string" && age >= rule.from_age && (rule.to_age === undefined || age <= rule.to_age);
-          // One payment a person: a new claim replaces the old.
-          for (const [id, x] of paying) if (x.person === who) paying.delete(id);
-          if (ok) paying.set(c.id, { person: who, account: c.data!.account as string, payment, next: t + rule!.every_days * DAY });
-          steps.push(because(ok ? `A claim for ${payment} support from someone it's for (aged ${age}): granted, at ${usd(rule!.amount)} every ${rule!.every_days} days.` : `A claim for ${payment} support that doesn't qualify: refused.`,
-            say("benefit_decision", ok ? `Claim ${c.id} granted: ${usd(rule!.amount)} every ${rule!.every_days} days.` : `Claim ${c.id} refused.`, {
-              to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: ok, ...(ok ? { amount: rule!.amount, every: rule!.every_days * DAY } : {}) },
+          const d = decide(rule, c, t);
+          // One payment of a kind a person: a new claim replaces the old.
+          for (const [id, x] of paying) if (x.person === who && x.payment === payment) paying.delete(id);
+          if (d.ok) paying.set(c.id, { person: who, account: c.data!.account as string, payment, from: rule!.account || p.account, amount: d.amount, every: rule!.every_days * DAY, next: t + rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}), ...(rule!.lasts?.then ? { then: rule!.lasts.then } : {}) });
+          const lasting = d.ok && d.until !== undefined ? ` until day ${Math.floor(d.until / DAY)}` : "";
+          const why = !d.ok && d.why ? `: ${d.why}` : "";
+          steps.push(because(d.ok ? `A claim for ${payment} support from someone it's for (aged ${age}): granted, at ${usd(d.amount)} every ${rule!.every_days} days${lasting}.` : `A claim for ${payment} support that doesn't qualify${why}: refused.`,
+            say("benefit_decision", d.ok ? `Claim ${c.id} granted: ${usd(d.amount)} every ${rule!.every_days} days${lasting}.` : `Claim ${c.id} refused${why}.`, {
+              to: [who], visible: [who, me], basis: c.id, data: { claim: c.id, payment, granted: d.ok, ...(d.ok ? { amount: d.amount, every: rule!.every_days * DAY, ...(d.until !== undefined ? { until: d.until } : {}) } : d.why ? { reason: d.why } : {}) },
             })));
         }
         // Stopping: the claimant asked, died or left.
         const gone = new Set([...book.all("death_registration").map((r) => r.data?.deceased as string), ...book.all("departure").map((r) => r.speaks_for!)]);
         for (const r of book.all("benefit_change")) if (r.data?.stop) paying.delete(r.data.claim);
         for (const [id, x] of paying) if (gone.has(x.person)) paying.delete(id);
-        // Paying what's due, in batches (a program has at most 32 lines).
+        // Paying what's due, in batches (a program has at most 32 lines); and a payment whose time has run out ends.
         const due: C.Call[] = [];
-        for (const [, x] of [...paying].sort(([a], [b]) => (a < b ? -1 : 1))) {
-          const rule = p.payments[x.payment]!;
-          while (x.next <= t) {
-            due.push(pay(x.account, rule.amount, { from: p.account, for: `${x.payment} support.` }));
-            x.next += rule.every_days * DAY;
+        const ended: [string, Paying][] = [];
+        for (const [id, x] of [...paying].sort(([a], [b]) => (a < b ? -1 : 1))) {
+          while (x.next <= t && x.next <= (x.until ?? Infinity)) {
+            due.push(pay(x.account, x.amount, { from: x.from, for: `${x.payment} support.` }));
+            x.next += x.every;
           }
+          if (x.until !== undefined && (x.next > x.until || t >= x.until)) ended.push([id, x]);
         }
         for (let i = 0; i < due.length; i += 30) steps.push(because(`Paying the support due (${due.length} payments).`, ...due.slice(i, i + 30)));
+        for (const [id, x] of ended) {
+          paying.delete(id);
+          steps.push(because(`The ${x.payment} payment under claim ${id} has run its time: telling the claimant it has ended.`,
+            say("benefit_end", `Claim ${id}: the ${x.payment} payment has ended.${x.then ? ` You may claim ${x.then}.` : ""}`, { to: [x.person], visible: [x.person, me], basis: id, data: { claim: id, payment: x.payment, ended: true, ...(x.then ? { then: x.then } : {}) } })));
+        }
         // The published figures: recipients of each payment.
         if (t >= nextPublish) {
           nextPublish = t + p.publish_every_days * DAY;
-          const recipients = Object.fromEntries(Object.keys(p.payments).sort().map((k) => [k, [...paying.values()].filter((x) => x.payment === k).length]));
+          const recipients = Object.fromEntries(ours.map((r) => r.id).sort().map((k) => [k, [...paying.values()].filter((x) => x.payment === k).length]));
           steps.push(because("Publishing this period's figures: how many we pay, of each kind.",
             say("support_statistics", `Support recipients: ${Object.entries(recipients).map(([k, n]) => `${k} ${n}`).join(", ")}.`, { visible: "public", data: { recipients } })));
         }
@@ -592,7 +654,7 @@ export const idle: BehaviourModule = {
  *
  * Monthly, it looks at the town's standing job postings (as someone thinking of moving would). A newcomer expects the
  * mean posted wage times the chance of a job: postings / (postings + those competing for them: the town's jobseekers,
- * as the latest published count of recipients of `jobseekers_payment` says, and the adults it has brought in the last
+ * as the latest published counts of recipients of the payments for those out of work (`jobseekers_payment`) say, and the adults it has brought in the last
  * `memory_days`). In Harris & Todaro the chance is the destination's employment rate: a town's own unemployed make it
  * less. The one who came for the job looks for work; other adults do at `participation_bps` (`template_outside_lf`
  * for those who don't). For each posting, a household comes with probability
@@ -602,7 +664,7 @@ export const idle: BehaviourModule = {
  */
 export const migration: BehaviourModule = {
   name: "world.migration",
-  version: "0.6.0", // 0.6.0: says how many came (the statistician counts them)
+  version: "0.6.1", // 0.6.0: says how many came (the statistician counts them); 0.6.1: counts every payment for those out of work
   doc: "docs/behaviour/boundary.md",
   cadence: () => 30 * DAY,
   firstWake: () => 30 * DAY,
@@ -618,7 +680,7 @@ export const migration: BehaviourModule = {
         template: "newcomer",
         households: null as HouseholdSpec | null, // who comes, as the world's profile describes households (required)
         search_limit: 200,
-        jobseekers_payment: "", // the support payment whose published recipients count as jobseekers ("": none published)
+        jobseekers_payment: "", // the support payments whose published recipients count as jobseekers (several: with commas between; "": none published)
         participation_bps: 10_000, // of adults other than the one who came for the job, those looking for work
         template_outside_lf: "", // the template for those who aren't ("": everyone takes `template`)
         // Where bodies have a skill (schooling): the years each newcomer has had, as the world's people have, and how much
@@ -690,7 +752,7 @@ export const migration: BehaviourModule = {
           const mean = monthly.reduce((a, b) => a + b, 0) / monthly.length;
           const recent = brought.filter((b) => obs.t - b.t < p.memory_days * DAY).reduce((a, b) => a + b.adults, 0);
           const stats = book.open("support_statistics").sort((a, b) => b.at - a.at || (a.id < b.id ? 1 : -1))[0];
-          const jobseekers = p.jobseekers_payment ? Number(stats?.data?.recipients?.[p.jobseekers_payment] ?? 0) : 0;
+          const jobseekers = p.jobseekers_payment.split(",").filter(Boolean).reduce((x, k) => x + Number(stats?.data?.recipients?.[k] ?? 0), 0);
           const chance = postings.length / (postings.length + recent + jobseekers);
           const gapBps = Math.floor(((mean * chance - p.outside_monthly_income) * 10_000) / p.outside_monthly_income);
           const perPosting = Math.min(10_000, Math.max(0, Math.floor((gapBps * p.response_bps) / 10_000)));

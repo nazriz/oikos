@@ -439,3 +439,7 @@ Full citations: docs/research/references.md.
 1. The needs and values: sources per place for values (European Social Survey, World Values Survey) and for needs.
 2. EWA or Erev–Roth for learning: test both against the calibration targets.
 3. When each later phase (3d, 4, belief) starts: Naz's call.
+4. Inputs from the profile-depth work, left for this design and not bolted onto today's citizen (docs/decisions.md, 2026-10-09, "A payment and a tax are published laws their offices read"). Each is a person weighing an offer's terms:
+   - *a payment for those out of work changing how choosily someone looks for work* (a wage below which an offer is refused, which a payment's size and remaining time raise; exits bunching when a payment runs out): today a time limit changes income and nothing else;
+   - *a pension's terms moving the age people stop work* (an earlier or later pension at a reduction or an increase; working on while drawing): today the age is drawn once from the place's survey and never moves;
+   - *take-up*: who claims what they are entitled to (today everyone who fits claims), and *what a person declares* on a claim (today the truth as they know it).

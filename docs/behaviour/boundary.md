@@ -93,15 +93,48 @@ of the outside world's offices does too. The estimate has no error added of its 
 (a search returns the oldest standing lists first, so in a town with more outlets than the sample it leans to shops
 whose prices have not changed: at 200 this bites above about 200 sellers); the collectors' time.
 
-## `world.transfers` (v0.2.0): support paid from outside
+## `world.transfers` (v0.3.0): the payments office, applying the published support law
 
-Support paid to people in the world by someone outside it: for a town, a national government's payments. The world names the payments (`payments`: a kind, its amount, how often, and the ages it's for). A person claims (a `benefit_claim` to the payer, with the kind, the account to pay and their date of birth); the payer grants the claim if their age fits (taking the stated date of birth as true), says so (`benefit_decision`), and pays on schedule until the person asks to stop (`benefit_change`), dies (a death registration) or leaves (a departure). One payment a person: a new claim replaces the old.
+Support paid to people in the world by someone outside it: for a town, a higher government's payments office. Until 2026-10-08 the payments were the office's own settings (a kind, an amount, how often, the ages). Now **a payment is a rule of a published law**, and the office reads the law and applies it, as an employer reads the tax law.
 
-**Published figures** (0.2.0): every `publish_every_days` (none by default; the generated town, 30), it publishes how many it pays of each kind (a public `support_statistics` statement, `data: { recipients: { kind: n } }`), as a payments department publishes its recipients by area (DSS, *JobSeeker Payment and Youth Allowance recipients, monthly profile*, by SA2). Would-be migrants read it.
+**The law** (`law-support`, kind `law`, the outside world's; `data.payments`; `PaymentRule`, `participants/src/behaviour/payments.ts`). A place with no payments has no such law. Each payment is a rule in three parts, each from a short list; sums are in the smallest unit of the world's money, for one payment:
 
-**Leaves out:** means tests; couples' rates; checking what's claimed; payments for anything but age and being out of work. A world that needs a national government's decisions inside it replaces this module with a participant of its own, reading the same claims (phase F).
+| Part | Says | Forms |
+|---|---|---|
+| `who` | who qualifies; everything listed must hold | `from_age`, `to_age` (whole years, both inclusive); `out_of_work` (for someone without work who is looking); `record` (contributions on the payer's book for the claimant: in at least `months` monthly reports, one if not said, within the last `within_months`); `income_under` (the household's income for a month, as the claimant declares it, under a sum: for the household, or a head); `no_other_pension`; `children` (at least so many under an age in the household) |
+| `amount` | how much | `flat`; or `share_bps` of the claimant's previous pay for as long as one payment covers (`of`: `gross`, or `net`: after what the tax law withholds from such a pay), no less than `least` and no more than `most` (one sum, or by age: `[{ from_age, amount }]`), and `with_child_bps` for a claimant who declares a child under 18; or a household's: `household`, with `per_member` and `per_child` (under an age) |
+| `lasts` | for how long | nothing said: while the claimant qualifies and claims; `days` from the grant; `until_age`; `then`: the payment that may be claimed when this one ends |
 
-In the generated town, the profile's payments are "pension" (from the retirement age) and "unemployment" (below it, from the age the profile gives).
+and `every_days` (how often it is paid: 14, 30, 61 for a pension paid every two months), `payer` and `account` (who pays, from which account: in a profile, `paid_from`, one of `public_finance.funds`, or the general government).
+
+**Who decides, and on what.** The office decides each claim on what the claim states and on its own book. It is shown nothing whole that it does not keep (docs/no-god-view.md):
+- *Age:* the date of birth stated on the claim, taken as true (as before).
+- *What a rule has the claimant declare* (`data.declares` on the claim: the household's income for a month and how many live in it, the children's dates of birth, whether anyone else pays them a pension): taken as stated. A false declaration is possible and uncaught: an audit, asking the keeper of one record about one claimant, is a later module. The office does refuse a "no other pension" claim from someone it pays another pension itself.
+- *A record of contributions and previous pay:* the employers' monthly `withholding_report`s addressed to the payer, where a charge of the tax law is reported worker by worker (docs/behaviour/public-finance.md). Each is addressed to it entry by entry: its own book (the `contributions` channel, given only where a payment needs it). Previous pay is the mean of the monthly gross pay reported for the claimant, over the last twelve reports at most; a month partly worked counts as it was paid, so it pulls the mean down. Work for an employer that reports nothing leaves no record, and so no payment.
+- *Net pay:* the published tax law, which the office reads as anyone may.
+
+It grants or refuses (`benefit_decision`: the sum, how often, and `until` where the payment's time is limited; a refusal says why, except for age), pays on the payment's schedule from the payment's account, and stops when the claimant asks (`benefit_change`), dies (a death registration), leaves (a departure), or the payment's time runs out. Then it tells the claimant (`benefit_end`, naming what may be claimed next). One payment of each kind a person: a new claim for the same payment replaces the old; different payments are drawn together (a pension and a household's payment).
+
+**Who claims what** is the citizen's (docs/behaviour/citizen.md, "Retiring and support").
+
+**Published figures** (0.2.0): every `publish_every_days` (none by default; the generated town, 30), it publishes how many it pays of each payment (a public `support_statistics` statement, `data: { recipients: { payment: n } }`), as a payments department publishes its recipients by area (DSS, *JobSeeker Payment and Youth Allowance recipients, monthly profile*, by SA2). Would-be migrants read it.
+
+**The nine places' payments as data** (each profile's note on `support.payments` says what was moved, what was said for the first time and from what, and what is still a stand-in):
+
+| Shape | Place | As data |
+|---|---|---|
+| none | India, Kenya, Mexico (no payment to the unemployed) | no payment in the list: nobody claims one, none is paid or counted. (Until 2026-10-08 each had a payment of nought; in a batch with pensions, a payment of nothing made the world refuse the whole batch, so most pensions in those towns went unpaid.) |
+| flat, no time limit | Victoria, England; Germany's and Brazil's second payment | `who: { from_age, to_age, out_of_work }`, `amount: { flat }` |
+| a share of previous pay, on a record, for a time | Germany: 60% of net (67% with a child), 360 days, then the flat payment; Ohio: half of gross up to a maximum, 182 days; Japan: 60% of gross under limits by age | `who.record`, `amount: { share_bps, of, most }`, `lasts: { days, then }` |
+| a household's payment on declared income | Brazil's family transfer | sayable (`who.income_under` per head, `amount.household`, `per_child`); the profile still pays its average flat to those out of work, because its note gives no rule's figures |
+| a pension for those without another | Kenya | `who: { from_age, no_other_pension }` |
+| a pension on a means test | Tamil Nadu | sayable (`who.income_under`); the profile's note gives no income line, so everyone from the age is still paid |
+| a pension every two months | Japan, Mexico | `every_days: 61` |
+| a pension paid from a fund | Germany, Brazil, Ohio | `paid_from` |
+
+**Behaviour that is deliberately not here** (it belongs to the citizen redesign, docs/design/ai-citizens.md): a payment changing how hard or how choosily someone looks for work. Longer or richer insurance lengthens spells out of work and leaving bunches when it runs out (Meyer 1990; Schmieder, von Wachter and Bender 2012; Chetty 2008; to confirm), but today's citizen applies for one posting a week and takes what it is offered: it has no wage below which it refuses for a payment to raise. Until then, a payment's size and length change people's income and when they give up and leave town, and nothing else. Nor is there a take-up share: everyone who fits claims.
+
+**Leaves out:** a payment that falls as income rises (a taper); couples' rates; rules by sex or by year of birth; an early or late pension at a reduction or an increase; a waiting time before the first payment; a pension reckoned from years of contributions or past earnings; housing costs paid on top; checking what is declared; a payment whose rule changes in a run (a payment granted keeps its sum). A world that needs a national government's decisions inside it replaces this module with a participant of its own, reading the same law and claims (phase F).
 
 ## `world.funding` (v0.1.0): money lent into the world from outside
 
@@ -113,7 +146,7 @@ For a town's bank, the wider market it funds itself from. It lends what's asked 
 
 | Rule | Detail | Source |
 |---|---|---|
-| **When people come** | Monthly, it looks at the town's standing job postings, as someone thinking of moving would. A newcomer expects the mean posted wage times the chance of a job, where the chance is postings ÷ (postings + those competing for them: the town's jobseekers, as the latest published count of unemployment support recipients says (0.2.0), and the adults it brought in the last 90 days). Where that beats `outside_monthly_income`, each posting draws a household with probability `response_bps` × the gap (as a share of the outside income). At most 8 households a month. | Harris & Todaro (1970), "Migration, Unemployment and Development: A Two-Sector Analysis", *AER* 60(1): migration responds to the *expected* wage gap, the wage times the probability of employment, so it can go on while there's unemployment. The response rate and the outside income are **placeholders** to calibrate against ABS regional internal migration. |
+| **When people come** | Monthly, it looks at the town's standing job postings, as someone thinking of moving would. A newcomer expects the mean posted wage times the chance of a job, where the chance is postings ÷ (postings + those competing for them: the town's jobseekers, as the latest published counts of recipients of the payments for those out of work say (0.2.0; every such payment the law has: `jobseekers_payment`, their names with commas between, 0.6.1), and the adults it brought in the last 90 days). Where that beats `outside_monthly_income`, each posting draws a household with probability `response_bps` × the gap (as a share of the outside income). At most 8 households a month. | Harris & Todaro (1970), "Migration, Unemployment and Development: A Two-Sector Analysis", *AER* 60(1): migration responds to the *expected* wage gap, the wage times the probability of employment, so it can go on while there's unemployment. The response rate and the outside income are **placeholders** to calibrate against ABS regional internal migration. |
 | **Who comes** | Households drawn from the same census shares as the town's ([households.md](households.md)) | ABS Census 2021 (a placeholder: movers are younger and more often single than the whole population) |
 | **What they bring** | Each adult carries 1–3 months of `outside_monthly_income` in savings, in their own keeping. It moves from the outside world's account, which may go negative. | Placeholder |
 | **Their paperwork** | It writes the `household` record the newcomers bring (members, couples, who will hold a lease), once it knows how to reach each of them: it looks each newcomer up once they have crossed (0.5.0; nobody is shown who's who, and the answer comes at once) | |

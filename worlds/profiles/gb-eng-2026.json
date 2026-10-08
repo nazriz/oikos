@@ -576,16 +576,32 @@
    17500000
   ],
   "support": {
-   "pension": {
-    "amount": 48260,
-    "every_days": 14,
-    "from_age": 66
-   },
-   "unemployment": {
-    "amount": 19611,
-    "every_days": 14,
-    "from_age": 25
-   }
+   "payments": [
+    {
+     "id": "pension",
+     "name": "State Pension",
+     "every_days": 14,
+     "who": {
+      "from_age": 66
+     },
+     "amount": {
+      "flat": 48260
+     }
+    },
+    {
+     "id": "unemployment",
+     "name": "Universal Credit standard allowance",
+     "every_days": 14,
+     "who": {
+      "from_age": 25,
+      "to_age": 65,
+      "out_of_work": true
+     },
+     "amount": {
+      "flat": 19611
+     }
+    }
+   ]
   },
   "firm_ownership": {
    "forms_bps": {
@@ -719,6 +735,24 @@
     "rate": 0
    }
   ],
+  "labour_force_share_by_age": [
+   {
+    "from": 25,
+    "bps": 8743
+   },
+   {
+    "from": 55,
+    "bps": 7677
+   },
+   {
+    "from": 60,
+    "bps": 6012
+   },
+   {
+    "from": 65,
+    "bps": 1314
+   }
+  ],
   "labour_force_participation_bps": 7910,
   "tenancy": {
    "rent_review_months": 12,
@@ -816,27 +850,63 @@
    "payment_approval_over": 5000000
   },
   "public_finance": {
+   "funds": [
+    {
+     "id": "national-insurance",
+     "name": "National Insurance"
+    }
+   ],
    "income_tax": {
-    "brackets": [
+    "charges": [
      {
-      "from": 0,
-      "rate_bps": 0
+      "id": "income-tax",
+      "name": "Income Tax",
+      "base": {
+       "less": [
+        {
+         "amount": 1257000,
+         "tapers": {
+          "above": 10000000,
+          "bps": 5000
+         }
+        }
+       ]
+      },
+      "schedule": [
+       {
+        "from": 0,
+        "rate_bps": 2000
+       },
+       {
+        "from": 3770000,
+        "rate_bps": 4000
+       },
+       {
+        "from": 12514000,
+        "rate_bps": 4500
+       }
+      ]
      },
      {
-      "from": 1257000,
-      "rate_bps": 2000
-     },
-     {
-      "from": 5027000,
-      "rate_bps": 4000
-     },
-     {
-      "from": 12514000,
-      "rate_bps": 4500
+      "id": "national-insurance",
+      "name": "National Insurance",
+      "schedule": [
+       {
+        "from": 0,
+        "rate_bps": 0
+       },
+       {
+        "from": 1257000,
+        "rate_bps": 800
+       },
+       {
+        "from": 5027000,
+        "rate_bps": 200
+       }
+      ],
+      "paid_to": "national-insurance"
      }
-    ],
-    "levy_bps": 800,
-    "levy_from": 1257000
+    ]
    },
    "grants_per_resident_per_year": 10000,
    "rates_per_resident_per_year": 85210,
@@ -1305,11 +1375,10 @@
   "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections). A model's figure, not this place's.",
   "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1: 0.25 a month). A model's figure, not this place's.",
   "spending.essentials_per_month": "ESTIMATE: what a person spends however little comes in, about GBP 300 a month: food and non-alcoholic drinks GBP 73.70 a week per household (ONS, Family spending in the UK: April 2024 to March 2025), about GBP 31 a week a person at about 2.4 people a household (household size to confirm), so about GBP 135 a month; with fuel and power, transport and the like to round it. PLACEHOLDER.",
-  "retirement_age": "The State Pension age: 66 today, rising to 67 for people born after 6 April 1960, between May 2026 and March 2028 (Pensions Act 2014; Pensions Act 2007 as amended; GOV.UK 'State Pension age', to confirm). The profile takes one integer: 66. A structural gap (the age is still rising by month of birth).",
+  "retirement_age": "The State Pension age: 66 today, rising to 67 for people born after 6 April 1960, between May 2026 and March 2028 (Pensions Act 2014; Pensions Act 2007 as amended; GOV.UK 'State Pension age', to confirm). The profile takes one integer: 66. A structural gap (the age is still rising by month of birth). Since 2026-10-08 people here stop work at ages of their own, drawn from labour_force_share_by_age; this age is still the one the profile's other figures turn on (the retired's savings, the end of the payments for those out of work, a retirement fund's access) and the top of the working ages the measures use. The pension's age is the payment's own (support.payments).",
   "savings_by_age": "An adult's cash and deposits (not pensions, not property), by age: the 10th, 25th, 50th, 75th and 90th percentiles. PLACEHOLDER: the au-vic-2026 table converted at an assumed 0.5 pounds to the Australian dollar and rounded. It should come from the ONS Wealth and Assets Survey (household financial wealth by age of reference person, Great Britain, April 2020 to March 2022), not opened.",
   "retiree_savings": "PLACEHOLDER: the au-vic-2026 range ($150,000-350,000) at an assumed 0.5 pounds to the Australian dollar: GBP 75,000-175,000. To confirm against the ONS Wealth and Assets Survey (private pension wealth and savings at 65 to 69) and the Pensions Policy Institute.",
-  "support.pension": "New State Pension, full rate, GBP 241.30 a week from April 2026 (4.8% rise under the triple lock; GOV.UK / DWP benefit and pension rates 2026-27; search summaries, to confirm) = GBP 482.60 a fortnight. Pension Credit, the Winter Fuel Payment and the old basic State Pension are left out; the payment is flat and not means-tested.",
-  "support.unemployment": "Universal Credit standard allowance, single claimant aged 25 or over, GBP 424.90 a month from 7 April 2026 (DWP, benefit and pension rates 2026-27; search summary, to confirm) = GBP 196.11 a fortnight (x12/26). Universal Credit is paid monthly, is means-tested and tapered at 55% (to confirm), and adds housing, child and disability elements, all left out: a claimant who rents gets no rent support here, which is the largest gap between this payment and the real one. Under 25s get a lower standard allowance (GBP 338.58 in 2025-26): here the payment starts at 25.",
+  "support.payments": "[The pension:] New State Pension, full rate, GBP 241.30 a week from April 2026 (4.8% rise under the triple lock; GOV.UK / DWP benefit and pension rates 2026-27; search summaries, to confirm) = GBP 482.60 a fortnight. Pension Credit, the Winter Fuel Payment and the old basic State Pension are left out; the payment is flat and not means-tested. [The payment to those out of work:] Universal Credit standard allowance, single claimant aged 25 or over, GBP 424.90 a month from 7 April 2026 (DWP, benefit and pension rates 2026-27; search summary, to confirm) = GBP 196.11 a fortnight (x12/26). Universal Credit is paid monthly, is means-tested and tapered at 55% (to confirm), and adds housing, child and disability elements, all left out: a claimant who rents gets no rent support here, which is the largest gap between this payment and the real one. Under 25s get a lower standard allowance (GBP 338.58 in 2025-26): here the payment starts at 25. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. Two payments, the same figures: nothing is changed. Still left out, as this note says: Universal Credit's means test and taper and its housing and child elements (a means test on declared household income, `who.income_under`, and sums for a household's members and children can now be said; the taper cannot: a payment that falls as income rises is not built).",
   "firm_ownership.forms_bps": "PLACEHOLDERS carried over from au-vic-2026: shops and landlords are small businesses held closely; most UK businesses are micro (DBT, Business population estimates for the UK and regions 2025: nearly all of the 5.6 million or so private-sector businesses are small, to confirm); rented homes are owned by individual landlords (MHCLG, English Private Landlord Survey 2021: most have one or two properties, to confirm). The shares owned from outside the town are placeholders.",
   "firm_ownership.closely_held": "PLACEHOLDERS carried over from au-vic-2026 (households behind a company: 85% one, 12% two, 3% three; the top wealth fifth holds 85% of business assets, from an Australian study of household wealth). To source for Great Britain: ONS Wealth and Assets Survey, business wealth by wealth decile.",
   "firm_ownership.widely_held": "PLACEHOLDER carried over from au-vic-2026: a factory is mostly owned by companies and investors elsewhere. The town's part is held by the households that hold shares directly.",
@@ -1322,6 +1391,7 @@
   "ordinary_hours_per_week": "Maximum average working week, 48 hours, unless a worker opts out (Working Time Regulations 1998 reg 4, averaged over 17 weeks; to confirm). England has no 'ordinary hours' maximum like Australia's 38; the full-time norm is 37 to 40. A structural gap: the 48 is a cap averaged over a period, with opt-outs.",
   "fertility_per_10000": "PLACEHOLDER estimate, constrained to the total fertility rate for England and Wales in 2024, 1.41 (ONS, Births in England and Wales: 2024 (refreshed populations), published 1 July 2025): births per 10,000 women a year by age: 15-19 90; 20-24 320; 25-29 620; 30-34 930; 35-39 670; 40-44 150; 45-49 15 (sum x5 = 1.40). The ONS bulletin text says rates fell at 25-29 and under (by 1.2 per 1,000 at 25-29), rose at 30-39 (30-34 by 0.5), and mothers' standardised mean age was 31.0; the age-by-age table was not opened. ONS's 40-and-over group is split here as a guess.",
   "labour_force_participation_bps": "The economic activity rate for people aged 16 to 64, 79.1% (100% less the economic inactivity rate of 20.9%) for April to June 2026 (ONS, Labour market overview, UK: August 2026; search summary, to confirm).",
+  "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, the United Kingdom, national, annual 2025, from the ONS Labour Force Survey: ages 25 to 54, 87.434%; 55 to 59, 76.772%; 60 to 64, 60.117%; 65 and over, 13.141%. National, not England (no table by age for the region was found); not checked against the ONS (table A05)'s own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
   "tenancy": "Renters' Rights Act 2025, in force from 1 May 2026 (to confirm): assured tenancies are periodic, with fixed terms abolished; a landlord may raise the rent once a year by a section 13 notice giving at least two months' notice (taken as 61 days), which the tenant may challenge at the First-tier Tribunal. rent_review_months 12. after_fixed_term 'periodic' fits: every tenancy is periodic.",
   "values": "PLACEHOLDER carried over from au-vic-2026: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations ('Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500. To source for this place: the European Social Survey's Schwartz items for the UK, rescaled.",
   "industrial_action": "Trade Union Act 2016 ballot rules as amended by the Employment Rights Act 2025: a ballot needs at least 50% of those entitled to vote to vote and more than 50% of votes in favour (and, for important public services, at least 40% of all entitled in favour). The Act repeals the 50% turnout threshold once e-balloting is in place and cuts the notice of industrial action from 14 to 10 days (search summaries of the Act, to confirm what was in force at October 2026; the turnout repeal was expected April to August 2026): the profile keeps 50% turnout and 10 days. paid_during_action false: employers need not pay workers on strike. Structural gaps: the 40% test, the separate need for a ballot per bargaining unit, and the statutory ballot mandate lapsing.",
@@ -1338,7 +1408,8 @@
   "opening": "PLACEHOLDERS carried over from au-vic-2026, in pounds not converted: what each organisation holds on the first day (bank 500,000; town 2,000,000; builder 300,000; each landlord 600,000; a shop 30,000; a factory 400,000) and the least an adult in the labour force has saved (1,000). Model sizing figures, to source.",
   "town_finance.parks_per_year": "PLACEHOLDER carried over: the town's yearly parks line, 150,000 pounds.",
   "town_finance.payment_approval_over": "PLACEHOLDER carried over: the town's payments procedure needs the mayor's written approval for any payment over 50,000 pounds.",
-  "public_finance.income_tax": "Income tax 2026-27, England: personal allowance GBP 12,570 (frozen until 2031), basic rate 20% to GBP 50,270, higher rate 40% to GBP 125,140, additional rate 45% above (GOV.UK, Income Tax rates and Personal Allowances; to confirm for 2026-27). The levy is National Insurance (employee Class 1 main rate 8% from the primary threshold of GBP 12,570, which is 2% above GBP 50,270; thresholds frozen; GOV.UK 'National Insurance rates and categories', to confirm). The personal allowance taper (lost at GBP 1 per GBP 2 above GBP 100,000), the 2% rate on high earnings and employers' National Insurance (15% above GBP 5,000) cannot be expressed. Employers deduct tax through PAYE on cumulative pay; the profile reckons each pay as a year's income.",
+  "public_finance.income_tax": "Income tax 2026-27, England: personal allowance GBP 12,570 (frozen until 2031), basic rate 20% to GBP 50,270, higher rate 40% to GBP 125,140, additional rate 45% above (GOV.UK, Income Tax rates and Personal Allowances; to confirm for 2026-27). The levy is National Insurance (employee Class 1 main rate 8% from the primary threshold of GBP 12,570, which is 2% above GBP 50,270; thresholds frozen; GOV.UK 'National Insurance rates and categories', to confirm). The personal allowance taper (lost at GBP 1 per GBP 2 above GBP 100,000), the 2% rate on high earnings and employers' National Insurance (15% above GBP 5,000) cannot be expressed. Employers deduct tax through PAYE on cumulative pay; the profile reckons each pay as a year's income. SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). Income Tax, the same figures said as the law says them: the personal allowance of GBP 12,570 taken off the pay, and the rates on what is left (20% on the first GBP 37,700, which is GBP 50,270 less the allowance; 40% to GBP 125,140; 45% above). EXPRESSED NOW, from this note: the allowance tapering away at GBP 1 for each GBP 2 of pay above GBP 100,000 (no wage in the profile is near it). UN-FOLDED: the levy of 8% of the whole of a pay from GBP 12,570 that stood for National Insurance is now the contribution as this note gives it: 8% of pay between the primary threshold of GBP 12,570 and GBP 50,270, and 2% above, paid to National Insurance and not to general revenue. That lowers what is withheld from every wage by 8% of GBP 12,570 a year. Not expressed: employers' National Insurance (a charge the employer bears is not built).",
+  "public_finance.funds": "The named funds and bodies of the higher government that this place's charges on pay are paid to, each kept as an account of the outside world's of its own (the general government's account takes the rest). National Insurance contributions, kept apart from Income Tax (the note on the income tax).",
   "public_finance.grants_per_resident_per_year": "PLACEHOLDER: GBP 100 a resident. English councils get a mix of Revenue Support Grant, retained business rates and specific grants; general-purpose funding per head is to source from DLUHC/MHCLG, Local Authority Revenue Expenditure and Financing, and the local government finance settlement. For scale only: North Yorkshire Council's gross spending requirement for 2026-27 (GBP 1,323M) less its council tax requirement (GBP 524M) is about GBP 1,300 a resident, but that includes ring-fenced grants, fees and retained business rates, so it is not used.",
   "public_finance.rates_per_resident_per_year": "Derived: North Yorkshire Council's council tax requirement for its own purposes in 2026-27, GBP 524,458,818 (North Yorkshire Council, Council Tax Resolution Report, February 2026; Band D GBP 2,036.32; tax base 257,552 Band D equivalents), over 615,492 residents (ONS Census 2021, TS007A via Nomis) = GBP 852 a resident a year. Excludes the police (GBP 335.86 Band D) and fire (GBP 116.62) precepts and parish precepts; total Band D GBP 2,544.34. Council tax in England is a charge on each dwelling by valuation band, not a rate on land value.",
   "public_finance.rates_instalments": "Council Tax (Administration and Enforcement) Regulations 1992: council tax is payable in ten monthly instalments by default (April to January), or twelve on request (to confirm).",

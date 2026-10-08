@@ -1,6 +1,6 @@
 {
   "name": "citizen.default",
-  "version": "0.41.1",
+  "version": "0.42.0",
   "doc": "docs/behaviour/citizen.md",
   "params": {
     "accept_fewer_bedrooms_after_days": {
@@ -517,30 +517,22 @@
       "default": 7,
       "source": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none"
     },
+    "stop_work_curve": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "stops_work_at": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "strike_vote_yes_bps": {
       "schema": {
         "type": "integer"
       },
       "unit": "bps",
       "default": 8500,
-      "source": "placeholder"
-    },
-    "support_from": {
-      "schema": {
-        "description": "who pays support (an entity: in a town, usually the outside world)"
-      },
-      "default": null,
-      "source": "placeholder"
-    },
-    "support_kinds": {
-      "schema": {
-        "type": "object",
-        "description": "what to claim, when"
-      },
-      "default": {
-        "retired": "pension",
-        "unemployed": "unemployment"
-      },
       "source": "placeholder"
     },
     "sway": {

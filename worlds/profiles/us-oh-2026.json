@@ -578,16 +578,39 @@
       30000000
     ],
     "support": {
-      "pension": {
-        "amount": 207100,
-        "every_days": 30,
-        "from_age": 67
-      },
-      "unemployment": {
-        "amount": 80000,
-        "every_days": 14,
-        "from_age": 18
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Social Security retirement benefit",
+          "every_days": 30,
+          "who": {
+            "from_age": 67
+          },
+          "amount": {
+            "flat": 207100
+          },
+          "paid_from": "social-security"
+        },
+        {
+          "id": "unemployment",
+          "name": "Unemployment compensation",
+          "every_days": 14,
+          "who": {
+            "from_age": 18,
+            "to_age": 66,
+            "out_of_work": true,
+            "record": {}
+          },
+          "amount": {
+            "share_bps": 5000,
+            "of": "gross",
+            "most": 124800
+          },
+          "lasts": {
+            "days": 182
+          }
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -721,6 +744,32 @@
         "rate": 0
       }
     ],
+    "labour_force_share_by_age": [
+      {
+        "from": 25,
+        "bps": 8356
+      },
+      {
+        "from": 55,
+        "bps": 7499
+      },
+      {
+        "from": 60,
+        "bps": 5871
+      },
+      {
+        "from": 65,
+        "bps": 3330
+      },
+      {
+        "from": 70,
+        "bps": 1880
+      },
+      {
+        "from": 75,
+        "bps": 850
+      }
+    ],
     "labour_force_participation_bps": 8171,
     "tenancy": {
       "rent_review_months": 12,
@@ -818,47 +867,87 @@
       "payment_approval_over": 5000000
     },
     "public_finance": {
+      "funds": [
+        {
+          "id": "social-security",
+          "name": "Social Security"
+        },
+        {
+          "id": "medicare",
+          "name": "Medicare"
+        }
+      ],
       "income_tax": {
-        "brackets": [
+        "charges": [
           {
-            "from": 0,
-            "rate_bps": 0
+            "id": "income-tax",
+            "name": "Federal and state income tax",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 0
+              },
+              {
+                "from": 1610000,
+                "rate_bps": 1000
+              },
+              {
+                "from": 2605000,
+                "rate_bps": 1275
+              },
+              {
+                "from": 2850000,
+                "rate_bps": 1475
+              },
+              {
+                "from": 6650000,
+                "rate_bps": 2475
+              },
+              {
+                "from": 12180000,
+                "rate_bps": 2675
+              },
+              {
+                "from": 21787500,
+                "rate_bps": 3475
+              },
+              {
+                "from": 27232500,
+                "rate_bps": 3775
+              },
+              {
+                "from": 65670000,
+                "rate_bps": 3975
+              }
+            ],
+            "itemised": true
           },
           {
-            "from": 1610000,
-            "rate_bps": 1000
+            "id": "social-security",
+            "name": "Social Security tax",
+            "base": {
+              "up_to": 18450000
+            },
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 620
+              }
+            ],
+            "paid_to": "social-security"
           },
           {
-            "from": 2605000,
-            "rate_bps": 1275
-          },
-          {
-            "from": 2850000,
-            "rate_bps": 1475
-          },
-          {
-            "from": 6650000,
-            "rate_bps": 2475
-          },
-          {
-            "from": 12180000,
-            "rate_bps": 2675
-          },
-          {
-            "from": 21787500,
-            "rate_bps": 3475
-          },
-          {
-            "from": 27232500,
-            "rate_bps": 3775
-          },
-          {
-            "from": 65670000,
-            "rate_bps": 3975
+            "id": "medicare",
+            "name": "Medicare tax",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 145
+              }
+            ],
+            "paid_to": "medicare"
           }
-        ],
-        "levy_bps": 765,
-        "levy_from": 0
+        ]
       },
       "grants_per_resident_per_year": 3600,
       "rates_per_resident_per_year": 70000,
@@ -1305,10 +1394,9 @@
     "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick 2013, 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections). A model's figure, not a place's.",
     "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1). A model's figure, not a place's.",
     "savings_by_age": "The 50th percentile of each age group is the median value of transaction accounts among families that hold them, by age of the reference person, 2022 Survey of Consumer Finances: under 35 $5,400; 35-44 $7,500; 45-54 $8,800; 55-64 $7,900; 65-74 $13,500 (Federal Reserve Board, SCF 2022 bulletin tables, Table 6, https://www.federalreserve.gov/econres/files/scf2022_tables_internal_nominal_historical.xlsx, opened). The under-35 median is used for ages 18 and 25. 10th, 25th, 75th and 90th percentiles: placeholders, the median times 0.07, 0.33, 2.7 and 8.3 (the spread is not in the bulletin tables). Families, not adults; holders only (98% of families hold such an account).",
-    "retirement_age": "Social Security full retirement age is 67 for anyone born in 1960 or later (Social Security Administration, 'Retirement Benefits: Full retirement age', Social Security Act s 216(l); to confirm). Benefits can be claimed from 62 at a permanent reduction; the profile structure has one age (a structural gap).",
+    "retirement_age": "Social Security full retirement age is 67 for anyone born in 1960 or later (Social Security Administration, 'Retirement Benefits: Full retirement age', Social Security Act s 216(l); to confirm). Benefits can be claimed from 62 at a permanent reduction; the profile structure has one age (a structural gap). Since 2026-10-08 people here stop work at ages of their own, drawn from labour_force_share_by_age; this age is still the one the profile's other figures turn on (the retired's savings, the end of the payments for those out of work, a retirement fund's access) and the top of the working ages the measures use. The pension's age is the payment's own (support.payments).",
     "retiree_savings": "Median retirement-account value among families holding one, age 65-74, $199,600 (SCF 2022 bulletin Table 6, opened, as above). The range $100,000-300,000 around it is a placeholder.",
-    "support.pension": "Social Security retirement benefit: the average retired worker's benefit is about $2,071 a month from January 2026 after the 2.8% cost-of-living adjustment (Social Security Administration, announced 24 October 2025; reported by https://www.advisorperspectives.com/articles/2025/10/25/us-retirees-get-2-8-increase-2026-social-security-checks and others; the SSA fact sheet returned 403, so the figure is to confirm at https://www.ssa.gov/news/en/cola/factsheets/2026.html). Paid monthly (every 30 days here), from the full retirement age; an average benefit stands in for the formula (a worker's benefit depends on 35 years of earnings; spouses', survivors', Medicare and SSI left out).",
-    "support.unemployment": "Unemployment compensation: placeholder of $400 a week ($800 a fortnight), estimated from Ohio's rule that the weekly benefit is about half of the claimant's average weekly wage up to a maximum of $624 for a claimant with no dependents in 2026 (Ohio Department of Job and Family Services; maximum reported by search results such as https://remotelaws.com/unemployment/us-states/ohio/, not primary, to confirm at https://jfs.ohio.gov); typical wages above give half-pay of $310-440 a week. Lasts at most 26 weeks in Ohio (Ohio Revised Code 4141.30; to confirm): the profile has no time limit (a structural gap). Open from age 18 (no age rule in the law; the other profile starts at 22 for a youth-allowance reason). Work-search and wage-history tests left out.",
+    "support.payments": "[The pension:] Social Security retirement benefit: the average retired worker's benefit is about $2,071 a month from January 2026 after the 2.8% cost-of-living adjustment (Social Security Administration, announced 24 October 2025; reported by https://www.advisorperspectives.com/articles/2025/10/25/us-retirees-get-2-8-increase-2026-social-security-checks and others; the SSA fact sheet returned 403, so the figure is to confirm at https://www.ssa.gov/news/en/cola/factsheets/2026.html). Paid monthly (every 30 days here), from the full retirement age; an average benefit stands in for the formula (a worker's benefit depends on 35 years of earnings; spouses', survivors', Medicare and SSI left out). [The payment to those out of work:] Unemployment compensation: placeholder of $400 a week ($800 a fortnight), estimated from Ohio's rule that the weekly benefit is about half of the claimant's average weekly wage up to a maximum of $624 for a claimant with no dependents in 2026 (Ohio Department of Job and Family Services; maximum reported by search results such as https://remotelaws.com/unemployment/us-states/ohio/, not primary, to confirm at https://jfs.ohio.gov); typical wages above give half-pay of $310-440 a week. Lasts at most 26 weeks in Ohio (Ohio Revised Code 4141.30; to confirm): the profile has no time limit (a structural gap). Open from age 18 (no age rule in the law; the other profile starts at 22 for a youth-allowance reason). Work-search and wage-history tests left out. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. The pension is paid from Social Security. UN-FOLDED: the placeholder of $400 a week is now the rule this note gives: about half of the claimant's previous weekly wage, no more than the maximum of $624 a week ($1,248 a fortnight), for at most 26 weeks (182 days), for someone with wages on record (the employers' reports of each worker's pay). Previous pay is the mean of the monthly pay reported for the person. Nobody has a record on the first day of a run, so those out of work at the start are paid nothing until they have worked; once a payment has run its 26 weeks it is not claimed again until the person has worked. Not set: how much work history is needed (`who.record.months`, `within_months`; the note gives no figures), dependents' higher maximum, the work-search test.",
     "firm_ownership.forms_bps": "Carried over from the other profile as placeholders (shops and landlords closely held small businesses, the factory widely held). U.S. support for the shape: the great majority of U.S. employer firms are small (U.S. Census Bureau, Statistics of U.S. Businesses: about 89% of employer firms have fewer than 20 employees; recalled, not opened, to confirm). Shares not re-estimated.",
     "firm_ownership.closely_held": "Carried over from the other profile: placeholder (one owning household 85%, two 12%, three 3%); the fifth-of-wealth weights are placeholders too. To replace with the Survey of Consumer Finances 2022 business-ownership shares by wealth group.",
     "firm_ownership.widely_held": "Carried over: placeholder (a factory is mostly owned by companies and investors elsewhere); to source.",
@@ -1317,6 +1405,7 @@
     "industry": "Placeholders to confirm: manufacturing's compensation of employees (about 17%) and intermediate inputs (about 72%) as shares of gross output (recalled from Bureau of Economic Analysis, Industry Economic Accounts, GDP by Industry / Input-Output Accounts; not opened); retail trade's purchases of goods (70%) and wages (14%) as shares of sales, carried over from the other profile and not re-estimated.",
     "prices": "Unit conventions carried over from the other profile, not place figures: an item of goods worth $100 at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs $2.50 a kg; building materials $1.25 a kg (docs/behaviour/building.md). Placeholders: not checked against U.S. price indexes.",
     "labour_force_participation_bps": "U.S. Census Bureau, American Community Survey 2020-2024 5-year estimates, Wyandot County, Ohio (county seat Upper Sandusky; a rural county of 21,598 people), table B23001, read through the Census Reporter API (https://api.censusreporter.org/1.0/data/show/latest?table_ids=B23001&geo_ids=05000US39175, opened). Share of people aged 20 to 64 in the labour force: 9651 of 11811 (81.7%). (The profile's definition is adults 18 to the retirement age; the table's age groups start at 20 for this range, so 18-19 are left out.)",
+    "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, the United States, national, annual 2025, from the Current Population Survey: ages 25 to 54, 83.559%; 55 to 59, 74.988%; 60 to 64, 58.712%; 65 and over, 19.089%. National, not Ohio (no table by age for the region was found); not checked against the BLS's own table (to confirm). The open band is split here with the BLS's own table: Current Population Survey, table 3, 2025 annual averages (https://www.bls.gov/cps/cpsaat03.htm), participation at 65 to 69, 33.3%; 70 to 74, 18.8%; 75 and over, 8.5% (read from that page by a research agent on 2026-10-08, not re-read here: to confirm; its 55 to 59 and 60 to 64 agree with the figures above). So here people are drawn to stop at 55, 60, 65, 70 or 75, and about a tenth of those in the labour force never do. How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Ohio Revised Code chapter 5321 (Landlord-Tenant Act) has no rent control and no limit on how often rent may be raised; the usual notice to change a periodic tenancy is 30 days (to confirm). The 12 months is a practice (a standard lease runs a year, rent changes at renewal), not a legal limit; after a fixed term a tenancy that continues is month-to-month (periodic). Structural gap: the profile cannot say 'no statutory limit'.",
     "values": "Placeholder, carried over unchanged from the other profile: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power; Schwartz and Bardi 2001, Journal of Cross-Cultural Psychology 32(3)); means and spreads are not a place's. To replace with a U.S. sample's (World Values Survey; European Social Survey does not cover the U.S.).",
     "industrial_action": "The National Labor Relations Act (29 U.S.C. 151-169) requires no strike ballot and no notice before a strike in a private workplace, except 10 days' notice before a strike at a health-care institution (s 8(g)) and 60 days' notice to the other side before a contract ends (s 8(d)); unions' own constitutions usually require a strike-authorisation vote by a majority (some two-thirds) of those voting. turnout and pass shares (50% each) are placeholders carried over from the other profile's legal quorum; notice_days 0. Strike pay is small (paid_during_action false). Structural gap: no legal ballot, so the rule's thresholds describe union practice.",
@@ -1333,7 +1422,8 @@
     "opening": "Carried over from the other profile, placeholders to source: what each organisation holds on the first day (the bank's own funds $500,000; the town $2,000,000; the builder $300,000; each landlord $600,000; a shop $30,000; a factory $400,000), and the least an adult in the labour force has saved ($1,000). Not re-estimated for this place.",
     "town_finance.parks_per_year": "Placeholder, carried over: the town's yearly parks line, $150,000.",
     "town_finance.payment_approval_over": "Placeholder, carried over: the town's payments procedure needs the mayor's written approval for any payment over $50,000. (An Ohio village's council authorises expenditures by ordinance, Ohio Revised Code ch. 731 and 5705; to confirm. Not modelled.)",
-    "public_finance.income_tax": "A combined schedule on gross income for a single resident, 2026. Federal: IRS Revenue Procedure 2025-32 (tax year 2026 inflation adjustments; https://www.irs.gov/pub/irs-drop/rp-25-32.pdf, opened): standard deduction $16,100; single brackets 10% to $12,400, 12% to $50,400, 22% to $105,700, 24% to $201,775, 32% to $256,225, 35% to $640,600, 37% above; each band starts $16,100 higher in gross income. Ohio: a flat 2.75% above $26,050 for tax year 2026 (Ohio Legislative Service Commission / Department of Taxation material on HB 96 of 2025, as returned by search; not opened; the quoted '$332 plus 2.75% of income above $26,050' suggests a small base amount that is not modelled; to confirm), added from $26,050. levy_bps 765: the employee's FICA, Social Security 6.2% and Medicare 1.45% (IRS; the 2026 wage cap of $184,500 per the SSA fact sheet, not modelled). Left out: Ohio's municipal income tax (1-3% of wages, the main revenue of Ohio municipalities), school-district income taxes, credits (earned income, child), itemised deductions. Structural gaps: no credits, no wage cap, no separate local tax.",
+    "public_finance.income_tax": "A combined schedule on gross income for a single resident, 2026. Federal: IRS Revenue Procedure 2025-32 (tax year 2026 inflation adjustments; https://www.irs.gov/pub/irs-drop/rp-25-32.pdf, opened): standard deduction $16,100; single brackets 10% to $12,400, 12% to $50,400, 22% to $105,700, 24% to $201,775, 32% to $256,225, 35% to $640,600, 37% above; each band starts $16,100 higher in gross income. Ohio: a flat 2.75% above $26,050 for tax year 2026 (Ohio Legislative Service Commission / Department of Taxation material on HB 96 of 2025, as returned by search; not opened; the quoted '$332 plus 2.75% of income above $26,050' suggests a small base amount that is not modelled; to confirm), added from $26,050. levy_bps 765: the employee's FICA, Social Security 6.2% and Medicare 1.45% (IRS; the 2026 wage cap of $184,500 per the SSA fact sheet, not modelled). Left out: Ohio's municipal income tax (1-3% of wages, the main revenue of Ohio municipalities), school-district income taxes, credits (earned income, child), itemised deductions. Structural gaps: no credits, no wage cap, no separate local tax. SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). The income tax keeps the author's combined federal and state schedule on gross pay. UN-FOLDED: the levy of 7.65% that stood for FICA is its two parts as this note gives them, each paid to its own fund: Social Security 6.2% of pay up to the 2026 wage cap of $184,500, and Medicare 1.45% of all pay. The employers' report of the income tax names each worker and their pay (employers report each worker's wages to the state): the record unemployment compensation is reckoned from. Not expressed: the municipal income tax (the note gives a range, 1 to 3% of wages, and no rate for this town; it would be a charge with `paid_to: \"town\"`, which the generator pays into the town's own account), school-district income taxes, credits (a credit paid out as money needs a yearly assessment, which does not exist).",
+    "public_finance.funds": "The named funds and bodies of the higher government that this place's charges on pay are paid to, each kept as an account of the outside world's of its own (the general government's account takes the rest). The two funds FICA is paid to (the note on the income tax).",
     "public_finance.grants_per_resident_per_year": "Placeholder: Ohio's Local Government Fund is about 1.7% of state general revenue fund tax revenues (Ohio Legislative Service Commission, as returned by search; the LSC pdf could not be fetched), about $36 a resident (estimated from a recalled total of about $430 million over 11.8 million residents).",
     "public_finance.rates_per_resident_per_year": "Placeholder (not found at a primary source): estimated at about $700 a resident a year of property-tax revenue for a village or township, outside the school district. Tried: the Wyandot County auditor's Tax-Rates.pdf (403 to this client) and Ohio Department of Taxation's pages (404). A third-party estimate gives an effective property-tax rate of 1.28% for Upper Sandusky (Ownwell, https://www.ownwell.com/trends/ohio/wyandot-county/upper-sandusky, search snippet; not primary). Left out: the municipal income tax.",
     "public_finance.rates_instalments": "Ohio Revised Code 323.12: real property taxes are payable in two half-year instalments (January and July; to confirm). Two.",

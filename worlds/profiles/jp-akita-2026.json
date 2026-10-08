@@ -584,16 +584,53 @@
       12000000
     ],
     "support": {
-      "pension": {
-        "amount": 141216,
-        "every_days": 61,
-        "from_age": 65
-      },
-      "unemployment": {
-        "amount": 132700,
-        "every_days": 28,
-        "from_age": 18
-      }
+      "payments": [
+        {
+          "id": "pension",
+          "name": "Basic old-age pension",
+          "every_days": 61,
+          "who": {
+            "from_age": 65
+          },
+          "amount": {
+            "flat": 141216
+          }
+        },
+        {
+          "id": "unemployment",
+          "name": "Employment Insurance basic allowance",
+          "every_days": 28,
+          "who": {
+            "from_age": 18,
+            "to_age": 64,
+            "out_of_work": true,
+            "record": {}
+          },
+          "amount": {
+            "share_bps": 6000,
+            "of": "gross",
+            "most": [
+              {
+                "from_age": 0,
+                "amount": 208600
+              },
+              {
+                "from_age": 30,
+                "amount": 231560
+              },
+              {
+                "from_age": 45,
+                "amount": 255080
+              },
+              {
+                "from_age": 60,
+                "amount": 219240
+              }
+            ]
+          },
+          "paid_from": "social-insurance"
+        }
+      ]
     },
     "firm_ownership": {
       "forms_bps": {
@@ -689,6 +726,24 @@
       {
         "from": 50,
         "rate": 0
+      }
+    ],
+    "labour_force_share_by_age": [
+      {
+        "from": 25,
+        "bps": 9025
+      },
+      {
+        "from": 55,
+        "bps": 8590
+      },
+      {
+        "from": 60,
+        "bps": 7690
+      },
+      {
+        "from": 65,
+        "bps": 2650
       }
     ],
     "labour_force_participation_bps": 8000,
@@ -788,39 +843,64 @@
       "payment_approval_over": 3000000
     },
     "public_finance": {
+      "funds": [
+        {
+          "id": "social-insurance",
+          "name": "Employees' social insurance"
+        }
+      ],
       "income_tax": {
-        "brackets": [
+        "charges": [
           {
-            "from": 0,
-            "rate_bps": 0
+            "id": "income-tax",
+            "name": "Income tax and resident tax",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 0
+              },
+              {
+                "from": 1380000,
+                "rate_bps": 1168
+              },
+              {
+                "from": 2200000,
+                "rate_bps": 831
+              },
+              {
+                "from": 3600000,
+                "rate_bps": 1179
+              },
+              {
+                "from": 6600000,
+                "rate_bps": 2222
+              },
+              {
+                "from": 8500000,
+                "rate_bps": 2713
+              },
+              {
+                "from": 13000000,
+                "rate_bps": 3638
+              }
+            ]
           },
           {
-            "from": 1380000,
-            "rate_bps": 1168
-          },
-          {
-            "from": 2200000,
-            "rate_bps": 831
-          },
-          {
-            "from": 3600000,
-            "rate_bps": 1179
-          },
-          {
-            "from": 6600000,
-            "rate_bps": 2222
-          },
-          {
-            "from": 8500000,
-            "rate_bps": 2713
-          },
-          {
-            "from": 13000000,
-            "rate_bps": 3638
+            "id": "social-insurance",
+            "name": "Social insurance premiums",
+            "base": {
+              "from": 1300000
+            },
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 1500
+              }
+            ],
+            "paid_to": "social-insurance",
+            "itemised": true
           }
-        ],
-        "levy_bps": 1500,
-        "levy_from": 1300000
+        ]
       },
       "grants_per_resident_per_year": 479900,
       "rates_per_resident_per_year": 55000,
@@ -1256,11 +1336,10 @@
     "spending.shops_known": "Not a figure of this place: a model's. Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections (as in the other profile).",
     "spending.shop_search_bps_per_month": "PLACEHOLDER carried over: a household's chance a month of looking for a new seller (25%). To source.",
     "spending.essentials_per_month": "PLACEHOLDER: what a person spends however little comes in, 45,000 yen a month, near the food spending of a one-person household in Japan (about 40,000 yen a month; Statistics Bureau, Family Income and Expenditure Survey, single-person households; recalled, not opened: the annual report PDF opened this pass (https://www.stat.go.jp/data/kakei/2025np/pdf/gaiyou.pdf) was the survey's methods overview, with the results tables in e-Stat, not opened).",
-    "retirement_age": "Basic old-age pension age 65 (National Pension Act; claiming can be deferred to 75). Employers must secure work to 65 (Act on Stabilization of Employment of Elderly Persons). STRUCTURAL GAP: Japan has no single retirement age; about half of 65-69 year olds work (Labour Force Survey), which a single retirement age cannot show. Statutory facts from memory; to confirm.",
+    "retirement_age": "Basic old-age pension age 65 (National Pension Act; claiming can be deferred to 75). Employers must secure work to 65 (Act on Stabilization of Employment of Elderly Persons). STRUCTURAL GAP: Japan has no single retirement age; about half of 65-69 year olds work (Labour Force Survey), which a single retirement age cannot show. Statutory facts from memory; to confirm. Since 2026-10-08 people here stop work at ages of their own, drawn from labour_force_share_by_age; this age is still the one the profile's other figures turn on (the retired's savings, the end of the payments for those out of work, a retirement fund's access) and the top of the working ages the measures use. The pension's age is the payment's own (support.payments).",
     "savings_by_age": "An adult's cash and deposits, 10th/25th/50th/75th/90th percentiles by age. The 50th percentiles are set from the median financial assets of households of two or more people by age of head, 2024: 20s 840,000 yen, 30s 1.8 million, 40s 2.5 million, 50s 2.5 million (the 55+ band is raised towards the 60s' 6.5 million), 60s 6.5 million, 70s 12.05 million (Financial Services Agency-affiliated J-FLEC, Survey of Household Financial Behaviour, 2024, two-or-more-person households, https://j-flec.go.jp/wpimages/uploads/yoronf24.pdf; figures as reported in a search summary, the PDF not opened: to confirm). They are household, not individual, holdings and include non-holders. The other percentiles and the 18-24 band are PLACEHOLDERS.",
     "retiree_savings": "Median financial assets of two-or-more-person households headed by people in their 60s (6.5 million yen) and 70s (12.05 million yen), J-FLEC, Survey of Household Financial Behaviour 2024 (as for savings_by_age; to confirm); used as the range.",
-    "support.pension": "Basic old-age pension (National Pension), full monthly amount FY2026: 70,608 yen (up 1.9% from 69,308), Japan Pension Service notice, https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202604/0401.html (read 2026-10-08). Paid every second month for the two preceding months (the 15th of even months), so 141,216 yen every 61 days (365/6 = 60.8). from_age 65. Left out: the earnings-related employees' pension that most Akita retirees with an employment history also receive (average well above the basic pension), contribution-record reductions, means-tested welfare (seikatsu hogo) and the couples' rate. STRUCTURAL GAP: a second, earnings-related tier.",
-    "support.unemployment": "Employment Insurance basic allowance (Employment Insurance Act). Opened: Hello Work, Basic allowance (https://www.hellowork.mhlw.go.jp/insurance/insurance_basicbenefit.html, opened 2026-10-08): the daily amount is about 50-80% of the previous daily wage (45-80% at 60-64), the more the lower the wage; upper limits per day from 1 Aug 2024: under 30, 7,450 yen; 30-44, 8,270; 45-59, 9,110; 60-64, 7,830; benefit days run from 90 to 360 by age, insured period and reason for leaving. The page did not give the lower limit or the 28-day cycle (I am recalling that benefits are recognised and paid in four-week cycles; to confirm). The flat figure is DERIVED: 60% (my choice inside the 50-80% range) of a daily wage of about 7,900 yen (the Akita retail monthly scheduled earnings of 237,500 yen, from the wage survey above, over 30 days) = 4,740 yen a day, x 28 days = 132,700 yen. from_age 18. STRUCTURAL GAP: contribution requirement, wage-linked amount, limited duration.",
+    "support.payments": "[The pension:] Basic old-age pension (National Pension), full monthly amount FY2026: 70,608 yen (up 1.9% from 69,308), Japan Pension Service notice, https://www.nenkin.go.jp/oshirase/taisetu/kojin/2026/202604/0401.html (read 2026-10-08). Paid every second month for the two preceding months (the 15th of even months), so 141,216 yen every 61 days (365/6 = 60.8). from_age 65. Left out: the earnings-related employees' pension that most Akita retirees with an employment history also receive (average well above the basic pension), contribution-record reductions, means-tested welfare (seikatsu hogo) and the couples' rate. STRUCTURAL GAP: a second, earnings-related tier. [The payment to those out of work:] Employment Insurance basic allowance (Employment Insurance Act). Opened: Hello Work, Basic allowance (https://www.hellowork.mhlw.go.jp/insurance/insurance_basicbenefit.html, opened 2026-10-08): the daily amount is about 50-80% of the previous daily wage (45-80% at 60-64), the more the lower the wage; upper limits per day from 1 Aug 2024: under 30, 7,450 yen; 30-44, 8,270; 45-59, 9,110; 60-64, 7,830; benefit days run from 90 to 360 by age, insured period and reason for leaving. The page did not give the lower limit or the 28-day cycle (I am recalling that benefits are recognised and paid in four-week cycles; to confirm). The flat figure is DERIVED: 60% (my choice inside the 50-80% range) of a daily wage of about 7,900 yen (the Akita retail monthly scheduled earnings of 237,500 yen, from the wage survey above, over 30 days) = 4,740 yen a day, x 28 days = 132,700 yen. from_age 18. STRUCTURAL GAP: contribution requirement, wage-linked amount, limited duration. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. The pension is as it was (every 61 days). UN-FOLDED: the flat allowance, which the author derived as 60% of a typical daily wage for 28 days, is now that rule itself: 60% (the author's choice within the law's 50 to 80%) of the claimant's own previous pay for 28 days, no more than the daily upper limit for their age times 28 (7,450 yen under 30; 8,270 at 30 to 44; 9,110 at 45 to 59; 7,830 at 60 to 64, as this note gives them), for those with contributions on the insurance's record, paid from employees' social insurance. Nobody has a record on the first day of a run, so those out of work at the start are paid nothing until they have worked. Not set: how long it lasts (this note gives a range, 90 to 360 days by age, insured time and why the job ended, and no table: the field is `lasts.days`), the insured time needed (`who.record.months`), the lower limit (`amount.least`), the rate rising for the low paid.",
     "firm_ownership.forms_bps": "PLACEHOLDERS carried over from another profile (factories widely held; shops 80% closely held and 20% from outside; landlords 70% closely held). Roughly right in kind for Japan (small rural shops family-run; private rented housing is mostly owned by individuals, Housing and Land Survey), not sourced for Akita.",
     "firm_ownership.closely_held": "PLACEHOLDERS carried over from another profile (one household 85%, two 12%, three 3%; wealth weights). Not sourced for Japan.",
     "firm_ownership.widely_held": "PLACEHOLDER: the share of a widely held (listed) company's shares held from outside the town: 90%. A town of a few thousand holds almost none of a national listed company; the 80% of the other profile is too low for the same reason. To source from the JPX shareholding distribution survey.",
@@ -1272,6 +1351,7 @@
     "ordinary_hours_per_week": "Statutory working hours: 40 a week and 8 a day (Labour Standards Act 1947, art. 32; from memory, to confirm).",
     "fertility_per_10000": "Age shape: MHLW, Vital Statistics 2024 final figures, table 7 (total fertility rate by mother's five-year age group, 2024; https://www.mhlw.go.jp/toukei/saikin/hw/jinkou/kakutei24/xls/16_hyoR06.xlsx, opened 2026-10-08): 15-19 0.0082, 20-24 0.0764, 25-29 0.3064, 30-34 0.4369, 35-39 0.2566, 40-44 0.0608, 45-49 0.0022, total 1.1475 (Japan 2024). Level: Akita's total fertility rate in 2024 was 1.04 (Akita Prefecture, Vital Statistics 2024 final figures, https://www.pref.akita.lg.jp/ summary opened 2026-10-08); the national shape is scaled by 1.04/1.1475, an assumption that Akita's age pattern is Japan's (Akita's own age-specific table is in the prefecture table of the same release and was not read). Each band's value is the sum of single-year rates, so per year per 10,000 women it is value x 2,000.",
     "labour_force_participation_bps": "PLACEHOLDER: the share of working-age adults (18 to the retirement age) in the labour force, about 80%. National Labour Force Survey, August 2026, opened: employment rate 80.3% for ages 15-64 and 62.5% for those 15 and over; unemployment 2.5% (Statistics Bureau of Japan, Labour Force Survey (Basic Tabulation), August 2026, https://www.stat.go.jp/data/roudou/sokuhou/tsuki/pdf/gaiyou.pdf, opened 2026-10-08). Akita's own is not looked up.",
+    "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, Japan, national, annual 2025, from the Statistics Bureau's Labour Force Survey: ages 25 to 54, 90.248%; 55 to 59, 85.9%; 60 to 64, 76.9%; 65 and over, 26.5%. National, not Akita (no table by age for the region was found); not checked against the Statistics Bureau's own table (to confirm). The note on retirement_age says about half of 65 to 69 year olds work; a search summary gives the 2025 survey's shares as 54.5% at 65 to 69, 36.2% at 70 to 74 and 12.6% at 75 and over (Statistics Bureau, topics no. 149; not opened: to confirm), which would split the open band. How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Act on Land and House Leases (Shakuchi-shakuya-ho), arts. 26-28, 32: a lease renews unless the landlord gives notice 6 to 12 months ahead and has a justifiable cause; rent is changed by agreement, or by a court if the parties disagree (art. 32); there is no cap or notice period for an increase like some countries' rules. Custom: two-year leases, renewed with a renewal fee (so rent_review_months 24 and 30 days' notice are PLACEHOLDERS from custom). STRUCTURAL GAP: the 'justifiable cause' rule for ending a tenancy. After a fixed term the lease renews as a continuing one ('periodic'). From memory; to confirm.",
     "values": "PLACEHOLDER carried over: Schwartz's ten basic values in the cross-national order found by Schwartz and Bardi (J. Cross-Cultural Psychology 32(3), 2001; to confirm). Japan's own order differs (it is higher on conformity, security and tradition, lower on hedonism and stimulation among 56 nations' averages); to replace from the World Values Survey (wave 7) Schwartz items for Japan.",
     "industrial_action": "Trade Union Act and Labour Relations Adjustment Act: no statutory ballot for a private-sector strike beyond a union's own rules (a vote of the members by direct secret ballot is required by the union's constitution under Trade Union Act art. 5(2)(8)); no notice period except 10 days' notice for public-interest businesses (Labour Relations Adjustment Act art. 37); 'no work, no pay' during a strike. ballot_turnout_bps, ballot_pass_bps and notice_days are PLACEHOLDERS; paid_during_action false follows the no-work-no-pay principle. From memory; to confirm.",
@@ -1288,7 +1368,8 @@
     "opening": "PLACEHOLDERS: what each organisation holds on the first day, set by scaling another profile's openings by the ratio of the two retail fortnightly wages (about 62 yen per unit of that currency): bank 31 million, town 124 million, builder 18 million, each landlord 37 million, a shop 1.8 million, a factory 25 million yen; and the least an adult in the labour force has saved, 60,000 yen. Scaling is not sourcing; to source.",
     "town_finance.parks_per_year": "PLACEHOLDER: the town's yearly parks line, 9 million yen (another profile's figure scaled by wages, about a park a year at what the builder charges).",
     "town_finance.payment_approval_over": "PLACEHOLDER: the town's procedure needs the mayor's written approval over 3 million yen (another profile's threshold scaled by wages). To source from a municipality's financial regulations.",
-    "public_finance.income_tax": "STATED AS PUBLISHED, National Tax Agency (opened 2026-10-08): income tax rates on taxable income, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/2260.htm: up to 1.949 million yen 5%; 1.95-3.299 million 10% less 97,500; 3.3-6.949 million 20% less 427,500; 6.95-8.999 million 23% less 636,000; 9-17.999 million 33% less 1,536,000; 18-39.999 million 40% less 2,796,000; 40 million and over 45% less 4,796,000; plus a reconstruction special income tax of 2.1% of the tax (1.1% from 2027). Employment income deduction for 2026 and 2027, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1410.htm: 740,000 yen to 2.2 million of pay; 30% + 80,000 to 3.6 million; 20% + 440,000 to 6.6 million; 10% + 1,100,000 to 8.5 million; 1.95 million above. Basic deduction for 2026, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1199.htm (the page says it takes effect on 1 December 2026): 1.04 million yen at total income up to 1.32 million; 620,000 to 3.36 million; 680,000 to 4.89 million; 670,000 to 6.55 million; 620,000 to 23.5 million. Resident tax (prefectural 4% and municipal 6%, flat 10% of taxable income, basic deduction 430,000) and employee social insurance at 15% of pay are from memory (to confirm). THE APPROXIMATION, separately and mine: the structure takes marginal rates on gross annual pay. I computed total tax (national with the reconstruction tax, plus resident tax) on pay G as national tax on max(0, G - employment deduction - basic deduction - 15% of G) plus 10% of max(0, G - employment deduction - 430,000 - 15% of G), and fitted marginal rates between 1.38, 2.2, 3.6, 6.6, 8.5 and 13 million yen of pay: nothing up to 1.38 million, then 11.68%, 8.31%, 11.79%, 22.22%, 27.13% and 36.38% (above 13 million). The fit is within a few thousand yen of the computed tax at the nodes, and within about 7,000 to 20,000 yen between 2 and 5 million. Family deductions (spouse, dependants) and other deductions cannot be expressed. The 'levy' stands for employees' social insurance (health about 5%, long-term care 0.9% from 40, employees' pension 9.15%, employment insurance 0.55%, about 15.6%; from memory, to confirm) charged from 1.3 million yen; the 15% in the derivation above is deducted because insurance premiums are deductible from taxable income.",
+    "public_finance.income_tax": "STATED AS PUBLISHED, National Tax Agency (opened 2026-10-08): income tax rates on taxable income, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/2260.htm: up to 1.949 million yen 5%; 1.95-3.299 million 10% less 97,500; 3.3-6.949 million 20% less 427,500; 6.95-8.999 million 23% less 636,000; 9-17.999 million 33% less 1,536,000; 18-39.999 million 40% less 2,796,000; 40 million and over 45% less 4,796,000; plus a reconstruction special income tax of 2.1% of the tax (1.1% from 2027). Employment income deduction for 2026 and 2027, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1410.htm: 740,000 yen to 2.2 million of pay; 30% + 80,000 to 3.6 million; 20% + 440,000 to 6.6 million; 10% + 1,100,000 to 8.5 million; 1.95 million above. Basic deduction for 2026, https://www.nta.go.jp/taxes/shiraberu/taxanswer/shotoku/1199.htm (the page says it takes effect on 1 December 2026): 1.04 million yen at total income up to 1.32 million; 620,000 to 3.36 million; 680,000 to 4.89 million; 670,000 to 6.55 million; 620,000 to 23.5 million. Resident tax (prefectural 4% and municipal 6%, flat 10% of taxable income, basic deduction 430,000) and employee social insurance at 15% of pay are from memory (to confirm). THE APPROXIMATION, separately and mine: the structure takes marginal rates on gross annual pay. I computed total tax (national with the reconstruction tax, plus resident tax) on pay G as national tax on max(0, G - employment deduction - basic deduction - 15% of G) plus 10% of max(0, G - employment deduction - 430,000 - 15% of G), and fitted marginal rates between 1.38, 2.2, 3.6, 6.6, 8.5 and 13 million yen of pay: nothing up to 1.38 million, then 11.68%, 8.31%, 11.79%, 22.22%, 27.13% and 36.38% (above 13 million). The fit is within a few thousand yen of the computed tax at the nodes, and within about 7,000 to 20,000 yen between 2 and 5 million. Family deductions (spouse, dependants) and other deductions cannot be expressed. The 'levy' stands for employees' social insurance (health about 5%, long-term care 0.9% from 40, employees' pension 9.15%, employment insurance 0.55%, about 15.6%; from memory, to confirm) charged from 1.3 million yen; the 15% in the derivation above is deducted because insurance premiums are deductible from taxable income. SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). The income tax and resident tax keep the author's fitted marginal rates on gross pay (the approximation described above; the deductions it folds could now be said as deductions, `base.less`, one of them a share of pay within a least and a most: left for the author). The levy of 15% of the whole of a pay from 1.3 million yen, which stood for employees' social insurance, is the same figure as a charge of its own, paid to the social insurance bodies and not to general revenue; its parts (health, long-term care, pension, employment insurance) are from the author's memory and sum to about 15.6%, so they are not split. The employers' report of it names each worker and their pay: the record the employment insurance payment is reckoned from.",
+    "public_finance.funds": "The named funds and bodies of the higher government that this place's charges on pay are paid to, each kept as an account of the outside world's of its own (the general government's account takes the rest). Employees' social insurance (health, long-term care, employees' pension, employment insurance), which the levy stood for (the note on the income tax).",
     "public_finance.grants_per_resident_per_year": "Ikawa Town, FY2024 settlement (Financial Status Collection, 2024, https://www.town.ikawa.akita.jp/uploaded/attachment/2729.xlsx, opened 2026-10-08): local allocation tax 1,994,958 thousand yen (47.3% of the town's revenue), over 4,157 residents on the register (1 Jan 2025) = 479,900 yen a resident. The central government's local allocation tax is a general grant to municipalities; the sheet marks the town as not a 'surplus-revenue' municipality (the grant-free-excess flag is ×).",
     "public_finance.rates_per_resident_per_year": "Ikawa Town, FY2024 settlement (same collection, 'Status of ordinary accounts'): fixed asset tax 228,703 thousand yen (55.5% of local tax of 412,391 thousand), over 4,157 residents = 55,000 yen a resident. The fixed asset tax is the municipal tax on land and buildings (standard rate 1.4% of assessed value, Local Tax Act art. 350; to confirm). Sets the town's opening rate in the yen.",
     "public_finance.rates_instalments": "Fixed asset tax is paid in four instalments (usually June, September, December and February; each municipality sets its own dates), Local Tax Act art. 362 (from memory; to confirm).",

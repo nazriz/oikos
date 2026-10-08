@@ -47,7 +47,9 @@ test("with jobs going, households move in, bank their savings, and find work and
   expect(occupied.some((e) => e.space.includes("/dwelling."))).toBe(true);
   // (The races the other tests allow: a new job's first day after a morning at the old one, say; and a child home from
   // school by its own round while the parent's act moving the household in is still under way.)
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "already_present"].includes(e.code))).toEqual([]);
+  // And one more race: a couple at home together when one decides on a child, and the other gone out of the door by
+  // the time the act is made (it needs them both there; the month's chance is lost).
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "already_present"].includes(e.code) && !(e.code === "too_far" && /isn't near/.test(e.detail ?? "")))).toEqual([]);
   // The one who came for the job looks for work (the newcomer template); the others, at participation 0, don't.
   const templateOf = new Map(ev.filter((e) => e.event === "participant_created").map((e) => [e.person, e.template]));
   // (Newcomers' households, as they came, recorded by the migration office: a household may later put a newborn on its
