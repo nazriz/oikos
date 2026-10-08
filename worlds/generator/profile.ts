@@ -28,8 +28,13 @@ export interface Profile {
       /** Deaths care could prevent: the share of each age's deaths that's treatable, carried by an illness band. */
       treatable?: { share_bps_by_age: { from: number; bps: number }[]; band: string };
     };
+    /** The working week a full-time wage is pay for, in hours: what people here work, not a legal ceiling above it. The
+     * generator spreads it over the days of the week people work, and reckons an hour's pay from it. */
     ordinary_hours_per_week: number;
-    wages_per_fortnight: { shop: number; factory: number; construction: number };
+    /** How often wages are paid here, in days (14, 30...). */
+    pay_period_days: number;
+    /** A full-time wage by kind of work, gross, for one pay period. */
+    wages_per_pay_period: { shop: number; factory: number; construction: number };
     rents_per_month: {
       apartment_units: { bedrooms: number; count: number; rent: number }[];
       house_types: { id: string; bedrooms: number; share_bps: number; rent: number }[];
@@ -39,22 +44,30 @@ export interface Profile {
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
     retirement_age: number;
     labour_force_participation_bps: number;
-    tenancy: { rent_review_months: number; rent_increase_notice_days: number; after_fixed_term?: "periodic" };
+    /** Tenancy law. A place with no rule on how often a rent may rise or on what notice leaves both figures out (no
+     * such law is written); landlords then review rents as often as `rent_review_practice_months` says, if it's given. */
+    tenancy: { rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };
     values: { [value: string]: { mean_bps: number; sd_bps: number } };
-    industrial_action: { ballot_turnout_bps: number; ballot_pass_bps: number; notice_days: number; paid_during_action: boolean };
+    /** The law on industrial action. A place that requires no ballot leaves both ballot figures out; one that requires
+     * no notice either leaves that out too (and no such law is written). */
+    industrial_action: { ballot_turnout_bps?: number; ballot_pass_bps?: number; notice_days?: number; paid_during_action: boolean };
     world_price_process: { [kind: string]: { sd_bps: number; persistence_bps: number } };
     credit: {
-      cash_rate_bps: number; funding_spread_bps: number; lending_rate_bps: { person: number; organisation: number }; serviceability_buffer_bps: number;
+      cash_rate_bps: number; funding_spread_bps: number; lending_rate_bps: { person: number; organisation: number };
+      /** What lenders add to their rate when assessing whether a loan can be repaid. Left out where they add nothing. */
+      serviceability_buffer_bps?: number;
       max_repayment_share_bps: { person: number; organisation: number }; arrears_days: number; default_days: number; max_months: number;
       /** The cash the bank's lending office keeps back. */
       reserve: number;
     };
-    /** What each organisation holds on the first day, and the least an adult in the labour force has saved. */
-    opening: { bank: number; town: number; builder: number; landlord: number; shop: number; factory: number; person_min_savings: number };
+    /** What each organisation holds on the first day, and the least an adult in the labour force has saved. (A shop's
+     * and a factory's opening money isn't stated: the generator works out their working capital.) */
+    opening: { bank: number; town: number; builder: number; landlord: number; person_min_savings: number };
     /** The town's own money rules: its yearly parks line, and the payment its procedure needs the mayor's approval over. */
     town_finance: { parks_per_year: number; payment_approval_over: number };
     retiree_savings: [number, number];
-    support: { pension: { amount: number; every_days: number; from_age: number }; unemployment: { amount: number; every_days: number; from_age: number } };
+    /** Support paid from outside the town. A place with no payment to the unemployed leaves `unemployment` out. */
+    support: { pension: { amount: number; every_days: number; from_age: number }; unemployment?: { amount: number; every_days: number; from_age: number } };
     /** Who owns firms (docs/behaviour/firm-ownership.md). Fifths are of households by wealth, lowest first. */
     firm_ownership: {
       /** Of the firms of each kind, the share held each way: by one household or a few; from outside; widely. */
@@ -73,7 +86,10 @@ export interface Profile {
      * share of what it takes in. */
     retirement_fund?: { share_bps_of_local: number; member_bps: number; pension_every_days: number; drawdown_bps_by_age: { from: number; bps: number }[]; cost_bps_of_income: number };
     industry: { factory_labour_share_bps: number; factory_input_share_bps: number; retail_purchases_share_bps: number; retail_labour_share_bps: number };
-    prices: { goods_world: number; goods_import_markup_bps: number; inputs_per_kg: number; materials_per_kg: number };
+    /** Prices at the world market. `goods_world` is the price of an item of goods, the town's own unit and no real
+     * thing's price: left out, the generator derives it (an item is a fixed amount of factory work); stated, it fixes
+     * the unit, and the generator checks it's a size the world's whole numbers can carry (docs/profiles.md). */
+    prices: { goods_world?: number; goods_import_markup_bps: number; inputs_per_kg: number; materials_per_kg: number };
     public_finance: {
       income_tax: { brackets: { from: number; rate_bps: number }[]; levy_bps: number; levy_from: number };
       grants_per_resident_per_year: number;
@@ -87,7 +103,8 @@ export interface Profile {
     };
     services: {
       waste_per_person_per_day_g: number;
-      landfill_levy_per_tonne: number;
+      /** What the landfill charges the town for a tonne of waste. Left out where it charges nothing. */
+      landfill_levy_per_tonne?: number;
       council_staff_per_1000: number;
       collect_seconds_per_10kg: number;
       asset_life_years: number;
@@ -99,11 +116,11 @@ export interface Profile {
     groups?: { kinds: { kind: string; name: string; every_days: number; lasts_minutes: number; teaching?: string; held_at_start_bps?: number }[]; per_kind_per_1000_people: number; taking_part_bps: number; leave_notice_days: number };
     /** Health (docs/design/world-expansion.md 4): the clinic's doctors, their care for conditions (as consultations), and who
      * seeks it; the conditions that keep someone off work. */
-    health?: { doctors_per_1000: number; doctor_wage_per_fortnight: number; consult_minutes: number; seek_care_bps: number;
+    health?: { doctors_per_1000: number; doctor_wage_per_pay_period: number; consult_minutes: number; seek_care_bps: number;
       treats: { kind: "illness" | "injury"; severity?: string; consults: number; days_kept_bps: number; fatal_kept_bps: number }[]; off_work_severities: string[] };
     /** Education (world-expansion 4): school ages, staffing, the school year, adults' attainment (as years of schooling), and
      * the return to a year of it. */
-    education?: { school_ages: [number, number]; students_per_teacher: number; school_days_per_year: number; hours_per_day: number; teacher_wage_per_fortnight: number;
+    education?: { school_ages: [number, number]; students_per_teacher: number; school_days_per_year: number; hours_per_day: number; teacher_wage_per_pay_period: number;
       attainment: { label: string; share_bps: number; years: number }[]; return_per_year_bps: number; max_years: number };
     /** The daily round (world-expansion 6.3): working and school hours, and what crossing a cell takes (seconds). */
     round?: { work_start_hour: number; work_end_hour: number; work_days: number; school_start_hour: number; school_end_hour: number; travel_seconds_per_cell: number; travel_by_cover: { [cover: string]: number };
@@ -132,11 +149,13 @@ export interface Profile {
     hazards?: { river_bank_kl: number; spill_bps_per_day: number; flood_above_kl: number; wetland_soak_kl_per_day: number };
     /** Crime and policing (world-expansion 7.2): how rarely people in need take from work, the police's establishment, and
      * how often an investigation finds who. */
-    crime?: { take_bps_per_month_in_need: number; caught_bps_reckoned: number; take_quantity: number; detection_bps: number; investigation_hours: number; police_per_1000: number; officer_wage_per_fortnight: number };
+    crime?: { take_bps_per_month_in_need: number; caught_bps_reckoned: number; take_quantity: number; detection_bps: number; investigation_hours: number; police_per_1000: number; officer_wage_per_pay_period: number };
     /** Justice (world-expansion 5): the tribunal's times, and how often people take a case to it. */
     justice?: { hearing_after_days: number; pay_within_days: number; challenge_bps: number; apply_bps: number; apply_after_days: number };
     /** Elections and the local paper (docs/design/world-expansion.md 3). */
-    elections?: { term_years: number; method: "preferential" | "plurality"; turnout_bps: number; stand_bps: number; news_readers_bps: number };
+    elections?: { term_years: number; method: "preferential" | "plurality";
+      /** Whether the law here requires electors to vote (the town's election law says so, or that they may). */
+      compulsory_voting: boolean; turnout_bps: number; stand_bps: number; news_readers_bps: number };
     /** Nature (docs/design/world-expansion.md 2): the landscape around the town, its covers, pollution, and species in
      * real units (per hectare, hectares), converted to cells by the generator with `cell_m`. */
     nature?: {

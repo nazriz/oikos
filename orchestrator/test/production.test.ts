@@ -155,7 +155,10 @@ test("Lengnick: with too little demand a factory lets workers go and stops makin
   const quit = e1.filter((e) => e.event === "recorded" && e.record.record === "notice" && factoryJobs.has(e.record.agreement) && e.record.text === "Resigning: moving to another job.");
   // ... or let go because the money for the next pay period isn't there (slack demand runs a factory's cash down).
   const cashLetGo = c1.filter((c) => c.participant?.startsWith("factory-") && /Can't cover the next pay period/.test(c.reasoning ?? ""));
-  expect(letGo.length).toBeGreaterThanOrEqual(1);
+  // (Since shops stopped ordering all from one factory, 2026-10-08, a factory's orders are steadier and its making stops
+  // at its band's top before its stock passes last month's demand: in this town the staff go for want of the wages,
+  // not by the month's-end rule. Either is the factory letting workers go for too little demand.)
+  expect(letGo.length + cashLetGo.length).toBeGreaterThanOrEqual(1);
   // (At least two of its staff go. Four, before the clinic and the school took four of the town's 120 people's jobs
   // from the factory: generator 0.22.0.)
   expect(letGo.length + cashLetGo.length + quit.length).toBeGreaterThanOrEqual(2);

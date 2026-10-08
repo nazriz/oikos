@@ -191,7 +191,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.11.1",
+  version: "0.11.2",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -460,7 +460,7 @@ export const builder: BehaviourModule = {
         }));
         // (Short of the next pay period for those we're keeping: someone already given notice is still crew until it runs
         // out, and counting them let the whole crew go, one after another within the moment.)
-        const keeping = staffing.keeping(book, t);
+        const keeping = staffing.staying(book, t);
         const broke = keeping > 0 && acc.balance < keeping * wage;
         if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || broke) {
           const s = staffing.letGo(book, t, broke ? `Can't cover the next pay period (${usd(acc.balance)} for ${keeping}): letting the most recent hire go.` : `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands; we have ${crewNow.length}: letting the most recent hire go.`,

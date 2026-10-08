@@ -1,0 +1,1465 @@
+{
+  "id": "ke-nakuru-2026",
+  "place": "A small town in Nakuru County, Kenya (a market town in the Rift Valley highlands, like Njoro or Molo)",
+  "as_of": "2026-10",
+  "about": "Every place-specific figure the town generator uses for a small town in Nakuru County, Kenya, with its source. Each source entry begins with a tag: [OPENED] the figure was read from a primary document or dataset that was opened (named in the entry); [SECONDARY] it rests on a press report or a search summary of an official release, not opened; [MIXED] part of the entry is opened, part is estimated (the entry says which); [PLACEHOLDER] estimated or carried over from another profile's placeholder, with what it was estimated from. IMPORTANT LIMIT: informal and own-account work, which is most of employment in Kenya (about 84% of jobs: KNBS, Economic Survey 2026), is not represented yet. The generator can only place people in shop, factory and construction jobs, or without work, so a town made from this profile has formal-sector-style employment only; farming, trading from a stall, motorcycle-taxi work and other own-account work are missing. Other structural gaps are listed in the report that accompanied this profile. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md).",
+  "values": {
+    "currency": {
+      "code": "KES",
+      "minor_units": 2,
+      "symbol": "KSh",
+      "unit_words": [
+        "shilling",
+        "shillings",
+        "bob"
+      ],
+      "minor_words": [
+        "cent",
+        "cents"
+      ]
+    },
+    "households": {
+      "lone_bps": 2020,
+      "group_bps": 300,
+      "couple_bps": 1400,
+      "couple_children_bps": 4380,
+      "one_parent_bps": 1900,
+      "children_couple": [
+        2800,
+        3200,
+        4000
+      ],
+      "children_one_parent": [
+        4000,
+        3200,
+        2800
+      ],
+      "same_sex_couple_bps": 0,
+      "lone_parent_female_bps": 8500,
+      "adult_female_bps": 5066,
+      "child_male_bps": 5050,
+      "adult_ages": [
+        18,
+        99
+      ],
+      "mother_age_at_first_birth": [
+        17,
+        25
+      ],
+      "child_max_age": 24,
+      "group_size": [
+        2,
+        3
+      ],
+      "age_bands_bps": [
+        {
+          "from": 0,
+          "to": 4,
+          "bps": 1265
+        },
+        {
+          "from": 5,
+          "to": 9,
+          "bps": 1237
+        },
+        {
+          "from": 10,
+          "to": 14,
+          "bps": 1270
+        },
+        {
+          "from": 15,
+          "to": 19,
+          "bps": 1089
+        },
+        {
+          "from": 20,
+          "to": 24,
+          "bps": 982
+        },
+        {
+          "from": 25,
+          "to": 29,
+          "bps": 836
+        },
+        {
+          "from": 30,
+          "to": 34,
+          "bps": 790
+        },
+        {
+          "from": 35,
+          "to": 39,
+          "bps": 602
+        },
+        {
+          "from": 40,
+          "to": 44,
+          "bps": 499
+        },
+        {
+          "from": 45,
+          "to": 49,
+          "bps": 408
+        },
+        {
+          "from": 50,
+          "to": 54,
+          "bps": 291
+        },
+        {
+          "from": 55,
+          "to": 59,
+          "bps": 234
+        },
+        {
+          "from": 60,
+          "to": 64,
+          "bps": 157
+        },
+        {
+          "from": 65,
+          "to": 69,
+          "bps": 123
+        },
+        {
+          "from": 70,
+          "to": 74,
+          "bps": 93
+        },
+        {
+          "from": 75,
+          "to": 79,
+          "bps": 54
+        },
+        {
+          "from": 80,
+          "to": 84,
+          "bps": 34
+        },
+        {
+          "from": 85,
+          "to": 99,
+          "bps": 36
+        }
+      ]
+    },
+    "life": {
+      "qx_per_100000": {
+        "male": [
+          3296,
+          283,
+          283,
+          283,
+          283,
+          96,
+          96,
+          96,
+          96,
+          96,
+          86,
+          86,
+          86,
+          86,
+          86,
+          176,
+          176,
+          176,
+          176,
+          176,
+          298,
+          298,
+          298,
+          298,
+          298,
+          413,
+          413,
+          413,
+          413,
+          413,
+          563,
+          563,
+          563,
+          563,
+          563,
+          774,
+          774,
+          774,
+          774,
+          774,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1353,
+          1353,
+          1353,
+          1353,
+          1353,
+          1790,
+          1790,
+          1790,
+          1790,
+          1790,
+          2348,
+          2348,
+          2348,
+          2348,
+          2348,
+          3266,
+          3266,
+          3266,
+          3266,
+          3266,
+          4373,
+          4373,
+          4373,
+          4373,
+          4373,
+          5817,
+          5817,
+          5817,
+          5817,
+          5817,
+          8007,
+          8007,
+          8007,
+          8007,
+          8007,
+          11716,
+          11716,
+          11716,
+          11716,
+          11716,
+          17345,
+          17345,
+          17345,
+          17345,
+          17345,
+          24360,
+          24360,
+          24360,
+          24360,
+          24360,
+          32211,
+          32211,
+          32211,
+          32211,
+          32211,
+          38539
+        ],
+        "female": [
+          2630,
+          304,
+          304,
+          304,
+          304,
+          90,
+          90,
+          90,
+          90,
+          90,
+          76,
+          76,
+          76,
+          76,
+          76,
+          139,
+          139,
+          139,
+          139,
+          139,
+          227,
+          227,
+          227,
+          227,
+          227,
+          334,
+          334,
+          334,
+          334,
+          334,
+          453,
+          453,
+          453,
+          453,
+          453,
+          603,
+          603,
+          603,
+          603,
+          603,
+          760,
+          760,
+          760,
+          760,
+          760,
+          969,
+          969,
+          969,
+          969,
+          969,
+          1259,
+          1259,
+          1259,
+          1259,
+          1259,
+          1646,
+          1646,
+          1646,
+          1646,
+          1646,
+          2304,
+          2304,
+          2304,
+          2304,
+          2304,
+          3228,
+          3228,
+          3228,
+          3228,
+          3228,
+          4441,
+          4441,
+          4441,
+          4441,
+          4441,
+          6206,
+          6206,
+          6206,
+          6206,
+          6206,
+          9292,
+          9292,
+          9292,
+          9292,
+          9292,
+          14463,
+          14463,
+          14463,
+          14463,
+          14463,
+          21034,
+          21034,
+          21034,
+          21034,
+          21034,
+          28994,
+          28994,
+          28994,
+          28994,
+          28994,
+          36091
+        ]
+      },
+      "illness": {
+        "by_age": [
+          {
+            "from": 0,
+            "bps": 600
+          },
+          {
+            "from": 5,
+            "bps": 350
+          },
+          {
+            "from": 15,
+            "bps": 600
+          },
+          {
+            "from": 45,
+            "bps": 900
+          },
+          {
+            "from": 65,
+            "bps": 1800
+          },
+          {
+            "from": 85,
+            "bps": 4500
+          }
+        ],
+        "severity": [
+          {
+            "label": "serious",
+            "share_bps": 8000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "severe",
+            "share_bps": 2000,
+            "days": [
+              14,
+              60
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "injury": {
+        "bps": 210,
+        "severity": [
+          {
+            "label": "minor",
+            "share_bps": 6000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "serious",
+            "share_bps": 4000,
+            "days": [
+              14,
+              90
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "birth": {
+        "ages": [
+          15,
+          49
+        ],
+        "gestation_days": 266,
+        "female_bps": 4926
+      },
+      "treatable": {
+        "share_bps_by_age": [
+          {
+            "from": 0,
+            "bps": 1500
+          },
+          {
+            "from": 75,
+            "bps": 0
+          }
+        ],
+        "band": "severe"
+      },
+      "work_injury_bps": {
+        "factory": 160,
+        "shop": 116
+      },
+      "found_alone_after": [
+        {
+          "within_days": 1,
+          "bps": 3691
+        },
+        {
+          "within_days": 3,
+          "bps": 2062
+        },
+        {
+          "within_days": 7,
+          "bps": 1359
+        },
+        {
+          "within_days": 30,
+          "bps": 1959
+        },
+        {
+          "within_days": 365,
+          "bps": 929
+        }
+      ]
+    },
+    "pay_period_days": 14,
+    "wages_per_pay_period": {
+      "shop": 857650,
+      "factory": 712060,
+      "construction": 857666
+    },
+    "rents_per_month": {
+      "apartment_units": [
+        {
+          "bedrooms": 1,
+          "count": 3,
+          "rent": 600000
+        },
+        {
+          "bedrooms": 2,
+          "count": 7,
+          "rent": 1300000
+        },
+        {
+          "bedrooms": 3,
+          "count": 2,
+          "rent": 1400000
+        }
+      ],
+      "house_types": [
+        {
+          "id": "house",
+          "bedrooms": 3,
+          "share_bps": 5500,
+          "rent": 3000000
+        },
+        {
+          "id": "large-house",
+          "bedrooms": 4,
+          "share_bps": 4500,
+          "rent": 3750000
+        }
+      ]
+    },
+    "spending": {
+      "saving_bps": 500,
+      "wealth_effect_bps_per_year": 300,
+      "essentials_per_month": 600000,
+      "shops_known": 7,
+      "shop_search_bps_per_month": 2500
+    },
+    "savings_by_age": [
+      {
+        "from": 18,
+        "pct": [
+          10000,
+          50000,
+          200000,
+          600000,
+          1500000
+        ]
+      },
+      {
+        "from": 25,
+        "pct": [
+          30000,
+          150000,
+          500000,
+          1500000,
+          4000000
+        ]
+      },
+      {
+        "from": 35,
+        "pct": [
+          50000,
+          250000,
+          800000,
+          2500000,
+          7000000
+        ]
+      },
+      {
+        "from": 45,
+        "pct": [
+          50000,
+          300000,
+          1000000,
+          3000000,
+          9000000
+        ]
+      },
+      {
+        "from": 55,
+        "pct": [
+          50000,
+          300000,
+          1200000,
+          4000000,
+          12000000
+        ]
+      }
+    ],
+    "retirement_age": 70,
+    "retiree_savings": [
+      3000000,
+      15000000
+    ],
+    "support": {
+      "pension": {
+        "amount": 200000,
+        "every_days": 30,
+        "from_age": 70
+      },
+      "unemployment": {
+        "amount": 0,
+        "every_days": 30,
+        "from_age": 18
+      }
+    },
+    "firm_ownership": {
+      "forms_bps": {
+        "factory": {
+          "closely_held": 5000,
+          "outside": 4000,
+          "widely_held": 1000
+        },
+        "shop": {
+          "closely_held": 9500,
+          "outside": 500,
+          "widely_held": 0
+        },
+        "landlord": {
+          "closely_held": 9500,
+          "outside": 500,
+          "widely_held": 0
+        }
+      },
+      "closely_held": {
+        "households_bps": [
+          8500,
+          1200,
+          300
+        ],
+        "owner_wealth_fifth_bps": [
+          100,
+          200,
+          400,
+          800,
+          8500
+        ]
+      },
+      "widely_held": {
+        "outside_bps": 5000
+      },
+      "direct_holders": {
+        "by_wealth_fifth_bps": [
+          0,
+          100,
+          200,
+          400,
+          1500
+        ],
+        "firms_held": [
+          1,
+          3
+        ]
+      }
+    },
+    "retirement_fund": {
+      "share_bps_of_local": 4000,
+      "member_bps": 2400,
+      "pension_every_days": 30,
+      "drawdown_bps_by_age": [
+        {
+          "from": 0,
+          "bps": 400
+        },
+        {
+          "from": 60,
+          "bps": 500
+        },
+        {
+          "from": 70,
+          "bps": 600
+        },
+        {
+          "from": 80,
+          "bps": 700
+        }
+      ],
+      "cost_bps_of_income": 500
+    },
+    "industry": {
+      "factory_labour_share_bps": 2000,
+      "factory_input_share_bps": 6700,
+      "retail_purchases_share_bps": 7800,
+      "retail_labour_share_bps": 1000
+    },
+    "prices": {
+      "goods_world": 50000,
+      "goods_import_markup_bps": 1500,
+      "inputs_per_kg": 5000,
+      "materials_per_kg": 600
+    },
+    "ordinary_hours_per_week": 52,
+    "fertility_per_10000": [
+      {
+        "from": 15,
+        "rate": 580
+      },
+      {
+        "from": 20,
+        "rate": 1950
+      },
+      {
+        "from": 25,
+        "rate": 1600
+      },
+      {
+        "from": 30,
+        "rate": 1200
+      },
+      {
+        "from": 35,
+        "rate": 980
+      },
+      {
+        "from": 40,
+        "rate": 330
+      },
+      {
+        "from": 45,
+        "rate": 50
+      },
+      {
+        "from": 50,
+        "rate": 0
+      }
+    ],
+    "labour_force_participation_bps": 7000,
+    "tenancy": {
+      "rent_review_months": 12,
+      "rent_increase_notice_days": 30,
+      "after_fixed_term": "periodic"
+    },
+    "values": {
+      "benevolence": {
+        "mean_bps": 7000,
+        "sd_bps": 1500
+      },
+      "universalism": {
+        "mean_bps": 6600,
+        "sd_bps": 1500
+      },
+      "self_direction": {
+        "mean_bps": 6200,
+        "sd_bps": 1500
+      },
+      "security": {
+        "mean_bps": 5800,
+        "sd_bps": 1500
+      },
+      "conformity": {
+        "mean_bps": 5400,
+        "sd_bps": 1500
+      },
+      "hedonism": {
+        "mean_bps": 5000,
+        "sd_bps": 1500
+      },
+      "achievement": {
+        "mean_bps": 4600,
+        "sd_bps": 1500
+      },
+      "tradition": {
+        "mean_bps": 4200,
+        "sd_bps": 1500
+      },
+      "stimulation": {
+        "mean_bps": 3800,
+        "sd_bps": 1500
+      },
+      "power": {
+        "mean_bps": 3400,
+        "sd_bps": 1500
+      }
+    },
+    "industrial_action": {
+      "ballot_turnout_bps": 5000,
+      "ballot_pass_bps": 5000,
+      "notice_days": 7,
+      "paid_during_action": false
+    },
+    "world_price_process": {
+      "goods": {
+        "sd_bps": 150,
+        "persistence_bps": 9000
+      },
+      "inputs": {
+        "sd_bps": 400,
+        "persistence_bps": 9000
+      },
+      "materials": {
+        "sd_bps": 300,
+        "persistence_bps": 9000
+      }
+    },
+    "credit": {
+      "cash_rate_bps": 875,
+      "funding_spread_bps": 300,
+      "lending_rate_bps": {
+        "person": 1800,
+        "organisation": 1434
+      },
+      "serviceability_buffer_bps": 300,
+      "max_repayment_share_bps": {
+        "person": 6667,
+        "organisation": 2000
+      },
+      "arrears_days": 30,
+      "default_days": 90,
+      "max_months": 60,
+      "reserve": 150000000
+    },
+    "opening": {
+      "bank": 180000000,
+      "town": 720000000,
+      "builder": 100000000,
+      "landlord": 200000000,
+      "person_min_savings": 30000
+    },
+    "town_finance": {
+      "parks_per_year": 54000000,
+      "payment_approval_over": 20000000
+    },
+    "public_finance": {
+      "income_tax": {
+        "brackets": [
+          {
+            "from": 0,
+            "rate_bps": 0
+          },
+          {
+            "from": 28800000,
+            "rate_bps": 2500
+          },
+          {
+            "from": 38800000,
+            "rate_bps": 3000
+          },
+          {
+            "from": 600000000,
+            "rate_bps": 3250
+          },
+          {
+            "from": 960000000,
+            "rate_bps": 3500
+          }
+        ],
+        "levy_bps": 425,
+        "levy_from": 0
+      },
+      "grants_per_resident_per_year": 600000,
+      "rates_per_resident_per_year": 50000,
+      "rates_instalments": 4,
+      "rates_due_days": 30,
+      "rates_penalty_interest_bps": 1000,
+      "median_house_price": 500000000,
+      "rates_exempt_kinds": [
+        "health_service",
+        "school",
+        "utility",
+        "police"
+      ]
+    },
+    "services": {
+      "waste_per_person_per_day_g": 400,
+      "landfill_levy_per_tonne": 0,
+      "council_staff_per_1000": 6,
+      "collect_seconds_per_10kg": 12,
+      "asset_life_years": 15,
+      "upkeep_hours_per_week_per_asset": 4,
+      "complain_bps": 3000
+    },
+    "unions": {
+      "membership_bps": {
+        "manufacturing": 2000,
+        "retail": 800,
+        "construction": 500,
+        "public_administration": 4500,
+        "other": 1500
+      },
+      "dues_per_month": 30000,
+      "resignation_notice_days": 30,
+      "claim_margin_bps": 200,
+      "meeting_every_days": 30,
+      "teaching": "Together, workers win better pay and conditions than each alone."
+    },
+    "groups": {
+      "kinds": [
+        {
+          "kind": "sport",
+          "name": "football club",
+          "every_days": 7,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "religious",
+          "name": "church",
+          "every_days": 7,
+          "lasts_minutes": 150,
+          "teaching": "There is a God who made the world and cares how we live.",
+          "held_at_start_bps": 9369
+        },
+        {
+          "kind": "arts",
+          "name": "choir and drama group",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "hobby",
+          "name": "youth and farmers' group",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "interest",
+          "name": "chama (savings group)",
+          "every_days": 14,
+          "lasts_minutes": 120
+        }
+      ],
+      "per_kind_per_1000_people": 1,
+      "taking_part_bps": 5000,
+      "leave_notice_days": 0
+    },
+    "elections": {
+      "compulsory_voting": false,
+      "term_years": 5,
+      "method": "plurality",
+      "turnout_bps": 6540,
+      "stand_bps": 200,
+      "news_readers_bps": 3000
+    },
+    "health": {
+      "doctors_per_1000": 0.35,
+      "doctor_wage_per_pay_period": 9507692,
+      "consult_minutes": 30,
+      "seek_care_bps": 9000,
+      "treats": [
+        {
+          "kind": "illness",
+          "severity": "serious",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "illness",
+          "severity": "severe",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "minor",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "serious",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        }
+      ],
+      "off_work_severities": [
+        "serious",
+        "severe"
+      ]
+    },
+    "round": {
+      "work_start_hour": 8,
+      "work_end_hour": 17,
+      "work_days": 5,
+      "school_start_hour": 8,
+      "school_end_hour": 16,
+      "travel_seconds_per_cell": 18,
+      "travel_by_cover": {
+        "water": 120,
+        "wetland": 30,
+        "woodland": 25,
+        "scrub": 25
+      },
+      "roads": {
+        "seconds_per_cell": 3,
+        "within_cells": 3,
+        "budget_per_resident": 60000
+      }
+    },
+    "ownership": {
+      "house_owner_bps": 6250,
+      "mortgage_bps_by_age": [
+        {
+          "from": 18,
+          "bps": 300
+        },
+        {
+          "from": 45,
+          "bps": 500
+        },
+        {
+          "from": 65,
+          "bps": 100
+        }
+      ],
+      "mortgage_payment_per_month": 3500000,
+      "mortgage_rate_bps": 1300,
+      "mortgage_years_left": [
+        5,
+        20
+      ],
+      "market": {
+        "buy_bps_per_month": 50,
+        "deposit_bps": 1500,
+        "costs_bps": 600,
+        "mortgage_months": 240,
+        "relist_days": 30,
+        "cut_bps": 500,
+        "floor_bps": 8000
+      }
+    },
+    "utilities": {
+      "water": {
+        "litres_per_person_per_day": 50,
+        "price_per_kl": 9500,
+        "service_per_quarter": 90000,
+        "river_inflow_kl_per_cell_per_day": 1000,
+        "river_decay_bps_per_day": 1000,
+        "river_flow_bps_per_day": 5000
+      },
+      "energy": {
+        "kwh_per_household_per_day": 3,
+        "price_per_kwh": 2583,
+        "supply_per_day": 400,
+        "grid_price_per_kwh": 1500,
+        "grid_emissions_g_per_kwh": 100
+      }
+    },
+    "climate": {
+      "rain_by_month_bps": [
+        5252,
+        3796,
+        10262,
+        20007,
+        14487,
+        8032,
+        6580,
+        8632,
+        8266,
+        11227,
+        14195,
+        9266
+      ],
+      "storm_bps_per_month": 1000,
+      "storm_days": [
+        2,
+        4
+      ],
+      "storm_bps": 25000,
+      "drought_bps_per_year": 1000,
+      "drought_months": [
+        6,
+        24
+      ],
+      "drought_bps": 4000,
+      "summer_months": [
+        1,
+        2,
+        3
+      ],
+      "heatwave_bps_per_week": 0,
+      "heatwave_days": [
+        3,
+        5
+      ],
+      "heat_units": 10,
+      "built_heat_units": 12,
+      "heat_illness_bps_per_unit": 100,
+      "warning_lead_days": 2
+    },
+    "hazards": {
+      "river_bank_kl": 12000,
+      "spill_bps_per_day": 3000,
+      "flood_above_kl": 300,
+      "wetland_soak_kl_per_day": 500
+    },
+    "crime": {
+      "take_bps_per_month_in_need": 200,
+      "caught_bps_reckoned": 3000,
+      "take_quantity": 5,
+      "detection_bps": 2000,
+      "investigation_hours": 4,
+      "police_per_1000": 1.9,
+      "officer_wage_per_pay_period": 1352123
+    },
+    "justice": {
+      "hearing_after_days": 30,
+      "pay_within_days": 30,
+      "challenge_bps": 2000,
+      "apply_bps": 3000,
+      "apply_after_days": 30
+    },
+    "education": {
+      "school_ages": [
+        6,
+        17
+      ],
+      "students_per_teacher": 36.8,
+      "school_days_per_year": 195,
+      "hours_per_day": 7,
+      "teacher_wage_per_pay_period": 3125555,
+      "attainment": [
+        {
+          "label": "No level completed",
+          "share_bps": 1374,
+          "years": 4
+        },
+        {
+          "label": "Primary",
+          "share_bps": 4866,
+          "years": 8
+        },
+        {
+          "label": "Secondary",
+          "share_bps": 2742,
+          "years": 12
+        },
+        {
+          "label": "Middle-level college or technical training",
+          "share_bps": 700,
+          "years": 14
+        },
+        {
+          "label": "University",
+          "share_bps": 318,
+          "years": 16
+        }
+      ],
+      "return_per_year_bps": 1100,
+      "max_years": 20
+    },
+    "nature": {
+      "cell_m": 25,
+      "landscape": {
+        "margin_cells": 100,
+        "block_cells": 16,
+        "shares_bps": {
+          "woodland": 1500,
+          "scrub": 1000,
+          "grassland": 1500,
+          "farmland": 5500,
+          "wetland": 500
+        },
+        "woodland_patches": 2
+      },
+      "covers": [
+        {
+          "id": "woodland"
+        },
+        {
+          "id": "scrub",
+          "succeeds_to": {
+            "cover": "woodland",
+            "after_years": 40
+          }
+        },
+        {
+          "id": "grassland"
+        },
+        {
+          "id": "cleared",
+          "succeeds_to": {
+            "cover": "grassland",
+            "after_years": 1
+          }
+        },
+        {
+          "id": "farmland"
+        },
+        {
+          "id": "wetland"
+        },
+        {
+          "id": "riverbank"
+        }
+      ],
+      "default_cover": "grassland",
+      "cleared_cover": "cleared",
+      "river_cover": "riverbank",
+      "pollution": {
+        "decay_bps_per_day": 300,
+        "diffusion_bps_per_day": 800,
+        "flow_bps_per_day": 5000,
+        "per_factory_per_day": 40,
+        "per_farmland_cell_per_day": 1
+      },
+      "species": [
+        {
+          "id": "black-and-white-colobus",
+          "name": "black-and-white colobus",
+          "density_per_ha": {
+            "woodland": 0.6,
+            "riverbank": 0.4
+          },
+          "home_range_ha": 15,
+          "growth_bps_per_year": 1500,
+          "mortality_bps_per_year": 800,
+          "dispersal_bps_per_year": 500,
+          "dispersal_m": 100,
+          "barriers": [
+            "built",
+            "farmland",
+            "grassland"
+          ],
+          "min_viable": 4,
+          "detection_bps": 6000,
+          "listed": true
+        },
+        {
+          "id": "grey-crowned-crane",
+          "name": "grey crowned crane",
+          "density_per_ha": {
+            "wetland": 0.1,
+            "farmland": 0.01,
+            "grassland": 0.01
+          },
+          "home_range_ha": 40,
+          "growth_bps_per_year": 1500,
+          "mortality_bps_per_year": 1000,
+          "dispersal_bps_per_year": 2000,
+          "dispersal_m": 2000,
+          "min_viable": 2,
+          "tolerance": {
+            "pollution": {
+              "above": 400,
+              "mortality_bps_per_day": 20
+            }
+          },
+          "detection_bps": 8000,
+          "listed": true
+        },
+        {
+          "id": "hadada-ibis",
+          "name": "hadada ibis",
+          "density_per_ha": {
+            "grassland": 0.3,
+            "riverbank": 0.5,
+            "farmland": 0.15,
+            "wetland": 0.2
+          },
+          "home_range_ha": 5,
+          "growth_bps_per_year": 4000,
+          "mortality_bps_per_year": 2500,
+          "dispersal_bps_per_year": 1500,
+          "dispersal_m": 1000,
+          "min_viable": 1,
+          "detection_bps": 9000,
+          "conspicuous": true
+        }
+      ],
+      "survey_hours_per_ha": 1,
+      "survey_staff": 1,
+      "spin_up_years": 10
+    }
+  },
+  "sources": {
+    "currency": "[SECONDARY] Kenyan shillings, in cents: written \"KSh1,234.56\" (the sign KSh; informally a shilling is a 'bob'), or in words as shillings and cents. ISO 4217: KES, two decimal places (Central Bank of Kenya; to confirm the sign against its notes: KSh is the abbreviation in common official use).",
+    "households": "[PLACEHOLDER] adult_female_bps and child_male_bps are computed from KNBS, 2019 Kenya Population and Housing Census, Volume III, Table 2.3 (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-3-Distribution-of-Population-by-Age-and-Sex.pdf) (Nakuru County, males and females by age; adults 18+ taken as 20+ and three fifths of 15-19). Household types: [MIXED] anchored to KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 3.7: Nakuru households of 1-2 persons 35.0%, 3-4 persons 35.4%, 5-6 persons 22.2%, 7-8 persons 5.7%, 9-10 persons 1.3%, 11 or more 0.4%; and to KNBS, 2019 Census Analytical Report on Household and Family Dynamics (https://www.knbs.or.ke/wp-content/uploads/2024/05/KPHC-Census-Analytical-Report-on-Household-and-Family-Dynamics-Vol.XI_.pdf), national: average household size 3.8, 20.2% of households with one person, 28.5% nuclear, 38.2% headed by women; Nakuru County's average household size was 3.6 (Volume II, 616,046 households). lone_bps 20.2% is the national one-person share (the county's own was not extractable from that report, whose tables are images). couple_bps, group_bps, one_parent_bps, couple_children_bps, children_couple, children_one_parent, group_size and lone_parent_female_bps are estimates (placeholders) chosen so that 1-2 person households are about 35% and women head about 38%; same_sex_couple_bps is 0 (same-sex relations are criminalised: Penal Code s 162, and no count exists). mother_age_at_first_birth [17,25] is a range around the median age at first birth of 20.9 years in Nakuru, KDHS 2022 (DHS Program API, indicator FE_AAFB_W_M2B; 20.7 nationally). Extended-family households are common and cannot be expressed (see the gaps report).",
+    "households.age_bands_bps": "[OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume III, Table 2.3 (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-3-Distribution-of-Population-by-Age-and-Sex.pdf): Nakuru County, population by five-year age group and sex (total 2,162,107 with intersex excluded; male 1,077,272, female 1,084,835): 0-4 273,331; 5-9 267,494; 10-14 274,490; 15-19 235,458; 20-24 212,256; 25-29 180,817; 30-34 170,777; 35-39 130,178; 40-44 107,971; 45-49 88,232; 50-54 63,012; 55-59 50,698; 60-64 33,840; 65-69 26,554; 70-74 20,046; 75-79 11,635; 80-84 7,416; 85 and over 7,861 (85-89 4,297; 90-94 1,888; 95-99 1,120; 100+ 556), taken to 99. The county includes the city of Nakuru, so a small town is likely younger and more rural than these shares.",
+    "households.child_max_age": "[PLACEHOLDER] Placeholder: a child living with parents counts up to 24 (adult children stay at home longer in Kenya, with housing costs and school fees; no figure found).",
+    "life.qx_per_100000": "[OPENED] [OPENED] United Nations, Department of Economic and Social Affairs, World Population Prospects 2024, Abridged Life Table, medium variant, Kenya, 2023 (https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_Life_Table_Abridged_Medium_1950-2023.csv.gz), column qx, by sex. Age 0: qx for age 0 (male 3.30%, female 2.63%); ages 1-4: the published 4q1 spread as a constant annual hazard; each later five-year group likewise (annual q = 1 - (1 - 5qx)^(1/5)); age 100: from the 100+ group's death rate mx. Life expectancy at birth in this table: males 61.5, females 65.9, both sexes 63.6. This is the national life table, not Nakuru's.",
+    "life.illness": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile's placeholder (an age gradient of hospital-level illness); no Kenyan figure found. To replace with age-specific admission rates from KNBS, Kenya Household Health Expenditure and Utilisation Survey 2018.",
+    "life.injury": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile's placeholder; no Kenyan figure found (road traffic injuries, many on motorcycle taxis, are a large share in Kenya: NTSA).",
+    "life.birth": "[PLACEHOLDER] ages 15 to 49 and gestation of 266 days after conception (biology). female_bps 4926: 103 boys per 100 girls at birth (a standard sex ratio at birth; no Kenyan figure was opened: to confirm).",
+    "life.treatable": "[PLACEHOLDER] Placeholder: carried over from the other profile; no Kenyan figure found (treatable deaths are more common where care is scarce, 0.2 doctors per 1,000: to estimate from the Lancet Commission on quality of care or WHO amenable mortality).",
+    "life.found_alone_after": "[PLACEHOLDER] Placeholder: carried over from the other profile (Japan's counts of people who died alone at home). No Kenyan figure exists; in Kenya, with extended families and burial customs, a person living alone is found sooner as a rule. To replace.",
+    "life.work_injury_bps": "[PLACEHOLDER] Placeholder: carried over from the other profile; to source from Kenya's Directorate of Occupational Safety and Health Services (DOSHS) and KNBS, Economic Survey, work injuries.",
+    "fertility_per_10000": "[OPENED] [OPENED] KNBS and ICF, Kenya Demographic and Health Survey 2022, age-specific fertility rates for Nakuru County (births per 1,000 women a year), read from the DHS Program API (https://api.dhsprogram.com/rest/dhs/data?countryIds=KE&surveyIds=KE2022DHS&indicatorIds=FE_FRTR_W_A15,...&breakdown=subnational): 15-19 58; 20-24 195; 25-29 160; 30-34 120; 35-39 98; 40-44 33; 45-49 not published for the county, so the national 5 is used. Total fertility rate, Nakuru County 3.4; national 3.4 (age-specific 73, 179, 172, 137, 87, 35, 5). Per 10,000 women.",
+    "pay_period_days": "Added 2026-10-08 by the platform change that made this a profile figure; needs its author's check. 14 days, because this profile's wages are stated for fourteen days (where pay here is monthly, its author converted them: see wages_per_pay_period). To set to the place's own pay period, with the wages restated for it.",
+    "elections.compulsory_voting": "Added 2026-10-08 by the platform change that made this a profile figure; needs its author's check. Voting is voluntary in Kenya (Constitution of Kenya 2010, art. 38: a right; from knowledge, to confirm).",
+    "ordinary_hours_per_week": "[PLACEHOLDER] Regulation of Wages (General) Order, Kenya: ordinary working hours for day workers not exceeding 52 hours a week (the Employment Act 2007 allows more rest than the Order's limit; recalled, not opened: to confirm). Hours bound the wage's hourly rate.",
+    "wages_per_pay_period": "[OPENED] [OPENED] Regulation of Wages (General) (Amendment) Order, 2026, Legal Notice 95 of 2026, Kenya Gazette Supplement 128 of 29 May 2026, in force from 1 May 2026 (https://new.kenyalaw.org/akn/ke/act/ln/2026/95/eng@2026-05-29/source), Schedule, column 4 'All other areas' (outside the cities of Nairobi, Mombasa, Kisumu, Nakuru and Eldoret, the former municipalities and the town councils of Mavoko, Ruiru and Limuru), basic minimum monthly wage excluding housing allowance: shop assistant (item 6) KSh 18,582.41; machine attendant, bakery worker (item 4; taken as the factory worker) KSh 15,427.97 (printed '15.427.97'); ungraded artisan (item 12; taken as construction) KSh 18,582.77. Converted from a month to a fortnight by 12/26 (the world pays fortnightly; see the gaps report). These are legal minimums, not the wages actually paid; actual small-town pay is not recorded in an opened source. For comparison, national average annual earnings per employee in the private sector in 2025: manufacturing KSh 874,301, construction KSh 907,956, wholesale and retail trade KSh 1,134,834; overall KSh 988.2 thousand (KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Table 3.7), means of formal wage jobs that are skewed by Nairobi and the largest firms; they are not used. Correction to the first pass: 16,591.44, taken from a press summary, was not the schedule's figure.",
+    "rents_per_month": "[PLACEHOLDER] [MIXED] apartment_units are [OPENED] KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 4.1 'Average Rent by County, Dwelling Type and Number of Bedrooms, Urban', Nakuru, flats/apartments: one bedroom KSh 6,000; two bedrooms KSh 13,000; three bedrooms KSh 14,000 a month (the table lists the average urban rent of the county, which includes the city of Nakuru; a small town may be lower). house_types: the 3-bedroom house is the 3-bedroom townhouse of the same table, KSh 30,000 (2-bedroom townhouse KSh 10,000; compound house not sharing facilities, 2 bedrooms, KSh 12,500); the 4-bedroom house, KSh 37,500, is a placeholder (25% above the 3-bedroom). The national Consumer Price Index average price of a bed-sitter, KSh 7,690 a month (KNBS, Consumer Price Indices and Inflation Rates, September 2026, https://www.knbs.or.ke/wp-content/uploads/2026/09/Kenya-Consumer-Price-Indices-and-Inflation-Rates-September-2026.pdf), is context.",
+    "spending.saving_bps": "[PLACEHOLDER] Placeholder: household saving, 5%. Kenya's gross national savings were about 14% of GDP (National Treasury; to confirm), mostly by firms and government; households in rural Kenya save little. To source from KNBS, Kenya National Accounts.",
+    "spending.wealth_effect_bps_per_year": "[PLACEHOLDER] Placeholder: carried over from the other profile (a model parameter).",
+    "spending.shops_known": "[PLACEHOLDER] Placeholder: carried over from the other profile.",
+    "spending.shop_search_bps_per_month": "[PLACEHOLDER] Placeholder: carried over from the other profile.",
+    "spending.essentials_per_month": "[PLACEHOLDER] [PLACEHOLDER] KSh 6,000 a person a month, scaled from the official rural poverty line of KSh 3,252 a month per adult equivalent in 2015/16 (food line KSh 1,954; KNBS, Basic Report on Well-Being in Kenya, KIHBS 2015/16, as quoted in a search result, not opened) by consumer price rises since (the CPI base is February 2019; rough). KNBS's 2025/26 KIHBS was in the field until July 2026 and is not yet published; the 2023/24 Housing Survey gives renters' rent as a share of expenditure (Nakuru 33.3%: urban 34.6%, rural 24.5%, Table 4.2), used as a target.",
+    "retirement_age": "[PLACEHOLDER] Placeholder, and a compromise: the public service retires at 60 (Public Service Commission), but most workers in Kenya (informal work, farming) carry on until they can't, and the old-age transfer (Inua Jamii) starts at 70, so here retirement is at 70, the age the transfer is paid. See the gaps report.",
+    "savings_by_age": "[PLACEHOLDER] Placeholders shaped by KNBS and CBK, FinAccess Household Survey 2021 and 2024 (most adults hold small balances in M-Pesa, a Sacco or a group; the report was not opened: to confirm): an adult's cash and deposits (mobile money, bank, Sacco, chama), percentiles 10, 25, 50, 75 and 90 by age. Median about KSh 5,000 at 25-34.",
+    "retiree_savings": "[PLACEHOLDER] Placeholder: KSh 30,000 to 150,000 at retirement (NSSF lump sums and a few years' savings; no figure found).",
+    "support.pension": "[SECONDARY] [SECONDARY, consistent with opened] Inua Jamii Senior Citizens Scheme (Older Persons Cash Transfer): KSh 2,000 a month to people aged 70 and over not on another pension (State Department for Social Protection; the rate and age come from press reports of the October 2025 disbursement; the department's site was opened but states no amount). KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Tables 18.12-18.13 and para 18.19: the OPCT allocation expected to rise 29.8% to KSh 30.1 billion in 2025/26 for about 1.3 million beneficiaries, about KSh 23,000 a person a year, KSh 1,930 a month, consistent with the KSh 2,000 rate. Eligibility by age 70 only.",
+    "support.unemployment": "[PLACEHOLDER] Kenya has no unemployment benefit. This entry is a gap: the structure requires a payment, so it is set to zero cents (a payment of nothing, from age 18). If the world rejects a zero payment, the generator needs an optional payment (see the gaps report). Closest real things: the Inua Jamii cash transfers for orphans and vulnerable children and for persons with severe disabilities (KSh 2,000 a month), which are not for the unemployed; NSSF has no unemployment cover.",
+    "firm_ownership.forms_bps": "[PLACEHOLDER] Placeholders: most Kenyan shops and landlords are sole proprietorships and family businesses (KNBS, 2016 Micro, Small and Medium Establishments Basic Report: 1.56 million licensed MSMEs, plus 5.0 million unlicensed; recalled, to confirm), so shops and landlords are 95% closely held; a small-town factory is more often a branch or an outsider's (maize milling, dairy, a tea or flour company) or a family firm.",
+    "firm_ownership.closely_held": "[PLACEHOLDER] Placeholder: carried over from the other profile (a household owns most closely held firms; the weights by wealth).",
+    "firm_ownership.widely_held": "[PLACEHOLDER] Placeholder: 50% of a widely held firm (a company listed on the Nairobi Securities Exchange) is from outside the town; foreign investors held about 40% of the exchange's market value in some years (Nairobi Securities Exchange; to confirm).",
+    "firm_ownership.direct_holders": "[PLACEHOLDER] Placeholder: very few Kenyans hold shares directly (about 1.5 million Central Depository accounts, CDSC, for about 30 million adults; recalled, to confirm), so the shares of the wealth fifths are far below the other profile's.",
+    "retirement_fund": "[PLACEHOLDER] [PLACEHOLDER], after the National Social Security Fund (NSSF Act 2013: contributions of 6% by the worker and 6% by the employer up to an earnings limit; pension access at 60, early at 50; not opened). member_bps 24%: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf): pension scheme membership rose to 8.0 million in 2025 (NSSF contributions KSh 84.0 billion, pension schemes KSh 285.4 billion), over about 33 million people aged 15 and over (population 53.3 million, same survey, times the 62% aged 15 and over in Nakuru in the census); the survey does not say whether the 8.0 million includes NSSF, so this is rough. The other figures are estimates. The fund here pays a pension; NSSF mostly pays lump sums (see the gaps report).",
+    "industry": "[PLACEHOLDER] [PLACEHOLDER] The KNBS Gross County Product 2024 report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2024-Gross-County-Product.pdf) was opened (Nakuru is the fourth largest county economy; GCP KSh 785,747 million in 2023, current prices) but gives value added by county and sector, not the labour and input shares of output a firm needs; factory_labour_share_bps 20% and factory_input_share_bps 67% are carried over from the other profile (its source was ABS Input-Output Tables); retail purchases 78% and labour 10% are estimates for a small town where retail margins run near 20%. KNBS Supply and Use Tables would give Kenyan shares (not found).",
+    "prices": "[PLACEHOLDER] [PLACEHOLDER] an item of goods worth KSh 500 at world prices (the unit the town counts in); imports 15% dearer. For scale, KNBS, Consumer Price Indices and Inflation Rates, September 2026, national average retail prices: sifted maize flour 2 kg KSh 152.00; sugar 1 kg KSh 165.79; beans 1 kg KSh 182.76; cooking oil 1 litre KSh 359.36; tomatoes 1 kg KSh 106.44; fresh cow milk 1 litre KSh 77.54; charcoal 1 kg KSh 99.52; petrol 1 litre KSh 214.95. inputs_per_kg KSh 50 (the order of maize grain at the farm gate; not found in the CPI release) and materials_per_kg KSh 6 (cement is about KSh 14 a kg; blocks and sand cost less; no source opened) are placeholders.",
+    "tenancy": "[PLACEHOLDER] Placeholders: most tenancies in Kenyan small towns are month to month and often unwritten; rent is reviewed rarely or yearly; a landlord needs to give a month's notice of rent increase or ending (the Rent Restriction Act, Cap 296, for low-rent dwellings, and the Distress for Rent Act, Cap 293; the Landlord and Tenant (Shops, Hotels and Catering Establishments) Act, Cap 301, for business premises; the acts were not opened: to confirm).",
+    "values": "[PLACEHOLDER] Placeholder: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations ('Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500; carried over unchanged from the other profile. To source for this place: the World Values Survey / Afrobarometer Schwartz-style items for Kenya.",
+    "industrial_action": "[PLACEHOLDER] Labour Relations Act 2007 (Kenya), s 76: a strike or lock-out is lawful after a dispute has been reported and conciliated and after at least seven days' written notice (taken as 7 days); the Act does not set a ballot quorum, so 50% turnout and 50% approval are placeholders carried over; the Act does not require pay during a strike (the Employment Act 2007, s 80: wages are not paid during a lawful strike unless agreed; recalled, to confirm). The Act was not opened.",
+    "world_price_process": "[PLACEHOLDER] Placeholder: carried over from the other profile. To estimate from KNBS, Consumer Price Index (food and commodity series) or the world prices Kenya pays (the sd in this profile is not a place figure).",
+    "credit.cash_rate_bps": "[SECONDARY] Central Bank of Kenya, Central Bank Rate: 8.75% (cut by 25 points from 9.00% in February 2026, held on 8 April, 9 June and 11 August 2026; khusoko.com reports of Monetary Policy Committee decisions, which cite the CBK; CBK, 36th MPC Report, April 2026).",
+    "credit.funding_spread_bps": "[PLACEHOLDER] Placeholder: 3%, the bank's cost of deposits over the policy rate (no figure found; CBK, Monthly Economic Indicators, interest rates).",
+    "credit.lending_rate_bps": "[PLACEHOLDER] organisation: [OPENED] Central Bank of Kenya, Commercial Banks Weighted Average Rates (https://www.centralbank.go.ke/rates/commercial-banks-weighted-average-rates/): August 2026 lending 14.34% (deposit 6.91%, savings 3.54%, overdraft 12.5%; July 14.39, June 14.38, May 14.5, April 14.69, March 14.7). person: [PLACEHOLDER] 18%, above the average, for unsecured personal loans (no figure opened; digital lenders charge far more).",
+    "credit.serviceability_buffer_bps": "[PLACEHOLDER] Placeholder: carried over from the other profile (a lender's stress buffer).",
+    "credit.max_repayment_share_bps": "[PLACEHOLDER] person: 66.67%, the legal ceiling: Employment Act 2007, s 19(3), allows deductions from an employee's wages only so far as the employee is left at least a third of the wages (recalled, the Act was not opened: to confirm); lenders to employees in Kenya (banks, Saccos) use it as the 'two-thirds rule'. organisation: 20% of what comes in, a placeholder carried over.",
+    "credit.arrears_days": "[PLACEHOLDER] Placeholder: 30 days in arrears is the bank's own definition here; the CBK's Prudential Guidelines classify a loan as 'substandard' after 90 days (to confirm).",
+    "credit.default_days": "[PLACEHOLDER] Placeholder: default after 90 days (CBK Prudential Guidelines, loan classification; recalled, to confirm).",
+    "credit.max_months": "[PLACEHOLDER] Placeholder: carried over from the other profile (a model parameter).",
+    "credit.reserve": "[PLACEHOLDER] Placeholder: KSh 1.5 million the lending office keeps back, scaled from the other profile by the ratio of the two countries' shop wages (about 3.6); no real figure.",
+    "opening": "[PLACEHOLDER] Placeholders, to source: what each organisation holds on the first day (the bank's own funds KSh 1.8 million; the town KSh 7.2 million; the builder KSh 1 million; each landlord KSh 2 million; a shop KSh 100,000; a factory KSh 1.4 million) and the least an adult in the labour force has saved (KSh 300), the other profile's figures scaled by the ratio of the two countries' shop wages in local units (about 3.6), and the shop and factory figures scaled by the wage bill. No Kenyan source.",
+    "town_finance.parks_per_year": "[PLACEHOLDER] Placeholder: KSh 540,000 a year (scaled from the other profile's by the same ratio of 3.6; no source).",
+    "town_finance.payment_approval_over": "[PLACEHOLDER] Placeholder: KSh 200,000 (a county's public procurement thresholds are far higher; the Public Procurement and Asset Disposal Act 2015 sets them; to source).",
+    "public_finance.income_tax": "[PLACEHOLDER] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible.",
+    "public_finance.grants_per_resident_per_year": "[PLACEHOLDER] Placeholder: about KSh 6,000 a resident a year, the order of a county's equitable share (Controller of Budget; County Allocation of Revenue Act 2025, Nakuru County, not opened: to confirm and to replace with equitable share over the county's population, 2,162,202 in 2019).",
+    "public_finance.rates_per_resident_per_year": "[PLACEHOLDER] Placeholder: KSh 500 a resident a year, a small part of a county's own-source revenue (Nakuru County Finance Act and Rating Act 2019: land rates, plot rents; the Controller of Budget's County Budget Implementation Review Report gives own-source revenue by county; not opened).",
+    "public_finance.rates_instalments": "[PLACEHOLDER] Placeholder: 4 a year.",
+    "public_finance.rates_due_days": "[PLACEHOLDER] Placeholder: an instalment falls due 30 days after its notice.",
+    "public_finance.rates_penalty_interest_bps": "[PLACEHOLDER] Placeholder: carried over from the other profile (10% a year on arrears).",
+    "public_finance.median_house_price": "[PLACEHOLDER] Placeholder: KSh 5 million for a three-bedroom house in a small town; no survey found (the CBK, Kenya Residential Property Price Index, and the Hass Property Index give Nakuru prices; not opened).",
+    "public_finance.rates_exempt_kinds": "[PLACEHOLDER] Land owned by schools, health services, utilities and police is not rateable (the Rating Act 2019 exempts public institutions' land: recalled, to confirm).",
+    "services.waste_per_person_per_day_g": "[PLACEHOLDER] [PLACEHOLDER] 400 g a person a day in a small town (urban Kenya generates 0.3 to 0.6 kg: NEMA, National Solid Waste Management Strategy 2015; not opened).",
+    "services.landfill_levy_per_tonne": "[PLACEHOLDER] Kenya has no landfill levy (NEMA / Sustainable Waste Management Act 2022 has producer responsibility but no per-tonne levy; recalled, to confirm). Set to 0.",
+    "services.council_staff_per_1000": "[PLACEHOLDER] Placeholder: carried over from the other profile (6 per 1,000); Kenyan counties employ more per head on average in towns than rural (Controller of Budget; to source).",
+    "services.collect_seconds_per_10kg": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile (a model parameter).",
+    "services.asset_life_years": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile (a model parameter).",
+    "services.upkeep_hours_per_week_per_asset": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile (a model parameter).",
+    "services.complain_bps": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile (a model parameter).",
+    "unions.membership_bps": "[PLACEHOLDER] Placeholders, shaped by: Danish Trade Union Development Agency, Kenya Labour Market Profile 2024 (union density of total employment 15% in 2018; collective bargaining agreements covered 14% of wage employees in 2021, mainly education), and COTU-K's claim of 2.5 million members in 43 affiliated unions against about 3.3 million formal wage jobs (KNBS, Economic Survey 2026); the figures are not consistent with each other (to confirm). Public administration and teaching (KNUT, KUPPET) are the most unionised; manufacturing and retail far less. Keyed by the industries employers' postings name.",
+    "unions.dues_per_month": "[PLACEHOLDER] Placeholder: KSh 300 a month (union dues in Kenya are a fixed sum or a percentage, 'agency fees' of 2% of basic pay for non-members in some CBAs; no figure found).",
+    "unions.resignation_notice_days": "[PLACEHOLDER] Labour Relations Act 2007, s 48: a member may resign on a month's written notice (recalled, the Act was not opened: to confirm); taken as 30 days.",
+    "unions.claim_margin_bps": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile.",
+    "unions.meeting_every_days": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile.",
+    "unions.teaching": "[PLACEHOLDER] Placeholder: carried over unchanged from the other profile.",
+    "groups.kinds": "[MIXED] The kinds of social group the other profile counts, with Kenyan forms: a football club, a church, a choir and drama group, a youth and farmers' group, and a chama (a rotating savings and credit group). [PLACEHOLDER] how often each meets and for how long. held_at_start_bps 9,369: [OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume IV (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-4-Distribution-of-Population-by-Socio-Economic-Characteristics.pdf), Table 2.30, Nakuru County, population 2,142,667: Catholic 349,527; Protestant 703,881; Evangelical churches 647,780; African instituted churches 154,007; Orthodox 12,182; other Christian 140,000: 2,007,377 Christians (93.7%); Islam 25,479; no religion 67,640. Whether people come is theirs: participation is a calibration target, not a rate given to anyone.",
+    "groups.taking_part_bps": "[PLACEHOLDER] Placeholder: 50% (no Kenyan survey of group participation was found; chamas, churches and Saccos are widespread: FinAccess).",
+    "groups.per_kind_per_1000_people": "[PLACEHOLDER] Placeholder: carried over from the other profile (1 group of each kind per 1,000 people).",
+    "groups.leave_notice_days": "[PLACEHOLDER] Placeholder: a person may leave at once.",
+    "elections": "[SECONDARY] Constitution of Kenya 2010, Articles 101 and 177 (not opened here): general elections every five years, first past the post. Turnout 65.4% of 22.1 million registered voters at the 2022 general election [SECONDARY]: IEBC chairperson's declaration, reported by Nation and Mwananchi (64.77% on the final count). stand_bps and news_readers_bps are placeholders. The town elects its mayor (a liberty).",
+    "health": "[PLACEHOLDER] The clinic stands for the town's health system (a sub-county hospital and dispensaries; a liberty). doctors_per_1000 0.35: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), summary table: 18,561 licensed doctors and dentists in 2025 over a population of 53.3 million (same table); licensed, not practising (the Kenya Medical Practitioners and Dentists Council reports about 11,751 locally registered doctors practising: reported in the press, not opened), so this overstates; a town of 1,000 has a third of a doctor, so the generator will round to the clinic's minimum. doctor_wage_per_pay_period: [SECONDARY] a medical officer in a lower-level public facility earns about KSh 206,000 a month (Salaries and Remuneration Commission pay as reported by The Kenya Times, 2026; not opened), converted by 12/26. consult_minutes, seek_care_bps, treats and off_work_severities: placeholders carried over (docs/behaviour/life.md).",
+    "round": "[PLACEHOLDER] Working hours 8 to 5, Monday to Friday, for everyone (a liberty: many work Saturday mornings and shops open Sunday; the Employment Act's rest day and the Regulation of Wages Order's 52-hour week); school 8 to 4 (Ministry of Education, primary and secondary day schools, about 8:00 to 15:30 or 16:00; recalled, to confirm). Travel: off the roads a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997; to confirm; most people in a Kenyan small town walk or use motorcycle taxis, boda boda); roads: 3 seconds a cell (about 30 km/h, the speed of a boda boda in town; placeholder); slower across water, wetland and bush (placeholders); the town builds toward buildings more than three cells from a road, within a roads budget of KSh 600 a resident a year (placeholder; the Controller of Budget's county development expenditure on roads, to source).",
+    "ownership": "[PLACEHOLDER] house_owner_bps 62.5%: [OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume IV (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-4-Distribution-of-Population-by-Socio-Economic-Characteristics.pdf), Table 2.10, Njoro sub-county (a small-town and farming area of Nakuru County): of 61,156 conventional households, 38,198 (62.5%) own their dwelling and 22,949 (37.5%) rent or are provided it; Nakuru County overall 46.0%; the 2023/24 Housing Survey (Table 3.6) has Nakuru owner-occupied 51.6% (rural 83.7%, urban 25.3%). Flats here are all rented. [PLACEHOLDER] everything else: mortgages are rare in Kenya (about 30,000 mortgage loans, Kenya Mortgage Refinance Company; recalled, not opened), so mortgage_bps_by_age is 1 to 5%; mortgage_payment_per_month KSh 35,000 for a loan of about KSh 3 million over 20 years at 13%; mortgage_rate 13% (CBK reports mortgage rates near 13 to 14%; not opened); deposit 15%, costs 6% of the price, a term of 20 years.",
+    "utilities": "[PLACEHOLDER] Water: price_per_kl [OPENED] WASREB, approved tariff structure for NAWASSCO (Nakuru Water and Sanitation Services Company), 2024/25 to 2029/30 (https://wasreb.go.ke/wp-content/uploads/2025/08/Nakuru.pdf): domestic/residential KSh 95 a cubic metre for 1 to 6 m3, 123 for 7 to 20, 135 for 21 to 50 (the lifeline block is taken); sewerage without a water connection KSh 300 a month per dwelling unit. [PLACEHOLDER] litres_per_person_per_day 50 (WASREB's Impact Report gives small towns' consumption in the tens of litres; not opened), service_per_quarter KSh 900, and the river's inflow, flow and losses. Energy: price_per_kwh [OPENED, derived] KNBS, Consumer Price Indices and Inflation Rates, September 2026, average retail prices: electricity 50 kWh KSh 1,258.21 (KSh 25.16 a kWh) and 200 kWh KSh 5,533.76 (KSh 27.67 a kWh), all in with levies and VAT; interpolated linearly to the 90 kWh a month a household of 3 kWh a day uses: KSh 25.83. [PLACEHOLDER] kwh_per_household_per_day 3; supply_per_day KSh 4; grid_price_per_kwh KSh 15; grid_emissions_g_per_kwh 100 (about 85% of Kenya's power is geothermal, hydro and wind: Ember, KenGen; not opened). Cooking is mostly with charcoal (KSh 99.52 a kg in September 2026, same CPI release), firewood and gas (13 kg KSh 3,419), not modelled.",
+    "climate": "[PLACEHOLDER] Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: [OPENED, reanalysis] NASA POWER (Prediction Of Worldwide Energy Resources) climatology API (https://power.larc.nasa.gov/api/temporal/climatology/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN&community=AG&longitude=35.94&latitude=-0.33), bias-corrected precipitation PRECTOTCORR at Njoro, 1991-2020 monthly mean mm a day: Jan 1.74, Feb 1.38, Mar 3.40, Apr 6.85, May 4.80, Jun 2.75, Jul 2.18, Aug 2.86, Sep 2.83, Oct 3.72, Nov 4.86, Dec 3.07 (annual 3.37, about 1,230 mm); times days in the month and scaled to the year's mean month: a gridded satellite and reanalysis product at about 50 km, not a rain-gauge station (the Kenya Meteorological Department's station normals and the World Bank Climate Knowledge Portal API could not be opened: the portal returned 403). Mean temperature there 14 to 17 C, mean daily maximum 25 to 30 C, mean daily minimum 4 to 8 C (same dataset): no heatwaves of the kind the structure models, so heatwave_bps_per_week is 0, and a cold season (nights near 4 C in January, July) is not expressible. [PLACEHOLDER] storm_*, drought_*, heat_units and the warning lead (the April-May 2024 floods and the 2020-2023 drought are real events; the frequencies are estimates), summer_months (the warmest months, January to March).",
+    "hazards": "[PLACEHOLDER] Placeholders carried over from the other profile (the river's banks and spill, how deep before a building floods, wetland's soaking). Flood hazard in Nakuru County is real (the 2024 floods; Njoro and the Lake Nakuru and Baringo basins flood; the County Fact Sheets give the hazard map; not opened) but the figures here are not a Kenyan river's.",
+    "crime": "[PLACEHOLDER] Crime (world-expansion 7.2), deliberately rare and driven by circumstance only. police_per_1000 1.9: [OPENED] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), chapter 17: the ratio of police to population was 1:525 in 2025 (1:504 in 2024); 101,650 National Police Service officers. Context, not used: Nakuru Command recorded 4,719 crimes reported to police in 2025 (4,664 in 2024; 5,072 in 2023), Table 17.2, about 2.2 a thousand residents. officer_wage_per_pay_period: [SECONDARY] new police constables start at KSh 29,296 a month from July 2026 (National Police Service Commission pay rise, reported by The Star and AllAfrica, March 2026; not opened), converted by 12/26. take_bps_per_month_in_need, caught_bps_reckoned, take_quantity, investigation_hours and detection_bps: placeholders carried over (the National Police Service annual crime report was not found; KNBS reports offences reported, not cleared).",
+    "justice": "[PLACEHOLDER] The tribunal stands for the Small Claims Court (Small Claims Court Act 2016) and the magistrates' and rent tribunals. [SECONDARY] The Judiciary's published median of 53 days to hear and conclude cases in the Small Claims Courts (to May 2023, reported on judiciary.go.ke and in the press; the State of the Judiciary and Administration of Justice reports were not found as downloadable files in this pass) and the 60-day limit for judgment; hearing_after_days 30 is a placeholder; challenge_bps, apply_bps, apply_after_days and pay_within_days are placeholders carried over.",
+    "education": "[PLACEHOLDER] school_ages: 6 to 17 (Basic Education Act 2013; Competency-Based Curriculum; Ministry of Education; recalled, not opened: to confirm). students_per_teacher 36.8: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Tables 15.4(a), 15.8, 15.7 and 15.11: enrolment in 2025 in primary and junior school 11,935.7 thousand and in secondary school 3,338.8 thousand (all schools, public and private), over public primary teachers 215,691, junior school teachers 68,325 and public secondary teachers 131,501 (TSC); the enrolment includes private schools, so the ratio is an upper bound. school_days_per_year about 195 (three terms of about 13 weeks: Ministry of Education school calendar 2026; recalled, not opened) and hours_per_day 7 (8 to 4 with breaks): placeholders. teacher_wage_per_pay_period: [OPENED] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Table 3.7: average annual earnings per employee of the Teachers Service Commission, 2025, KSh 812,644.2 (public sector), a month's twelfth, converted by 12/26. attainment: [OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume IV (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-4-Distribution-of-Population-by-Socio-Economic-Characteristics.pdf), Table 2.5, Nakuru County, population aged 3 and above by highest level of education completed (total 1,817,950): none or pre-primary or adult basic or Madrasa or not stated 249,729 (13.7%); primary 884,543 (48.7%); secondary 498,450 (27.4%); middle-level college or TVET 127,430 (7.0%); university 57,798 (3.2%). The base includes children under 15; the years of schooling given to each level (4, 8, 12, 14, 16) are placeholders. return_per_year_bps 11%: placeholder after Psacharopoulos and Patrinos (2018), not opened.",
+    "nature": "[PLACEHOLDER] Nature (docs/design/world-expansion.md 2). cell_m: a 25 m lot. Landscape around a Rift Valley highland town: mostly farmland (maize, wheat, dairy and horticulture), with eucalyptus and indigenous forest remnants of the Mau, scrub, grazing land and wetlands (placeholders, shaped by Nakuru County land use; the County Integrated Development Plan has the proportions, not opened). The covers' succession, the pollution figures, survey_hours_per_ha and survey_staff are placeholders carried over from the other profile; spin_up_years: nature is run alone this long before the start so it begins in its own balance.",
+    "nature.species": "[PLACEHOLDER] Real species of the region; the demographic and detection figures are placeholders except where stated. Black-and-white colobus (Colobus guereza matschiei, the Mau Forest guereza; protected; common in forest fragments, 'sometimes at high density' in small disturbed patches: Primate Conservation 29 (2015), 'Distribution and conservation status of the Mount Kilimanjaro guereza colobus'; densities from 20 to over 90 per km2 in other sites, e.g. 94.4 per km2 in Wof-Washa, Ethiopia; here 0.6 per ha, 60 per km2, a placeholder; troops of about eight use 15 ha, a placeholder). Barriers: built and farmland and grassland (an arboreal animal). Grey crowned crane (Balearica regulorum; IUCN Endangered; Kenya's population fell from about 37,000 in 1987 to under 10,000 by 2024: Citizen Digital, Standard Media, the National Museums of Kenya; crude densities of 0.13 to 0.14 per km2 around Nairobi in a 2023-24 study, i.e. 0.0013 per ha; Lake Nakuru and Nakuru County hold some of the largest numbers); wetlands for roosting and breeding, foraging on farmland and grassland: here 0.1 a hectare on wetland and 0.01 on farmland and grassland, home range 40 ha, placeholders; sensitive to wetland pollution, drainage and poisoning. Hadada ibis (Bostrychia hagedash), a common and conspicuous control, densities by cover placeholders. Growth, mortality, dispersal, min_viable and detection: placeholders. Rothschild's giraffe (89 counted in Lake Nakuru National Park in 2011-12: PMC5751992) was considered but is a park animal, not a town's edge.",
+    "nature.landscape": "[PLACEHOLDER] Placeholders; see nature.",
+    "nature.pollution": "[PLACEHOLDER] Placeholder: carried over from the other profile (a model parameter).",
+    "nature.covers": "[PLACEHOLDER] Placeholder: carried over from the other profile (cleared land to grassland in a year; scrub to woodland in about 40 years; in a highland climate, regrowth is quicker: to source).",
+    "nature.survey_hours_per_ha": "[PLACEHOLDER] Placeholder: carried over.",
+    "nature.survey_staff": "[PLACEHOLDER] Placeholder: carried over.",
+    "nature.spin_up_years": "[PLACEHOLDER] Nature is run alone this long before the start, so it begins in its own balance (as ecological and climate models spin up).",
+    "nature.cell_m": "[PLACEHOLDER] Placeholder: carried over (a model parameter).",
+    "nature.default_cover": "[PLACEHOLDER] Placeholder: carried over (a model parameter).",
+    "nature.cleared_cover": "[PLACEHOLDER] Placeholder: carried over (a model parameter).",
+    "nature.river_cover": "[PLACEHOLDER] Placeholder: carried over (a model parameter).",
+    "labour_force_participation_bps": "[PLACEHOLDER] Placeholder: 70% of adults aged 18 to the retirement age (here 70) are in the labour force, from 67.4% of those 15 and over in 2025 (ILO modelled estimate via Trading Economics; KNBS Quarterly Labour Force Report not opened: to confirm). 'In the labour force' here includes farming and informal work, which the world cannot place (see the gaps report).",
+    "rents_per_month.apartment_units": "[OPENED] [MIXED] apartment_units are [OPENED] KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 4.1 'Average Rent by County, Dwelling Type and Number of Bedrooms, Urban', Nakuru, flats/apartments: one bedroom KSh 6,000; two bedrooms KSh 13,000; three bedrooms KSh 14,000 a month (the table lists the average urban rent of the county, which includes the city of Nakuru; a small town may be lower). house_types: the 3-bedroom house is the 3-bedroom townhouse of the same table, KSh 30,000 (2-bedroom townhouse KSh 10,000; compound house not sharing facilities, 2 bedrooms, KSh 12,500); the 4-bedroom house, KSh 37,500, is a placeholder (25% above the 3-bedroom). The national Consumer Price Index average price of a bed-sitter, KSh 7,690 a month (KNBS, Consumer Price Indices and Inflation Rates, September 2026, https://www.knbs.or.ke/wp-content/uploads/2026/09/Kenya-Consumer-Price-Indices-and-Inflation-Rates-September-2026.pdf), is context.",
+    "rents_per_month.house_types": "[MIXED] [MIXED] apartment_units are [OPENED] KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 4.1 'Average Rent by County, Dwelling Type and Number of Bedrooms, Urban', Nakuru, flats/apartments: one bedroom KSh 6,000; two bedrooms KSh 13,000; three bedrooms KSh 14,000 a month (the table lists the average urban rent of the county, which includes the city of Nakuru; a small town may be lower). house_types: the 3-bedroom house is the 3-bedroom townhouse of the same table, KSh 30,000 (2-bedroom townhouse KSh 10,000; compound house not sharing facilities, 2 bedrooms, KSh 12,500); the 4-bedroom house, KSh 37,500, is a placeholder (25% above the 3-bedroom). The national Consumer Price Index average price of a bed-sitter, KSh 7,690 a month (KNBS, Consumer Price Indices and Inflation Rates, September 2026, https://www.knbs.or.ke/wp-content/uploads/2026/09/Kenya-Consumer-Price-Indices-and-Inflation-Rates-September-2026.pdf), is context.",
+    "public_finance.income_tax.brackets": "[OPENED] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible.",
+    "public_finance.income_tax.levy_bps": "[SECONDARY] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible.",
+    "public_finance.income_tax.levy_from": "[SECONDARY] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible.",
+    "credit.lending_rate_bps.organisation": "[OPENED] organisation: [OPENED] Central Bank of Kenya, Commercial Banks Weighted Average Rates (https://www.centralbank.go.ke/rates/commercial-banks-weighted-average-rates/): August 2026 lending 14.34% (deposit 6.91%, savings 3.54%, overdraft 12.5%; July 14.39, June 14.38, May 14.5, April 14.69, March 14.7). person: [PLACEHOLDER] 18%, above the average, for unsecured personal loans (no figure opened; digital lenders charge far more).",
+    "credit.lending_rate_bps.person": "[PLACEHOLDER] organisation: [OPENED] Central Bank of Kenya, Commercial Banks Weighted Average Rates (https://www.centralbank.go.ke/rates/commercial-banks-weighted-average-rates/): August 2026 lending 14.34% (deposit 6.91%, savings 3.54%, overdraft 12.5%; July 14.39, June 14.38, May 14.5, April 14.69, March 14.7). person: [PLACEHOLDER] 18%, above the average, for unsecured personal loans (no figure opened; digital lenders charge far more).",
+    "education.teacher_wage_per_pay_period": "[OPENED] school_ages: 6 to 17 (Basic Education Act 2013; Competency-Based Curriculum; Ministry of Education; recalled, not opened: to confirm). students_per_teacher 36.8: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Tables 15.4(a), 15.8, 15.7 and 15.11: enrolment in 2025 in primary and junior school 11,935.7 thousand and in secondary school 3,338.8 thousand (all schools, public and private), over public primary teachers 215,691, junior school teachers 68,325 and public secondary teachers 131,501 (TSC); the enrolment includes private schools, so the ratio is an upper bound. school_days_per_year about 195 (three terms of about 13 weeks: Ministry of Education school calendar 2026; recalled, not opened) and hours_per_day 7 (8 to 4 with breaks): placeholders. teacher_wage_per_pay_period: [OPENED] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Table 3.7: average annual earnings per employee of the Teachers Service Commission, 2025, KSh 812,644.2 (public sector), a month's twelfth, converted by 12/26. attainment: [OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume IV (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-4-Distribution-of-Population-by-Socio-Economic-Characteristics.pdf), Table 2.5, Nakuru County, population aged 3 and above by highest level of education completed (total 1,817,950): none or pre-primary or adult basic or Madrasa or not stated 249,729 (13.7%); primary 884,543 (48.7%); secondary 498,450 (27.4%); middle-level college or TVET 127,430 (7.0%); university 57,798 (3.2%). The base includes children under 15; the years of schooling given to each level (4, 8, 12, 14, 16) are placeholders. return_per_year_bps 11%: placeholder after Psacharopoulos and Patrinos (2018), not opened.",
+    "education.students_per_teacher": "[OPENED] school_ages: 6 to 17 (Basic Education Act 2013; Competency-Based Curriculum; Ministry of Education; recalled, not opened: to confirm). students_per_teacher 36.8: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Tables 15.4(a), 15.8, 15.7 and 15.11: enrolment in 2025 in primary and junior school 11,935.7 thousand and in secondary school 3,338.8 thousand (all schools, public and private), over public primary teachers 215,691, junior school teachers 68,325 and public secondary teachers 131,501 (TSC); the enrolment includes private schools, so the ratio is an upper bound. school_days_per_year about 195 (three terms of about 13 weeks: Ministry of Education school calendar 2026; recalled, not opened) and hours_per_day 7 (8 to 4 with breaks): placeholders. teacher_wage_per_pay_period: [OPENED] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Table 3.7: average annual earnings per employee of the Teachers Service Commission, 2025, KSh 812,644.2 (public sector), a month's twelfth, converted by 12/26. attainment: [OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume IV (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-4-Distribution-of-Population-by-Socio-Economic-Characteristics.pdf), Table 2.5, Nakuru County, population aged 3 and above by highest level of education completed (total 1,817,950): none or pre-primary or adult basic or Madrasa or not stated 249,729 (13.7%); primary 884,543 (48.7%); secondary 498,450 (27.4%); middle-level college or TVET 127,430 (7.0%); university 57,798 (3.2%). The base includes children under 15; the years of schooling given to each level (4, 8, 12, 14, 16) are placeholders. return_per_year_bps 11%: placeholder after Psacharopoulos and Patrinos (2018), not opened.",
+    "education.attainment": "[OPENED] school_ages: 6 to 17 (Basic Education Act 2013; Competency-Based Curriculum; Ministry of Education; recalled, not opened: to confirm). students_per_teacher 36.8: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Tables 15.4(a), 15.8, 15.7 and 15.11: enrolment in 2025 in primary and junior school 11,935.7 thousand and in secondary school 3,338.8 thousand (all schools, public and private), over public primary teachers 215,691, junior school teachers 68,325 and public secondary teachers 131,501 (TSC); the enrolment includes private schools, so the ratio is an upper bound. school_days_per_year about 195 (three terms of about 13 weeks: Ministry of Education school calendar 2026; recalled, not opened) and hours_per_day 7 (8 to 4 with breaks): placeholders. teacher_wage_per_pay_period: [OPENED] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Table 3.7: average annual earnings per employee of the Teachers Service Commission, 2025, KSh 812,644.2 (public sector), a month's twelfth, converted by 12/26. attainment: [OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume IV (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-4-Distribution-of-Population-by-Socio-Economic-Characteristics.pdf), Table 2.5, Nakuru County, population aged 3 and above by highest level of education completed (total 1,817,950): none or pre-primary or adult basic or Madrasa or not stated 249,729 (13.7%); primary 884,543 (48.7%); secondary 498,450 (27.4%); middle-level college or TVET 127,430 (7.0%); university 57,798 (3.2%). The base includes children under 15; the years of schooling given to each level (4, 8, 12, 14, 16) are placeholders. return_per_year_bps 11%: placeholder after Psacharopoulos and Patrinos (2018), not opened.",
+    "health.doctors_per_1000": "[OPENED] The clinic stands for the town's health system (a sub-county hospital and dispensaries; a liberty). doctors_per_1000 0.35: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), summary table: 18,561 licensed doctors and dentists in 2025 over a population of 53.3 million (same table); licensed, not practising (the Kenya Medical Practitioners and Dentists Council reports about 11,751 locally registered doctors practising: reported in the press, not opened), so this overstates; a town of 1,000 has a third of a doctor, so the generator will round to the clinic's minimum. doctor_wage_per_pay_period: [SECONDARY] a medical officer in a lower-level public facility earns about KSh 206,000 a month (Salaries and Remuneration Commission pay as reported by The Kenya Times, 2026; not opened), converted by 12/26. consult_minutes, seek_care_bps, treats and off_work_severities: placeholders carried over (docs/behaviour/life.md).",
+    "health.doctor_wage_per_pay_period": "[SECONDARY] The clinic stands for the town's health system (a sub-county hospital and dispensaries; a liberty). doctors_per_1000 0.35: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), summary table: 18,561 licensed doctors and dentists in 2025 over a population of 53.3 million (same table); licensed, not practising (the Kenya Medical Practitioners and Dentists Council reports about 11,751 locally registered doctors practising: reported in the press, not opened), so this overstates; a town of 1,000 has a third of a doctor, so the generator will round to the clinic's minimum. doctor_wage_per_pay_period: [SECONDARY] a medical officer in a lower-level public facility earns about KSh 206,000 a month (Salaries and Remuneration Commission pay as reported by The Kenya Times, 2026; not opened), converted by 12/26. consult_minutes, seek_care_bps, treats and off_work_severities: placeholders carried over (docs/behaviour/life.md).",
+    "crime.police_per_1000": "[OPENED] Crime (world-expansion 7.2), deliberately rare and driven by circumstance only. police_per_1000 1.9: [OPENED] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), chapter 17: the ratio of police to population was 1:525 in 2025 (1:504 in 2024); 101,650 National Police Service officers. Context, not used: Nakuru Command recorded 4,719 crimes reported to police in 2025 (4,664 in 2024; 5,072 in 2023), Table 17.2, about 2.2 a thousand residents. officer_wage_per_pay_period: [SECONDARY] new police constables start at KSh 29,296 a month from July 2026 (National Police Service Commission pay rise, reported by The Star and AllAfrica, March 2026; not opened), converted by 12/26. take_bps_per_month_in_need, caught_bps_reckoned, take_quantity, investigation_hours and detection_bps: placeholders carried over (the National Police Service annual crime report was not found; KNBS reports offences reported, not cleared).",
+    "crime.officer_wage_per_pay_period": "[SECONDARY] Crime (world-expansion 7.2), deliberately rare and driven by circumstance only. police_per_1000 1.9: [OPENED] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), chapter 17: the ratio of police to population was 1:525 in 2025 (1:504 in 2024); 101,650 National Police Service officers. Context, not used: Nakuru Command recorded 4,719 crimes reported to police in 2025 (4,664 in 2024; 5,072 in 2023), Table 17.2, about 2.2 a thousand residents. officer_wage_per_pay_period: [SECONDARY] new police constables start at KSh 29,296 a month from July 2026 (National Police Service Commission pay rise, reported by The Star and AllAfrica, March 2026; not opened), converted by 12/26. take_bps_per_month_in_need, caught_bps_reckoned, take_quantity, investigation_hours and detection_bps: placeholders carried over (the National Police Service annual crime report was not found; KNBS reports offences reported, not cleared).",
+    "ownership.house_owner_bps": "[OPENED] house_owner_bps 62.5%: [OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume IV (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-4-Distribution-of-Population-by-Socio-Economic-Characteristics.pdf), Table 2.10, Njoro sub-county (a small-town and farming area of Nakuru County): of 61,156 conventional households, 38,198 (62.5%) own their dwelling and 22,949 (37.5%) rent or are provided it; Nakuru County overall 46.0%; the 2023/24 Housing Survey (Table 3.6) has Nakuru owner-occupied 51.6% (rural 83.7%, urban 25.3%). Flats here are all rented. [PLACEHOLDER] everything else: mortgages are rare in Kenya (about 30,000 mortgage loans, Kenya Mortgage Refinance Company; recalled, not opened), so mortgage_bps_by_age is 1 to 5%; mortgage_payment_per_month KSh 35,000 for a loan of about KSh 3 million over 20 years at 13%; mortgage_rate 13% (CBK reports mortgage rates near 13 to 14%; not opened); deposit 15%, costs 6% of the price, a term of 20 years.",
+    "utilities.water.price_per_kl": "[OPENED] Water: price_per_kl [OPENED] WASREB, approved tariff structure for NAWASSCO (Nakuru Water and Sanitation Services Company), 2024/25 to 2029/30 (https://wasreb.go.ke/wp-content/uploads/2025/08/Nakuru.pdf): domestic/residential KSh 95 a cubic metre for 1 to 6 m3, 123 for 7 to 20, 135 for 21 to 50 (the lifeline block is taken); sewerage without a water connection KSh 300 a month per dwelling unit. [PLACEHOLDER] litres_per_person_per_day 50 (WASREB's Impact Report gives small towns' consumption in the tens of litres; not opened), service_per_quarter KSh 900, and the river's inflow, flow and losses. Energy: price_per_kwh [OPENED, derived] KNBS, Consumer Price Indices and Inflation Rates, September 2026, average retail prices: electricity 50 kWh KSh 1,258.21 (KSh 25.16 a kWh) and 200 kWh KSh 5,533.76 (KSh 27.67 a kWh), all in with levies and VAT; interpolated linearly to the 90 kWh a month a household of 3 kWh a day uses: KSh 25.83. [PLACEHOLDER] kwh_per_household_per_day 3; supply_per_day KSh 4; grid_price_per_kwh KSh 15; grid_emissions_g_per_kwh 100 (about 85% of Kenya's power is geothermal, hydro and wind: Ember, KenGen; not opened). Cooking is mostly with charcoal (KSh 99.52 a kg in September 2026, same CPI release), firewood and gas (13 kg KSh 3,419), not modelled.",
+    "utilities.energy.price_per_kwh": "[OPENED] Water: price_per_kl [OPENED] WASREB, approved tariff structure for NAWASSCO (Nakuru Water and Sanitation Services Company), 2024/25 to 2029/30 (https://wasreb.go.ke/wp-content/uploads/2025/08/Nakuru.pdf): domestic/residential KSh 95 a cubic metre for 1 to 6 m3, 123 for 7 to 20, 135 for 21 to 50 (the lifeline block is taken); sewerage without a water connection KSh 300 a month per dwelling unit. [PLACEHOLDER] litres_per_person_per_day 50 (WASREB's Impact Report gives small towns' consumption in the tens of litres; not opened), service_per_quarter KSh 900, and the river's inflow, flow and losses. Energy: price_per_kwh [OPENED, derived] KNBS, Consumer Price Indices and Inflation Rates, September 2026, average retail prices: electricity 50 kWh KSh 1,258.21 (KSh 25.16 a kWh) and 200 kWh KSh 5,533.76 (KSh 27.67 a kWh), all in with levies and VAT; interpolated linearly to the 90 kWh a month a household of 3 kWh a day uses: KSh 25.83. [PLACEHOLDER] kwh_per_household_per_day 3; supply_per_day KSh 4; grid_price_per_kwh KSh 15; grid_emissions_g_per_kwh 100 (about 85% of Kenya's power is geothermal, hydro and wind: Ember, KenGen; not opened). Cooking is mostly with charcoal (KSh 99.52 a kg in September 2026, same CPI release), firewood and gas (13 kg KSh 3,419), not modelled.",
+    "climate.rain_by_month_bps": "[OPENED] Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: [OPENED, reanalysis] NASA POWER (Prediction Of Worldwide Energy Resources) climatology API (https://power.larc.nasa.gov/api/temporal/climatology/point?parameters=PRECTOTCORR,T2M,T2M_MAX,T2M_MIN&community=AG&longitude=35.94&latitude=-0.33), bias-corrected precipitation PRECTOTCORR at Njoro, 1991-2020 monthly mean mm a day: Jan 1.74, Feb 1.38, Mar 3.40, Apr 6.85, May 4.80, Jun 2.75, Jul 2.18, Aug 2.86, Sep 2.83, Oct 3.72, Nov 4.86, Dec 3.07 (annual 3.37, about 1,230 mm); times days in the month and scaled to the year's mean month: a gridded satellite and reanalysis product at about 50 km, not a rain-gauge station (the Kenya Meteorological Department's station normals and the World Bank Climate Knowledge Portal API could not be opened: the portal returned 403). Mean temperature there 14 to 17 C, mean daily maximum 25 to 30 C, mean daily minimum 4 to 8 C (same dataset): no heatwaves of the kind the structure models, so heatwave_bps_per_week is 0, and a cold season (nights near 4 C in January, July) is not expressible. [PLACEHOLDER] storm_*, drought_*, heat_units and the warning lead (the April-May 2024 floods and the 2020-2023 drought are real events; the frequencies are estimates), summer_months (the warmest months, January to March).",
+    "retirement_fund.member_bps": "[MIXED] [PLACEHOLDER], after the National Social Security Fund (NSSF Act 2013: contributions of 6% by the worker and 6% by the employer up to an earnings limit; pension access at 60, early at 50; not opened). member_bps 24%: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf): pension scheme membership rose to 8.0 million in 2025 (NSSF contributions KSh 84.0 billion, pension schemes KSh 285.4 billion), over about 33 million people aged 15 and over (population 53.3 million, same survey, times the 62% aged 15 and over in Nakuru in the census); the survey does not say whether the 8.0 million includes NSSF, so this is rough. The other figures are estimates. The fund here pays a pension; NSSF mostly pays lump sums (see the gaps report).",
+    "households.adult_female_bps": "[OPENED] adult_female_bps and child_male_bps are computed from KNBS, 2019 Kenya Population and Housing Census, Volume III, Table 2.3 (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-3-Distribution-of-Population-by-Age-and-Sex.pdf) (Nakuru County, males and females by age; adults 18+ taken as 20+ and three fifths of 15-19). Household types: [MIXED] anchored to KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 3.7: Nakuru households of 1-2 persons 35.0%, 3-4 persons 35.4%, 5-6 persons 22.2%, 7-8 persons 5.7%, 9-10 persons 1.3%, 11 or more 0.4%; and to KNBS, 2019 Census Analytical Report on Household and Family Dynamics (https://www.knbs.or.ke/wp-content/uploads/2024/05/KPHC-Census-Analytical-Report-on-Household-and-Family-Dynamics-Vol.XI_.pdf), national: average household size 3.8, 20.2% of households with one person, 28.5% nuclear, 38.2% headed by women; Nakuru County's average household size was 3.6 (Volume II, 616,046 households). lone_bps 20.2% is the national one-person share (the county's own was not extractable from that report, whose tables are images). couple_bps, group_bps, one_parent_bps, couple_children_bps, children_couple, children_one_parent, group_size and lone_parent_female_bps are estimates (placeholders) chosen so that 1-2 person households are about 35% and women head about 38%; same_sex_couple_bps is 0 (same-sex relations are criminalised: Penal Code s 162, and no count exists). mother_age_at_first_birth [17,25] is a range around the median age at first birth of 20.9 years in Nakuru, KDHS 2022 (DHS Program API, indicator FE_AAFB_W_M2B; 20.7 nationally). Extended-family households are common and cannot be expressed (see the gaps report).",
+    "households.child_male_bps": "[OPENED] adult_female_bps and child_male_bps are computed from KNBS, 2019 Kenya Population and Housing Census, Volume III, Table 2.3 (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-3-Distribution-of-Population-by-Age-and-Sex.pdf) (Nakuru County, males and females by age; adults 18+ taken as 20+ and three fifths of 15-19). Household types: [MIXED] anchored to KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 3.7: Nakuru households of 1-2 persons 35.0%, 3-4 persons 35.4%, 5-6 persons 22.2%, 7-8 persons 5.7%, 9-10 persons 1.3%, 11 or more 0.4%; and to KNBS, 2019 Census Analytical Report on Household and Family Dynamics (https://www.knbs.or.ke/wp-content/uploads/2024/05/KPHC-Census-Analytical-Report-on-Household-and-Family-Dynamics-Vol.XI_.pdf), national: average household size 3.8, 20.2% of households with one person, 28.5% nuclear, 38.2% headed by women; Nakuru County's average household size was 3.6 (Volume II, 616,046 households). lone_bps 20.2% is the national one-person share (the county's own was not extractable from that report, whose tables are images). couple_bps, group_bps, one_parent_bps, couple_children_bps, children_couple, children_one_parent, group_size and lone_parent_female_bps are estimates (placeholders) chosen so that 1-2 person households are about 35% and women head about 38%; same_sex_couple_bps is 0 (same-sex relations are criminalised: Penal Code s 162, and no count exists). mother_age_at_first_birth [17,25] is a range around the median age at first birth of 20.9 years in Nakuru, KDHS 2022 (DHS Program API, indicator FE_AAFB_W_M2B; 20.7 nationally). Extended-family households are common and cannot be expressed (see the gaps report).",
+    "households.lone_bps": "[MIXED] adult_female_bps and child_male_bps are computed from KNBS, 2019 Kenya Population and Housing Census, Volume III, Table 2.3 (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-3-Distribution-of-Population-by-Age-and-Sex.pdf) (Nakuru County, males and females by age; adults 18+ taken as 20+ and three fifths of 15-19). Household types: [MIXED] anchored to KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 3.7: Nakuru households of 1-2 persons 35.0%, 3-4 persons 35.4%, 5-6 persons 22.2%, 7-8 persons 5.7%, 9-10 persons 1.3%, 11 or more 0.4%; and to KNBS, 2019 Census Analytical Report on Household and Family Dynamics (https://www.knbs.or.ke/wp-content/uploads/2024/05/KPHC-Census-Analytical-Report-on-Household-and-Family-Dynamics-Vol.XI_.pdf), national: average household size 3.8, 20.2% of households with one person, 28.5% nuclear, 38.2% headed by women; Nakuru County's average household size was 3.6 (Volume II, 616,046 households). lone_bps 20.2% is the national one-person share (the county's own was not extractable from that report, whose tables are images). couple_bps, group_bps, one_parent_bps, couple_children_bps, children_couple, children_one_parent, group_size and lone_parent_female_bps are estimates (placeholders) chosen so that 1-2 person households are about 35% and women head about 38%; same_sex_couple_bps is 0 (same-sex relations are criminalised: Penal Code s 162, and no count exists). mother_age_at_first_birth [17,25] is a range around the median age at first birth of 20.9 years in Nakuru, KDHS 2022 (DHS Program API, indicator FE_AAFB_W_M2B; 20.7 nationally). Extended-family households are common and cannot be expressed (see the gaps report)."
+  },
+  "targets": [
+    {
+      "what": "unemployment_rate_pct",
+      "value": 5.4,
+      "source": "Kenya's unemployment rate in 2025, as compiled by Trading Economics from the ILO modelled estimate and KNBS (rural about 4.8%, urban about 8.1%, same source; the Quarterly Labour Force Report of KNBS was not opened: to confirm)"
+    },
+    {
+      "what": "participation_rate_pct",
+      "value": 67.4,
+      "source": "Labour force participation rate, Kenya, 2025: 67.39% (Trading Economics, from ILO modelled estimates; the KNBS Quarterly Labour Force Report was not opened: to confirm)"
+    },
+    {
+      "what": "employment_to_population_pct",
+      "value": 63.8,
+      "source": "Derived: participation 67.4% times (1 - 5.4% unemployment) of the working-age population (same sources; to confirm)"
+    },
+    {
+      "what": "female_headed_households_pct",
+      "value": 34.0,
+      "source": "KNBS and ICF, Kenya Demographic and Health Survey 2022 (rural 36%, urban 31%), reported by Citizen Digital"
+    },
+    {
+      "what": "social_group_participation_pct",
+      "value": 50.0,
+      "source": "Placeholder target, no Kenyan survey found (the other profile's, ABS General Social Survey 2019: 50.0%); to replace with FinAccess 2024's share of adults in chamas or other groups"
+    },
+    {
+      "what": "central_bank_rate_pct",
+      "value": 8.75,
+      "source": "Central Bank of Kenya, Monetary Policy Committee, 11 August 2026 (held)"
+    },
+    {
+      "what": "average_lending_rate_pct",
+      "value": 14.34,
+      "source": "Central Bank of Kenya, commercial banks' weighted average lending rate, August 2026 (as reported by khusoko.com)"
+    },
+    {
+      "what": "voter_turnout_pct",
+      "value": 65.4,
+      "source": "IEBC, 2022 general election, declared by the chairperson (reported by Nation, 2022)"
+    },
+    {
+      "what": "police_to_population_ratio",
+      "value": 525,
+      "source": "KNBS, Economic Survey 2026, chapter 17: one police officer to 525 people in 2025 (1:504 in 2024)"
+    },
+    {
+      "what": "total_fertility_rate",
+      "value": 3.4,
+      "source": "KNBS and ICF, Kenya Demographic and Health Survey 2022, Nakuru County and national (DHS Program API, FE_FRTR_W_TFR)"
+    },
+    {
+      "what": "life_expectancy_at_birth_years",
+      "value": 63.6,
+      "source": "United Nations, World Population Prospects 2024, abridged life table, Kenya 2023, both sexes (males 61.5, females 65.9)"
+    },
+    {
+      "what": "mean_household_size",
+      "value": 3.6,
+      "source": "KNBS, 2019 Kenya Population and Housing Census, Volume II, Nakuru County: 616,046 households"
+    },
+    {
+      "what": "households_of_one_or_two_persons_pct",
+      "value": 35.0,
+      "source": "KNBS, 2023/24 Kenya Housing Survey Basic Report, Table 3.7, Nakuru County"
+    },
+    {
+      "what": "owner_occupied_households_pct",
+      "value": 51.6,
+      "source": "KNBS, 2023/24 Kenya Housing Survey Basic Report, Table 3.6, Nakuru County (rural 83.7, urban 25.3); the 2019 census, Volume IV Table 2.10, has Njoro sub-county at 62.5 and the county at 46.0"
+    },
+    {
+      "what": "renters_rent_share_of_expenditure_pct",
+      "value": 33.3,
+      "source": "KNBS, 2023/24 Kenya Housing Survey Basic Report, Table 4.2, Nakuru County (urban 34.6, rural 24.5): rent as a share of household expenditure of renting households (expenditure, not income)"
+    },
+    {
+      "what": "informal_share_of_employment_pct",
+      "value": 84.0,
+      "source": "Derived from KNBS, Economic Survey 2026: 18.1 million in the informal sector in 2025 against 3.3 million formal wage jobs; a town made of formal jobs only cannot be measured against this (see the profile's about)"
+    },
+    {
+      "what": "crimes_reported_per_1000_residents",
+      "value": 2.2,
+      "source": "KNBS, Economic Survey 2026, Table 17.2: Nakuru Command 4,719 crimes reported in 2025, over the 2019 census population of 2,162,202"
+    },
+    {
+      "what": "christian_share_pct",
+      "value": 93.7,
+      "source": "KNBS, 2019 Census Volume IV, Table 2.30, Nakuru County"
+    }
+  ]
+}

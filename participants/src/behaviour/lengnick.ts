@@ -55,13 +55,13 @@ export function moveWage(p: LengnickParams, rng: Rng, wage: number, o: { unfille
   if (o.unfilled) {
     const up = rng.below(p.delta_bps + 1);
     const next = Math.floor((wage * (10_000 + up)) / 10_000);
-    return { wage: next, fullMonths: 0, why: `a job we posted has gone unfilled for a month: offering ${up / 100}% more (${usd(next)} a fortnight)` };
+    return { wage: next, fullMonths: 0, why: `a job we posted has gone unfilled for a month: offering ${up / 100}% more (${usd(next)} a pay period)` };
   }
   if (!o.posting && o.staffed) {
     if (o.fullMonths + 1 >= p.gamma_months) {
       const down = rng.below(p.delta_bps + 1);
       const next = Math.floor((wage * (10_000 - down)) / 10_000);
-      return { wage: next, fullMonths: 0, why: `fully staffed for ${p.gamma_months} months: offering ${down / 100}% less to new hires (${usd(next)} a fortnight)` };
+      return { wage: next, fullMonths: 0, why: `fully staffed for ${p.gamma_months} months: offering ${down / 100}% less to new hires (${usd(next)} a pay period)` };
     }
     return { wage, fullMonths: o.fullMonths + 1 };
   }

@@ -22,7 +22,7 @@ import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from
  */
 export const producer: BehaviourModule = {
   name: "firm.producer",
-  version: "0.4.1",
+  version: "0.4.2",
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -196,7 +196,7 @@ export const producer: BehaviourModule = {
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
           target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
-          why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} a fortnight.`,
+          why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} every ${p.period / DAY} days.`,
         }));
         // Can't cover the next pay period: let the most recent hire go.
         steps.push(...borrowing.steps(book, t, acc.account));
@@ -214,7 +214,7 @@ export const producer: BehaviourModule = {
         }
         // (Those we're keeping: someone already given notice is still staff until it runs out, and counting them made
         // this let everyone go, one after another within the moment, where the rule lets the most recent hire go.)
-        const keeping = staffing.keeping(book, t);
+        const keeping = staffing.staying(book, t);
         if (winding.state === "trading" && keeping && acc.balance < keeping * wage) {
           // Short of the next pay period: first, working capital from our bank (two months' wages); while we wait to hear,
           // nobody is let go. Refused (or in default): the most recent hire goes, and this month's headcount with them

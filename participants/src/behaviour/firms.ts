@@ -615,9 +615,11 @@ export class Staffing {
   workers(book: Book, t: number): string[] {
     return this.staff(book, t).map((a) => a.terms.parties[1] as string);
   }
-  /** How many of our staff we're keeping: those we haven't given notice. (Someone let go is still staff, and paid, until
-   * their notice runs out; a rule that lets people go until the rest can be paid counts these, or it never stops.) */
-  keeping(book: Book, t: number): number {
+
+  /** How many of our staff are staying: those we haven't given notice. (Someone working out their notice is still on
+   * the staff and still paid, so a firm that lets people go until it can cover its wages counts those who stay: counted
+   * with those going, one shortfall let the whole staff go, one after another, in a day.) */
+  staying(book: Book, t: number): number {
     return this.staff(book, t).filter((a) => !this.noticed.has(a.id)).length;
   }
 
@@ -1150,7 +1152,7 @@ function creditorAccount(book: Book, holder: string): string | undefined {
 
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.6.2",
+  version: "0.6.3",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -1190,7 +1192,7 @@ export const employer: BehaviourModule = {
       });
       // Can't cover the next pay period: lay off the most recent hire (and the next, at our next look, until those we're
       // keeping can be paid: not everyone, one after another, because the ones already given notice are still counted).
-      const keeping = staffing.keeping(book, t);
+      const keeping = staffing.staying(book, t);
       if (keeping && acc.balance < keeping * p.wage) {
         steps.push(...staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${keeping} staff): laying off the most recent hire.`, "Redundancy: we can't cover the wage bill."));
       }
