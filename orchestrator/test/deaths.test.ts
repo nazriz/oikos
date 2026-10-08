@@ -42,7 +42,9 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   // of this town has a family new to town whose leaseholder took a home and died in it within the week, before the
   // others, still sleeping at their work, ever went there; and someone else, not of the household, still living in
   // it. Those others of the household never lived with them; whoever does live there reports it: below.)
-  const beenIn = new Set(ev.filter((e) => e.event === "occupied").map((e) => `${e.occupant}|${e.space}`));
+  // (Been in it: went into it at some time, or was in it when the world began and may never have left: someone who has
+  // stopped work and stays at home.)
+  const beenIn = new Set([...config.world.occupancy.map((o: any) => `${o.occupant}|${o.space}`), ...ev.filter((e) => e.event === "occupied").map((e) => `${e.occupant}|${e.space}`)]);
   const livedWith = (d: { person: string; t: number }) => housemates(d).filter((m) => beenIn.has(`${m}|${homeOf.get(d.person)}`));
   const stillThere = (d: { person: string; t: number }) => [...new Set(ev.filter((e) => e.event === "occupied" && e.space === homeOf.get(d.person) && e.occupant !== d.person && e.t > d.t && e.t <= d.t + 3 * DAY).map((e) => e.occupant as string))];
   const shared = early.filter((d) => housemates(d).length > 0 && (livedWith(d).length > 0 || stillThere(d).length === 0));

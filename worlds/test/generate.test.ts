@@ -131,3 +131,47 @@ test("a firm is held by its owners, from outside, or widely: never by every hous
     expect(config.positions.find((p: any) => p.entity === "fund").role_module.code).toBe("fund.retirement");
   }
 });
+
+// Stopping work (docs/behaviour/citizen.md): at the profile's one age, or, where the profile gives the share in the
+// labour force by age, at each person's own.
+test("people stop work at one age where the profile gives no curve, and at ages of their own, drawn to the curve's shares, where it does", async () => {
+  const { generateFrom } = await import("../generator/generate");
+  const { loadProfile } = await import("../generator/profile");
+  const big = Bun.YAML.parse(readFileSync(join(root, "worlds/town-1000.yaml"), "utf8")) as TownSpec;
+  const YEAR = 365 * 86_400;
+  const look = (P: any) => {
+    const c = generateFrom(big, P);
+    const age = new Map<string, number>(c.world.entities.filter((e: any) => e.kind === "person").map((e: any) => [e.id, Math.floor(-e.born_at / YEAR)]));
+    const params = new Map<string, any>(c.participants.filter((p: any) => p.kind === "person").map((p: any) => [p.person, p.controller.params]));
+    const workers = new Set<string>(c.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "employment").map((r: any) => r.terms.parties[1]));
+    return { c, age, params, workers };
+  };
+  // One age: nobody is given an age of their own, and nobody at or over the age has a job.
+  const single = structuredClone(loadProfile("au-vic-2026"));
+  delete single.values.labour_force_share_by_age;
+  const one = look(single);
+  expect([...one.params.values()].some((p) => p.stops_work_at !== undefined || p.stop_work_curve !== undefined)).toBe(false);
+  expect([...one.workers].filter((w) => one.age.get(w)! >= single.values.retirement_age)).toEqual([]);
+  // A curve (not any place's): four fifths in the labour force at 25 to 54, three fifths of those still in at 55, a
+  // quarter at 65, none from 75.
+  const P = structuredClone(single);
+  P.values.labour_force_share_by_age = [{ from: 25, bps: 8000 }, { from: 55, bps: 4800 }, { from: 65, bps: 2000 }, { from: 75, bps: 0 }];
+  const many = look(P);
+  const adults = [...many.age].filter(([, a]) => a >= 18).map(([id]) => id);
+  const inForce = adults.filter((id) => many.params.get(id).in_labour_force !== false);
+  expect(Math.abs(inForce.length / adults.length - P.values.labour_force_participation_bps / 10_000)).toBeLessThan(0.04);
+  // Everyone in the labour force has their own age (this curve leaves nobody who never stops); the shares stopping at
+  // each band are the curve's.
+  const stops = inForce.map((id) => many.params.get(id).stops_work_at);
+  expect(stops.every((s) => [55, 65, 75].includes(s))).toBe(true);
+  const share = (at: number) => stops.filter((s) => s === at).length / stops.length;
+  expect(Math.abs(share(55) - 0.4)).toBeLessThan(0.05);
+  expect(Math.abs(share(65) - 0.35)).toBeLessThan(0.05);
+  expect(Math.abs(share(75) - 0.25)).toBeLessThan(0.05);
+  // Nobody past their own age holds a job; some past the profile's retirement age do, and some under it have stopped.
+  expect([...many.workers].filter((w) => many.age.get(w)! >= many.params.get(w).stops_work_at)).toEqual([]);
+  expect([...many.workers].filter((w) => many.age.get(w)! >= P.values.retirement_age).length).toBeGreaterThan(0);
+  expect(inForce.filter((id) => many.age.get(id)! < P.values.retirement_age && many.age.get(id)! >= many.params.get(id).stops_work_at).length).toBeGreaterThan(0);
+  // Those who come later draw their own from the same curve.
+  expect(many.c.templates.every((t: any) => JSON.stringify(t.controller.params.stop_work_curve) === JSON.stringify(P.values.labour_force_share_by_age))).toBe(true);
+}, 120_000);

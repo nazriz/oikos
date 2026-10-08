@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, chargesInWords, forAge, forOutOfWork, paymentsInWords, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule, type PaymentRule } from "@oikos/participants";
+import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, chargesInWords, forAge, forOutOfWork, paymentsInWords, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule, type PaymentRule } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -597,12 +597,22 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const pick = rng("people");
   const ageOf = (m: Person) => Math.floor(-m.born_at / YEAR);
   const working = (m: Person) => m.adult && ageOf(m) < V.retirement_age;
+  // Stopping work (docs/behaviour/citizen.md): at the profile's one age; or, where it gives the share in the labour
+  // force by age, at each person's own age, drawn so that the shares by age come out as the survey's.
+  const CURVE = V.labour_force_share_by_age;
+  if (CURVE && (CURVE.length < 2 || CURVE.some((b, i) => i > 0 && b.from <= CURVE[i - 1]!.from) || !(CURVE[0]!.bps > 0))) throw new Error(`profile ${P.id}: labour_force_share_by_age needs at least two bands in order of age, the first (the reference) above nought`);
+  /** Of those in the labour force at the reference ages, the share still in it at an age, by the curve. */
+  const stillIn = (age: number) => { let kept = 1; for (const b of (CURVE ?? []).slice(1)) if (b.from <= age) kept = Math.min(kept, b.bps / CURVE![0]!.bps); return kept; };
+  const stopsAt = new Map<string, number | "never">();
   // Shops start with the staff their expected sales need: what the town's people would spend, by their own rule of
   // spending (citizen.default: of what comes in, what isn't saved, less the rent, and never less than the essentials;
   // and a share a year of savings beyond a few months' income), at the retail price, served in a shop's hours.
   {
     const ofWorkingAge = everyone.filter(working);
-    const inLabourForce = Math.floor((ofWorkingAge.length * V.labour_force_participation_bps) / 10_000);
+    // (In the labour force: the profile's participation, of those of working age; with a curve by age, of every adult
+    // by the share of their age still in it.)
+    const mayWork = CURVE ? everyone.filter((m) => m.adult).reduce((x, m) => x + stillIn(ageOf(m)), 0) : ofWorkingAge.length;
+    const inLabourForce = Math.floor((mayWork * V.labour_force_participation_bps) / 10_000);
     const workers = Math.floor((inLabourForce * spec.employed_bps) / 10_000);
     const retirees = everyone.filter((m) => m.adult && !working(m)).length;
     // (Wages as they reach people, after what employers withhold; a pension by how often it is paid.)
@@ -620,7 +630,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // From income: those with a wage or a pension, less the rent; those looking for work, their payment where there
     // is one; those outside the labour force, the essentials (from what they have).
     const fromIncome = Math.max((workers + retirees) * ESS, (workers * wage + retirees * pension) * kept - rentBill)
-      + (inLabourForce - workers) * Math.max(ESS, benefit * kept) + (ofWorkingAge.length - inLabourForce) * ESS;
+      + (inLabourForce - workers) * Math.max(ESS, benefit * kept) + Math.max(0, ofWorkingAge.length - inLabourForce) * ESS;
     // From savings: the profile's share a year of what each holds beyond the months of income kept in hand, in
     // expectation over the profile's savings (by age for those of working age; the retired's range).
     const beyond = (saved: (q: number) => number, income: number) => Array.from({ length: 100 }, (_, i) => Math.max(0, saved(i * 100 + 50) - SAVINGS_KEPT_MONTHS * Math.max(income, ESS))).reduce((a, b) => a + b, 0) / 100;
@@ -653,7 +663,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const outOfLabourForce = new Set<string>();
   for (const c of everyone.filter((m) => m.adult)) {
     // Retired (at the profile's retirement age): savings to live on, and no job.
-    if (!working(c)) {
+    if (!CURVE && !working(c)) {
       const [lo, hi] = V.retiree_savings;
       accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: lo + Math.floor((pick.below(10_001) * (hi - lo)) / 10_000) });
       monthlyPay.set(c.id, 0);
@@ -662,14 +672,20 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // In the labour force (the profile's participation), and then in work (the spec's share of the labour force).
     const participating = pick.below(10_000) < V.labour_force_participation_bps;
     if (!participating) outOfLabourForce.add(c.id);
-    const employed = participating && pick.below(10_000) < spec.employed_bps && job < jobSlots.length;
+    // (With a curve by age: their own age of stopping work, which some have reached and some never will.)
+    if (CURVE && participating) stopsAt.set(c.id, stopsWorkAt(CURVE, pick.below(10_000)) ?? "never");
+    const stopped = CURVE && participating && stopsAt.get(c.id) !== "never" && ageOf(c) >= (stopsAt.get(c.id) as number);
+    const employed = participating && !stopped && pick.below(10_000) < spec.employed_bps && job < jobSlots.length;
     const w = employed ? jobSlots[job++]! : undefined;
     const monthly = w ? Math.floor((w.wage * MONTH) / PAY) : 0;
     monthlyPay.set(c.id, monthly);
-    // Savings: drawn from the profile's distribution by age (else, the spec's months of pay).
+    // Savings: drawn from the profile's distribution by age (else, the spec's months of pay); from the profile's
+    // retirement age, the retired's savings, working or not.
     const band = V.savings_by_age && !spec.savings_months_only ? [...V.savings_by_age].reverse().find((b) => b.from <= ageOf(c)) : undefined;
-    const saved = band ? drawSavings(band.pct, pick.below(10_000)) : monthly * (spec.savings_months[0] + pick.below(spec.savings_months[1] - spec.savings_months[0] + 1));
-    accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: Math.max(V.opening.person_min_savings, saved) });
+    const [lo, hi] = V.retiree_savings;
+    const saved = !working(c) ? lo + Math.floor((pick.below(10_001) * (hi - lo)) / 10_000)
+      : band ? drawSavings(band.pct, pick.below(10_000)) : monthly * (spec.savings_months[0] + pick.below(spec.savings_months[1] - spec.savings_months[0] + 1));
+    accounts.push({ id: `acc-${c.id}`, holder: c.id, custodian: "bank", balance: !working(c) ? saved : Math.max(V.opening.person_min_savings, saved) });
     if (!w) continue;
     staffCount.set(w.employer, (staffCount.get(w.employer) ?? 0) + 1);
     const ag = `job-${c.id}`;
@@ -1035,7 +1051,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const rateable = records.filter((r) => r.record === "claim" && r.about?.kind === "ownership" && r.holder !== "city" && !rateExempt.includes(r.holder))
     .reduce((x, r) => x + landValue + (onLot.has(cellOf.get(r.about.object)) ? buildPrice(onLot.get(cellOf.get(r.about.object))!.type) : 0), 0);
   const ratePpm = rateable > 0 ? Math.round((V.public_finance.rates_per_resident_per_year * everyone.length * 1_000_000) / rateable) : 0;
-  records.push({ id: taxLaw.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
+  // (A place with no charge on pay has no such law, and nothing is withheld.)
+  if (taxLaw.charges.length) records.push({ id: taxLaw.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
     text: `Tax on pay. ${chargesInWords(taxLaw.charges, asWritten, (c) => `${payeeName(c.account)} (${c.account})`)}. Employers withhold each from every pay, reckoned as a year's pay, and pay what they withheld over monthly, with a report${taxLaw.charges.some((c) => c.itemised) ? " (naming each worker and their pay in the month, where a charge is reported worker by worker)" : ""}.`,
     adico: { attribute: "employers", deontic: "must", aim: "withhold income tax from each pay and pay it over", condition: "monthly" },
     data: { tax: "income", charges: taxLaw.charges } });
@@ -1416,7 +1433,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     values: { values: V.values }, // (people's values, for their minds: docs/design/ai-citizens.md 3a)
     year: life.year, births: spec.life !== false, gestation: life.birth.gestation, fertility_per_10000: V.fertility_per_10000,
     buffer_months: SAVINGS_KEPT_MONTHS, saving_bps: V.spending.saving_bps, wealth_effect_bps_per_year: V.spending.wealth_effect_bps_per_year, essentials: V.spending.essentials_per_month,
-    retirement_age: V.retirement_age,
+    retirement_age: V.retirement_age, ...(CURVE ? { stop_work_curve: CURVE } : {}),
     // Starting businesses: a placeholder monthly chance for someone able to (to calibrate against business entry rates).
     ventures: [shopVenture], found_bps: 200 });
   // Those outside the labour force don't look for work (their own controller settings).
@@ -1424,7 +1441,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   for (const m of everyone) {
     const controller = outOfLabourForce.has(m.id) ? outsideLabourForce : citizenController;
     const held = beliefs.get(m.id);
-    participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: held ? { ...controller, params: { ...controller.params, beliefs: held } } : controller, framing: unstated });
+    // (Their own beliefs; and, where people here stop work at ages of their own, theirs.)
+    const own = { ...(held ? { beliefs: held } : {}), ...(stopsAt.has(m.id) ? { stops_work_at: stopsAt.get(m.id) } : {}) };
+    participants.push({ id: `${m.id}-self`, kind: "person", person: m.id, channels: citizenChannels, controller: Object.keys(own).length ? { ...controller, params: { ...controller.params, ...own } } : controller, framing: unstated });
   }
   // People who may come later: newcomers from elsewhere, and children born here.
   // (Each also outside the labour force, at the profile's participation: a newcomer who didn't come for the job, a child.)

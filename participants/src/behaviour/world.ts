@@ -630,7 +630,7 @@ export const idle: BehaviourModule = {
  */
 export const migration: BehaviourModule = {
   name: "world.migration",
-  version: "0.4.0",
+  version: "0.4.1",
   doc: "docs/behaviour/boundary.md",
   cadence: () => 30 * DAY,
   firstWake: () => 30 * DAY,

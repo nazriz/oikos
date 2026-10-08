@@ -129,25 +129,36 @@ test("the age at which someone stops work, drawn from the share in the labour fo
 const claims = (said: Awaited<ReturnType<ReturnType<typeof person>["wake"]>>) => said.filter((c) => c.fn === "statement" && c.args.kind === "benefit_claim").map((c) => c.args.data);
 const answer = (id: string, t: number, who: string, c: any, granted: boolean, x: object = {}) => statement(id, t, "benefit_decision", { speaks_for: "outside", addressed_to: [who], visible_to: [who, "outside"], basis: c.id, data: { claim: c.id, payment: c.args.data.payment, granted, ...x } });
 
-test("a person out of work claims the first payment for it the law lists, the next when that refuses or runs out, and none again until they are older", async () => {
+test("a person out of work claims the first payment for it the law lists, the next when that refuses, and the refused one not again until they are older", async () => {
   const rules: PaymentRule[] = [
-    { id: "insurance", ...by, every_days: 30, who: { out_of_work: true, record: {} }, amount: { share_bps: 6000, of: "gross" }, lasts: { days: 60, then: "basic" } },
+    { id: "older", ...by, every_days: 30, who: { out_of_work: true, from_age: 50 }, amount: { flat: 6_000 } },
     { id: "basic", ...by, every_days: 30, who: { out_of_work: true }, amount: { flat: 4_000 } },
     { id: "pension", ...by, every_days: 30, who: { from_age: 67 }, amount: { flat: 9_000 } },
   ];
   const p = person(citizen, { year: YEAR }, { age: 40 });
   const first = await p.wake(DAY, { records: [law(rules)], balance: 500_000 });
-  expect(claims(first)).toEqual([{ payment: "insurance", account: "acc-c1", born_at: -40 * YEAR }]);
+  expect(claims(first)).toEqual([{ payment: "older", account: "acc-c1", born_at: -40 * YEAR }]);
   const c1 = first.find((c) => c.args.kind === "benefit_claim")!;
-  // Refused (no record): the next one, at once.
-  const second = await p.wake(2 * DAY, { records: [answer("d1", 2 * DAY, "c1", c1, false)] });
-  expect(claims(second).map((d) => d.payment)).toEqual([]);
+  // Refused (the office applies the age): the next one.
+  expect(claims(await p.wake(2 * DAY, { records: [answer("d1", 2 * DAY, "c1", c1, false)] }))).toEqual([]);
   const third = await p.wake(3 * DAY);
   expect(claims(third).map((d) => d.payment)).toEqual(["basic"]);
   const c2 = third.find((c) => c.args.kind === "benefit_claim")!;
   // Granted: nothing more is claimed, and the refused one isn't asked for again at this age.
   expect(claims(await p.wake(4 * DAY, { records: [answer("d2", 4 * DAY, "c1", c2, true, { amount: 4_000, every: 30 * DAY })] }))).toEqual([]);
   expect(claims(await p.wake(40 * DAY))).toEqual([]);
+});
+
+test("a payment that turns on a record of contributions isn't claimed by someone who has not worked here", async () => {
+  const rules: PaymentRule[] = [
+    { id: "insurance", ...by, every_days: 30, who: { out_of_work: true, record: {} }, amount: { share_bps: 6000, of: "gross" }, lasts: { days: 60, then: "basic" } },
+    { id: "basic", ...by, every_days: 30, who: { out_of_work: true }, amount: { flat: 4_000 } },
+  ];
+  const p = person(citizen, { year: YEAR }, { age: 40 });
+  expect(claims(await p.wake(DAY, { records: [law(rules)], balance: 500_000 })).map((d) => d.payment)).toEqual(["basic"]);
+  // With only the insurance in the law, such a person claims nothing.
+  const q = person(citizen, { year: YEAR }, { age: 40 });
+  expect(claims(await q.wake(DAY, { records: [law(rules.slice(0, 1))], balance: 500_000 }))).toEqual([]);
 });
 
 test("a pension is claimed at its own age by someone who has not stopped work, and a rule's declarations go on the claim", async () => {

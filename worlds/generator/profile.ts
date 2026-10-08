@@ -42,8 +42,16 @@ export interface Profile {
     spending: { saving_bps: number; wealth_effect_bps_per_year: number; essentials_per_month: number; shops_known: number; shop_search_bps_per_month: number };
     /** An adult's savings (cash and deposits), by age: percentiles 10, 25, 50, 75, 90 (cents). */
     savings_by_age?: { from: number; pct: [number, number, number, number, number] }[];
+    /** The age people here stop work, where the profile gives one age for everyone; with `labour_force_share_by_age`,
+     * the age the profile's other figures by age turn on (the retired's savings, the end of the payments for those out
+     * of work, a retirement fund's access) and the top of the working ages the measures use. */
     retirement_age: number;
     labour_force_participation_bps: number;
+    /** The share of people in the labour force by age band, from the place's labour force survey (bands in order of
+     * age; the first is the reference, the ages before leaving begins): each person in the labour force stops work at
+     * an age drawn so that the shares by age come out as these do (docs/behaviour/citizen.md, "Stopping work"). Left
+     * out: everyone stops at `retirement_age`. */
+    labour_force_share_by_age?: { from: number; bps: number }[];
     /** Tenancy law. A place with no rule on how often a rent may rise or on what notice leaves both figures out (no
      * such law is written); landlords then review rents as often as `rent_review_practice_months` says, if it's given. */
     tenancy: { rent_review_months?: number; rent_increase_notice_days?: number; rent_review_practice_months?: number; after_fixed_term?: "periodic" };

@@ -699,9 +699,12 @@ export class Staffing {
     const died = doesPay ? [...new Set([...book.all("death_registration").map((r) => r.data?.deceased as string), ...this.bankSaysDead])] : [];
     for (const who of died) {
       const a = staff.find((x) => x.terms.parties[1] === who);
-      if (!a || this.noticed.has(a.id)) continue;
+      // (Someone already under notice, let go or leaving, who dies while it runs: their wages stop now all the same.
+      // Until 2026-10-09 they were paid to the end of the notice.)
+      const underNotice = !!a && this.noticed.has(a.id);
+      if (!a || (underNotice && !this.orders.has(a.id))) continue;
       this.noticed.set(a.id, t);
-      const s: Step = because(`${who}, who worked for us, has died: stopping their wages.`, notice(a.id, "The employee has died."));
+      const s: Step = because(`${who}, who worked for us, has died: stopping their wages.`, ...(underNotice ? [] : [notice(a.id, "The employee has died.")]));
       if (this.orders.has(a.id)) {
         s.push(withdraw(this.orders.get(a.id)!, "The employee has died; stop wages."));
         this.orders.delete(a.id);
@@ -763,7 +766,9 @@ export class Staffing {
           const accounts = [...new Set(parts.map((c) => c.charge.account))];
           const itemised = parts.some((c) => c.charge.itemised);
           const basis = due.find((x) => x.charge.collector === collector)!.law || law?.id;
-          if (accounts.length === 1 && !itemised) {
+          // (A law whose charges all go to one account, none reported worker by worker: one sum, as it has always been said.)
+          const oneAccount = !law || (new Set(law.charges.map((c) => c.account)).size === 1 && !law.charges.some((c) => c.itemised));
+          if (oneAccount && accounts.length === 1 && !itemised) {
             steps.push(because(paid === owed ? `Monthly: paying over the ${usd(owed)} of income tax we withheld from wages.` : `Monthly: we owe ${usd(owed)} of income tax withheld from wages and have ${usd(paid)}: paying that, and still owing the rest.`,
               say("withholding_report", `Income tax withheld from wages, owed: ${usd(owed)}; paid now: ${usd(paid)}.`, { to: [collector], visible: [me, collector], ...(basis ? { basis } : {}), data: { withheld: owed, paid, period_end: t, account } }),
               ...(paid > 0 ? [pay(accounts[0]!, paid, { from: account, for: "Income tax withheld from wages." })] : [])));

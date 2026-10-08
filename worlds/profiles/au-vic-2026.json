@@ -609,6 +609,24 @@
         "rate": 0
       }
     ],
+    "labour_force_share_by_age": [
+      {
+        "from": 25,
+        "bps": 8700
+      },
+      {
+        "from": 55,
+        "bps": 7752
+      },
+      {
+        "from": 60,
+        "bps": 6100
+      },
+      {
+        "from": 65,
+        "bps": 1613
+      }
+    ],
     "labour_force_participation_bps": 8000,
     "tenancy": {
       "rent_review_months": 12,
@@ -896,7 +914,7 @@
     "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections; read 2026-10-08). Not a figure of this place: a model's, kept until a survey of shops used is found (the nearest found: 4.4 grocery stores a month for a household in the United States, an industry figure reported in the press; to confirm).",
     "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1: the probability of searching for a cheaper seller, 0.25 a month; read 2026-10-08). A model's figure, as above.",
     "spending.essentials_per_month": "Placeholder: what a person spends however little comes in.",
-    "retirement_age": "The Age Pension age, 67 (Services Australia).",
+    "retirement_age": "The Age Pension age, 67 (Services Australia). Since 2026-10-08 people here stop work at ages of their own, drawn from labour_force_share_by_age; this age is still the one the profile's other figures turn on (the retired's savings, the end of the payments for those out of work, a retirement fund's access) and the top of the working ages the measures use. The pension's age is the payment's own (support.payments).",
     "savings_by_age": "An adult's cash and deposits (not superannuation, not property), by age: the 10th, 25th, 50th, 75th and 90th percentiles; drawn between them, and above the 90th up to three times it. Placeholders shaped by the ABS Survey of Income and Housing (household wealth: deposits by age of reference person), per adult; to confirm against the SIH tables.",
     "retiree_savings": "Placeholder: savings at retirement, $150,000-350,000, around typical superannuation balances at 65-69 (to confirm against ATO or ASFA figures).",
     "support.payments": "[The pension:] Age Pension, single, maximum rate with supplements: $1,200.90 a fortnight from 20 March 2026 (Department of Social Services, rates from 20 March 2026). Couples' rates and means tests left out. [The payment to those out of work:] JobSeeker Payment, single, no children: $808.70 a fortnight from 20 March 2026 (Department of Social Services). From age 22 (younger people are on Youth Allowance, left out). Means test left out. SHAPE (2026-10-08, track D of docs/design/profile-depth.md): support is now a list of payments, each a rule in three parts: who qualifies, how much, for how long (docs/behaviour/boundary.md); the law is published and the payments office reads it. The payments for those out of work end the year before the profile's retirement age (to_age): the rule the generator applied to every profile until now, written into the payment, where it can be changed. Two payments, the same figures: nothing is changed. Both are flat, with no time limit and no means test, as before: the Age Pension's income and assets tests and the JobSeeker income test could now be said in part (`who.income_under`: a household's income as the claimant declares it), but this note gives no figures for them.",
@@ -911,6 +929,7 @@
     "ordinary_hours_per_week": "Maximum ordinary hours for a full-time employee, 38 a week (Fair Work Act 2009, s 62, the National Employment Standards).",
     "fertility_per_10000": "ABS, Births, Australia 2024: births per 10,000 women (the published rates per 1,000, times 10: configs are integers) a year, by age.",
     "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80%; to confirm against ABS, Labour Force, Australia, Table 16 (15-64 year olds). Those outside it (studying, caring, other reasons) don't look for work.",
+    "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, Australia, national, annual 2025, from the ABS Labour Force Survey: ages 25 to 54, 87.003%; 55 to 59, 77.523%; 60 to 64, 61.001%; 65 and over, 16.129%. National, not regional Victoria (no table by age for the region was found); not checked against the ABS (Labour Force, Australia, Detailed)'s own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Residential Tenancies Act 1997 (Vic), s 44: a residential rent may be increased no more than once every 12 months, with at least 60 days' written notice. After a fixed term, a tenancy continues as a periodic (month-to-month) one unless it's ended by notice or a new agreement (the Act; Consumer Affairs Victoria's guidance on fixed-term agreements, to confirm the section).",
     "values": "Placeholder: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power: 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500. To source for this place: the World Values Survey's Schwartz items for Australia (wave 6), rescaled.",
     "industrial_action": "Fair Work Act 2009 (Cth), Part 3-3: a protected action ballot needs at least 50% of the members on the roll voting (s 459(1)(b)) and more than 50% of the votes approving (s 459(1)(c)); at least 3 working days' written notice of action (s 414(2)(a), taken as 3 days); an employer must not pay employees for a period of protected action (s 470).",
