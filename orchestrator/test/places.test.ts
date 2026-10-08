@@ -125,8 +125,11 @@ test("money in a generated town's laws and papers is written as its currency is,
     const c = town(id);
     const whole = (n: number) => (cur.minor_units && n % 10 ** cur.minor_units === 0 ? formatMoney(n, cur).slice(0, -(cur.minor_units + 1)) : formatMoney(n, cur));
     const tax = c.world.records.find((r: any) => r.id === "law-income-tax");
-    for (const b of P.values.public_finance.income_tax.brackets) expect(tax.text).toContain(`above ${whole(b.from)}`);
-    expect(tax.text).toContain(`from ${whole(P.values.public_finance.income_tax.levy_from)}`);
+    for (const c of P.values.public_finance.income_tax.charges) {
+      if (c.schedule.length > 1) for (const b of c.schedule) expect(tax.text).toContain(`above ${whole(b.from)}`);
+      if (c.base?.from) expect(tax.text).toContain(`from ${whole(c.base.from)}`);
+      if (c.base?.up_to !== undefined) expect(tax.text).toContain(`up to ${whole(c.base.up_to)}`);
+    }
     // A mortgage's words give its sums as money (a home loan agreed before the start).
     for (const loan of c.world.records.filter((r: any) => r.record === "agreement" && r.terms.template === "loan")) {
       const [lends, repays] = loan.terms.commitments.map((k: any) => Number(k.does.outcome.money.amount));

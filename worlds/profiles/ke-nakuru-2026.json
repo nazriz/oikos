@@ -804,31 +804,87 @@
       "payment_approval_over": 20000000
     },
     "public_finance": {
+      "funds": [
+        {
+          "id": "health-insurance",
+          "name": "Social Health Insurance Fund"
+        },
+        {
+          "id": "housing-levy",
+          "name": "Affordable Housing Levy"
+        },
+        {
+          "id": "nssf",
+          "name": "National Social Security Fund"
+        }
+      ],
       "income_tax": {
-        "brackets": [
+        "charges": [
           {
-            "from": 0,
-            "rate_bps": 0
+            "id": "income-tax",
+            "name": "PAYE",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 1000
+              },
+              {
+                "from": 28800000,
+                "rate_bps": 2500
+              },
+              {
+                "from": 38800000,
+                "rate_bps": 3000
+              },
+              {
+                "from": 600000000,
+                "rate_bps": 3250
+              },
+              {
+                "from": 960000000,
+                "rate_bps": 3500
+              }
+            ],
+            "reliefs": [
+              {
+                "amount": 2880000
+              }
+            ]
           },
           {
-            "from": 28800000,
-            "rate_bps": 2500
+            "id": "health-insurance",
+            "name": "Social Health Insurance Fund contribution",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 275
+              }
+            ],
+            "paid_to": "health-insurance"
           },
           {
-            "from": 38800000,
-            "rate_bps": 3000
+            "id": "housing-levy",
+            "name": "Affordable Housing Levy",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 150
+              }
+            ],
+            "paid_to": "housing-levy"
           },
           {
-            "from": 600000000,
-            "rate_bps": 3250
-          },
-          {
-            "from": 960000000,
-            "rate_bps": 3500
+            "id": "nssf",
+            "name": "NSSF contribution",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 600
+              }
+            ],
+            "paid_to": "nssf"
           }
-        ],
-        "levy_bps": 425,
-        "levy_from": 0
+        ]
       },
       "grants_per_resident_per_year": 600000,
       "rates_per_resident_per_year": 50000,
@@ -1299,7 +1355,8 @@
     "opening": "[PLACEHOLDER] Placeholders, to source: what each organisation holds on the first day (the bank's own funds KSh 1.8 million; the town KSh 7.2 million; the builder KSh 1 million; each landlord KSh 2 million; a shop KSh 100,000; a factory KSh 1.4 million) and the least an adult in the labour force has saved (KSh 300), the other profile's figures scaled by the ratio of the two countries' shop wages in local units (about 3.6), and the shop and factory figures scaled by the wage bill. No Kenyan source.",
     "town_finance.parks_per_year": "[PLACEHOLDER] Placeholder: KSh 540,000 a year (scaled from the other profile's by the same ratio of 3.6; no source).",
     "town_finance.payment_approval_over": "[PLACEHOLDER] Placeholder: KSh 200,000 (a county's public procurement thresholds are far higher; the Public Procurement and Asset Disposal Act 2015 sets them; to source).",
-    "public_finance.income_tax": "[PLACEHOLDER] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible.",
+    "public_finance.income_tax": "[PLACEHOLDER] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible. [The note on brackets was the same, marked [OPENED].] [The note on levy_bps was the same, marked [SECONDARY].] [The note on levy_from was the same, marked [SECONDARY].] SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). PAYE as this note gives it: 10% on the first KSh 288,000 of a year's pay and the rates above, with the personal relief of KSh 28,800 a year taken off the tax (the author had set the first band to nought because the relief cancels it: the sums are the same to the cent). UN-FOLDED: the levy of 4.25% is its two parts, each paid to its own body: the Social Health Insurance Fund contribution, 2.75% of gross pay, and the Affordable Housing Levy, 1.5%. ADDED, from this note and the note on the retirement fund: the worker's NSSF contribution of 6%, which could not be said before; it lowers what every worker is paid by 6% of gross. The earnings limit on the NSSF contribution is not in the notes, so none is set (the field is `base.up_to`); nor is it said here that the contributions are taken off the pay before tax (the field is `base.less: [{ charges: [...] }]`). The employer's NSSF share is not expressed.",
+    "public_finance.funds": "The named funds and bodies of the higher government that this place's charges on pay are paid to, each kept as an account of the outside world's of its own (the general government's account takes the rest). The three bodies the levies on pay go to, as the note on the income tax names them.",
     "public_finance.grants_per_resident_per_year": "[PLACEHOLDER] Placeholder: about KSh 6,000 a resident a year, the order of a county's equitable share (Controller of Budget; County Allocation of Revenue Act 2025, Nakuru County, not opened: to confirm and to replace with equitable share over the county's population, 2,162,202 in 2019).",
     "public_finance.rates_per_resident_per_year": "[PLACEHOLDER] Placeholder: KSh 500 a resident a year, a small part of a county's own-source revenue (Nakuru County Finance Act and Rating Act 2019: land rates, plot rents; the Controller of Budget's County Budget Implementation Review Report gives own-source revenue by county; not opened).",
     "public_finance.rates_instalments": "[PLACEHOLDER] Placeholder: 4 a year.",
@@ -1349,9 +1406,6 @@
     "labour_force_participation_bps": "[PLACEHOLDER] Placeholder: 70% of adults aged 18 to the retirement age (here 70) are in the labour force, from 67.4% of those 15 and over in 2025 (ILO modelled estimate via Trading Economics; KNBS Quarterly Labour Force Report not opened: to confirm). 'In the labour force' here includes farming and informal work, which the world cannot place (see the gaps report).",
     "rents_per_month.apartment_units": "[OPENED] [MIXED] apartment_units are [OPENED] KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 4.1 'Average Rent by County, Dwelling Type and Number of Bedrooms, Urban', Nakuru, flats/apartments: one bedroom KSh 6,000; two bedrooms KSh 13,000; three bedrooms KSh 14,000 a month (the table lists the average urban rent of the county, which includes the city of Nakuru; a small town may be lower). house_types: the 3-bedroom house is the 3-bedroom townhouse of the same table, KSh 30,000 (2-bedroom townhouse KSh 10,000; compound house not sharing facilities, 2 bedrooms, KSh 12,500); the 4-bedroom house, KSh 37,500, is a placeholder (25% above the 3-bedroom). The national Consumer Price Index average price of a bed-sitter, KSh 7,690 a month (KNBS, Consumer Price Indices and Inflation Rates, September 2026, https://www.knbs.or.ke/wp-content/uploads/2026/09/Kenya-Consumer-Price-Indices-and-Inflation-Rates-September-2026.pdf), is context.",
     "rents_per_month.house_types": "[MIXED] [MIXED] apartment_units are [OPENED] KNBS, 2023/24 Kenya Housing Survey Basic Report (https://www.knbs.or.ke/wp-content/uploads/2025/01/2023-24-Kenya-Housing-Survey-Basic-Report1.pdf), Table 4.1 'Average Rent by County, Dwelling Type and Number of Bedrooms, Urban', Nakuru, flats/apartments: one bedroom KSh 6,000; two bedrooms KSh 13,000; three bedrooms KSh 14,000 a month (the table lists the average urban rent of the county, which includes the city of Nakuru; a small town may be lower). house_types: the 3-bedroom house is the 3-bedroom townhouse of the same table, KSh 30,000 (2-bedroom townhouse KSh 10,000; compound house not sharing facilities, 2 bedrooms, KSh 12,500); the 4-bedroom house, KSh 37,500, is a placeholder (25% above the 3-bedroom). The national Consumer Price Index average price of a bed-sitter, KSh 7,690 a month (KNBS, Consumer Price Indices and Inflation Rates, September 2026, https://www.knbs.or.ke/wp-content/uploads/2026/09/Kenya-Consumer-Price-Indices-and-Inflation-Rates-September-2026.pdf), is context.",
-    "public_finance.income_tax.brackets": "[OPENED] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible.",
-    "public_finance.income_tax.levy_bps": "[SECONDARY] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible.",
-    "public_finance.income_tax.levy_from": "[SECONDARY] brackets: [OPENED] Kenya Revenue Authority, PAYE page (https://www.kra.go.ke/individual/filing-paying/types-of-taxes/paye), rates effective 1 July 2023 and in force in 2026: on the first KSh 24,000 a month (KSh 288,000 a year) 10%; the next KSh 8,333 (KSh 100,000 a year) 25%; the next KSh 467,667 (KSh 5,612,000 a year) 30%; the next KSh 300,000 (KSh 3,600,000 a year) 32.5%; above KSh 800,000 a month (KSh 9,600,000 a year) 35%; personal relief KSh 2,400 a month (KSh 28,800 a year). Here the first band is taxed at 0 because the relief exactly cancels 10% of it (a person with other relief or deductions is not expressible); the Finance Bill 2026's proposed changes were not in the Bill as published and are not law as far as found. levy_bps 425: [SECONDARY] the Social Health Insurance Fund contribution (2.75% of gross pay: Social Health Insurance Act 2023) and the Affordable Housing Levy (1.5%: Affordable Housing Act 2024), from press and law-firm summaries (cliffedekkerhofmeyr.com, countrytaxcalc.com), not the Acts; NSSF (6%) is not expressible.",
     "credit.lending_rate_bps.organisation": "[OPENED] organisation: [OPENED] Central Bank of Kenya, Commercial Banks Weighted Average Rates (https://www.centralbank.go.ke/rates/commercial-banks-weighted-average-rates/): August 2026 lending 14.34% (deposit 6.91%, savings 3.54%, overdraft 12.5%; July 14.39, June 14.38, May 14.5, April 14.69, March 14.7). person: [PLACEHOLDER] 18%, above the average, for unsecured personal loans (no figure opened; digital lenders charge far more).",
     "credit.lending_rate_bps.person": "[PLACEHOLDER] organisation: [OPENED] Central Bank of Kenya, Commercial Banks Weighted Average Rates (https://www.centralbank.go.ke/rates/commercial-banks-weighted-average-rates/): August 2026 lending 14.34% (deposit 6.91%, savings 3.54%, overdraft 12.5%; July 14.39, June 14.38, May 14.5, April 14.69, March 14.7). person: [PLACEHOLDER] 18%, above the average, for unsecured personal loans (no figure opened; digital lenders charge far more).",
     "education.teacher_wage_per_pay_period": "[OPENED] school_ages: 6 to 17 (Basic Education Act 2013; Competency-Based Curriculum; Ministry of Education; recalled, not opened: to confirm). students_per_teacher 36.8: [OPENED, derived] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Tables 15.4(a), 15.8, 15.7 and 15.11: enrolment in 2025 in primary and junior school 11,935.7 thousand and in secondary school 3,338.8 thousand (all schools, public and private), over public primary teachers 215,691, junior school teachers 68,325 and public secondary teachers 131,501 (TSC); the enrolment includes private schools, so the ratio is an upper bound. school_days_per_year about 195 (three terms of about 13 weeks: Ministry of Education school calendar 2026; recalled, not opened) and hours_per_day 7 (8 to 4 with breaks): placeholders. teacher_wage_per_pay_period: [OPENED] KNBS, Economic Survey 2026 (https://www.knbs.or.ke/wp-content/uploads/2026/04/2026-Economic-Survey.pdf), Table 3.7: average annual earnings per employee of the Teachers Service Commission, 2025, KSh 812,644.2 (public sector), a month's twelfth, converted by 12/26. attainment: [OPENED] KNBS, 2019 Kenya Population and Housing Census, Volume IV (https://www.knbs.or.ke/wp-content/uploads/2023/09/2019-Kenya-population-and-Housing-Census-Volume-4-Distribution-of-Population-by-Socio-Economic-Characteristics.pdf), Table 2.5, Nakuru County, population aged 3 and above by highest level of education completed (total 1,817,950): none or pre-primary or adult basic or Madrasa or not stated 249,729 (13.7%); primary 884,543 (48.7%); secondary 498,450 (27.4%); middle-level college or TVET 127,430 (7.0%); university 57,798 (3.2%). The base includes children under 15; the years of schooling given to each level (4, 8, 12, 14, 16) are placeholders. return_per_year_bps 11%: placeholder after Psacharopoulos and Patrinos (2018), not opened.",

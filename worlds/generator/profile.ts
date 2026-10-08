@@ -3,7 +3,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Currency, HouseholdSpec } from "@oikos/participants";
+import type { Charge, Currency, HouseholdSpec } from "@oikos/participants";
 
 export interface Profile {
   id: string;
@@ -91,7 +91,13 @@ export interface Profile {
      * the unit, and the generator checks it's a size the world's whole numbers can carry (docs/profiles.md). */
     prices: { goods_world?: number; goods_import_markup_bps: number; inputs_per_kg: number; materials_per_kg: number };
     public_finance: {
-      income_tax: { brackets: { from: number; rate_bps: number }[]; levy_bps: number; levy_from: number };
+      /** Named funds and bodies of the higher government that charges on pay are paid to (and support may be paid
+       * from), each an account of its own; what names none is the general government's. */
+      funds?: { id: string; name: string }[];
+      /** The tax on pay, as its law's list of charges (docs/behaviour/public-finance.md): each with what it is charged on,
+       * its schedule, its reliefs, and whom it is paid to (`paid_to`: one of `funds`, or "town" for a local tax paid to
+       * the town; left out: the general government). Yearly sums. */
+      income_tax: { charges: (Omit<Charge, "collector" | "account"> & { paid_to?: string })[] };
       grants_per_resident_per_year: number;
       rates_per_resident_per_year: number;
       rates_instalments: number;

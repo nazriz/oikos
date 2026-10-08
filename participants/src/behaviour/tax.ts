@@ -129,7 +129,7 @@ export function annualTax(law: IncomeTaxLaw, income: number): number {
 /**
  * What's withheld from a pay of `gross` every `period` seconds, charge by charge: the pay reckoned as a year's, the
  * law's charges on that, and a pay period's part. The whole is rounded down once; each charge has its part rounded
- * down, and what that leaves over goes to the first. No law: nothing.
+ * down, and what that leaves over goes to the first that takes anything. No law: nothing.
  */
 export function withheld(law: IncomeTaxLaw | undefined, gross: number, period: number): { total: number; parts: { charge: Charge; amount: number }[] } {
   if (!law || gross <= 0 || period <= 0) return { total: 0, parts: [] };
@@ -137,8 +137,9 @@ export function withheld(law: IncomeTaxLaw | undefined, gross: number, period: n
   const year = chargesOn(law, yearly);
   const total = Math.floor((year.reduce((x, c) => x + c.amount, 0) * period) / YEAR);
   const parts = year.map((c) => ({ charge: c.charge, amount: Math.floor((c.amount * period) / YEAR) }));
-  if (parts[0]) parts[0].amount += total - parts.reduce((x, c) => x + c.amount, 0);
-  return { total, parts: parts.filter((c) => c.amount > 0) };
+  const taking = parts.filter((c, i) => year[i]!.amount > 0);
+  if (taking[0]) taking[0].amount += total - taking.reduce((x, c) => x + c.amount, 0);
+  return { total, parts: taking.filter((c) => c.amount > 0) };
 }
 
 /** What's withheld from a pay of `gross` every `period` seconds, in all (rounded down). No law: nothing. */
@@ -147,8 +148,9 @@ export function withholding(law: IncomeTaxLaw | undefined, gross: number, period
 }
 
 /** A law's charges in words, for the law's own text and for an office's report: each with what it is charged on, its
- * rates, its reliefs and where it is paid. `written` words a sum of money as the world writes it. */
-export function chargesInWords(charges: Charge[], written: (amount: number) => string): string {
+ * rates, its reliefs and where it is paid. `written` words a sum of money as the world writes it; `payee`, whom a charge
+ * is paid to. */
+export function chargesInWords(charges: Charge[], written: (amount: number) => string, payee: (c: Charge) => string = (c) => c.account): string {
   const pct = (bps: number) => `${bps / 100}%`;
   return charges.map((c) => {
     const b = c.base ?? {};
@@ -160,6 +162,6 @@ export function chargesInWords(charges: Charge[], written: (amount: number) => s
     const rates = bands.length === 1 && bands[0]!.from === 0 && bands[0]!.rising_to_bps === undefined ? pct(bands[0]!.rate_bps)
       : bands.map((s) => `${pct(s.rate_bps)}${s.rising_to_bps !== undefined ? ` rising to ${pct(s.rising_to_bps)}` : ""} above ${written(s.from)}`).join(", ");
     const reliefs = (c.reliefs ?? []).map((r) => ("none_due_up_to" in r ? `none due where that is ${written(r.none_due_up_to)} or less` : `less ${written(r.amount)} of the charge${r.tapers ? ` (reduced by ${pct(r.tapers.bps)} of pay above ${written(r.tapers.above)})` : ""}`));
-    return `${c.name ?? c.id}: ${[on, ...(b.from ? [`from ${written(b.from)}`] : []), ...(b.up_to !== undefined ? [`up to ${written(b.up_to)}`] : []), ...less].join(", ")}: ${rates}${reliefs.length ? `; ${reliefs.join("; ")}` : ""}; paid to ${c.account}`;
+    return `${c.name ?? c.id}: ${[on, ...(b.from ? [`from ${written(b.from)}`] : []), ...(b.up_to !== undefined ? [`up to ${written(b.up_to)}`] : []), ...less].join(", ")}: ${rates}${reliefs.length ? `; ${reliefs.join("; ")}` : ""}; paid to ${payee(c)}${c.itemised ? ", reported worker by worker" : ""}`;
   }).join(". ");
 }

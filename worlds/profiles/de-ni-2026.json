@@ -815,39 +815,120 @@
       "payment_approval_over": 5000000
     },
     "public_finance": {
+      "funds": [
+        {
+          "id": "pension-insurance",
+          "name": "Statutory pension insurance"
+        },
+        {
+          "id": "health-insurance",
+          "name": "Statutory health insurance"
+        },
+        {
+          "id": "care-insurance",
+          "name": "Long-term care insurance"
+        },
+        {
+          "id": "unemployment-insurance",
+          "name": "Unemployment insurance"
+        }
+      ],
       "income_tax": {
-        "brackets": [
+        "charges": [
           {
-            "from": 0,
-            "rate_bps": 0
+            "id": "income-tax",
+            "name": "Einkommensteuer",
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 0
+              },
+              {
+                "from": 1234900,
+                "rate_bps": 1900
+              },
+              {
+                "from": 1780000,
+                "rate_bps": 2900
+              },
+              {
+                "from": 3200000,
+                "rate_bps": 3400
+              },
+              {
+                "from": 4500000,
+                "rate_bps": 3900
+              },
+              {
+                "from": 6987900,
+                "rate_bps": 4200
+              },
+              {
+                "from": 27782700,
+                "rate_bps": 4500
+              }
+            ]
           },
           {
-            "from": 1234900,
-            "rate_bps": 1900
+            "id": "pension-insurance",
+            "name": "Pension insurance contribution",
+            "base": {
+              "from": 723600,
+              "up_to": 10140000
+            },
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 930
+              }
+            ],
+            "paid_to": "pension-insurance"
           },
           {
-            "from": 1780000,
-            "rate_bps": 2900
+            "id": "health-insurance",
+            "name": "Health insurance contribution",
+            "base": {
+              "from": 723600,
+              "up_to": 6975000
+            },
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 875
+              }
+            ],
+            "paid_to": "health-insurance"
           },
           {
-            "from": 3200000,
-            "rate_bps": 3400
+            "id": "care-insurance",
+            "name": "Care insurance contribution",
+            "base": {
+              "from": 723600
+            },
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 180
+              }
+            ],
+            "paid_to": "care-insurance"
           },
           {
-            "from": 4500000,
-            "rate_bps": 3900
-          },
-          {
-            "from": 6987900,
-            "rate_bps": 4200
-          },
-          {
-            "from": 27782700,
-            "rate_bps": 4500
+            "id": "unemployment-insurance",
+            "name": "Unemployment insurance contribution",
+            "base": {
+              "from": 723600
+            },
+            "schedule": [
+              {
+                "from": 0,
+                "rate_bps": 130
+              }
+            ],
+            "paid_to": "unemployment-insurance",
+            "itemised": true
           }
-        ],
-        "levy_bps": 2115,
-        "levy_from": 723600
+        ]
       },
       "grants_per_resident_per_year": 37620,
       "rates_per_resident_per_year": 18000,
@@ -1328,7 +1409,8 @@
     "opening": "Placeholders, to source: what each organisation holds on the first day (the bank's own funds EUR 500,000; the town EUR 2,000,000; the builder EUR 300,000; each landlord EUR 600,000; a shop EUR 30,000; a factory EUR 400,000), and the least an adult in the labour force has saved (EUR 1,000).",
     "town_finance.parks_per_year": "Placeholder: the town's yearly parks line, EUR 150,000.",
     "town_finance.payment_approval_over": "Placeholder: the town's payments procedure needs the mayor's written approval for payments over EUR 50,000 (in Niedersachsen the limit is set in each municipality's Hauptsatzung and financial rules under the NKomVG; to source).",
-    "public_finance.income_tax": "Income tax tariff 2026, Einkommensteuergesetz para 32a (https://www.gesetze-im-internet.de/estg/__32a.html, opened): taxable income to EUR 12,348 untaxed (Grundfreibetrag); EUR 12,349-17,799: (914.51 y + 1,400) y; EUR 17,800-69,878: (173.10 z + 2,397) z + 1,034.87; EUR 69,879-277,825: 0.42 x - 11,135.63; above: 0.45 x - 19,470.38 (y and z are the income above the zone's start, in units of EUR 10,000). The marginal rate therefore rises linearly from 14% to 23.97% in the first zone and from 23.97% to 42% in the second. The structure takes marginal-rate steps, so the curve is approximated by 19% (about the mean of 14-24%) from EUR 12,349, then 29%, 34%, 39% as the 24-42% ramp passes EUR 17,800, 32,000 and 45,000 (the step values are my approximation), and 42% and 45% as written. levy: the employee's share of social insurance contributions in 2026, 21.15% = pension 9.3% + health 7.3% (the general rate is 14.6%, halved) + 1.45% (half of the average additional contribution of 2.9%; Federal Ministry of Health, opened) + care 1.8% + unemployment 1.3% (the pension, care and unemployment rates are recalled, not opened, to confirm), from the Minijob limit of EUR 603 a month, EUR 7,236 a year (Bundesregierung page above, opened). Contribution ceilings (pension EUR 101,400, health EUR 69,750 in 2026; recalled, to confirm) and the solidarity surcharge are left out; see gaps.",
+    "public_finance.income_tax": "Income tax tariff 2026, Einkommensteuergesetz para 32a (https://www.gesetze-im-internet.de/estg/__32a.html, opened): taxable income to EUR 12,348 untaxed (Grundfreibetrag); EUR 12,349-17,799: (914.51 y + 1,400) y; EUR 17,800-69,878: (173.10 z + 2,397) z + 1,034.87; EUR 69,879-277,825: 0.42 x - 11,135.63; above: 0.45 x - 19,470.38 (y and z are the income above the zone's start, in units of EUR 10,000). The marginal rate therefore rises linearly from 14% to 23.97% in the first zone and from 23.97% to 42% in the second. The structure takes marginal-rate steps, so the curve is approximated by 19% (about the mean of 14-24%) from EUR 12,349, then 29%, 34%, 39% as the 24-42% ramp passes EUR 17,800, 32,000 and 45,000 (the step values are my approximation), and 42% and 45% as written. levy: the employee's share of social insurance contributions in 2026, 21.15% = pension 9.3% + health 7.3% (the general rate is 14.6%, halved) + 1.45% (half of the average additional contribution of 2.9%; Federal Ministry of Health, opened) + care 1.8% + unemployment 1.3% (the pension, care and unemployment rates are recalled, not opened, to confirm), from the Minijob limit of EUR 603 a month, EUR 7,236 a year (Bundesregierung page above, opened). Contribution ceilings (pension EUR 101,400, health EUR 69,750 in 2026; recalled, to confirm) and the solidarity surcharge are left out; see gaps. SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). The income tax keeps the author's steps approximating the continuous tariff (a schedule can now say a rate that rises in a straight line through a band, `rising_to_bps`, which is the tariff's two zones exactly: left for the author). UN-FOLDED: the levy of 21.15% that stood for the employee's social insurance is now its four contributions as this note gives them, each paid to its own body: pension 9.3% up to the ceiling of EUR 101,400; health 8.75% (7.3% and the 1.45% additional contribution) up to EUR 69,750; care 1.8%; unemployment 1.3%; each from the Minijob limit, as before. The note gives no ceiling for care or unemployment insurance (in fact they share the health and pension ceilings: to confirm), so none is set: the field is `base.up_to`. The employers' report of the unemployment contribution names each worker and their pay: the record the insurance payment is reckoned from. Not expressed: the solidarity surcharge (it would be a charge on the tax, `base.on`; the note gives no figure), the employer's share.",
+    "public_finance.funds": "The named funds and bodies of the higher government that this place's charges on pay are paid to, each kept as an account of the outside world's of its own (the general government's account takes the rest). The four branches of social insurance the employee's contributions go to, as the note on the income tax lists them.",
     "public_finance.grants_per_resident_per_year": "Derived: Niedersachsen's 2026 key allocations (Schluesselzuweisungen) for municipal tasks, EUR 3,010,991,289 (53.8% of the allocation mass of EUR 5.97 billion) under the Niedersaechsisches Finanzausgleichsgesetz, as quoted in a Landesamt fuer Statistik / state finance document found by search (LSN, https://www.statistik.niedersachsen.de/download/227085; not opened, to confirm), over the state's 8.0 million people (Niedersachsen-Monitor 2025): about EUR 376 a resident. Municipalities in Germany also receive a share of income tax and of VAT and levy the trade tax (see gaps).",
     "public_finance.rates_per_resident_per_year": "Placeholder: property tax (Grundsteuer A and B), about EUR 15 billion a year nationally, so about EUR 180 a resident (Destatis, Kassenstatistik; recalled, to confirm). Sets the town's opening rate. Waste and water are charged separately as fees (services, utilities); the trade tax and the income-tax share are not modelled. Note the 2025 Grundsteuer reform (new valuations) is in force from 2025 (to confirm).",
     "public_finance.rates_instalments": "Grundsteuergesetz para 28: property tax is due in four equal instalments on 15 February, 15 May, 15 August and 15 November (https://www.gesetze-im-internet.de/grstg_1973/__28.html, opened).",

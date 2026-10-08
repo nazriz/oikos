@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, taxLawOf, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type LawSchedule } from "@oikos/participants";
+import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, chargesInWords, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -336,8 +336,17 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   const MATERIALS_PRICE = V.prices.materials_per_kg;
   // The income tax law, from the profile (the outside world's: for a town, a higher government's), which employers
   // withhold under.
-  const TAX = { ...V.public_finance.income_tax, collector: "outside", account: "acc-outside" };
-  const taxLaw = taxLawOf("law-income-tax", TAX)!;
+  // Each charge is paid where the profile says: to a named fund or body of that government (an account of the outside
+  // world's of its own), to the town (a local tax), or, naming neither, to the general government.
+  const FUNDS = V.public_finance.funds ?? [];
+  const paidAt = (to: string | undefined, what: string) => {
+    if (to === undefined) return { collector: "outside", account: "acc-outside" };
+    if (to === "town") return { collector: "city", account: "acc-city" };
+    if (!FUNDS.some((f) => f.id === to)) throw new Error(`profile ${P.id}: ${what} names the fund ${to}, which public_finance.funds doesn't list`);
+    return { collector: "outside", account: `acc-outside-${to}` };
+  };
+  const payeeName = (account: string) => (account === "acc-outside" ? "the general government" : account === "acc-city" ? "the town" : FUNDS.find((f) => `acc-outside-${f.id}` === account)?.name ?? account);
+  const taxLaw: IncomeTaxLaw = { id: "law-income-tax", charges: V.public_finance.income_tax.charges.map(({ paid_to, ...c }) => ({ ...c, ...paidAt(paid_to, `the charge ${c.id}`) })) };
   // A factory's item: its labour share of the world price in hours at the factory wage; its input share in kg of inputs.
   const MAKE = {
     labour: Math.round((share(V.industry.factory_labour_share_bps, WORLD.goods_export) / hourly(wages.factory)) * HOUR),
@@ -508,6 +517,8 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // ---- people: savings, homes, jobs ----
   const accounts: any[] = [
     { id: "acc-outside", holder: "outside", custodian: "outside", balance: 0 },
+    // (The higher government's named funds: accounts of the outside world's, each its own.)
+    ...FUNDS.map((f) => ({ id: `acc-outside-${f.id}`, holder: "outside", custodian: "outside", balance: 0 })),
     { id: "acc-bank", holder: "bank", custodian: "bank", balance: V.opening.bank },
     { id: "acc-union", holder: "union", custodian: "bank", balance: 0 },
     { id: "acc-city", holder: "city", custodian: "bank", balance: V.opening.town },
@@ -1012,9 +1023,9 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     .reduce((x, r) => x + landValue + (onLot.has(cellOf.get(r.about.object)) ? buildPrice(onLot.get(cellOf.get(r.about.object))!.type) : 0), 0);
   const ratePpm = rateable > 0 ? Math.round((V.public_finance.rates_per_resident_per_year * everyone.length * 1_000_000) / rateable) : 0;
   records.push({ id: taxLaw.id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "outside", kind: "law",
-    text: `Income tax: on a year's income, ${TAX.brackets.map((b) => `${b.rate_bps / 100}% above ${asWritten(b.from)}`).join(", ")}; and a levy of ${TAX.levy_bps / 100}% of the whole from ${asWritten(TAX.levy_from)}. Employers withhold it from each pay, reckoned as a year's income, and pay what they withheld to ${TAX.account} monthly.`,
+    text: `Tax on pay. ${chargesInWords(taxLaw.charges, asWritten, (c) => `${payeeName(c.account)} (${c.account})`)}. Employers withhold each from every pay, reckoned as a year's pay, and pay what they withheld over monthly, with a report${taxLaw.charges.some((c) => c.itemised) ? " (naming each worker and their pay in the month, where a charge is reported worker by worker)" : ""}.`,
     adico: { attribute: "employers", deontic: "must", aim: "withhold income tax from each pay and pay it over", condition: "monthly" },
-    data: { tax: "income", brackets: TAX.brackets, levy_bps: TAX.levy_bps, levy_from: TAX.levy_from, collector: TAX.collector, account: TAX.account } });
+    data: { tax: "income", charges: taxLaw.charges } });
   records.push({ id: "law-rates", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "law", basis: "law-charter",
     text: `Rates: every owner of land in the town (but the town) owes the town ${ratePpm / 10_000}% of its value a year, as the valuer values it, in ${V.public_finance.rates_instalments} instalments, each due ${V.public_finance.rates_due_days} days after its notice. Or else: interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year on what's overdue.`,
     adico: { attribute: "owners of land in the town", deontic: "must", aim: "pay rates on its value", condition: `in ${V.public_finance.rates_instalments} instalments a year`, or_else: `interest at ${V.public_finance.rates_penalty_interest_bps / 100}% a year` },

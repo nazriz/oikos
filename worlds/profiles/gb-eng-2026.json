@@ -814,27 +814,63 @@
    "payment_approval_over": 5000000
   },
   "public_finance": {
+   "funds": [
+    {
+     "id": "national-insurance",
+     "name": "National Insurance"
+    }
+   ],
    "income_tax": {
-    "brackets": [
+    "charges": [
      {
-      "from": 0,
-      "rate_bps": 0
+      "id": "income-tax",
+      "name": "Income Tax",
+      "base": {
+       "less": [
+        {
+         "amount": 1257000,
+         "tapers": {
+          "above": 10000000,
+          "bps": 5000
+         }
+        }
+       ]
+      },
+      "schedule": [
+       {
+        "from": 0,
+        "rate_bps": 2000
+       },
+       {
+        "from": 3770000,
+        "rate_bps": 4000
+       },
+       {
+        "from": 12514000,
+        "rate_bps": 4500
+       }
+      ]
      },
      {
-      "from": 1257000,
-      "rate_bps": 2000
-     },
-     {
-      "from": 5027000,
-      "rate_bps": 4000
-     },
-     {
-      "from": 12514000,
-      "rate_bps": 4500
+      "id": "national-insurance",
+      "name": "National Insurance",
+      "schedule": [
+       {
+        "from": 0,
+        "rate_bps": 0
+       },
+       {
+        "from": 1257000,
+        "rate_bps": 800
+       },
+       {
+        "from": 5027000,
+        "rate_bps": 200
+       }
+      ],
+      "paid_to": "national-insurance"
      }
-    ],
-    "levy_bps": 800,
-    "levy_from": 1257000
+    ]
    },
    "grants_per_resident_per_year": 10000,
    "rates_per_resident_per_year": 85210,
@@ -1336,7 +1372,8 @@
   "opening": "PLACEHOLDERS carried over from au-vic-2026, in pounds not converted: what each organisation holds on the first day (bank 500,000; town 2,000,000; builder 300,000; each landlord 600,000; a shop 30,000; a factory 400,000) and the least an adult in the labour force has saved (1,000). Model sizing figures, to source.",
   "town_finance.parks_per_year": "PLACEHOLDER carried over: the town's yearly parks line, 150,000 pounds.",
   "town_finance.payment_approval_over": "PLACEHOLDER carried over: the town's payments procedure needs the mayor's written approval for any payment over 50,000 pounds.",
-  "public_finance.income_tax": "Income tax 2026-27, England: personal allowance GBP 12,570 (frozen until 2031), basic rate 20% to GBP 50,270, higher rate 40% to GBP 125,140, additional rate 45% above (GOV.UK, Income Tax rates and Personal Allowances; to confirm for 2026-27). The levy is National Insurance (employee Class 1 main rate 8% from the primary threshold of GBP 12,570, which is 2% above GBP 50,270; thresholds frozen; GOV.UK 'National Insurance rates and categories', to confirm). The personal allowance taper (lost at GBP 1 per GBP 2 above GBP 100,000), the 2% rate on high earnings and employers' National Insurance (15% above GBP 5,000) cannot be expressed. Employers deduct tax through PAYE on cumulative pay; the profile reckons each pay as a year's income.",
+  "public_finance.income_tax": "Income tax 2026-27, England: personal allowance GBP 12,570 (frozen until 2031), basic rate 20% to GBP 50,270, higher rate 40% to GBP 125,140, additional rate 45% above (GOV.UK, Income Tax rates and Personal Allowances; to confirm for 2026-27). The levy is National Insurance (employee Class 1 main rate 8% from the primary threshold of GBP 12,570, which is 2% above GBP 50,270; thresholds frozen; GOV.UK 'National Insurance rates and categories', to confirm). The personal allowance taper (lost at GBP 1 per GBP 2 above GBP 100,000), the 2% rate on high earnings and employers' National Insurance (15% above GBP 5,000) cannot be expressed. Employers deduct tax through PAYE on cumulative pay; the profile reckons each pay as a year's income. SHAPE (2026-10-08, track E of docs/design/profile-depth.md): the law is now a list of charges, each with what it is charged on, its schedule, its reliefs and whom it is paid to (docs/behaviour/public-finance.md). Income Tax, the same figures said as the law says them: the personal allowance of GBP 12,570 taken off the pay, and the rates on what is left (20% on the first GBP 37,700, which is GBP 50,270 less the allowance; 40% to GBP 125,140; 45% above). EXPRESSED NOW, from this note: the allowance tapering away at GBP 1 for each GBP 2 of pay above GBP 100,000 (no wage in the profile is near it). UN-FOLDED: the levy of 8% of the whole of a pay from GBP 12,570 that stood for National Insurance is now the contribution as this note gives it: 8% of pay between the primary threshold of GBP 12,570 and GBP 50,270, and 2% above, paid to National Insurance and not to general revenue. That lowers what is withheld from every wage by 8% of GBP 12,570 a year. Not expressed: employers' National Insurance (a charge the employer bears is not built).",
+  "public_finance.funds": "The named funds and bodies of the higher government that this place's charges on pay are paid to, each kept as an account of the outside world's of its own (the general government's account takes the rest). National Insurance contributions, kept apart from Income Tax (the note on the income tax).",
   "public_finance.grants_per_resident_per_year": "PLACEHOLDER: GBP 100 a resident. English councils get a mix of Revenue Support Grant, retained business rates and specific grants; general-purpose funding per head is to source from DLUHC/MHCLG, Local Authority Revenue Expenditure and Financing, and the local government finance settlement. For scale only: North Yorkshire Council's gross spending requirement for 2026-27 (GBP 1,323M) less its council tax requirement (GBP 524M) is about GBP 1,300 a resident, but that includes ring-fenced grants, fees and retained business rates, so it is not used.",
   "public_finance.rates_per_resident_per_year": "Derived: North Yorkshire Council's council tax requirement for its own purposes in 2026-27, GBP 524,458,818 (North Yorkshire Council, Council Tax Resolution Report, February 2026; Band D GBP 2,036.32; tax base 257,552 Band D equivalents), over 615,492 residents (ONS Census 2021, TS007A via Nomis) = GBP 852 a resident a year. Excludes the police (GBP 335.86 Band D) and fire (GBP 116.62) precepts and parish precepts; total Band D GBP 2,544.34. Council tax in England is a charge on each dwelling by valuation band, not a rate on land value.",
   "public_finance.rates_instalments": "Council Tax (Administration and Enforcement) Regulations 1992: council tax is payable in ten monthly instalments by default (April to January), or twelve on request (to confirm).",
