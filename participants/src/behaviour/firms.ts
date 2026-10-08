@@ -743,6 +743,9 @@ export class Staffing {
     const posts = this.postings(book);
     const apps = book.open("job_application").filter((a) => (a.addressed_to ?? []).includes(me) && !this.handled.has(a.id));
     for (const post of doesHire ? posts : []) {
+      // (An advertisement of ours that we have put on hold: nobody is offered the post while the hold stands; those
+      // who applied are still on file when it is lifted.)
+      if (book.onHold(post.id, [me])) continue;
       const mine = apps.filter((a) => a.data?.posting === post.id).sort((x, y) => (x.id < y.id ? -1 : 1));
       for (const a of mine) this.handled.add(a.id);
       if (!mine.length) continue;

@@ -141,6 +141,23 @@ test("the rates officer, directed to add no penalty interest, adds none while th
   expect(letters(w)).toEqual(["From the rates office: your direction rec.50 is received. No penalty interest is added to overdue rates while it stands; the rates are still owed. It stands until you replace or withdraw it."]);
 });
 
+test("a direction its giver puts on hold is not followed while the hold stands, and is followed again when the hold is withdrawn; anyone else's hold is nothing", () => {
+  const d = direction("rec.50", 5 * DAY, "form-works-staffing", "mayor", { recruit: "no" });
+  const hold = (by: string) => statement("rec.55", 6 * DAY, "hold", { author: "mayor-system", speaks_for: by, addressed_to: [by], visible_to: [by], data: { holds: ["rec.50"] } });
+  expect(posted(wake(works(), 7 * DAY, records(...base, d), { entity: "city" }))).toBe(0);
+  expect(posted(wake(works(), 7 * DAY, records(...base, d, hold("city")), { entity: "city" }))).toBe(1);
+  expect(posted(wake(works(), 7 * DAY, records(...base, d, hold("city"), withdrawal("rec.56", 6 * DAY, "rec.55")), { entity: "city" }))).toBe(0);
+  expect(posted(wake(works(), 7 * DAY, records(...base, d, hold("bank")), { entity: "city" }))).toBe(0);
+});
+
+test("an advertisement the office has put on hold brings nobody an offer while the hold stands", () => {
+  const advert = statement("rec.40", 9 * DAY, "job_posting", { author: "works-system", in_position: "works", data: { wage: WAGE, period: PERIOD, role: "works crew" } });
+  const application = { id: "rec.41", at: 9 * DAY + 10, record: "statement", author: "c0100-self", speaks_for: "c0100", kind: "job_application", addressed_to: ["city"], visible_to: ["city", "c0100"], text: "x", data: { posting: "rec.40", account: "acc-c0100" } };
+  const hold = statement("rec.42", 9 * DAY + 20, "hold", { addressed_to: ["city"], visible_to: ["city"], data: { holds: ["rec.40"] } });
+  expect(wake(works(), 10 * DAY, records(...base, advert, application), { entity: "city" }).of("agreement")).toHaveLength(1);
+  expect(wake(works(), 10 * DAY, records(...base, advert, application, hold), { entity: "city" }).of("agreement")).toEqual([]);
+});
+
 test("every direction a module declares has a form's shape: a name, a title, fields with their descriptions, and what following it means", () => {
   const declared = Object.values(modules).flatMap((m) => (m.takes ?? []).map((t) => ({ module: m.name, ...t })));
   expect(declared.map((t) => `${t.module}: ${t.form}`).sort()).toEqual(["city.environment: environment_staffing", "city.inspector: inspector_enforcement", "city.rates_officer: rates_recovery", "city.works: works_collection", "city.works: works_staffing"]);
