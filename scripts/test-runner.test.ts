@@ -75,3 +75,39 @@ test("a file with a timeout and another kind of failure is not rerun", async () 
     expect(out).not.toMatch(/LATE|RERUN/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);
+
+test("--changed picks the tests that are changed, import a changed file (however far down) or name a changed data file, and says why", async () => {
+  const dir = fixtures({
+    "a.test.ts": `import { one } from "./lib/a";\ntest("a", () => expect(one()).toBe(1));`,
+    "b.test.ts": `test("b", () => expect(1).toBe(1));`,
+    "c.test.ts": `import { readFileSync } from "node:fs";\ntest("c", () => expect(readFileSync(import.meta.dir + "/data/town.yaml", "utf8")).toContain("x"));`,
+    "d.test.ts": `test("d", () => expect(1).toBe(1));`,
+  });
+  const git = (...a: string[]) => { const p = Bun.spawnSync(["git", "-c", "user.name=t", "-c", "user.email=t@t", ...a], { cwd: dir, stdout: "pipe", stderr: "pipe" }); if (p.exitCode !== 0) throw new Error(p.stderr.toString()); };
+  try {
+    mkdirSync(join(dir, "lib")); mkdirSync(join(dir, "data"));
+    writeFileSync(join(dir, "lib/a.ts"), `import { inner } from "./deep";\nexport const one = () => inner();\n`);
+    writeFileSync(join(dir, "lib/deep.ts"), `export const inner = () => 1;\n`);
+    writeFileSync(join(dir, "lib/alone.ts"), `export const nobody = 0;\n`);
+    writeFileSync(join(dir, "data/town.yaml"), "x: 1\n");
+    git("init", "-q", "-b", "main"); git("add", "."); git("commit", "-q", "-m", "base"); git("tag", "base");
+    // Nothing changed: nothing chosen (no file here has a recorded time, so the fast tier is empty).
+    const none = await runner_(dir, "--changed", "--base", "base");
+    expect(none.out).toMatch(/^0 pass, 0 fail across 0 files/m);
+    writeFileSync(join(dir, "lib/deep.ts"), `export const inner = () => 1; // changed\n`);
+    writeFileSync(join(dir, "lib/alone.ts"), `export const nobody = 1;\n`);
+    writeFileSync(join(dir, "data/town.yaml"), "x: 2\n");
+    writeFileSync(join(dir, "d.test.ts"), `import { test, expect } from "bun:test";\ntest("d", () => expect(2).toBe(2));`);
+    git("commit", "-q", "-am", "committed on the branch"); // (lib/deep.ts and the rest, committed: still changed since the base)
+    writeFileSync(join(dir, "e.test.ts"), `import { test, expect } from "bun:test";\ntest("e", () => expect(1).toBe(1));`); // (new, untracked)
+    const { code, out } = await runner_(dir, "--changed", "--base", "base");
+    expect(code).toBe(0);
+    expect(out).toMatch(/^  \+ a\.test\.ts .*: imports lib\/deep\.ts \(2 imports down\)$/m);
+    expect(out).toMatch(/^  \+ c\.test\.ts .*: names data\/town\.yaml$/m);
+    expect(out).toMatch(/^  \+ d\.test\.ts .*: changed itself$/m);
+    expect(out).toMatch(/^  \+ e\.test\.ts .*: changed itself$/m);
+    expect(out).toMatch(/^  no test imports or names: lib\/alone\.ts$/m);
+    expect(out).not.toMatch(/b\.test\.ts/);
+    expect(out).toMatch(/^4 pass, 0 fail across 4 files, .*\(fast tier and what changed\), 0 passed on rerun$/m);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}, 120_000);

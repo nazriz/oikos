@@ -138,5 +138,12 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
   and looked in on, not waited for.
 - A laptop that sleeps looks like a model that's slow. Long runs: detached, with `caffeinate`, on a machine that stays
   awake (what `scripts/mini run` does).
+- **Running tests on the shared machine (2026-10-08; docs/dev-machine.md).** One full suite per merge: `bun run
+  test:all` is run once, on the merge, by whoever merges. On a branch: `bun run test:changed` (the fast tier and the
+  tests that import what the branch changed; it says what it chose and why), or `bun scripts/test.ts <filter>...`.
+  Suites, kernel builds and `oikos run` batches share the cores through the slots (`bun scripts/slots.ts status` says
+  who holds them and who waits; a job that waits says so once a minute and loses nothing but time). A fresh worktree
+  is made ready with `bun scripts/worktree-warm.ts <path>`. Never kill by pattern (`pkill -f`, `killall`): only a
+  process id you started.
 - Don't edit source while a test suite is running from the same checkout, or rebuild the engine while a run is using
   it: both have produced failures that weren't real.

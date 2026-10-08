@@ -2,3 +2,5 @@
 # A test about a hang gives its own short limit; a real hang still fails, only later.
 [test]
 timeout = 120000
+# Before the tests: one of the machine's slots for this process (scripts/slots.ts; nothing under the suite runner).
+preload = ["./scripts/slots-preload.ts"]
