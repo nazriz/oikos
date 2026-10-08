@@ -7,7 +7,7 @@ import { citizen } from "../src/behaviour/citizen";
 import { SAYING } from "../src/behaviour/household";
 import { inCurrency } from "../src/money";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
-import { DAY, employment, person, signed, statement, type Said } from "./stepping";
+import { DAY, employment, lease, person, signed, statement, type Said } from "./stepping";
 
 inCurrency(PROFILE.values.currency);
 
@@ -81,4 +81,16 @@ test("an adult told by a child of the household reports it from where they are; 
   expect(reports(said)).toEqual([{ deceased: "c1", tell: TELL, partner: "c2", children: ["k1"], adult_children: [] }]);
   // Home that evening, the death still among the home's departures: nothing more to report.
   expect(reports(await partner.wake(at + 3 * HOUR, { street: street(["c2", "k1"], died(at - 5 * HOUR)), in: HOME }))).toEqual([]);
+});
+
+test("an adult who lives in a home reports the death there of someone not of their household, naming no family", async () => {
+  // c9 rents the home and lives in it; c1 (of another household, the home let again over c9's head) dies there.
+  const lodger = person(citizen, PARAMS, { me: "c9", age: 30 });
+  const tenancy = signed(lease("L9", 0, "landlord-1", "c9", HOME, 100_000));
+  await lodger.wake(DAY + 20 * HOUR, { records: tenancy, readings: { L9: { of: "agreement", status: "in_force" } }, balance: 300_000, street: street(["c1", "c9"]), in: HOME });
+  const at = 3 * DAY + 7 * HOUR;
+  const said = await lodger.wake(at, { street: street(["c9"], died(at - 4 * HOUR)), in: HOME, woke_for: "cadence" });
+  expect(reports(said)).toEqual([{ deceased: "c1", found_at: HOME }]);
+  // Once.
+  expect(reports(await lodger.wake(at + DAY, { street: street(["c9"], died(at - 4 * HOUR)), in: HOME }))).toEqual([]);
 });

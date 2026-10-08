@@ -117,7 +117,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.39.0",
+  version: "0.39.1",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -297,6 +297,7 @@ export const citizen: BehaviourModule = {
      * unasked, those standing. */
     let onSale: StatementRecord[] | null = null;
     let saleAsked = false;
+    let saleSeenAt = -1; // when we last had an answer from the listings
     const forSaleNow = (): StatementRecord[] => (p.sale_board ? onSale ?? [] : book.open("property_for_sale"));
     let nextShopSearch = ctx.rng("shop-search-day").below(30) * DAY;
     const lookedUp = new Set<string>(); // shops whose prices we know from looking them up, not from passing
@@ -647,7 +648,10 @@ export const citizen: BehaviourModule = {
       if (ads?.kind === "records" && ads.search) for (const r of ads.records) if (r.speaks_for) lookedUp.add(r.speaks_for);
       const sale = p.sale_board ? obs.channels[p.sale_board] : undefined;
       // (Only the answer to a look we just made: the channel goes on holding its last answer.)
-      if (saleAsked && sale?.kind === "records" && sale.search) onSale = sale.records as StatementRecord[];
+      if (saleAsked && sale?.kind === "records" && sale.search) {
+        onSale = sale.records as StatementRecord[];
+        saleSeenAt = obs.t;
+      }
       saleAsked = false;
       for (const k of ["homes", "jobs", "petitions"] as const) {
         const ch = obs.channels[k];
@@ -744,6 +748,18 @@ export const citizen: BehaviourModule = {
         const school = p.school && age >= p.school.ages[0] && age <= p.school.ages[1] ? p.school.entity : undefined;
         return [...new Set([p.bank, p.utilities?.energy, school, home && !home.owned ? home.landlord : undefined].filter((x): x is string => !!x && x !== me))].sort();
       };
+      // Someone who died in the home we live in and is not of our household (a home let again over our heads, a
+      // lodger): an adult living there says so to the registry, as whoever is present at a death may. We can't say who
+      // their family is, so the report names none (docs/behaviour/deaths.md).
+      if (ourHome && street?.kind === "sites" && p.registry && obs.body && t - obs.body.born_at >= ADULT_YEARS * year) {
+        const here = street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.space === ourHome);
+        if (here.some((sp) => (sp.occupants ?? []).includes(me))) for (const l of here.flatMap((sp) => sp.left ?? [])) {
+          if (l.reason !== "died" || mourned.has(l.occupant) || household?.members.some((m) => m.person === l.occupant)) continue;
+          mourned.add(l.occupant);
+          steps.push(because(`${l.occupant}, who lived where we live and is not of our household, has died here: reporting it to the registry.`,
+            say("death_notification", `${l.occupant} has died at ${ourHome}.`, { to: [p.registry], data: { deceased: l.occupant, found_at: ourHome } })));
+        }
+      }
       if (household) {
         let hh: HouseholdData = household;
         const ours = ourHome && street?.kind === "sites" ? street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.space === ourHome) : [];
@@ -2049,11 +2065,13 @@ export const citizen: BehaviourModule = {
         // is the same home, and the seller takes a purchase answering any of its listings; we are shown listings being
         // taken down now, and a relisting must not read as the home gone.)
         const forSale = forSaleNow().some((r) => r.id === b.listing || (r.speaks_for === b.seller && r.data?.lot === b.lot));
-        // (Looked up, a home being relisted can be found with no listing standing for a moment, the old one taken down
-        // and the new not yet up: it is gone when a look a day or more later still finds none.)
+        // (Looked up, a home being relisted is found with no listing standing: a seller takes it off and lists it again
+        // for less at their next week's plan. So it is gone when a look more than a week after the first that found
+        // none still finds none. Shown listings unasked, as before: gone when it is not there.)
         if (forSale) b.goneSince = undefined;
-        else b.goneSince ??= t;
-        if (declined || (!forSale && t - b.goneSince! >= DAY) || t - b.since > 60 * DAY) buying = null;
+        else b.goneSince ??= p.sale_board ? saleSeenAt : -Infinity;
+        const gone = !forSale && (p.sale_board ? saleSeenAt : t) - b.goneSince! > 7 * DAY;
+        if (declined || gone || t - b.since > 60 * DAY) buying = null;
         else if (forSale && b.funded && acc.balance >= b.price) {
           b.stage = "paid";
           steps.push(because(`Our mortgage is through: buying ${b.structure} for ${usd(b.price)}.`,
