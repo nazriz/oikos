@@ -42,6 +42,9 @@ export class ModelUnreachable extends SpendingLimitReached {
  * it's recorded: the run goes on, and replays exactly, because what the model said (nothing) is in the log. */
 export class ModelCallFailed extends Error {
   override name = "ModelCallFailed";
+  /** When the seat the call was for sits again (its participant's own reckoning: the next working day's sitting): the
+   * run has it woken then. Without it a seat would wait out its whole usual rhythm, days, with nobody in it. */
+  backAt?: number;
 }
 
 /** Whether a failed call's words say the prompt was more than the model takes. Such a call is never made again

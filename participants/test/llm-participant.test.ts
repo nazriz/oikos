@@ -149,29 +149,52 @@ test("more actions than can be taken at once: the ones left out are said and rec
   expect(notes.filter((n) => n.dropped_tool_use).length).toBe(1);
 });
 
-test("a model call that fails loses nothing the participant hadn't read: at a sitting's start, and in the middle of one", async () => {
+test("a seat whose model call fails misses that sitting and sits again at its next working day's: nothing it hadn't read is lost, and it is told it missed one", async () => {
   const sessions = { start: 9 * HOUR, end: 17 * HOUR, days: 5 };
-  // At the start of a sitting: what was kept for it, and the report it failed on, are shown by the next call.
-  const { p, calls } = harness(["fail", "fail", [use("a", "write", { to: ["clerk"], text: "Thanks.", as: "mayor" })], "fail", "fail"], { sessions });
+  const failed = async (step: Promise<unknown>) => { try { await step; } catch (e) { return e as ModelCallFailed; } throw new Error("the call went through"); };
+  // At the start of a sitting. The failure says when the seat sits again (the run has it woken then): the next working
+  // day's sitting, not its usual rhythm of a week.
+  const { p, calls, notes } = harness(["fail", "fail", [use("a", "write", { to: ["clerk"], text: "Thanks.", as: "mayor" })], "fail"], { sessions });
   await p.step(obs(2 * HOUR, "an early letter"), ctx);
-  await expect(p.step(obs(9 * HOUR, "a letter at nine"), ctx)).rejects.toThrow("no answer within 180 s");
-  await expect(p.step(obs(10 * HOUR, "a letter at ten"), ctx)).rejects.toBeInstanceOf(ModelCallFailed);
+  const first = await failed(p.step(obs(9 * HOUR, "a letter at nine"), ctx));
+  expect(first).toBeInstanceOf(ModelCallFailed);
+  expect(first.message).toContain("no answer within 180 s");
+  expect(first.backAt).toBe(DAY + 9 * HOUR);
+  expect(notes.find((n) => n.sitting_missed)!.sitting_missed).toMatchObject({ day: 0, midway: false, back_at: DAY + 9 * HOUR, why: "model_call_failed" });
+  // Woken again that day (a letter): the day's sitting is the one it missed, so no call is made, and it waits for the next.
+  expect(await p.step(obs(10 * HOUR, "a letter at ten"), ctx)).toEqual({ type: "wait", until: DAY + 9 * HOUR });
+  expect(calls.length).toBe(1);
+  // The next day's fails too: the day after, then.
+  expect((await failed(p.step(obs(DAY + 9 * HOUR, "a letter the next morning"), ctx))).backAt).toBe(2 * DAY + 9 * HOUR);
   // (What a mock's code brain reads, the observations themselves, is kept the same way.)
-  expect(calls[1]!.context.missed.map((o: any) => o.t)).toEqual([2 * HOUR, 9 * HOUR]);
-  expect(await p.step(obs(11 * HOUR, "a letter at eleven"), ctx)).toMatchObject({ type: "message" });
-  for (const l of ["an early letter", "a letter at nine", "a letter at ten", "a letter at eleven"]) expect(shown(calls[2]!)).toContain(l);
-  expect(calls[2]!.context.missed.map((o: any) => o.t)).toEqual([2 * HOUR, 9 * HOUR, 10 * HOUR]);
-  // In the middle of one: the result of its own action, and what came after, reach it once the call goes through.
-  await expect(p.step(obs(11 * HOUR + 60, "the clerk's reply"), ctx)).rejects.toBeInstanceOf(ModelCallFailed);
-  await expect(p.step(obs(12 * HOUR, "a letter at noon"), ctx)).rejects.toBeInstanceOf(ModelCallFailed);
-  await p.step(obs(13 * HOUR, "a letter at one"), ctx);
+  expect(calls[1]!.context.missed.map((o: any) => o.t)).toEqual([2 * HOUR, 9 * HOUR, 10 * HOUR]);
+  expect(await p.step(obs(2 * DAY + 9 * HOUR, "a letter on the third day"), ctx)).toMatchObject({ type: "message" });
+  const third = shown(calls[2]!);
+  for (const l of ["an early letter", "a letter at nine", "a letter at ten", "a letter the next morning", "a letter on the third day"]) expect(third).toContain(l);
+  // Told first thing, in the world's terms, once for each sitting missed: that it was missed, and that nothing was done.
+  expect(third).toContain("You missed your sitting on year 1, day 1: you were not at your desk, and nothing was read or done that day.");
+  expect(third).toContain("You missed your sitting on year 1, day 2: you were not at your desk, and nothing was read or done that day.");
+  expect(third.indexOf("You missed your sitting on year 1, day 1")).toBeLessThan(third.indexOf("an early letter"));
+  expect(third).not.toMatch(/\bmodel|\bcall|platform|timed? ?out|no answer/i);
+  // In the middle of one (its letter sent, the call for its next turn fails): the sitting ends there; what its action
+  // showed, and what came after, are set out at the next day's, which says the sitting was cut short.
+  const mid = await failed(p.step(obs(2 * DAY + 9 * HOUR + 60, "the clerk's reply"), ctx));
+  expect(mid.backAt).toBe(3 * DAY + 9 * HOUR);
+  expect(notes.filter((n) => n.sitting_missed).at(-1)!.sitting_missed).toMatchObject({ day: 2, midway: true });
+  expect(await p.step(obs(2 * DAY + 12 * HOUR, "a letter at noon"), ctx)).toEqual({ type: "wait", until: 3 * DAY + 9 * HOUR });
+  await p.step(obs(3 * DAY + 9 * HOUR, "a letter on the fourth day"), ctx);
   const last = calls.at(-1)!;
-  expect(resultsOf(last).a).toContain("the clerk's reply");
-  expect(shown(last)).toContain("a letter at noon");
-  expect(shown(last)).toContain("a letter at one");
-  expect(last.messages.length).toBe(3); // the sitting's first report, its answer, and the results: no failed turn left in
-  // Once shown, not shown again.
-  expect(calls.at(-1)!.context.missed.map((o: any) => o.t)).toEqual([11 * HOUR + 60, 12 * HOUR]);
+  expect(calls.length).toBe(5);
+  expect(last.messages.length).toBe(1); // (a sitting of its own: no failed turn left in)
+  for (const l of ["the clerk's reply", "a letter at noon", "a letter on the fourth day"]) expect(shown(last)).toContain(l);
+  expect(shown(last)).toContain("Your sitting on year 1, day 3 was cut short: you were away from your desk after your last answer there, and nothing more was done that day.");
+  expect(shown(last)).not.toContain("You missed your sitting on year 1, day 1"); // (once told, not told again)
+  // With no office hours: a day on.
+  const plain = harness(["fail"]);
+  expect((await failed(plain.p.step(obs(5 * HOUR, "a letter"), ctx))).backAt).toBe(DAY + 5 * HOUR);
+  await plain.p.step(obs(DAY + 5 * HOUR), ctx);
+  expect(shown(plain.calls[1]!)).toContain("You missed your sitting on year 1, day 1");
+  expect(shown(plain.calls[1]!)).toContain("a letter");
 });
 
 test("more kept for a sitting than can be set out: whole reports are left out from the front, counted, and recorded", async () => {
@@ -398,8 +421,10 @@ test("looks kept ready: at most six; one it makes two sittings running is said t
   await f.p.step(looked(9 * HOUR, [bill("rec.1")]), ctx);
   await f.p.step(books(DAY + 9 * HOUR), ctx);
   await expect(f.p.step(looked(DAY + 9 * HOUR, [bill("rec.2")]), ctx)).rejects.toThrow("no answer within 180 s");
-  expect(await f.p.step(books(DAY + 10 * HOUR), ctx)).toMatchObject({ type: "look" });
-  await f.p.step(looked(DAY + 10 * HOUR, [bill("rec.3")]), ctx);
+  // (That day's sitting is missed: it sits the next working day.)
+  expect(await f.p.step(books(DAY + 10 * HOUR), ctx)).toEqual({ type: "wait", until: 2 * DAY + 9 * HOUR });
+  expect(await f.p.step(books(2 * DAY + 9 * HOUR), ctx)).toMatchObject({ type: "look" });
+  await f.p.step(looked(2 * DAY + 9 * HOUR, [bill("rec.3")]), ctx);
   expect(f.calls.length).toBe(4);
   expect(shown(f.calls[3]!)).toContain("Invoice rec.2.");
   expect(shown(f.calls[3]!)).toContain("Invoice rec.3.");

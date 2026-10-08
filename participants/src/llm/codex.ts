@@ -157,11 +157,16 @@ export class CodexCliAdapter implements LlmAdapter {
       let r!: Awaited<ReturnType<CodexRunner>>;
       for (let n = 1; ; n++) {
         r = await this.run(args, codexPrompt(req), dir, timeoutMs);
-        // (Its error output only when it failed: a warning on a good answer isn't a limit.)
-        const limited = !r.timedOut && [...(r.code !== 0 ? [r.stderr] : []), ...r.stdout.split("\n").filter((l) => /"type":"(error|turn\.failed)"/.test(l))].find((s) => LIMITED.test(s));
+        // (Its error output only when it failed: a warning on a good answer isn't a limit. A call that ran out of time
+        // failed too: what the CLI had said by then is read the same way, so a limit it reported and then went on
+        // waiting or retrying under stops the run as a limit, and is not taken for a model that was only slow.)
+        const errors = r.stdout.split("\n").filter((l) => /"type":"(error|turn\.failed)"/.test(l));
+        const limited = [...(r.code !== 0 || r.timedOut ? [r.stderr] : []), ...errors].find((s) => LIMITED.test(s));
         if (limited) throw new UsageLimitReached(`the Codex subscription's usage limit was reached (${limited.trim().slice(0, 300)}): the run stops here; resume it once the limit resets (oikos resume <log>)`);
         if (r.code === 0 && !r.timedOut) break;
-        const why = r.timedOut ? `no answer within ${Math.round(timeoutMs / 1000)} s` : `exit ${r.code}: ${r.stderr.slice(0, 500)}`;
+        // (What it last said goes with a call that ran out of time, so that why it did can be told from the log.)
+        const lastSaid = r.timedOut ? [...errors, ...r.stderr.split("\n")].map((l) => l.trim()).filter(Boolean).at(-1) : undefined;
+        const why = r.timedOut ? `no answer within ${Math.round(timeoutMs / 1000)} s${lastSaid ? `; the last it said: ${lastSaid.slice(0, 300)}` : ""}` : `exit ${r.code}: ${r.stderr.slice(0, 500)}`;
         // (A prompt too long for the model is the same prompt next time: it is not tried again.)
         const tooLong = !r.timedOut && promptTooLong(`${r.stderr}\n${r.stdout.split("\n").filter((l) => /"type":"(error|turn\.failed)"/.test(l)).join("\n")}`);
         if (n >= attempts || tooLong) throw new Error(`codex exec failed after ${n} attempt${n === 1 ? "" : "s"} (${tooLong ? `the prompt is too long: ${why.slice(0, 300)}` : why})`);

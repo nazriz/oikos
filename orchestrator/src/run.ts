@@ -1012,9 +1012,13 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
             }
             const inARow = modelDown ? failures.get(x.u.key) ?? 0 : (failures.get(x.u.key) ?? 0) + 1;
             failures.set(x.u.key, inARow);
-            await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err?.name ?? "Error"}: ${String(err?.message ?? err)}`.slice(0, 2000), in_a_row: inARow } } } });
-            log(`${o.runId}: ${x.u.key} failed to decide at t=${t} (it waits this wake): ${String(err?.message ?? err).slice(0, 200)}`);
+            // (A seat whose model did not answer says when it sits again, its next working day's sitting: the engine is
+            // told, or it would not be woken before its usual rhythm came round, days later.)
+            const backAt = modelDown && typeof (err as ModelCallFailed).backAt === "number" ? (err as ModelCallFailed).backAt : undefined;
+            await k.request({ op: "annotate", annotation: { annotation: "note", subject: x.u.participant, data: { participant_error: { unit: x.u.key, error: `${err?.name ?? "Error"}: ${String(err?.message ?? err)}`.slice(0, 2000), in_a_row: inARow, ...(backAt !== undefined ? { back_at: backAt } : {}) } } } });
+            log(`${o.runId}: ${x.u.key} failed to decide at t=${t} (${backAt !== undefined ? `it missed this sitting, and sits again at t=${backAt}` : "it waits this wake"}): ${String(err?.message ?? err).slice(0, 200)}`);
             if (inARow >= MAX_FAILURES_IN_A_ROW) await retire(x.u);
+            else if (backAt !== undefined && units.get(x.u.key) === x.u) await k.request({ op: "finished", key: x.u.key, until: backAt });
             continue;
           }
           failures.delete(x.u.key);

@@ -136,3 +136,15 @@ test("a prompt too long for a seat's model, and something a seat sent that was n
   ]);
   expect((await scanOptOuts(log, a.offset)).faults).toEqual([]);
 });
+
+test("a sitting a seat missed is heard of while the pilot runs; a run stopped with its model not answering is waited for, not left as a failure", async () => {
+  const log = join(base, "missed.seed1.jsonl");
+  const note = (t: number, subject: string, data: object) => JSON.stringify({ kind: "annotation", t, body: { annotation: "note", subject, data } }) + "\n";
+  writeFileSync(log, note(24 * 86_400 + 32_400, "mayor-seat", { sitting_missed: { day: 24, midway: false, back_at: 25 * 86_400 + 32_400, why: "model_call_failed", error: "codex exec failed after 3 attempts (no answer within 180 s)" } })
+    + note(3 * 86_400, "finance-seat", { sitting_missed: { day: 3, back_at: 4 * 86_400, why: "prompt_too_long" } }));
+  // (A prompt too long is told by its own note: not twice.)
+  expect((await scanOptOuts(log, 0)).faults).toEqual([{ participant: "mayor-seat", t: 24 * 86_400 + 32_400, day: 24, kind: "sitting_missed", detail: "it sits again on day 25 (codex exec failed after 3 attempts (no answer within 180 s))" }]);
+  const down = "the model can't be reached (3 calls in a row failed; the last: codex/x (participant, for mayor-seat): codex exec failed after 3 attempts (no answer within 180 s)): the run stops here; resume it once it can be (oikos resume <log>)";
+  expect(await runState(await folder("unreachable", { t: 864_000, end: { reason: "aborted", detail: down }, stoppedBy: "ModelUnreachable" }), UNTIL)).toMatchObject({ stop: "unreachable", t: 864_000 });
+  expect(await runState(await folder("unreachable-bare", { t: 864_000, end: { reason: "aborted", detail: down }, summary: false }), UNTIL)).toMatchObject({ stop: "unreachable" });
+}, 60_000);

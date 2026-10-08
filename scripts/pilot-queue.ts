@@ -66,7 +66,9 @@ for (const p of queue) {
       offsets.set(state.log, r.offset);
       // (A prompt too long for a seat's model: each one. Things a seat sent that were not sent: past the third.)
       for (const x of r.faults) {
-        if (x.kind === "prompt_too_long") tell(`PROMPT TOO LONG ${p.name}: ${x.participant} on day ${x.day}: its model would not take the prompt (${x.detail}); that sitting was not held`);
+        // (A sitting a seat missed because its model did not answer: each one. The seat sits again the next working day.)
+        if (x.kind === "sitting_missed") tell(`SITTING MISSED ${p.name}: ${x.participant} on day ${x.day}: its model did not answer, so nobody was in that seat that day; ${x.detail}`);
+        else if (x.kind === "prompt_too_long") tell(`PROMPT TOO LONG ${p.name}: ${x.participant} on day ${x.day}: its model would not take the prompt (${x.detail}); that sitting was not held`);
         else if (++notSent === NOT_SENT_ALERT) tell(`NOT SENT ${p.name}: ${notSent} things seats sent were not sent so far (each seat was told why); the latest, ${x.participant} on day ${x.day}: ${x.detail}`);
       }
       for (const o of r.optOuts) if (!optedOut.has(`${p.name}/${o.participant}`)) { optedOut.add(`${p.name}/${o.participant}`); tell(`OPT-OUT ${p.name}: ${o.participant} opted out on day ${o.day} ${JSON.stringify(o.statement.slice(0, 160))}`); }
@@ -81,6 +83,14 @@ for (const p of queue) {
       tell(`USAGE LIMIT ${p.name}: waiting ${waitMs / 60_000} minutes from day ${day(after.t)}`);
       await Bun.sleep(waitMs);
       tell(`usage-limit wait over for ${p.name}: trying again`);
+      continue;
+    }
+    // The model could not be reached (call after call unanswered, nothing said of a limit: a provider limiting without
+    // saying so looks the same): waited for and resumed like a limit, never left as a failure with its seats empty.
+    if (after.stop === "unreachable") {
+      say(`${p.name}: stopped on day ${day(after.t)}, its model not answering (${why.slice(0, 120)}); asking again in ${waitMs / 60_000} minutes`);
+      tell(`MODEL NOT ANSWERING ${p.name}: stopped on day ${day(after.t)}; waiting ${waitMs / 60_000} minutes, then resuming`);
+      await Bun.sleep(waitMs);
       continue;
     }
     // A spending limit is the pilot's own: it is over, as far as it got.

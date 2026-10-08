@@ -17,7 +17,7 @@ import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
-import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked, type WhoIs } from "./render";
+import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, when, type Looked, type WhoIs } from "./render";
 
 export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
@@ -940,8 +940,38 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             const told = "When you were last to sit, more was set out for you than could be read at once, so that sitting was not held. Less is set out now: the oldest of what you had looked up is left out, and says so where it stood. Look again for what you need, a little at a time.";
             if (!unsaid.includes(told)) unsaid.push(told);
           }
-          // No answer (the call failed, or the run is stopping): nothing it was to be shown is dropped. What was kept
-          // for it stays kept, and this report joins it, so the next call shows everything this one would have.
+          // No answer, and the run goes on (the call failed after its adapter's own retries): the seat was not at its
+          // desk for this sitting. Nothing it was to be shown is dropped: this report, what was kept for it, and what
+          // its last answer's actions showed all wait for its next sitting, which is its next working day's (a day on,
+          // without office hours), whatever it had last arranged; and it is told then, first thing, that it missed one
+          // and that nothing was done. (2026-10-09: three seats whose calls failed were not woken again for the last
+          // five days of a run: nothing said when they were due, so each waited out its usual rhythm of a week.)
+          if (e instanceof ModelCallFailed) {
+            const midway = !fresh;
+            if (fresh) carried.push(now); // (with what was looked up for its opening, if anything was)
+            else {
+              keepForNext();
+              carried.push(...extra, ...(turn === 1 && !wasResult ? [body] : []));
+            }
+            if (turn === 1) missed.push(obs);
+            const tooLong = promptTooLong(e.message);
+            const told = midway
+              ? `Your sitting on ${when(obs.t)} was cut short: you were away from your desk after your last answer there, and nothing more was done that day. How what you had asked for went is set out below, with what has come in since.`
+              : `You missed your sitting on ${when(obs.t)}: you were not at your desk, and nothing was read or done that day. What had come in for it is set out below, with what has come in since.`;
+            if (!tooLong && !unsaid.includes(told)) unsaid.push(told);
+            const keptMail = restore.mail || mail;
+            away();
+            queue = [];
+            doneAfter = undefined;
+            mail = keptMail;
+            if (S) sittingDay = Math.floor(obs.t / DAYS); // (that day's sitting is the one missed)
+            backAt = 0;
+            e.backAt = S ? nextSitting(obs.t + 1) : obs.t + DAYS;
+            await note({ sitting_missed: { day: Math.floor(obs.t / DAYS), midway, back_at: e.backAt, why: tooLong ? "prompt_too_long" : "model_call_failed", error: String(e.message).slice(0, 300) } });
+            throw e;
+          }
+          // No answer because the run is stopping (a limit): nothing it was to be shown is dropped. What was kept for it
+          // stays kept, and this report joins it, so the call made again when the run is resumed shows the same.
           if (turn === 1) {
             if (fresh) {
               carried.push(now); // (with what was looked up for its opening, if anything was)

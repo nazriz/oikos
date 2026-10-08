@@ -190,6 +190,18 @@ test("a model call that failed is in the log, and a resumed run is served it as 
   expect(failure[0]).toMatchObject({ subject: "mayor-system", data: { purpose: "participant", provider: "mock", model: "mock", error: "mock/mock (participant, for mayor-system): the provider answered 503" } });
   expect(failure[0]!.data.system_sha256).toMatch(/^[0-9a-f]{64}$/);
   expect(failure[0]!.data.input).toBeTruthy();
+  // The seat is not left empty: it sits again at its next working day's sitting (not after its usual rhythm of a week,
+  // nor the three days it had last given), and is told there, in the world's terms, that it missed one (2026-10-09:
+  // three seats whose calls failed did not sit again for the last five days of a run).
+  const failedAt = failure[0]!.data.t as number;
+  const missed = notes(u.logPath).find((a) => a.data?.participant_error)!.data.participant_error;
+  const sat = notes(u.logPath).filter((a) => a.annotation === "transcript" && a.subject === "mayor-system" && a.data.purpose === "participant").find((a) => a.data.t > failedAt)!;
+  const daysOn = Math.floor(sat.data.t / DAY) - Math.floor(failedAt / DAY);
+  expect(daysOn).toBeGreaterThanOrEqual(1);
+  expect(daysOn).toBeLessThanOrEqual(3); // (the next day, or the Monday after a Friday)
+  expect(missed.back_at).toBe(sat.data.t);
+  expect(JSON.stringify(sat.data.input)).toContain(`You missed your sitting on year 1, day ${Math.floor(failedAt / DAY) + 1}: you were not at your desk, and nothing was read or done that day.`);
+  expect(notes(u.logPath).find((a) => a.data?.sitting_missed)!.data.sitting_missed).toMatchObject({ day: Math.floor(failedAt / DAY), back_at: sat.data.t });
   // The same run, stopped at day 20 (after the failure) ...
   const d = dir("failed-cut");
   const first = mayor((n) => n === 3);
