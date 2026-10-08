@@ -1,0 +1,10 @@
+One change to the instructions in writer-instructions.txt, from the coordinator of this work. It takes precedence over them where they differ.
+
+Hand back several requests for each situation, not only the one or two you would make at that moment: up to eight, each different from the others in what it asks for. First, what you yourself would ask through `do` now. Then other things a holder of this seat could reasonably ask through `do` in this situation, today or over the days that follow, each grounded in what the situation actually shows (its accounts, records, people, places, forms, laws, letters, by their ids). Among them, where the situation gives occasion for it:
+- asking to be shown, to read, to inspect or to review something (in the runs these situations come from, seats asked for that through `do` often: do so too, although today's description of `do` says to use look);
+- directing, asking or telling another office or person to do something;
+- submitting one of the forms on file, with its fields said as you would say them;
+- withdrawing, cancelling, pausing or stopping something that is on file or under way;
+- an act of the seat's own (a payment, a notice, an agreement offered, a vote, an appointment, something built or moved).
+Do not pad: a request that the situation gives no ground for is worse than none, and fewer than eight is fine. Each request is whole by itself, in your own voice and at the length natural to you for that request (some are one line, some run to several sentences with what must stay as it is and what must not be done). Name nothing the situation doesn't show you.
+The file to hand back is as writer-instructions.txt says: one line for each situation, {"id": …, "requests": [ … ]}.
