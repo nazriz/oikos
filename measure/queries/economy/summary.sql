@@ -1,14 +1,14 @@
 -- The economy against its calibration targets (docs/calibration.md), per run: at the end, adults, those of working age (below the retirement age its citizens were given) and in the labour force, and people in jobs; employment and participation as shares of adults, and the unemployment rate; over the last 12 months, households' saving (what came into people's accounts less what went out, over what came in; people's accounts are those people hold, and wealth moving with people leaving or arriving isn't counted).
 with r as (select run_id, world, seed, end_t, greatest(0, end_t - 12 * 2592000) as from_t from runs),
-ret as (select distinct run_id, (json_extract_string(params, '$.retirement_age'))::INTEGER as age from participants where impl = 'citizen.default' and json_extract_string(params, '$.retirement_age') is not null),
+ret as (select distinct run_id, (json_extract_string(params, '$.retirement_age'))::BIGINT as age from participants where impl = 'citizen.default' and json_extract_string(params, '$.retirement_age') is not null),
 gone as (select run_id, person, min(t) as t from life where event in ('person_left', 'person_died') group by all),
 outside_lf as (select run_id, person from participants where impl = 'citizen.default' and json_extract_string(params, '$.in_labour_force') = 'false'),
 people as (select e.run_id, e.entity, e.born_at, e.created_t, g.t as gone_t, o.person is not null as outside_lf from entities e left join gone g on g.run_id = e.run_id and g.person = e.entity
   left join outside_lf o on o.run_id = e.run_id and o.person = e.entity where e.kind = 'person'),
 at_end as (select r.run_id,
-    count(*) filter (where p.born_at + 18 * 365 * 86400 <= r.end_t) as adults,
-    count(*) filter (where p.born_at + 18 * 365 * 86400 <= r.end_t and (ret.age is null or p.born_at + ret.age * 365 * 86400 > r.end_t)) as working_age,
-    count(*) filter (where p.born_at + 18 * 365 * 86400 <= r.end_t and (ret.age is null or p.born_at + ret.age * 365 * 86400 > r.end_t) and not p.outside_lf) as labour_force
+    count(*) filter (where p.born_at + 18::BIGINT * 365 * 86400 <= r.end_t) as adults,
+    count(*) filter (where p.born_at + 18::BIGINT * 365 * 86400 <= r.end_t and (ret.age is null or p.born_at + ret.age * 365 * 86400 > r.end_t)) as working_age,
+    count(*) filter (where p.born_at + 18::BIGINT * 365 * 86400 <= r.end_t and (ret.age is null or p.born_at + ret.age * 365 * 86400 > r.end_t) and not p.outside_lf) as labour_force
   from r join people p on p.run_id = r.run_id and p.created_t <= r.end_t and (p.gone_t is null or p.gone_t > r.end_t) left join ret on ret.run_id = r.run_id group by all),
 -- (Jobs are employment agreements the worker signed, with no notice on them yet: being at work is only part of a day.)
 emp as (select a.run_id, a.id, json_extract_string(a.body, '$.terms.parties[0]') as employer, json_extract_string(a.body, '$.terms.parties[1]') as worker,

@@ -220,6 +220,21 @@ Sources opened on 2026-10-08 unless marked.
 |---|---|---|
 | Values that are the same are held once and found again by what they are made of (hash consing; the flyweight) | Goto, E. (1974), "Monocopy and associative algorithms in extended Lisp", Technical Report 74-03, University of Tokyo **(to confirm)**; Gamma, E., Helm, R., Johnson, R. & Vlissides, J. (1994), *Design Patterns*, Addison-Wesley (Flyweight) | A book's shelves: a list shown whole to many readers is one shelf, found by its records, with each reader's differences beside it (`Book`, `Pages`) |
 
+## Reading an amount as its place writes it (participants/src/calls.ts `parseAmount`; docs/decisions.md, 2026-10-08)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A currency code is a country's two letters and a letter for the currency, so a sign several currencies share is told apart by the country's letters before it | ISO 4217, *Codes for the representation of currencies*, International Organization for Standardization **(to confirm: the standard was not opened; the two-letter prefix before a sign is common usage, not part of it)** | A marker of the world's money: its sign with the first two letters of its code |
+| Digits grouped as the last three and then twos, with lakh (a hundred thousand) and crore (ten million) for the larger groups | The Indian numbering system, as in everyday and official use in South Asia **(to confirm with a source: e.g. the Reserve Bank of India's own publications write sums this way)** | Groups of two read in any currency; lakh and crore among the multipliers; the training data's `grouping: "twos"` |
+| Where a place's decimal mark and digit grouping differ, a number is read by its locale, and a lone separator with three digits after it cannot be read without one | Unicode CLDR, number formatting patterns and symbols (decimal and grouping separators by locale), Unicode Technical Standard #35 **(to confirm)** | What is refused and not guessed; the proposed currency fields `decimal_mark`, `grouping`, `symbol_after` |
+
+## A shared development machine (docs/dev-machine.md; docs/decisions.md, 2026-10-08; scripts/slots.ts)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A pool of tokens that every job on a machine draws from before it starts heavy work, however deep in a tree of processes it is, with a job's children counted as inside its token | GNU Make's jobserver: Smith, P. D., "Jobserver Implementation", in the GNU Make manual, "Sharing Job Slots with GNU make" (Free Software Foundation) **(to confirm: section title and author as cited)** | `scripts/slots.ts`: the tokens are files in one directory rather than bytes in a pipe, so that jobs in unrelated process trees share them and a dead holder's can be reclaimed |
+| A lock taken by making a hard link to a file already written (atomic on a local file system; the lock is never seen half written) | The `open(2)` manual's note on lock files over NFS (`link(2)` to a unique file, in place of `O_EXCL`) **(to confirm)** | `scripts/slots.ts`, `claim` |
+
 ## Scenarios: the size of each shift (docs/scenarios.md; worlds/scenarios/)
 
 Every one of these is cited from memory: none was checked against its source when the scenarios were written

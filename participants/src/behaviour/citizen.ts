@@ -35,7 +35,7 @@ import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Hea
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
 import { Borrowing } from "./credit";
-import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
+import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
 /** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
  * certainty a gathering takes it (with 20 or more others there), and being told; how strongly it's held to say so, and
@@ -321,6 +321,11 @@ export const citizen: BehaviourModule = {
     const isMember = () => !!p.union && memberOf(p.union);
     let lastServed = 10_000; // how fully the last shop served us (basis points)
     const decided: DecisionRecord[] = []; // the mind's decisions since the last action, carried with the next (7)
+    let personTold = false; // who we are goes with our first recorded decision, once (it does not change)
+    const wholeFacts = (f: Facts): NonNullable<DecisionRecord["options"][number]["facts"]> => ({ money_per_month: Math.round(f.money_per_month),
+      ...(f.home ? { home: f.home.bedrooms !== undefined ? { bedrooms: f.home.bedrooms } : {} } : {}),
+      ...(f.work_hours_per_month !== undefined ? { work_hours_per_month: Math.round(f.work_hours_per_month) } : {}), ...(f.goods_per_month !== undefined ? { goods_per_month: Math.round(f.goods_per_month) } : {}),
+      ...(f.company !== undefined ? { company: Math.round(f.company) } : {}), ...(f.time_hours_per_month !== undefined ? { time_hours_per_month: Math.round(f.time_hours_per_month) } : {}) });
     // Feelings, about people and things (docs/design/ai-citizens.md 3d), and ties with the people we know.
     const feelings = new Feelings();
     const ties = new Ties();
@@ -359,12 +364,29 @@ export const citizen: BehaviourModule = {
     // (Fear for our money makes us less sure of our options where money's at stake: we look harder at them.)
     const MONEY_MATTERS = new Set(["shop", "job", "home"]);
     const decide = (domain: string, t: number, rng: Rng, o: Parameters<Mind["decide"]>[2]) => {
-      const d = mind.decide(domain, rng, { doubt: MONEY_MATTERS.has(domain) ? Math.round(feelings.level("fear", "money", t) / 2) : 0, ...o });
+      const doubt = o.doubt ?? (MONEY_MATTERS.has(domain) ? Math.round(feelings.level("fear", "money", t) / 2) : 0);
+      const d = mind.decide(domain, rng, { ...o, doubt });
       // (With the mind's state behind it: training data for citizen models, contracts-0.7 A2.)
       const emotion = feelings.strongest(t);
       const held = Object.fromEntries([...beliefs].filter(([, b]) => b > 0).sort(([a], [b]) => (a < b ? -1 : 1)));
       const goal = [...pursuits.values()].find((x) => x.method !== undefined);
-      decided.push({ t, domain, strategy: d.strategy, ...(d.key !== undefined ? { choice: d.key } : {}), options: d.scores.length ? d.scores : o.options.map((x) => ({ key: x.key, score: 0 })),
+      // And what it had before it (docs/design/ai-citizens.md 7): every option with its facts, how many it knows took it,
+      // what it means to them and what they have learned of it; their routine; their circumstances. Whole numbers only.
+      // (An option the way of deciding gave no score has 0: none under repeat, under imitate those nobody is known to take.)
+      const scoreOf = new Map(d.scores.map((x) => [x.key, x.score]));
+      const learned = mind.learned(domain);
+      const seen = [...o.options].sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)).map((x) => ({ key: x.key, score: scoreOf.get(x.key) ?? 0,
+        ...(x.facts ? { facts: wholeFacts(x.facts) } : {}), ...(x.others ? { others: x.others } : {}), ...(x.meaning ? { meaning: Math.round(x.meaning) } : {}),
+        ...(learned.known(x.key) ? { learned: Math.round(learned.get(x.key)) } : {}) }));
+      const c = o.circ;
+      const person = personTold ? undefined : { values: { ...mind.person.values }, temperament: { ...mind.person.temperament }, weights: { ...mind.person.weights } };
+      personTold = true;
+      decided.push({ t, domain, strategy: d.strategy, ...(d.key !== undefined ? { choice: d.key } : {}), options: seen,
+        ...(o.current !== undefined ? { current: o.current } : {}),
+        circumstances: { monthly_income: Math.round(c.monthly_income), savings: Math.round(c.savings), homeless: c.homeless,
+          ...(c.homeBedroomsNeeded !== undefined ? { bedrooms_needed: c.homeBedroomsNeeded } : {}), ...(c.essentials !== undefined ? { essentials: Math.round(c.essentials) } : {}) },
+        ...(o.satisfied_here !== undefined ? { satisfied_here: Math.round(o.satisfied_here) } : {}), ...(doubt ? { doubt: Math.round(doubt) } : {}),
+        ...(person ? { person } : {}),
         state: { mind: MIND_VERSION, needs: { ...levelsNow }, satisfaction: d.satisfaction ?? 0, certainty: d.certainty ?? 0,
           ...(emotion ? { emotion } : {}), ...(Object.keys(held).length ? { beliefs: held } : {}), ...(goal ? { goal: { goal: goal.goal, method: goal.method! } } : {}) } });
       return d;
@@ -1480,7 +1502,7 @@ export const citizen: BehaviourModule = {
           applied.add(best.id);
           if (typeof best.data?.industry === "string") industryOf.set(best.speaks_for, best.data.industry);
           const how = d!.strategy === "imitate" ? ", where people we know told us to look or work" : d!.strategy === "compare" ? ", with an employer we know" : ", weighing each job's pay and hours";
-          steps.push(because(`Applying for a job at ${usd(best.data?.wage ?? 0)} a fortnight${job ? `, better than ours (${usd(job.wage)})` : ""}${how}.`,
+          steps.push(because(`Applying for a job at ${usd(best.data?.wage ?? 0)} a pay period${job ? `, better than ours (${usd(job.wage)})` : ""}${how}.`,
             say("job_application", "Application for the advertised job.", { to: [best.speaks_for], visible: [me, best.speaks_for], data: { posting: best.id, account: acc.account }, basis: best.id })));
         }
       }

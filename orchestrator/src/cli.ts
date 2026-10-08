@@ -34,6 +34,9 @@
 //     against fresh ones, on the world's own questions and people. The mock by default. Every call is kept beside it.
 //   oikos run ... [--log lean|full]: how much the log keeps (full, the default; lean for quick test runs: no
 //     observation hashes, no written reasoning from code participants; replay still checks the state).
+//   oikos run ... [--record-decisions full|none]: code citizens' decisions as their minds made them (what each had
+//     before it, how it decided, what it chose: docs/design/ai-citizens.md 7), training data for citizen models.
+//     full is the default (about a twentieth of a log); never in a lean log. A resumed run records as it began.
 //   oikos dataset <DIR|log.jsonl> [--out DIR] [--actions]
 //     Run datasets: each log's data as training examples, in <run>.dataset/ (docs/design/run-datasets.md): the manifest,
 //     system prompts, translations, model participants' decisions; code participants' acts with --actions; and
@@ -92,6 +95,10 @@
 //   oikos in-situ-label <FILE> --answers FILE --reader NAME --answers FILE --reader NAME --out DIR
 //     Two readers' answers ({id, program}) to a file of such requests, made into DIR's examples.jsonl (a request both
 //     read as the same program, which the request carries whole), rejects.jsonl (the rest, each with why) and manifest.json.
+//   oikos translator-pipeline <config.json>
+//     The translator's training pipeline in one unattended command (pipeline.ts, docs/translator-pipeline.md): pilots'
+//     situations, writers, two readers, the labelled examples, test sets, the join, the export and (if the config says
+//     so) training on a rented GPU. Resumable: the same command goes on where it stopped.
 //   oikos replay <log.jsonl> [--anchors <anchors.jsonl>]      (the kernel's own replay)
 //   oikos story <log.jsonl> [participant]                     (what a language-model participant did, day by day)
 //
@@ -119,7 +126,7 @@ const sets = () => [...flags("set"), ...(flag("scenario") ? [`scenario=${flag("s
 /** Where a batch under named starting conditions goes, unless told: a folder of its own beside the plain world's. */
 const scenarioOut = (world: string) => (flag("scenario") ? join("runs", `${world.split("/").at(-1)!.replace(/\.(json|ya?ml)$/, "")}.${flag("scenario")!.replace(/[^A-Za-z0-9+-]+/g, "+")}`) : undefined);
 /** Positional arguments: everything that isn't a flag or a flag's value. */
-const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind", "--briefs", "--no-spares"].includes(rest[i - 1]!)));
+const positional = () => rest.filter((x, i) => !x.startsWith("--") && !(i > 0 && rest[i - 1]!.startsWith("--") && !["--no-measure", "--list", "--compress", "--no-compress", "--actions", "--consult", "--overwrite", "--force", "--real", "--only-real", "--blind", "--briefs", "--no-spares", "--no-write"].includes(rest[i - 1]!)));
 
 /** The measurement folder for a DIR: its measure/, exported from its logs if there isn't one yet. */
 async function measureDir(dir: string): Promise<string> {
@@ -153,7 +160,7 @@ function stopOnSignal(): StopSignal {
   return stop;
 }
 
-const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios | replay <log.jsonl> | story <log.jsonl> [participant]";
+const usage = "usage: oikos run <world> [--seeds N] [--parallel P] [--out DIR] [--until S] [--set k=v] [--scenario NAME[+NAME]] [--modules FILE] [--translator-model m] [--no-measure] [--overwrite] [--model provider/model --budget USD [--base-url URL]] | resume <log.jsonl[.zst]|DIR> [--until S] [--model ... as for run] | measure <DIR> [QUERY...] [--sql SQL] [--list] | diff <BASELINE> <CHANGE> [QUERY...] | health <DIR> [--profile NAME] | cost <DIR> [--translator-model m] | translator-eval --model provider/model [--budget USD] [--out FILE] [--real | --only-real] [--jobs N] | scenarios | pilot-report <DIR>... [--no-write] | replay <log.jsonl> | story <log.jsonl> [participant]";
 
 try {
   if (cmd === "run" && positional()[0]) {
@@ -161,7 +168,7 @@ try {
       world: positional()[0]!, seeds: Number(flag("seeds", "1")), out: flag("out") ?? scenarioOut(positional()[0]!), parallel: flag("parallel") ? Number(flag("parallel")) : undefined,
       until: flag("until") ? Number(flag("until")) : undefined, sets: sets(), translatorModel: flag("translator-model"), measure: !has("no-measure"), log: console.log,
       model: flag("model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
+      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), compress: !has("no-compress"), keep: flag("keep") as "log" | "measures" | undefined,
       batchBudgetUsd: flag("batch-budget") ? Number(flag("batch-budget")) : undefined, consult: has("consult"), consultAvoid: flag("consult-avoid"),
       overwrite: has("overwrite"), stop: stopOnSignal(),
     });
@@ -196,7 +203,7 @@ try {
   } else if (cmd === "run-one" && positional()[0]) {
     await runOne({ world: positional()[0]!, seed: Number(flag("seed")), out: flag("out", "runs")!, until: flag("until") ? Number(flag("until")) : undefined, sets: sets(),
       model: flag("model"), translatorModel: flag("translator-model"), budgetUsd: flag("budget") ? Number(flag("budget")) : undefined, baseUrl: flag("base-url"), modules: flag("modules"),
-      recordObservations: flag("record-observations"), logDetail: flag("log"), consult: has("consult"), consultAvoid: flag("consult-avoid"), overwrite: has("overwrite"), stop: stopOnSignal() });
+      recordObservations: flag("record-observations"), recordDecisions: flag("record-decisions"), logDetail: flag("log"), consult: has("consult"), consultAvoid: flag("consult-avoid"), overwrite: has("overwrite"), stop: stopOnSignal() });
   } else if (cmd === "resume" && positional()[0]) {
     // A run that stopped (a stall, a crash, cut short): run again from its own config, serving its recorded model calls.
     const o = { until: flag("until") ? Number(flag("until")) : undefined, modules: flag("modules"),
@@ -212,6 +219,10 @@ try {
       const names = positional().slice(1);
       for (const name of names.length ? names : ["overview"]) console.log(`## ${name}\n${table(await runQuery(dir, name))}\n`);
     }
+  } else if (cmd === "pilot-report" && positional()[0]) {
+    // A pilot folder's report from its log alone (pilot-report.ts), printed and written as <DIR>/pilot-report.json.
+    const { pilotReport, renderReport } = await import("./pilot-report");
+    for (const dir of positional()) console.log(renderReport(await pilotReport(dir, !has("no-write"))) + "\n");
   } else if (cmd === "health" && positional()[0]) {
     // The health report (docs/design/rebuild.md 8.4): the batch's measures against its profile's targets.
     const { health, healthText } = await import("@oikos/measure");
@@ -332,6 +343,11 @@ try {
     const m = label(positional()[0]!, files.map((file, i) => ({ file, reader: names[i]! })), flag("out")!);
     console.log(`${m.examples} examples of ${m.requests} requests written to ${flag("out")} (examples.jsonl, rejects.jsonl, manifest.json); dropped: ${Object.entries(m.by_reason).filter(([, n]) => n).map(([why, n]) => `${why} ${n}`).join(", ") || "none"}`);
     console.log(`  by function: ${Object.entries(m.by_function).map(([fn, n]) => `${fn} ${n}`).join(", ")}`);
+  } else if (cmd === "translator-pipeline" && positional()[0]) {
+    const { loadConfig, plainReport, runPipeline } = await import("./pipeline");
+    const m = await runPipeline(loadConfig(positional()[0]!));
+    console.log(plainReport(m));
+    if (m.status !== "complete") process.exit(3);
   } else if (cmd === "dataset" && positional()[0]) {
     // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
     const { logsIn } = await import("./corpus");

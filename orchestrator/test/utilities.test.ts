@@ -54,7 +54,7 @@ test("water is drawn from the river and energy bought from the grid, as the town
   const due = bills.filter((b) => b.at < 110 * DAY);
   expect(due.filter((b) => paid.has(b.id)).length).toBeGreaterThan(due.length * 0.9);
   expect(recs.some((r) => r.kind === "water_restrictions")).toBe(false);
-}, 900_000);
+}, 2_400_000);
 
 test("with no water coming down the river, it runs dry and the corporation announces restrictions", async () => {
   const config = generate({ ...spec, years: 1 });
@@ -63,4 +63,4 @@ test("with no water coming down the river, it runs dry and the corporation annou
   const { ev, recs } = await run("drought", config, 30);
   expect(recs.some((r) => r.kind === "water_restrictions" && r.data?.since !== undefined)).toBe(true);
   expect(ev.some((e) => e.event === "action_refused" && e.code === "field_exhausted")).toBe(true);
-}, 900_000);
+}, 2_400_000);

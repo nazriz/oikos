@@ -64,8 +64,6 @@ const MINOR_WORD = /\bcents?\b/i;
  * - a pattern's replacement naming what it matched (`"$1"`);
  * - what a model run costs whoever runs it: providers bill in US dollars, and that's the operator's money, not the
  *   world's (spending limits, the cost report);
- * - the translator's prompt, whose worked examples are written in one currency (translator/src/index.ts): to fix, by
- *   writing them in the world's (held while the prompt is being changed and a model trained on it);
  * - Rust's unit tests, which sit in the files they test (everything from `#[cfg(test)]` on);
  * - the name `cents` for an amount in the smallest unit (money.ts `cents()`, and variables and comments that follow
  *   it): a name the code uses for "the smallest unit" whatever the currency, about 160 lines across every module.
@@ -75,7 +73,6 @@ const EXEMPT: { file: RegExp; line: RegExp }[] = [
   { file: /^kernel\/crates\/(world|resolver)\/src\/|^translator\/src\/(resolver|preview)\.ts$/, line: /(starts_with|strip_prefix|startsWith)\((["'])\$\2\)|`\$\$\{(ref|v\.var|b\.ref)\}`|format!\("\$\{\w+\}( is (not bound|bound twice)[^"]*)?"\)/ },
   { file: /./, line: /"\$[1-9] ?"\)/ },
   { file: /^orchestrator\/src\/(cost|batch|models|cli)\.ts$|^participants\/src\/llm\/call\.ts$/, line: /usd|budget|spending limit|model calls/i },
-  { file: /^translator\/src\/index\.ts$/, line: /^\s*" .* -> {2}\w+\(/ },
 ];
 
 /** The texts a line of code writes or matches (its quoted parts, and those inside the values set into them, without
@@ -164,11 +161,11 @@ test("a town is generated from each profile, taking its figures from it", () => 
     const c = generate({ ...spec, citizens: 60, profile: p.id });
     expect(c.world.currencies).toEqual([p.values.currency]);
     const retail = c.participants.find((x: any) => x.controller?.impl === "firm.retailer");
-    expect(retail.controller.params.wage).toBe(p.values.wages_per_fortnight.shop);
+    expect(retail.controller.params.wage).toBe(p.values.wages_per_pay_period.shop);
     const person = c.participants.find((x: any) => x.kind === "person");
     expect(person.controller.params.retirement_age).toBe(p.values.retirement_age);
   }
-});
+}, 120_000); // (nine towns to generate: longer than a test's usual five seconds on a busy machine)
 
 test("platform code names none of a generated world's entities, accounts or buildings: modules are told whom they deal with", () => {
   // Every id the generated town has (its organisations, people, accounts and buildings): none may be written into the

@@ -1,4 +1,4 @@
--- Rent against household income at the end of each run (households with a lease and someone earning): the median share, and the share of households paying over 30% of gross income ("rental stress"). Income is wages under employment agreements still in force; rent is the leaseholder's latest lease. Calibration targets: docs/calibration.md.
+-- Rent against household income at the end of each run (households with a lease and someone earning): the median share, and the share of households paying over 30% of gross income ("rental stress"). Income is wages under employment agreements still in force, by the pay period each agreement states; rent is the leaseholder's latest lease. Calibration targets: docs/calibration.md.
 with signed as (select distinct json_extract_string(body, '$.agreement') as agreement, run_id from records where record = 'signature'),
 noticed as (select distinct json_extract_string(body, '$.agreement') as agreement, run_id from records where record = 'notice'),
 agreements as (
@@ -11,7 +11,8 @@ leases as (
   from agreements where template = 'lease' group by all),
 jobs as (
   select a.run_id, a.second as worker,
-    sum((json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.does.outcome.money.amount'))::HUGEINT * 30 / 14) as monthly
+    sum((json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.does.outcome.money.amount'))::HUGEINT * 2592000
+      / (json_extract_string(list_filter(a.commitments, c -> json_extract_string(c, '$.who') = a.first)[1], '$.every'))::BIGINT) as monthly
   from agreements a where a.template = 'employment' and not exists (select 1 from noticed n where n.run_id = a.run_id and n.agreement = a.id) group by all),
 hh as (
   select r.run_id, json_extract_string(r.body, '$.data.leaseholder') as leaseholder, from_json(json_extract(r.body, '$.data.members'), '["JSON"]') as members

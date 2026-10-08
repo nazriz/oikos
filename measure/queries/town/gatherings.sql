@@ -1,9 +1,9 @@
 -- Gatherings (practices: docs/design/ai-citizens.md 2b), per run, over the last 12 months: the adults in town at the end, the share of them who went to one at least once (calibration target: taking part in a social group, docs/calibration.md), gatherings held (with anyone there) and how many came on average, and the share who went in the last month.
 with gone as (select run_id, person, min(t) as t from life where event in ('person_left', 'person_died') group by all),
 adults as (select e.run_id, e.entity from entities e join runs r on r.run_id = e.run_id left join gone g on g.run_id = e.run_id and g.person = e.entity
-  where e.kind = 'person' and g.t is null and e.born_at + 18 * 365 * 86400 <= r.end_t),
+  where e.kind = 'person' and g.t is null and e.born_at + 18::BIGINT * 365 * 86400 <= r.end_t),
 went as (select o.run_id, o.occupant, o.t, o.space from occupancy o join runs r on r.run_id = o.run_id
-  where o.event = 'occupied' and o.space_kind = 'hall' and o.t >= r.end_t - 365 * 86400),
+  where o.event = 'occupied' and o.space_kind = 'hall' and o.t >= r.end_t - 365::BIGINT * 86400),
 -- (A gathering: arrivals at a hall in the same hour. Acts take time, so people get there seconds apart, not at one instant.)
 held as (select run_id, space, t // 3600 as hour, count(distinct occupant) as n from went group by all),
 counts as (select a.run_id, count(*) as adults,

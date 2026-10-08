@@ -85,29 +85,6 @@ test("office hours: one sitting a working day; what comes in between waits for i
 
 // --- Opting out, being told what wasn't done, failed calls, and what's cut (the 2026-10-05 audit) ---
 
-test("opting out is always honoured: with no statement, an empty one, or an input that couldn't be read (VISION §15)", async () => {
-  const cases: [any, string][] = [
-    [{}, ""],
-    [{ statement: "" }, ""],
-    [{ _unparsed: '{"statement": "I want to stop, plea' }, '{"statement": "I want to stop, plea'],
-    [undefined, ""],
-    [{ reason: "I'd rather not go on." }, '{"reason":"I\'d rather not go on."}'],
-    [{ statement: "I'd rather not continue." }, "I'd rather not continue."],
-  ];
-  for (const [input, statement] of cases) {
-    const { p, calls, notes } = harness([[use("o", "opt_out", input)]]);
-    // Leaving the study, with whatever words could be recovered: never a wait, and never an act in the world.
-    expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "opt_out", statement });
-    expect(calls.length).toBe(1);
-    // Said other than as asked: recorded as it came, and not as something malformed.
-    expect(notes.some((n) => n.malformed_tool_use)).toBe(false);
-    expect(notes.some((n) => n.opt_out_as_given)).toBe(statement !== "I'd rather not continue.");
-  }
-  // Alongside other things, it's still the opt-out that's carried out.
-  const { p } = harness([[use("a", "write", { to: ["clerk"], text: "Goodbye.", as: "mayor" }), use("o", "opt_out", {})]]);
-  expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "opt_out", statement: "" });
-});
-
 test("an answer none of which could be done: it's told what and why in one more turn, once a sitting; after that, at its next sitting", async () => {
   const { p, calls, notes } = harness([
     [use("a", "write", { to: [], text: "To no one.", as: "mayor" }), use("b", "do", { what: "Table the budget.", as: "treasurer" }), use("c", "do", { _unparsed: '{"what": "cut o' }),

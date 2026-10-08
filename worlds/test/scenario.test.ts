@@ -97,11 +97,11 @@ test("each scenario changes what it says it changes", () => {
   expect(balance(lean, "acc-city")).toBe(Math.round(P.opening.town / 10));
   expect(office(lean, "outside-grants").per_resident_per_year).toBe(Math.round(P.public_finance.grants_per_resident_per_year / 2));
   expect(balance(lean, "acc-bank")).toBe(balance(base, "acc-bank"));
-  // An export slump: the world takes 12% less from the first day; the factories' balances a quarter.
+  // An export slump: the world takes 12% less from the first day; what a factory has in hand is as it was (derived).
   const slump = town("export-slump");
   expect(office(slump, "outside-trade").shocks).toEqual([{ from_day: 0, kind: "goods", what: "demand", factor_bps: 8800 }]);
   expect(office(base, "outside-trade").shocks).toEqual([]);
-  expect(balance(slump, "acc-factory-1")).toBe(Math.round(P.opening.factory / 4));
+  expect(balance(slump, "acc-factory-1")).toBe(balance(base, "acc-factory-1"));
   expect(office(slump, "outside-trade").buys).toEqual(office(base, "outside-trade").buys); // (the demand itself is the profile's still)
   // Dear energy: the grid's price doubled from the first day.
   expect(office(town("energy-price-shock"), "outside-trade").shocks).toEqual([{ from_day: 0, kind: "energy", what: "price", factor_bps: 20_000 }]);

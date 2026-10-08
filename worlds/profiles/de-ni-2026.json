@@ -1,0 +1,1458 @@
+{
+  "id": "de-ni-2026",
+  "place": "A small town of a few thousand people in Lower Saxony (Niedersachsen), Germany",
+  "as_of": "2026-10",
+  "about": "Every place-specific figure the town generator uses, with its source. Lower Saxony is the federal state used for state-level figures; where only a national figure was found it is used and says so. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md). Everything here is written in English; the currency is the euro.",
+  "values": {
+    "currency": {
+      "code": "EUR",
+      "minor_units": 2,
+      "symbol": "€",
+      "unit_words": [
+        "euro",
+        "euros"
+      ],
+      "minor_words": [
+        "cent",
+        "cents"
+      ]
+    },
+    "households": {
+      "lone_bps": 4120,
+      "group_bps": 300,
+      "couple_bps": 2640,
+      "couple_children_bps": 2200,
+      "one_parent_bps": 740,
+      "children_couple": [
+        4600,
+        4000,
+        1400
+      ],
+      "children_one_parent": [
+        6500,
+        2700,
+        800
+      ],
+      "same_sex_couple_bps": 80,
+      "lone_parent_female_bps": 7970,
+      "adult_female_bps": 5000,
+      "child_male_bps": 5127,
+      "adult_ages": [
+        18,
+        99
+      ],
+      "mother_age_at_first_birth": [
+        23,
+        37
+      ],
+      "child_max_age": 24,
+      "group_size": [
+        2,
+        3
+      ],
+      "age_bands_bps": [
+        {
+          "from": 0,
+          "to": 4,
+          "bps": 451
+        },
+        {
+          "from": 5,
+          "to": 9,
+          "bps": 491
+        },
+        {
+          "from": 10,
+          "to": 14,
+          "bps": 461
+        },
+        {
+          "from": 15,
+          "to": 19,
+          "bps": 481
+        },
+        {
+          "from": 20,
+          "to": 24,
+          "bps": 521
+        },
+        {
+          "from": 25,
+          "to": 29,
+          "bps": 581
+        },
+        {
+          "from": 30,
+          "to": 34,
+          "bps": 611
+        },
+        {
+          "from": 35,
+          "to": 39,
+          "bps": 641
+        },
+        {
+          "from": 40,
+          "to": 44,
+          "bps": 611
+        },
+        {
+          "from": 45,
+          "to": 49,
+          "bps": 571
+        },
+        {
+          "from": 50,
+          "to": 54,
+          "bps": 641
+        },
+        {
+          "from": 55,
+          "to": 59,
+          "bps": 822
+        },
+        {
+          "from": 60,
+          "to": 64,
+          "bps": 792
+        },
+        {
+          "from": 65,
+          "to": 69,
+          "bps": 651
+        },
+        {
+          "from": 70,
+          "to": 74,
+          "bps": 541
+        },
+        {
+          "from": 75,
+          "to": 79,
+          "bps": 471
+        },
+        {
+          "from": 80,
+          "to": 84,
+          "bps": 341
+        },
+        {
+          "from": 85,
+          "to": 99,
+          "bps": 321
+        }
+      ]
+    },
+    "life": {
+      "qx_per_100000": {
+        "male": [
+          338,
+          25,
+          17,
+          14,
+          13,
+          10,
+          11,
+          9,
+          10,
+          9,
+          8,
+          6,
+          8,
+          11,
+          13,
+          17,
+          22,
+          29,
+          38,
+          46,
+          46,
+          44,
+          45,
+          45,
+          42,
+          45,
+          48,
+          49,
+          47,
+          50,
+          53,
+          54,
+          62,
+          65,
+          78,
+          81,
+          91,
+          101,
+          105,
+          123,
+          131,
+          136,
+          158,
+          167,
+          183,
+          194,
+          219,
+          241,
+          263,
+          285,
+          330,
+          358,
+          405,
+          435,
+          478,
+          537,
+          595,
+          666,
+          745,
+          825,
+          927,
+          1023,
+          1143,
+          1271,
+          1422,
+          1543,
+          1680,
+          1850,
+          2000,
+          2182,
+          2332,
+          2568,
+          2757,
+          3020,
+          3259,
+          3626,
+          3872,
+          4248,
+          4641,
+          5217,
+          5811,
+          6355,
+          7092,
+          7878,
+          8951,
+          9995,
+          11376,
+          13053,
+          14740,
+          16793,
+          18727,
+          21101,
+          23758,
+          25980,
+          28369,
+          30698,
+          33622,
+          36315,
+          38767,
+          39954,
+          42042
+        ],
+        "female": [
+          299,
+          22,
+          14,
+          11,
+          8,
+          10,
+          8,
+          8,
+          7,
+          6,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          15,
+          18,
+          19,
+          20,
+          19,
+          21,
+          19,
+          16,
+          20,
+          18,
+          20,
+          21,
+          23,
+          24,
+          25,
+          29,
+          34,
+          34,
+          40,
+          46,
+          47,
+          52,
+          62,
+          68,
+          68,
+          79,
+          82,
+          93,
+          99,
+          105,
+          119,
+          136,
+          148,
+          164,
+          185,
+          200,
+          217,
+          240,
+          270,
+          295,
+          327,
+          364,
+          397,
+          443,
+          501,
+          553,
+          612,
+          678,
+          764,
+          829,
+          930,
+          1000,
+          1092,
+          1202,
+          1306,
+          1437,
+          1590,
+          1740,
+          1904,
+          2164,
+          2375,
+          2688,
+          2966,
+          3348,
+          3774,
+          4183,
+          4796,
+          5347,
+          6201,
+          7156,
+          8317,
+          9749,
+          11205,
+          12812,
+          14688,
+          16817,
+          19055,
+          21260,
+          23609,
+          26132,
+          28572,
+          31111,
+          33983,
+          35873,
+          37226
+        ]
+      },
+      "illness": {
+        "by_age": [
+          {
+            "from": 0,
+            "bps": 600
+          },
+          {
+            "from": 5,
+            "bps": 350
+          },
+          {
+            "from": 15,
+            "bps": 600
+          },
+          {
+            "from": 45,
+            "bps": 900
+          },
+          {
+            "from": 65,
+            "bps": 1800
+          },
+          {
+            "from": 85,
+            "bps": 4500
+          }
+        ],
+        "severity": [
+          {
+            "label": "serious",
+            "share_bps": 8000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "severe",
+            "share_bps": 2000,
+            "days": [
+              14,
+              60
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "injury": {
+        "bps": 210,
+        "severity": [
+          {
+            "label": "minor",
+            "share_bps": 6000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "serious",
+            "share_bps": 4000,
+            "days": [
+              14,
+              90
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "birth": {
+        "ages": [
+          15,
+          49
+        ],
+        "gestation_days": 266,
+        "female_bps": 4873
+      },
+      "treatable": {
+        "share_bps_by_age": [
+          {
+            "from": 0,
+            "bps": 1500
+          },
+          {
+            "from": 75,
+            "bps": 0
+          }
+        ],
+        "band": "severe"
+      },
+      "work_injury_bps": {
+        "factory": 240,
+        "shop": 200
+      },
+      "found_alone_after": [
+        {
+          "within_days": 1,
+          "bps": 3691
+        },
+        {
+          "within_days": 3,
+          "bps": 2062
+        },
+        {
+          "within_days": 7,
+          "bps": 1359
+        },
+        {
+          "within_days": 30,
+          "bps": 1959
+        },
+        {
+          "within_days": 365,
+          "bps": 929
+        }
+      ]
+    },
+    "pay_period_days": 14,
+    "wages_per_pay_period": {
+      "shop": 148431,
+      "factory": 226754,
+      "construction": 194446
+    },
+    "rents_per_month": {
+      "apartment_units": [
+        {
+          "bedrooms": 1,
+          "count": 3,
+          "rent": 29520
+        },
+        {
+          "bedrooms": 2,
+          "count": 7,
+          "rent": 42640
+        },
+        {
+          "bedrooms": 3,
+          "count": 2,
+          "rent": 52480
+        }
+      ],
+      "house_types": [
+        {
+          "id": "house",
+          "bedrooms": 3,
+          "share_bps": 5500,
+          "rent": 72160
+        },
+        {
+          "id": "large-house",
+          "bedrooms": 4,
+          "share_bps": 4500,
+          "rent": 85280
+        }
+      ]
+    },
+    "spending": {
+      "saving_bps": 1030,
+      "wealth_effect_bps_per_year": 300,
+      "essentials_per_month": 56300,
+      "shops_known": 7,
+      "shop_search_bps_per_month": 2500
+    },
+    "savings_by_age": [
+      {
+        "from": 18,
+        "pct": [
+          20000,
+          100000,
+          400000,
+          1200000,
+          3000000
+        ]
+      },
+      {
+        "from": 25,
+        "pct": [
+          100000,
+          400000,
+          1500000,
+          4500000,
+          10000000
+        ]
+      },
+      {
+        "from": 35,
+        "pct": [
+          150000,
+          600000,
+          2000000,
+          6000000,
+          14000000
+        ]
+      },
+      {
+        "from": 45,
+        "pct": [
+          200000,
+          800000,
+          2500000,
+          7500000,
+          17000000
+        ]
+      },
+      {
+        "from": 55,
+        "pct": [
+          300000,
+          1000000,
+          3500000,
+          10000000,
+          23000000
+        ]
+      }
+    ],
+    "retirement_age": 67,
+    "retiree_savings": [
+      15000000,
+      35000000
+    ],
+    "support": {
+      "pension": {
+        "amount": 191340,
+        "every_days": 30,
+        "from_age": 67
+      },
+      "unemployment": {
+        "amount": 56300,
+        "every_days": 30,
+        "from_age": 18
+      }
+    },
+    "firm_ownership": {
+      "forms_bps": {
+        "factory": {
+          "closely_held": 7000,
+          "outside": 1000,
+          "widely_held": 2000
+        },
+        "shop": {
+          "closely_held": 8000,
+          "outside": 2000,
+          "widely_held": 0
+        },
+        "landlord": {
+          "closely_held": 8500,
+          "outside": 1500,
+          "widely_held": 0
+        }
+      },
+      "closely_held": {
+        "households_bps": [
+          8500,
+          1200,
+          300
+        ],
+        "owner_wealth_fifth_bps": [
+          100,
+          200,
+          400,
+          800,
+          8500
+        ]
+      },
+      "widely_held": {
+        "outside_bps": 8000
+      },
+      "direct_holders": {
+        "by_wealth_fifth_bps": [
+          200,
+          700,
+          1300,
+          2100,
+          3800
+        ],
+        "firms_held": [
+          1,
+          4
+        ]
+      }
+    },
+    "retirement_fund": {
+      "share_bps_of_local": 7200,
+      "member_bps": 5500,
+      "pension_every_days": 30,
+      "drawdown_bps_by_age": [
+        {
+          "from": 0,
+          "bps": 400
+        },
+        {
+          "from": 65,
+          "bps": 500
+        },
+        {
+          "from": 75,
+          "bps": 600
+        },
+        {
+          "from": 80,
+          "bps": 700
+        },
+        {
+          "from": 85,
+          "bps": 900
+        },
+        {
+          "from": 90,
+          "bps": 1100
+        },
+        {
+          "from": 95,
+          "bps": 1400
+        }
+      ],
+      "cost_bps_of_income": 1500
+    },
+    "industry": {
+      "factory_labour_share_bps": 2000,
+      "factory_input_share_bps": 6700,
+      "retail_purchases_share_bps": 7000,
+      "retail_labour_share_bps": 1400
+    },
+    "prices": {
+      "goods_world": 10000,
+      "goods_import_markup_bps": 1000,
+      "inputs_per_kg": 250,
+      "materials_per_kg": 125
+    },
+    "ordinary_hours_per_week": 39,
+    "fertility_per_10000": [
+      {
+        "from": 15,
+        "rate": 55
+      },
+      {
+        "from": 20,
+        "rate": 327
+      },
+      {
+        "from": 25,
+        "rate": 754
+      },
+      {
+        "from": 30,
+        "rate": 1037
+      },
+      {
+        "from": 35,
+        "rate": 540
+      },
+      {
+        "from": 40,
+        "rate": 116
+      },
+      {
+        "from": 45,
+        "rate": 10
+      },
+      {
+        "from": 50,
+        "rate": 0
+      }
+    ],
+    "labour_force_participation_bps": 8000,
+    "tenancy": {
+      "rent_review_months": 15,
+      "rent_increase_notice_days": 60,
+      "after_fixed_term": "periodic"
+    },
+    "values": {
+      "benevolence": {
+        "mean_bps": 7000,
+        "sd_bps": 1500
+      },
+      "universalism": {
+        "mean_bps": 6600,
+        "sd_bps": 1500
+      },
+      "self_direction": {
+        "mean_bps": 6200,
+        "sd_bps": 1500
+      },
+      "security": {
+        "mean_bps": 5800,
+        "sd_bps": 1500
+      },
+      "conformity": {
+        "mean_bps": 5400,
+        "sd_bps": 1500
+      },
+      "hedonism": {
+        "mean_bps": 5000,
+        "sd_bps": 1500
+      },
+      "achievement": {
+        "mean_bps": 4600,
+        "sd_bps": 1500
+      },
+      "tradition": {
+        "mean_bps": 4200,
+        "sd_bps": 1500
+      },
+      "stimulation": {
+        "mean_bps": 3800,
+        "sd_bps": 1500
+      },
+      "power": {
+        "mean_bps": 3400,
+        "sd_bps": 1500
+      }
+    },
+    "industrial_action": {
+      "ballot_turnout_bps": 0,
+      "ballot_pass_bps": 7500,
+      "notice_days": 0,
+      "paid_during_action": false
+    },
+    "world_price_process": {
+      "goods": {
+        "sd_bps": 150,
+        "persistence_bps": 9000
+      },
+      "inputs": {
+        "sd_bps": 400,
+        "persistence_bps": 9000
+      },
+      "materials": {
+        "sd_bps": 300,
+        "persistence_bps": 9000
+      }
+    },
+    "credit": {
+      "cash_rate_bps": 250,
+      "funding_spread_bps": 100,
+      "lending_rate_bps": {
+        "person": 700,
+        "organisation": 500
+      },
+      "serviceability_buffer_bps": 0,
+      "max_repayment_share_bps": {
+        "person": 3500,
+        "organisation": 2000
+      },
+      "arrears_days": 30,
+      "default_days": 90,
+      "max_months": 60,
+      "reserve": 10000000
+    },
+    "opening": {
+      "bank": 50000000,
+      "town": 200000000,
+      "builder": 30000000,
+      "landlord": 60000000,
+      "person_min_savings": 100000
+    },
+    "town_finance": {
+      "parks_per_year": 15000000,
+      "payment_approval_over": 5000000
+    },
+    "public_finance": {
+      "income_tax": {
+        "brackets": [
+          {
+            "from": 0,
+            "rate_bps": 0
+          },
+          {
+            "from": 1234900,
+            "rate_bps": 1900
+          },
+          {
+            "from": 1780000,
+            "rate_bps": 2900
+          },
+          {
+            "from": 3200000,
+            "rate_bps": 3400
+          },
+          {
+            "from": 4500000,
+            "rate_bps": 3900
+          },
+          {
+            "from": 6987900,
+            "rate_bps": 4200
+          },
+          {
+            "from": 27782700,
+            "rate_bps": 4500
+          }
+        ],
+        "levy_bps": 2115,
+        "levy_from": 723600
+      },
+      "grants_per_resident_per_year": 37620,
+      "rates_per_resident_per_year": 18000,
+      "rates_instalments": 4,
+      "rates_due_days": 30,
+      "rates_penalty_interest_bps": 1200,
+      "median_house_price": 33900000,
+      "rates_exempt_kinds": [
+        "health_service",
+        "school",
+        "utility",
+        "police"
+      ]
+    },
+    "services": {
+      "waste_per_person_per_day_g": 1260,
+      "landfill_levy_per_tonne": 0,
+      "council_staff_per_1000": 6,
+      "collect_seconds_per_10kg": 12,
+      "asset_life_years": 15,
+      "upkeep_hours_per_week_per_asset": 4,
+      "complain_bps": 3000
+    },
+    "unions": {
+      "membership_bps": {
+        "manufacturing": 1900,
+        "retail": 900,
+        "construction": 1500,
+        "public_administration": 2400,
+        "other": 1410
+      },
+      "dues_per_month": 3000,
+      "resignation_notice_days": 90,
+      "claim_margin_bps": 200,
+      "meeting_every_days": 30,
+      "teaching": "Together, workers win better pay and conditions than each alone."
+    },
+    "groups": {
+      "kinds": [
+        {
+          "kind": "sport",
+          "name": "sports club",
+          "every_days": 7,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "religious",
+          "name": "congregation",
+          "every_days": 7,
+          "lasts_minutes": 90,
+          "teaching": "There is a God who made the world and cares how we live.",
+          "held_at_start_bps": 5000
+        },
+        {
+          "kind": "arts",
+          "name": "arts society",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "hobby",
+          "name": "hobby group",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "interest",
+          "name": "community club",
+          "every_days": 30,
+          "lasts_minutes": 120
+        }
+      ],
+      "per_kind_per_1000_people": 1,
+      "taking_part_bps": 4000,
+      "leave_notice_days": 0
+    },
+    "elections": {
+      "compulsory_voting": false,
+      "term_years": 5,
+      "method": "preferential",
+      "turnout_bps": 6460,
+      "stand_bps": 200,
+      "news_readers_bps": 4000
+    },
+    "health": {
+      "doctors_per_1000": 0.7,
+      "doctor_wage_per_pay_period": 398492,
+      "consult_minutes": 30,
+      "seek_care_bps": 9000,
+      "treats": [
+        {
+          "kind": "illness",
+          "severity": "serious",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "illness",
+          "severity": "severe",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "minor",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "serious",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        }
+      ],
+      "off_work_severities": [
+        "serious",
+        "severe"
+      ]
+    },
+    "round": {
+      "work_start_hour": 8,
+      "work_end_hour": 16,
+      "work_days": 5,
+      "school_start_hour": 8,
+      "school_end_hour": 13,
+      "travel_seconds_per_cell": 18,
+      "travel_by_cover": {
+        "water": 120,
+        "wetland": 30,
+        "woodland": 25,
+        "scrub": 25
+      },
+      "roads": {
+        "seconds_per_cell": 2,
+        "within_cells": 3,
+        "budget_per_resident": 30000
+      }
+    },
+    "ownership": {
+      "house_owner_bps": 8000,
+      "mortgage_bps_by_age": [
+        {
+          "from": 18,
+          "bps": 8500
+        },
+        {
+          "from": 45,
+          "bps": 5500
+        },
+        {
+          "from": 65,
+          "bps": 1500
+        }
+      ],
+      "mortgage_payment_per_month": 126400,
+      "mortgage_rate_bps": 380,
+      "mortgage_years_left": [
+        5,
+        30
+      ],
+      "market": {
+        "buy_bps_per_month": 100,
+        "deposit_bps": 2000,
+        "costs_bps": 1050,
+        "mortgage_months": 360,
+        "relist_days": 30,
+        "cut_bps": 500,
+        "floor_bps": 8000
+      }
+    },
+    "utilities": {
+      "water": {
+        "litres_per_person_per_day": 126,
+        "price_per_kl": 447,
+        "service_per_quarter": 2329,
+        "river_inflow_kl_per_cell_per_day": 1000,
+        "river_decay_bps_per_day": 1000,
+        "river_flow_bps_per_day": 5000
+      },
+      "energy": {
+        "kwh_per_household_per_day": 7,
+        "price_per_kwh": 37,
+        "supply_per_day": 0,
+        "grid_price_per_kwh": 24,
+        "grid_emissions_g_per_kwh": 344
+      }
+    },
+    "climate": {
+      "rain_by_month_bps": [
+        14000,
+        14000,
+        14000,
+        11500,
+        9000,
+        7500,
+        7000,
+        6500,
+        7000,
+        8500,
+        11000,
+        13000
+      ],
+      "storm_bps_per_month": 800,
+      "storm_days": [
+        2,
+        4
+      ],
+      "storm_bps": 25000,
+      "drought_bps_per_year": 800,
+      "drought_months": [
+        6,
+        18
+      ],
+      "drought_bps": 4000,
+      "summer_months": [
+        6,
+        7,
+        8
+      ],
+      "heatwave_bps_per_week": 1481,
+      "heatwave_days": [
+        3,
+        5
+      ],
+      "heat_units": 10,
+      "built_heat_units": 12,
+      "heat_illness_bps_per_unit": 100,
+      "warning_lead_days": 2
+    },
+    "hazards": {
+      "river_bank_kl": 12000,
+      "spill_bps_per_day": 3000,
+      "flood_above_kl": 300,
+      "wetland_soak_kl_per_day": 500
+    },
+    "crime": {
+      "take_bps_per_month_in_need": 200,
+      "caught_bps_reckoned": 3000,
+      "take_quantity": 5,
+      "detection_bps": 3000,
+      "investigation_hours": 4,
+      "police_per_1000": 2.4,
+      "officer_wage_per_pay_period": 184615
+    },
+    "justice": {
+      "hearing_after_days": 14,
+      "pay_within_days": 28,
+      "challenge_bps": 2000,
+      "apply_bps": 3000,
+      "apply_after_days": 30
+    },
+    "education": {
+      "school_ages": [
+        6,
+        17
+      ],
+      "students_per_teacher": 15,
+      "school_days_per_year": 190,
+      "hours_per_day": 5,
+      "teacher_wage_per_pay_period": 240000,
+      "attainment": [
+        {
+          "label": "Lower secondary or below (ISCED 0-2)",
+          "share_bps": 1300,
+          "years": 9
+        },
+        {
+          "label": "Upper secondary or vocational training (ISCED 3-4)",
+          "share_bps": 5300,
+          "years": 13
+        },
+        {
+          "label": "Master craftsman, technician or other short-cycle tertiary (ISCED 5)",
+          "share_bps": 1100,
+          "years": 14
+        },
+        {
+          "label": "Bachelor, master or doctorate (ISCED 6-8)",
+          "share_bps": 2300,
+          "years": 16
+        }
+      ],
+      "return_per_year_bps": 700,
+      "max_years": 20
+    },
+    "nature": {
+      "cell_m": 25,
+      "landscape": {
+        "margin_cells": 100,
+        "block_cells": 16,
+        "shares_bps": {
+          "woodland": 2200,
+          "scrub": 300,
+          "grassland": 2000,
+          "farmland": 5000,
+          "wetland": 500
+        },
+        "woodland_patches": 2
+      },
+      "covers": [
+        {
+          "id": "woodland"
+        },
+        {
+          "id": "scrub",
+          "succeeds_to": {
+            "cover": "woodland",
+            "after_years": 40
+          }
+        },
+        {
+          "id": "grassland"
+        },
+        {
+          "id": "cleared",
+          "succeeds_to": {
+            "cover": "grassland",
+            "after_years": 1
+          }
+        },
+        {
+          "id": "farmland"
+        },
+        {
+          "id": "wetland"
+        },
+        {
+          "id": "riverbank"
+        }
+      ],
+      "default_cover": "grassland",
+      "cleared_cover": "cleared",
+      "river_cover": "riverbank",
+      "pollution": {
+        "decay_bps_per_day": 300,
+        "diffusion_bps_per_day": 800,
+        "flow_bps_per_day": 5000,
+        "per_factory_per_day": 40,
+        "per_farmland_cell_per_day": 1
+      },
+      "species": [
+        {
+          "id": "red-squirrel",
+          "name": "red squirrel",
+          "density_per_ha": {
+            "woodland": 0.4,
+            "scrub": 0.1
+          },
+          "home_range_ha": 7,
+          "growth_bps_per_year": 6000,
+          "mortality_bps_per_year": 4000,
+          "dispersal_bps_per_year": 1000,
+          "dispersal_m": 300,
+          "barriers": [
+            "built",
+            "farmland"
+          ],
+          "min_viable": 1,
+          "detection_bps": 3000
+        },
+        {
+          "id": "great-crested-newt",
+          "name": "great crested newt",
+          "density_per_ha": {
+            "wetland": 50,
+            "riverbank": 2,
+            "scrub": 3,
+            "woodland": 3,
+            "grassland": 2
+          },
+          "home_range_ha": 0.3,
+          "growth_bps_per_year": 4000,
+          "mortality_bps_per_year": 3000,
+          "dispersal_bps_per_year": 1000,
+          "dispersal_m": 500,
+          "barriers": [
+            "built",
+            "farmland"
+          ],
+          "min_viable": 4,
+          "tolerance": {
+            "pollution": {
+              "above": 400,
+              "mortality_bps_per_day": 50
+            }
+          },
+          "detection_bps": 3000,
+          "listed": true
+        },
+        {
+          "id": "chaffinch",
+          "name": "chaffinch",
+          "density_per_ha": {
+            "woodland": 0.66,
+            "scrub": 0.5,
+            "riverbank": 0.5,
+            "grassland": 0.05
+          },
+          "home_range_ha": 1.5,
+          "growth_bps_per_year": 5000,
+          "mortality_bps_per_year": 4000,
+          "dispersal_bps_per_year": 1000,
+          "dispersal_m": 500,
+          "min_viable": 1,
+          "detection_bps": 8000,
+          "conspicuous": true
+        }
+      ],
+      "survey_hours_per_ha": 1,
+      "survey_staff": 1,
+      "spin_up_years": 10
+    }
+  },
+  "sources": {
+    "currency": "Euro, in cents: ISO 4217 EUR, two decimal places. Written here with the euro sign before the amount, as English does (EUR1,234.56 style, with the sign), or in words as euros and cents. German itself writes the sign after the amount (1.234,56 EUR): the structure can only put it before (see the report's gaps).",
+    "health": "The clinic stands for the town's health system (general practice and the hospital it refers to; a liberty). doctor_wage_per_pay_period: EUR 8,634 a month, the median gross monthly pay (without special payments) of full-time doctors (KldB 814, Human- und Zahnmedizin), April 2025, times 12 over 26 (Destatis, table 62361-03, as under wages_per_pay_period, opened); national, not the clinic's own agreement. doctors_per_1000: placeholder, about 0.7 full-time-equivalent general practitioners per 1,000 people, recalled from a count of about 5,000-5,500 Hausaerzte in Niedersachsen (Kassenaerztliche Vereinigung Niedersachsen); the Bundesaerztekammer and KVN statistics pages could not be opened (404), so not confirmed. consult_minutes, seek_care_bps, treats and off_work_severities: placeholders as in the Australian profile (conditions here are hospital-level; care shortens them by a fifth; nobody works with a serious or severe condition). Statutory health insurance covers nearly everyone; nothing is charged at the clinic here (a liberty).",
+    "round": "Working hours 8 to 16, Monday to Friday, for everyone, shops included (a liberty: German shops open Saturdays and, by Land law, close on Sundays; Niedersachsen's Ladenoeffnungsgesetz allows Monday to Saturday; to confirm); average usual weekly hours of full-time employees are 39.1 (Destatis, Durchschnittliche Bruttoverdienste und Arbeitszeiten, April 2025, https://www.destatis.de/DE/Themen/Arbeit/Verdienste/Verdienste-Branche-Berufe/Tabellen/bruttomonats-verdienste-stichmonat.html), so 8 hours a day with the lunch break outside it. School 8 to 13 on school days (primary and secondary schools in Niedersachsen mostly end around 13:00 without all-day provision; placeholder, to confirm). Travel: off the roads a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997; to confirm); on a road about 2 seconds (50 km/h, the general urban limit in the Strassenverkehrs-Ordnung, StVO para 3(3); to confirm); slower across water, wetland and bush (placeholders). Roads budget about EUR 300 a resident a year: placeholder carried over from the Australian profile; no German municipal road-spending figure was found.",
+    "ownership": "house_owner_bps: placeholder, 80% of separate houses owner-occupied. LSN reports that 47.7% of dwellings in Niedersachsen are owner-occupied and 47.0% rented (Zensus 2022, https://www.statistik.niedersachsen.de/zensus2022/ergebnisse-des-zensus-2022-233166.html, opened) and that about half of all households own their home (press release 074/2025); owner-occupation is much higher in houses than in flats, but the Zensus table by building type was not opened (to confirm); flats here are all rented (a liberty). mortgage_bps_by_age: placeholder carried over (most owners under 45 have a mortgage, few over 65; Bundesbank PHF would give it, to source). mortgage_payment_per_month: derived, not observed: 80% of the median asking price of a one- or two-family house (EUR 339,000, empirica for LBS NordWest, 2025: see public_finance.median_house_price) over 30 years at 3.8% is about EUR 1,264 a month. mortgage_rate_bps: placeholder 3.8%, a guess for 10-year-fixed home loans with the ECB deposit rate at 2.5% (Bundesbank MFI interest rate statistics, new housing loans; to source). mortgage_years_left: placeholder. market: deposit 20% (lenders expect about 20% equity; placeholder, to confirm); costs 10.5%: land transfer tax in Niedersachsen 5.0% (Niedersaechsisches Grunderwerbsteuergesetz; to confirm), notary and land register about 2%, and the buyer's half of a typical 7.14% estate agent's commission, 3.57% (to confirm); a 30-year term (placeholder; German loans fix the rate for 10-15 years); buy_bps_per_month, relist_days, cut_bps and floor_bps: placeholders as in the Australian profile (Merlo and Ortalo-Magne 2004; to confirm).",
+    "utilities": "Water: 126 litres a person a day for households in Germany (Destatis, Wasserwirtschaft page, opened 2026-10-08). Price: EUR 1.82 a cubic metre for drinking water in Niedersachsen on 1 January 2025 plus a household-usual basic charge of EUR 93.15 a year (EUR 23.29 a quarter), population-weighted over tariff areas (Destatis, table 'Entgelt fuer die Trinkwasserversorgung in Tarifgebieten nach Tariftypen 2023 bis 2025', Land Niedersachsen, 'Kubikmeter- und Grundentgelt', https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Umwelt/Wasserwirtschaft/Tabellen/tw-09-entgelt-trinkwasserversorgung-tarifgeb-nach-tariftypen-2023-2025-land-bund.html, opened), plus waste water at the national EUR 2.62-2.71 a cubic metre in 2025 (take 2.65; same Destatis series, table aw-07, Germany only, opened), so EUR 4.47 a kilolitre. Bills go to owners. River inflow, flow and losses are placeholders sized so a small town's draw is a small share of a modest river. Energy: price_per_kwh 37 cents, the average household electricity price in 2026 at 3,500 kWh a year with the base charge included (BDEW Strompreisanalyse August 2026, https://www.bdew.de/service/daten-und-grafiken/bdew-strompreisanalyse/, opened); because the base charge is already in it, supply_per_day is 0. grid_price_per_kwh: 24 cents, procurement and sales (15.2 ct) plus network charges (9.2 ct) of that price, the rest (12.6 ct) being taxes, levies and surcharges (same page, opened); here the town's retailer keeps the 12.6 ct (see gaps). kwh_per_household_per_day: 7, placeholder (about 2,500 kWh a year for an average household of two people; not opened). grid_emissions_g_per_kwh: 344 g CO2 per kWh of electricity consumed in Germany in 2025 (Umweltbundesamt, Strom- und Waermeversorgung in Zahlen, https://www.umweltbundesamt.de/themen/klima-energie/energieversorgung/strom-waermeversorgung-in-zahlen, opened).",
+    "climate": "Weather drawn for each run (docs/behaviour/weather.md). Opened: Deutscher Wetterdienst climate normals 1991-2020 (https://opendata.dwd.de/climate_environment/CDC/observations_germany/climate/multi_annual/mean_91-20/): Hannover station (id 2014) has 7.7 hot days (30 C or more) a year, 7.3 of them in June to August, and 36 summer days (25 C or more); Celle station (id 850) has 680 mm of precipitation a year, from 40 mm (April) to 74 mm (July). heatwave_bps_per_week is derived: 7.7 hot days over spells of about 4 days is about 1.9 spells in the 13 weeks of June to August, 1,480 basis points a week (rounded from the formula; not every hot day starts a spell of 3-5 days, so it is an upper reading). rain_by_month_bps: the river's flow by month is not precipitation (northern German rivers peak in winter and early spring because evaporation is low; lowest in late summer and early autumn; BfG / NLWKN gauge data were not fetched), so the monthly shape is a placeholder (10,000 = the year's mean). storm_*: heavy-rain spells, placeholder (the floods of December 2023 to January 2024 in Niedersachsen show the order of rarity; NLWKN reports not opened). drought_*: placeholder (Germany had droughts in 2018-2020 and 2022). Heatwave length, heat units and the illness gradient are carried over from the Australian profile (Robert Koch Institute heat-death estimates not opened). warning_lead_days: placeholder.",
+    "hazards": "Floods: placeholders sized against the river as modelled, as in the Australian profile (about 9,000 kL a 25 m cell in the usual flow; it spills past 12,000, 30% of the excess a day; a building floods above 300 kL on its cell; wetland soaks up 500 kL a cell a day). Real record to calibrate against: the December 2023 to January 2024 flood in Niedersachsen (NLWKN, Hochwasser Dezember 2023 / Januar 2024; to confirm). Emergency relief is run by Landkreis and Gemeinde fire services and the Technisches Hilfswerk (Niedersaechsisches Katastrophenschutzgesetz; to confirm): here the town hall.",
+    "crime": "Crime, deliberately rare and driven by circumstance only (Becker 1968; Cohen and Felson 1979), never by any group. take_bps_per_month_in_need, caught_bps_reckoned, take_quantity, investigation_hours: placeholders. detection_bps: placeholder 30%, recalled from the national figure that about three theft offences in ten are cleared (Bundeskriminalamt, Polizeiliche Kriminalstatistik, Diebstahl insgesamt; to confirm; Niedersachsen's overall clearance rate for all offences was 62.72% in 2025 and it recorded 156,725 thefts, Polizeiliche Kriminalstatistik Niedersachsen 2025, https://www.mi.niedersachsen.de/download/226742/Handout_Polizeiliche_Kriminalstatistik_2025_Niedersachsen.pdf; the theft clearance rate itself was in a chart that could not be read). police_per_1000: placeholder 2.4 sworn officers per 1,000, recalled order of magnitude for the Landespolizei Niedersachsen (to confirm). officer_wage_per_pay_period: placeholder EUR 4,000 a month for a Polizeikommissar (grade A9, Niedersaechsische Besoldungstabelle; to confirm), times 12 over 26.",
+    "justice": "The tribunal stands for the civil and labour courts (Amtsgericht for tenancy and small claims; Arbeitsgericht for unpaid wages). hearing_after_days: 14, since 'the conciliation hearing (Guteverhandlung) is to be held within two weeks of the filing of the claim' (Arbeitsgerichtsgesetz para 61a(2), https://www.gesetze-im-internet.de/arbgg/__61a.html, opened); civil courts take longer (months). pay_within_days, challenge_bps, apply_bps, apply_after_days: placeholders carried over from the Australian profile; no German figure found (Destatis Rechtspflege tables were not reached). A money judgment is enforced by an attachment of the debtor's bank account (Kontopfaendung, ZPO para 829 ff.; not opened).",
+    "education": "school_ages: schooling is compulsory from the school year in which a child turns 6 (cut-off 30 September) for 12 years, 9 in full-time schooling and the rest part-time (Niedersaechsisches Schulgesetz para 63-66; to confirm); 6 to 17 here. students_per_teacher: placeholder 15 for general schools (Destatis' 2025/26 report on general schools, opened, gives Niedersachsen's 72,952 teachers by head count, not full-time equivalents, and national pupils of about 9.0 million, so no clean ratio; recalled about 15, to confirm). school_days_per_year: about 190, derived: 261 weekdays less about 12 weeks of school holidays and public holidays in term (Niedersachsen's holiday calendar; to confirm). hours_per_day: 5 (8:00 to 13:00; placeholder). teacher_wage_per_pay_period: placeholder, EUR 5,200 a month gross for a teacher in grade A12/A13 (Niedersaechsische Besoldungstabelle; to confirm), times 12 over 26. attainment: placeholder shapes from OECD (tried: Destatis' 'Bevoelkerung nach Bildungsabschluss' table, opened, gives 2019 shares of all people aged 15 and over, 25.2% with no vocational qualification, 46.6% dual training, 9.3% technical school, 18.5% degree: it includes pupils and students, so it was not used for adults 25-64; the Zensus 2022 Bildungsstand tables are in the script-driven Zensus database), Education at a Glance (Germany, adults 25-64: about 13% below upper secondary, 53% upper or post-secondary non-tertiary (mostly the dual vocational system), 11% short-cycle tertiary (Meister, Techniker), 23% bachelor or above; recalled, to confirm); years of schooling 9, 13, 14, 16 are placeholders. return_per_year_bps: placeholder 7% (German Mincer-type estimates run about 6-9%; to source); applied as productivity (Mincer 1974). max_years: placeholder.",
+    "elections": "Niedersaechsisches Kommunalverfassungsgesetz (NKomVG): councils are elected every five years by proportional representation with three votes that may be piled on one candidate or spread across lists (kumulieren, panaschieren); the full-time mayor is elected directly, needing an absolute majority or winning a run-off (Stichwahl); both are approximated by 'preferential' (see gaps). Last general local election 13 September 2026; turnout 64.6% (preliminary result as reported by press and the Boell Foundation's Kommunalwiki, https://kommunalwiki.boell.de/index.php/Kommunalwahlen_in_Niedersachsen_2026; 57% in 2021; the Landeswahlleiterin's tables not opened, to confirm). stand_bps and news_readers_bps: placeholders (2%; 40% reading the local paper each week).",
+    "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a cell is a 25 m lot. landscape.shares_bps: placeholder shaped by Niedersachsen's land use (about 60% agriculture and about 25% forest of the state's 47,710 km2; Landesamt fuer Statistik Niedersachsen, Flaechenerhebung; recalled, to confirm) for a lowland small town: 22% woodland, 3% scrub, 20% grassland, 50% farmland, 5% wetland. margin_cells, block_cells, woodland_patches, the covers' succession, the pollution figures, survey_hours_per_ha, survey_staff are placeholders as in the Australian profile (nothing region-specific; spin_up_years likewise).",
+    "nature.species": "Placeholders for growth, mortality, dispersal, min_viable and detection. red squirrel (Sciurus vulgaris): pre-breeding density 0.39-0.58 a hectare in heterogeneous habitat and 0.28 in a conifer plantation, home ranges 2-10 ha with an average of about 7 (summaries found in a web search of the red-squirrel literature, including studies in the Insubria and Durham repositories; the papers were not opened, to confirm), 0.4 a hectare of woodland used; strictly protected under the Bundesartenschutzverordnung (to confirm). great crested newt (Triturus cristatus): listed under the EU Habitats Directive annexes II and IV and 'gefaehrdet' (category 3) on Niedersachsen's red list of amphibians (NLWKN; found in a web search, 2013 list; to confirm); an average of 230 spawning migrants a year counted at one monitored site in 2012-2018 (NLWKN amphibian protection report; not opened, to confirm); the densities per hectare, home range, dispersal (up to 500 m) and tolerance of pollution are placeholders; it needs both ponds and land habitat close by. chaffinch (Fringilla coelebs), a common conspicuous control: 3.3 breeding pairs per 10 ha in one Austrian forest study (found in a web search; not opened, to confirm), so 0.33 pairs, 0.66 birds a hectare; other covers and the territory of 1.5 ha are placeholders.",
+    "households": "LSN, Zensus 2022: Landesamt fuer Statistik Niedersachsen (LSN), press release no. 074 of 19 August 2025, 'Zensus 2022: 78% der Singlehaushalte zahlten weniger als 500 Euro Nettokaltmiete', https://www.statistik.niedersachsen.de/presse/zensus-2022-78-der-singlehaushalte-zahlten-weniger-als-500-euro-nettokaltmiete-244136.html - of 3.8 million private households 41.2% one-person, 27% couples without children, 22% couples with children, 7.4% single parents (5.9 points of them mothers: 79.7% of single-parent households), 3% multi-person households that are no family. couple_bps is the remainder after the others are fixed (the published 27% is rounded). group_bps: the 3%, as 'multi-person households without a family core'. Opened sources: LSN press release 074/2025 (household shares and mothers' share of single parents) and Destatis, Statistischer Bericht Geburten 2024, table 12612-01 (Niedersachsen: 33,658 boys of 65,646 live births in 2024, so child_male_bps 5127). Children per family (children_couple, children_one_parent): placeholders shaped by Mikrozensus family statistics (one child is the most common; to source from Destatis, Familien nach Kinderzahl). same_sex_couple_bps: placeholder, below 1% of couples (Mikrozensus; to confirm). child_male_bps and life.birth.female_bps: the natural ratio of about 105 boys to 100 girls, placeholder (Destatis, Geburten; to confirm). adult_female_bps, group_size, adult_ages: placeholders. mother_age_at_first_birth: mothers' mean age at first birth 30.5 and at all births 31.9 in 2025 (Destatis press release 230 of 2026, https://www.destatis.de/DE/Presse/Pressemitteilungen/2026/07/PD26_230_12.html), so 23 to 37 here. The Zensus counts dependants differently from the family coding; see child_max_age.",
+    "life.qx_per_100000": "Statistisches Bundesamt (Destatis), Statistischer Bericht Sterbetafeln 2022/2024 (EVAS 12621), tables 12613-b01 (males) and 12613-b02 (females), 'Sterbetafel 2022/2024 fuer Deutschland nach Altersjahren', downloaded 2026-10-08 from https://www.lifetable.de/File/GetDocument/data/DEU/DEU000020222024CU1.pdf: the probability of dying within a year (qx), ages 0 to 100, per 100,000, males and females, Germany (not Niedersachsen: its life expectancy at birth is 78.0 and 82.6 years against Germany's 78.5 and 83.2, so Germany's table slightly flatters this place; Niedersachsen-Monitor 2025). From age 99 the table's values are extrapolated.",
+    "life.illness": "Placeholder carried over from the Australian profile, shaped by a hospitalisation age gradient; to replace with age-specific overnight rates from Destatis, Diagnosedaten der Krankenhaeuser.",
+    "life.injury": "Placeholder: 210 injury hospitalisations per 10,000 people (carried over from the Australian profile; Destatis hospital diagnosis data, chapter XIX injuries, would give the German rate, to source). Severity split: placeholder.",
+    "life.birth": "Bearing a child from 15 to 49 (Destatis counts the total fertility rate over ages 15 to under 50: Statistischer Bericht Geburten 2024, table 12612-b01, opened); 38 weeks from conception (biology). Female share of births in Niedersachsen 2024: 31,988 of 65,646 = 48.73% (Destatis, Statistischer Bericht Geburten 2024, table 12612-01, https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Geburten/Publikationen/Downloads-Geburten/statistischer-bericht-geburten-5126104247005.xlsx, opened 2026-10-08).",
+    "life.treatable": "The share of deaths that timely, effective health care could have prevented (treatable mortality as the OECD and Eurostat define it: under 75 only). Placeholder carried over from the Australian figure (about 15% of deaths under 75); Eurostat's avoidable mortality table for Germany would give it (to source). Carried by the severe illness band, as in the Australian profile.",
+    "life.found_alone_after": "Placeholder carried over: no German figure was found. Japan's National Police Agency count of people who died alone at home in 2025 (76,941): found within 1 day 28,398; 2-3 days 15,865; 4-7 days 10,456; 8 days or more 22,222, read as reported in the press (to confirm). Japan's living-alone share and neighbourhood ties are its own.",
+    "life.work_injury_bps": "Placeholder: notifiable workplace accidents (more than three days off) were about 22 per 1,000 full-time workers across the economy (Deutsche Gesetzliche Unfallversicherung, Arbeitsunfallstatistik; recalled, to confirm); 2.4% a year for a factory and 2.0% for a shop are rough guesses around that.",
+    "wages_per_pay_period": "Gross monthly pay times 12 over 26 (the structure has fortnights; German pay is monthly: see gaps). All national, Germany (a Niedersachsen breakdown by sector was not found in Destatis' published tables; the Verdiensterhebung's Land tables are in GENESIS 62361, behind registration). Shop: EUR 3,216 a month, the median gross monthly pay (without special payments) of full-time sales workers (KldB 621, Verkauf ohne Produktspezialisierung), April 2025 (Destatis, Statistischer Bericht Verdiensterhebung, table 62361-03, https://www.destatis.de/DE/Themen/Arbeit/Verdienste/Verdienste-Branche-Berufe/Publikationen/Downloads/statistischer-bericht-verdienste-5623601263225.xlsx, opened 2026-10-08). The Niedersachsen retail collective agreement's pay from the seventh year, EUR 3,219 (retail-news.de, May 2026), agrees. Factory: EUR 4,913 a month, average gross monthly earnings without special payments of full-time employees in manufacturing, April 2025, 38.2 hours a week; construction EUR 4,213 (40.1 hours) (Destatis, 'Durchschnittliche Bruttoverdienste und Arbeitszeiten, Ergebnisse fuer April 2025', published 9 January 2026, opened). The statutory minimum wage is EUR 13.90 an hour from 1 January 2026 and EUR 14.60 from 2027 (Bundesregierung, https://www.bundesregierung.de/breg-de/aktuelles/mindestlohn-steigt-2391010, opened).",
+    "rents_per_month": "One opened figure, with assumptions: the average net cold rent (Nettokaltmiete) in Niedersachsen was EUR 6.56 a square metre on 15 May 2022 (highest Landkreis Harburg 8.17, lowest Holzminden 4.56; Zensus 2022 as published by the Landesamt fuer Statistik Niedersachsen, https://www.statistik.niedersachsen.de/zensus2022/ergebnisse-des-zensus-2022-233166.html, opened 2026-10-08); a municipality-level figure for a named small town needs the Zensus database (script-driven; not fetchable). Rents here are cold rents (heating, water and service charges, Nebenkosten, are paid on top and are not modelled). Dwelling sizes are assumed: 45, 65 and 80 m2 for flats of 1-3 bedrooms and 110 and 130 m2 for houses of 3 and 4 bedrooms (the average dwelling in Niedersachsen is 105 m2: LSN press release 074/2025, opened). The apartment mix and house shares are placeholders. The figure is the 2022 level; rents have risen since.",
+    "spending.saving_bps": "Household saving ratio 10.3% in the first half of 2025 (Destatis, as reported by retail-news.de, https://retail-news.de/sparquote-deutschland-2025-destatis/; the full-year 2025 figure was reported at about 10.4% in the press; Destatis table not opened, to confirm).",
+    "spending.wealth_effect_bps_per_year": "Placeholder carried over from the Australian profile (about 3 cents of consumption a year per euro of wealth); no German estimate found (to source, e.g. Bundesbank Monthly Report studies on wealth effects).",
+    "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections; read 2026-10-08). Not a figure of this place: a model's, kept until a survey of shops used is found (the nearest found: 4.4 grocery stores a month for a household in the United States, an industry figure reported in the press; to confirm).",
+    "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1: the probability of searching for a cheaper seller, 0.25 a month; read 2026-10-08). A model's figure, as above.",
+    "spending.essentials_per_month": "Placeholder: what a person spends however little comes in, taken as the Regelsatz for a single adult, EUR 563 a month in 2026 (Bundesregierung/BMAS; unchanged from 2025; the reform replacing Buergergeld with a 'Neue Grundsicherung' during 2026 was not checked, to confirm); see support.unemployment.",
+    "retirement_age": "The standard retirement age (Regelaltersgrenze) is 67 for everyone born in 1964 or later; for those born 1958 to 1963 it is 66 years (1958), 66y2m, 66y4m, 66y6m, 66y8m and 66y10m (1963) (SGB VI para 235, https://www.gesetze-im-internet.de/sgb_6/__235.html, opened). The structure takes one age: 67, the end state. People with 45 insurance years can retire earlier without deduction (see gaps).",
+    "savings_by_age": "Placeholders carried over from the Australian profile as an order of magnitude (cash and deposits by age at the 10th, 25th, 50th, 75th and 90th percentile, in euros): to replace with the Bundesbank Panel on Household Finances (PHF) 2023, Sicht- und Spareinlagen by age of head of household (to source). Not Germany's measured figures.",
+    "retiree_savings": "Placeholder carried over: savings at retirement of EUR 150,000-350,000 (to replace with PHF 2023 net financial wealth of households aged 65-69). Occupational and private pensions are a small part of German retirement income (the statutory pension is pay-as-you-go).",
+    "support.pension": "The statutory pension (gesetzliche Rente) is earnings-related, not flat. The structure takes one flat amount, so the Eckrente (a 'standard pension': 45 earnings points) is used: 45 x the current pension value of EUR 42.52 from 1 July 2026 (up 4.24% from EUR 40.79), set by the Rentenwertbestimmungsverordnung 2026 (Bundesrat Drucksache 243/26 of 30 April 2026, https://dserver.bundestag.de/brd/2026/0243-26.pdf, opened) = EUR 1,913.40 a month, gross, paid monthly. It is more than most pensioners get (a typical new pension is lower), and health and care contributions are deducted. Not means-tested. every_days 30 because German pensions are monthly.",
+    "support.unemployment": "The Regelsatz (Regelbedarfsstufe 1) of Buergergeld, EUR 563 a month for a single adult in 2026, unchanged from 2025 (Bundesregierung/BMAS, reported by finanz.de and the Buergerbeauftragte; to confirm against the Regelbedarfsstufen-Fortschreibungsverordnung; the 2026 reform to a 'Grundsicherung' is not reflected). Housing and heating costs are paid on top as actual costs (not modelled: the town's landlord is not paid by the state), and the first 12 months of unemployment are paid under insurance (Arbeitslosengeld I, 60% of previous net pay, 67% with children) which the structure cannot express. from_age 18 (adults; the under-25 rule that young people stay with parents is left out). Paid every 30 days. Means test left out.",
+    "firm_ownership.forms_bps": "How the firms of each kind are held. Shops and landlords are small businesses, held closely (more than 99% of German companies are small or medium-sized, and about 90% are family-owned: Stiftung Familienunternehmen / ZEW, 'Die volkswirtschaftliche Bedeutung der Familienunternehmen'; recalled, to confirm). A manufacturing works of 40 people is a typical Mittelstand firm: 70% closely held (family), 10% from outside, 20% widely held (a subsidiary of a listed group); a placeholder reflecting that Germany's industry is more family-owned than Australia's. Shares owned from outside the town (shop 20%, landlord 15%): placeholders. Private individuals own most rented homes in Germany (about two-thirds of rental flats; Zensus 2022 / GdW; to confirm).",
+    "firm_ownership.closely_held": "Placeholders carried over from the Australian profile (households_bps: one owning household 85%, two 12%, three 3%; owner_wealth_fifth_bps: the top fifth of households holds most business assets), to source for Germany (Bundesbank PHF 2023: the top 10% of households hold about 56% of net wealth; business assets are more concentrated).",
+    "firm_ownership.widely_held": "Placeholder carried over: outside_bps 80% of a widely held works is held from outside the town.",
+    "firm_ownership.direct_holders": "by_wealth_fifth_bps: placeholders shaped by the Deutsches Aktieninstitut's count of share and equity-fund holders, about 14 million people or roughly 17% of the population aged 14 and over in 2025 (Deutsches Aktieninstitut, Aktionaerszahlen; recalled, to confirm); the fifths average 16.2% and rise with wealth. firms_held: placeholder (one to four companies each).",
+    "retirement_fund": "Used only by a world that asks for one (retirement_fund: true; off by default). Germany's statutory pension is pay-as-you-go (Umlageverfahren), not a fund, so this does not describe it; the values are carried over from the Australian profile (the structure's example), except member_bps 55%: the share of employees with a claim to an occupational pension (betriebliche Altersversorgung), about 55% (BMAS, Alterssicherungsbericht / Aon / TNS Infratest; recalled, to confirm). A placeholder block; see gaps.",
+    "industry": "Placeholders carried over from the Australian profile, to confirm for Germany: manufacturing's compensation of employees and intermediate inputs as shares of output (Destatis, Input-Output-Rechnung and Kostenstrukturerhebung im Verarbeitenden Gewerbe); retail trade's purchases of goods and wages as shares of sales (Destatis, Kostenstruktur im Einzelhandel).",
+    "prices": "Placeholders: an item of goods worth EUR 100 at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs EUR 2.50 a kg; building materials EUR 1.25 a kg (docs/behaviour/building.md).",
+    "pay_period_days": "Added 2026-10-08 by the platform change that made this a profile figure; needs its author's check. 14 days, because this profile's wages are stated for fourteen days (where pay here is monthly, its author converted them: see wages_per_pay_period). To set to the place's own pay period, with the wages restated for it.",
+    "elections.compulsory_voting": "Added 2026-10-08 by the platform change that made this a profile figure; needs its author's check. Voting is a right, not a duty, in German elections (Grundgesetz art. 38; no Land law compels it; from knowledge, to confirm).",
+    "ordinary_hours_per_week": "Average usual weekly hours of full-time employees, 39.1 (Destatis, April 2025, opened; see wages_per_pay_period), taken as 39. The legal maximum is 8 hours a working day, extendable to 10 (Arbeitszeitgesetz para 3; not opened, to confirm): not the same as the Australian 38-hour 'ordinary hours' standard, so this is the observed norm, not a legal ceiling (see gaps).",
+    "fertility_per_10000": "Derived from an opened source: births by mother's age in Niedersachsen, 2024 (Destatis, Statistischer Bericht Geburten 2024, table 12612-01, opened 2026-10-08; 'unter 18' counted at 15-19) over women by age, which was not available by sex: women are taken as half of each five-year band's share of Niedersachsen's 8,004,489 people (LSN; see households.age_bands_bps). The five-year rates this gives sum to a total fertility rate of 1.38, against the published 1.42 for Niedersachsen 2024 (Niedersachsen-Monitor 2025), so all rates are scaled by 1.42/1.38. The GENESIS table 12612-0008 (rates by single year) could not be fetched (the API needs registration; the web page is script-driven).",
+    "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80% (recalled: Germany's participation of 15-64 year olds is about 80%, Destatis / Eurostat; to confirm). Those outside it do not look for work.",
+    "tenancy": "Buergerliches Gesetzbuch (BGB) para 558 (opened at gesetze-im-internet.de/bgb/__558.html): a landlord may ask for a rent increase up to the local comparative rent (ortsuebliche Vergleichsmiete) once the rent has been unchanged for 15 months at the time the increase is to take effect (and not more than once a year), capped at 20% in three years (15% in tight markets); 15 months is used as rent_review_months. rent_increase_notice_days: 60, placeholder (the tenant has until the end of the second month after receipt to consent: para 558b, not opened). After a fixed term a tenancy continues for an indefinite period unless a party objects (para 545; not opened); statutory notice for tenants is three months (para 573c; not opened). The cap and the comparative-rent rule cannot be expressed (see gaps).",
+    "values": "Placeholder: Schwartz's ten basic values in the pan-cultural order of importance (benevolence first, power last: Schwartz and Bardi, 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), with a spread of 1,500; unchanged from the Australian profile. To source for this place: the European Social Survey's Schwartz items for Germany.",
+    "industrial_action": "Germany has no statutory strike ballot; strikes are lawful if called by a union to support a collective agreement once the peace obligation has expired (Tarifvertragsgesetz and Federal Labour Court case law, Bundesarbeitsgericht 10.6.1980 and 21.6.1988; to confirm). The unions' own rules require a ballot (Urabstimmung) before an unlimited strike: IG Metall's constitution requires 75% approval (IG Metall Satzung para 23 on Urabstimmung; recalled, to confirm), with no minimum turnout; warning strikes need no ballot and no notice period. ballot_turnout_bps is therefore 0, ballot_pass_bps 7500, notice_days 0; pay stops during a strike (the union pays Streikgeld from its funds, not modelled).",
+    "world_price_process": "Placeholder: world prices move each month by a mean-reverting random process, as in the Australian profile (to estimate from Destatis, Index der Einfuhrpreise / Ausfuhrpreise).",
+    "credit.cash_rate_bps": "The ECB's deposit facility rate, 2.50% as of 16 September 2026 (main refinancing 2.65%, marginal lending 2.90%), from the ECB's page of key interest rates, https://www.ecb.europa.eu/stats/policy_and_exchange_rates/key_ecb_interest_rates/html/index.en.html, opened 2026-10-08 (the page's text says rates were 'decreased', while press reports say raised from 2.25%; the level, 2.50%, is the same in both).",
+    "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for its funding (Sparkassen and cooperative banks fund themselves largely from retail deposits).",
+    "credit.lending_rate_bps": "Placeholders: people 7.0% (consumer loans; Bundesbank MFI interest rate statistics, Konsumentenkredite; recalled, to confirm); organisations 5.0% (loans to non-financial corporations up to EUR 1 million; same statistics; to confirm).",
+    "credit.serviceability_buffer_bps": "0: Germany has no regulatory minimum buffer on borrowers' repayment capacity (BaFin has had the power to set borrower-based measures since 2022 but none is in force; to confirm); banks do check a household budget in practice (see gaps).",
+    "credit.max_repayment_share_bps": "Placeholders: people 35% of net monthly income (a common lending rule of thumb in German mortgage advice; to confirm); organisations 20% of what comes in.",
+    "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first reminder).",
+    "credit.default_days": "Default after 90 days past due on a material amount: Regulation (EU) No 575/2013 (Capital Requirements Regulation) Article 178.",
+    "credit.max_months": "Placeholder: the longest term for these loans (five years).",
+    "credit.reserve": "Placeholder: the cash the bank's lending office keeps back and doesn't lend, EUR 100,000. To source.",
+    "opening": "Placeholders, to source: what each organisation holds on the first day (the bank's own funds EUR 500,000; the town EUR 2,000,000; the builder EUR 300,000; each landlord EUR 600,000; a shop EUR 30,000; a factory EUR 400,000), and the least an adult in the labour force has saved (EUR 1,000).",
+    "town_finance.parks_per_year": "Placeholder: the town's yearly parks line, EUR 150,000.",
+    "town_finance.payment_approval_over": "Placeholder: the town's payments procedure needs the mayor's written approval for payments over EUR 50,000 (in Niedersachsen the limit is set in each municipality's Hauptsatzung and financial rules under the NKomVG; to source).",
+    "public_finance.income_tax": "Income tax tariff 2026, Einkommensteuergesetz para 32a (https://www.gesetze-im-internet.de/estg/__32a.html, opened): taxable income to EUR 12,348 untaxed (Grundfreibetrag); EUR 12,349-17,799: (914.51 y + 1,400) y; EUR 17,800-69,878: (173.10 z + 2,397) z + 1,034.87; EUR 69,879-277,825: 0.42 x - 11,135.63; above: 0.45 x - 19,470.38 (y and z are the income above the zone's start, in units of EUR 10,000). The marginal rate therefore rises linearly from 14% to 23.97% in the first zone and from 23.97% to 42% in the second. The structure takes marginal-rate steps, so the curve is approximated by 19% (about the mean of 14-24%) from EUR 12,349, then 29%, 34%, 39% as the 24-42% ramp passes EUR 17,800, 32,000 and 45,000 (the step values are my approximation), and 42% and 45% as written. levy: the employee's share of social insurance contributions in 2026, 21.15% = pension 9.3% + health 7.3% (the general rate is 14.6%, halved) + 1.45% (half of the average additional contribution of 2.9%; Federal Ministry of Health, opened) + care 1.8% + unemployment 1.3% (the pension, care and unemployment rates are recalled, not opened, to confirm), from the Minijob limit of EUR 603 a month, EUR 7,236 a year (Bundesregierung page above, opened). Contribution ceilings (pension EUR 101,400, health EUR 69,750 in 2026; recalled, to confirm) and the solidarity surcharge are left out; see gaps.",
+    "public_finance.grants_per_resident_per_year": "Derived: Niedersachsen's 2026 key allocations (Schluesselzuweisungen) for municipal tasks, EUR 3,010,991,289 (53.8% of the allocation mass of EUR 5.97 billion) under the Niedersaechsisches Finanzausgleichsgesetz, as quoted in a Landesamt fuer Statistik / state finance document found by search (LSN, https://www.statistik.niedersachsen.de/download/227085; not opened, to confirm), over the state's 8.0 million people (Niedersachsen-Monitor 2025): about EUR 376 a resident. Municipalities in Germany also receive a share of income tax and of VAT and levy the trade tax (see gaps).",
+    "public_finance.rates_per_resident_per_year": "Placeholder: property tax (Grundsteuer A and B), about EUR 15 billion a year nationally, so about EUR 180 a resident (Destatis, Kassenstatistik; recalled, to confirm). Sets the town's opening rate. Waste and water are charged separately as fees (services, utilities); the trade tax and the income-tax share are not modelled. Note the 2025 Grundsteuer reform (new valuations) is in force from 2025 (to confirm).",
+    "public_finance.rates_instalments": "Grundsteuergesetz para 28: property tax is due in four equal instalments on 15 February, 15 May, 15 August and 15 November (https://www.gesetze-im-internet.de/grstg_1973/__28.html, opened).",
+    "public_finance.rates_due_days": "Placeholder: an instalment falls due 30 days after its notice (in Germany the dates are fixed in the statute, see rates_instalments).",
+    "public_finance.rates_penalty_interest_bps": "Abgabenordnung para 240(1): a late-payment surcharge (Saeumniszuschlag) of 1% for each month or part of a month of delay (https://www.gesetze-im-internet.de/ao_1977/__240.html, opened), so 12% a year.",
+    "public_finance.rates_exempt_kinds": "Land used for public service, schools, and hospitals and charitable purposes is not subject to property tax (Grundsteuergesetz paras 3-4; to confirm): here, the clinic's, the school's, the police station's and the utilities'.",
+    "public_finance.median_house_price": "Median asking price of a one- or two-family house in Niedersachsen, EUR 339,000 (EUR 2,158 a square metre), empirica for LBS NordWest, 2025, as reported by leinetal24.de, https://www.leinetal24.de/niedersachsen/niedersachsen-an-gefragten-standorten-auf-hohem-niveau-so-teuer-sind-immobilien-aktuell-in-94095224.html (asking prices, not sale prices; the original not opened, to confirm). The land value of a lot is derived from it: this less what the builder charges.",
+    "services.waste_per_person_per_day_g": "Placeholder: about 460 kg of household waste per person a year (Destatis, Abfallbilanz; recalled, to confirm), a day's worth in grams.",
+    "services.landfill_levy_per_tonne": "0: Germany levies no landfill tax (landfilling untreated waste has been banned since 2005; waste incineration pays the national CO2 price under the Brennstoffemissionshandelsgesetz from 2024; both are not modelled; to confirm). See gaps.",
+    "services.council_staff_per_1000": "Placeholder carried over from the Australian profile (about 6 per 1,000, all of them the works crew); Germany's municipal staff is much larger (kindergartens, hospitals, social services), Destatis, Personal des oeffentlichen Dienstes (to source).",
+    "services.collect_seconds_per_10kg": "Placeholder: a one-driver side-loader lifts up to 6 bins a minute (Bucher Municipal, Sport side loader); with driving between houses, about 1,000 bins a day is taken as a round, and a household's week of waste as about 24 kg: about 12 seconds of work per 10 kg.",
+    "services.asset_life_years": "Placeholder: a park or civic building wears out in 15 years without upkeep (after VAGO, Maintaining Local Roads: spray seals last 10-15 years).",
+    "services.upkeep_hours_per_week_per_asset": "Placeholder: a crew member's half a day a week keeps a park or the hall up (mowing, bins, repairs).",
+    "services.complain_bps": "Placeholder: the chance a week that a household whose waste has gone two weeks uncollected writes to the town. Who reports and who doesn't varies (the service-request literature, e.g. Stowers 2022, State and Local Government Review); a rate is to be sourced.",
+    "unions.membership_bps": "'other' (the overall rate): 14.1% of employees were union members in Germany in 2024 (OECD, Trade union density, series TUD, percentage of employees, https://sdmx.oecd.org/public/rest/data/OECD.ELS.SAE,DSD_TUD_CBC@DF_TUD,1.0/DEU...; 15.9% in 2016, falling; opened 2026-10-08). By industry (manufacturing 19%, construction 15%, retail 9%, public administration 24%): placeholders (IG Metall, IG BAU, ver.di strength; to source from the WSI Mitgliederbefragung or Destatis). Keyed by the industries employers' postings name.",
+    "unions.resignation_notice_days": "Placeholder: 90 days; German unions' rules usually allow leaving only with written notice to the end of a quarter (ver.di Satzung; to confirm), which the structure can only express as a notice period.",
+    "groups.leave_notice_days": "Placeholder: a member may leave a club or congregation at once (a registered association, Verein: BGB para 39 lets a member leave at any time, with a statute-set notice of up to two years; to confirm).",
+    "unions.dues_per_month": "Placeholder: EUR 30 a month, about 1% of a gross monthly pay of EUR 3,000, the dues rule of ver.di and IG Metall (their constitutions; recalled, to confirm).",
+    "unions.claim_margin_bps": "Placeholder: a union claims the year's rise in prices and 2% more. Settlements are measured against the Destatis' Tarifindex or the WSI Tarifarchiv's collective wage increases (average annualised wage increases in new agreements), a calibration target.",
+    "households.age_bands_bps": "LSN, population by age group as a share of Niedersachsen's population on 31 December 2024 (0-4: 4.5%, 5-9: 4.9%, 10-14: 4.6%, 15-19: 4.8%, 20-24: 5.2%, 25-29: 5.8%, 30-34: 6.1%, 35-39: 6.4%, 40-44: 6.1%, 45-49: 5.7%, 50-54: 6.4%, 55-59: 8.2%, 60-64: 7.9%, 65-69: 6.5%, 70-74: 5.4%, 75 and over: 11.3%), table A100011G, read from a regional profile of the Elbe-Weser region that quotes the state (IHK Stade, 'Regionalstruktur: Demografische Merkmale des Elbe-Weser-Raums', data retrieved 2025-07-17, https://www.ihk.de/blueprint/servlet/resource/blob/3390782/480bf1a16d99f22db0c57cbca47ed845/bevoelkerung-data.pdf); shares sum to 99.8% and are scaled to 100%. The split of 75 and over into 75-79 (4.7%), 80-84 (3.4%) and 85 and over (3.2%) is a placeholder. Mean age 45.1 (Niedersachsen-Monitor 2025). Adults living alone, as couples without children at home, or in groups are drawn from this less the parents the family shares imply (docs/behaviour/households.md).",
+    "unions.meeting_every_days": "Placeholder: a members' meeting a month.",
+    "groups.kinds": "The kinds of group in a German town, mostly registered associations (Vereine; about 600,000 in Germany, ZiviZ-Survey; recalled, to confirm): sport (the sports club, the largest by members), religious, arts and culture, hobby and interest. How often each meets and for how long are placeholders. Whether people come is theirs; participation is a target, not a rate given to anyone.",
+    "groups.taking_part_bps": "Placeholder carried over: the share of adults who belong to a group at the start and go to its gatherings, 40%. German volunteering and association membership (Freiwilligensurvey 2019: 39.7% volunteer; Deutscher Olympischer Sportbund: about 28 million memberships in sports clubs; to confirm) is the nearest target.",
+    "groups.kinds.teaching": "What a group asks people to hold, in its words: content, for belief to attach to (docs/design/ai-citizens.md 5). The congregation's stands for the Christian denominations together (one congregation per town is a simplification).",
+    "groups.kinds.held_at_start_bps": "Placeholder 50%: roughly half of people in Niedersachsen belong to a Christian church (the Evangelical Church of Hanover alone had about 2.4 million members and the Catholic Church in the state about 1.2 million; Germany-wide, Catholic 24.8% and Protestant 22.7% in Zensus 2022; recalled, to confirm). At the start the congregation's members hold its teaching strongly and others up to this share hold it less; after that it strengthens, spreads and fades.",
+    "unions.teaching": "The union movement's claim, in words (content for belief). Its members hold it at the start.",
+    "groups.per_kind_per_1000_people": "Placeholder: one group of each kind for every 1,000 people (Germany has far more associations per head; to source).",
+    "households.child_max_age": "The Zensus and Mikrozensus count children of any age living with their parents; family statistics count unmarried children living at home without their own child or partner as children. Children at home are drawn up to 24 (a simplification: older children at home are left out)."
+  },
+  "targets": [
+    {
+      "what": "household_saving_ratio_pct",
+      "value": 10.3,
+      "source": "Destatis, saving ratio of private households, first half of 2025, as reported by retail-news.de, https://retail-news.de/sparquote-deutschland-2025-destatis/ (to confirm against Destatis's table)"
+    },
+    {
+      "what": "total_fertility_rate_niedersachsen",
+      "value": 1.42,
+      "source": "Niedersachsen-Monitor 2025 (LSN), TFR 2024 for women aged 15-49, https://www.statistik.niedersachsen.de/download/224040"
+    },
+    {
+      "what": "life_expectancy_at_birth_males_years",
+      "value": 78.0,
+      "source": "Niedersachsen-Monitor 2025 (LSN), Sterbetafel 2022/2024, Niedersachsen, 2024"
+    },
+    {
+      "what": "life_expectancy_at_birth_females_years",
+      "value": 82.6,
+      "source": "Niedersachsen-Monitor 2025 (LSN), Sterbetafel 2022/2024, Niedersachsen, 2024"
+    },
+    {
+      "what": "population_aged_65_plus_pct",
+      "value": 23.2,
+      "source": "Niedersachsen-Monitor 2025 (LSN), 31 December 2024"
+    },
+    {
+      "what": "mean_age_years",
+      "value": 45.1,
+      "source": "Niedersachsen-Monitor 2025 (LSN), 31 December 2024"
+    },
+    {
+      "what": "one_person_households_pct",
+      "value": 41.2,
+      "source": "LSN press release 074/2025, Zensus 2022, https://www.statistik.niedersachsen.de/presse/zensus-2022-78-der-singlehaushalte-zahlten-weniger-als-500-euro-nettokaltmiete-244136.html"
+    },
+    {
+      "what": "average_dwelling_size_m2",
+      "value": 105.0,
+      "source": "LSN press release 074/2025, Zensus 2022"
+    },
+    {
+      "what": "recorded_crimes_per_100000_people",
+      "value": 6329,
+      "source": "Polizeiliche Kriminalstatistik Niedersachsen 2025 (Haeufigkeitszahl), https://www.mi.niedersachsen.de/download/226742/Handout_Polizeiliche_Kriminalstatistik_2025_Niedersachsen.pdf"
+    },
+    {
+      "what": "crime_clearance_rate_pct",
+      "value": 62.72,
+      "source": "Polizeiliche Kriminalstatistik Niedersachsen 2025, all offences"
+    },
+    {
+      "what": "local_election_turnout_pct",
+      "value": 64.6,
+      "source": "Kommunalwahl Niedersachsen, 13 September 2026, preliminary result as reported (Kommunalwiki of the Heinrich-Boell-Stiftung, https://kommunalwiki.boell.de/index.php/Kommunalwahlen_in_Niedersachsen_2026; 2021: 57%; to confirm against the Landeswahlleiterin)"
+    },
+    {
+      "what": "statutory_minimum_wage_eur_per_hour",
+      "value": 13.9,
+      "source": "Mindestlohnkommission decision of 27 June 2025, in force 1 January 2026, https://www.bundesregierung.de/breg-de/aktuelles/mindestlohn-steigt-2391010"
+    },
+    {
+      "what": "full_time_average_gross_monthly_earnings_all_industries_eur",
+      "value": 4851,
+      "source": "Destatis, Durchschnittliche Bruttomonatsverdienste, Zeitreihe, 2025 (without special payments), https://www.destatis.de/DE/Themen/Arbeit/Verdienste/Verdienste-Branche-Berufe/Tabellen/liste-bruttomonatsverdienste.html"
+    },
+    {
+      "what": "average_weekly_hours_full_time",
+      "value": 39.1,
+      "source": "Destatis, Durchschnittliche Bruttoverdienste und Arbeitszeiten, April 2025"
+    },
+    {
+      "what": "owner_occupied_dwellings_pct",
+      "value": 47.7,
+      "source": "LSN, Zensus 2022, https://www.statistik.niedersachsen.de/zensus2022/ergebnisse-des-zensus-2022-233166.html (opened)"
+    },
+    {
+      "what": "average_net_cold_rent_eur_per_m2",
+      "value": 6.56,
+      "source": "LSN, Zensus 2022, same page (opened)"
+    },
+    {
+      "what": "union_density_pct_of_employees",
+      "value": 14.1,
+      "source": "OECD, Trade union density, Germany, 2024 (opened)"
+    },
+    {
+      "what": "drinking_water_price_niedersachsen_eur_per_m3",
+      "value": 1.82,
+      "source": "Destatis, Entgelt fuer die Trinkwasserversorgung 2023-2025, Niedersachsen, 2025 (opened)"
+    },
+    {
+      "what": "household_water_use_litres_per_person_per_day",
+      "value": 126,
+      "source": "Destatis, Wasserwirtschaft page (opened)"
+    }
+  ]
+}

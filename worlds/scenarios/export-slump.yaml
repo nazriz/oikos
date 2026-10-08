@@ -1,7 +1,8 @@
-# The world wants less of what the town makes, and its factories have little in hand: the world market takes 12% less
-# of the factories' goods from the first day, and each factory starts with a quarter of the profile's opening balance.
+# The world wants less of what the town makes: the world market takes 12% less of the factories' goods from the first
+# day. What a factory has in hand is not touched: the generator works its opening money out from its wages and inputs
+# (its working capital), and no figure of a profile states it.
 id: export-slump
-about: The world market takes 12% less of the factories' goods from the first day, and each factory starts with a quarter of the money the profile gives it.
+about: The world market takes 12% less of the factories' goods from the first day.
 bears_on: [mayor, finance, union-organiser, bank-lending, factory managers]
 changes:
   - in: town
@@ -10,9 +11,3 @@ changes:
     basis: >-
       The volume of world merchandise trade fell by about 12% in 2009 (World Trade Organization, press release 598,
       March 2010: 12.2%; to confirm). A condition of the world market as the run finds it, not a change during it.
-  - in: profile
-    path: opening.factory
-    times_bps: 2500
-    basis: >-
-      Placeholder for an employer with little cash in hand. The size has no source, as the profile's own opening
-      balance has none.

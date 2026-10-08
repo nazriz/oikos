@@ -1,0 +1,1439 @@
+{
+  "id": "mx-jal-2026",
+  "place": "A small town of a few thousand people in Jalisco, Mexico (the western-highlands municipalities such as the Sierra de Amula, with Jalisco's state figures standing where a town's are not published)",
+  "as_of": "2026-10",
+  "about": "Every place-specific figure the town generator uses, with its source: Jalisco, Mexico, October 2026. Written in English; amounts in Mexican pesos (centavos as the smallest unit). A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md). Most figures are Jalisco's (INEGI Censo 2020, ENOE 2026, ENIGH 2024, CONAPO), the national minimum wage, tax tariff and pension, or placeholders flagged as such in `sources`: a small town's own figures are mostly not published, so state values stand in for them.",
+  "values": {
+    "currency": {
+      "code": "MXN",
+      "minor_units": 2,
+      "symbol": "$",
+      "unit_words": [
+        "peso",
+        "pesos"
+      ],
+      "minor_words": [
+        "centavo",
+        "centavos"
+      ]
+    },
+    "households": {
+      "lone_bps": 1260,
+      "group_bps": 200,
+      "couple_bps": 1196,
+      "couple_children_bps": 5978,
+      "one_parent_bps": 1366,
+      "children_couple": [
+        3200,
+        4000,
+        2800
+      ],
+      "children_one_parent": [
+        5000,
+        3200,
+        1800
+      ],
+      "same_sex_couple_bps": 120,
+      "lone_parent_female_bps": 8600,
+      "adult_female_bps": 5120,
+      "child_male_bps": 5070,
+      "adult_ages": [
+        18,
+        99
+      ],
+      "mother_age_at_first_birth": [
+        18,
+        32
+      ],
+      "child_max_age": 24,
+      "group_size": [
+        2,
+        3
+      ],
+      "age_bands_bps": [
+        {
+          "from": 0,
+          "to": 4,
+          "bps": 810
+        },
+        {
+          "from": 5,
+          "to": 9,
+          "bps": 870
+        },
+        {
+          "from": 10,
+          "to": 14,
+          "bps": 860
+        },
+        {
+          "from": 15,
+          "to": 19,
+          "bps": 870
+        },
+        {
+          "from": 20,
+          "to": 24,
+          "bps": 840
+        },
+        {
+          "from": 25,
+          "to": 29,
+          "bps": 810
+        },
+        {
+          "from": 30,
+          "to": 34,
+          "bps": 770
+        },
+        {
+          "from": 35,
+          "to": 39,
+          "bps": 730
+        },
+        {
+          "from": 40,
+          "to": 44,
+          "bps": 660
+        },
+        {
+          "from": 45,
+          "to": 49,
+          "bps": 620
+        },
+        {
+          "from": 50,
+          "to": 54,
+          "bps": 530
+        },
+        {
+          "from": 55,
+          "to": 59,
+          "bps": 430
+        },
+        {
+          "from": 60,
+          "to": 64,
+          "bps": 370
+        },
+        {
+          "from": 65,
+          "to": 69,
+          "bps": 290
+        },
+        {
+          "from": 70,
+          "to": 74,
+          "bps": 220
+        },
+        {
+          "from": 75,
+          "to": 79,
+          "bps": 150
+        },
+        {
+          "from": 80,
+          "to": 84,
+          "bps": 90
+        },
+        {
+          "from": 85,
+          "to": 99,
+          "bps": 80
+        }
+      ]
+    },
+    "fertility_per_10000": [
+      {
+        "from": 15,
+        "rate": 437
+      },
+      {
+        "from": 20,
+        "rate": 1005
+      },
+      {
+        "from": 25,
+        "rate": 1037
+      },
+      {
+        "from": 30,
+        "rate": 717
+      },
+      {
+        "from": 35,
+        "rate": 435
+      },
+      {
+        "from": 40,
+        "rate": 137
+      },
+      {
+        "from": 45,
+        "rate": 12
+      },
+      {
+        "from": 50,
+        "rate": 0
+      }
+    ],
+    "life": {
+      "qx_per_100000": {
+        "male": [
+          1030,
+          91,
+          55,
+          40,
+          33,
+          28,
+          25,
+          23,
+          22,
+          21,
+          21,
+          23,
+          26,
+          33,
+          44,
+          60,
+          79,
+          102,
+          125,
+          147,
+          167,
+          182,
+          192,
+          197,
+          198,
+          196,
+          190,
+          183,
+          175,
+          168,
+          161,
+          155,
+          151,
+          149,
+          149,
+          151,
+          156,
+          162,
+          171,
+          182,
+          196,
+          212,
+          231,
+          252,
+          275,
+          302,
+          332,
+          366,
+          403,
+          444,
+          489,
+          540,
+          596,
+          657,
+          725,
+          800,
+          883,
+          975,
+          1076,
+          1187,
+          1310,
+          1446,
+          1595,
+          1759,
+          1940,
+          2139,
+          2358,
+          2599,
+          2864,
+          3155,
+          3475,
+          3825,
+          4210,
+          4631,
+          5093,
+          5598,
+          6149,
+          6751,
+          7407,
+          8122,
+          8898,
+          9742,
+          10655,
+          11644,
+          12711,
+          13860,
+          15096,
+          16421,
+          17837,
+          19348,
+          20953,
+          22655,
+          24452,
+          26343,
+          28326,
+          30396,
+          32548,
+          34777,
+          37075,
+          39433,
+          41841
+        ],
+        "female": [
+          848,
+          67,
+          39,
+          28,
+          23,
+          19,
+          17,
+          15,
+          14,
+          14,
+          14,
+          14,
+          15,
+          18,
+          21,
+          26,
+          32,
+          39,
+          45,
+          51,
+          55,
+          59,
+          61,
+          62,
+          62,
+          62,
+          61,
+          60,
+          60,
+          59,
+          60,
+          61,
+          63,
+          65,
+          69,
+          73,
+          78,
+          85,
+          92,
+          100,
+          110,
+          120,
+          132,
+          145,
+          160,
+          176,
+          194,
+          214,
+          236,
+          260,
+          287,
+          317,
+          350,
+          387,
+          427,
+          471,
+          521,
+          575,
+          635,
+          701,
+          773,
+          854,
+          942,
+          1040,
+          1148,
+          1267,
+          1398,
+          1543,
+          1702,
+          1877,
+          2070,
+          2282,
+          2516,
+          2772,
+          3054,
+          3364,
+          3704,
+          4077,
+          4486,
+          4934,
+          5424,
+          5959,
+          6544,
+          7181,
+          7876,
+          8632,
+          9452,
+          10342,
+          11305,
+          12345,
+          13467,
+          14674,
+          15968,
+          17354,
+          18833,
+          20407,
+          22076,
+          23842,
+          25702,
+          27654,
+          35000
+        ]
+      },
+      "illness": {
+        "by_age": [
+          {
+            "from": 0,
+            "bps": 600
+          },
+          {
+            "from": 5,
+            "bps": 350
+          },
+          {
+            "from": 15,
+            "bps": 600
+          },
+          {
+            "from": 45,
+            "bps": 900
+          },
+          {
+            "from": 65,
+            "bps": 1800
+          },
+          {
+            "from": 85,
+            "bps": 4500
+          }
+        ],
+        "severity": [
+          {
+            "label": "serious",
+            "share_bps": 8000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "severe",
+            "share_bps": 2000,
+            "days": [
+              14,
+              60
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "injury": {
+        "bps": 210,
+        "severity": [
+          {
+            "label": "minor",
+            "share_bps": 6000,
+            "days": [
+              3,
+              14
+            ],
+            "fatal_bps": 0
+          },
+          {
+            "label": "serious",
+            "share_bps": 4000,
+            "days": [
+              14,
+              90
+            ],
+            "fatal_bps": 0
+          }
+        ]
+      },
+      "birth": {
+        "ages": [
+          15,
+          49
+        ],
+        "gestation_days": 266,
+        "female_bps": 4878
+      },
+      "work_injury_bps": {
+        "factory": 160,
+        "shop": 116
+      },
+      "found_alone_after": [
+        {
+          "within_days": 1,
+          "bps": 3691
+        },
+        {
+          "within_days": 3,
+          "bps": 2062
+        },
+        {
+          "within_days": 7,
+          "bps": 1359
+        },
+        {
+          "within_days": 30,
+          "bps": 1959
+        },
+        {
+          "within_days": 365,
+          "bps": 929
+        }
+      ],
+      "treatable": {
+        "share_bps_by_age": [
+          {
+            "from": 0,
+            "bps": 1500
+          },
+          {
+            "from": 75,
+            "bps": 0
+          }
+        ],
+        "band": "severe"
+      }
+    },
+    "ordinary_hours_per_week": 48,
+    "pay_period_days": 14,
+    "wages_per_pay_period": {
+      "shop": 529270,
+      "factory": 705690,
+      "construction": 617480
+    },
+    "rents_per_month": {
+      "apartment_units": [
+        {
+          "bedrooms": 1,
+          "count": 3,
+          "rent": 230000
+        },
+        {
+          "bedrooms": 2,
+          "count": 7,
+          "rent": 290000
+        },
+        {
+          "bedrooms": 3,
+          "count": 2,
+          "rent": 350000
+        }
+      ],
+      "house_types": [
+        {
+          "id": "house",
+          "bedrooms": 3,
+          "share_bps": 5500,
+          "rent": 330000
+        },
+        {
+          "id": "large-house",
+          "bedrooms": 4,
+          "share_bps": 4500,
+          "rent": 420000
+        }
+      ]
+    },
+    "spending": {
+      "saving_bps": 1906,
+      "wealth_effect_bps_per_year": 300,
+      "essentials_per_month": 163100,
+      "shops_known": 7,
+      "shop_search_bps_per_month": 2500
+    },
+    "savings_by_age": [
+      {
+        "from": 18,
+        "pct": [
+          50000,
+          250000,
+          1002000,
+          3005000,
+          7512000
+        ]
+      },
+      {
+        "from": 25,
+        "pct": [
+          250000,
+          1002000,
+          3756000,
+          11269000,
+          25042000
+        ]
+      },
+      {
+        "from": 35,
+        "pct": [
+          376000,
+          1502000,
+          5008000,
+          15025000,
+          35058000
+        ]
+      },
+      {
+        "from": 45,
+        "pct": [
+          501000,
+          2003000,
+          6260000,
+          18781000,
+          42571000
+        ]
+      },
+      {
+        "from": 55,
+        "pct": [
+          751000,
+          2504000,
+          8765000,
+          25042000,
+          57596000
+        ]
+      }
+    ],
+    "retirement_age": 65,
+    "labour_force_participation_bps": 6700,
+    "tenancy": {
+      "rent_review_months": 12,
+      "rent_increase_notice_days": 30,
+      "after_fixed_term": "periodic"
+    },
+    "values": {
+      "benevolence": {
+        "mean_bps": 7000,
+        "sd_bps": 1500
+      },
+      "universalism": {
+        "mean_bps": 6600,
+        "sd_bps": 1500
+      },
+      "self_direction": {
+        "mean_bps": 6200,
+        "sd_bps": 1500
+      },
+      "security": {
+        "mean_bps": 5800,
+        "sd_bps": 1500
+      },
+      "conformity": {
+        "mean_bps": 5400,
+        "sd_bps": 1500
+      },
+      "hedonism": {
+        "mean_bps": 5000,
+        "sd_bps": 1500
+      },
+      "achievement": {
+        "mean_bps": 4600,
+        "sd_bps": 1500
+      },
+      "tradition": {
+        "mean_bps": 4200,
+        "sd_bps": 1500
+      },
+      "stimulation": {
+        "mean_bps": 3800,
+        "sd_bps": 1500
+      },
+      "power": {
+        "mean_bps": 3400,
+        "sd_bps": 1500
+      }
+    },
+    "industrial_action": {
+      "ballot_turnout_bps": 5000,
+      "ballot_pass_bps": 5000,
+      "notice_days": 6,
+      "paid_during_action": false
+    },
+    "world_price_process": {
+      "goods": {
+        "sd_bps": 150,
+        "persistence_bps": 9000
+      },
+      "inputs": {
+        "sd_bps": 400,
+        "persistence_bps": 9000
+      },
+      "materials": {
+        "sd_bps": 300,
+        "persistence_bps": 9000
+      }
+    },
+    "credit": {
+      "cash_rate_bps": 650,
+      "funding_spread_bps": 200,
+      "lending_rate_bps": {
+        "person": 2400,
+        "organisation": 1535
+      },
+      "serviceability_buffer_bps": 0,
+      "max_repayment_share_bps": {
+        "person": 3000,
+        "organisation": 2000
+      },
+      "arrears_days": 30,
+      "default_days": 90,
+      "max_months": 60,
+      "reserve": 25040000
+    },
+    "opening": {
+      "bank": 125210000,
+      "town": 500830000,
+      "builder": 75120000,
+      "landlord": 150250000,
+      "person_min_savings": 250000
+    },
+    "town_finance": {
+      "parks_per_year": 37560000,
+      "payment_approval_over": 12520000
+    },
+    "retiree_savings": [
+      3000000,
+      9000000
+    ],
+    "support": {
+      "pension": {
+        "amount": 640000,
+        "every_days": 61,
+        "from_age": 65
+      },
+      "unemployment": {
+        "amount": 0,
+        "every_days": 14,
+        "from_age": 18
+      }
+    },
+    "firm_ownership": {
+      "forms_bps": {
+        "factory": {
+          "closely_held": 3000,
+          "outside": 5000,
+          "widely_held": 2000
+        },
+        "shop": {
+          "closely_held": 8500,
+          "outside": 1500,
+          "widely_held": 0
+        },
+        "landlord": {
+          "closely_held": 9000,
+          "outside": 1000,
+          "widely_held": 0
+        }
+      },
+      "closely_held": {
+        "households_bps": [
+          8500,
+          1200,
+          300
+        ],
+        "owner_wealth_fifth_bps": [
+          100,
+          200,
+          400,
+          800,
+          8500
+        ]
+      },
+      "widely_held": {
+        "outside_bps": 8000
+      },
+      "direct_holders": {
+        "by_wealth_fifth_bps": [
+          50,
+          100,
+          200,
+          400,
+          900
+        ],
+        "firms_held": [
+          1,
+          4
+        ]
+      }
+    },
+    "retirement_fund": {
+      "share_bps_of_local": 7200,
+      "member_bps": 8400,
+      "pension_every_days": 30,
+      "drawdown_bps_by_age": [
+        {
+          "from": 0,
+          "bps": 400
+        },
+        {
+          "from": 65,
+          "bps": 500
+        },
+        {
+          "from": 75,
+          "bps": 600
+        },
+        {
+          "from": 80,
+          "bps": 700
+        },
+        {
+          "from": 85,
+          "bps": 900
+        },
+        {
+          "from": 90,
+          "bps": 1100
+        },
+        {
+          "from": 95,
+          "bps": 1400
+        }
+      ],
+      "cost_bps_of_income": 1500
+    },
+    "industry": {
+      "factory_labour_share_bps": 2000,
+      "factory_input_share_bps": 6700,
+      "retail_purchases_share_bps": 7000,
+      "retail_labour_share_bps": 1400
+    },
+    "prices": {
+      "goods_world": 25000,
+      "goods_import_markup_bps": 1000,
+      "inputs_per_kg": 500,
+      "materials_per_kg": 400
+    },
+    "public_finance": {
+      "income_tax": {
+        "brackets": [
+          {
+            "from": 0,
+            "rate_bps": 192
+          },
+          {
+            "from": 1013512,
+            "rate_bps": 640
+          },
+          {
+            "from": 8602212,
+            "rate_bps": 1088
+          },
+          {
+            "from": 15117620,
+            "rate_bps": 1600
+          },
+          {
+            "from": 17573567,
+            "rate_bps": 1792
+          },
+          {
+            "from": 21040370,
+            "rate_bps": 2136
+          },
+          {
+            "from": 42435398,
+            "rate_bps": 2352
+          },
+          {
+            "from": 66884015,
+            "rate_bps": 3000
+          },
+          {
+            "from": 127692599,
+            "rate_bps": 3200
+          },
+          {
+            "from": 170256798,
+            "rate_bps": 3400
+          },
+          {
+            "from": 510770393,
+            "rate_bps": 3500
+          }
+        ],
+        "levy_bps": 0,
+        "levy_from": 0
+      },
+      "grants_per_resident_per_year": 300000,
+      "rates_per_resident_per_year": 3884,
+      "rates_instalments": 6,
+      "rates_due_days": 30,
+      "rates_penalty_interest_bps": 1764,
+      "rates_exempt_kinds": [
+        "health_service",
+        "school",
+        "police"
+      ],
+      "median_house_price": 210723200
+    },
+    "services": {
+      "waste_per_person_per_day_g": 944,
+      "landfill_levy_per_tonne": 25000,
+      "council_staff_per_1000": 5,
+      "collect_seconds_per_10kg": 12,
+      "asset_life_years": 15,
+      "upkeep_hours_per_week_per_asset": 4,
+      "complain_bps": 3000
+    },
+    "unions": {
+      "membership_bps": {
+        "manufacturing": 1500,
+        "retail": 500,
+        "construction": 500,
+        "public_administration": 3500,
+        "other": 1200
+      },
+      "dues_per_month": 15000,
+      "resignation_notice_days": 0,
+      "claim_margin_bps": 200,
+      "meeting_every_days": 30,
+      "teaching": "Together, workers win better pay and conditions than each alone."
+    },
+    "groups": {
+      "kinds": [
+        {
+          "kind": "sport",
+          "name": "sports club",
+          "every_days": 7,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "religious",
+          "name": "parish congregation",
+          "every_days": 7,
+          "lasts_minutes": 60,
+          "teaching": "There is a God who made the world and cares how we live.",
+          "held_at_start_bps": 9390
+        },
+        {
+          "kind": "arts",
+          "name": "arts society",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "hobby",
+          "name": "hobby group",
+          "every_days": 14,
+          "lasts_minutes": 120
+        },
+        {
+          "kind": "interest",
+          "name": "community club",
+          "every_days": 30,
+          "lasts_minutes": 120
+        }
+      ],
+      "per_kind_per_1000_people": 1,
+      "taking_part_bps": 4000,
+      "leave_notice_days": 0
+    },
+    "health": {
+      "doctors_per_1000": 1.2,
+      "doctor_wage_per_pay_period": 1380820,
+      "consult_minutes": 30,
+      "seek_care_bps": 9000,
+      "treats": [
+        {
+          "kind": "illness",
+          "severity": "serious",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "illness",
+          "severity": "severe",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "minor",
+          "consults": 1,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        },
+        {
+          "kind": "injury",
+          "severity": "serious",
+          "consults": 2,
+          "days_kept_bps": 8000,
+          "fatal_kept_bps": 5000
+        }
+      ],
+      "off_work_severities": [
+        "serious",
+        "severe"
+      ]
+    },
+    "education": {
+      "school_ages": [
+        3,
+        17
+      ],
+      "students_per_teacher": 22,
+      "school_days_per_year": 185,
+      "hours_per_day": 5,
+      "teacher_wage_per_pay_period": 644380,
+      "attainment": [
+        {
+          "label": "Less than primary",
+          "share_bps": 1180,
+          "years": 3
+        },
+        {
+          "label": "Primary complete, secondary incomplete",
+          "share_bps": 1800,
+          "years": 7
+        },
+        {
+          "label": "Secondary complete",
+          "share_bps": 2700,
+          "years": 9
+        },
+        {
+          "label": "Upper secondary (bachillerato)",
+          "share_bps": 2500,
+          "years": 12
+        },
+        {
+          "label": "Higher education",
+          "share_bps": 1820,
+          "years": 16
+        }
+      ],
+      "return_per_year_bps": 1040,
+      "max_years": 20
+    },
+    "round": {
+      "work_start_hour": 9,
+      "work_end_hour": 17,
+      "work_days": 5,
+      "school_start_hour": 8,
+      "school_end_hour": 13,
+      "travel_seconds_per_cell": 18,
+      "travel_by_cover": {
+        "water": 120,
+        "wetland": 30,
+        "woodland": 25,
+        "scrub": 25
+      },
+      "roads": {
+        "seconds_per_cell": 2,
+        "within_cells": 3,
+        "budget_per_resident": 12000
+      }
+    },
+    "ownership": {
+      "house_owner_bps": 5868,
+      "mortgage_bps_by_age": [
+        {
+          "from": 18,
+          "bps": 3000
+        },
+        {
+          "from": 45,
+          "bps": 2000
+        },
+        {
+          "from": 65,
+          "bps": 500
+        }
+      ],
+      "mortgage_payment_per_month": 650000,
+      "mortgage_rate_bps": 1020,
+      "mortgage_years_left": [
+        5,
+        20
+      ],
+      "market": {
+        "buy_bps_per_month": 50,
+        "deposit_bps": 1500,
+        "costs_bps": 500,
+        "mortgage_months": 240,
+        "relist_days": 30,
+        "cut_bps": 500,
+        "floor_bps": 8000
+      }
+    },
+    "utilities": {
+      "water": {
+        "litres_per_person_per_day": 200,
+        "price_per_kl": 2043,
+        "service_per_quarter": 30000,
+        "river_inflow_kl_per_cell_per_day": 1000,
+        "river_decay_bps_per_day": 1000,
+        "river_flow_bps_per_day": 5000
+      },
+      "energy": {
+        "kwh_per_household_per_day": 6,
+        "price_per_kwh": 115,
+        "supply_per_day": 0,
+        "grid_price_per_kwh": 100,
+        "grid_emissions_g_per_kwh": 444
+      }
+    },
+    "climate": {
+      "rain_by_month_bps": [
+        2838,
+        3075,
+        1735,
+        1025,
+        2208,
+        11275,
+        20657,
+        24047,
+        24678,
+        18134,
+        7884,
+        2444
+      ],
+      "storm_bps_per_month": 600,
+      "storm_days": [
+        2,
+        4
+      ],
+      "storm_bps": 25000,
+      "drought_bps_per_year": 1000,
+      "drought_months": [
+        6,
+        18
+      ],
+      "drought_bps": 4000,
+      "summer_months": [
+        4,
+        5,
+        6
+      ],
+      "heatwave_bps_per_week": 1000,
+      "heatwave_days": [
+        3,
+        5
+      ],
+      "heat_units": 10,
+      "built_heat_units": 12,
+      "heat_illness_bps_per_unit": 100,
+      "warning_lead_days": 2
+    },
+    "hazards": {
+      "river_bank_kl": 12000,
+      "spill_bps_per_day": 3000,
+      "flood_above_kl": 300,
+      "wetland_soak_kl_per_day": 500
+    },
+    "crime": {
+      "take_bps_per_month_in_need": 200,
+      "caught_bps_reckoned": 3000,
+      "take_quantity": 5,
+      "detection_bps": 1000,
+      "investigation_hours": 4,
+      "police_per_1000": 1.6,
+      "officer_wage_per_pay_period": 598360
+    },
+    "justice": {
+      "hearing_after_days": 60,
+      "pay_within_days": 30,
+      "challenge_bps": 2000,
+      "apply_bps": 1500,
+      "apply_after_days": 30
+    },
+    "elections": {
+      "compulsory_voting": false,
+      "term_years": 3,
+      "method": "plurality",
+      "turnout_bps": 5284,
+      "stand_bps": 200,
+      "news_readers_bps": 4000
+    },
+    "nature": {
+      "cell_m": 25,
+      "landscape": {
+        "margin_cells": 100,
+        "block_cells": 16,
+        "shares_bps": {
+          "woodland": 3000,
+          "scrub": 1500,
+          "grassland": 2000,
+          "farmland": 3000,
+          "wetland": 500
+        },
+        "woodland_patches": 2
+      },
+      "covers": [
+        {
+          "id": "woodland"
+        },
+        {
+          "id": "scrub",
+          "succeeds_to": {
+            "cover": "woodland",
+            "after_years": 40
+          }
+        },
+        {
+          "id": "grassland"
+        },
+        {
+          "id": "cleared",
+          "succeeds_to": {
+            "cover": "grassland",
+            "after_years": 1
+          }
+        },
+        {
+          "id": "farmland"
+        },
+        {
+          "id": "wetland"
+        },
+        {
+          "id": "riverbank"
+        }
+      ],
+      "default_cover": "grassland",
+      "cleared_cover": "cleared",
+      "river_cover": "riverbank",
+      "pollution": {
+        "decay_bps_per_day": 300,
+        "diffusion_bps_per_day": 800,
+        "flow_bps_per_day": 5000,
+        "per_factory_per_day": 40,
+        "per_farmland_cell_per_day": 1
+      },
+      "species": [
+        {
+          "id": "collies-squirrel",
+          "name": "Collie's squirrel",
+          "density_per_ha": {
+            "woodland": 0.5,
+            "scrub": 0.1
+          },
+          "home_range_ha": 2,
+          "growth_bps_per_year": 3000,
+          "mortality_bps_per_year": 2000,
+          "dispersal_bps_per_year": 1000,
+          "dispersal_m": 75,
+          "barriers": [
+            "built",
+            "farmland"
+          ],
+          "min_viable": 1,
+          "detection_bps": 3000
+        },
+        {
+          "id": "montezuma-leopard-frog",
+          "name": "Montezuma leopard frog",
+          "density_per_ha": {
+            "wetland": 60,
+            "riverbank": 8
+          },
+          "home_range_ha": 0.5,
+          "growth_bps_per_year": 12000,
+          "mortality_bps_per_year": 4000,
+          "dispersal_bps_per_year": 1500,
+          "dispersal_m": 200,
+          "barriers": [
+            "built"
+          ],
+          "min_viable": 4,
+          "tolerance": {
+            "pollution": {
+              "above": 400,
+              "mortality_bps_per_day": 50
+            }
+          },
+          "detection_bps": 5000,
+          "listed": true
+        },
+        {
+          "id": "vermilion-flycatcher",
+          "name": "vermilion flycatcher",
+          "density_per_ha": {
+            "scrub": 1,
+            "grassland": 0.5,
+            "riverbank": 1,
+            "farmland": 0.3
+          },
+          "home_range_ha": 1,
+          "growth_bps_per_year": 5000,
+          "mortality_bps_per_year": 3000,
+          "dispersal_bps_per_year": 1000,
+          "dispersal_m": 500,
+          "min_viable": 1,
+          "detection_bps": 8000,
+          "conspicuous": true
+        }
+      ],
+      "survey_hours_per_ha": 1,
+      "survey_staff": 1,
+      "spin_up_years": 10
+    }
+  },
+  "sources": {
+    "currency": "Mexican pesos, in centavos: written with the peso sign, which is the same character as the dollar sign ('$1,234.56'; the sign carries no code, so a reader outside Mexico cannot tell pesos from dollars by it), or in words as pesos and centavos. ISO 4217: MXN, two decimal places. Banco de México, https://www.banxico.org.mx (the peso, 'peso mexicano'; the page was not opened: to confirm). In-world the participants simply write '$' as people in Mexico do.",
+    "households": "IIEG Jalisco, ficha informativa 'Los hogares censales en Jalisco 2020' (1 March 2022; from INEGI, Censo 2020), https://iieg.gob.mx/ns/wp-content/uploads/2022/03/HogaresCensalesJalisco2020.pdf: of 2,330,706 census households in Jalisco in 2020, 12.6% were one-person (unipersonal), 85.9% family households (nuclear 73.8% of them, extended 25.0%, compound 1.2%) and 0.5% unspecified; non-family households of co-residents were 23,104 (1.0% of all). lone_bps = 1,260 (unipersonal). group_bps = 200: co-residents 1.0% plus compound households 1.2% of family households (about 1.0% of all), counted with groups as the au-vic-2026 profile counts its 'other' families. The remaining 85.4% are family households, of which 22.5% are EXTENDED or compound (more than one family nucleus, or relatives beyond the nucleus). THE STRUCTURE HAS NO EXTENDED HOUSEHOLD, so all family households are assigned to the three nuclear types in proportion to a split of the nuclear type. That split (couple without children 14%, couple with children 70%, one parent 16% of the nuclear and extended family households) is a PLACEHOLDER: the Jalisco split of nuclear households by type was not found. Cross-checks: IIEG Jalisco, same ficha, 68.4% of children under 18 lived with both parents, 20.0% with their mother only, 2.1% with their father only, 3.1% with neither; INEGI (Censo 2020, national) found single-mother households headed by women 9.5% of households (https://www.gaceta.unam.mx/transformacion-compleja-del-concepto-de-familia/ and https://www.aztecajalisco.com/noticias/6-de-marzo-dia-de-la-familia-en-mexico/, secondary reports; not opened). children_couple and children_one_parent (shares of 1, 2, 3+ children at home): placeholders shaped by Jalisco's total fertility of 1.89 (ENADID 2023) and the ENIGH 2024 average of 0.74 members under 15 per household. same_sex_couple_bps: INEGI Censo 2020, national: 1.2% of households have at least one same-sex couple (reported by https://mexicocomovamos.mx/animal-politico/2022/06/sacando-a-las-estadisticas-del-closet-una-mirada-a-la-diversidad-sexual-con-datos-del-censo-2020/ , secondary; not opened; a Jalisco figure and the share of couples were not found: placeholder at 120). lone_parent_female_bps: placeholder (8,600), from single-mother households being the great majority of one-parent households (INEGI Censo 2020, national; exact share not found). adult_female_bps: Censo 2020 Jalisco: 100 women to 96 men overall (51.0% women), more women at older ages, 49.4% of men aged 20-39 (placeholder 51.2%, to confirm against the age and sex table). child_male_bps: Censo 2020 Jalisco, 0-14: 102.2-103.7 boys per 100 girls (about 50.7% boys). mother_age_at_first_birth: placeholder [18, 32] (ENADID 2023 reports age at first birth; the median was not extracted; to confirm). child_max_age 24, adult_ages and group_size: the same simplifications as the au-vic-2026 profile (children at home drawn up to 24; adults 18-99; groups of 2-3), not Mexican figures.",
+    "households.age_bands_bps": "INEGI, Censo de Población y Vivienda 2020, Presentación de resultados, Jalisco, https://www.inegi.org.mx/contenidos/programas/ccpv/2020/doc/cpv2020_pres_res_jal.pdf, 'Estructura de la población, 2000, 2010 y 2020' (median age 29): percentage of the population by five-year age group, men and women added (0-4: 4.1+4.0, 5-9: 4.4+4.3, ... 85 and over 0.3+0.5; the two pyramids sum to 100.0%); 85 and over taken to 99. Rounded to 0.1 point in the source.",
+    "fertility_per_10000": "INEGI, Encuesta Nacional de la Dinámica Demográfica (ENADID) 2023, results for Jalisco as published by IIEG Jalisco ('Resultados ENADID 2023, parte I', https://iieg.gob.mx/ns/wp-content/uploads/2024/06/ResultadosENADID2023ParteI.pdf): age-specific fertility rates for Jalisco, 2018-2022, per 1,000 women: 15-19 43.68, 20-24 100.50, 25-29 103.70, 30-34 71.69, 35-39 43.45, 40-44 13.67, 45-49 1.20 (total fertility 1.89), times 10 for 'per 10,000'. CONAPO's projection for 2024 gives 1.93 (CONAPO, Proyecciones de la población de México y de las entidades federativas 2020-2070 (update of August 2023), as published by IIEG Jalisco, 'Estructura demográfica de la población, Jalisco 2024-2030', https://iieg.gob.mx/ns/wp-content/uploads/2024/08/EstructuraDemográficaPoblación2024.pdf).",
+    "life.qx_per_100000": "PLACEHOLDER MODEL TABLE: no single-year life table by sex for Jalisco was found (CONAPO publishes projections of e0 and mortality, not the full table, on the pages opened). A Heligman-Pollard-shaped curve (infant, young-adult hump with a larger hump for men, senescent rise), fitted by bisection so that life expectancy at birth matches CONAPO's projection for Jalisco in 2024: men 73.00 years, women 79.28 years, and infant mortality matches CONAPO's 2023 figures for Jalisco (10.04 per 1,000 boys, 8.29 per 1,000 girls). Source of the targets: CONAPO, Proyecciones de la población de México y de las entidades federativas 2020-2070 (update of August 2023), as published by IIEG Jalisco, 'Estructura demográfica de la población, Jalisco 2024-2030', https://iieg.gob.mx/ns/wp-content/uploads/2024/08/EstructuraDemográficaPoblación2024.pdf. The shape between 1 and 100 is the model's, not an observed table: replace with the CONAPO or INEGI abridged table by sex for Jalisco (INEGI mortality statistics, deaths registered, give the ages at death) when found. The fit gives male qx at 20 of 167 per 100,000, which is plausible for a country with high male violent mortality but unverified.",
+    "life.illness": "Placeholder, carried over from the au-vic-2026 profile, whose shape was set by AIHW's age gradient of hospitalisations; no Mexican age-specific hospitalisation rates (Secretaría de Salud, Egresos hospitalarios) were found. To replace.",
+    "life.injury": "Placeholder, carried over from au-vic-2026 (210 injury hospitalisations per 10,000 a year, AIHW 2022-23, an Australian figure). No Mexican rate was found (Secretaría de Salud, Egresos hospitalarios por lesiones). To replace.",
+    "life.birth": "Bearing a child from 15 to 49 (ENADID fertility rates cover 15-49, INEGI, Encuesta Nacional de la Dinámica Demográfica (ENADID) 2023, results for Jalisco as published by IIEG Jalisco ('Resultados ENADID 2023, parte I', https://iieg.gob.mx/ns/wp-content/uploads/2024/06/ResultadosENADID2023ParteI.pdf)); 38 weeks from conception (266 days, the same biology as au-vic-2026); female_bps 4,878 is a PLACEHOLDER: the usual sex ratio at birth of about 105 boys per 100 girls (the Jalisco figure from INEGI's births statistics was not found).",
+    "life.treatable": "Placeholder: the share of deaths that timely, effective health care could have prevented (treatable mortality). Carried over from au-vic-2026 (about 15% of deaths under 75 in Australia, AIHW). No Mexican figure was found; Mexico's treatable share is likely higher (to source from OECD, Health at a Glance, or Secretaría de Salud).",
+    "life.found_alone_after": "How long after dying at home alone a person is found. No figure for Victoria or Australia was found, so Japan's is used, the one country found to count it: National Police Agency of Japan, people who died alone at home in 2025 (76,941): found the same or the next day 28,398; in 2 to 3 days 15,865; in 4 to 7 days 10,456; in 8 days or more 22,222, of them 7,148 after a month or more and 208 after a year or more. Read 2026-10-08 as reported in the press (a summary of the agency's release), not in the agency's own tables (to confirm). The last band is closed at a year (208 of 76,941 were longer). Japan's share of people living alone and its neighbourhood ties are its own: a placeholder for a local figure. (Carried over unchanged to this profile: no figure for Mexico was found either.)",
+    "life.work_injury_bps": "Placeholder, carried over from au-vic-2026 (Safe Work Australia serious claims per million hours). Mexican occupational-accident rates (IMSS, Memoria Estadística: riesgos de trabajo por 100 trabajadores) were not opened. To replace.",
+    "pay_period_days": "Added 2026-10-08 by the platform change that made this a profile figure; needs its author's check. 14 days, because this profile's wages are stated for fourteen days (where pay here is monthly, its author converted them: see wages_per_pay_period). To set to the place's own pay period, with the wages restated for it.",
+    "elections.compulsory_voting": "Added 2026-10-08 by the platform change that made this a profile figure; needs its author's check. The Constitution makes voting a citizen's obligation (art. 36) but no penalty is applied for not voting, so the town's law says electors may vote; its author should decide which the law text should say (from knowledge, to confirm).",
+    "ordinary_hours_per_week": "Ley Federal del Trabajo (LFT) arts 61 and 69: maximum daily day shift 8 hours, one rest day in six, giving 48 hours a week; in force through 2026. The constitutional reform published in the Diario Oficial on 3 March 2026 (art 123 A, fractions IV and XI) lowers it by 2 hours a year from 1 January 2027 to 40 hours in 2030 (https://www.hklaw.com/es/insights/publications/2026/03/mexico-officially-enacts-constitutional-reform ; summary of the reform, DOF text not opened: to confirm). ENOE Jalisco Q1 2026 finds a mean of 41 hours worked a week (INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf).",
+    "wages_per_pay_period": "Placeholder, anchored to two real figures: Comisión Nacional de los Salarios Mínimos (CONASAMI), resolution of December 2025: general minimum wage from 1 January 2026, 315.04 pesos a day (13% rise from 278.80), https://www.ey.com/content/dam/ey-unified-site/ey-com/es-mx/technical/tax/documents/ey-law-flash-incremento-salarios-minimos-2026.pdf (EY law flash summarising the DOF notice; the DOF text itself not opened: to confirm) (315.04 pesos a day, paid seven days a week, so 14 days = 4,410.56 pesos, and 39.38 pesos an hour at 8 h x 6 days); and ENOE income per hour worked in Jalisco, 65 pesos (IIEG Jalisco / MIDE Jalisco, indicator 'ingreso por hora trabajada', fourth quarter 2025, https://mide.jalisco.gob.mx/mide/reporte/ficha_indicador/1462 ; search snippet only, page not opened: to confirm). Shop = 1.2 x the minimum wage, factory = 1.6 x, construction = 1.4 x (14 days x daily wage): the multiples are the placeholder. They reproduce hourly pay (wage / 96 hours) of about 55, 73.5 and 64 pesos around the 65-peso average. ENOE Jalisco Q1 2026: 32.5% of the employed earn up to one minimum wage and 42.6% one to two (INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); this is for all workers, mostly informal and part-time. To replace with ENOE or IMSS wages by sector for Jalisco. The IMSS average contribution wage in Jalisco was 558.04 pesos a day (October 2024, constant pesos) against 580.5 nationally, and 671.3 nationally in May 2026 (https://imcp.org.mx/noticias-fiscales-2026-125-stps-salario-promedio-afiliado-al-imss-registra-maximo-historico-de-671-3-pesos-diarios/ ; a trade-press digest of the STPS release; formal jobs only).",
+    "rents_per_month": "Placeholder: no Jalisco rent table by bedrooms for small towns was found. Anchor: ENIGH 2024 Jalisco, the estimated rent of the home (imputed rent, all households) averages 9,694 pesos a quarter, 3,231 a month (INEGI, Encuesta Nacional de Ingresos y Gastos de los Hogares (ENIGH) 2024, presentación de resultados, Jalisco (July 2025), https://www.inegi.org.mx/contenidos/programas/enigh/nc/2024/doc/enigh2024_ns_presentacion_resultados_jal.pdf); urban Guadalajara asks far more (Lamudi: 21,121 pesos a month for an apartment in 2024, secondary report), so a small town is placed near the imputed-rent average: 2,300, 2,900 and 3,500 pesos for apartments of 1-3 bedrooms and 3,300 and 4,200 for houses of 3 and 4 bedrooms. The apartment mix and house shares are the generator's, as in au-vic-2026.",
+    "spending.saving_bps": "Derived: ENIGH 2024 Jalisco, average quarterly current income 87,199 pesos and total current spending 70,579 pesos (monetary 56,015 plus non-monetary 14,563), so (87,199 - 70,579) / 87,199 = 19.1% (INEGI, Encuesta Nacional de Ingresos y Gastos de los Hogares (ENIGH) 2024, presentación de resultados, Jalisco (July 2025), https://www.inegi.org.mx/contenidos/programas/enigh/nc/2024/doc/enigh2024_ns_presentacion_resultados_jal.pdf, pages 9 and 19). A household-survey measure, not the national accounts' saving ratio, and includes the part of income spent on financial and capital outlays (home improvement, deposits, tandas); it reads high against AU's 6.5% net national-accounts figure. To replace with INEGI's institutional-sector accounts (Cuentas por sectores institucionales) when found.",
+    "spending.wealth_effect_bps_per_year": "Placeholder: a model parameter from the literature (about 3 cents of consumption a year per dollar of wealth; Dvornak & Kohler 2003, RBA RDP 2003-07, an Australian estimate), carried over from au-vic-2026. No Mexican estimate was found.",
+    "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections; read 2026-10-08). Not a figure of this place: a model's, kept until a survey of shops used is found (the nearest found: 4.4 grocery stores a month for a household in the United States, an industry figure reported in the press; to confirm).",
+    "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1: the probability of searching for a cheaper seller, 0.25 a month; read 2026-10-08). A model's figure, as above.",
+    "spending.essentials_per_month": "Derived: ENIGH 2024 Jalisco, food and drink consumed at home 16,005 pesos a quarter per household (INEGI, Encuesta Nacional de Ingresos y Gastos de los Hogares (ENIGH) 2024, presentación de resultados, Jalisco (July 2025), https://www.inegi.org.mx/contenidos/programas/enigh/nc/2024/doc/enigh2024_ns_presentacion_resultados_jal.pdf, page 23), over 3 months and 3.27 members per household (page 5): 1,631 pesos per person per month. What a person spends however little comes in, taken as the food bought for the home.",
+    "savings_by_age": "Placeholder: no Mexican distribution of adult cash and deposits by age was found (the ENIF financial inclusion survey, INEGI/CNBV, gives account holding, not balances; to source). Carried over from au-vic-2026's percentiles and scaled by the ratio of the two profiles' shop wages (2.50 pesos per Australian dollar), which assumes Mexican balances relative to wages match Australian ones: surely too high for Mexico, where many adults have no bank account. Drawn between percentiles, and above the 90th up to three times it, as the generator does.",
+    "retirement_age": "Old-age pension (vejez) from 65 under the Ley del Seguro Social (IMSS; cesantía en edad avanzada from 60) and the Pensión para el Bienestar de las Personas Adultas Mayores from 65 (women from 63 in the phase-in of 2025-26; IMSS, https://www.imss.gob.mx/node/1217 and the search digest at https://www.adn40.mx/mexico/2026-07-21/es-oficial-estas-son-las-semanas-cotizadas-obligatorias-para-jubilarte-en-julio-2026/ ; pages not opened: to confirm). One age is used for everyone: 65.",
+    "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to 64) in the labour force, 67%. ENOE Jalisco Q1 2026: participation 56.2% of everyone aged 15 and over (men 72.2%, women 41.6%; INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); the working-age share is higher because the base includes the 65+ and students under 18; the 67% is an estimate from that, to confirm against ENOE's age tables. Those outside it (home-making is 33.6% of the non-active in the 2020 census, studying 42.9%) do not look for work.",
+    "tenancy": "Código Civil del Estado de Jalisco, title on leases (arrendamiento): a rent may be raised once a year, by notice, so the tenant can agree or object; a legal extension (prórroga) of up to a year is regulated and rent may rise by up to 10% in it if the landlord shows rents in the zone rose as much (summarised by the search at https://leyes-mx.com/codigo_civil_jalisco/2028.htm ; the article numbers and the notice period were not read: to confirm). rent_review_months 12 follows. rent_increase_notice_days 30 is a PLACEHOLDER (the Code's period was not found). after_fixed_term 'periodic': a tenant who stays on after a fixed term continues month to month (tacit renewal; to confirm in the Code).",
+    "values": "Placeholder: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations (benevolence, universalism, self-direction, security, conformity, hedonism, achievement, tradition, stimulation, power: 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500. To source for this place: the World Values Survey's Schwartz items for Australia (wave 6), rescaled. Carried over unchanged: a cross-national ordering, not a Mexican measurement; a placeholder for Mexico, to replace with a Mexican survey of Schwartz values (for example the World Values Survey wave 7 for Mexico, or the European Social Survey's Portrait Values Questionnaire if run there) when found.",
+    "industrial_action": "Ley Federal del Trabajo (LFT), title 8 (strikes), art 920 fr III: the strike petition (emplazamiento) must give six days' notice in private firms (ten in public services); art 930 and following: the headcount (recuento) of workers decides the strike's legality and only the workers of the firm who attend count. The 2019 labour reform requires a vote of the workers for contract matters. Source of the summary: the search result on arts 920-931 (https://mley.mx/LFT/articulo/920/ and https://mley.mx/LFT/articulo/931/ ; pages not opened: to confirm). notice_days 6 follows. ballot_turnout_bps and ballot_pass_bps (5,000 each: more than half of the workers) follow the rule as summarised (the exact threshold in the strike-legality headcount, art 930 fr II, is a majority of the workers: to confirm). paid_during_action false: strikers are not paid wages (a collective agreement can say otherwise; to confirm).",
+    "world_price_process": "Placeholder: carried over from au-vic-2026 (monthly mean-reverting random moves in world prices; to estimate from INEGI's Índices de precios del comercio exterior).",
+    "credit.cash_rate_bps": "Banco de México, target for the overnight interbank interest rate: 6.50% (held on 24 September 2026, unanimous; reported by https://www.poresto.com/mexico/2026/9/24/banxico-mantiene-tasa-de-interes-en-650-y-preve-que-inflacion-llegue-a-la-meta-hasta-finales-de-2027.html , a news report of the decision; the Banxico statement itself not opened: to confirm).",
+    "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for funding. Banks' spreads in Mexico are wide; 2 points is an estimate, to source from Banxico's Reporte de Estabilidad Financiera.",
+    "credit.lending_rate_bps": "Organisations: SME loans average about 15.35% a year (Banco de México via a press digest, https://vanguardia.com.mx/dinero/creditos-cada-vez-mas-caros-en-mexico-HE7017966 ; date of the figure not confirmed, 'datos anteriores': to confirm against Banxico's interest-rate series for business credit). People: personal loans at 21% to nearly 30% a year according to Banxico data cited by the press (https://www.merca20.com/?p=12577970 and the Bloomberg Línea / Excélsior reports; not opened); 24% is taken as the middle of that range, a placeholder.",
+    "credit.serviceability_buffer_bps": "Placeholder: Mexican bank regulation (CNBV) has no stress buffer on the rate like Australia's (APRA); set to 0. A gap in the profile structure's meaning: it is a rule, not a figure.",
+    "credit.max_repayment_share_bps": "Placeholder: the most of a borrower's monthly income a lender lets repayments take (people 30%, a common lending guide; organisations 20% of what comes in), carried over from au-vic-2026. Mexican banks' rule of thumb (payment-to-income of about 30-35% for mortgages) was not found in a source.",
+    "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first notice).",
+    "credit.default_days": "Cartera vencida: a loan is past due after 90 days without payment under the CNBV's Disposiciones de carácter general aplicables a las instituciones de crédito (Criterios contables, Anexo 33; summarised, page not opened: to confirm).",
+    "credit.max_months": "Placeholder: the longest term for these loans (five years).",
+    "credit.reserve": "Placeholder: the cash the bank's lending office keeps back, scaled from au-vic-2026's $100,000 by the ratio of shop wages (2.50), rounded.",
+    "opening": "Placeholder, to source: what each organisation holds on the first day and the least an adult in the labour force has saved; scaled from au-vic-2026's placeholders by the ratio of the two profiles' shop wages (2.50 pesos per Australian dollar) and rounded.",
+    "town_finance.parks_per_year": "Placeholder: the town's yearly parks line; scaled from au-vic-2026's by the shop-wage ratio (2.50).",
+    "town_finance.payment_approval_over": "Placeholder: the town's procedure needs the mayor's written approval for any payment over this; scaled from au-vic-2026's by the shop-wage ratio. The municipal council (ayuntamiento) and its treasurer (tesorero) decide this by Ley de Gobierno y la Administración Pública Municipal del Estado de Jalisco; thresholds not found.",
+    "retiree_savings": "Placeholder: cash savings at retirement, 30,000 to 90,000 pesos. Most of a worker's retirement wealth is in the individual Afore account (not cash), and a majority never contributed (ENOE Jalisco Q1 2026: 48.6% of the employed are informal; INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); the range is an estimate of what a retiree holds as deposits, to source from ENIF 2024 (INEGI/CNBV) and CONSAR.",
+    "support.pension": "Pensión para el Bienestar de las Personas Adultas Mayores: 6,400 pesos paid every two months in 2026 (up from 6,200 in 2025), universal, from age 65 (https://www.nmas.com.mx/nacional/cuanto-paga-pension-bienestar-2026-nuevo-monto-oficial-aumento-adultos-mayores-mujeres/ and https://expansion.mx/finanzas-personales/2025/12/15/calendario-primeros-pagos-pension-bienestar-2026 ; news reports of the programme's rules, not the DOF/Secretaría de Bienestar text: to confirm). every_days 61 (one two-month period, 365/6). IMSS pensions (cesantía y vejez) are not modelled; only this universal payment is.",
+    "support.unemployment": "NO EQUIVALENT: Mexico has no national unemployment benefit (only Mexico City's seguro de desempleo, and a partial withdrawal from the Afore account, ley del Seguro Social art 191). Amount set to 0 so nobody receives one; from_age 18 and every_days 14 are neutral values. The closest thing the structure allows; listed as a gap. Source: Ley del Seguro Social, art 191 (partial withdrawal for unemployment from the Afore account after 46 days; summarised only, not opened: to confirm).",
+    "firm_ownership.forms_bps": "Placeholder: how the firms of each kind are held (docs/behaviour/firm-ownership.md). Shops and landlords are small family businesses held closely: ENOE Jalisco Q1 2026: 45.5% of non-agricultural workers are in micro-businesses and 23.5% in small establishments; of the employed, 6.5% are employers and 18.0% are own-account workers (INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf); the closely held/outside split is an estimate. Factories: a mix of family firms, branches of firms from elsewhere and a few listed groups; the split 30/50/20 is a placeholder. No source for ownership forms of firms by kind was found.",
+    "firm_ownership.closely_held": "Placeholder: the shares with one, two, three owning households (85/12/3), carried over from au-vic-2026 with no Mexican figure; owner_wealth_fifth_bps: closely held firms belong mostly to the richest fifth of households, carried over unchanged.",
+    "firm_ownership.widely_held": "Placeholder: the part of a widely held firm held from outside (80%), carried over from au-vic-2026.",
+    "firm_ownership.direct_holders": "Placeholder: share of households holding listed shares directly, by fifth of wealth: 0.5%, 1%, 2%, 4%, 9%. Direct share ownership in Mexico is rare (the Mexican stock exchange, BMV, has a small retail investor base); the figures are estimates of that order, not from a source (to source from CNBV or BMV investor statistics, or the ENIF).",
+    "retirement_fund": "Placeholder, all of it: the retirement fund's rules were modelled on Australian account-based pensions, and these figures are carried over from au-vic-2026. Mexico's system is the Afores (individual defined-contribution accounts run by private administrators supervised by CONSAR, with a guaranteed minimum pension): a fund of this type exists but its parameters (a pension at the rate of the balance, rising with age) are not Mexico's. Use with a world that asks for one only after replacing from CONSAR statistics. IMSS contribution rates, for reference: retiro 2.0% of salary from the employer, cesantía y vejez employer 3.15% rising to 11.875% by 2030 and 1.125% from the worker, under the 2020 pension reform (https://www.elcontribuyente.mx/indicadores/cuotas-imss/ , summary; not opened).",
+    "industry": "Placeholder: carried over from au-vic-2026 (manufacturing's compensation of employees and intermediate inputs as shares of output; retail's purchases of goods and wages as shares of sales; from ABS input-output tables). Mexican equivalents: INEGI, Matriz Insumo-Producto 2018 and Censos Económicos 2024 (value added and remuneration by sector). Not opened. Retail's labour share of 14% is likely higher in a country with low retail wages; unverified.",
+    "prices": "Placeholder, all four, scaled so that the town's price level is consistent with its wages (the shop wage here is 2.50 times au-vic-2026's in currency units): an item of goods worth 250 pesos at world prices (the unit the town counts in; au-vic-2026 uses $100); imports 10% dearer (freight and margins); factory inputs 5 pesos a kg; building materials 4 pesos a kg (retail prices of cement, about 4-5 pesos a kg for a 50 kg bag, are the anchor; unverified, to check against the Sistema Nacional de Información de Precios, SNIIM or INEGI's INPC and the construction input price index).",
+    "public_finance.income_tax": "Servicio de Administración Tributaria (SAT), Resolución Miscelánea Fiscal 2026, Anexo 8 (published in the Diario Oficial on 28 December 2025): annual tariff for individuals (Art. 152 LISR): marginal rates 1.92%, 6.40%, 10.88%, 16.00%, 17.92%, 21.36%, 23.52%, 30.00%, 32.00%, 34.00% and 35.00% above lower limits of 0.01, 10,135.12, 86,022.12, 151,176.20, 175,735.67, 210,403.70, 424,353.98, 668,840.15, 1,276,925.99, 1,702,567.98 and 5,107,703.93 pesos (the fixed fees in the tariff equal the cumulated tax of the brackets below, so marginal rates are equivalent), from https://elconta.mx/tablas-y-tarifas-isr-2026-anexo-8-de-la-resolucion-miscelanea-fiscal-2026/ (a tax-practice site reproducing Anexo 8; the DOF text not opened: to confirm). The employment subsidy (subsidio para el empleo) for low incomes and employees' social-security contributions (IMSS worker share) are NOT modelled; there is no Medicare-type levy, so levy_bps is 0. Employers withhold monthly in Mexico; here they withhold on each pay, reckoned as a year's income.",
+    "public_finance.grants_per_resident_per_year": "Placeholder: federal and state transfers to municipalities (participaciones, Ramo 28, and aportaciones, Ramo 33: FISM and FORTAMUN) per resident: about 3,000 pesos a year is an order-of-magnitude estimate for a small Jalisco municipality; the amounts by municipality are in Jalisco's Ley de Coordinación Fiscal distribution and the Ramo 33 / Ramo 28 estimates for 2024 (e.g. https://www.zapopan.gob.mx/wp-content/uploads/2024/05/Estimaciones_Ramo_33_y_28_2024.pdf , not opened). Participations are 50.3% and aportaciones 37.7% of Jalisco state income in 2022 (INEGI, Finanzas públicas estatales y municipales, through IIEG: https://iieg.gob.mx/ns/wp-content/uploads/2024/05/Ficha-informativa-Finanzas-publicas-estatales-y-municipales-ingresos-2022-20240515.pdf ; search snippet).",
+    "public_finance.rates_per_resident_per_year": "Derived, with an assumed input: Jalisco's property tax (predial) tariff in the Ley de Hacienda Municipal del Estado de Jalisco / the municipal Ley de Ingresos applies a marginal rate of 0.0002540 to fiscal values from 0 to 776,142.90 pesos (as published for Guadalajara, https://transparencia.guadalajara.gob.mx/sites/default/files/TasasTarifasImpuestoPredial24.pdf ; a small town's schedule differs, not found); at an ASSUMED fiscal value of 500,000 pesos a dwelling that is 127 pesos a year, over 3.27 residents per household (ENIGH 2024 Jalisco): about 38.8 pesos a resident a year. Predial is a small part of Mexican municipal income; the rest is transfers (above).",
+    "public_finance.rates_instalments": "Ley de Hacienda Municipal del Estado de Jalisco: the predial is assessed and paid bimonthly (six payments; the Ley de Ingresos of each municipality adds discounts for paying in advance), per the schedule published by Guadalajara (https://transparencia.guadalajara.gob.mx/sites/default/files/TasasTarifasImpuestoPredial24.pdf ; summary only, not read in full: to confirm).",
+    "public_finance.rates_due_days": "Placeholder: an instalment falls due 30 days after its notice.",
+    "public_finance.rates_penalty_interest_bps": "Placeholder: surcharges (recargos) on late payments. The Código Fiscal de la Federación's rate of 1.47% a month (17.64% a year, simple) is used as a stand-in; the municipal Ley de Ingresos sets its own (to confirm; the monthly surcharge percentages were not found in the Jalisco results).",
+    "public_finance.rates_exempt_kinds": "Constitución Política de los Estados Unidos Mexicanos, art 115 fr IV inciso c): the municipal property tax exempts only property in the public domain of the Federation, the states and the municipalities, unless used by parastatal entities or by individuals. Here: the clinic's (public), the school's (public) and the police station's. The utility (CFE-type state enterprise selling a service) is NOT exempt. (Provision recalled from the Constitution; the text was not opened in this session: to confirm.)",
+    "public_finance.median_house_price": "Sociedad Hipotecaria Federal (SHF), Índice SHF de Precios de la Vivienda, second quarter of 2026: Jalisco's average house price 2,107,232 pesos (8th highest among states; +10.13% on a year earlier), reported by IIEG Jalisco, https://iieg.gob.mx/ns/wp-content/uploads/2026/08/reporte_indice_precios_vivienda_mexico_2doT_2026.pdf (search snippet; the report itself not opened: to confirm). An AVERAGE for the whole state, weighted to metropolitan Guadalajara; a small town's median is lower, so this overstates local prices. Used as the median to derive the land value (this less the cost of building a house).",
+    "services.waste_per_person_per_day_g": "SEMARNAT, Diagnóstico Básico para la Gestión Integral de los Residuos 2020: 0.944 kg of municipal solid waste per person per day, nationally (120,128 tonnes a day; Jalisco 7,961 tonnes a day), as reported by https://apps1.semarnat.gob.mx:8443/dgeia/compartidos/pdf/COM_MET_GENTOTPER.pdf and the search digest; the Diagnóstico itself not opened: to confirm.",
+    "services.landfill_levy_per_tonne": "Placeholder: Mexico has no landfill levy like Victoria's; what is charged at a sanitary landfill (relleno sanitario) is a gate or tipping fee set by each municipality or concessionaire. 250 pesos a tonne is an estimate of that order; a figure for Jalisco (for example SIMEPRODE, the Jalisco intermunicipal waste body) was not found. To source.",
+    "services.council_staff_per_1000": "Placeholder: municipal workers per 1,000 residents. INEGI's Censo Nacional de Gobiernos Municipales y Demarcaciones Territoriales 2025 gives the personnel of municipal administrations; the figure for Jalisco was not found. 5 per 1,000 is an estimate; in the town, all of them are its works crew.",
+    "services.collect_seconds_per_10kg": "Placeholder: a one-driver side-loader lifts up to 6 bins a minute (Bucher Municipal, Sport side loader); with driving between houses, about 1,000 bins a day is taken as a round, and a household's week of waste as about 24 kg: about 12 seconds of work per 10 kg. (A physical estimate carried over from au-vic-2026, not Mexican.)",
+    "services.asset_life_years": "Placeholder: a park or civic building wears out in 15 years without upkeep (after VAGO, Maintaining Local Roads: spray seals last 10-15 years). (Carried over; not Mexican.)",
+    "services.upkeep_hours_per_week_per_asset": "Placeholder: a crew member's half a day a week keeps a park or the hall up (mowing, bins, repairs).",
+    "services.complain_bps": "Placeholder: the chance a week that a household whose waste has gone two weeks uncollected writes to the town. Who reports and who doesn't varies (the service-request literature, e.g. Stowers 2022, State and Local Government Review); a rate is to be sourced.",
+    "unions.membership_bps": "Placeholder: union membership of employees by industry. No sector split for Mexico was found: about 12% of wage-and-salary workers are union members nationally (secondary report, 'alrededor de 12%', INEGI ENOE-based; https://www.tusbuenasnoticias.com/noticias/opinion/2025/09/08/50130-sindicatos-estan-en-extincion ; not opened) and 22.3% in Nuevo Leon in 2023 (Coparmex via Milenio). 'other' = 12% (the national rate); manufacturing 15%, retail 5%, construction 5% and public administration 35% are estimates that follow the usual ranking (public sector far above private) and are NOT sourced. To replace with INEGI's ENOE tables on union membership by sector.",
+    "unions.dues_per_month": "Placeholder: about 150 pesos a month (roughly 1.5% of a monthly wage of 10,000 pesos; Mexican unions commonly take 1% to 3%; not sourced).",
+    "unions.resignation_notice_days": "Ley Federal del Trabajo, art 358: nobody can be forced to join a union or to leave it; a member may resign at any time (taken as effective at once; the article was recalled, not opened: to confirm). Written into each membership as the member's notice.",
+    "unions.claim_margin_bps": "Placeholder: a union claims the year's rise in prices and 2% more (carried over; the Secretaría del Trabajo's data on revisiones contractuales / salary increases in collective contracts are a calibration target).",
+    "unions.meeting_every_days": "Placeholder: a members' meeting a month.",
+    "unions.teaching": "The union movement's claim, in words (content for belief). Its members hold it at the start. The same wording as au-vic-2026.",
+    "groups.kinds": "The kinds of social group (sport; religious; arts; hobby; other recreational interest), carried over from au-vic-2026, which took them from the ABS General Social Survey's categories: no equivalent Mexican survey category list was found (INEGI's ENCUESTA NACIONAL SOBRE USO DEL TIEMPO and the Módulo de Bienestar Autorreportado, BIARE, ask about leisure and social life; not opened). How often each meets and for how long are placeholders; a Catholic parish (the congregation) holds Mass weekly, taken as 60 minutes (to confirm).",
+    "groups.taking_part_bps": "Placeholder: the share of adults who belong to a group at the start and go to its gatherings, 40%, carried over from au-vic-2026's calibrated value. No Mexican figure for participation in groups was found. After the start, whether anyone goes is theirs.",
+    "groups.per_kind_per_1000_people": "Placeholder: one group of each kind for every 1,000 people.",
+    "groups.leave_notice_days": "Placeholder: a member may leave a club or congregation at once.",
+    "groups.kinds.teaching": "What a group asks people to hold, in its words (docs/design/ai-citizens.md 5). The congregation's stands for the Christian churches together (in Jalisco 89.2% of people are Catholic and 4.7% Protestant or evangelical: Censo 2020, INEGI, Censo de Población y Vivienda 2020, Presentación de resultados, Jalisco, https://www.inegi.org.mx/contenidos/programas/ccpv/2020/doc/cpv2020_pres_res_jal.pdf); one congregation per town is a simplification.",
+    "groups.kinds.held_at_start_bps": "INEGI, Censo de Población y Vivienda 2020, Presentación de resultados, Jalisco, https://www.inegi.org.mx/contenidos/programas/ccpv/2020/doc/cpv2020_pres_res_jal.pdf: religion in 2020: Catholic 7,448,776 (89.2%), Protestant/evangelical 396,295 (4.7%), no religion 384,118 (4.6%), believers without affiliation 33,125 (0.4%), others 0.3% of 8,348,151. Christian (Catholic plus Protestant) 93.9%. At the start, the congregation's members hold its teaching strongly, and others up to this share hold it less (as in au-vic-2026).",
+    "health": "The clinic stands for the town's health system (a liberty: a town of 200 has none). doctors_per_1000: 1.2, from the Secretaría de Salud de Jalisco: 1.25 physicians per 1,000 inhabitants (2019) and 1.18 (2022) for the population without social security (https://presupuestociudadano.jalisco.gob.mx/sid/report/pp/18898 and the MIR documents; search snippet, to confirm); the national density is 2.5 per 1,000 (OECD-based, secondary). doctor_wage_per_pay_period: PLACEHOLDER, 30,000 pesos a month (a salaried public-sector general practitioner; not sourced), converted to 14 days. consult_minutes, seek_care_bps, treats and off_work_severities: placeholders carried over from au-vic-2026 (the conditions here are hospital-level, so nearly everyone with one is treated; care shortens them by a fifth; fatal_kept_bps has no effect while conditions don't kill: docs/behaviour/life.md). Health coverage in Jalisco: 69.9% of people affiliated to a health service in 2020, 71.1% of those to IMSS (INEGI, Censo de Población y Vivienda 2020, Presentación de resultados, Jalisco, https://www.inegi.org.mx/contenidos/programas/ccpv/2020/doc/cpv2020_pres_res_jal.pdf).",
+    "round": "Working hours 9 to 5, five days a week for everyone, shops included. The legal week is 48 hours over six days (LFT arts 61 and 69; ENOE Jalisco Q1 2026 finds a mean of 41 hours worked a week and 61.3% working 35-48 hours, INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf), but the one 'work_days' parameter drives work, shops and school alike, and school runs five days; six would put school on Saturdays. Closest allowed: 5 days (a liberty). School 8 to 13 (SEP basic education runs about four and a half to five hours a day in the morning shift; the day length in the SEP calendar was not found: placeholder, to confirm). Travel: off the roads, a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997, carried over from au-vic-2026; to confirm); on a road, 2 seconds (45 km/h under urban limits; carried over); slower across water, wetland and bush (placeholders). Roads budget: placeholder 120 pesos a resident a year (municipal roads in Mexico are paid from FISM/FORTAMUN transfers; the amount was not found).",
+    "ownership": "house_owner_bps: 58.68% of inhabited private dwellings in Jalisco are owner-occupied (INEGI, Censo 2020, indicator in MIDE Jalisco, https://mide.jalisco.gob.mx/mide/reporte/ficha_indicador/1477 or /1474 ; search snippet: to confirm which of the two ids carries it); flats here are all rented (a liberty), so the same share is used for houses (an understatement of houses owned, since flats are mostly rented). The rest of Jalisco's dwellings are rented, lent by family (prestada) or in other tenure (the shares were not found). mortgage_bps_by_age: PLACEHOLDER, the share of owner-occupiers still repaying a mortgage by the household head's age; far fewer owners have a mortgage than in Australia because most Mexican homes are self-built or inherited (to source from ENIGH 2024 or INEGI's ENVI). mortgage_payment_per_month: PLACEHOLDER 6,500 pesos (to source: INFONAVIT and SHF report average monthly payments). mortgage_rate_bps: an owner-occupier mortgage rate of about 10.2% to 10.4% in 2025-26 (banks' executives in the press: https://forbes.com.mx/?p=1433411 and similar, not opened; range 10-12%). mortgage_years_left: placeholder. market: a 15% deposit (banks ask 10-20%; INFONAVIT lends more; placeholder), costs about 5% (notary, transfer tax ISAI and registration; placeholder, to source from Jalisco's Ley de Hacienda Municipal), 20-year terms (placeholder; bank mortgages run 10-20 years), buy_bps_per_month 50, relist and cut: placeholders as in au-vic-2026.",
+    "utilities.water": "litres_per_person_per_day: PLACEHOLDER 200 (CONAGUA reports supply per head in Jalisco above 200 l/day; the residential use figure for a small town was not found). price_per_kl: 20.43 pesos per cubic metre, SIAPA's tariff before its 2025 adjustment (SIAPA Guadalajara area; a 28.74-peso fixed tariff was proposed and revoked in 2025; https://www.aztecajalisco.com/local/siapa-no-aumentara-200-la-tarifa-agua-potable-en-el-amg-para-2026/ and https://www.cronica.com.mx/jalisco/guadalajara/2025/07/23/diputados-de-todos-los-partidos-se-oponen-a-nueva-alza-a-tarifas-del-agua-en-2026/ ; snippets, not opened). The real production cost is 24.94 pesos a cubic metre, and homes using up to 25 m3 a month get an 80% discount until 15 December 2026 (the same reports). A small town's water board charges its own tariff, usually lower (not found). service_per_quarter: PLACEHOLDER 300 pesos. The river's inflow, flow and decay are placeholders carried over from au-vic-2026, sized so a small town's draw is a small share of a modest river's water. Bills go to owners.",
+    "utilities.energy": "CFE domestic Tarifa 1 for 2026: basic block (first 75 kWh) 1.125 pesos a kWh, intermediate (next 65) 1.369, excess 4.004 (https://www.unotv.com/nacional/las-tarifas-domesticas-de-cfe-van-de-1-a-4-pesos-por-kwh-en-junio-de-2026/ ; news digest of CFE's published tariffs: to confirm); Jalisco homes are mostly on tariff 1B with an effective price near 1.15 pesos a kWh (https://www.voltflow.net/blog/costo-electricidad-mexico-por-estado-cfe-2026 , a private blog, not opened). price_per_kwh 115 centavos. supply_per_day 0: CFE has no fixed daily supply charge for homes, only a minimum billed consumption of 25 kWh (the structure's per-day charge cannot express a minimum consumption; a gap). kwh_per_household_per_day: PLACEHOLDER 6 (about 180 kWh a month for a household in a temperate state; not sourced). grid_price_per_kwh 100: PLACEHOLDER, set just under the retail price so the retailer is not made to sell below cost; in fact CFE sells to homes far below the cost of supply and the Treasury pays the difference (a subsidy the structure cannot express; a gap). grid_emissions_g_per_kwh: 444, the emission factor of the National Electric System for 2024 (0.444 tCO2e/MWh), determined by the Comisión Reguladora de Energía and published by SEMARNAT on 28 February 2025 (https://www.hklaw.com/-/media/files/insights/publications/2025/03/mexicoenvironmentalinsights_march2025_en.pdf ; law-firm digest of the notice, not opened: to confirm).",
+    "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: monthly rainfall at Ciudad Guzmán, Jalisco, climate normals 1991-2020, mm: Jan 28, Feb 11, Mar 11, Apr 2, May 26, Jun 117, Jul 145, Aug 160, Sep 153, Oct 77, Nov 23, Dec 8 (CONAGUA / Servicio Meteorológico Nacional normals as reported by https://www.climate-zone.com/climate/mx/ciudad-guzman/ ; a climate website, SMN tables not opened: to confirm; the station is the nearest well documented, not the town's; Tecolotlán and Ameca, the other towns checked, have 903 and 924 mm a year against 761 here). The river's inflow is taken to follow rainfall with a lag of about a month (each month's flow is half this month's rain and half last month's), so the river runs low in spring and high in August to October: the lag is a PLACEHOLDER. storm_*: PLACEHOLDER, a heavy-rain spell in about one month in seventeen (a year-round figure, though in fact storms and hurricanes strike from June to October; the structure has no seasonal storm chance, a gap); in 2025, 9 of Jalisco's 125 municipalities asked for an emergency declaration from rain, floods or earthquakes (reports at https://www.aztecajalisco.com/local/sismos-y-lluvias-provocaron-desastres-en-estos-municipios-jalisco-en-2025 ; not opened). drought_*: PLACEHOLDER, a drought begins in about one year in ten (to calibrate against the Monitor de Sequía de México, CONAGUA SMN). summer_months [4, 5, 6]: the hot dry months before the rains (April to June are the hottest in the Jalisco highlands; to confirm against the SMN normals). heatwave_*, heat units, illness per unit and warning lead: PLACEHOLDERS carried over from au-vic-2026.",
+    "hazards": "Floods, placeholders carried over from au-vic-2026, sized against the river as modelled (about 9,000 kL a 25 m cell in the usual flow). A flood-zone figure for the town was not found; Jalisco's emergency declarations from floods (Tlajomulco, Tlaquepaque, Chapala, 2025) show that urban flooding is real but are not hazard thresholds.",
+    "crime": "Crime (world-expansion 7.2), deliberately rare and driven by circumstance only (Becker 1968; Cohen and Felson 1979). take_bps_per_month_in_need, caught_bps_reckoned and take_quantity: placeholders carried over. detection_bps: PLACEHOLDER 1,000 (10%): of crimes in 2024, 93.2% were not reported or got no investigation file (INEGI, ENVIPE 2025, national, https://www.inegi.org.mx/contenidos/programas/envipe/2025/doc/envipe2025_jal.pdf for Jalisco, which has the lowest hidden-crime figure; Jalisco's victimisation prevalence was 24,179 victims per 100,000 in 2024); the share of investigations that identify who is lower than in Australia, and no figure was found; 10% is an estimate. police_per_1000: 1.6 municipal police per 1,000 inhabitants in Jalisco in 2025 (INEGI, Censo Nacional de Gobiernos Municipales y Demarcaciones Territoriales 2025, as reported by https://politica.expansion.mx/mexico/2026/03/20/municipios-sin-policias-mexico-inegi-2025 ; one in five municipalities nationally has no police; the report itself not opened: to confirm). officer_wage_per_pay_period: PLACEHOLDER, 13,000 pesos a month (to source from Jalisco municipal pay tables). investigation_hours: placeholder.",
+    "justice": "Placeholder: the town's court is a first-instance civil court (juzgado de primera instancia / juzgado municipal) under the Poder Judicial del Estado de Jalisco. hearing_after_days 60, pay_within_days 30, challenge_bps 2000, apply_bps 1500, apply_after_days 30: no timing or case-rate figures for Jalisco courts were found (INEGI, Censo Nacional de Impartición de Justicia Estatal, would give them; not opened).",
+    "elections": "Constitución Política del Estado de Jalisco: municipal presidents (presidentes municipales), councillors (regidores) and syndics are elected for three years, starting on 1 October of the election year, re-electable once for the next period (https://mexico.justia.com/estatales/jalisco/constitucion-politica-del-estado-de-jalisco/titulo-septimo/capitulo-i/ ; and the 2024 election summary at https://www.milenio.com/politica/elecciones ; search results, text not opened: to confirm). The mayor is elected by relative majority of a slate (plurality), with the councillors on the same slate: the structure has a single mayor, a simplification of the slate (a gap). turnout_bps: 52.84% of the electorate voted in Jalisco in the 2024 elections (state level; the 2024 municipal turnout by town was not found). stand_bps and news_readers_bps: placeholders carried over. In 125 municipalities the presidency was filled in 2024 (the local-paper readership has no Mexican source).",
+    "education": "school_ages [3, 17]: compulsory schooling runs from preschool at age 3 to upper secondary (media superior) at 17-18 (Constitución art 3, as amended 2019; recalled, not opened: to confirm the age bounds). school_days_per_year: 185, the SEP calendar for 2025-2026, published in the Diario Oficial (https://www.elimparcial.com/mexico/2025/06/09/sep-ya-publico-su-nuevo-calendario-escolar-oficial-del-ciclo-2025-2026-y-estas-son-las-fechas-de-inicio-y-fin-de-las-clases-asi-como-los-dias-festivos-y-otros-dias-inhabiles/ , a news report of the calendar). students_per_teacher: PLACEHOLDER 22 (SEP's 'Principales cifras del sistema educativo nacional' gives students per teacher by level and state; basic education is near 22 nationally; not opened: to confirm). hours_per_day: PLACEHOLDER 5 (a morning shift). teacher_wage_per_pay_period: PLACEHOLDER, 14,000 pesos a month for a basic-education teacher (SEP salary tables not opened). attainment: INEGI Censo 2020 Jalisco, population aged 15 and over, 6,193,111 people: 2.9% illiterate, 8.9% without primary, 18.0% without secondary (education lag: https://comsoc.udg.mx/printpdf/69189 ; derived: less than primary 11.8% (illiterate plus without primary), primary complete without secondary 18.0%); average schooling 9.9 years (INEGI, Censo de Población y Vivienda 2020, Presentación de resultados, Jalisco, https://www.inegi.org.mx/contenidos/programas/ccpv/2020/doc/cpv2020_pres_res_jal.pdf). The split of the remaining 70.2% into secondary complete (27%), upper secondary (25%) and higher education (18.2%) is a PLACEHOLDER chosen so that the mean is 9.9 years. return_per_year_bps: derived from ENIGH 2024 Jalisco: average quarterly monetary income by schooling: up to primary 21,072 pesos, secondary 26,963, upper secondary 32,402, professional (higher education) 59,573 (INEGI, Encuesta Nacional de Ingresos y Gastos de los Hogares (ENIGH) 2024, presentación de resultados, Jalisco (July 2025), https://www.inegi.org.mx/contenidos/programas/enigh/nc/2024/doc/enigh2024_ns_presentacion_resultados_jal.pdf, page 15): ln(59,573 / 21,072) over 10 more years of school is 10.4% a year. max_years 20: postgraduate (income 122,120 pesos; page 15).",
+    "nature": "Nature (docs/design/world-expansion.md 2). The town is modelled in the highlands of central-western Jalisco (the Sierra de Amula and Valles region: pine-oak and tropical dry woodland on the slopes, thorn scrub (matorral subtropical), grazed grassland, maize and agave farmland, wetland and gallery woodland on the river), where annual rainfall is 760-920 mm (see climate). cell_m: a cell is a 25 m lot. The landscape around the town (margin_cells, block_cells, shares_bps 30/15/20/30/5, woodland_patches), the covers' succession (cleared land to grassland in a year; scrub to woodland in about 40), the pollution figures, survey_hours_per_ha and survey_staff are PLACEHOLDERS carried over from au-vic-2026 (the land-cover shares of the town's municipality are in INEGI's Uso del suelo y vegetación, Serie VII; not opened). spin_up_years: nature is run alone this long before the start so it begins in its own balance (as ecological and climate models spin up).",
+    "nature.species": "ALL FIGURES ARE PLACEHOLDERS: no density, home range or population-dynamics figure was looked up for these species. The species are real and live in that region (to confirm ranges against CONABIO and the NOM-059-SEMARNAT-2010 list): Collie's squirrel, Sciurus colliaei, a tree squirrel of the Pacific slope woodlands and dry forests of western Mexico; the Montezuma leopard frog, Lithobates montezumae, a frog of ponds and wet meadows of the central Mexican plateau (listed under special protection in the NOM-059 list, as recalled; not opened: to confirm); and the vermilion flycatcher, Pyrocephalus rubinus, a conspicuous common bird of scrub, farmland and river edges, the common control as the fairy-wren is in au-vic-2026. Densities (0.5 squirrels a hectare of woodland; 60 frogs a hectare of wetland; 1 flycatcher a hectare of scrub), home ranges and the growth, mortality and dispersal rates are carried over by ecological role from au-vic-2026's squirrel glider, growling grass frog and superb fairy-wren, whose own densities were taken from Australian studies. They are not Mexican field values. Squirrels and flycatchers live in family groups or pairs sharing a home range, which isn't modelled, so their breeding threshold is one; frogs breed where at least four share a pond (home range half a hectare). To replace each with a published field study."
+  },
+  "targets": [
+    {
+      "what": "employment_to_population_pct",
+      "value": 55.3,
+      "source": "Derived: ENOE Jalisco, first quarter of 2026: 3,848,036 employed of 6,955,048 aged 15 and over (INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf, table 2)."
+    },
+    {
+      "what": "unemployment_rate_pct",
+      "value": 1.6,
+      "source": "INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf: unemployment rate 1.6% of the active population in Jalisco, Q1 2026 (2.9% in July 2026 per the IIEG bulletin of August 2026, search snippet)."
+    },
+    {
+      "what": "participation_rate_pct",
+      "value": 56.2,
+      "source": "INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf: participation of those aged 15 and over, Q1 2026 (men 72.2%, women 41.6%)."
+    },
+    {
+      "what": "informal_employment_pct",
+      "value": 48.6,
+      "source": "INEGI, Encuesta Nacional de Ocupación y Empleo (ENOE), Jalisco, primer trimestre de 2026, boletín de indicador 315/26 (26 May 2026), https://www.inegi.org.mx/contenidos/saladeprensa/boletines/2026/enoe/enoe2026_05_Jal.pdf: labour informality rate TIL1, Q1 2026 (55.1% in Q2 2026 for Jalisco per a search snippet of the IIEG August 2026 bulletin; to confirm)."
+    },
+    {
+      "what": "household_saving_ratio_pct",
+      "value": 19.1,
+      "source": "Derived from ENIGH 2024 Jalisco (INEGI, Encuesta Nacional de Ingresos y Gastos de los Hogares (ENIGH) 2024, presentación de resultados, Jalisco (July 2025), https://www.inegi.org.mx/contenidos/programas/enigh/nc/2024/doc/enigh2024_ns_presentacion_resultados_jal.pdf): (current income 87,199 - total current spending 70,579) / 87,199. A household-survey measure, not the national accounts' ratio."
+    },
+    {
+      "what": "life_expectancy_at_birth_years",
+      "value": 76.02,
+      "source": "CONAPO, Proyecciones de la población de México y de las entidades federativas 2020-2070 (update of August 2023), as published by IIEG Jalisco, 'Estructura demográfica de la población, Jalisco 2024-2030', https://iieg.gob.mx/ns/wp-content/uploads/2024/08/EstructuraDemográficaPoblación2024.pdf: 2024, men 73.00, women 79.28."
+    },
+    {
+      "what": "total_fertility_rate",
+      "value": 1.89,
+      "source": "INEGI, Encuesta Nacional de la Dinámica Demográfica (ENADID) 2023, results for Jalisco as published by IIEG Jalisco ('Resultados ENADID 2023, parte I', https://iieg.gob.mx/ns/wp-content/uploads/2024/06/ResultadosENADID2023ParteI.pdf): 2018-2022 quinquennium (CONAPO's 2024 projection: 1.93)."
+    },
+    {
+      "what": "median_age_years",
+      "value": 29,
+      "source": "INEGI, Censo de Población y Vivienda 2020, Presentación de resultados, Jalisco, https://www.inegi.org.mx/contenidos/programas/ccpv/2020/doc/cpv2020_pres_res_jal.pdf: median age 29 in 2020."
+    },
+    {
+      "what": "victimisation_prevalence_per_100000",
+      "value": 24179,
+      "source": "INEGI, Encuesta Nacional de Victimización y Percepción sobre Seguridad Pública (ENVIPE) 2025, Jalisco: victims of crime in 2024 per 100,000 inhabitants (reported by the search result for https://www.inegi.org.mx/contenidos/programas/envipe/2025/doc/envipe2025_jal.pdf ; the report not opened: to confirm)."
+    },
+    {
+      "what": "owner_occupied_dwellings_pct",
+      "value": 58.68,
+      "source": "INEGI, Censo 2020, owner-occupied share of inhabited private dwellings, Jalisco (MIDE Jalisco indicator, https://mide.jalisco.gob.mx/mide/reporte/ficha_indicador/1477 ; search snippet: to confirm)."
+    },
+    {
+      "what": "union_membership_pct_of_employees",
+      "value": 12,
+      "source": "About 12% of wage and salary workers are union members in Mexico (secondary report, https://www.tusbuenasnoticias.com/noticias/opinion/2025/09/08/50130-sindicatos-estan-en-extincion ; INEGI ENOE-based, not opened: to confirm)."
+    },
+    {
+      "what": "catholic_share_change_pts_per_year",
+      "value": -0.28,
+      "source": "INEGI, Censo de Población y Vivienda 2020, Presentación de resultados, Jalisco, https://www.inegi.org.mx/contenidos/programas/ccpv/2020/doc/cpv2020_pres_res_jal.pdf: Catholic 92.0% (2010) to 89.2% (2020): -2.8 points over ten years."
+    }
+  ]
+}
