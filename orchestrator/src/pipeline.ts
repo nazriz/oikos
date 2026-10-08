@@ -33,6 +33,8 @@ import { TRANSLATOR_VERSION, translatorSystem } from "@oikos/translator";
 import { formOfLine, type BlindAnswer } from "../../translator/train/blind";
 import { functionOf, sameProgram, type Example, type FormSpec } from "../../translator/train/data";
 import { withListsQuoted, type LabelManifest, type Unlabelled } from "../../translator/train/readers";
+import { evaluateSet, loadSet, type SetReport } from "@oikos/translator/eval";
+import { DecideAdapter } from "../../translator/model/adapter";
 import { chooseModel } from "./models";
 import { blindFile, briefOf, chunksFor, inSitu, inSituInstructions, label, runName, takeInFiles, type Situation } from "./in-situ";
 import { logsIn } from "./corpus";
@@ -87,6 +89,8 @@ export interface PipelineConfig {
   seeds?: number[];
   trainExtra?: string[];
   deadlineHours?: number;
+  /** Minutes one call to a writer or reader may take before it is given up and made again (15). */
+  callMinutes?: number;
   /** A name for the data and the runs (the folder's name). */
   name?: string;
 }
@@ -167,25 +171,36 @@ export interface Hooks {
   adapter?: (model: string) => { adapter: LlmAdapter; prices: { [key: string]: Price } };
   sleep?: (ms: number) => Promise<void>;
   log?: (line: string) => void;
+  /** In place of the rented GPU (tests): given the data folder, the runs and where they come home, leaves each run's
+   * folder as the pod script does, and answers with that script's exit code. */
+  pod?: (o: { data: string; runs: { name: string; encoder: string; seed: number }[]; models: string; state: string }) => number;
 }
 
 export interface Used { input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number; cost_microusd: number; calls: number }
 const noUse = (): Used => ({ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, cost_microusd: 0, calls: 0 });
 const addUse = (a: Used, b: Used): Used => ({ input_tokens: a.input_tokens + b.input_tokens, output_tokens: a.output_tokens + b.output_tokens, cache_read_tokens: a.cache_read_tokens + b.cache_read_tokens, cache_write_tokens: a.cache_write_tokens + b.cache_write_tokens, cost_microusd: a.cost_microusd + b.cost_microusd, calls: a.calls + b.calls });
 
-/** The one tool a writer or reader has: it hands in its answer file as a list, a line of the file to an item. */
-const HAND_IN = {
-  name: "hand_in",
-  description: "Hand in the answer file: `answers` is the file's lines, in order, one object for each line, exactly as the task describes them.",
-  input_schema: { type: "object", properties: { answers: { type: "array", items: { type: "object" }, description: "the answer file, a line to an item" } }, required: ["answers"] },
+/**
+ * How a writer or a reader hands its file in: as one object of a given shape, `answers` a list with an object for each
+ * line of the file, every field a plain string (or a list of them). A model called through Claude Code or the Codex CLI
+ * is asked for exactly that shape as its answer (`answer`: no string of JSON inside it for the model to escape by hand,
+ * which a reader once did to 25 of 34 programs); any other adapter is given the same shape as the input of a tool.
+ */
+const handIn = (item: { [field: string]: object }) => {
+  const schema = { type: "object", additionalProperties: false, required: ["answers"], properties: { answers: { type: "array", description: "the answer file, a line to an item, in order", items: { type: "object", additionalProperties: false, required: Object.keys(item), properties: item } } } };
+  return { answer: { name: "hand_in", schema }, tools: [{ name: "hand_in", description: "Hand in the answer file: `answers` is the file's lines, in order, one object for each line, exactly as the task describes them.", input_schema: schema }] };
+};
+export const HAND_IN = {
+  reader: handIn({ id: { type: "string", description: "the request's id, copied exactly" }, program: { type: "string", description: "the program, as it is written" } }),
+  writer: handIn({ id: { type: "string", description: "the situation's id, copied exactly" }, requests: { type: "array", items: { type: "string" }, description: "the requests, each as it is said" } }),
 };
 
-class Caller {
+export class Caller {
   readonly budget: Budget;
   private readonly seen = new Set<string>();
   private readonly adapters = new Map<string, { adapter: LlmAdapter; prices: { [key: string]: Price } }>();
   private waitedMs = 0;
-  constructor(private readonly cfg: PipelineConfig, private readonly ledger: string, private readonly hooks: Hooks, private readonly say: (s: string) => void) {
+  constructor(private readonly cfg: Pick<PipelineConfig, "budget" | "waitMinutes" | "maxWaitHours" | "callMinutes">, private readonly ledger: string, private readonly hooks: Hooks, private readonly say: (s: string) => void) {
     // The spending limit is the run's: what earlier sittings of this run spent counts (the ledger holds it).
     let spent = 0;
     for (const e of jsonl<any>(ledger)) if (e.annotation === "usage") spent += e.cost_microusd ?? 0;
@@ -196,14 +211,15 @@ class Caller {
   private model(name: string) {
     let m = this.adapters.get(name);
     if (!m) {
-      m = this.hooks.adapter ? this.hooks.adapter(name) : (({ adapter, prices }) => ({ adapter, prices }))(chooseModel(name, { budgetUsd: this.cfg.budget }));
+      // (A batch of thirty requests, or a call of several situations, can take a model longer than a seat's answer does.)
+      m = this.hooks.adapter ? this.hooks.adapter(name) : (({ adapter, prices }) => ({ adapter, prices }))(chooseModel(name, { budgetUsd: this.cfg.budget, timeoutMs: (this.cfg.callMinutes ?? 15) * 60_000 }));
       this.adapters.set(name, m);
     }
     return m;
   }
 
   /** One model call: the text it answered and what it used. A usage limit is waited out; the spending limit stops the run. */
-  async ask(model: string, where: { step: string; unit: string }, req: { system: string; user: string; maxTokens: number; subject: string }): Promise<{ text: string; used: Used }> {
+  async ask(model: string, where: { step: string; unit: string }, req: { system: string; user: string; maxTokens: number; subject: string; form: keyof typeof HAND_IN }): Promise<{ text: string; used: Used; ms: number }> {
     const m = this.model(model);
     let used = noUse();
     const io: LlmIO = {
@@ -214,13 +230,14 @@ class Caller {
       },
     };
     const sleep = this.hooks.sleep ?? ((ms: number) => Bun.sleep(ms));
+    const started = Date.now();
     for (let attempt = 1; ; attempt++) {
       try {
-        // (The file is handed in through a tool, as a list: a reply of plain words is cut at 4,000 characters by the Claude Code
-        // adapter, a third of a batch of answers. A reply of words is still read, if the model gives one.)
-        const res = await callModel(io, { purpose: "consult", subject: req.subject, system: req.system, messages: [{ role: "user", content: req.user }], maxTokens: req.maxTokens, tools: [HAND_IN] }, this.seen);
+        // (The file is handed in as an object of a given shape, a list: a reply of plain words is cut at 4,000 characters by the
+        // Claude Code adapter, a third of a batch of answers. A reply of words is still read, if the model gives one.)
+        const res = await callModel(io, { purpose: "consult", subject: req.subject, system: req.system, messages: [{ role: "user", content: req.user }], maxTokens: req.maxTokens, ...HAND_IN[req.form] }, this.seen);
         const handed = res.content.flatMap((b) => (b.type === "tool_use" && Array.isArray(b.input?.answers) ? (b.input.answers as unknown[]) : []));
-        return { text: handed.length ? handed.map((o) => JSON.stringify(o)).join("\n") : res.content.map((b) => (b.type === "text" ? b.text : "")).join(""), used };
+        return { text: handed.length ? handed.map((o) => JSON.stringify(o)).join("\n") : res.content.map((b) => (b.type === "text" ? b.text : "")).join(""), used, ms: Date.now() - started };
       } catch (e) {
         if (e instanceof UsageLimitReached || e instanceof ModelUnreachable) {
           const ms = (this.cfg.waitMinutes ?? 20) * 60_000;
@@ -243,6 +260,24 @@ class Caller {
  * already carries as JSON (a quoted text as \"x\"). The program it meant; any other program is left as it is. */
 export function undoubled(program: string): string {
   return program.includes('\\"') && !/(^|[^\\])"/.test(program) ? program.replaceAll('\\"', '"').replaceAll("\\n", "\n") : program;
+}
+
+/**
+ * One batch of blind requests read by one reader: the translator's prompt as the system message, the reader's task and
+ * the batch's lines as the message. `whole`: answers that are a program for a request of the batch; `repaired`: how
+ * many of them came with every quotation mark escaped by hand and were read as meant (`undoubled`).
+ */
+export async function askReader(caller: Caller, reader: string, where: { step: string; unit: string }, system: string, task: string, batch: { id: string; request: string; forms: string[] }[]): Promise<{ answers: BlindAnswer[]; repaired: number; used: Used; ms: number }> {
+  const r = await caller.ask(reader, where, { system, user: `${task}\n\n=== BLIND ===\n${batch.map((b) => JSON.stringify(b)).join("\n")}\n`, maxTokens: Math.min(24_000, 800 + 400 * batch.length), subject: "translator-pipeline/reader", form: "reader" });
+  const ids = new Set(batch.map((b) => b.id));
+  let repaired = 0;
+  const seen = new Set<string>();
+  const answers = objectsIn(r.text).filter((o) => typeof o.id === "string" && ids.has(o.id) && typeof o.program === "string" && !seen.has(o.id) && !!seen.add(o.id)).map((o) => {
+    const program = undoubled(o.program as string);
+    if (program !== o.program) repaired++;
+    return { id: o.id as string, program };
+  });
+  return { answers, repaired, used: r.used, ms: r.ms };
 }
 
 /** The JSON objects in a model's reply, a line each (a code fence, or the whole reply as one list, is let pass). */
@@ -351,6 +386,9 @@ export interface Manifest {
   usage: { total: Used; by_model: { [model: string]: Used } };
   agreement: { [lane: string]: { [fn: string]: { requests: number; agreed: number; disagreed: number; other: number } } };
   tests: { [name: string]: { file: string; examples: number; by_function: { [fn: string]: number } } };
+  /** Each trained run on each test set made here: right, no draft, wrong draft; and the same by pilot, seat model,
+   * profile, currency (each case read in its own world's), origin and function (translator/eval/set-run.ts). The answers themselves are in the run's `eval-sets.json`. */
+  test_scores?: { [run: string]: { [test: string]: Pick<SetReport, "all" | "by" | "forms_not_as_written" | "currency_not_given"> } };
   data?: { joined: string; data: string; counts: any };
   runs: { [name: string]: any };
 }
@@ -375,6 +413,8 @@ export function pilotMeta(dir: string): { test: boolean; why?: string; commit?: 
 
 /** The day a request was said, as a key for holding whole seat-days out: its situation without the turn. */
 const seatDay = (e: { source?: string; id: string }): string => { const s = e.source ?? e.id; return s.replace(/\/[^/]*$/, ""); };
+/** A pilot's folder as its examples' ids begin: its path from the runs folder on, without `runs/`. */
+const inRuns = (log: string): string => runName(log).replace(/^runs\//, "");
 /** A stable number for a text, 0 to 999. */
 const bucket = (s: string, seed: number): number => parseInt(sha(`${seed}:${s}`).slice(0, 8), 16) % 1000;
 
@@ -430,7 +470,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
   say(`${cfg.pilots.length} pilots: ${trainPilots.length} for training, ${testPilots.length} test-only; writers ${Object.values(cfg.writers).join(", ")}; readers ${cfg.readers.join(" and ")}; spending limit ${cfg.budget} USD (spent so far ${(caller.budget.spentMicroUsd / 1e6).toFixed(4)})`);
   save();
 
-  const results: { [lane: string]: { examples: Example[]; rejects: any[]; labelManifest: LabelManifest } } = {};
+  const results: { [lane: string]: { examples: Example[]; rejects: any[]; labelManifest: LabelManifest; seatModel: Map<string, string> } } = {};
   try {
     for (const lane of lanes) results[lane.name] = await laneSteps(lane);
     await tail();
@@ -532,7 +572,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
           let used = noUse(), answers: any[] = [];
           let reply = "";
           for (let attempt = 1; attempt <= 3 && !answers.length; attempt++) {
-            const r = await caller.ask(model, { step: key("write"), unit: basename(file) }, { system: writerSystem, user, maxTokens: Math.min(24_000, 1_500 + 1_800 * group.length), subject: "translator-pipeline/writer" });
+            const r = await caller.ask(model, { step: key("write"), unit: basename(file) }, { system: writerSystem, user, maxTokens: Math.min(24_000, 1_500 + 1_800 * group.length), subject: "translator-pipeline/writer", form: "writer" });
             used = addUse(used, r.used);
             reply = r.text;
             answers = objectsIn(r.text).filter((o) => typeof o.id === "string" && group.includes(o.id) && Array.isArray(o.requests));
@@ -588,7 +628,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     for (const reader of cfg.readers) {
       const rdir = join(dir, "read", safe(reader));
       const got = new Map<string, string>();
-      let readUse = noUse();
+      let readUse = noUse(), repaired = 0;
       const batchSize = cfg.readerBatch ?? 30, batchChars = cfg.readerBatchChars ?? 60_000;
       for (let pass = 0; pass < 2; pass++) {
         const left = blind.filter((b) => !got.has(b.id));
@@ -604,22 +644,22 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
         for (const [bi, batch] of batches.entries()) {
           const file = join(rdir, `pass${pass}-${String(bi + 1).padStart(3, "0")}.json`);
           const unitFp = fp(batch.map((b) => b.id), reader, sha(system), sha(task));
-          let u = read<{ fp: string; answers: BlindAnswer[]; used: Used }>(file);
+          let u = read<{ fp: string; answers: BlindAnswer[]; used: Used; repaired?: number }>(file);
           if (u?.fp !== unitFp) {
             if (u) setAside(file, "stale");
-            const r = await caller.ask(reader, { step: key("read"), unit: `${safe(reader)}/${basename(file)}` }, { system, user: `${task}\n\n=== BLIND ===\n${batch.map((b) => JSON.stringify(b)).join("\n")}\n`, maxTokens: Math.min(24_000, 800 + 400 * batch.length), subject: "translator-pipeline/reader" });
-            const ids = new Set(batch.map((b) => b.id));
-            const mine = objectsIn(r.text).filter((o) => typeof o.id === "string" && ids.has(o.id) && typeof o.program === "string").map((o) => ({ id: o.id as string, program: undoubled(o.program as string) }));
+            const r = await askReader(caller, reader, { step: key("read"), unit: `${safe(reader)}/${basename(file)}` }, system, task, batch);
+            const mine = r.answers;
             const odd = implausiblyUniform(mine, false);
             if (odd) {
               putJson(`${file}.rejected-1`, { fp: unitFp, why: odd, answers: mine, used: r.used });
               throw new Stopped("reader uniform", `${reader}'s answers to ${basename(file)} are implausibly uniform (${odd}); they are set aside as ${basename(file)}.rejected-1 and the run stopped. A reader that answers by a rule is not a reader`);
             }
-            u = { fp: unitFp, answers: mine, used: r.used };
+            u = { fp: unitFp, answers: mine, used: r.used, repaired: r.repaired };
             putJson(file, u);
-            say(`${key("read")}: ${reader} ${basename(file)}: ${mine.length} of ${batch.length} answered (${(r.used.cost_microusd / 1e6).toFixed(4)} USD)`);
+            say(`${key("read")}: ${reader} ${basename(file)}: ${mine.length} of ${batch.length} answered${r.repaired ? `, ${r.repaired} with quotation marks escaped by hand, read as meant` : ""} (${(r.used.cost_microusd / 1e6).toFixed(4)} USD)`);
           }
           readUse = addUse(readUse, u.used);
+          repaired += u.repaired ?? 0;
           for (const a of u.answers) if (!got.has(a.id)) got.set(a.id, a.program);
         }
       }
@@ -630,7 +670,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
         throw new Stopped("reader uniform", `${reader}'s answers are implausibly uniform (${odd}); its answers are set aside (${basename(rdir)}.rejected-1) and the run stopped. A reader that answers by a rule is not a reader`);
       }
       answers[reader] = got;
-      m.steps[key(`read ${reader}`)] = { requests: blind.length, answered: got.size, unanswered: blind.length - got.size, used: readUse };
+      m.steps[key(`read ${reader}`)] = { requests: blind.length, answered: got.size, unanswered: blind.length - got.size, escaped_by_hand_and_repaired: repaired, used: readUse };
       save();
     }
 
@@ -670,7 +710,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     m.steps[key("label")] = { requests: lm.requests, examples: lm.examples, dropped: lm.by_reason, basis_unioned: unioned.length, by_function: lm.by_function, kept_from: lm.kept_from, writers: lm.writers };
     say(`${key("label")}: ${lm.examples} examples of ${lm.requests} requests (${Object.entries(lm.by_reason).filter(([, n]) => n).map(([w, n]) => `${w} ${n}`).join(", ") || "none dropped"}; ${unioned.length} with the basis joined)`);
     save();
-    return { examples, rejects, labelManifest: lm };
+    return { examples, rejects, labelManifest: lm, seatModel: modelOf };
   }
 
   // ------------------------------------------------------------------------------------------------ the tests, the join, the export, the models
@@ -679,8 +719,17 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     const testsDir = join(out, "tests");
     mkdirSync(testsDir, { recursive: true });
     const requestsOf = new Set<string>();
+    // A test's line says where it is from, for a score by pilot, seat model and profile: the pilot's folder, the model
+    // its seat ran on, and the profile its town was generated from (the pilot's batch.json, where it says).
+    const logRuns = m.sources.filter((s) => s.logs.length).map((s) => ({ run: inRuns(s.logs[0]!), pilot: basename(s.path), profile: read<any>(join(s.path, "batch.json"))?.spec?.profile as unknown }));
+    const seatModels = new Map<string, string>([...(results["train"]?.seatModel ?? []), ...(results["test"]?.seatModel ?? [])]);
+    const placed = (e: Example) => {
+      const run = logRuns.filter((r) => (e.source ?? e.id).startsWith(`${r.run}/`)).sort((a, b) => b.run.length - a.run.length)[0];
+      const model = seatModels.get(e.source) ?? (e.written_by?.endsWith(" (seat)") ? e.written_by.slice(0, -7) : undefined);
+      return { ...e, ...(run ? { pilot: run.pilot } : {}), ...(model ? { seat_model: model } : {}), ...(typeof run?.profile === "string" ? { profile: run.profile } : {}) };
+    };
     const note = (name: string, file: string, xs: Example[]) => {
-      put(join(testsDir, file), lines(xs));
+      put(join(testsDir, file), lines(xs.map(placed)));
       m.tests[name] = { file: join(testsDir, file), examples: xs.length, by_function: count(xs.map(functionOf)) };
       for (const e of xs) requestsOf.add(e.request.trim());
     };
@@ -714,8 +763,9 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     const newTrain = candidates.filter((e) => !heldIds.has(e.id) && !dropIds.has(e.id));
 
     // The standing set, less anything of a test-only pilot (its examples, by run) or in a test's words.
-    const testRuns = m.sources.filter((s) => s.test && s.logs.length).map((s) => runName(s.logs[0]!));
-    const ofTestRun = (e: { id: string; source?: string }) => testRuns.some((r) => (e.source ?? "").startsWith(`${r}/`) || e.id.startsWith(`${r}/`));
+    // (An example names its run from the runs folder on, with `runs/` before it or, as the pilots' own requests do, without.)
+    const testRuns = m.sources.filter((s) => s.test && s.logs.length).map((s) => inRuns(s.logs[0]!));
+    const ofTestRun = (e: { id: string; source?: string }) => testRuns.some((r) => [e.source ?? "", e.id].some((x) => x.startsWith(`${r}/`) || x.startsWith(`runs/${r}/`)));
     const stand = (name: string): any[] => (cfg.standing && existsSync(join(cfg.standing, name)) ? jsonl<any>(join(cfg.standing, name)) : []);
     const standing = { train: stand("train.jsonl"), validation: stand("validation.jsonl"), real: stand("validation-real.jsonl") };
     let droppedRun = 0, droppedWords = 0;
@@ -762,8 +812,34 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
     if (missing.length) {
       say(`train: ${missing.map((r) => r.name).join(", ")} on a rented GPU`);
       const env = { ...process.env, OIKOS_POD_STATE: join(out, "pod"), OIKOS_POD_MODELS: models, OIKOS_REPO: REPO, ...(cfg.deadlineHours ? { SECONDS_LIMIT: String(Math.round(cfg.deadlineHours * 3600)) } : {}) };
-      const p = Bun.spawnSync(["zsh", join(REPO, "translator/model/pod/pod.sh"), "run", data, ...missing.map((r) => `${r.name}:${r.encoder}:${r.seed}${cfg.trainExtra?.length ? `:${cfg.trainExtra.join(" ")}` : ""}`)], { cwd: REPO, env, stdout: "inherit", stderr: "inherit" });
-      if (p.exitCode !== 0) throw new Stopped("training", `pod.sh run ended with ${p.exitCode}; the runs already home are kept, and the same command goes on`);
+      const code = hooks.pod
+        ? hooks.pod({ data, runs: missing, models, state: join(out, "pod") })
+        : Bun.spawnSync(["zsh", join(REPO, "translator/model/pod/pod.sh"), "run", data, ...missing.map((r) => `${r.name}:${r.encoder}:${r.seed}${cfg.trainExtra?.length ? `:${cfg.trainExtra.join(" ")}` : ""}`)], { cwd: REPO, env, stdout: "inherit", stderr: "inherit" }).exitCode;
+      // (The pod script ends its pod on every way out, and says in <out>/pod/pod.log what the provider then lists.)
+      if (code !== 0) throw new Stopped("training", `pod.sh run ended with ${code}${code === 5 ? " (THE POD COULD NOT BE CONFIRMED ENDED: look at once)" : ""}; the runs already home are kept, and the same command goes on`);
+    }
+    // Each run on the test sets made here (the test-only pilots' requests, and the real requests held back), scored on
+    // this machine: `oikos translator-eval --model decide/NAME --only-sets --set FILE` does the same by hand.
+    const sets = Object.entries(m.tests).filter(([, t]) => t.examples > 0);
+    for (const r of sets.length ? runs : []) {
+      if (!existsSync(join(models, r.name, "report.json"))) continue;
+      const file = join(models, r.name, "eval-sets.json");
+      const setsFp = fp(sets.map(([name, t]) => [name, sha(readFileSync(t.file, "utf8"))]), TRANSLATOR_VERSION);
+      let scored = read<{ fp: string; sets: { [name: string]: SetReport } }>(file);
+      if (scored?.fp !== setsFp) {
+        if (scored) setAside(file, "stale");
+        const a = hooks.adapter ? hooks.adapter(`decide/${r.name}`) : { adapter: new DecideAdapter(r.name, { dir: join(models, r.name) }), prices: { [`decide/${r.name}`]: { input: 0, output: 0, cache_read: 0, cache_write: 0 } } };
+        scored = { fp: setsFp, sets: {} };
+        try {
+          for (const [name, t] of sets) scored.sets[name] = await evaluateSet(a.adapter, loadSet(t.file), { name, file: t.file, prices: a.prices });
+        } finally {
+          (a.adapter as { close?: () => void }).close?.();
+        }
+        putJson(file, scored);
+      }
+      (m.test_scores ??= {})[r.name] = Object.fromEntries(Object.entries(scored.sets).map(([name, s]) => [name, { all: s.all, by: s.by, forms_not_as_written: s.forms_not_as_written, currency_not_given: s.currency_not_given }]));
+      for (const [name, s] of Object.entries(scored.sets)) say(`${r.name} on "${name}": ${s.all.passed}/${s.all.of} right, ${s.all.no_draft} no draft, ${s.all.wrong_draft} wrong drafts`);
+      save();
     }
     for (const r of runs) {
       const report = read<any>(join(models, r.name, "report.json"));
@@ -801,6 +877,10 @@ export function plainReport(m: Manifest): string {
   for (const [n, t] of Object.entries(m.tests)) L.push(`  test set "${n}": ${t.examples} examples (${t.file})`);
   if (m.data) L.push(`  data: ${m.data.data}`);
   for (const [n, r] of Object.entries(m.runs)) L.push(`  run ${n}: ${r.validation ? `validation ${r.validation[0]}/${r.validation[1]}` : "no report yet"}${r.real_requests ? `; ${r.real_requests.replace(/ on decide[^:]*:/, ":").replace(/Cost.*/, "").trim()}` : ""}`);
+  for (const [run, by] of Object.entries(m.test_scores ?? {})) for (const [name, s] of Object.entries(by)) {
+    L.push(`  run ${run} on "${name}": ${s.all.passed}/${s.all.of} right, ${s.all.no_draft} no draft, ${s.all.wrong_draft} wrong drafts`);
+    for (const d of ["pilot", "seat_model", "profile", "currency"]) if (s.by[d] && Object.keys(s.by[d]!).length > 1) L.push(`    by ${d.replace("_", " ")}: ${Object.entries(s.by[d]!).map(([v, t]) => `${v} ${t.passed}/${t.of}`).join(", ")}`);
+  }
   L.push(`Cost: ${usd(m.usage.total)} in ${m.usage.total.calls} calls (${m.usage.total.input_tokens} input tokens, ${m.usage.total.output_tokens} output)${Object.keys(m.usage.by_model).length > 1 ? `; ${Object.entries(m.usage.by_model).map(([k, u]) => `${k} ${usd(u)}`).join(", ")}` : ""}`);
   return L.join("\n");
 }

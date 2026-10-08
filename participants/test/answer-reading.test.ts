@@ -129,3 +129,38 @@ test("Codex CLI: a use's input that is not exactly an object is unread, not repa
   const words = await run("I do it.");
   expect(words.content).toEqual([{ type: "text", text: "I do it.", unread: expect.any(String) }]);
 });
+
+test("an answer asked for as one object of the caller's own shape: the schema is the caller's, and the object comes back as it is, with no string of JSON inside it to escape", async () => {
+  const schema = { type: "object", additionalProperties: false, required: ["answers"], properties: { answers: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "program"], properties: { id: { type: "string" }, program: { type: "string" } } } } } };
+  const ask: LlmRequest = { purpose: "consult", subject: "reader", system: "You translate.", maxTokens: 500, messages: [{ role: "user", content: "Two requests." }], answer: { name: "hand_in", schema }, tools: [{ name: "hand_in", description: "Hand it in.", input_schema: schema }] };
+  const object = { answers: [{ id: "a", program: 'message(to="the clerk", text="say \\"yes\\"")' }, { id: "b", program: "none(unclear)" }] };
+  // Claude Code: the caller's schema, no tools described, the structured output as the use's input.
+  let claude: { args: string[]; system: string } | undefined;
+  const result = (extra: object) => JSON.stringify({ type: "result", is_error: false, result: "", usage: { input_tokens: 1, output_tokens: 2 }, ...extra });
+  const c = await new ClaudeCodeAdapter("claude-sonnet-5-5", async (args) => {
+    claude = { args, system: await Bun.file(args[args.indexOf("--system-prompt-file") + 1]!).text() };
+    return { code: 0, stderr: "", stdout: result({ structured_output: object }) };
+  }).complete(ask);
+  expect(JSON.parse(claude!.args[claude!.args.indexOf("--json-schema") + 1]!)).toEqual(schema);
+  expect(claude!.system).toContain("Give your answer in the structured output asked for");
+  expect(claude!.system).not.toContain("=== Tools you can use ===");
+  expect(c.content).toEqual([{ type: "tool_use", id: "claude-code-1", name: "hand_in", input: object }]);
+  // What is not an object is unread, and (not a seat's answer) asked for again.
+  let tries = 0;
+  const bad = await new ClaudeCodeAdapter("claude-sonnet-5-5", async () => (tries++, { code: 0, stderr: "", stdout: result({ result: "Here are my answers." }) }), { attempts: 2 }).complete(ask).catch((e) => e);
+  expect(tries).toBe(2);
+  expect(bad.content).toEqual([{ type: "text", text: "Here are my answers.", unread: "it wasn't in the form asked for" }]);
+  // The Codex CLI: the same schema as its output schema, the last message as the object.
+  let codexSchema: unknown, prompt = "";
+  const x = await new CodexCliAdapter("gpt-test", async (args, stdin) => {
+    const { readFileSync, writeFileSync } = await import("node:fs");
+    codexSchema = JSON.parse(readFileSync(args[args.indexOf("--output-schema") + 1]!, "utf8"));
+    prompt = stdin;
+    writeFileSync(args[args.indexOf("--output-last-message") + 1]!, JSON.stringify(object));
+    return { code: 0, stdout: "", stderr: "" };
+  }).complete(ask);
+  expect(codexSchema).toEqual(schema);
+  expect(prompt).toContain("Answer only with the JSON object the output schema asks for.");
+  expect(prompt).not.toContain("=== Tools you can use ===");
+  expect(x.content).toEqual([{ type: "tool_use", id: "codex-1", name: "hand_in", input: object }]);
+});

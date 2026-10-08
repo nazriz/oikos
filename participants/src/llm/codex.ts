@@ -110,7 +110,8 @@ export function transcript(messages: LlmMessage[]): string {
 
 /** Everything Codex is given: our instructions, the tools, the conversation so far, and how to answer. */
 export function codexPrompt(req: LlmRequest): string {
-  const tools = (req.tools ?? []).map((t) => `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.input_schema)}`).join("\n");
+  // (An answer asked for as one object of a shape of the caller's own: no tools to describe.)
+  const tools = req.answer ? "" : (req.tools ?? []).map((t) => `- ${t.name}: ${t.description}\n  input schema: ${JSON.stringify(t.input_schema)}`).join("\n");
   return [
     "Do not run commands or edit files. Answer only with the JSON the output schema asks for.",
     "",
@@ -122,7 +123,7 @@ export function codexPrompt(req: LlmRequest): string {
     transcript(req.messages),
     "",
     // (How many tools an answer may use is the instructions' to say: a participant's say several, the translator's one.)
-    tools ? "=== Your answer ===\nGive the tool you use in `tool`, with its input as a JSON object in input_json. If you use more than one tool in this answer, as your instructions allow, the first goes in `tool` and every other one in `also`, each with its own input_json, in the order they're to be carried out. With only the one, leave `also` empty." : "=== Your answer ===\nAnswer in text.",
+    req.answer ? "=== Your answer ===\nAnswer only with the JSON object the output schema asks for." : tools ? "=== Your answer ===\nGive the tool you use in `tool`, with its input as a JSON object in input_json. If you use more than one tool in this answer, as your instructions allow, the first goes in `tool` and every other one in `also`, each with its own input_json, in the order they're to be carried out. With only the one, leave `also` empty." : "=== Your answer ===\nAnswer in text.",
   ].join("\n");
 }
 
@@ -148,7 +149,7 @@ export class CodexCliAdapter implements LlmAdapter {
     try {
       const schema = join(dir, "schema.json");
       const last = join(dir, "answer.json");
-      writeFileSync(schema, JSON.stringify(answerSchema((req.tools ?? []).map((t) => t.name))));
+      writeFileSync(schema, JSON.stringify(req.answer ? req.answer.schema : answerSchema((req.tools ?? []).map((t) => t.name))));
       const args = ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--sandbox", "read-only",
         ...(this.model !== "default" ? ["-m", this.model.split("@")[0]!] : []), ...(this.effort ? ["-c", `model_reasoning_effort="${this.effort}"`] : []), "--output-schema", schema, "--output-last-message", last, "-"];
       const timeoutMs = this.o.timeoutMs ?? 180_000;
@@ -187,7 +188,18 @@ export class CodexCliAdapter implements LlmAdapter {
       } catch {
         // (not the object: its text as it came)
       }
-      const content = names.length ? readAnswerText(said, names, nextId) : [{ type: "text" as const, text: words.slice(0, 4000) }];
+      // (The caller's own shape: the object as it came, as one use of the name given.)
+      let object: unknown;
+      if (req.answer) {
+        try {
+          object = JSON.parse(said);
+        } catch {
+          object = undefined;
+        }
+      }
+      const content: ContentBlock[] = req.answer
+        ? object && typeof object === "object" && !Array.isArray(object) ? [{ type: "tool_use", id: nextId(), name: req.answer.name, input: object }] : [{ type: "text", text: said.slice(0, 4000), unread: "it wasn't in the form asked for" }]
+        : names.length ? readAnswerText(said, names, nextId) : [{ type: "text" as const, text: words.slice(0, 4000) }];
       return { content, usage };
     } finally {
       rmSync(dir, { recursive: true, force: true });
