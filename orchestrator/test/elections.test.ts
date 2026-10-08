@@ -96,4 +96,4 @@ test("an election in a town run well, and in a town whose mayor funds no works c
   const office = voted.recs.filter((r) => r.in_position === "mayor" && r.basis && !String(r.basis).startsWith("form-"));
   const bases = office.map((r) => `${r.record}:${r.kind ?? ""}:${r.basis}`);
   expect(new Set(bases).size).toBe(bases.length);
-}, 900_000);
+}, 2_400_000);

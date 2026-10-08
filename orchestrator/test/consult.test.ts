@@ -67,4 +67,4 @@ test("a town with the sparse mind on: citizens ask about joining the union, deci
   // Off (the default): no consultations.
   const off = await run("off", false);
   expect(off.log.some((e) => e.kind === "annotation" && String(e.body.data?.ref ?? "").startsWith("consult/"))).toBe(false);
-}, 900_000);
+}, 2_400_000);

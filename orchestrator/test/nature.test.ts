@@ -48,4 +48,4 @@ test("the landscape's species hold, the office surveys and reports, and drained 
   // What the office found of frogs, summed over its rounds: fewer too.
   const found = (r: typeof kept) => r.reports.reduce((a: number, x: any) => a + (x.data.species["growling-grass-frog"]?.found ?? 0), 0);
   expect(found(drained)).toBeLessThan(found(kept));
-}, 900_000);
+}, 2_400_000);

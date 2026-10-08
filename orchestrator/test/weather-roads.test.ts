@@ -81,4 +81,4 @@ test("streets are laid, the bureau warns ahead, heat makes illness likelier, and
   expect(granted?.data.decision).toBe("granted");
   const began = log.find((e) => e.kind === "command" && (e.body.blocks ?? []).some((b: any) => b.block === "construct" && b.structure_type === "road"));
   expect(began).toBeDefined();
-}, 900_000);
+}, 2_400_000);

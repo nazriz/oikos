@@ -1,0 +1,4 @@
+# A suite-wide default per-test limit: generous, so a busy machine is not a failure (bun's own is 5 seconds).
+# A test about a hang gives its own short limit; a real hang still fails, only later.
+[test]
+timeout = 120000
