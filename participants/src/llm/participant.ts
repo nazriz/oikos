@@ -60,6 +60,10 @@ export interface LlmParticipantConfig {
   /** Who someone is in the world, by any id of theirs (render.ts, `WhoIs`): how a letter's writer and a paper's author
    * are named to the seat, and what a participant's own id (the platform's, which no seat is shown) is put as. */
   whoIs?: WhoIs;
+  /** The staff of its own office, where the office employs any: its posts, who is in each, which are vacant, as it
+   * stands at a time, in words (behaviour/roster.ts, from the office's own papers). Set out at its first sitting and
+   * at any sitting where it has changed since it was last set out. */
+  staff?: { text(t: number): string };
   /** The most one prompt may come to, in characters (the system prompt and everything shown): `PROMPT_MAX` unless set. */
   promptMax?: number;
 }
@@ -476,6 +480,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   let mail = false; // someone wrote, in something it hasn't been shown yet
   const seenSystems = new Set<string>();
   let standingText = "";
+  // Its office's staff as last set out for it, and as they stand at the sitting under way.
+  let staffShown: string | undefined;
+  let staffNow: string | undefined;
   const DAYS = 86_400;
   const S = c.sessions;
   const sittingStart = (day: number) => day * DAYS + (S?.start ?? 0);
@@ -864,7 +871,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         } else {
           const since = sinceLast(now);
           if (since.left) await note({ carried_not_shown: { reports: since.left, of: since.of, limit_characters: CARRY_MAX } });
-          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}` }];
+          // Its own office's staff, at its first sitting and whenever the list has changed since it was last set out.
+          staffNow = c.staff ? inWorld(c.staff.text(obs.t)) : undefined;
+          const staffPart = staffNow !== undefined && staffNow !== staffShown ? `\n\n${staffNow}` : "";
+          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}${staffPart}` }];
         }
 
         let res: Awaited<ReturnType<typeof callModel>>;
@@ -984,6 +994,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // Answered: it has now seen all of it. (A day it sat, whatever it did: its record of the run says from when to when.)
         [tally.first, tally.last] = [tally.first < 0 ? obs.t : tally.first, obs.t];
         messages = [...sending, { role: "assistant", content: res.content }];
+        if (fresh && staffNow !== undefined) staffShown = staffNow;
         carried = [];
         missed = [];
         unsaid = unreadTwice ? [`When you were last here, ${unreadTwice}.`] : [];

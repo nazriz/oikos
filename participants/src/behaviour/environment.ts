@@ -20,6 +20,7 @@ export const environment: BehaviourModule = {
   name: "city.environment",
   issues: [P.JOB_ADVERTISEMENT, ...P.ENVIRONMENT],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "environmental scientist", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), planning: p.planning }),
+  staffed: (p) => ({ role: p.role ?? "environmental scientist", own: "role", posts: { budget_line: p.staff_line ?? "environment", wage: p.wage ?? 0, period: p.period ?? 14 * DAY } }),
   takes: [staffingForm("environment_staffing", "the environment office", "environmental scientists")],
   version: "0.4.0", // 0.4.0: takes a written direction on its staffing (docs/behaviour/directions.md); 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
   doc: "docs/behaviour/environment.md",

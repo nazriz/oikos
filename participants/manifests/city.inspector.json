@@ -90,6 +90,7 @@
     {
       "form": "valuation_request",
       "title": "Request to the valuer for a supplementary valuation",
+      "does": "Asks the valuer to value a lot again after building work, so that its rates follow what now stands on it.",
       "fields": {
         "notice": {
           "type": "record",
@@ -131,6 +132,7 @@
     {
       "form": "demolition_order",
       "title": "Order to demolish a building",
+      "does": "Orders an owner to take down a building put up in breach of a law.",
       "fields": {
         "owner": {
           "type": "entity",

@@ -51,6 +51,9 @@ export class Knowledge {
   private readonly claimIds = new Set<string>();
   entity = "";
   t = 0;
+  /** The staff of the office the participant holds, where the office employs any (the run keeps it from the office's
+   * own papers): what they are called and how many are in post. A draft's preview says when work is ordered of nobody. */
+  ownStaff?: { role: string; inPost: number };
 
   absorb(obs: Observation): void {
     this.entity = obs.entity;
