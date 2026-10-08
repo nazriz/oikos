@@ -1,6 +1,6 @@
 {
   "name": "firm.builder",
-  "version": "0.12.1",
+  "version": "0.12.3",
   "doc": "docs/behaviour/institutions.md",
   "params": {
     "build_markup_bps": {
@@ -9,6 +9,21 @@
       },
       "unit": "bps",
       "default": 2000,
+      "source": "placeholder"
+    },
+    "casual_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "day_wage": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
       "source": "placeholder"
     },
     "horizon_days": {
@@ -95,6 +110,14 @@
     "register": {
       "schema": {},
       "default": null,
+      "source": "placeholder"
+    },
+    "registered_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
       "source": "placeholder"
     },
     "sites": {
