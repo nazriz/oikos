@@ -3015,6 +3015,13 @@ See the design note, §16.
   - **Not verified:** what the Codex CLI prints while limited and hanging (no model was called); whether those three calls were a limit or a slow model (planning answered between them, which points to slow).
   - **Revisit if** missed sittings cluster on long prompts (then the time limit per call is the thing to raise), or a wave shows runs stopping as unreachable and resuming into the same wall (then wait longer between tries).
 
+- **Offices run by code word a sum as money, and a form's length of time in hours and minutes** (2026-10-09; `participants/src/behaviour/firms.ts`, `union.ts`, `institutions.ts`, `bank.ts`, `government.ts`; `participants/src/forms.ts` and `kernel/crates/resolver/src/resolve.rs`).
+  - **What changed.** Fourteen places wrote a sum at run time counted in the currency's smallest unit by its name ("161500 cents"): job advertisements and employment agreements, leases, renewals and listings, the landlord's rent report, the builder's invoice, the bank's two notes of a payment not made, the union's offer, acceptance and membership, the tax office's overdue notice. They write it as the place writes its money. A form's length of time that is not whole days read "3600 seconds"; it reads "1 hour", "1 hour 30 minutes", "45 minutes" in both resolvers, seconds only where nothing rounder fits. Nothing reads a sum back out of these words (the bank's note is recognised by its shape, not its figure).
+  - **The state hash moves, and only for this.** A record's words are part of the state. The 1,000-person month of seed 1 with no mock seat ends at 8a5441ddc8a1408a (main at f6ac4ee, and this branch one commit earlier: 5be63866badc311a), with the same 166,784 commands and 130 refused.
+  - **Left:** the bank's own report still writes a standing payment's period in seconds where it is not whole days; `inSmallest` stays in `money.ts`, unused by any module.
+  - **Not verified:** `bun run test:all` (the merge's); towns other than the first profile's.
+  - **Revisit if** a place wants a posted figure in its smallest unit (then it is the profile's to say, not the module's).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.
