@@ -10,7 +10,8 @@ For a session starting cold: on a new machine, in the cloud, after a break. Read
   for two full simulated years; three seats at once (mayor, planning, finance) for the first 59 and 39 days of two
   more. A model seat takes several actions an answer and keeps office hours; a round's translations run at once; any
   office can be handed to a model (`model_seats`).
-- **Tests:** 441, about 8 minutes in parallel (`bun run test:all`); 16 seconds for the quick tier (`bun run test:fast`).
+- **Tests:** 653, about 7 minutes in parallel on a quiet machine (`bun run test:all`, once per merge); the quick tier in
+  under half a minute (`bun run test:fast`); on a branch, `bun run test:changed` (docs/dev-machine.md).
 
 ## Where things run
 - **The run server is set up**: a Mac mini (always on, M4 Pro, 14 cores, 64 GB, about 620 GB free), host

@@ -179,7 +179,9 @@ if (import.meta.main) {
   const weight = w === "half" ? Math.ceil(availableParallelism() / 2) : Number(w);
   const cmd = args;
   const slot = await take(weight, opt("what") ?? cmd.join(" ").slice(0, 80));
-  const child = Bun.spawn(cmd, { stdin: "inherit", stdout: "inherit", stderr: "inherit", env: insideSlot(weight) });
+  // (A build given K tokens compiles K at a time: cargo's own default is every core, whatever else is running.)
+  const env = { ...insideSlot(weight), ...(slot?.weight && slot.weight > 1 && !process.env.CARGO_BUILD_JOBS ? { CARGO_BUILD_JOBS: String(slot.weight) } : {}) };
+  const child = Bun.spawn(cmd, { stdin: "inherit", stdout: "inherit", stderr: "inherit", env });
   for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const) process.on(sig, () => child.kill(sig));
   const code = await child.exited;
   slot?.release();

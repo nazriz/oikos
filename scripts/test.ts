@@ -19,7 +19,7 @@ import { Glob } from "bun";
 import { cpus, loadavg } from "node:os";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { realpathSync, utimesSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import { insideSlot, take } from "./slots";
 
 const repo = join(import.meta.dir, "..");
@@ -70,14 +70,17 @@ function preconditions() {
   const kernel = process.env.OIKOS_KERNEL ?? join(repo, "kernel/target/release/oikos-kernel");
   const wasm = process.env.OIKOS_LAW_MODULE ?? join(repo, "kernel/target/wasm32-unknown-unknown/release/oikos_law.wasm");
   const src = newest(join(repo, "kernel"));
-  const stale = () => [kernel, wasm].filter((p) => !existsSync(p) || statSync(p).mtimeMs < src.t);
-  if (!stale().length) return;
+  // Current: both are there, and something was built since the newest source changed. (Cargo leaves alone an artefact
+  // the changed file is no part of, so each is not asked to be newer by itself; the stamp records a build made here
+  // that cargo found nothing to do in.)
+  const stamp = join(repo, "kernel/target/.oikos-built");
+  const built = () => Math.max(...[kernel, wasm, stamp].map((p) => statSync(p, { throwIfNoEntry: false })?.mtimeMs ?? 0));
+  const stale = () => [kernel, wasm].some((p) => !existsSync(p)) || built() < src.t;
+  if (!stale()) return;
   if (noBuild) stop(`the kernel binary or the law wasm module is missing or older than ${src.f.replace(repo + "/", "")}: run \`bun run kernel\``);
   console.log("building the kernel and the law module (bun run kernel)...");
   if (!run(["bun", "run", "kernel"], repo) || [kernel, wasm].some((p) => !existsSync(p))) stop("`bun run kernel` did not produce a kernel binary and law wasm module: run it and read its errors");
-  // (Cargo is the judge of what is current: it leaves alone an artefact that the changed file is no part of, which
-  // then still looks older than the sources. Dated now, so that the question is not asked again.)
-  for (const p of stale()) utimesSync(p, new Date(), new Date());
+  if (!process.env.OIKOS_KERNEL && !process.env.OIKOS_LAW_MODULE) writeFileSync(stamp, "");
 }
 if (!custom) preconditions();
 
@@ -163,7 +166,7 @@ const t0 = performance.now();
 let failed = 0;
 if (!filters.length && !custom && !timeNew && (!pick || pick.kernel)) {
   const slot = await take(Math.ceil(cores / 2), "the kernel's tests (cargo test)");
-  const k = Bun.spawn(["cargo", "test", "--release", "--manifest-path", "kernel/Cargo.toml", "--workspace", "-q"], { cwd: repo, stdout: "pipe", stderr: "pipe", env: insideSlot(Math.ceil(cores / 2)) });
+  const k = Bun.spawn(["cargo", "test", "--release", "--manifest-path", "kernel/Cargo.toml", "--workspace", "-q"], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...insideSlot(Math.ceil(cores / 2)), ...(slot?.weight ? { CARGO_BUILD_JOBS: String(slot.weight) } : {}) } });
   children.add(k);
   const out = (await Promise.all([new Response(k.stdout).text(), new Response(k.stderr).text()])).join("");
   const ok = (await k.exited) === 0;
