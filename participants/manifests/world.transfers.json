@@ -1,16 +1,16 @@
 {
   "name": "world.transfers",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "doc": "docs/behaviour/boundary.md",
   "params": {
     "account": {
       "schema": {
         "type": "string",
-        "description": "the outside's account it pays from and is paid into (the world must say)"
+        "description": "the account it pays from where a payment names none (the world must say)"
       },
       "default": "",
       "required": true,
-      "source": "the outside's account it pays from and is paid into (the world must say)"
+      "source": "the account it pays from where a payment names none (the world must say)"
     },
     "payments": {
       "schema": {

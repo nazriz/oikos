@@ -505,6 +505,16 @@
       "default": 7,
       "source": "Lengnick 2013, Table 1: sellers a household deals with (7): how many it looks up, knowing none"
     },
+    "stop_work_curve": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
+    "stops_work_at": {
+      "schema": {},
+      "default": null,
+      "source": "placeholder"
+    },
     "strike_vote_yes_bps": {
       "schema": {
         "type": "integer"
