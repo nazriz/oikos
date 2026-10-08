@@ -19,7 +19,7 @@ import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
-import { because, between, Book, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, structureOf, withdraw, type Step } from "./common";
+import { because, between, Book, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -90,7 +90,7 @@ export function receipts(obs: Observation, account: string): Map<string, number>
 
 export const landlord: BehaviourModule = {
   name: "firm.landlord",
-  version: "0.13.0",
+  version: "0.13.1",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -313,11 +313,14 @@ export const landlord: BehaviourModule = {
       }
 
       // A tenant has died. Seen in our own buildings (someone leaving a home because they died): report it, if nobody
-      // has. Once registered: give notice on their lease, as it allows (the household may apply for a home again).
+      // has, and only where nobody else lives: the home empty, and nobody in or out of it for a day (those who share a
+      // home report a death themselves, and say who the family is, which we can't; docs/behaviour/deaths.md). Once
+      // registered: give notice on their lease, as it allows (the household may apply for a home again).
       const registered = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
       const tenants = new Map(active.map((a) => [tenantOf(a) as string, a]));
       for (const site of sites) for (const sp of site.structure?.spaces ?? []) for (const l of sp.left ?? []) {
         if (l.reason !== "died" || !tenants.has(l.occupant) || registered.has(l.occupant) || handled.has(`died-${l.occupant}`)) continue;
+        if (!stoodEmpty(sp, t)) continue;
         handled.add(`died-${l.occupant}`);
         steps.push(because(`Our tenant ${l.occupant} has died in ${sp.space}: reporting it to the registry.`, say("death_notification", `${l.occupant}, our tenant at ${sp.space}, has died.`, { to: [p.city], data: { deceased: l.occupant } })));
       }

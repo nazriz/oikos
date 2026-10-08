@@ -1,0 +1,67 @@
+{
+  "name": "fund.retirement",
+  "version": "0.1.0",
+  "doc": "docs/behaviour/firm-ownership.md",
+  "params": {
+    "access_age": {
+      "schema": {
+        "description": "the age from which a member is paid (the world must say)"
+      },
+      "default": null,
+      "required": true,
+      "source": "the age from which a member is paid (the world must say)"
+    },
+    "administrator_account": {
+      "schema": {
+        "type": "string",
+        "description": "where its costs are paid: its administrator's account (the world must say)"
+      },
+      "default": "",
+      "required": true,
+      "source": "where its costs are paid: its administrator's account (the world must say)"
+    },
+    "cost_bps_of_income": {
+      "schema": {
+        "type": "integer",
+        "description": "none unless the world says"
+      },
+      "default": 0,
+      "source": "placeholder"
+    },
+    "drawdown_bps_by_age": {
+      "schema": {
+        "type": "array",
+        "description": "none unless the world says: only what comes in is paid"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
+    "pay_every_days": {
+      "schema": {
+        "type": "integer",
+        "description": "placeholder"
+      },
+      "unit": "days",
+      "default": 30,
+      "source": "placeholder"
+    },
+    "report_every_days": {
+      "schema": {
+        "type": "integer",
+        "description": "never unless the world says"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
+    "year": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 31536000,
+      "source": "placeholder"
+    }
+  },
+  "perceives": [],
+  "state": "none"
+}

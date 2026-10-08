@@ -42,7 +42,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.24.0";
+export const GENERATOR_VERSION = "0.26.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -61,6 +61,9 @@ export interface TownSpec {
   factories: number;
   landlords: number;
   hall_capacity?: number; // the town hall's hall: how many a gathering can hold (default 200)
+  /** A retirement fund holding part of the town's widely held firms for its members (docs/behaviour/firm-ownership.md).
+   * Off unless a world asks for it; its figures are the profile's (retirement_fund), which must then have them. */
+  retirement_fund?: boolean;
   /** Nature around the town (the profile's `nature`: docs/design/world-expansion.md 2). Default: where the profile
    * describes it; false: none. */
   nature?: boolean;
@@ -731,32 +734,103 @@ export function generate(spec: TownSpec): any {
   }
 
   // ---- firms: their opening stock (a factory's month of inputs for the staff it has, and some goods; a shop's half month
-  // of goods) and their shareholders. Ownership is concentrated as wealth is: households ranked by savings into fifths,
-  // each fifth holding the profile's share of the town's part of every firm (evenly within it: its leaseholders), and
-  // part of each firm held from outside the town (the profile's share, by kind of firm).
+  // of goods) and who owns them (docs/behaviour/firm-ownership.md; every figure is the profile's). Each firm is held in
+  // one of three ways: closely (by one household or a few, its owners), from outside the town, or widely (part from
+  // outside; the town's part by the few households that hold shares directly and, in a world that asks for one, by a
+  // retirement fund for its members).
   const factoryStock: any[] = [];
+  const FO = V.firm_ownership;
   const balanceOf = new Map(accounts.map((a) => [a.holder, a.balance as number]));
   const ranked = households.map((h) => ({ h, wealth: h.members.reduce((x, m) => x + (balanceOf.get(m.id) ?? 0), 0) })).sort((a, b) => a.wealth - b.wealth || (a.h.leaseholder < b.h.leaseholder ? -1 : 1));
-  const local: { holder: string; account: string; shares: number }[] = [];
-  V.wealth_quintile_shares_bps.forEach((bps, q) => {
-    const fifth = ranked.slice(Math.floor((q * ranked.length) / 5), Math.floor(((q + 1) * ranked.length) / 5));
-    for (const { h } of fifth) local.push({ holder: h.leaseholder, account: `acc-${h.leaseholder}`, shares: Math.floor((bps * 100) / fifth.length) });
-  });
-  const localShares = local.reduce((x, h) => x + h.shares, 0);
-  const holdersOf = (kind: "factory" | "shop" | "landlord") => {
-    const out = V.outside_ownership_bps[kind];
-    const outside = out >= 10_000 ? 1 : Math.floor((localShares * out) / (10_000 - out));
-    return [...local.filter((h) => h.shares > 0 && out < 10_000), ...(outside > 0 ? [{ holder: "outside", account: "acc-outside", shares: outside }] : [])];
+  const fifthOf = (i: number) => Math.min(4, Math.floor((i * 5) / ranked.length));
+  const ownerPick = rng("firm-owners");
+  type Holder = { holder: string; account: string; shares: number };
+  const UNITS = 1_000_000; // a firm's shares, in all
+  const outsideHolder = (shares: number): Holder => ({ holder: "outside", account: "acc-outside", shares });
+  const firmsByKind = { factory: factories, shop: shops, landlord: landlords };
+  // How each firm is held: of each kind, the profile's share of firms in each way (the count rounded; which ones, drawn).
+  const formOf = new Map<string, "closely_held" | "outside" | "widely_held">();
+  for (const kind of ["factory", "shop", "landlord"] as const) {
+    const f = FO.forms_bps[kind];
+    const order = firmsByKind[kind].map((id) => ({ id, u: ownerPick.below(1_000_000) })).sort((x, y) => x.u - y.u || (x.id < y.id ? -1 : 1)).map((x) => x.id);
+    const outside = Math.round((order.length * f.outside) / 10_000), widely = Math.round((order.length * f.widely_held) / 10_000);
+    order.forEach((id, i) => formOf.set(id, i < outside ? "outside" : i < outside + widely ? "widely_held" : "closely_held"));
+  }
+  const firmIds = [...factories, ...shops, ...landlords];
+  // Closely held: one household or a few (the profile's shares), in equal parts; who, drawn by the household's fifth
+  // of wealth (the profile's weights), no household owning a second business while another that could has none.
+  const canOwn = ranked.map((r, i) => ({ r, weight: FO.closely_held.owner_wealth_fifth_bps[fifthOf(i)]! })).filter((x) => x.weight > 0);
+  let free = [...canOwn];
+  const drawOwner = (not: Set<string>) => {
+    if (!free.some((x) => !not.has(x.r.h.leaseholder))) free = [...canOwn];
+    const pool = free.filter((x) => !not.has(x.r.h.leaseholder));
+    if (!pool.length) return undefined;
+    let u = ownerPick.below(pool.reduce((x, c) => x + c.weight, 0));
+    const got = pool.find((c) => (u -= c.weight) < 0) ?? pool.at(-1)!;
+    free = free.filter((x) => x !== got);
+    return got.r.h.leaseholder;
   };
+  const registers = new Map<string, Holder[]>();
+  for (const firm of firmIds) {
+    const form = formOf.get(firm)!;
+    if (form === "outside") registers.set(firm, [outsideHolder(UNITS)]);
+    if (form !== "closely_held") continue;
+    let u = ownerPick.below(FO.closely_held.households_bps.reduce((x, y) => x + y, 0));
+    const n = 1 + Math.max(0, FO.closely_held.households_bps.findIndex((b) => (u -= b) < 0));
+    const owners = new Set<string>();
+    for (let i = 0; i < n; i++) {
+      const o = drawOwner(owners);
+      if (o) owners.add(o);
+    }
+    // (A town with no household that could own it: held from outside.)
+    registers.set(firm, owners.size ? [...owners].map((o) => ({ holder: o, account: `acc-${o}`, shares: Math.floor(UNITS / owners.size) })) : [outsideHolder(UNITS)]);
+  }
+  // Widely held: the profile's part from outside; the town's part among the households that hold shares directly: each
+  // with the chance of its fifth of wealth, holding a few of the firms (the profile's range), by its wealth. A world
+  // that asks for a retirement fund (spec.retirement_fund; off otherwise) gives the fund its share of the town's part
+  // first, for its members, and the whole of it in a firm no household holds directly.
+  const widely = firmIds.filter((f) => formOf.get(f) === "widely_held");
+  const RF = spec.retirement_fund ? V.retirement_fund : undefined;
+  if (spec.retirement_fund && !RF) throw new Error(`the town asks for a retirement fund, and its profile (${P.id}) has no figures for one (retirement_fund)`);
+  const FUND = RF && widely.length ? "fund" : undefined;
+  const direct = new Map<string, { holder: string; weight: number }[]>(widely.map((f) => [f, []]));
+  if (widely.length) ranked.forEach((r, i) => {
+    if (ownerPick.below(10_000) >= FO.direct_holders.by_wealth_fifth_bps[fifthOf(i)]!) return;
+    const [lo, hi] = FO.direct_holders.firms_held;
+    const n = Math.min(widely.length, lo + ownerPick.below(hi - lo + 1));
+    const left = [...widely];
+    for (let k = 0; k < n; k++) direct.get(left.splice(ownerPick.below(left.length), 1)[0]!)!.push({ holder: r.h.leaseholder, weight: Math.max(1, Math.floor(r.wealth / n)) });
+  });
+  for (const firm of widely) {
+    const outside = Math.floor((UNITS * FO.widely_held.outside_bps) / 10_000);
+    const local = UNITS - outside;
+    const holders = direct.get(firm)!;
+    const forDirect = holders.length ? local - (FUND ? Math.floor((local * RF!.share_bps_of_local) / 10_000) : 0) : 0;
+    const weight = holders.reduce((x, h) => x + h.weight, 0);
+    const lines: Holder[] = holders.map((h) => ({ holder: h.holder, account: `acc-${h.holder}`, shares: Math.floor((forDirect * h.weight) / weight) })).filter((h) => h.shares > 0);
+    const rest = local - lines.reduce((x, h) => x + h.shares, 0);
+    // (What rounding leaves, and the town's part of a firm nobody holds directly: the fund's; with no fund, outside's.)
+    registers.set(firm, [...lines, ...(FUND && rest > 0 ? [{ holder: FUND, account: `acc-${FUND}`, shares: rest }] : []), ...(outside + (FUND ? 0 : rest) > 0 ? [outsideHolder(outside + (FUND ? 0 : rest))] : [])]);
+  }
   for (const f of factories) {
     const month = Math.floor(((staffCount.get(f) ?? 0) * WORKING_DAY * 5 * 30) / 7 / MAKE.labour);
     factoryStock.push({ kind: "inputs", holder: f, at: `${f}-works`, quantity: String(month * MAKE.inputs) }, { kind: "goods", holder: f, at: `${f}-works`, quantity: String(Math.floor(month / 4)) });
   }
   for (const s of shops) factoryStock.push({ kind: "goods", holder: s, at: `${s}-premises`, quantity: String(Math.floor(SHOP.demand / 2)) });
-  for (const [firm, kind] of [...factories.map((f) => [f, "factory"] as const), ...shops.map((x) => [x, "shop"] as const), ...landlords.map((l) => [l, "landlord"] as const)]) {
-    const holders = holdersOf(kind);
+  for (const firm of firmIds) {
+    const holders = registers.get(firm)!;
     records.push({ id: `shareholders-${firm}`, record: "statement", author: "genesis", at: 0, visible_to: [firm, ...holders.map((h) => h.holder)], speaks_for: firm, kind: "shareholders",
       text: `The shareholders of ${firm}, and their shares.`, data: { holders } });
+  }
+  // The retirement fund: its members (the profile's share of adults), each with units for the years of working life
+  // behind them (a placeholder for a balance), on the register it keeps.
+  if (FUND) {
+    entities.push({ id: FUND, kind: "retirement_fund", name: `${spec.name} Retirement Fund` });
+    accounts.push({ id: `acc-${FUND}`, holder: FUND, custodian: "bank", balance: 0 });
+    const members = everyone.filter((m) => m.adult && ownerPick.below(10_000) < RF!.member_bps)
+      .map((m) => ({ member: m.id, account: `acc-${m.id}`, born_at: m.born_at, units: Math.max(1, Math.min(ageOf(m), V.retirement_age) - 18) }));
+    records.push({ id: `members-${FUND}`, record: "statement", author: "genesis", at: 0, visible_to: [FUND], speaks_for: FUND, kind: "fund_members",
+      text: `The members of ${FUND}, and their units.`, data: { members } });
   }
 
   const opening = factories.reduce((x, f) => x + Math.floor(((staffCount.get(f) ?? 0) * WORKING_DAY * 5 * 30) / 7 / MAKE.labour), 0);
@@ -1014,9 +1088,15 @@ export function generate(spec: TownSpec): any {
     const officers = Math.max(1, Math.ceil((CR.police_per_1000 * everyone.length) / 1000));
     const stationCell = structures.find((x) => x.id === "police-station")!.at;
     accounts.push({ id: "acc-police", holder: "police", custodian: "bank", balance: 6 * CR.officer_wage_per_fortnight * officers });
-    office("police-oic", "police", "Officer in charge", "officer_in_charge", [{ id: "books", kind: "accounts" }, mine("police-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [stationCell], occupants: "names" }],
+    // (And who calls at a home nobody has been in or out of since someone died there: they look at the town's homes when
+    // they ask to, and report such a death to the registry after the time the profile says it takes to be found;
+    // docs/behaviour/deaths.md.)
+    const found = V.life.found_alone_after;
+    office("police-oic", "police", "Officer in charge", "officer_in_charge", [{ id: "books", kind: "accounts" }, mine("police-business"), deaths, lawBook, { id: "premises", kind: "sites", area: [stationCell], occupants: "names" },
+      ...(found ? [{ id: "homes", title: "The town's homes, called at", kind: "sites", area: { place: "town" }, occupants: "names", on_request: true }] : [])],
       code("police.station", { building: "police-station", workplace: "police-station/workplace.1", account: "acc-police", officers, wage: CR.officer_wage_per_fortnight, period: 14 * DAY,
-        working_day: WORKING_DAY, task_seconds: CR.investigation_hours * HOUR, tribunal: "tribunal", ...look }));
+        working_day: WORKING_DAY, task_seconds: CR.investigation_hours * HOUR, tribunal: "tribunal", ...look,
+        ...(found ? { homes_channel: "homes", registry: "city", found_after: found } : {}) }));
     office("outside-police-funding", "outside", "Police funding", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
       code("world.grants", { account: "acc-outside", to: "police", to_account: "acc-police", per_resident_per_year: Math.ceil(((CR.officer_wage_per_fortnight * officers * 365) / 14) / Math.max(1, homes.length)) }));
   }
@@ -1185,6 +1265,12 @@ export function generate(spec: TownSpec): any {
       pension: { ...V.support.pension },
       unemployment: { ...V.support.unemployment, to_age: V.retirement_age - 1 },
     } }));
+  // The retirement fund's trustee (docs/behaviour/firm-ownership.md): takes in what the fund's holdings pay, pays its
+  // costs (its administrator is outside the town), and pays its retired members their pensions.
+  if (FUND) office("fund-trustee", FUND, "Trustee", undefined,
+    [{ id: "ledger", kind: "accounts" }, mine("register"), { id: "gone", kind: "records", match: { statement_kinds: ["death_registration", "departure"] } }],
+    code("fund.retirement", { administrator_account: "acc-outside", cost_bps_of_income: RF!.cost_bps_of_income, pay_every_days: RF!.pension_every_days,
+      access_age: V.retirement_age, drawdown_bps_by_age: RF!.drawdown_bps_by_age, report_every_days: 365 }));
 
   // Offices handed to a language model (spec.model_seats): the same office, its channels and its role's module; the
   // model in place of the code, told honestly what it is, keeping office hours where the world has working hours.

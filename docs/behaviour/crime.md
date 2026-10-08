@@ -22,6 +22,7 @@ any group, only to circumstances: need, opportunity, and the chance of being cau
 | **Offending** | In need (less than a month's essentials) and at work where the employer keeps goods: the month's chance of taking some (`take_bps`, 2%), less as the chance of being caught they reckon (`caught_bps`, 30%) is higher. They take a few (5) and bring them home. | Becker (1968); Cohen and Felson (1979). Placeholders, deliberately rare |
 | **Noticing** | Shops: a monthly stocktake. What's there against the books (last count, what came, what was served); short, reported to the police with its value. | Ordinary retail practice |
 | **The police** | The state's, paid by a grant from outside: `police_per_1000` (2.3) officers. They take reports and investigate each (4 hours of an officer's day). Found: a charge to the tribunal, with what they found. Not found: unsolved, as most are. | Victoria Police annual report (to confirm) |
+| **Found dead at home** | The police are also who calls at a home nobody has been in or out of since someone died there, and reports the death (`police.station` v0.2.0). | [deaths.md](deaths.md) |
 | **Detection** | One investigation in five finds who (`detection_bps`). | Crime Statistics Agency Victoria (to confirm) |
 | **The tribunal** | A charge with evidence naming the respondent: proven, and an order to make good the goods' value to the shop. | docs/behaviour/justice.md |
 | **Paying** | Someone ordered to pay does, when they can keep a month's essentials. | — |

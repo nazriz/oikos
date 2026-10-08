@@ -20,3 +20,114 @@ test("generation is deterministic from the seed", () => {
   expect(JSON.stringify(generate(spec))).toBe(JSON.stringify(generate(spec)));
   expect(JSON.stringify(generate({ ...spec, seed: 2 }))).not.toBe(JSON.stringify(generate(spec)));
 });
+
+// Who owns firms (docs/behaviour/firm-ownership.md): until 2026-10-08 every household held shares in every firm.
+// A town has no retirement fund unless its description asks for one (retirement_fund: true): both are checked.
+test("a firm is held by its owners, from outside, or widely: never by every household", () => {
+  const big = Bun.YAML.parse(readFileSync(join(root, "worlds/town-1000.yaml"), "utf8")) as TownSpec;
+  for (const s of [spec, big, { ...spec, retirement_fund: true }, { ...big, retirement_fund: true }]) {
+    const config = generate(s) as any;
+    const values = JSON.parse(readFileSync(join(root, `worlds/profiles/${s.profile}.json`), "utf8")).values;
+    const profile = values.firm_ownership;
+    const withFund = s.retirement_fund === true;
+    // Nothing of a fund where none was asked for: no organisation, account, office, register or holding.
+    expect(config.world.entities.some((e: any) => e.id === "fund" || e.kind === "retirement_fund")).toBe(withFund);
+    expect(config.world.accounts.some((a: any) => a.holder === "fund")).toBe(withFund);
+    expect(config.positions.some((p: any) => p.entity === "fund")).toBe(withFund);
+    expect(config.world.records.some((r: any) => r.kind === "fund_members")).toBe(withFund);
+    expect(JSON.stringify(config).includes("fund.retirement")).toBe(withFund);
+    const registers = config.world.records.filter((r: any) => r.kind === "shareholders") as { speaks_for: string; visible_to: string[]; data: { holders: { holder: string; account: string; shares: number }[] } }[];
+    const households = config.world.records.filter((r: any) => r.kind === "household") as { data: { leaseholder: string } }[];
+    const heads = new Set(households.map((h) => h.data.leaseholder));
+    const firms = config.world.entities.filter((e: any) => ["factory", "shop", "landlord"].includes(e.kind));
+    expect(registers.length).toBe(firms.length);
+    const accounts = new Set(config.world.accounts.map((a: any) => a.id));
+    const kindOf = new Map<string, "factory" | "shop" | "landlord">(firms.map((e: any) => [e.id, e.kind]));
+    const held = { closely: 0, outside: 0, widely: 0 };
+    const owners = new Map<string, number>();
+    for (const r of registers) {
+      const holders = r.data.holders;
+      // Every share of the firm is someone's (but what dividing among equal owners leaves), each holder has an
+      // account to be paid into, and sees the register.
+      expect(holders.reduce((x, h) => x + h.shares, 0)).toBeGreaterThan(999_990);
+      expect(holders.reduce((x, h) => x + h.shares, 0)).toBeLessThanOrEqual(1_000_000);
+      expect(new Set(holders.map((h) => h.holder)).size).toBe(holders.length);
+      for (const h of holders) {
+        expect(h.shares).toBeGreaterThan(0);
+        expect(accounts.has(h.account)).toBe(true);
+        expect(r.visible_to).toContain(h.holder);
+      }
+      const people = holders.filter((h) => heads.has(h.holder));
+      const outside = holders.find((h) => h.holder === "outside")?.shares ?? 0;
+      const fund = holders.find((h) => h.holder === "fund")?.shares ?? 0;
+      if (!withFund) expect(fund).toBe(0);
+      expect(people.length + (outside ? 1 : 0) + (fund ? 1 : 0)).toBe(holders.length);
+      const forms = profile.forms_bps[kindOf.get(r.speaks_for)!];
+      if (outside === 1_000_000) {
+        // (All from outside: a firm of a kind held that way, or, with no fund, a widely held one that no household
+        // happens to hold directly.)
+        held.outside++;
+        expect(forms.outside + (withFund ? 0 : forms.widely_held)).toBeGreaterThan(0);
+      } else if (fund || outside) {
+        // Widely held: the profile's part from outside, and the rest the town's.
+        held.widely++;
+        expect(forms.widely_held).toBeGreaterThan(0);
+        const fromOutside = (1_000_000 * profile.widely_held.outside_bps) / 10_000;
+        const local = 1_000_000 - fromOutside;
+        expect(people.length).toBeGreaterThan(0);
+        if (withFund) {
+          // The fund has its share of the town's part (and what rounding leaves); direct holders the remainder.
+          expect(outside).toBe(fromOutside);
+          const fundsShare = Math.floor((local * values.retirement_fund.share_bps_of_local) / 10_000);
+          expect(fund).toBeGreaterThanOrEqual(fundsShare);
+          expect(fund).toBeLessThanOrEqual(fundsShare + people.length);
+        } else {
+          // No fund: the households that hold it directly have the town's whole part (what rounding leaves, a share
+          // or so a holder, goes with the part from outside: nothing is paid to nobody).
+          const direct = people.reduce((x, h) => x + h.shares, 0);
+          expect(direct).toBeLessThanOrEqual(local);
+          expect(direct).toBeGreaterThan(local - people.length - 1);
+          expect(outside).toBe(1_000_000 - direct);
+        }
+      } else {
+        // Closely held: one household or a few, in equal parts.
+        held.closely++;
+        expect(forms.closely_held).toBeGreaterThan(0);
+        expect(people.length).toBeGreaterThanOrEqual(1);
+        expect(people.length).toBeLessThanOrEqual(profile.closely_held.households_bps.length);
+        expect(new Set(people.map((h) => h.shares)).size).toBe(1);
+        for (const h of people) owners.set(h.holder, (owners.get(h.holder) ?? 0) + 1);
+      }
+    }
+    // Of each kind, the profile's share of firms is held from outside.
+    for (const kind of ["factory", "shop", "landlord"] as const) {
+      const of = registers.filter((r) => kindOf.get(r.speaks_for) === kind);
+      expect(of.filter((r) => r.data.holders.length === 1 && r.data.holders[0]!.holder === "outside").length).toBe(Math.round((of.length * profile.forms_bps[kind].outside) / 10_000));
+    }
+    expect(held.closely).toBeGreaterThan(0);
+    expect(held.widely).toBeGreaterThan(0);
+    // No household owns a second business while there are households that could own one and have none.
+    expect(Math.max(...owners.values())).toBe(1);
+    // The register lines grow with the town, not with the town times its firms: no household is on every register,
+    // and most households are on none.
+    const lines = registers.reduce((x, r) => x + r.data.holders.length, 0);
+    expect(lines).toBeLessThan(households.length * profile.direct_holders.firms_held[1] + 3 * firms.length);
+    const on = new Map<string, number>();
+    for (const r of registers) for (const h of r.data.holders) if (heads.has(h.holder)) on.set(h.holder, (on.get(h.holder) ?? 0) + 1);
+    expect(Math.max(...on.values())).toBeLessThanOrEqual(profile.direct_holders.firms_held[1] + 1);
+    expect(on.size).toBeLessThan(households.length * 0.6);
+    if (!withFund) continue;
+    // The fund: an organisation of the town with an account, an office that runs it, and a register only it sees of
+    // its members: adults of the town (the profile's share of them, give or take the draw), each with units.
+    const members = config.world.records.find((r: any) => r.kind === "fund_members");
+    expect(members.visible_to).toEqual(["fund"]);
+    const adults = new Set(config.world.entities.filter((e: any) => e.kind === "person" && -e.born_at >= 18 * 365 * 86_400).map((e: any) => e.id));
+    for (const m of members.data.members) {
+      expect(adults.has(m.member)).toBe(true);
+      expect(m.units).toBeGreaterThan(0);
+      expect(accounts.has(m.account)).toBe(true);
+    }
+    expect(Math.abs(members.data.members.length / adults.size - values.retirement_fund.member_bps / 10_000)).toBeLessThan(0.08);
+    expect(config.positions.find((p: any) => p.entity === "fund").role_module.code).toBe("fund.retirement");
+  }
+});

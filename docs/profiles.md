@@ -45,5 +45,6 @@ A town spec names its profile (`profile: au-vic-2026`); a spec can override a fi
 - **Some rules were modelled on one country's institutions:**
   - the Age Pension's age window, as the support payments' eligibility;
   - Victoria's rules in the example legal code.
+  - the retirement fund's rules, in a world that has one (`fund.retirement`, off by default: a pension of at least a yearly share of the balance, rising with age; paid from the age people here stop work), after Australia's account-based pensions.
 
   The rules are general in form, but they were chosen with one place in mind. As a second profile is added, each should be checked.

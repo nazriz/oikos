@@ -49,7 +49,7 @@ Lengnick, M. (2013), *Agent-based macroeconomics: a baseline model*, **Journal o
 - **Exports.** A buyer outside the town takes goods at a world price, up to the factory's share of a monthly demand ([boundary.md](boundary.md)). Lengnick's economy is closed.
 - **The buffer** includes a month's wages and inputs. Lengnick's firms pay wages at the month's end out of the month's sales; here wages go out every fortnight by standing order, and inputs are paid for with the order, both ahead of sales.
 - **Dividends out of earnings only.** Lengnick pays out all liquidity above the buffer. Here, a factory with no staff yet (a buffer of nothing) would have paid out all its capital, so payouts are capped at the month's earnings, as dividend practice is.
-- **Shareholders.** Lengnick distributes profits to all households in proportion to their wealth. In the generated town, each household's leaseholder holds shares in each factory in proportion to the household's savings at the start. Shares aren't traded yet.
+- **Shareholders.** Lengnick distributes profits to all households in proportion to their wealth. In the generated town a factory is widely held: mostly from outside, and the town's part by the minority of households that hold shares directly (and by a retirement fund, where a town has one) ([firm-ownership.md](firm-ownership.md); until 2026-10-08 every household held a part of every factory). Shares aren't traded yet.
 - **Letting go** picks the most recent hire (last in, first out, as redundancy practice usually does). Lengnick picks at random.
 
 ## Parameters

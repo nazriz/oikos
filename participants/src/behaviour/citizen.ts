@@ -117,7 +117,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.36.0",
+  version: "0.37.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -442,6 +442,10 @@ export const citizen: BehaviourModule = {
     const mourned = new Set<string>();
     let wasLeaseholder: boolean | null = null;
     let askedForCare = false;
+    // A death at home we were told of by a child of the household (nobody grown was there to see it), and, as that
+    // child, whose death we have told someone of.
+    const toldDead: { person: string; space: string }[] = [];
+    const toldOf = new Set<string>();
     // Children: those we already knew of (from the start), a pregnancy's due date, and when we next think about it.
     let knownChildren: Set<string> | null = null;
     let expectingUntil = 0;
@@ -640,6 +644,10 @@ export const citizen: BehaviourModule = {
         }
         const from = household?.members.find((x) => x.participant === m.from && x.person !== me);
         const what = from ? hear(m.text) : undefined;
+        if (from && what?.kind === "died") {
+          toldDead.push({ person: what.person, space: what.space });
+          continue;
+        }
         if (from && what) {
           heard.push({ from, what });
           continue;
@@ -697,6 +705,64 @@ export const citizen: BehaviourModule = {
       }
     };
 
+    // A death at home: someone of the household left our home because they died (we see who left, and why). Looked for
+    // at every wake at home, not only when the week's plan is made: whoever shares a home with someone who has died knows
+    // it the next time they are awake there, leaving in the morning or coming in (docs/behaviour/deaths.md). Until
+    // 2026-10-08 it was seen only in a full plan, made while the death was still among the home's last few departures,
+    // which a household's own comings and goings push out within a day or two.
+    const seeDeathAtHome = (obs: Observation): Step[] => {
+      const steps: Step[] = [];
+      const street = obs.channels.street;
+      const t = obs.t;
+      const ourHome = home?.space ?? livingAt;
+      if (household) {
+        let hh: HouseholdData = household;
+        const ours = ourHome && street?.kind === "sites" ? street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.space === ourHome) : [];
+        const atHome = new Set(ours.flatMap((sp) => sp.occupants ?? []));
+        // (Seen ourselves; or told by a child of the household, who tells one adult when none is at home: ours to report.)
+        const died: { occupant: string; told?: string }[] = [...ours.flatMap((sp) => sp.left ?? []).filter((l) => l.reason === "died"), ...toldDead.splice(0).map((x) => ({ occupant: x.person, told: x.space }))];
+        for (const d of died) {
+          if (mourned.has(d.occupant) || !hh.members.some((m) => m.person === d.occupant)) continue;
+          mourned.add(d.occupant);
+          const dead = hh.members.find((m) => m.person === d.occupant)!;
+          const heldLease = hh.leaseholder === dead.person;
+          const survivors = hh.members.filter((m) => m.person !== d.occupant && !mourned.has(m.person));
+          const grown = survivors.filter((m) => ageAt(m, t, year) >= ADULT_YEARS);
+          const partner = hh.couples.find((c) => c.includes(dead.person))?.find((x) => x !== dead.person);
+          const kids = survivors.filter((m) => m.parents?.includes(dead.person));
+          const leaseholder = hh.leaseholder !== dead.person ? hh.leaseholder : (grown.find((m) => m.person === partner) ?? [...grown].sort((a, b) => a.born_at - b.born_at)[0])?.person;
+          // Of the surviving adults at home now, the first in the household's list reports it, and writes the household's
+          // new record (one who comes home later finds the record already without them, and has nothing to report).
+          if ((d.told || grown.find((m) => atHome.has(m.person))?.person === me) && p.registry) {
+            steps.push(because(`${dead.person}, of our household, has died: reporting it to the registry.`, say("death_notification", `${dead.person} has died.`, {
+              to: [p.registry],
+              data: { deceased: dead.person, ...(partner && survivors.some((m) => m.person === partner) ? { partner } : {}),
+                children: kids.map((k) => k.person), adult_children: kids.filter((k) => ageAt(k, t, year) >= ADULT_YEARS).map((k) => k.person) },
+            })));
+            if (leaseholder) {
+              const next: HouseholdData = { ...hh, leaseholder, members: survivors, couples: hh.couples.filter((c) => !c.includes(dead.person)) };
+              steps.push(because(`${dead.person} has died: the household's record without them${hh.leaseholder === dead.person ? `, ${leaseholder} holding the lease from now` : ""}.`, say("household", `Household: ${survivors.map((m) => m.person).join(", ")}.`, {
+                to: survivors.map((m) => m.person), visible: survivors.map((m) => m.person), for: leaseholder, data: next,
+              })));
+              hh = next; // as we've just written it
+            }
+          }
+          // (Told of it, and we never knew where the household had come to live: it is there, and so do we.)
+          if (d.told && !home && livingAt === null) {
+            steps.push(because(`The household lives at ${d.told}: going there.`, moveIn(d.told)));
+            livingAt = d.told;
+          }
+          // Our share of the rent went to the one who died: stop it.
+          if (share?.order && heldLease) {
+            steps.push(because(`${dead.person} held the lease and has died: stopping our share of the rent to them.`, withdraw(share.order, "The leaseholder has died.")));
+            share = null;
+          }
+        }
+        household = hh;
+      }
+      return steps;
+    };
+
     const plan = (obs: Observation): Step[] => {
       if (plannedAt === -1) learnFromInitialRecords(obs);
       if (!home) findOwnHome(obs);
@@ -719,44 +785,8 @@ export const citizen: BehaviourModule = {
       const inside = (space: string) =>
         street?.kind !== "sites" || street.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === space && sp.occupants?.includes(me)));
 
-      // A death at home: someone of the household left our home because they died (we see who left, and why).
-      const ourHome = home?.space ?? livingAt;
-      if (household && ourHome && street?.kind === "sites") {
-        let hh: HouseholdData = household;
-        const died = street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((sp) => sp.space === ourHome).flatMap((sp) => sp.left ?? []).filter((l) => l.reason === "died");
-        for (const d of died) {
-          if (mourned.has(d.occupant) || !hh.members.some((m) => m.person === d.occupant)) continue;
-          mourned.add(d.occupant);
-          const dead = hh.members.find((m) => m.person === d.occupant)!;
-          const heldLease = hh.leaseholder === dead.person;
-          const survivors = hh.members.filter((m) => m.person !== d.occupant && !mourned.has(m.person));
-          const grown = survivors.filter((m) => ageAt(m, t, year) >= ADULT_YEARS);
-          const partner = hh.couples.find((c) => c.includes(dead.person))?.find((x) => x !== dead.person);
-          const kids = survivors.filter((m) => m.parents?.includes(dead.person));
-          const leaseholder = hh.leaseholder !== dead.person ? hh.leaseholder : (grown.find((m) => m.person === partner) ?? [...grown].sort((a, b) => a.born_at - b.born_at)[0])?.person;
-          // The surviving adult first in the household's list reports it, and writes the household's new record.
-          if (grown[0]?.person === me && p.registry) {
-            steps.push(because(`${dead.person}, of our household, has died: reporting it to the registry.`, say("death_notification", `${dead.person} has died.`, {
-              to: [p.registry],
-              data: { deceased: dead.person, ...(partner && survivors.some((m) => m.person === partner) ? { partner } : {}),
-                children: kids.map((k) => k.person), adult_children: kids.filter((k) => ageAt(k, t, year) >= ADULT_YEARS).map((k) => k.person) },
-            })));
-            if (leaseholder) {
-              const next: HouseholdData = { ...hh, leaseholder, members: survivors, couples: hh.couples.filter((c) => !c.includes(dead.person)) };
-              steps.push(because(`${dead.person} has died: the household's record without them${hh.leaseholder === dead.person ? `, ${leaseholder} holding the lease from now` : ""}.`, say("household", `Household: ${survivors.map((m) => m.person).join(", ")}.`, {
-                to: survivors.map((m) => m.person), visible: survivors.map((m) => m.person), for: leaseholder, data: next,
-              })));
-              hh = next; // as we've just written it
-            }
-          }
-          // Our share of the rent went to the one who died: stop it.
-          if (share?.order && heldLease) {
-            steps.push(because(`${dead.person} held the lease and has died: stopping our share of the rent to them.`, withdraw(share.order, "The leaseholder has died.")));
-            share = null;
-          }
-        }
-        household = hh;
-      }
+      // A death at home (seen at any wake there; here for one first seen as the plan is made).
+      steps.push(...seeDeathAtHome(obs));
 
       // Newly holding the household's lease (the leaseholder died): we start looking for a home from today.
       if (wasLeaseholder === false && isLeaseholder() && !home) homelessSince = t;
@@ -2259,6 +2289,20 @@ export const citizen: BehaviourModule = {
               return callAction(because("No adult of our household is left: asking for help.", say("care_request", "We have no adult at home any more.", { to: [p.child_protection], data: { children: kids } })));
             }
           }
+          // Someone of the household has died at home and no adult of it is there: a child old enough for school tells
+          // the first of its adults still living (docs/behaviour/deaths.md), once.
+          if (household && street?.kind === "sites" && (!p.school || obs.t - obs.body.born_at >= p.school.ages[0] * year)) {
+            for (const sp of street.cells.flatMap((c) => c.structure?.spaces ?? []).filter((x) => x.kind === "dwelling" && x.occupants?.includes(me))) {
+              const dead = new Set((sp.left ?? []).filter((l) => l.reason === "died").map((l) => l.occupant));
+              const grown = household.members.filter((m) => ageAt(m, obs.t, year) >= ADULT_YEARS && !dead.has(m.person));
+              for (const who of dead) {
+                if (toldOf.has(who) || !household.members.some((m) => m.person === who)) continue;
+                toldOf.add(who);
+                if (!grown.length || grown.some((m) => sp.occupants?.includes(m.person))) continue;
+                return callAction(because(`${who}, of our household, has died at home and no adult is here: telling ${grown[0]!.person}.`, message([reach(grown[0]!)], SAYING.died(who, sp.space))));
+              }
+            }
+          }
           const cared: Step[] = [];
           const sees = obs.channels.street;
           seekCare(obs, obs.t, cared, (space) => sees?.kind !== "sites" || sees.cells.some((c) => c.structure?.spaces.some((sp) => sp.space === space && sp.occupants?.includes(me))));
@@ -2269,6 +2313,11 @@ export const citizen: BehaviourModule = {
           if (go) return sendGo(go);
           return wait(Math.min(obs.t + MONTH, ctx.world.runEnd + DAY, p.round ? nextChange(obs.t) : Infinity));
         }
+        // A death at home, seen now: what it asks of us is done first, and the week's plan is made afresh as soon as
+        // that is done (who holds the lease may have changed, and with it who must find the household a home).
+        const mournedBefore = mourned.size;
+        todo.push(...seeDeathAtHome(obs).filter((s) => s.length));
+        if (mourned.size > mournedBefore) nextPlanAt = Math.min(nextPlanAt, obs.t);
         // The daily round: a wake that's only for going somewhere (one we asked for, our cadence, or a move done), with
         // nothing left to do and no full plan due, just takes us where we belong.
         if (p.round && obs.t < nextPlanAt && todo.length === 0 && obs.woke_for !== "news" && obs.woke_for !== "start" && !(practiceWake !== null && obs.t >= practiceWake)) {
