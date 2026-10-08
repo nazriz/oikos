@@ -8,7 +8,7 @@ A shop buys goods wholesale and sells them to households. Selling takes its staf
 
 **Buying.**
 - Weekly, if its stock plus what's on order is below the middle of Lengnick's band of last month's demand (φ, φ̄ = 25%, 100%), it orders up to the top of the band.
-- It buys from the cheapest of its suppliers: local factories at wholesale, or the world market's imports. A supplier that came up short in the last week goes to the back.
+- It buys from the cheapest of its suppliers: local factories at wholesale, or the world market's imports. A supplier that came up short in the last week goes to the back. Among suppliers asking the same price it has its own usual order of asking, drawn once when the shop begins (2026-10-08: until then the order was by name, so while factories' prices were level every shop in town sent its order to the same factory, and the next week to the same second one).
 - It orders at least a supplier's minimum, and only as much as it can pay for while keeping the next pay period's wages aside.
 
 **Selling.**
