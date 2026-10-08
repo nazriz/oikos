@@ -275,5 +275,5 @@ export function table(rows: Record<string, unknown>[]): string {
   return [line(cols), line(w.map((n) => "-".repeat(n))), ...rows.map((r) => line(cols.map((k) => cell(r[k]))))].join("\n");
 }
 
-export { diff, diffText, DIFF_QUERIES, type DiffRow } from "./diff";
+export { diff, diffText, drawn, drawnText, DIFF_QUERIES, type DiffRow, type Drawn } from "./diff";
 export { health, healthText, TARGET_MEASURES, type HealthRow, type Target } from "./health";

@@ -19,6 +19,10 @@ It answers every application (`loan_decision`, with the reason if it's declined)
 
 **Mortgages** (0.3.0): an application for "a home" is lent at `mortgage_rate_bps` over up to `mortgage_max_months`, at
 most `max_lvr_bps` of the price it gives, within the usual rule on income; the agreement's text names the home.
+The limit is that share of the price in whole units of the smallest kind, rounded down (0.3.1: said so, and compared
+so; what it admits is what it always admitted), and a loan of exactly that much is within it. A buyer asks for the
+price less a deposit rounded up to a whole unit (`loanFor`), which is that limit where the deposit and the limit make
+up the whole price.
 
 **Paying off** (0.3.0): asked (`loan_payout_request`), the bank says what paying a loan off takes (`loan_payout`): its
 remaining repayments' present value at the loan's rate (a world mortgage's rate read from its text). A payment settling
