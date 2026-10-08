@@ -173,6 +173,13 @@ export interface Used { input_tokens: number; output_tokens: number; cache_read_
 const noUse = (): Used => ({ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, cost_microusd: 0, calls: 0 });
 const addUse = (a: Used, b: Used): Used => ({ input_tokens: a.input_tokens + b.input_tokens, output_tokens: a.output_tokens + b.output_tokens, cache_read_tokens: a.cache_read_tokens + b.cache_read_tokens, cache_write_tokens: a.cache_write_tokens + b.cache_write_tokens, cost_microusd: a.cost_microusd + b.cost_microusd, calls: a.calls + b.calls });
 
+/** The one tool a writer or reader has: it hands in its answer file as a list, a line of the file to an item. */
+const HAND_IN = {
+  name: "hand_in",
+  description: "Hand in the answer file: `answers` is the file's lines, in order, one object for each line, exactly as the task describes them.",
+  input_schema: { type: "object", properties: { answers: { type: "array", items: { type: "object" }, description: "the answer file, a line to an item" } }, required: ["answers"] },
+};
+
 class Caller {
   readonly budget: Budget;
   private readonly seen = new Set<string>();
@@ -209,8 +216,11 @@ class Caller {
     const sleep = this.hooks.sleep ?? ((ms: number) => Bun.sleep(ms));
     for (let attempt = 1; ; attempt++) {
       try {
-        const res = await callModel(io, { purpose: "consult", subject: req.subject, system: req.system, messages: [{ role: "user", content: req.user }], maxTokens: req.maxTokens }, this.seen);
-        return { text: res.content.map((b) => (b.type === "text" ? b.text : "")).join(""), used };
+        // (The file is handed in through a tool, as a list: a reply of plain words is cut at 4,000 characters by the Claude Code
+        // adapter, a third of a batch of answers. A reply of words is still read, if the model gives one.)
+        const res = await callModel(io, { purpose: "consult", subject: req.subject, system: req.system, messages: [{ role: "user", content: req.user }], maxTokens: req.maxTokens, tools: [HAND_IN] }, this.seen);
+        const handed = res.content.flatMap((b) => (b.type === "tool_use" && Array.isArray(b.input?.answers) ? (b.input.answers as unknown[]) : []));
+        return { text: handed.length ? handed.map((o) => JSON.stringify(o)).join("\n") : res.content.map((b) => (b.type === "text" ? b.text : "")).join(""), used };
       } catch (e) {
         if (e instanceof UsageLimitReached || e instanceof ModelUnreachable) {
           const ms = (this.cfg.waitMinutes ?? 20) * 60_000;
@@ -227,6 +237,12 @@ class Caller {
       }
     }
   }
+}
+
+/** A program whose every quotation mark has a backslash before it: what a model writes when it escapes by hand what the tool
+ * already carries as JSON (a quoted text as \"x\"). The program it meant; any other program is left as it is. */
+export function undoubled(program: string): string {
+  return program.includes('\\"') && !/(^|[^\\])"/.test(program) ? program.replaceAll('\\"', '"').replaceAll("\\n", "\n") : program;
 }
 
 /** The JSON objects in a model's reply, a line each (a code fence, or the whole reply as one list, is let pass). */
@@ -593,7 +609,7 @@ export async function runPipeline(cfg: PipelineConfig, hooks: Hooks = {}): Promi
             if (u) setAside(file, "stale");
             const r = await caller.ask(reader, { step: key("read"), unit: `${safe(reader)}/${basename(file)}` }, { system, user: `${task}\n\n=== BLIND ===\n${batch.map((b) => JSON.stringify(b)).join("\n")}\n`, maxTokens: Math.min(24_000, 800 + 400 * batch.length), subject: "translator-pipeline/reader" });
             const ids = new Set(batch.map((b) => b.id));
-            const mine = objectsIn(r.text).filter((o) => typeof o.id === "string" && ids.has(o.id) && typeof o.program === "string").map((o) => ({ id: o.id as string, program: o.program as string }));
+            const mine = objectsIn(r.text).filter((o) => typeof o.id === "string" && ids.has(o.id) && typeof o.program === "string").map((o) => ({ id: o.id as string, program: undoubled(o.program as string) }));
             const odd = implausiblyUniform(mine, false);
             if (odd) {
               putJson(`${file}.rejected-1`, { fp: unitFp, why: odd, answers: mine, used: r.used });

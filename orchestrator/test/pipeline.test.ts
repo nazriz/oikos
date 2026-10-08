@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MockAdapter, UsageLimitReached, type ContentBlock, type LlmRequest, type Price } from "@oikos/participants/llm";
-import { implausiblyUniform, objectsIn, pilotMeta, plainReport, runPipeline, unionBasis, type Hooks, type PipelineConfig } from "../src/pipeline";
+import { implausiblyUniform, objectsIn, pilotMeta, plainReport, runPipeline, undoubled, unionBasis, type Hooks, type PipelineConfig } from "../src/pipeline";
 import { inSituInstructions } from "../src/in-situ";
 
 const root = mkdtempSync(join(tmpdir(), "oikos-pipeline-"));
@@ -97,11 +97,13 @@ function hooks(counts: Counts, o: { uniformB?: boolean; limitOnce?: boolean; pri
     counts[who === "A" ? "readerA" : "readerB"]++;
     // (Blind: the message holds the task and the lines, and nothing of any gold.)
     const body = (req.messages[0]!.content as string).split("=== BLIND ===\n")[1]!;
-    return text(body.split("\n").filter(Boolean).map((l) => {
+    const file = body.split("\n").filter(Boolean).map((l) => {
       const b = JSON.parse(l);
       expect(Object.keys(b).sort()).toEqual(["forms", "id", "request"]);
       return JSON.stringify({ id: b.id, program: who === "B" && o.uniformB ? 'money(amount="5", to=acc-z)' : program(b.request, who) });
-    }).join("\n"));
+    }).join("\n");
+    // (Reader B hands its file in through the tool, as the real ones do; A answers in words.)
+    return who === "B" ? [{ type: "tool_use", id: "t1", name: "hand_in", input: { answers: file.split("\n").map((l) => JSON.parse(l)) } }] : text(file);
   };
   const slept: number[] = [];
   const zero: Price = o.price ?? { input: 0, output: 0, cache_read: 0, cache_write: 0 };
@@ -277,6 +279,12 @@ test("replies are read as files: lines, a fenced block, or a list", () => {
   expect(objectsIn('```json\n{"id":"a"}\n```').length).toBe(1);
   expect(objectsIn('[{"id":"a"},{"id":"b"}]').length).toBe(2);
   expect(objectsIn("Here you are:\n{\"id\":\"a\"}\nDone.").length).toBe(1);
+});
+
+test("a program a model escaped by hand inside the tool's JSON is read as it meant it; any other is left alone", () => {
+  expect(undoubled('form(to=city, proposal=\\"a budget\\", kind=budget)')).toBe('form(to=city, proposal="a budget", kind=budget)');
+  expect(undoubled('message(to=x, text="a \\"quoted\\" word")')).toBe('message(to=x, text="a \\"quoted\\" word")');
+  expect(undoubled("none(unclear)")).toBe("none(unclear)");
 });
 
 test("two readers' programs that differ in basis alone are joined: every record either gave, in the request's order", () => {

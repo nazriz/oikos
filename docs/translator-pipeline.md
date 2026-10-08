@@ -55,6 +55,10 @@ there and whole is skipped.
     test is read by the eval itself, on this machine, and never leaves it), ends the pod when all are home or at the deadline
     (the watchdog; `deadlineHours`, 6 if absent). With `"train": false` the pipeline stops after the export.
 
+Writers and readers hand their file in through a `hand_in` tool, as a list of objects: the Claude Code adapter cuts a reply of
+plain words at 4,000 characters. A reply of words is still read if a model gives one. A program whose every quotation mark came
+escaped by hand (a model doing in a tool's JSON what the tool already does) is read as meant (`undoubled`).
+
 ## The config
 
 ```json
