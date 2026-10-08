@@ -18,6 +18,26 @@ import * as P from "./papers";
 
 const YEAR = 365 * DAY;
 
+/** A budget's year in days, as its papers say it: "day 0 to day 364". (Year 1 begins with the town's records.) */
+export const yearInDays = (year: number): string => `day ${(year - 1) * 365} to day ${year * 365 - 1}`;
+
+/** The lines of the budget the mayor's office tables, from what it is given for each (a line it is given nothing for
+ * is left out, but for parks, which every budget of the town's has). The generator writes the budget a town opens
+ * with by the same rule, so the first year's budget is one this office would have tabled. */
+export function tabledLines(p: { park_budget: number; road_budget?: number; staff_budget?: number; services_budget?: number; environment_budget?: number }): Record<string, number> {
+  return { parks: p.park_budget, ...(p.road_budget ? { roads: p.road_budget } : {}), ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
+}
+
+/** A budget's lines in words, as the town writes its money, and their sum. */
+export function linesInWords(lines: Record<string, number>, written: (amount: number) => string): string {
+  return `${Object.entries(lines).map(([k, v]) => `${k} ${written(v)}`).join(", ")}; ${written(Object.values(lines).reduce((a, v) => a + v, 0))} in all`;
+}
+
+/** The town's budget for a year, of those adopted (the latest, if the council adopted more than one for it). */
+function budgetFor(book: Book, year: number): StatementRecord | undefined {
+  return book.open("budget").filter((b) => b.data?.year === year).sort((a, b) => b.at - a.at)[0];
+}
+
 /**
  * city.mayor_code: a rule-following mayor, for the all-code control condition
  * (a language model runs the office in AI experiments). Proposes a budget each year;
@@ -32,7 +52,7 @@ export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
   issues: P.MAYOR,
   issuesWith: (p) => ({ electoral: p.electoral }),
-  version: "0.11.0", // 0.11.0: knows the town's land from the town's own papers and goes to see a lot before applying to build on it; nominates to the electoral body; no longer shown a survey of the town or the land register
+  version: "0.12.0", // 0.12.0: tables the next year's budget before the year begins (budget_lead_days), and each paper says its lines as the town writes its money; builds by the budget of the year it is in
   doc: "docs/behaviour/government.md",
   cadence: () => 7 * DAY,
   create(ctx: ParticipantContext) {
@@ -42,6 +62,9 @@ export const mayorCode: BehaviourModule = {
       // Roads (docs/behaviour/daily-round.md): a year's budget for them, and how far (cells) a building may stand from one
       // before we build toward it, a road a time.
       road_budget: 0, road_type: "road", road_within: 3,
+      // How many days before a year begins the office tables that year's budget, so the council can adopt it before the
+      // year starts (0: at the year's start, when the year has none).
+      budget_lead_days: 0,
       stands_again: true, // false: it doesn't stand at the next election (retiring)
       // Who runs the election for this office: where a nomination is lodged (none: with the town itself).
       electoral: "",
@@ -106,22 +129,26 @@ export const mayorCode: BehaviourModule = {
           steps.push(because("An election for this office: nominating, as the incumbent.",
             say("nomination", `Nomination for ${ctx.position}: the incumbent. ${platform}`, { to: [p.electoral || me], visible: "public", data: { office: ctx.position, name: "the incumbent mayor", incumbent: true, values: ["security", "benevolence"] }, assertion: { that: platform } })));
         }
-        // The annual budget, for each year that has none adopted: tabled at the year's start (or on taking office), and
-        // again every 45 days until the council adopts one.
+        // The annual budget. A year's budget is adopted before the year begins: the office tables the next year's
+        // `budget_lead_days` before this year ends. A year that has none adopted (the council rejected it, or the office
+        // has just been taken up) has its budget tabled at once. Either is tabled again every 45 days until the council
+        // adopts one.
         const thisYear = Math.floor(t / YEAR) + 1;
-        const adopted = book.open("budget").some((b) => b.data?.year === thisYear);
-        if (!adopted && (tabledYear !== thisYear || t >= lastTabled + 45 * DAY)) {
-          const newYear = tabledYear !== thisYear;
-          tabledYear = thisYear;
+        const forYear = !budgetFor(book, thisYear) ? thisYear
+          : p.budget_lead_days > 0 && thisYear * YEAR - t <= p.budget_lead_days * DAY && !budgetFor(book, thisYear + 1) ? thisYear + 1 : 0;
+        if (forYear && (tabledYear !== forYear || t >= lastTabled + 45 * DAY)) {
+          const first = tabledYear !== forYear;
+          tabledYear = forYear;
           lastTabled = t;
-          const lines = { parks: p.park_budget, ...(p.road_budget ? { roads: p.road_budget } : {}), ...(p.staff_budget ? { staff: p.staff_budget } : {}), ...(p.services_budget ? { services: p.services_budget } : {}), ...(p.environment_budget ? { environment: p.environment_budget } : {}) };
-          steps.push(because(newYear ? "A new year: tabling the town's budget." : "No budget adopted for this year yet: tabling it again.", say("proposal", `Budget for year ${Math.floor(t / YEAR) + 1}: ${Object.entries(lines).map(([k, v]) => `${k} ${smallestNow(v)}`).join(", ")}.`, { to: [me],
-            data: { enact: { kind: "budget", text: `The town's budget for year ${Math.floor(t / YEAR) + 1}.`, data: { year: Math.floor(t / YEAR) + 1, lines } }, tags: ["budget"] } })));
+          const lines = tabledLines(p);
+          const words = `The town's budget for year ${forYear} (${yearInDays(forYear)}): ${linesInWords(lines, usd)}.`;
+          steps.push(because(!first ? `No budget adopted for year ${forYear} yet: tabling it again.` : forYear > thisYear ? `Year ${forYear} begins in ${Math.ceil((thisYear * YEAR - t) / DAY)} days: tabling its budget, for the council to adopt before then.` : "This year has no adopted budget: tabling one.",
+            say("proposal", words, { to: [me], data: { enact: { kind: "budget", text: words, data: { year: forYear, lines } }, tags: ["budget"] } })));
         }
-        // A park a year, if the adopted budget has room and there's a city lot free:
+        // A park a year, if the year's adopted budget has room and there's a city lot free:
         // apply for planning permission like anyone else, then commission the builder once granted.
-        const budget = book.open("budget").sort((a, b) => b.at - a.at)[0];
         const year = Math.floor(t / YEAR);
+        const budget = budgetFor(book, year + 1);
         // The builder's published price for a park (none published: nothing to plan with).
         const price = publishedPrice(book, p.builder, p.park_type) ?? 0;
         if (budget && budget.data?.year === year + 1 && parkYear !== year && price > 0 && price <= (budget.data?.lines?.parks ?? 0)) {
@@ -252,7 +279,7 @@ export const mayorCode: BehaviourModule = {
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
   issues: P.COUNCIL_CLERK,
-  version: "0.8.0", // 0.8.0: seats whoever the electoral body declares elected to an office of the town
+  version: "0.9.0", // 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -290,6 +317,9 @@ export const councilClerk: BehaviourModule = {
         for (const prop of book.open("proposal")) {
           if (balloted.has(prop.id) || !(prop.addressed_to ?? []).includes(me)) continue;
           balloted.add(prop.id);
+          // (Already put to the council, by the office's own record: whoever keeps this office carries on from its
+          // papers, and a proposal balloted before is not balloted again.)
+          if (book.open("ballot").some((b) => b.speaks_for === me && b.data?.proposal === prop.id)) continue;
           // A proposal on a law's amendment form: put to the council as what it would change (and not at all, if nothing).
           const am = amendment(book, me, prop);
           if (am && !Object.keys(am.given).length) {
@@ -303,6 +333,8 @@ export const councilClerk: BehaviourModule = {
           // (Our council's ballots only: an election's ballot speaks for the town too, and is the electoral office's.)
           if (closed.has(ballot.id) || ballot.speaks_for !== me || ballot.data?.electorate !== "council" || t < (ballot.data?.closes_at ?? Infinity)) continue;
           closed.add(ballot.id);
+          // (Counted and declared already, by the office's own record: its result stands.)
+          if (book.open("ballot_result").some((r) => r.speaks_for === me && r.data?.ballot === ballot.id)) continue;
           const latest = new Map<string, string>();
           // (Votes made while the ballot was open: one made at or after its closing time isn't counted, however late we
           // come to count. Until 0.6.1 it was, if it reached us before we did.)
@@ -344,12 +376,13 @@ export const councilClerk: BehaviourModule = {
           const open = book.open("ballot").filter((b) => b.speaks_for === me && b.data?.electorate === "council" && !closed.has(b.id));
           const results = book.open("ballot_result").slice(-3);
           const year = Math.floor(t / YEAR) + 1;
-          const budget = book.open("budget").find((b) => b.data?.year === year);
+          const budget = budgetFor(book, year), next = budgetFor(book, year + 1);
           return "Report from the council clerk: " +
             (open.length ? `ballots open: ${open.map((b) => `${b.id} on ${b.data?.proposal}, closing day ${Math.floor(b.data?.closes_at / DAY)}`).join("; ")}. ` : "no ballots are open. ") +
             (waiting.length ? `Proposals waiting for a ballot: ${waiting.map((x) => x.id).join(", ")}. ` : "") +
             (results.length ? `Recent results: ${results.map((r) => `${r.data?.ballot}: ${r.data?.passed ? "passed" : "rejected"} ${r.data?.yes}-${r.data?.no}`).join("; ")}. ` : "") +
             (budget ? `The council adopted a budget for year ${year} (${budget.id}). ` : `No budget is adopted for year ${year}. `) +
+            `Year ${year} is ${yearInDays(year)}; ${next ? `the council has adopted a budget for year ${year + 1} (${next.id}). ` : `no budget is adopted yet for year ${year + 1}, which the council adopts before it begins. `}` +
             `Anyone may put a proposal to the council on the council proposal form (form-council-proposal); I put it to a ballot of the councillors, open for ${p.vote_days} days. ` +
             `A law proposed on that form stands as its words: no rule is set down with it for acts to be checked against.${amendable(book, me, true)}`;
         }));
@@ -426,7 +459,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.8.3",
+  version: "0.9.0", // 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -460,15 +493,24 @@ export const financeOfficer: BehaviourModule = {
         const acc = ownAccount(obs);
         const steps: Step[] = [];
         if (!acc) return steps;
-        const budget = book.open("budget").sort((a, b) => b.at - a.at)[0];
-        if (budget && budget.data?.year !== budgetYear) {
-          budgetYear = budget.data?.year;
+        // The year's adopted budget. While the year has none, the charter's interim rule: the office goes on paying under
+        // the budget last adopted, at no more each month than a twelfth of it (so wages and standing charges go on, and
+        // little else fits). Spending is reckoned by the year, so what is paid in the interim counts against the year's
+        // budget once the council adopts it.
+        const year = Math.floor(obs.t / YEAR) + 1;
+        const adopted = budgetFor(book, year);
+        const last = adopted ?? book.open("budget").filter((b) => typeof b.data?.year === "number" && b.data.year < year).sort((a, b) => b.data.year - a.data.year || b.at - a.at)[0];
+        const budget = adopted ?? last;
+        if (year !== budgetYear) {
+          budgetYear = year;
           spent = 0;
           wagesAtYear = payroll.wagesPaid;
         }
         steps.push(...payroll.routine(obs, book, acc.account, { target: 0, wage: 0, canPost: false }));
         const wages = () => payroll.wagesPaid - wagesAtYear;
-        const limit = budget ? Object.values(budget.data?.lines ?? {}).reduce((s: number, v: any) => s + (v as number), 0) : 0;
+        const total = budget ? Object.values(budget.data?.lines ?? {}).reduce((s: number, v: any) => s + (v as number), 0) : 0;
+        const months = Math.min(12, Math.floor(((obs.t - (year - 1) * YEAR) * 12) / YEAR) + 1); // months of the year begun
+        const limit = adopted ? total : Math.floor((total * months) / 12);
         for (const inv of book.open("invoice").sort((a, b) => (a.id < b.id ? -1 : 1))) {
           if (paid.has(inv.id) || !(inv.addressed_to ?? []).includes(me)) continue;
           const owed = inv.data?.outcome?.money;
@@ -484,7 +526,8 @@ export const financeOfficer: BehaviourModule = {
           if (acc.balance < amount) continue;
           paid.add(inv.id);
           spent += amount;
-          steps.push(because(withinProcedure ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : "Paying an invoice outside the procedure.", pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })));
+          steps.push(because(!withinProcedure ? "Paying an invoice outside the procedure." : adopted ? "Paying an invoice within the adopted budget (with the mayor's approval where needed)." : `Year ${year} has no adopted budget yet: paying an invoice within a twelfth a month of the budget last adopted, as the charter allows (with the mayor's approval where needed).`,
+            pay(owed.to, amount, { from: acc.account, for: `Paying invoice ${inv.id}.`, settles: inv.id })));
         }
         steps.push(...letters.answer(() => {
           const unpaid = book.open("invoice").filter((i) => (i.addressed_to ?? []).includes(me) && !paid.has(i.id));
@@ -497,10 +540,10 @@ export const financeOfficer: BehaviourModule = {
           for (const f of month) if (f.amount > 0) byPayer.set(f.party, (byPayer.get(f.party) ?? 0) + f.amount);
           const top = [...byPayer].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([a, v]) => `${a} ${usd(v)}`).join(", ");
           const days = Math.max(1, Math.round(Math.min(obs.t, 365 * DAY) / DAY));
-          const year = since(365);
+          const twelveMonths = since(365);
           const history = flows.length
             ? `In the last 30 days the account received ${usd(sum(month, 1))}${top ? ` (largest: ${top})` : ""} and paid out ${usd(sum(month, -1))}. ` +
-              `Over the last ${days} days it received ${usd(sum(year, 1))} and paid out ${usd(sum(year, -1))}: at that rate, about ${usd(Math.round((sum(year, 1) * 30) / days))} a month in and ${usd(Math.round((sum(year, -1) * 30) / days))} out. `
+              `Over the last ${days} days it received ${usd(sum(twelveMonths, 1))} and paid out ${usd(sum(twelveMonths, -1))}: at that rate, about ${usd(Math.round((sum(twelveMonths, 1) * 30) / days))} a month in and ${usd(Math.round((sum(twelveMonths, -1) * 30) / days))} out. `
             : "No money has moved in or out of the account yet. ";
           // The town's payroll, itemised: who's paid, how often, gross and what reaches them after the tax withheld, into
           // which account, under which agreement (a mayor otherwise sees only recurring payments it can't place: pilots 8, 9).
@@ -515,7 +558,9 @@ export const financeOfficer: BehaviourModule = {
               }).join("; ")}. `
             : "The town employs nobody at present. ";
           return `Report from the finance office: the town's account ${acc.account} holds ${usd(acc.balance)}. ` + history + payrollText +
-            (budget ? `The adopted budget (${budget.id}, year ${budget.data?.year}): ${lines}; spent under it so far ${usd(spent + wages())} (${usd(wages())} of it the town's wages). ` : "No budget has been adopted for this year. ") +
+            (adopted ? `The adopted budget (${adopted.id}, year ${year}, ${yearInDays(year)}): ${lines}; spent under it so far ${usd(spent + wages())} (${usd(wages())} of it the town's wages). `
+              : last ? `No budget is adopted for year ${year} (${yearInDays(year)}) yet. Until the council adopts one we pay what the town is already bound to pay under the budget last adopted (${last.id}, year ${last.data?.year}: ${lines}), at no more each month than a twelfth of it, as the charter allows: ${usd(limit)} so far this year, of which ${usd(spent + wages())} is spent (${usd(wages())} of it the town's wages). `
+              : `No budget has been adopted for year ${year}, and none before it. `) +
             // The budget brief: what each line pays for (world config). The amounts are the mayor's and the council's to set.
             (Object.keys(p.budget_lines).length ? `The budget's lines: ${Object.entries(p.budget_lines).map(([k, v]) => `${k}, for ${v}`).join("; ")} Setting the amounts is for the mayor and the council; a budget goes to the council on the council proposal form. ` : "") +
             // What building costs, as builders have published it.
@@ -1068,10 +1113,13 @@ function fromForm(prop: StatementRecord | undefined, t: number): any {
     // Every amount on the form is a line (whatever lines the town's form has; pilot 7 found the form had only three of
     // the five, and the mayor, rightly, wouldn't table a budget that dropped two).
     const lines: Record<string, number> = { parks: line(d.parks) };
-    for (const [k, v] of Object.entries(d)) if (!["proposal", "kind", "affects", "form"].includes(k) && (typeof v === "string" || typeof v === "number")) {
+    for (const [k, v] of Object.entries(d)) if (!["proposal", "kind", "affects", "form", "year"].includes(k) && (typeof v === "string" || typeof v === "number")) {
       try { lines[k] = line(v); } catch { /* not an amount */ }
     }
-    return { kind: "budget", text: d.proposal, data: { year: Math.floor(t / YEAR) + 1, lines } };
+    // The year it is for: the one the form names, if that is this year or one to come (a budget is adopted before its
+    // year begins); with none named, or a year already past, the year in which the council adopts it.
+    const now = Math.floor(t / YEAR) + 1;
+    return { kind: "budget", text: d.proposal, data: { year: Number.isSafeInteger(d.year) && d.year >= now ? d.year : now, lines } };
   }
   return undefined;
 }

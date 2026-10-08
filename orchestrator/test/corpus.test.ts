@@ -16,7 +16,7 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 test("every translation in a language-model run can be read back whole, as a training example", async () => {
   const out = join(root, "runs", "test-corpus");
   rmSync(out, { recursive: true, force: true });
-  const s = await runWorld({ config: generate({ ...spec, citizens: 80, mayor: "llm" }), runId: "corpus", outDir: out, until: 40 * DAY });
+  const s = await runWorld({ config: generate({ ...spec, citizens: 80, mayor: "llm", opening_budget: false /* the mayor has a budget to propose in its first days */ }), runId: "corpus", outDir: out, until: 40 * DAY });
   const rows = await corpusOf(s.logPath);
   expect(rows.length).toBeGreaterThan(2);
   for (const r of rows) {
