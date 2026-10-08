@@ -114,7 +114,7 @@ test("an amendment that fails changes nothing: the law stands, and landlords and
   const ballot = kind("ballot").find((r) => r.data.proposal === prop.id);
   const result = kind("ballot_result").find((r) => r.data.ballot === ballot.id);
   expect(result.data).toMatchObject({ passed: false, yes: 0, no: 5 });
-  expect(result.text).toBe("Rejected: 0 for, 5 against.");
+  expect(result.text).toBe("Rejected: 0 for, 5 against. Voting for: none; against: councillor-1, councillor-2, councillor-3, councillor-4, councillor-5.");
   expect(kind("law")).toEqual([]);
   expect(recs.some((r) => r.record === "withdrawal" && r.withdraws === "law-rent-increases")).toBe(false);
   // Every landlord's notice is on 30 days (an increase starts with the next day), lawful as the law stands: nobody
