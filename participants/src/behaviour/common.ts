@@ -708,10 +708,15 @@ export function noting<T extends { step(obs: Observation, ...rest: any[]): Parti
 /** A figure of a law. A duration is held in seconds and worded in `unit` (days, months...); a count is held in
  * `held_in` (default: its unit), `per_unit` of them to one `unit` (a share: unit "percent", held in basis points, 100
  * to one). `type` is also the type of the figure's field on the law's amendment form. */
-export type LawFigure = { type: "duration" | "count"; unit: string; label?: string; held_in?: string; per_unit?: number; description?: string };
+export type LawFigure = { type: "duration" | "count"; unit: string; label?: string; held_in?: string; per_unit?: number; description?: string;
+  /** The law may do without it: a place that has no such requirement gives none, and the law then says nothing of it
+   * (given as nought, it is taken as not given: a requirement of nothing is none). */
+  optional?: boolean };
 /** A schedule: in its `text`, each of its `adico` parts and its `formal` (a CEL condition, if acts can be checked
  * against the law), `{name}` stands for the figure as worded ("60 days", "50") and `{name:seconds}` (any word after the
- * colon; by convention the unit it's held in) for the number as held. */
+ * colon; by convention the unit it's held in) for the number as held. Clauses that turn on optional figures are
+ * written as a list, `<<separator;;clause;;clause>>`: a clause is kept where every figure it names is given, and the
+ * kept ones are joined by the separator. */
 export type LawSchedule = { title: string; form?: string; figures: { [name: string]: LawFigure }; text: string; adico?: { [part: string]: string }; formal?: string };
 /** A law's figures as it carries them: each value with the unit it's held in. */
 export type LawFigures = { [name: string]: { value: number; unit: string } };
@@ -724,33 +729,51 @@ export const heldIn = (f: LawFigure): string => (f.type === "duration" ? "second
 /** A figure's value as held, from what its form field gives (a duration arrives in seconds; a count in the figure's unit). */
 export const heldValue = (f: LawFigure, given: number): number => (f.type === "duration" ? given : given * (f.per_unit ?? 1));
 
-/** A figure in words: a duration in the schedule's unit when it's a whole number of them, else in days (or hours...);
- * a count in its unit ("50%", "3 times"; without the unit, "50"). */
-export function figureWords(f: LawFigure, value: number, withUnit = true): string {
+/** A figure in words: a duration in the schedule's unit when it's a whole number of them, else in days, hours or minutes where
+ * it is a whole number of those, else in the schedule's unit as a decimal (a law does not count in
+ * seconds; nought is nought of the schedule's unit); a count in its unit ("50%", "3 times"; without the unit, "50").
+ * A figure that is not there is "none". */
+export function figureWords(f: LawFigure, value: number | undefined, withUnit = true): string {
+  if (!Number.isSafeInteger(value)) return "none";
   if (f.type === "duration") {
-    const own = DURATION_UNITS.find(([plural]) => plural === f.unit);
-    const [plural, singular, size] = [own, ...DURATION_UNITS.slice(3)].find((u) => u && value >= u[2] && value % u[2] === 0) ?? DURATION_UNITS.at(-1)!;
-    return `${value / size} ${value / size === 1 ? singular : plural}`;
+    const own = DURATION_UNITS.find(([plural]) => plural === f.unit) ?? DURATION_UNITS[3]!;
+    const [plural, singular, size] = [own, DURATION_UNITS[3]!, DURATION_UNITS[4]!, DURATION_UNITS[5]!].find((u) => value! >= u[2] && value! % u[2] === 0) ?? own;
+    const n = Math.round((value! * 100) / size) / 100;
+    return `${n} ${n === 1 ? singular : plural}`;
   }
-  const n = String(value / (f.per_unit ?? 1));
+  const n = String(value! / (f.per_unit ?? 1));
   return withUnit ? (f.unit === "percent" ? `${n}%` : `${n} ${f.unit}`) : n;
 }
 
+/** Is a figure given? An optional one given as nought is not: a requirement of nothing is none. */
+export const figureGiven = (f: LawFigure | undefined, value: number | undefined): boolean => !!f && Number.isSafeInteger(value) && !(f.optional && value === 0);
+
 /** A law written from figures by a schedule: its words, its breakdown, its rule, and the figures it carries. Throws if
- * the schedule names a figure it isn't given (a law can't be written with a gap in it). */
-export function draftLaw(scheduleId: string, s: LawSchedule, values: { [name: string]: number }): { text: string; adico?: { [part: string]: string }; formal?: { language: "cel"; condition: string }; data: { schedule: string; figures: LawFigures } } {
-  const fill = (template: string) => template.replace(/\{(\w+)(?::(\w+))?\}/g, (_, name: string, held?: string) => {
-    const f = s.figures[name];
-    const v = values[name];
-    if (!f || !Number.isSafeInteger(v)) throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
-    return held ? String(v) : figureWords(f, v!, false);
+ * the schedule names a figure it isn't given and can't do without (a law can't be written with a gap in it), or if it
+ * is given none of its figures at all (there is then no law to write). */
+export function draftLaw(scheduleId: string, s: LawSchedule, values: { [name: string]: number | undefined }): { text: string; adico?: { [part: string]: string }; formal?: { language: "cel"; condition: string }; data: { schedule: string; figures: LawFigures } } {
+  const given = (name: string) => figureGiven(s.figures[name], values[name]);
+  const named = (part: string) => [...part.matchAll(/\{(\w+)(?::\w+)?\}/g)].map((m) => m[1]!);
+  // The clauses that turn on optional figures: each kept where all it names is given, the kept ones joined.
+  const clauses = (template: string) => template.replace(/<<([\s\S]*?)>>/g, (_, list: string) => {
+    const [separator, ...parts] = list.split(";;");
+    return parts.filter((part) => named(part).every(given)).join(separator!);
   });
+  const fill = (template: string) => clauses(template).replace(/\{(\w+)(?::(\w+))?\}/g, (_, name: string, held?: string) => {
+    if (!given(name)) throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
+    return held ? String(values[name]) : figureWords(s.figures[name]!, values[name], false);
+  }).replace(/ {2,}/g, " ").trim();
   const figures: LawFigures = {};
   for (const [name, f] of Object.entries(s.figures)) {
-    if (!Number.isSafeInteger(values[name])) throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
+    if (!given(name)) {
+      if (f.optional) continue;
+      throw new Error(`law schedule ${scheduleId}: no figure ${name}`);
+    }
     figures[name] = { value: values[name]!, unit: heldIn(f) };
   }
-  return { text: fill(s.text), ...(s.adico ? { adico: Object.fromEntries(Object.entries(s.adico).map(([k, v]) => [k, fill(v)])) } : {}),
+  if (!Object.keys(figures).length) throw new Error(`law schedule ${scheduleId}: none of its figures is given, so there is no law to write`);
+  // (A part of the breakdown that turned wholly on figures not given is left out.)
+  return { text: fill(s.text), ...(s.adico ? { adico: Object.fromEntries(Object.entries(s.adico).map(([k, v]) => [k, fill(v)] as const).filter(([, v]) => v !== "")) } : {}),
     ...(s.formal ? { formal: { language: "cel" as const, condition: fill(s.formal) } } : {}), data: { schedule: scheduleId, figures } };
 }
 

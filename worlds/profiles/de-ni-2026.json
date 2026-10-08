@@ -780,6 +780,8 @@
     ],
     "labour_force_participation_bps": 8000,
     "tenancy": {
+      "end_notice_days": 60,
+      "tenant_notice_days": 30,
       "rent_review_months": 15,
       "rent_increase_notice_days": 60,
       "after_fixed_term": "periodic"
@@ -827,9 +829,7 @@
       }
     },
     "industrial_action": {
-      "ballot_turnout_bps": 0,
       "ballot_pass_bps": 7500,
-      "notice_days": 0,
       "paid_during_action": false
     },
     "world_price_process": {
@@ -853,7 +853,6 @@
         "person": 700,
         "organisation": 500
       },
-      "serviceability_buffer_bps": 0,
       "max_repayment_share_bps": {
         "person": 3500,
         "organisation": 2000
@@ -871,6 +870,7 @@
       "person_min_savings": 100000
     },
     "town_finance": {
+      "unpermitted_building_fine": 5000000,
       "parks_per_year": 15000000,
       "payment_approval_over": 5000000
     },
@@ -1005,7 +1005,6 @@
     },
     "services": {
       "waste_per_person_per_day_g": 1260,
-      "landfill_levy_per_tonne": 0,
       "council_staff_per_1000": 6,
       "collect_seconds_per_10kg": 12,
       "asset_life_years": 15,
@@ -1454,13 +1453,16 @@
     "labour_force_participation_bps": "Placeholder: the share of working-age adults (18 to the retirement age) in the labour force, about 80% (recalled: Germany's participation of 15-64 year olds is about 80%, Destatis / Eurostat; to confirm). Those outside it do not look for work.",
     "labour_force_share_by_age": "ILOSTAT, 'Labour force participation rate by sex and age (%)', five-year bands (dataflow DF_EAP_DWAP_SEX_AGE_RT, https://sdmx.ilo.org/rest/data/ILO,DF_EAP_DWAP_SEX_AGE_RT/all?startPeriod=2019; the data file opened and these figures read from it, 2026-10-08), persons, Germany, national, annual 2025, from the EU Labour Force Survey: ages 25 to 54, 88.369%; 55 to 59, 85.112%; 60 to 64, 69.624%; 65 and over, 10.36%. National, not Lower Saxony (no table by age for the region was found); not checked against Destatis (Mikrozensus)'s own table (to confirm). How it is used: the first band is the reference; someone in the labour force stops work at the start of a later band with the chance these shares give, and those still in at the last band never stop. The survey's last band is open (65 and over), so nobody is drawn to stop after 65, and those who work on are older on average than they are in fact: to split when the shares at 65 to 69, 70 to 74 and 75 and over are opened. The profile's own participation figure (labour_force_participation_bps) still says how many are in the labour force at the reference ages; this curve says only how that share falls with age.",
     "tenancy": "Buergerliches Gesetzbuch (BGB) para 558 (opened at gesetze-im-internet.de/bgb/__558.html): a landlord may ask for a rent increase up to the local comparative rent (ortsuebliche Vergleichsmiete) once the rent has been unchanged for 15 months at the time the increase is to take effect (and not more than once a year), capped at 20% in three years (15% in tight markets); 15 months is used as rent_review_months. rent_increase_notice_days: 60, placeholder (the tenant has until the end of the second month after receipt to consent: para 558b, not opened). After a fixed term a tenancy continues for an indefinite period unless a party objects (para 545; not opened); statutory notice for tenants is three months (para 573c; not opened). The cap and the comparative-rent rule cannot be expressed (see gaps).",
+    "tenancy.end_notice_days": "Placeholder: the example legal code's notice a landlord must give to end a tenancy, 60 days, carried over unchanged (nobody's acts are checked against it yet). To source from this place's tenancy law.",
+    "tenancy.tenant_notice_days": "Placeholder: the example legal code's notice a tenant may leave on, 30 days, carried over unchanged. To source from this place's tenancy law.",
+    "town_finance.unpermitted_building_fine": "Placeholder: the fine the town's planning law sets for building without a permit, EUR 50,000: the first profile's figure carried over, as this profile's other town figures are. To source from this place's planning law.",
     "values": "Placeholder: Schwartz's ten basic values in the pan-cultural order of importance (benevolence first, power last: Schwartz and Bardi, 'Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), with a spread of 1,500; unchanged from the Australian profile. To source for this place: the European Social Survey's Schwartz items for Germany.",
-    "industrial_action": "Germany has no statutory strike ballot; strikes are lawful if called by a union to support a collective agreement once the peace obligation has expired (Tarifvertragsgesetz and Federal Labour Court case law, Bundesarbeitsgericht 10.6.1980 and 21.6.1988; to confirm). The unions' own rules require a ballot (Urabstimmung) before an unlimited strike: IG Metall's constitution requires 75% approval (IG Metall Satzung para 23 on Urabstimmung; recalled, to confirm), with no minimum turnout; warning strikes need no ballot and no notice period. ballot_turnout_bps is therefore 0, ballot_pass_bps 7500, notice_days 0; pay stops during a strike (the union pays Streikgeld from its funds, not modelled).",
+    "industrial_action": "(Left out since 2026-10-09: the ballot turnout and the notice of industrial action, which stood here as nought for a rule the place does not have. The note is its author's, as written.) Germany has no statutory strike ballot; strikes are lawful if called by a union to support a collective agreement once the peace obligation has expired (Tarifvertragsgesetz and Federal Labour Court case law, Bundesarbeitsgericht 10.6.1980 and 21.6.1988; to confirm). The unions' own rules require a ballot (Urabstimmung) before an unlimited strike: IG Metall's constitution requires 75% approval (IG Metall Satzung para 23 on Urabstimmung; recalled, to confirm), with no minimum turnout; warning strikes need no ballot and no notice period. ballot_turnout_bps is therefore 0, ballot_pass_bps 7500, notice_days 0; pay stops during a strike (the union pays Streikgeld from its funds, not modelled).",
     "world_price_process": "Placeholder: world prices move each month by a mean-reverting random process, as in the Australian profile (to estimate from Destatis, Index der Einfuhrpreise / Ausfuhrpreise).",
     "credit.cash_rate_bps": "The ECB's deposit facility rate, 2.50% as of 16 September 2026 (main refinancing 2.65%, marginal lending 2.90%), from the ECB's page of key interest rates, https://www.ecb.europa.eu/stats/policy_and_exchange_rates/key_ecb_interest_rates/html/index.en.html, opened 2026-10-08 (the page's text says rates were 'decreased', while press reports say raised from 2.25%; the level, 2.50%, is the same in both).",
     "credit.funding_spread_bps": "Placeholder: what a small bank pays over the policy rate for its funding (Sparkassen and cooperative banks fund themselves largely from retail deposits).",
     "credit.lending_rate_bps": "Placeholders: people 7.0% (consumer loans; Bundesbank MFI interest rate statistics, Konsumentenkredite; recalled, to confirm); organisations 5.0% (loans to non-financial corporations up to EUR 1 million; same statistics; to confirm).",
-    "credit.serviceability_buffer_bps": "0: Germany has no regulatory minimum buffer on borrowers' repayment capacity (BaFin has had the power to set borrower-based measures since 2022 but none is in force; to confirm); banks do check a household budget in practice (see gaps).",
+    "credit.serviceability_buffer_bps": "(Left out since 2026-10-09: the serviceability buffer, which stood here as nought for a rule the place does not have. The note is its author's, as written.) 0: Germany has no regulatory minimum buffer on borrowers' repayment capacity (BaFin has had the power to set borrower-based measures since 2022 but none is in force; to confirm); banks do check a household budget in practice (see gaps).",
     "credit.max_repayment_share_bps": "Placeholders: people 35% of net monthly income (a common lending rule of thumb in German mortgage advice; to confirm); organisations 20% of what comes in.",
     "credit.arrears_days": "Placeholder: a month behind is arrears (a lender's first reminder).",
     "credit.default_days": "Default after 90 days past due on a material amount: Regulation (EU) No 575/2013 (Capital Requirements Regulation) Article 178.",
@@ -1479,7 +1481,7 @@
     "public_finance.rates_exempt_kinds": "Land used for public service, schools, and hospitals and charitable purposes is not subject to property tax (Grundsteuergesetz paras 3-4; to confirm): here, the clinic's, the school's, the police station's and the utilities'.",
     "public_finance.median_house_price": "Median asking price of a one- or two-family house in Niedersachsen, EUR 339,000 (EUR 2,158 a square metre), empirica for LBS NordWest, 2025, as reported by leinetal24.de, https://www.leinetal24.de/niedersachsen/niedersachsen-an-gefragten-standorten-auf-hohem-niveau-so-teuer-sind-immobilien-aktuell-in-94095224.html (asking prices, not sale prices; the original not opened, to confirm). The land value of a lot is derived from it: this less what the builder charges.",
     "services.waste_per_person_per_day_g": "Placeholder: about 460 kg of household waste per person a year (Destatis, Abfallbilanz; recalled, to confirm), a day's worth in grams.",
-    "services.landfill_levy_per_tonne": "0: Germany levies no landfill tax (landfilling untreated waste has been banned since 2005; waste incineration pays the national CO2 price under the Brennstoffemissionshandelsgesetz from 2024; both are not modelled; to confirm). See gaps.",
+    "services.landfill_levy_per_tonne": "(Left out since 2026-10-09: the landfill charge, which stood here as nought for a rule the place does not have. The note is its author's, as written.) 0: Germany levies no landfill tax (landfilling untreated waste has been banned since 2005; waste incineration pays the national CO2 price under the Brennstoffemissionshandelsgesetz from 2024; both are not modelled; to confirm). See gaps.",
     "services.council_staff_per_1000": "Placeholder carried over from the Australian profile (about 6 per 1,000, all of them the works crew); Germany's municipal staff is much larger (kindergartens, hospitals, social services), Destatis, Personal des oeffentlichen Dienstes (to source).",
     "services.collect_seconds_per_10kg": "Placeholder: a one-driver side-loader lifts up to 6 bins a minute (Bucher Municipal, Sport side loader); with driving between houses, about 1,000 bins a day is taken as a round, and a household's week of waste as about 24 kg: about 12 seconds of work per 10 kg.",
     "services.asset_life_years": "Placeholder: a park or civic building wears out in 15 years without upkeep (after VAGO, Maintaining Local Roads: spray seals last 10-15 years).",

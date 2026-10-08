@@ -149,9 +149,9 @@ test("the generated town: every law made from figures reads as its schedule writ
     }
   }
   // The laws on rent increases and industrial action, as they read from the profile's figures.
-  expect(records.find((r) => r.id === "law-rent-increases")).toMatchObject({ text: "A residential rent may be increased no more than once every 12 months, and only on written notice to the tenant of at least 60 days. Or else: the increase is invalid.",
+  expect(records.find((r) => r.id === "law-rent-increases")).toMatchObject({ text: "A residential rent may be increased no more than once every 12 months. A residential rent may be increased only on written notice to the tenant of at least 60 days. Or else: the increase is invalid.",
     formal: { language: "cel", condition: `block.block == 'publish' && block.kind == 'rent_increase' && (block.data.from - now < ${60 * DAY} || block.data.from - block.data.last_from < ${360 * DAY})` } });
-  expect(records.find((r) => r.id === "law-industrial-action")).toMatchObject({ text: "Industrial action is protected only if a ballot of the members concerned approves it, with at least 50% of them voting and more than 50% of the votes yes, and the employer has written notice of at least 3 days.",
+  expect(records.find((r) => r.id === "law-industrial-action")).toMatchObject({ text: "Industrial action is protected only where each of these holds. At least 50% of the members concerned have voted in a ballot on it. More than 50% of the votes in a ballot of the members concerned are for it. The employer has had written notice of it of at least 3 days.",
     formal: { language: "cel", condition: `block.block == 'publish' && block.kind == 'industrial_action' && (block.data.from - now < ${3 * DAY} || block.data.voted * 10000 < 5000 * block.data.eligible || block.data.yes * 10000 <= 5000 * block.data.voted)` } });
 });
 

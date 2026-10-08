@@ -10,6 +10,8 @@ Taxes are laws (records), and the institutions that levy, collect and pay are pa
 
 ## Tax on pay: a law that is a list of charges, withheld by employers (2026-10-08)
 
+**The law's words** give each charge's bands by where they begin, and the first by where it ends ("nothing up to 18,200, 16% above 18,200": until 2026-10-09, "0% above 0").
+
 **The law.** The outside world publishes a tax law at the start (`law-income-tax`, kind `law`, `data.tax` = `income`, `data.charges`). It is a list of **charges**, in the law's own order. A place with no charge on pay has no such law, and nothing is withheld. Each charge is data in four parts (`Charge`, `participants/src/behaviour/tax.ts`); every sum is a year's, in the smallest unit of the world's money:
 
 | Part | Says | Forms |
@@ -69,7 +71,7 @@ A charge may also say `itemised`: the employer's report of it names each worker 
   - a rate in the dollar of value a year (`rate_ppm`, millionths);
   - the instalments (4);
   - the days an instalment falls due after its notice (30);
-  - penalty interest on what's overdue (10% a year).
+  - penalty interest on what's overdue (10% a year), where the place charges any: a profile that states none (`rates_penalty_interest_bps` left out) has a rating law with no "or else", and the rates officer records none.
 
   The generator sets the opening rate to raise the profile's rates per resident from what's rateable. Rates become a steward's lever when budgets can set them (C4b).
 - **The rates officer** (`city.rates_officer`, replacing the tax clerk in the generated town):

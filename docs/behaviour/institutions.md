@@ -30,7 +30,7 @@ It inspects the building work it is told of. There is no patrol: until 0.6.0 the
 What happens next is up to the owner, and to whoever else might enforce.
 
 **Parameters:**
-- `fine` (default $50,000, matching the example law);
+- `fine` (a module default of 5,000,000 of the smallest unit; the generated town gives the profile's `town_finance.unpermitted_building_fine`, the same sum its planning law names);
 - `compliance_bps` (default 10000): how often it acts on what it finds. Below 10000 it sometimes looks the other way;
 - `sites`, `register`, `valuer`: the channel it goes to a site through, the land register's channels, and whom it tells.
 
