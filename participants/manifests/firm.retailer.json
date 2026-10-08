@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -27,12 +27,27 @@
       "default": 0,
       "source": "placeholder"
     },
+    "casual_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "placeholder"
+    },
     "chi_bps": {
       "schema": {
         "type": "integer"
       },
       "unit": "bps",
       "default": 1000,
+      "source": "placeholder"
+    },
+    "day_wage": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
       "source": "placeholder"
     },
     "delta_bps": {

@@ -77,7 +77,27 @@ The agreement itself is an ordinary employment agreement: the same notice, a sta
 
 **Leaves out:** a worker choosing or refusing an unregistered job, or asking less for a registered one (the citizen redesign: docs/design/ai-citizens.md, Open); an unregistered wage below the registered one (the surveys show a gap; the profile gives one wage for a kind of work, so both are paid it); a union treating such jobs differently; the firm's own tax; a share that differs between firms of one kind (each employer of a kind registers the kind's share of its own jobs, because a town has too few firms of a kind for "this firm does, that one does not" to give the place's share).
 
-**A worker's death** (v0.5.0): on the registration, it stops the wages and ends the employment on record; the post is advertised again as staffing allows.
+## Work by the day (2026-10-09; profile-depth item 1, part b)
+
+**In the real world.** Casual labour is hired and paid by the day or the task: a builder's hands for the days there is a job, a works' extra hands for an order. Labour force surveys count it as a status of its own beside regular wage work and self-employment, and publish its daily wage (the profiles' notes cite theirs).
+
+**The terms.** Work by the day is an employment agreement whose pay is a day's: the employer's commitment is a sum of money every day (`every` of one day), each side's notice is the least an agreement can say (one second: the agreement record's own fields, no new ones), and its words say "for each day worked; either may end it at once". That is all that marks it (`byTheDay`, `firms.ts`).
+
+**The rule.** A profile may state, by kind of firm, the share of jobs that are by the day (`employment.casual_bps`) and a day's pay for it (`employment.day_wage`), each with its source; a share without a day's pay is refused. At the start the generator makes that share of each such employer's jobs by the day. In the run, `Staffing` (for `firm.retailer`, `firm.producer`, `firm.builder`):
+
+| | |
+|---|---|
+| **Taking on** | A posting is for work by the day with the chance the share gives (drawn for each posting), at the day's pay, which moves as the firm's wage does. It says so (`data.by_the_day`, a period of a day), and its offer carries the terms. One applicant at random, as for any posting |
+| **Pay** | No standing order. On each working day, each hand who is at the workplace is paid the day's pay that day, once, by a payment of its own (an instruction to the firm's bank). Not there, not a working day, or no work for them today: no pay, and nothing owed. Short of money for all, the longest with the firm are paid first |
+| **The days there is work** | The builder: the days it has building in hand. The shop and the factory: every working day (a refinement for the factory, an order in hand, is left out) |
+| **What the law takes** | From a registered job by the day, what the charges take from a day's pay, reckoned as a year's over the working days of the week (a day's pay is pay for a working day, not for every day of the year: `dayPayPeriod`); paid over and reported with the rest. An unregistered one: nothing, as above |
+| **Ending** | Either side, at once. The firm lets the most recent hire go as before; with no notice to work out, the hand is gone that hour |
+
+**The hand** (docs/behaviour/citizen.md): knows the day's pay, whole or less tax, as their pay; reckons a month's income as the working days of a month of it; and, with no pay for most of a week (a pay period and five days, as for any job), takes it that there is no work for them there and ends it, with nothing to claim: no debt arises from a day not worked. Then they look for work as anyone out of work does.
+
+**Leaves out:** turning up each morning to be picked (the hand stays on the employer's list between days, which is how a regular day labourer is with a regular employer; a labour stand where strangers are picked each dawn is not modelled); pay by the task; a different crew each day; a firm choosing to fill a job by the day because trade is uncertain (the share is the place's stated fact); whether someone prefers a standing wage to more days' pay (the citizen redesign); the board's reader comparing a day's pay with a fortnight's on equal terms when the board is read in order of pay (a posting by the day reads low there; a person offered both compares them by the month).
+
+: on the registration, it stops the wages and ends the employment on record; the post is advertised again as staffing allows.
 
 ## Calibration notes for the checkpoint
 

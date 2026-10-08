@@ -33,7 +33,7 @@ import * as C from "../calls";
 import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, DAY, nextLook, usd, jobTerms, record, leaseTerms, message, MONTH, moveIn, moveOut, notice, pay, PAYMENT_FAILED, petitionSignatures, publishedCount, say, sign, stoodEmpty, structureOf, variableToday, vote, withdraw, type Step, ownBanked } from "./common";
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
-import { incomeTaxLaw, withholding } from "./tax";
+import { dayPayPeriod, incomeTaxLaw, withholding } from "./tax";
 import { declarationFor, forHousehold, forOutOfWork, stopsWorkAt, supportLaw, type PaymentRule } from "./payments";
 import { Borrowing, loanFor } from "./credit";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.42.0", // 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.42.1", // 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -472,7 +472,8 @@ export const citizen: BehaviourModule = {
     const stopAge: number | null = p.stops_work_at === "never" ? null : p.stops_work_at ?? (p.stop_work_curve ? stopsWorkAt(p.stop_work_curve, ctx.rng("stops-work").below(10_000)) ?? null : p.retirement_age);
     let retired = false; // we have stopped work
     const inflows: { t: number; amount: number }[] = []; // money that came in (refunds counted negative), for what our income is
-    const wageIncome = () => (job ? Math.floor((job.wage * MONTH) / job.period) : 0);
+    // (Work by the day is paid for the days worked: the working days of a month, not every day of it.)
+    const wageIncome = () => (!job ? 0 : job.period === DAY ? Math.floor((job.wage * 30 * (p.round?.work_days ?? 5)) / 7) : Math.floor((job.wage * MONTH) / job.period));
     // (Support for being out of work isn't income once we're in work: we stop claiming it. Counting it, a household applied
     // for a home only that income could afford, and then couldn't sign.)
     const supportIncome = (lastingOnly: boolean) => [...benefits.values()].filter((b) => b.lasting || (!lastingOnly && !job)).reduce((x, b) => x + Math.floor((b.amount * MONTH) / b.every), 0);
@@ -683,7 +684,8 @@ export const citizen: BehaviourModule = {
         }
         inflows.push({ t: tx.t, amount: cents(tx.amount) });
         // Our wages, as agreed: the wage, less the income tax the law says our employer withholds.
-        if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period))) {
+        // (A day's pay for work by the day: less what the law takes from a day's pay, reckoned over the working week.)
+        if (job && (cents(tx.amount) === job.wage || cents(tx.amount) === job.wage - withholding(incomeTaxLaw(book), job.wage, job.period === DAY ? dayPayPeriod(p.round?.work_days ?? 5) : job.period))) {
           job.paidAt = tx.t;
           mind.learn("job", job.employer, 10_000); // an employer that pays, as agreed
         }
@@ -1051,7 +1053,13 @@ export const citizen: BehaviourModule = {
       // employee can (docs/behaviour/citizen.md). The claim is a debt recorded against the employer.
       if (job && !job.claimed && t < jobEnds(job) && !striking) {
         const last = job.paidAt ?? job.since;
-        if (t - last > job.period + 5 * DAY) {
+        if (t - last > job.period + 5 * DAY && job.period === DAY) {
+          // Work by the day that has brought no pay for most of a week: there is no work there for us. Nothing is owed
+          // for a day not worked, so there is nothing to claim; we end it, as its terms let either side, and look elsewhere.
+          job.claimed = true;
+          steps.push(because(`No pay from our work by the day for ${Math.floor((t - last) / DAY)} days: there is no work for us there. Ending it.`, notice(job.agreement, "No work by the day for us here.")));
+          job.leftAt = t;
+        } else if (t - last > job.period + 5 * DAY) {
           job.claimed = true;
           mind.learn("job", job.employer, 0); // an employer that didn't pay: remembered
           feelings.feel("anger", job.employer, 8_000, t);

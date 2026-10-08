@@ -42,8 +42,12 @@ export interface Profile {
      * firms.md, "Informal work"). Each part is left out where the place's survey gives no figure, and the town is
      * then as it was: every job registered, on a standing wage.
      * `registered_bps`: of the jobs at employers of a kind (the kinds wages are given for), the share the employer
-     * registers: withholds from, and reports. Left out for a kind: all of them. */
-    employment?: { registered_bps?: { shop?: number; factory?: number; construction?: number } };
+     * registers: withholds from, and reports. Left out for a kind: all of them.
+     * `casual_bps`: of the jobs at employers of a kind, the share that is work by the day: taken on and paid by the
+     * day, for the days worked, with no notice and no standing wage; `day_wage`: a day's pay for it, by kind (needed
+     * for each kind that has a share). */
+    employment?: { registered_bps?: { shop?: number; factory?: number; construction?: number };
+      casual_bps?: { shop?: number; factory?: number; construction?: number }; day_wage?: { shop?: number; factory?: number; construction?: number } };
     rents_per_month: {
       apartment_units: { bedrooms: number; count: number; rent: number }[];
       house_types: { id: string; bedrooms: number; share_bps: number; rent: number }[];
