@@ -119,9 +119,18 @@ export interface BehaviourModule {
  */
 export const DECISIONS = Symbol.for("oikos.decisions");
 /** `state`: the mind's state behind it (contracts-0.7 A2): needs, satisfaction and certainty, and the strongest feeling,
- * beliefs held and goal pursued when there are any. */
+ * beliefs held and goal pursued when there are any. What it had before it, where the mind decided: each option's `facts`
+ * (a month's money in or out, a home and its bedrooms, hours, goods, company), how many `others` it knows took it, its
+ * `meaning` to them and what they have `learned` of it (basis points; absent: not known); `current`: their routine;
+ * `circumstances`; `satisfied_here` and `doubt` as the decision was given them; `person` (values, temperament, need
+ * weights), with a citizen's first recorded decision only. Whole numbers throughout. */
 export interface DecisionRecord {
-  t: number; domain: string; strategy: string; choice?: string; options: { key: string; score: number }[];
+  t: number; domain: string; strategy: string; choice?: string;
+  options: { key: string; score: number; facts?: { money_per_month: number; home?: { bedrooms?: number }; work_hours_per_month?: number; goods_per_month?: number; company?: number; time_hours_per_month?: number }; others?: number; meaning?: number; learned?: number }[];
+  current?: string;
+  circumstances?: { monthly_income: number; savings: number; homeless: boolean; bedrooms_needed?: number; essentials?: number };
+  satisfied_here?: number; doubt?: number;
+  person?: { values: { [value: string]: number }; temperament: { [facet: string]: number }; weights: { [need: string]: number } };
   state?: { mind: string; needs: { [need: string]: number }; satisfaction: number; certainty: number; emotion?: { kind: string; about: string; bps: number }; beliefs?: { [assertion: string]: number }; goal?: { goal: string; method: string } };
 }
 
