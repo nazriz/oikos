@@ -22,7 +22,7 @@ import { Deliveries, fill, goodsPrices, held, order, OrderBook, priceList } from
  */
 export const producer: BehaviourModule = {
   name: "firm.producer",
-  version: "0.4.1",
+  version: "0.4.2",
   doc: "docs/behaviour/producer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -196,7 +196,7 @@ export const producer: BehaviourModule = {
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
           target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
-          why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} a fortnight.`,
+          why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} every ${p.period / DAY} days.`,
         }));
         // Can't cover the next pay period: let the most recent hire go.
         steps.push(...borrowing.steps(book, t, acc.account));
@@ -219,7 +219,8 @@ export const producer: BehaviourModule = {
           if (borrowing.canApply(t)) {
             const amount = Math.ceil((2 * bill) / 100_000) * 100_000;
             steps.push(borrowing.apply(t, acc.account, amount, 12, "working capital", `We have ${usd(acc.balance)}, not enough for the next pay period (${workers.length} staff): asking our bank for ${usd(amount)} of working capital before letting anyone go.`));
-          } else if (!borrowing.waiting(t)) {
+          } else if (!borrowing.waiting(t) && acc.balance < staffing.staying(book, t) * wage) {
+            // (Until those who stay can be paid: the ones already given notice are going.)
             const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${workers.length} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
             if (s.length) headcount = Math.min(headcount, workers.length - 1);
             steps.push(...s);

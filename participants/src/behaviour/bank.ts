@@ -62,7 +62,7 @@ export const bankPaymentSystem: BehaviourModule = {
   keeps: [
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
   ],
-  version: "0.11.0",
+  version: "0.11.1",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -124,9 +124,21 @@ export const bankPaymentSystem: BehaviourModule = {
         }
       }
       // (Those withdrawn since the last plan: the set only grows, in the order they were withdrawn.)
+      // (A payment that fell due before its order was withdrawn is still made: the bank goes through its plans a day
+      // apart, and an order replaced in the hours after its pay day, a wage at a new rate say, would lose that pay.)
+      const lastCall = new Map<string, { order: StatementRecord; until: number }>();
       if (withdrawn.size !== withdrawnSeen) {
         let i = 0;
-        for (const id of withdrawn) if (i++ >= withdrawnSeen && standing.delete(id)) undated.delete(id);
+        for (const id of withdrawn) {
+          if (i++ < withdrawnSeen) continue;
+          const r = standing.get(id);
+          if (!r) continue;
+          const until = book.withdrawnAt.get(id) ?? obs.t;
+          const next = nextDue.get(id) ?? r.at + (Number.isInteger(r.data?.first) ? (r.data!.first as number) : (r.data!.every as number));
+          if (next <= until) lastCall.set(id, { order: r, until });
+          standing.delete(id);
+          undated.delete(id);
+        }
         withdrawnSeen = withdrawn.size;
       }
       // The instructions to go through: the new ones, and of the standing orders every one if what's checked has
@@ -145,13 +157,14 @@ export const bankPaymentSystem: BehaviourModule = {
         }
       }
       for (const r of fresh) look.set(r.id, r);
+      for (const [id, x] of lastCall) look.set(id, x.order);
       const instructions = [...look.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
       const out: Payment[] = [];
       // Deaths registered: the dead person's instructions are no longer carried out (law-succession).
       const deaths = book.all("death_registration");
       const dead = new Set(deaths.map((r) => r.data?.deceased as string));
       for (const ins of instructions) {
-        if (withdrawn.has(ins.id) || dead.has(ins.speaks_for ?? "")) continue;
+        if ((withdrawn.has(ins.id) && !lastCall.has(ins.id)) || dead.has(ins.speaks_for ?? "")) continue;
         // Requests the bank can't carry out get a reply, once, as a real bank's would (§9.3).
         const cannot = (why: string) => {
           if (done.has(ins.id)) return;
@@ -211,7 +224,8 @@ export const bankPaymentSystem: BehaviourModule = {
             done.add(`died:${ins.id}`);
             refusals.push(message([ins.author === "genesis" ? ins.speaks_for ?? me : ins.in_position ?? ins.author], PAYEE_DIED.note(payee.holder, d.to, ins.id), ins.id));
           }
-          while (due <= obs.t) {
+          const until = Math.min(obs.t, lastCall.get(ins.id)?.until ?? obs.t);
+          while (due <= until) {
             out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due });
             due += d.every;
           }
