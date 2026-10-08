@@ -1,0 +1,62 @@
+[
+ {
+  "name": "w2-01-council",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=101",
+   "profile=au-vic-2026",
+   "mayor=llm",
+   "model_seats=council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "codex/gpt-6-luna",
+  "until": 3888000,
+  "budget": 15,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2a (planned 2026-10-08), for the translator's data. Profile au-vic-2026, seed 101, 1,000 people, 45 days. Seats: mayor, council-clerk, councillor-1, councillor-2, councillor-3, councillor-4, councillor-5, all on claude-code/claude-sonnet-5-5. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. A council of models: the first votes any seat has cast, and councillors who read their letters."
+ },
+ {
+  "name": "w2-02-housing",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=102",
+   "profile=gb-eng-2026",
+   "model_seats=landlord-1-office,landlord-2-office,tribunal-member,tribunal-registrar"
+  ],
+  "model": "claude-code/claude-haiku-5-5",
+  "translator": "decide/pod-small-d16-s1",
+  "until": 3888000,
+  "budget": 45,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2a (planned 2026-10-08), for the translator's data. Profile gb-eng-2026, seed 102, 1,000 people, 45 days. Seats: landlord-1-office, landlord-2-office, tribunal-member, tribunal-registrar, all on claude-code/claude-haiku-5-5. Translator: decide/pod-small-d16-s1 (the trained one). Every draft is confirmed or declined by its seat. Private and judicial seats in a second currency, with the trained translator: leases, notices, orders."
+ },
+ {
+  "name": "w2-03-election",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=103",
+   "profile=de-ni-2026",
+   "mayor=llm",
+   "model_seats=electoral,editor,council-clerk"
+  ],
+  "args": [
+   "--scenario",
+   "election-due"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "codex/gpt-6-luna",
+  "until": 6480000,
+  "budget": 30,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2a (planned 2026-10-08), for the translator's data. Profile de-ni-2026, seed 103, 1,000 people, 75 days, starting conditions election-due. Seats: mayor, electoral, editor, council-clerk, all on claude-code/claude-sonnet-5-5. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. An election due on day 60, in a place that writes a decimal comma: notices, nominations, a count, an appointment."
+ }
+]
