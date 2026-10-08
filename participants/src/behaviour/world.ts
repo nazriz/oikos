@@ -55,6 +55,7 @@ export const exportDemand: BehaviourModule = {
  */
 export const trade: BehaviourModule = {
   name: "world.trade",
+  answers: {"office": "the world market's office", "acts": "What it acts on: an order for what it lists, paid for at its published prices."},
   boundary: [
     { what: "future", why: "A researcher's scripted shocks to world prices and demand are a scenario's boundary condition: this module is the world market and applies each from its day, publishing nothing of one before it comes." },
     { what: "every:factory", why: "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export." },
@@ -231,6 +232,7 @@ export const trade: BehaviourModule = {
  */
 export const transfers: BehaviourModule = {
   name: "world.transfers",
+  answers: {"office": "the support office", "acts": "What it acts on: a claim for a payment under the support law, made by the person it is for."},
   version: "0.3.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
@@ -364,6 +366,7 @@ export const transfers: BehaviourModule = {
  */
 export const funding: BehaviourModule = {
   name: "world.funding",
+  answers: {"office": "the wholesale funding desk", "acts": "What it acts on: a bank's draw on its funding, and the bank's repayments."},
   version: "0.1.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
@@ -396,6 +399,7 @@ export const funding: BehaviourModule = {
  */
 export const weather: BehaviourModule = {
   name: "world.weather",
+  answers: {"office": "the weather bureau", "acts": "It publishes its warnings as it issues them. It takes no requests."},
   boundary: [
     { what: "future", why: "The weather is fixed before the run, like the ground: this module stands for it at the world's edge, and is handed the spells to come so that it can warn of each a few days ahead. Nothing in the world can know or change them otherwise." },
   ],
@@ -436,6 +440,7 @@ export const weather: BehaviourModule = {
  */
 export const statistics: BehaviourModule = {
   name: "world.statistics",
+  answers: {"office": "the statistician's office", "acts": "It publishes its figures as it makes them. It takes no requests."},
   version: "0.2.0", // 0.2.0: the population estimate
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
@@ -498,6 +503,7 @@ export const statistics: BehaviourModule = {
  */
 export const valuer: BehaviourModule = {
   name: "world.valuer",
+  answers: {"office": "the valuer's office", "acts": "What it acts on: a rating authority's request to value a property; and the notices it is given of land changing hands."},
   keeps: [
     { what: "property_roll", why: "The valuation roll is the valuer's own: it makes an entry for each property it values." },
     { what: "acquisition_notice", why: "Each notice that land has changed hands is given to it, to keep its roll's owners by." },
@@ -566,6 +572,7 @@ export const valuer: BehaviourModule = {
  */
 export const grants: BehaviourModule = {
   name: "world.grants",
+  answers: {"office": "the grants office", "acts": "It pays by its determination, which is on file with whoever it pays: so much a year for each resident, by the published estimate of the population. A letter changes nothing in a determination."},
   version: "0.3.0", // 0.3.0: pays by the published population estimate; no longer shown the town's homes
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
@@ -602,6 +609,7 @@ export const grants: BehaviourModule = {
  */
 export const disposal: BehaviourModule = {
   name: "world.disposal",
+  answers: {"office": "the landfill's office", "acts": "What it acts on: a docket for what is brought to it, invoiced every month at the charge it has notified."},
   version: "0.1.0",
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,

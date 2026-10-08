@@ -7,7 +7,7 @@ import type { Assertion, LookRequest, Observation, Offer, Outcome as ActOutcome,
 import { basesOf, channels } from "../contracts";
 import { cents, moneyNow } from "../money";
 import { evaluate } from "../law";
-import type { ParticipantContext } from "../module";
+import type { Answers, BehaviourModule, ParticipantContext } from "../module";
 
 export const DAY = 86_400;
 export const MONTH = 30 * DAY;
@@ -1038,7 +1038,10 @@ export const callAction = (step: Step): ParticipantAction => {
  * answers every one the same way). Office reports aren't answered, so offices never write to each other forever.
  */
 export class Letters {
-  private pending: { id: string; from: string; as?: string; entity?: string }[] = [];
+  private pending: { id: string; from: string; as?: string; entity?: string; text: string }[] = [];
+  /** `answers`: what the office says of itself after its report (the module's `answers`): that the report is what
+   * every letter gets, and what the office does act on. */
+  constructor(private readonly answers?: Answers) {}
   /** Letters in: all but our own, reports (answers to letters), and news of a request of ours from those we asked to
    * carry it out (a bank saying a payment we asked for wasn't made), which isn't a question. A letter about anything
    * else is (pilot 10: a mayor asking the bank about an invoice, by its id, went unanswered). */
@@ -1049,15 +1052,68 @@ export class Letters {
       const sender = m.from_entity ?? (m.as ? book.positions.get(m.as)?.entity : book.participantPerson.get(m.from));
       return !!sender && (r.addressed_to ?? []).includes(sender);
     };
-    for (const m of obs.inbox) if (m.from !== obs.participant && !m.text.startsWith("Report from ") && !newsOfOurRequest(m)) this.pending.push({ id: m.id, from: m.from, ...(m.as ? { as: m.as } : {}), ...(m.from_entity ? { entity: m.from_entity } : {}) });
+    for (const m of obs.inbox) if (m.from !== obs.participant && !officeNote(m.text) && !newsOfOurRequest(m)) this.pending.push({ id: m.id, from: m.from, ...(m.as ? { as: m.as } : {}), ...(m.from_entity ? { entity: m.from_entity } : {}), text: m.text });
   }
   /** Each letter answered with the report (which may depend on who wrote: the participant, the position it wrote in,
    * and whom it wrote for, which a letter says of itself). */
   answer(report: (from: { participant: string; as?: string; entity?: string }) => string, why = "A letter to our office: answering with our standard report."): Step[] {
-    const out = this.pending.map((m) => because(why, message([m.from], report({ participant: m.from, as: m.as, entity: m.entity }), m.id)));
+    const out = this.pending.map((m) => because(why, message([m.from], `${report({ participant: m.from, as: m.as, entity: m.entity })}${this.answers ? ` ${REPORT_TAIL} ${whatItActsOn(this.answers, m.text)}` : ""}`, m.id)));
     this.pending = [];
     return out;
   }
+}
+
+/**
+ * A letter that is another office's notice, report or acknowledgement, in the fixed words offices write: not a
+ * question, and never answered (so that offices do not write to each other for ever). A person's letter is anything
+ * else.
+ */
+export const officeNote = (text: string): boolean =>
+  /^(Report from |From [^:]{1,80}: your )/.test(text) || PAYMENT_FAILED.is(text) || PAYEE_DIED.who(text) !== undefined ||
+  /^(Request \S+ not carried out: |Payment of .+ couldn't be made: |Hold \S+ (is in place|does not apply|is not in place)|Withdrawal \S+ (is not acted on|does not apply))/.test(text);
+
+/** What an office with a standing report says after it. */
+export const REPORT_TAIL = "That is this office's standing report, sent in answer to any letter: it does not act on a letter's words.";
+
+/** What an office acts on and how, in its own fixed words; and, where the letter plainly concerns something it has a
+ * form or a set way for, what it says of that. */
+export function whatItActsOn(a: Answers, letter: string): string {
+  const said = letter.toLowerCase();
+  const hints = (a.forms ?? []).filter((f) => f.about.some((w) => said.includes(w))).map((f) => f.say);
+  return [a.acts, ...hints].join(" ");
+}
+
+/** The acknowledgement an office with no report of its own sends. */
+export const acknowledged = (a: Answers, letter: string): string => `From ${a.office}: your letter is received. This office does not act on a letter's words. ${whatItActsOn(a, letter)}`;
+
+/**
+ * A module whose office acknowledges its letters (docs/behaviour/letters.md): one that says how it answers (`answers`)
+ * and has no standing report of its own. Each letter that is not another office's note is answered once, when the
+ * office has done its own work for the wake: that it is received, that the office does not act on a letter, and what
+ * it does act on. The module itself is untouched: it never sees that the letters were answered.
+ */
+export function answering<M extends BehaviourModule>(m: M): M {
+  const a = m.answers;
+  if (!a || a.report) return m;
+  return { ...m, create(ctx: ParticipantContext) {
+    const inner = m.create(ctx);
+    const step = inner.step.bind(inner);
+    let letters: { id: string; from: string; text: string }[] = [];
+    let then: ParticipantAction | undefined; // what the module answered when we acknowledged in its place: given next
+    inner.step = (obs, x) => {
+      if (then) {
+        const waited = then;
+        then = undefined;
+        return waited;
+      }
+      for (const l of obs.inbox) if (l.from !== obs.participant && !officeNote(l.text)) letters.push({ id: l.id, from: l.from, text: l.text });
+      const act = step(obs, x);
+      if (!letters.length || act instanceof Promise || act.type !== "wait") return act;
+      then = act;
+      return callAction(because(`Letters to ${a.office}: acknowledging each, and saying what the office acts on.`, ...letters.splice(0, 16).map((l) => message([l.from], acknowledged(a, l.text), l.id))));
+    };
+    return inner;
+  } };
 }
 
 /**

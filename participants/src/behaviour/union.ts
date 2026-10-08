@@ -31,6 +31,7 @@ interface Dispute {
 
 export const organiser: BehaviourModule = {
   name: "union.organiser",
+  answers: {"office": "the union's office", "acts": "What it acts on: an application to join; its members' votes on its ballots; and an employer's answer to a claim it has made."},
   issues: P.UNION,
   version: "0.5.0",
   doc: "docs/behaviour/unions.md",

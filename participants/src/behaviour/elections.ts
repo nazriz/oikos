@@ -38,6 +38,7 @@ export function instantRunoff(candidates: string[], rankings: string[][]): { win
 
 export const electoralOffice: BehaviourModule = {
   name: "city.electoral_office",
+  answers: {"office": "the electoral office", "acts": "What it acts on: a nomination for an office it has given notice of an election for, lodged before nominations close; and a vote cast on its ballot while the poll is open."},
   issues: P.ELECTORAL,
   keeps: [
     { what: "enrolment", why: "The electoral office keeps the roll: every elector's enrolment is lodged with it." },

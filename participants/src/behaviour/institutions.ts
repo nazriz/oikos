@@ -76,6 +76,7 @@ export function ownLand(book: Book, owner: string): OwnLot[] {
  */
 export const planningOfficer: BehaviourModule = {
   name: "city.planning_officer",
+  answers: {"office": "the planning office", "acts": "What it acts on: an application for a planning permit on the permit form (permit_application), which it decides under the planning law.", "forms": [{"about": ["permit", "build", "applic", "develop"], "say": "An application to build goes on the permit form (permit_application), naming the lot and the kind of building."}], "report": true},
   issues: P.PLANNING,
   version: "0.9.0", // 0.9.0: the town's land from the town's own papers; no longer shown the land register or a survey of the town
   doc: "docs/behaviour/institutions.md",
@@ -88,7 +89,7 @@ export const planningOfficer: BehaviourModule = {
     const book = new Book();
     const decided = new Set<string>();
     const decided_: { application: string; decision: "granted" | "refused" | "incomplete"; law?: string }[] = [];
-    const letters = new Letters();
+    const letters = new Letters(planningOfficer.answers);
     return noting(book, stepper(
       (obs) => {
         book.absorb(obs);
@@ -158,6 +159,7 @@ export const planningOfficer: BehaviourModule = {
  */
 export const inspector: BehaviourModule = {
   name: "city.inspector",
+  answers: {"office": "the building inspector's office", "acts": "What it acts on: a notice of building work given to the town, whose site it goes to see; and a direction on its enforcement form (inspector_enforcement) from those the town's rule on directions names.", "report": true},
   issues: P.INSPECTOR,
   issuesWith: (p) => ({ valuer: p.valuer }),
   takes: [{ form: "inspector_enforcement", title: "Enforcement direction to the building inspector",
@@ -187,7 +189,7 @@ export const inspector: BehaviourModule = {
     const sitesSeen = new Map<string, SiteStructure | null>(); // structure -> as we found it (null: nothing there)
     const found: string[] = []; // breaches acted on: "structure on lot (law)"
     let inspected = 0;
-    const letters = new Letters();
+    const letters = new Letters(inspector.answers);
     const report = () =>
       `Report from the building inspector: ${taken.size} notices of building work received, ${inspected} sites inspected. ${found.length ? `Breaches found and acted on (a fine and a demolition order each): ${found.join(", ")}.` : notFined.length ? "No breaches acted on." : "No breaches found."}${notFined.length ? ` Breaches found and, by direction, not fined or ordered demolished: ${notFined.join(", ")}.` : ""} We inspect the work we are told of; work nobody tells the town of we don't see.`;
     return noting(book, stepper(
@@ -298,6 +300,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
+  answers: {"office": "the builder's office", "acts": "What it acts on: a construction agreement signed with it, built once a permit for the site is in force and invoiced as agreed. Its prices are published.", "report": true},
   issues: [P.JOB_ADVERTISEMENT],
   issuesWith: (p) => P.staffingOwn({ role: "construction worker", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   version: "0.12.3", // 0.12.3: takes on the share of its hands the world gives by the day, and pays them for the days there is building to do; 0.12.2: registers the share of its jobs the world gives for its kind; 0.12.1: with what 0.11.2 changed; 0.12.0: goes to a lot before building on it, sees its sites as its crew works on them, and gives notice of building work; no longer shown the town
@@ -376,7 +379,7 @@ export const builder: BehaviourModule = {
     // What's recorded against us to pay (rates on our yard, a fine), paid as a firm pays its debts (we don't wind up).
     const dues = new WindingUp(ctx.entity, { short_days: 0, wind_up_days: 0, idle_days: 0, reprice_days: 0, reprice_bps: 0 });
     let lastLetGo = -Infinity;
-    const letters = new Letters();
+    const letters = new Letters(builder.answers);
     const deliveries = new Deliveries();
     const handled = new Set<string>(); // contracts taken on
     const going = new Map<string, string[]>(); // contract -> the places its foreman has set out to see
@@ -666,6 +669,7 @@ export const builder: BehaviourModule = {
  */
 export const landRegistry: BehaviourModule = {
   name: "land.registry",
+  answers: {"office": "the land registry", "acts": "What it acts on: a question about one lot or one title, asked of the register; a transfer of a title by its holder; and an application for a dead owner's land to pass.", "report": true},
   keeps: [
     { what: "lot", why: "The land registry makes the register of land: the plan of each lot is part of it." },
     { what: "records:claim", why: "The register of land it keeps: every title is made by being entered in it." },
@@ -683,7 +687,7 @@ export const landRegistry: BehaviourModule = {
     }, ctx.params);
     const me = ctx.entity;
     const book = new Book();
-    const letters = new Letters();
+    const letters = new Letters(landRegistry.answers);
     const applied = new Set<string>(); // transmission applications dealt with
     let dealings = 0; // how many transfers of the register we have read
     let passed = 0;
@@ -737,6 +741,7 @@ export const landRegistry: BehaviourModule = {
  */
 export const registry: BehaviourModule = {
   name: "city.registry",
+  answers: {"office": "the registry of births, deaths and marriages", "acts": "What it acts on: a notification of a death or of a birth, which it enters in its register; it sends the entry to whoever reported it and to those the notification names.", "report": true},
   issues: P.REGISTRY,
   issuesWith: (p) => ({ feeds: p.feeds ?? [], land_registry: p.land_registry }),
   version: "0.7.0", // 0.7.0: keeps no register of land: it applies to the land registry for a dead owner's titles to pass; 0.6.0: registers births
@@ -760,7 +765,7 @@ export const registry: BehaviourModule = {
     const registered = new Set<string>();
     const read = new Set<string>(); // notifications dealt with
     const born = new Set<string>();
-    const letters = new Letters();
+    const letters = new Letters(registry.answers);
     return stepper(
       (obs) => {
         book.absorb(obs);
@@ -826,13 +831,14 @@ export const registry: BehaviourModule = {
  */
 export const childProtection: BehaviourModule = {
   name: "city.child_protection",
+  answers: {"office": "the child protection office", "acts": "What it acts on: an entry of a death that leaves children with no adult at home.", "report": true},
   version: "0.3.1",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(_ctx: ParticipantContext) {
     const book = new Book();
     const taken = new Set<string>();
-    const letters = new Letters();
+    const letters = new Letters(childProtection.answers);
     return stepper(
       (obs) => {
         book.absorb(obs);

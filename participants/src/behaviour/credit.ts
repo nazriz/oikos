@@ -138,6 +138,7 @@ export function payout(payment: number, annualBps: number, monthsLeft: number): 
  */
 export const lending: BehaviourModule = {
   name: "bank.lending",
+  answers: {"office": "the bank's lending office", "acts": "What it acts on: an application for a loan, which it decides by its published terms; and the repayments of the loans it has made."},
   issues: P.LENDING,
   issuesWith: (p) => ({ funder: p.funding_from ?? undefined }),
   keeps: [

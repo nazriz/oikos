@@ -27,6 +27,7 @@ const KINDS: { [kind: string]: { weight: number; tone: (r: any) => number; headl
 
 export const newspaper: BehaviourModule = {
   name: "firm.newspaper",
+  answers: {"office": "the paper's editor", "acts": "The paper reports the public record. It prints no letters."},
   issues: P.EDITOR,
   issuesWith: (p) => ({ town: p.town }),
   version: "0.1.0",

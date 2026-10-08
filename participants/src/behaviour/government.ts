@@ -57,6 +57,7 @@ function budgetFor(book: Book, year: number): StatementRecord | undefined {
  */
 export const mayorCode: BehaviourModule = {
   name: "city.mayor_code",
+  answers: {"office": "the mayor's office", "acts": "What it acts on: a petition once its organiser's published count reaches the town's threshold; an invoice for work this office commissioned, which it approves in writing; and each year's budget, which it puts to the council. It gives no direction by letter.", "forms": [{"about": ["direction", "direct ", "staff", "recruit", "hire", "hiring", "crew", "vacanc", "posts"], "say": "If your letter asks for a direction: this office has given none on the matter, and an office needs none to act within its own powers and its budget line."}]},
   issues: P.MAYOR,
   issuesWith: (p) => ({ electoral: p.electoral }),
   version: "0.12.0", // 0.12.0: tables the next year's budget before the year begins (budget_lead_days), and each paper says its lines as the town writes its money; builds by the budget of the year it is in
@@ -285,6 +286,7 @@ export const mayorCode: BehaviourModule = {
  */
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
+  answers: {"office": "the council clerk's office", "acts": "What it acts on: a proposal put to the council on the council proposal form (council_proposal) or on a law's amendment form, which it puts to a ballot of the councillors; and the votes cast in a councillor's post while a ballot is open.", "forms": [{"about": ["propos", "motion", "amend", "resolution", "put to the council", "put to council"], "say": "What you want the council to decide goes on the council proposal form (council_proposal); a change to a figure in a law in force goes on that law's amendment form."}], "report": true},
   issues: P.COUNCIL_CLERK,
   version: "0.10.0", // 0.10.0: a result names who voted for and against; a vote on a closed ballot, or by someone who is no councillor, is not counted and its caster is told; 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
   doc: "docs/behaviour/government.md",
@@ -300,7 +302,7 @@ export const councilClerk: BehaviourModule = {
     const seated = new Set<string>();
     const balloted = new Set<string>();
     const closed = new Set<string>();
-    const letters = new Letters();
+    const letters = new Letters(councilClerk.answers);
     let membersAsked = -Infinity;
     let votesRead = 0; // how many of the votes it has been shown it has looked at (for those that do not count)
     return stepper(
@@ -444,6 +446,7 @@ export const councilClerk: BehaviourModule = {
  */
 export const councillor: BehaviourModule = {
   name: "city.councillor",
+  answers: {"office": "a councillor", "acts": "A councillor acts by voting on the council's open ballots, and a letter does not change a vote. What you want the council to decide goes to the council clerk on the council proposal form (council_proposal).", "report": true},
   version: "0.5.2", // 0.5.2: leaves alone a ballot that says it is closed
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
@@ -452,7 +455,7 @@ export const councillor: BehaviourModule = {
     const book = new Book();
     const voted = new Set<string>();
     const cast: string[] = []; // "ballot: yes|no", for its answer to letters
-    const letters = new Letters();
+    const letters = new Letters(councillor.answers);
     const place = (tags: string[]) => (tags.includes("tenant_protection") ? 60 : 0) - (tags.includes("development") ? 60 : 0);
     return stepper(
       (obs) => {
@@ -493,6 +496,7 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
+  answers: {"office": "the finance office", "acts": "What it acts on: an invoice addressed to the town, paid within the adopted budget (over the payments procedure's figure, once the mayor's written approval is on file); a payroll notice from an office that has taken someone on or is losing someone; and the tax withheld from wages, paid over each month. It does not start, stop or change a payment on a letter.", "forms": [{"about": ["approv"], "say": "An approval of an invoice is the mayor's to give, in writing, naming the invoice."}], "report": true},
   version: "0.10.0", // 0.10.0: sets a new starter's wage up on the hiring office's payroll notice, from the first pay day it gives (with none after payroll_wait_days, from the agreement on file); asks the mayor, once, for the written approval an invoice over the procedure's figure needs. 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
@@ -510,7 +514,7 @@ export const financeOfficer: BehaviourModule = {
     const payroll = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, role: "staff", does: { hire: false, pay: true }, notice_wait: p.payroll_wait_days * DAY });
     const approvalAsked = new Set<string>(); // invoices it has asked the mayor to approve
     let wagesAtYear = 0;
-    const letters = new Letters();
+    const letters = new Letters(financeOfficer.answers);
     // The town account's money in and out, as the office sees it (for its reports).
     const flows: { t: number; amount: number; party: string }[] = [];
     return Object.assign(stepper(
@@ -698,6 +702,7 @@ export const taxClerk: BehaviourModule = {
  */
 export const ratesOfficer: BehaviourModule = {
   name: "city.rates_officer",
+  answers: {"office": "the rates office", "acts": "What it acts on: the valuer's valuations, on which it levies under the rating law; a payment that names the rates it pays; and a direction on its recovery form (rates_recovery) from those the town's rule on directions names.", "report": true},
   routines: [{ task: "levy", at: "office", what: "At each instalment the rating law sets, the rates clerks send every owner on the rate book a notice of their share and record it as owed to the town; each month they add the law's penalty interest to what is overdue and write to the owner. When the notices go out is the law's: the order says only that they are to be sent." }],
   keeps: [
     { what: "valuation", why: "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on." },
@@ -719,7 +724,7 @@ export const ratesOfficer: BehaviourModule = {
       office: "", // where its clerks work, as a standing order names it (none given: the office itself)
     }, ctx.params);
     const book = new Book();
-    const letters = new Letters();
+    const letters = new Letters(ratesOfficer.answers);
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the rates office" });
     const routines = new StandingWork(ctx.entity, p.part);
     const settled = new Set<string>(); // claims a payment into our account has named
@@ -815,6 +820,7 @@ export const ratesOfficer: BehaviourModule = {
  */
 export const works: BehaviourModule = {
   name: "city.works",
+  answers: {"office": "the works office", "acts": "What it acts on: the adopted budget's staff line, which sets its crew; a complaint of a collection missed; and a direction on one of its own forms from those the town's rule on directions names.", "forms": [{"about": ["staff", "recruit", "hire", "hiring", "crew", "vacanc", "posts"], "say": "On staffing it follows a direction on its staffing form (works_staffing) from those the town's rule on directions names, and no letter."}, {"about": ["collect", "round", "waste", "bin", "rubbish"], "say": "On how often it collects it follows a direction on its collection form (works_collection) from those the town's rule on directions names; a collection missed is reported as a complaint."}], "report": true},
   routines: [
     { task: "collect", at: "depot", what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
     { task: "maintain", at: "depot", what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
@@ -857,7 +863,7 @@ export const works: BehaviourModule = {
     need(p, ["depot", "workplace", "landfill"], "city.works");
     const me = ctx.entity;
     const book = new Book();
-    const letters = new Letters();
+    const letters = new Letters(works.answers);
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the works office" });
     const routines = new StandingWork(me, p.part);
     const staffOnly = p.part === "staff";

@@ -149,7 +149,22 @@ export interface Routine {
   at: string;
 }
 
+/**
+ * How a code-run office answers a letter (docs/behaviour/letters.md). It cannot read one: so it says, in fixed words,
+ * that the letter is received and that it does not act on a letter's words, and then what it does act on and how
+ * (`acts`: a sentence or two in the world's terms, naming its forms where it has any). `forms`: where a letter
+ * plainly concerns something the office has a form or a set way for (it has one of the words in `about`), what to
+ * say of that (`say`). Nothing here may tell a writer what they could not otherwise know: the words are the same for
+ * everyone.
+ */
+export interface Answers { office: string; acts: string; forms?: { about: string[]; say: string }[];
+  /** The office has a standing report of its own, which it sends in answer to a letter, with these words after it. */
+  report?: true }
+
 export interface BehaviourModule {
+  /** How its office answers a letter it cannot act on (docs/behaviour/letters.md). An office with a standing report
+   * of its own (`Letters`) adds these words to it; any other acknowledges each letter with them (`answering`). */
+  answers?: Answers;
   /** The routine tasks its office's staff do by standing work order (docs/behaviour/standing-work.md). */
   routines?: Routine[];
   /** The papers it issues, each as a form of the office's own stationery (docs/behaviour/office-papers.md). */

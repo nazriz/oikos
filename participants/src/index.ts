@@ -18,6 +18,7 @@ export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, t
 export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
 export { linesInWords, tabledLines, votedWords, yearInDays } from "./behaviour/government";
 import type { BehaviourModule } from "./module";
+import { answering } from "./behaviour/common";
 import { bankPaymentSystem } from "./behaviour/bank";
 import { disposal, exportDemand, funding, grants, idle, migration, statistics, trade, transfers, valuer, weather } from "./behaviour/world";
 import { lending } from "./behaviour/credit";
@@ -86,5 +87,6 @@ export const modules: { [name: string]: BehaviourModule & { source: string } } =
       [station, "behaviour/police.ts"],
       [retirementFund, "behaviour/fund.ts"],
     ] as const
-  ).map(([m, src]) => [m.name, { ...m, source: new URL(`./${src}`, import.meta.url).pathname }]),
+  // (An office that says how it answers a letter, and has no standing report of its own, acknowledges each: `answering`.)
+  ).map(([m, src]) => [m.name, { ...answering(m), source: new URL(`./${src}`, import.meta.url).pathname }]),
 );

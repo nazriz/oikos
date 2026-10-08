@@ -32,6 +32,7 @@ export function yearsOfSchooling(age: number, s: SchoolingSpec, pick: (n: number
 
 export const principal: BehaviourModule = {
   name: "school.principal",
+  answers: {"office": "the school", "acts": "It teaches the children who come to it on school days. It enrols nobody by letter."},
   routines: [
     { task: "teach", at: "building", what: "Each school day, each classroom with pupils in it is taught by one of the teachers at work." },
     { task: "enrol", at: "building", what: "The school office answers each enrolment: a place in the least full classroom for a child of school age, or a letter saying why not; and gives each leaver a certificate of their years." },

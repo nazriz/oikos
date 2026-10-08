@@ -21,6 +21,7 @@ interface Member { member: string; account: string; born_at: number; units: numb
  */
 export const retirementFund: BehaviourModule = {
   name: "fund.retirement",
+  answers: {"office": "the retirement fund", "acts": "What it acts on: its members' accounts and the pensions it pays from them, as its rules say."},
   version: "0.1.0",
   doc: "docs/behaviour/firm-ownership.md",
   cadence: () => DAY,

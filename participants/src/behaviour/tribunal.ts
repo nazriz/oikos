@@ -16,6 +16,7 @@ export const APPLICATION_KINDS = ["rent_increase", "debt", "charge"] as const;
 
 export const member: BehaviourModule = {
   name: "tribunal.member",
+  answers: {"office": "the tribunal", "acts": "What it acts on: an application made to it by a party to a dispute, which it hears and decides by the laws in force."},
   issues: P.TRIBUNAL_MEMBER,
   version: "0.2.1",
   doc: "docs/behaviour/justice.md",
@@ -110,6 +111,7 @@ export const member: BehaviourModule = {
 
 export const registrar: BehaviourModule = {
   name: "tribunal.registrar",
+  answers: {"office": "the tribunal's registry", "acts": "What it acts on: an order of the tribunal to pay that has gone unpaid, which it enforces by an order to the debtor's bank."},
   issues: P.TRIBUNAL_REGISTRAR,
   issuesWith: (p) => ({ banks: p.banks ?? [] }),
   version: "0.1.0",

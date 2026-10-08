@@ -18,6 +18,7 @@ const YEAR = 365 * DAY;
 
 export const environment: BehaviourModule = {
   name: "city.environment",
+  answers: {"office": "the environment office", "acts": "What it acts on: the adopted budget's environment line, which sets its staff; and a direction on its staffing form from those the town's rule on directions names. It surveys the district's wildlife each quarter and publishes what it finds.", "forms": [{"about": ["staff", "recruit", "hire", "hiring", "crew", "vacanc", "posts"], "say": "On staffing it follows a direction on its staffing form (environment_staffing) from those the town's rule on directions names, and no letter."}]},
   issues: [P.JOB_ADVERTISEMENT, ...P.PAYROLL, ...P.ENVIRONMENT],
   issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "environmental scientist", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), planning: p.planning, payroll_office: p.payroll_office || undefined }),
   takes: [staffingForm("environment_staffing", "the environment office", "environmental scientists")],
