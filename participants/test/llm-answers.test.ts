@@ -33,7 +33,7 @@ test("an answer that can't be read: the seat is told plainly what, once, in the 
   expect(await p.step(obs(9 * HOUR), ctx)).toMatchObject({ type: "message", text: "Hello." });
   expect(calls.length).toBe(2);
   // What it is told: what couldn't be read, that nothing was done, and to answer again in the form asked for.
-  expect(lastText(calls[1]!)).toBe("Your last answer could not be read: there were words outside the answer itself. Nothing in it has been done. Please give your answer again, in the form asked for.");
+  expect(lastText(calls[1]!)).toBe("Your last answer could not be read: there were words outside the answer itself. Nothing in it has been done, so all you meant by it is still to do. Give the whole of it again, in the form asked for: every look, letter, request and note you meant, not only the part that could not be read. This is the same turn over again, not a sign to stop: say you are done for now only if you had meant to.");
   // The conversation keeps its first answer as the words it wrote, without the adapter's mark.
   expect(JSON.stringify(calls[1]!.messages)).toContain("I would rather think aloud.");
   expect(JSON.stringify(calls[1]!.messages)).not.toContain("unread");

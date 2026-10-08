@@ -912,7 +912,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             let why = unreadWhy(r.content);
             if (!why) return { res: r, sending: messages };
             await note({ unread_answer: { why, text: unreadText(r.content), asked_again: true } });
-            const again: LlmMessage[] = [...messages, { role: "assistant", content: plain(r.content) }, { role: "user", content: `Your last answer could not be read: ${why}. Nothing in it has been done. Please give your answer again, in the form asked for.` }];
+            const again: LlmMessage[] = [...messages, { role: "assistant", content: plain(r.content) }, { role: "user", content: `Your last answer could not be read: ${why}. Nothing in it has been done, so all you meant by it is still to do. Give the whole of it again, in the form asked for: every look, letter, request and note you meant, not only the part that could not be read. This is the same turn over again, not a sign to stop: say you are done for now only if you had meant to.` }];
             r = await ask(again);
             why = unreadWhy(r.content);
             if (why) await note({ unread_answer: { why, text: unreadText(r.content), asked_again: false } });

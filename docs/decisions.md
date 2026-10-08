@@ -3195,6 +3195,12 @@ See the design note, §16.
   - **Not verified:** against a run of the other branch (its fields are read as its code writes them; the two meet on main).
   - **Revisit if** an election's result ever carries names: the secrecy is the paper's to keep, and the renderer would show what it was given.
 
+- **An unread answer is asked for whole** (2026-10-09; live check 2, the table's note; `participants/src/llm/participant.ts`; test `participants/test/llm-answers.test.ts`; docs/real-models.md, "How an answer is asked for and read").
+  - **The fault.** The sentence a seat was given after an answer that could not be read ended "Please give your answer again, in the form asked for." In pilot 6 the second answer was only `done_for_now`: the look and the note the first had meant were not given again.
+  - **Now:** "Your last answer could not be read: <why>. Nothing in it has been done, so all you meant by it is still to do. Give the whole of it again, in the form asked for: every look, letter, request and note you meant, not only the part that could not be read. This is the same turn over again, not a sign to stop: say you are done for now only if you had meant to."
+  - **Not verified:** a real model's second answer under the new words (two cases seen under the old ones, one of which dropped its acts).
+  - **Revisit if** second answers still come back as `done_for_now` alone: then the first answer's readable parts could be said back to it.
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.
