@@ -3,6 +3,7 @@
 // default runs/translator-model/<name>). It reads the request and the forms out of what the translator would send a
 // language model, and answers with a program. Below `threshold` of sureness it asks back: none(unclear).
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { LlmAdapter, LlmRequest, LlmResponse } from "@oikos/participants/llm";
 import { calls } from "@oikos/participants";
@@ -21,18 +22,53 @@ export function shown(text: string): { request: string; forms: string[] } {
 }
 
 /** The program a model's steps come to (a span as its first and last piece), or to ask back where no program is
- * made of them: steps that don't parse, or a span of no piece (a reader with tokens of its own can point at a mark
- * that is none of the input). */
+ * made of them: steps that don't parse, a span of no piece (a reader with tokens of its own can point at a mark
+ * that is none of the input), or a program that is not in the call language as it stands (a model trained on another
+ * version of the language may hold a label or an argument this one doesn't have: its closed set is its own, kept with
+ * it in config.json). */
 export function programOf(input: string, ps: { at: [number, number] }[], steps: (string | [string, number, number])[]): string {
   try {
-    return decode(input, steps.map((s) => {
+    const program = decode(input, steps.map((s) => {
       if (typeof s === "string") return s;
       const a = ps[s[1]], z = ps[s[2]];
       if (!a || !z || z.at[1] <= a.at[0]) throw new Error("a span of no piece");
       return [s[0] as "id", a.at[0], z.at[1]];
     }));
+    // (A function or an argument the language doesn't have. An argument left out is not that: whoever resolves the
+    // call asks for it.)
+    if (calls.contractErrors(calls.parseProgram(program)).some((e) => !/ needs [a-z_]+$/.test(e))) throw new Error("not in the call language");
+    return program;
   } catch {
     return "none(unclear)";
+  }
+}
+
+/**
+ * Choices added to the call language after models had been trained without them, each with what it says. A model's
+ * closed set of choices is its own (config.json's `vocabulary`, made from the data it was trained on: export.ts), so
+ * a model trained before one of these loads and answers as it always did, and can never answer with it: a request
+ * that needs one gets the nearest thing the model was taught (before 2026-10-08 a request to hold something was
+ * taught as none(no_such_act), as was a record named only by describing it). Nothing here changes an answer; it is
+ * said so that whoever runs or scores such a model knows. Retraining on data made with the pipeline at 0.11.0 or
+ * later (translator/train/data.ts) gives a model all of them.
+ */
+export const ADDED: [choice: string, what: string][] = [
+  ["arg:hold", "a hold on something standing: statement(hold=...) (2026-10-08)"],
+  ["const:own", "an entry on one's own file: statement(kind=entry, visible=own, ...) (2026-10-08)"],
+  ["none:look_first", "the refusal for what needs something found out first: none(look_first) (2026-10-08)"],
+];
+
+/** What of `ADDED` a model with this closed set cannot say. */
+export const cannotSay = (vocabulary: readonly string[]): [choice: string, what: string][] => ADDED.filter(([choice]) => !vocabulary.includes(choice));
+
+/** A trained model's own closed set, from its folder (undefined where it can't be read: nothing is then known of it). */
+export function vocabularyOf(dir: string): string[] | undefined {
+  try {
+    const file = join(dir, "config.json");
+    const v = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")).vocabulary : undefined;
+    return Array.isArray(v) && v.every((x) => typeof x === "string") ? v : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -117,10 +153,20 @@ export class DecideAdapter implements LlmAdapter {
   /** Who was last asked back because the model was unsure (by the participant a draft is for): their next request is
    * drafted however unsure it is. */
   private askedBack = new Set<string>();
-  constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean } = {}) {}
+  /** What of the call language this model was trained without, and so can never answer with (`ADDED`). */
+  readonly cannot: [choice: string, what: string][];
+  constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean; quiet?: boolean } = {}) {
+    const vocabulary = vocabularyOf(this.dir());
+    this.cannot = vocabulary ? cannotSay(vocabulary) : [];
+    if (this.cannot.length && !o.quiet) console.error(`decide/${model} was trained before these were in the call language and cannot answer with them: ${this.cannot.map(([, what]) => what).join("; ")}. A request for one gets what the model was taught then. Retrain to add them.`);
+  }
+
+  private dir(): string {
+    return this.o.dir ?? join(process.env.OIKOS_TRANSLATOR_MODELS ?? resolve(HERE, "../../runs/translator-model"), this.model);
+  }
 
   private start(): void {
-    const dir = this.o.dir ?? join(process.env.OIKOS_TRANSLATOR_MODELS ?? resolve(HERE, "../../runs/translator-model"), this.model);
+    const dir = this.dir();
     const proc = (this.proc = spawn("uv", ["run", "--project", join(HERE, "py"), "python", join(HERE, "py/predict.py"), dir], { stdio: ["pipe", "pipe", "inherit"] }));
     proc.stdout!.on("data", (d: Buffer) => {
       this.buffer += d.toString();

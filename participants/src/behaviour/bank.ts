@@ -57,12 +57,22 @@ class Soonest {
   }
 }
 
+/**
+ * What a bank writes, once, to whoever put a hold on standing instructions of theirs (docs/behaviour/
+ * bank-payment-system.md, "A hold"): which it will not pay under and from which due date, that nothing missed is made
+ * up, that what the payments were for is still owed, and how the hold is lifted. `taken`: each instruction with the
+ * first due date the hold stops, in the bank's words.
+ */
+export const HOLD_NOTE = {
+  taken: (hold: string, taken: string[]) => `Hold ${hold} is in place. Not paid while it stands: ${taken.join("; ")}. Anything due before then is still paid. A payment not made under a hold is not made up when the hold is lifted: what it was for is still owed, and is yours to settle with whoever it is owed to. To resume, withdraw ${hold}; payments then go on from the next due date.`,
+};
+
 export const bankPaymentSystem: BehaviourModule = {
   name: "bank.payment_system",
   keeps: [
     { what: "request", why: "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it." },
   ],
-  version: "0.11.1",
+  version: "0.12.0",
   doc: "docs/behaviour/bank-payment-system.md",
   cadence: () => DAY,
   firstWake: () => 0,
@@ -88,6 +98,14 @@ export const bankPaymentSystem: BehaviourModule = {
     const byDue = new Soonest();
     const undated = new Set<string>();
     let withdrawnSeen = 0;
+    // Holds (docs/behaviour/bank-payment-system.md, "A hold"): a customer's instruction not to pay under a standing
+    // order while the hold stands. Read once as they arrive; each order's accepted holds, with the time from which
+    // each counts (when it was given, plus the notice the bank asks for). A hold is lifted by withdrawing it.
+    const holdNotice: number = Math.max(0, ctx.params.hold_notice ?? 86_400); // how long before a due date a hold must be given to stop that payment (seconds)
+    const lettersList: number = Math.max(0, ctx.params.letter_lists ?? 40); // how many of a customer's standing instructions a letter lists
+    let holdCursor = 0;
+    const holdsOn = new Map<string, { hold: string; from: number }[]>();
+    let holdNotes: Step = [];
     let read: { accounts: string[]; holders: string[]; signatories?: unknown; directory?: unknown } | undefined;
     let queue: Payment[] = [];
     let queuedAt = -1;
@@ -141,6 +159,46 @@ export const bankPaymentSystem: BehaviourModule = {
         }
         withdrawnSeen = withdrawn.size;
       }
+      // Holds that have arrived since the last plan. One counts for a standing order the bank has from whoever may
+      // instruct on the account it pays from (the same check as for any instruction); for anything else the writer
+      // is told, in one sentence that says nothing of anyone else's instructions. Either way it is answered, once.
+      const holds = book.all("hold");
+      for (const h of holds.slice(holdCursor)) {
+        if (!(h.addressed_to ?? []).includes(me) || !Array.isArray(h.data?.holds)) continue;
+        const taken: string[] = [], not: string[] = [];
+        for (const id of [...new Set(h.data!.holds as unknown[])].filter((x): x is string => typeof x === "string").slice(0, 64)) {
+          const order = standing.get(id);
+          const acc = order ? custody().get(order.data?.outcome?.money?.from) : undefined;
+          const named = acc ? signatories(acc.holder, acc.account) : undefined;
+          const may = !!acc && h.speaks_for === acc.holder && (!verifyAuthor || book.authorEntity(h) === acc.holder) && (!named || h.author === "genesis" || named.includes(h.in_position ?? ""));
+          if (!order || !may) {
+            not.push(id);
+            continue;
+          }
+          const from = h.at + holdNotice;
+          holdsOn.set(id, [...(holdsOn.get(id) ?? []), { hold: h.id, from }]);
+          // (The first payment it stops: the first due at or after the time it counts from.)
+          const every = order.data!.every as number;
+          const next = nextDue.get(id) ?? order.at + (Number.isInteger(order.data?.first) ? (order.data!.first as number) : every);
+          const first = next >= from ? next : next + Math.ceil((from - next) / every) * every;
+          taken.push(`${id}, from the payment due on day ${Math.floor(first / DAY) + 1}`);
+        }
+        if (!taken.length && !not.length) continue;
+        holdNotes.push(message([h.author === "genesis" ? h.speaks_for ?? me : h.in_position ?? h.author], [
+          ...(taken.length ? [HOLD_NOTE.taken(h.id, taken)] : []),
+          ...(not.length ? [`Hold ${h.id} does not apply to ${not.join(", ")}: we have no standing instruction of yours by that reference.`] : []),
+        ].join(" "), h.id));
+      }
+      holdCursor = holds.length;
+      /** Whether a payment under an order, due at a time, is under a hold: one that counted by then and had not been lifted. */
+      const held = (order: string, at: number): boolean => {
+        const on = holdsOn.get(order);
+        if (!on) return false;
+        return on.some((h) => {
+          const lifted = book.withdrawnAt.get(h.hold);
+          return h.from <= at && (lifted === undefined || lifted > at);
+        });
+      };
       // The instructions to go through: the new ones, and of the standing orders every one if what's checked has
       // changed, else those due by now and those with no due time.
       const look = new Map<string, StatementRecord>();
@@ -226,7 +284,8 @@ export const bankPaymentSystem: BehaviourModule = {
           }
           const until = Math.min(obs.t, lastCall.get(ins.id)?.until ?? obs.t);
           while (due <= until) {
-            out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due });
+            // (A due date under a hold is passed over: not paid then, and not made up when the hold is lifted.)
+            if (!held(ins.id, due)) out.push({ instruction: ins.id, from: d.from, to: d.to, amount: d.pay, due });
             due += d.every;
           }
           nextDue.set(ins.id, due);
@@ -296,9 +355,18 @@ export const bankPaymentSystem: BehaviourModule = {
       if (!mine.length) return `Report from ${obs.entity}: we hold no account for you. To open one, ask us for one in writing.`;
       const ids = new Set(mine.map((a) => a.account));
       const recent = channels.transactions(obs).filter((x) => ids.has(x.from) || ids.has(x.to)).sort((a, b) => b.t - a.t).slice(0, 8);
+      // The writer's own standing instructions, each by its reference (what it is named by to withdraw it or to hold
+      // it): from an account of theirs, in their name. Nobody else's.
+      const orders = [...standing.values()].filter((r) => r.speaks_for === holder && ids.has(r.data?.outcome?.money?.from)).sort((a, b) => (a.id < b.id ? -1 : 1));
+      const order = (r: StatementRecord) => {
+        const m = r.data!.outcome.money, every = r.data!.every as number, next = nextDue.get(r.id);
+        const on = (holdsOn.get(r.id) ?? []).filter((h) => book.withdrawnAt.get(h.hold) === undefined).map((h) => h.hold);
+        return `${r.id}: ${usd(cents(m.amount))} from ${m.from} to ${m.to} every ${every % DAY === 0 ? `${every / DAY} day${every === DAY ? "" : "s"}` : `${every} seconds`}${next !== undefined ? `, next due day ${Math.floor(next / DAY) + 1}` : ""}${on.length ? `, on hold (${on.join(", ")})` : ""}`;
+      };
       return `Report from ${obs.entity}: your accounts with us: ${mine.map((a) => `${a.account}, balance ${usd(cents(a.balance))}`).join("; ")}. ` +
         (recent.length ? `Latest payments: ${recent.map((x) => `day ${Math.floor(x.t / 86_400) + 1}: ${usd(cents(x.amount))} ${ids.has(x.from) ? `to ${x.to}` : `from ${x.from}`}${x.memo ? ` (${x.memo})` : ""}${x.per_instruction ? `, under your instruction ${x.per_instruction}` : ""}`).join("; ")}. ` : "No payments yet. ") +
-        "We pay on your written instruction (a request to pay, once or every so often), from an account you hold, if its balance covers it.";
+        (orders.length ? `Your standing instructions with us: ${orders.slice(0, lettersList).map(order).join("; ")}${orders.length > lettersList ? `; and ${orders.length - lettersList} more` : ""}. ` : "You have no standing instructions with us. ") +
+        "We pay on your written instruction (a request to pay, once or every so often), from an account you hold, if its balance covers it. To end a standing instruction, withdraw it by its reference; to pause one, put a hold on it by its reference, and withdraw the hold to resume.";
     };
 
     return {
@@ -323,6 +391,7 @@ export const bankPaymentSystem: BehaviourModule = {
         }
         inFlight = [];
         if (refusals.length) return callAction(because("Telling account holders about requests we couldn't carry out.", ...refusals.splice(0, 32)));
+        if (holdNotes.length) return callAction(because("Answering instructions to hold standing payments: what is held and from when, or that there is nothing of theirs by that reference.", ...holdNotes.splice(0, 32)));
         // (Who wrote: the organisation of the position written in, or the participant's person, from the directory.)
         replies.push(...letters.answer(({ participant, as }) => accountReport(obs, as ? book.positions.get(as)?.entity : book.participantPerson.get(participant)),
           "A letter to the bank: answering with the writer's own accounts and latest payments."));

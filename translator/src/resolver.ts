@@ -15,7 +15,7 @@ import { Knowledge } from "./knowledge";
 type Call = calls.Call;
 type Value = calls.Value;
 
-export const RESOLVER = { id: "resolver", version: "0.4.0" };
+export const RESOLVER = { id: "resolver", version: "0.5.0" };
 
 /** What the resolver reads from a structure type in the world's catalogue (which is public): its footprint, the terrains it can stand on, and its spaces. */
 export interface StructureTypeInfo {
@@ -35,7 +35,9 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
   unclear: "It isn't clear what should happen. Could you say it more plainly?",
   unknown_form: "You haven't seen a form by that name.",
   not_an_act: "That's something to look up or read, not something to do. Look at your reports and papers, or write to whoever keeps it.",
-  no_such_act: "Nothing here does that as such. You could write to whoever would have to see to it, or go about it another way.",
+  no_such_act: "Nothing here does that as such. If it is for someone else to see to, direct them in writing, on their form for it if they have one.",
+  // (Said of the request alone: nothing is looked up to say it, so it tells the caller nothing it didn't know.)
+  look_first: "That needs something found out first. Look it up (in your own papers, or by asking whoever keeps it), then say what is to be done, naming each paper by its id.",
 };
 
 class Ask extends Error {}
@@ -202,6 +204,8 @@ class Resolver {
     const v = this.raw(c, "visible");
     if (v === undefined) return undefined;
     if ("id" in v && v.id === "public") return "public";
+    // Its own file: seen only by the entity the act is made for.
+    if ("id" in v && v.id === "own") return [this.speaksFor(c).speaks_for];
     return this.ids(c, "visible");
   }
   private yes(c: Call, key: string): boolean {
@@ -592,6 +596,7 @@ class Resolver {
     const common = { ...this.speaksFor(c), ...this.basis(c), ...(this.visible(c) ? { visible_to: this.visible(c) } : {}), ...(bind ? { ref: bind } : {}) };
     const withdraw = this.id(c, "withdraw");
     if (withdraw) return [{ block: "withdraw", record: withdraw, ...(this.str(c, "text") ? { text: this.str(c, "text") } : {}), ...common }];
+    if (this.has(c, "hold")) return this.hold(c, common);
     const kind = this.label(c, "kind");
     const text = this.str(c, "text");
     if (!kind) throw new Ask("What kind of statement is it (a notice, a law, a report, …)?");
@@ -610,6 +615,31 @@ class Resolver {
     return [{ block: "publish", kind, text, ...(to ? { addressed_to: to } : {}), ...(on ? { place: on } : {}), ...(data !== undefined ? { data } : {}), ...(adico !== undefined ? { adico } : {}), ...(formal ? { formal: { language: "cel", condition: formal } } : {}),
       ...(offer !== undefined ? { offer } : {}), ...(practice !== undefined ? { practice } : {}),
       ...(assertion !== undefined ? { assertion } : {}), ...(registry !== undefined ? { registry } : {}), ...common }];
+  }
+
+  /**
+   * A hold (contracts/calls.md): an instruction to whoever acts on a standing record not to act on it while the hold
+   * stands. Who that is, is the one physical answer: whoever the record is addressed to, as the participant knows it
+   * (or whoever the call says). Nothing is stopped here: the one addressed honours it, or doesn't.
+   */
+  private hold(c: Call, common: { speaks_for: string; visible_to?: unknown }): Block[] {
+    const other = ["kind", "data", "adico", "formal", "on", "offer", "practice", "assertion", "registry"].filter((k) => this.has(c, k) && !(k === "kind" && this.label(c, "kind") === "hold"));
+    if (other.length) throw new Ask("A hold says only what it holds, in what words, for whom and on what basis: nothing else should be written.");
+    const held = [...new Set(this.ids(c, "hold")!)];
+    if (!held.length) throw new Ask("Hold what? Name it by its id.");
+    const me = common.speaks_for;
+    const given = this.ids(c, "to")?.map((x) => (x.startsWith("$") ? x : this.k.entityOf(x)));
+    const to: string[] = [];
+    for (const x of held) {
+      if (x.startsWith("$")) throw new Ask("A hold names something already on record, not something made in the same act.");
+      if (this.k.withdrawn.has(x)) throw new Ask(`${x} has been withdrawn: there is nothing to hold.`);
+      const acts = given ?? this.k.addressed.get(x);
+      if (!acts) throw new Ask(`You don't know of a standing paper called ${x} that someone acts on. Look it up and name it by its id, or say who is to hold it.`);
+      for (const a of acts) if (a !== me && !to.includes(a)) to.push(a);
+    }
+    if (!to.length) throw new Ask(`${held.join(", ")} ${held.length > 1 ? "are" : "is"} yours to act on: nobody else needs telling.`);
+    const text = this.str(c, "text") || `Please hold ${held.join(", ")}: nothing is to be done under ${held.length > 1 ? "them" : "it"} until this is withdrawn.`;
+    return [{ block: "publish", kind: "hold", text, addressed_to: to, data: { holds: held }, visible_to: [me, ...to], ...common }];
   }
 
   private form(c: Call, bind?: string): Block[] {

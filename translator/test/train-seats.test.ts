@@ -295,11 +295,11 @@ test("a letter asked for indirectly: about half of the letters, the writer told 
 
 test("refusals come in the seats' voices too, long and qualified; what is another's to decide is never worded as having or getting them to", async () => {
   // The refusal briefs are dealt the styles in the same turn as the requests: half in the seats' voices.
-  const plan = planOf(ACTS, { writers: ["w"], perGold: 1, refusalFloor: 6, piled: [[ACTS[0]!, ACTS[1]!]], seed: 3 });
+  const plan = planOf(ACTS, { writers: ["w"], perGold: 1, refusalFloor: 12, piled: [[ACTS[0]!, ACTS[1]!]], seed: 3 });
   const refusals = plan.filter((t): t is Extract<PlanItem, { kind: "refusal" }> => t.kind === "refusal" && t.round === 0);
   const seats = refusals.filter((t) => SEATS.includes(t.style));
   expect(seats.length).toBeGreaterThan(refusals.length * 0.4);
-  for (const label of ["not_an_act", "no_such_act", "unclear", "not_yours", "needs_calculation"]) expect([label, refusals.some((t) => t.refusal.label === label && t.style === "late")]).toEqual([label, true]);
+  for (const label of ["not_an_act", "no_such_act", "look_first", "unclear", "not_yours", "needs_calculation"]) expect([label, refusals.some((t) => t.refusal.label === label && t.style === "late")]).toEqual([label, true]);
   // Worded for a situation: "what is wanted" where a program's style says "the act", with nothing about a call.
   const b: RefusalBrief = { label: "not_an_act", brief: "The speaker wants to see what is recorded about rec.412.", mustCopy: ["rec.412"], source: "test" };
   const late = refusalRequestBrief(b, "late");
@@ -334,7 +334,7 @@ test("refusals come in the seats' voices too, long and qualified; what is anothe
   expect(long.length).toBeGreaterThan(5);
   for (const e of long) {
     expect(e.request.length).toBeGreaterThan(350);
-    expect(e.program).toMatch(/^none\((not_an_act|no_such_act|unclear|not_yours|needs_calculation)\)$/);
+    expect(e.program).toMatch(/^none\((not_an_act|no_such_act|look_first|unclear|not_yours|needs_calculation)\)$/);
   }
   expect(new Set(long.map((e) => e.program)).size).toBeGreaterThanOrEqual(4);
 });
@@ -409,27 +409,29 @@ test("the late voice is asked for at a seat's length: every particular in the ac
   expect(r.manifest.request_length.late!.p90).toBeGreaterThanOrEqual(r.manifest.request_length.late!.median);
 });
 
-test("in the seats' voices a request to read asks for particulars, one to pause says what is kept for resuming, one to visit what is looked for", () => {
+test("in the seats' voices a request to read asks for particulars, one that names something only by describing it describes it at length, one to visit says what is looked for", () => {
   const gold = [g('money(to=acc-landlord-1, amount="$850", from=acc-city, every="monthly", for="rent")'), ...ACTS];
   const briefs = refusalBriefs(gold, 6, 4);
   const of = (label: string, has: string) => briefs.find((b) => b.label === label && b.brief.includes(has))!;
-  const look = of("not_an_act", "to bring nothing about"), pause = of("no_such_act", "already stands"), visit = of("no_such_act", "in person"), routine = of("no_such_act", "a routine of their own");
+  const look = of("not_an_act", "to bring nothing about"), pause = of("look_first", "keeps repeating"), visit = of("no_such_act", "in person"), routine = of("no_such_act", "a routine of their own"), then = of("look_first", "depends on what is found");
   for (const style of SEATS) {
     // To read or inspect: the stretch of time (the world's own days, no calendar date) and what each entry is to show.
     const read = refusalRequestBrief(look, style);
     expect(read).toContain("what each entry is to show, three or four things by name");
     expect(read).toContain("in days of the year and never a calendar date");
     expect(read).toContain("never a second request");
-    // To pause: what is kept, so that it can be taken up again, and that it is not to be ended for good.
-    expect(refusalRequestBrief(pause, style)).toContain("what is to be kept so that it can be resumed, each thing by name in plain words");
-    expect(refusalRequestBrief(pause, style)).toContain("a permanent cancellation is not wanted");
+    // Something named only by describing it: described at length, and still with no id for it.
+    expect(refusalRequestBrief(pause, style)).toContain("describes what it means at length, as an office-holder does");
+    expect(refusalRequestBrief(pause, style)).toContain("it gives no id for the thing acted on");
+    // A look and what follows from it: one instruction, which does not say what the look will show.
+    expect(refusalRequestBrief(then, style)).toContain("then what is to be done with what is found, as one instruction");
     expect(refusalRequestBrief(visit, style)).toContain("what the speaker will look for there and what is to be noted of it");
     expect(refusalRequestBrief(routine, style)).toContain("what stays in place while it does");
     // (Said with the situation, before the style.)
     expect(read.indexOf("In this voice")).toBeLessThan(read.indexOf("\n\nStyle: "));
   }
   // The other styles' briefs are as they were: a short request stays short.
-  for (const b of [look, pause, visit, routine]) for (const style of ["terse", "chatty", "formal"]) expect(refusalRequestBrief(b, style)).not.toContain("In this voice");
+  for (const b of [look, pause, visit, routine, then]) for (const style of ["terse", "chatty", "formal"]) expect(refusalRequestBrief(b, style)).not.toContain("In this voice");
   // The other labels have nothing of the kind to add.
   for (const b of briefs.filter((x) => ["unclear", "not_yours", "needs_calculation"].includes(x.label))) expect(b.seats).toBeUndefined();
   // Many routines, so a part of nothing but these doesn't say eight things over and over.
@@ -533,13 +535,13 @@ test("a letter asked for indirectly in a seat's voice names ids inside its marke
   const outside = await generate(LETTERS, { writers: [model("a", (b) => (within(b).length ? say(b).replace(` at ${within(b).join(" and ")}`, "").replace(/\.$/, `, with ${within(b).join(" and ")} in mind.`) : say(b)))], perGold: 8, indirect: 1, seed: 5 });
   expect(outside.manifest.dropped.not_copied).toBe(plan.filter((t) => t.inside).length);
 
-  // Refusals: three to ten ids for a request to read, three to six to pause, three to five to visit; none for a
-  // routine. In a seat's voice the brief gives them and the request must carry them; in another style neither.
+  // Refusals: three to ten ids for a request to read, two to four with a standing payment named only by what it pays,
+  // three to five to visit; none for a routine. In a seat's voice the brief gives them and the request must carry them; in another style neither.
   const gold = [g('money(to=acc-landlord-1, amount="$850", from=acc-city, every="monthly", for="rent")'), ...ACTS];
   const briefs = refusalBriefs(gold, 200, 4);
   const sizes = (f: (b: RefusalBrief) => boolean) => new Set(briefs.filter(f).map((b) => b.mention?.length ?? 0));
   expect(sizes((b) => b.label === "not_an_act")).toEqual(new Set([3, 4, 5, 6, 7, 8, 9, 10]));
-  expect(sizes((b) => b.brief.includes("already stands"))).toEqual(new Set([3, 4, 5, 6]));
+  expect(sizes((b) => b.brief.includes("keeps repeating"))).toEqual(new Set([2, 3, 4]));
   expect(sizes((b) => b.brief.includes("in person"))).toEqual(new Set([3, 4, 5]));
   expect(sizes((b) => b.brief.includes("a routine of their own"))).toEqual(new Set([0]));
   expect(sizes((b) => ["unclear", "not_yours", "needs_calculation"].includes(b.label))).toEqual(new Set([0]));

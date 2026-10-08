@@ -9,7 +9,7 @@ import CALLS_SCHEMA from "../../contracts/calls.schema.json";
 
 export const FUNCTIONS = ["money", "goods", "work", "account", "structure", "occupancy", "entity", "claim", "agreement", "statement", "vote", "message", "form", "presence", "birth", "harm", "position", "system", "take"] as const;
 export type Fn = (typeof FUNCTIONS)[number];
-export const LABELS = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act", "no_such_act"] as const;
+export const LABELS = ["not_yours", "needs_calculation", "too_much", "unclear", "unknown_form", "not_an_act", "no_such_act", "look_first"] as const;
 export type Label = (typeof LABELS)[number];
 
 export type Value = { id: string } | { var: string } | { text: string } | { json: unknown } | { call: Call };

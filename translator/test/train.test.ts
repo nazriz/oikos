@@ -172,7 +172,7 @@ test("gold programs from the seen cases cover what a town's code rarely calls", 
 test("refusals that have to be worded: the label comes from how the brief is built; the request must carry what the brief keeps", async () => {
   const gold = await goldFromLog(LOG);
   const briefs = refusalBriefs(gold, 2, 9);
-  expect(briefs.map((b) => b.label)).toEqual(["needs_calculation", "not_yours", "unclear", "not_an_act", "no_such_act", "needs_calculation", "not_yours", "unclear", "not_an_act", "no_such_act"]);
+  expect(briefs.map((b) => b.label)).toEqual(["needs_calculation", "not_yours", "unclear", "not_an_act", "no_such_act", "look_first", "needs_calculation", "not_yours", "unclear", "not_an_act", "no_such_act", "look_first"]);
   // Something to look at and nothing to do: what's named must be in the request as written.
   expect(briefs[3]!.brief).toContain("to bring nothing about");
   for (const b of briefs.filter((x) => x.label === "not_an_act")) for (const l of b.mustCopy) expect(b.brief).toContain(l);
@@ -199,20 +199,31 @@ test("refusals that have to be worded: the label comes from how the brief is bui
   expect(refusals).not.toContain("none(unclear)"); // the second model made something of them: not kept
 });
 
-test("what no function does is written to a brief too: something standing to be held and resumed, a place to be gone to, an office's own routine", async () => {
+test("what no function does is written to a brief too (a place to be gone to, an office's own routine), and what needs something found out first (a standing payment named only by what it pays, a record only described, an act that depends on a look)", async () => {
   const g = (program: string): Gold => ({ program, shape: shapeOf(calls.parseProgram(program)), names: {}, source: "t" });
   const rent = 'money(to=acc-landlord-1, amount="$850", from=acc-city, every="monthly", for="rent")';
   const gold = [g(rent), g('work(task=make, units="3", at=str.7, by=c0042)'), g('money(to=builder, amount="$500", from=acc-city)')];
   const briefs = refusalBriefs(gold, 3, 4).filter((b) => b.label === "no_such_act");
   expect(briefs.length).toBe(3);
-  const [pause, visit, routine] = briefs as [typeof briefs[number], typeof briefs[number], typeof briefs[number]];
-  // A payment that repeats (never the one-off), held and not ended: its ids are the request's to carry, and it goes
-  // with that payment's family when the examples are split.
-  expect(pause.brief).toContain(rent);
-  expect(pause.brief).toContain("not ended, cancelled or withdrawn");
-  expect(pause.mustCopy).toEqual(expect.arrayContaining(["acc-landlord-1", "acc-city"]));
-  expect(pause.mustCopy).not.toContain("$850"); // the amount may be said or not: the hold isn't about it
-  expect(pause.gold).toBe(rent);
+  const [visit, routine] = briefs as [typeof briefs[number], typeof briefs[number], typeof briefs[number]];
+  // Holding something standing is no refusal any more (a program: statement(hold=...)): no brief asks for one as that.
+  for (const b of refusalBriefs(gold, 30, 4)) if (b.label === "no_such_act") expect(b.brief).not.toMatch(/on hold|paused|suspended|already stands/);
+  // What needs something found out first, three kinds in turn. A payment that repeats (never the one-off), named only
+  // by what it pays: the accounts and the amount, as its world writes it, are the request's to carry, no id for the
+  // instruction is given, and it goes with that payment's family when the examples are split.
+  const [described, record, lookThen] = refusalBriefs(gold, 3, 4).filter((b) => b.label === "look_first") as [typeof briefs[number], typeof briefs[number], typeof briefs[number]];
+  expect(described.brief).toContain(rent);
+  expect(described.brief).toContain("has no reference for the instruction itself");
+  expect(described.mustCopy.sort()).toEqual(["$850", "acc-city", "acc-landlord-1"]);
+  expect(described.gold).toBe(rent);
+  expect(described.mention!.length).toBeGreaterThanOrEqual(2);
+  expect(record.brief).toContain("a record that they name only by describing it, with no id for it");
+  expect([record.mustCopy, record.gold]).toEqual([[], undefined]);
+  expect(lookThen.brief).toContain("then something done that depends on what is found");
+  expect(lookThen.mustCopy).toEqual([]);
+  // With nothing standing among the gold programs, the first kind is a record only described: the label never waits on them.
+  const none = refusalBriefs([g('money(to=builder, amount="$500")')], 3, 4).filter((b) => b.label === "look_first");
+  expect(none.map((b) => b.brief.includes("only by describing it") || b.brief.includes("depends on what is found"))).toEqual([true, true, true]);
   // A place some program names, to be gone to: not read about, and nobody sent.
   expect(visit.mustCopy).toEqual(["str.7"]);
   expect(visit.brief).toContain("go to str.7 in person");
@@ -226,22 +237,23 @@ test("what no function does is written to a brief too: something standing to be 
   for (const b of bare) expect(b.brief).toContain("a routine of their own office");
   // Written and translated back: kept when the second model refuses it as that, dropped when it forces it into a call;
   // and the floor on refusals counts the label, saying when it came out short.
-  const said = (content: string) => (content.includes("already stands") ? "Hold the rent from acc-city to acc-landlord-1 until I say." : content.includes("in person") ? "Go to str.7 and see how it stands." : content.includes("routine of their own") ? `Stop doing that by yourselves. (${content.length})` : `Something else. (${content.length})`);
+  const said = (content: string) => (content.includes("keeps repeating") ? "Hold any standing payment of $850 from acc-city to acc-landlord-1 until I say." : content.includes("in person") ? "Go to str.7 and see how it stands." : content.includes("routine of their own") ? `Stop doing that by yourselves. (${content.length})` : `Something else. (${content.length})`);
   const w: LlmAdapter = { provider: "stand-in", model: "w", complete: async (req) => {
     const content = String((req.messages[0] as any).content);
     return { content: [{ type: "text", text: content.startsWith("Situation:") ? said(content) : "x" }], usage: { input_tokens: 1, output_tokens: 1 } };
   } };
-  const back = (forced: boolean) => ({ model: "stand-in/back", translate: async (q: string) => (q.startsWith("Hold") ? (forced ? "statement(withdraw=rec.1)" : "none(no_such_act)") : q.startsWith("Go to") || q.startsWith("Stop doing") ? "none(no_such_act)" : "none(unclear)") });
+  const back = (forced: boolean) => ({ model: "stand-in/back", translate: async (q: string) => (q.startsWith("Hold") ? (forced ? "statement(withdraw=rec.1)" : "none(look_first)") : q.startsWith("Go to") || q.startsWith("Stop doing") ? "none(no_such_act)" : "none(unclear)") });
   const r = await generate(gold, { writers: [w], perGold: 1, refusalFloor: 3, seed: 4, back: back(false) });
   const kept = r.examples.filter((e) => e.program === "none(no_such_act)");
-  expect(kept.map((e) => e.request.split(" ")[0]).sort()).toEqual(["Go", "Hold", "Stop"]);
-  expect(kept.find((e) => e.request.startsWith("Hold"))!.gold).toBe(rent);
-  expect(Object.keys(r.manifest.short_of_floor!)).not.toContain("no_such_act");
+  expect([...new Set(kept.map((e) => e.request.split(" ")[0]))].sort()).toEqual(["Go", "Stop"]);
+  const first = r.examples.filter((e) => e.program === "none(look_first)");
+  expect(first.find((e) => e.request.startsWith("Hold"))!.gold).toBe(rent);
+  expect(Object.keys(r.manifest.short_of_floor ?? {})).not.toContain("no_such_act");
   const forced = await generate(gold, { writers: [w], perGold: 1, refusalFloor: 3, seed: 4, back: back(true) });
   // (The request to hold something, forced into a withdrawal by the model checking, is never kept; the floor is then
   // made up, as far as it can be, from the other briefs.)
-  expect(forced.examples.filter((e) => e.program === "none(no_such_act)" && e.request.startsWith("Hold"))).toEqual([]);
-  expect(forced.rejects.some((x) => x.program === "none(no_such_act)" && x.got === "statement(withdraw=rec.1)")).toBe(true);
+  expect(forced.examples.filter((e) => e.program === "none(look_first)" && e.request.startsWith("Hold"))).toEqual([]);
+  expect(forced.rejects.some((x) => x.program === "none(look_first)" && x.got === "statement(withdraw=rec.1)")).toBe(true);
 });
 
 test("what a gold program is kept as, what a request must carry word for word, and what's too much to ask in a sentence", () => {
@@ -314,7 +326,10 @@ test("each span says how its value comes from the request: copied, chosen for it
     if (s.how === "copy") expect(e.request.slice(...s.at!)).toBe(s.value);
     const key = s.arg.slice(s.arg.lastIndexOf(".") + 1);
     if (["sex", "leave", "then"].includes(key)) expect([key, s.how]).toEqual([key, "implied"]);
-    if (e.shape.startsWith("form(") ? key === "form" : ["kind", "task", "type", "template", "role", "survey"].includes(key) && !/[0-9.\/-]/.test(s.value) && !/\s/.test(s.value)) expect([key, s.value, s.how]).toEqual([key, s.value, "choice"]);
+    // (An entry on one's own file: its kind is implied by the wording, as whose file is.)
+    const entry = key === "kind" && s.value === "entry" && e.program.includes("visible=own");
+    if (entry || (key === "visible" && s.value === "own")) expect([key, s.value, s.how]).toEqual([key, s.value, "implied"]);
+    else if (e.shape.startsWith("form(") ? key === "form" : ["kind", "task", "type", "template", "role", "survey"].includes(key) && !/[0-9.\/-]/.test(s.value) && !/\s/.test(s.value)) expect([key, s.value, s.how]).toEqual([key, s.value, "choice"]);
     if (s.value.includes("_")) expect([s.value, s.how]).toEqual([s.value, "choice"]);
   }
   expect(r.manifest.spans).toEqual({ copy: spans.filter((x) => x.s.how === "copy").length, choice: spans.filter((x) => x.s.how === "choice").length, implied: spans.filter((x) => x.s.how === "implied").length });

@@ -23,8 +23,14 @@ test("the real requests are well formed: ids, sources, answers in the call langu
     if (x.gap) expect(Object.keys(GAPS)).toContain(x.gap);
     // What nothing can say is refused as that (or has a half that can be said, or a reading that can).
     const said = x.expect.some((e) => !e.startsWith("none("));
-    if (x.gap && !said) expect([x.id, x.expect.includes("none(no_such_act)")]).toEqual([x.id, true]);
-    if (x.expect.includes("none(no_such_act)")) expect([x.id, x.gap !== undefined]).toEqual([x.id, true]);
+    // (Or, since 2026-10-08, as needing something found out first: a record named only by describing it, an act that
+    // depends on a look.)
+    if (x.gap && !said) expect([x.id, x.expect.includes("none(no_such_act)") || x.expect.includes("none(look_first)")]).toEqual([x.id, true]);
+    if (x.expect.includes("none(no_such_act)") || x.expect.includes("none(look_first)")) expect([x.id, x.gap !== undefined]).toEqual([x.id, true]);
+    // What can be said now is keyed to it: no request to hold records it names by id is still refused as unsayable.
+    if (x.gap === "pause") expect([x.id, x.expect.includes("none(no_such_act)")]).toEqual([x.id, false]);
+    if (x.gap === "unnamed_record") expect([x.id, x.expect.includes("none(look_first)"), x.expect.includes("none(no_such_act)")]).toEqual([x.id, true, false]);
+    if (x.gap === "look_then_act") expect([x.id, x.expect.includes("none(look_first)")]).toEqual([x.id, true]);
     // Each accepted answer is right by the scoring's own lights, and no accepted program is a refusal in disguise.
     for (const e of x.expect) expect([x.id, passesReal(x, e)]).toEqual([x.id, true]);
   }

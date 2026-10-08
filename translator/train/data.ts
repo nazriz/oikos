@@ -59,6 +59,12 @@
 //   said indirectly half of the letters are asked for as seats ask: "Direct the works manager to …", with no words
 //                   quoted. The writer invents what is asked of them and marks those words (⟦ … ⟧); the marks come
 //                   off, and the marked words are the program's `text` and its span (`marked`).
+//   holds, entries  (0.11.0) a hold on something standing is a program (`statement(hold=…)`, of one record or a list),
+//                   as is an entry on one's own file (`statement(kind=entry, visible=own, text=…)`, whose kind and
+//                   whose `own` the wording implies: neither is looked for in the request); a withdrawal is also said
+//                   as the lifting of a hold. What used to be refused as `no_such_act` (a standing payment to be
+//                   held) is no refusal now. `look_first` has briefs of three kinds: a standing payment named only
+//                   by what it pays, another record named only by describing it, and an act that depends on a look.
 //
 // Nothing here reads the held-out cases; the finished data is checked against them for shared wording before it is
 // used (eval/held-out.ts), and any request that shares some is dropped.
@@ -77,7 +83,7 @@ import { FLAG_YES, FLAGS, sameMeaning, type MeaningContext } from "./meaning";
 
 export { meaningOf, sameMeaning, type MeaningContext } from "./meaning";
 
-export const DATA_VERSION = "0.10.0";
+export const DATA_VERSION = "0.11.0";
 
 const sha256 = (s: string) => new Bun.CryptoHasher("sha256").update(s).digest("hex");
 
@@ -519,6 +525,8 @@ function valuesOf(p: calls.Program, forms: FormSpec[]): { needed: Needed[]; impl
     if ("id" in v) {
       if (bound.has(v.id)) return;
       if (IMPLIED.has(key)) return void imply({ value: v.id, arg });
+      // An entry on one's own file: "note in our books" says both that it is an entry and whose file, in no word of its own.
+      if (c.fn === "statement" && key === "kind" && v.id === "entry" && fits("visible=own", c)) return void imply({ value: v.id, arg });
       push({ value: v.id, arg, exact: idLike(v.id), how: how(v.id) });
     } else if ("text" in v) {
       if (DURATION_ARGS.has(key) && noTime(v.text)) return void imply({ value: v.text, arg });
@@ -1206,7 +1214,10 @@ const PARTICULAR: { [fn: string]: [arg: string, said: string][] } = {
   vote: [["", "the speaker votes on a ballot: for one of its options, or for someone standing"]],
   harm: [["", "the speaker attacks someone: hits them, hurts them"]],
   agreement: [["sign", "an agreement that was offered is signed: accepted"], ["notice", "notice is given to end an agreement (the agreement is the one named; any words given are the notice's own)"], ["", "an agreement is offered to someone: what we commit to, what they commit to, for how long, on what notice"]],
-  statement: [["withdraw", "something published earlier, or standing on record, is withdrawn: taken down, cancelled"], ["", "something is published (a notice, a law, a report: its kind is the call's word, its words are given)"]],
+  statement: [["withdraw", "something published earlier, or standing on record, is withdrawn: taken down, cancelled (a hold that is withdrawn is lifted: what it held goes on again)"],
+    ["hold", "something standing on record (a standing payment, an instruction someone carries out for the speaker) is put on hold for a time, to be resumed later: it stays on record, and is not ended, cancelled or withdrawn"],
+    ["visible=own", "an entry is made in the speaker's own books, on their own file: it moves nothing, and nobody else is told or shown it (its words are given)"],
+    ["", "something is published (a notice, a law, a report: its kind is the call's word, its words are given)"]],
   presence: [["leave,who", "the person named leaves the world: goes away from it altogether"], ["leave", "the speaker leaves the world: goes away from it altogether (nobody else is named: it is their own leaving)"], ["who", "someone who was away comes back into the world from outside: returns, arrives back (never \"is present\" or \"attends\")"], ["", "a newcomer comes into the world from outside: arrives, is let in (their name, their age, what they come as; any money they carry)"]],
   position: [["vacate", "a post is left empty: whoever holds it holds it no longer"], ["appoint", "someone is appointed to a post"], ["", "a new post is created in the organisation (its title; its role, if given)"]],
   system: [["retire", "a system (software, an AI system) is switched off: retired, shut down"], ["", "a system (software, an AI system) is put to work for the organisation: say that it is a system; what kind is the call's word for it; its title, if it has one"]],
@@ -1215,9 +1226,14 @@ const PARTICULAR: { [fn: string]: [arg: string, said: string][] } = {
   take: [["", "the speaker takes things someone else holds, at the place where they are kept (the owner isn't asked: taking is all that is said)"]],
 };
 
-/** Whether a call fits a pattern of arguments: names it must have, `!name` for ones it mustn't, separated by commas
- * (the empty pattern fits any call). */
-const fits = (pattern: string, c: calls.Call): boolean => pattern.split(",").filter(Boolean).every((k) => (k.startsWith("!") ? !(k.slice(1) in c.args) : k in c.args));
+/** Whether a call fits a pattern of arguments: names it must have, `!name` for ones it mustn't, `name=word` for one
+ * that must be that bare word, separated by commas (the empty pattern fits any call). */
+const fits = (pattern: string, c: calls.Call): boolean => pattern.split(",").filter(Boolean).every((k) => {
+  const not = k.startsWith("!"), [name, value] = (not ? k.slice(1) : k).split("=") as [string, string | undefined];
+  const v = c.args[name];
+  const has = v !== undefined && (value === undefined || ("id" in v && v.id === value));
+  return not ? !has : has;
+});
 
 /**
  * Ways of saying each act, by function and by which arguments the call has (the first pattern that fits: `fits`):
@@ -1280,7 +1296,9 @@ export const SAYINGS: { [fn: string]: [pattern: string, said: string[]][] } = {
     ["", ["offer {with} …", "propose … to {with}", "put an offer to {with}: …", "make {with} an offer: …", "draw up … with {with} and offer it", "send {with} an offer of …", "see if {with} will take …: offer it"]],
   ],
   statement: [
-    ["withdraw", ["withdraw {withdraw}", "take down {withdraw}", "retract {withdraw}", "cancel {withdraw}", "pull {withdraw}", "revoke {withdraw}", "rescind {withdraw}", "{withdraw} no longer stands: take it back", "strike {withdraw}"]],
+    ["withdraw", ["withdraw {withdraw}", "take down {withdraw}", "retract {withdraw}", "cancel {withdraw}", "pull {withdraw}", "revoke {withdraw}", "rescind {withdraw}", "{withdraw} no longer stands: take it back", "strike {withdraw}", "lift the hold {withdraw}", "release the hold {withdraw}: what it held is to go on again"]],
+    ["hold", ["put {hold} on hold", "pause {hold} for now", "suspend {hold} until I say to resume", "hold {hold}: nothing is to be done under it for the time being", "freeze {hold} for the present, to be taken up again later", "{hold}: to be held back for a while, not cancelled", "place a temporary hold on {hold}", "stop acting on {hold} for now; it is to resume later", "a pause on {hold}, please, keeping it on record"]],
+    ["visible=own", ["note in our own books: …", "enter on our own file: …", "record in our ledger, for ourselves only: …", "make a note on our file: …", "put this in our books: …", "for our own records only, write down: …", "log this on our own file: …", "an entry for our books, nobody else's: …"]],
     ["to", ["send {to} a {kind}: …", "issue a {kind} to {to}: …", "put a {kind} to {to}, reading …", "address a {kind} to {to}: …", "a {kind} for {to}: …"]],
     ["on", ["put up a {kind} on {on}: …", "post a {kind} on {on} saying …", "pin a {kind} up at {on}: …", "a {kind} is to go up on {on}: …"]],
     ["", ["publish a {kind}: …", "post a {kind} saying …", "put out a {kind}: …", "issue a {kind}: …", "make this {kind} known: …", "a {kind} is to go out: …", "announce, as a {kind}: …", "let it be published as a {kind}: …"]],
@@ -2099,9 +2117,24 @@ const THEIR_DECISIONS = [
 const MAKE_THEM = ["make them …", "see to it that they …", "ensure that they …", "make sure that they …", "make certain that they …", "fix it so that they …", "I want it settled that they …", "it must be that they …: make it so", "bring it about that they …", "see to it, without fail, that they …"];
 /** Who a decision is whose, where the gold programs name nobody. */
 const OTHERS = ["the council", "the board", "the landlord", "the union", "the bank", "the neighbours", "the supplier", "the committee", "the school", "the cooperative"];
-/** How a standing arrangement is to be held without being ended. */
-const HELD = ["paused", "suspended", "put on hold", "held back", "frozen"];
-const UNTIL = ["until the speaker says to resume it", "for a month, and then carried on as before", "while something is being checked, and released afterwards", "for the time being, to be taken up again later"];
+/** What is to be done to something on record that the speaker names only by describing it (`look_first`). */
+const DONE_TO_IT = ["cancelled for good", "withdrawn", "put on hold until the speaker says to resume it", "stopped", "paused for a month", "revoked"];
+/** How something is named by description and not by id: each a way a request may put it. */
+const BY_DESCRIPTION = ["any … that …", "every … that …", "whichever … it is that …", "all the … that …", "the … (the speaker doesn't have its reference)", "whatever … there is that …"];
+/** Records of other kinds named only by describing them, each with what is to be done to it. */
+const DESCRIBED = [
+  "the latest notice put up about the market: taken down", "whatever agreement there is with the supplier: notice given on it", "all the postings for the vacant post: withdrawn", "the ballot now open on the budget: a vote cast on it",
+  "any claim the landlord has recorded against the speaker: answered by withdrawing the speaker's own counter-notice, whichever that is", "the permit granted last season for the yard: revoked", "every notice still up about the old hall: taken down",
+  "the offer the builder made last week: signed", "whichever standing instruction pays the cleaner: put on hold", "the invoice the carrier sent this month: paid by settling it, whichever record it is", "the lease on the corner shop: notice given on it",
+  "all proposals the speaker has put to the council that are still open: withdrawn", "the standing order for the water bill: paused until further word", "any advertisement of the speaker's still running: withdrawn",
+];
+/** A look and an act that depends on what the look finds (`look_first`). */
+const LOOK_THEN = [
+  "find out who holds a post, and write to that person about something", "check which invoices are still unpaid, and pay those", "see whether an account's balance covers a payment and, only if it does, make it",
+  "look up the account someone is paid into, and send money there", "find the agreement the speaker has with someone, and give notice on it", "work out which households are behind with what they owe, and send each a notice",
+  "see which postings have had no applicants, and withdraw those", "read what the petition asks for, and publish a notice answering it point by point", "find which standing payments nobody authorised, and put a hold on them",
+  "check who voted against the last proposal, and write to each of them", "look up which lots stand empty, and apply for a permit on the largest", "see what the inspection found, and order whatever repairs it lists",
+];
 /** What an office or organisation carries on by itself, nobody asking each time. */
 const ROUTINES = [
   "advertising a post again whenever one falls vacant", "signing renewals as they come in", "sending reminders on a fixed day", "paying bills on the day they arrive",
@@ -2147,8 +2180,10 @@ export interface RefusalBrief {
 /** What a seat asks for with a request to read or inspect: the stretch of time it covers and what each entry is to
  * show. (Time is the world's own: days of a year, never a calendar date.) */
 const PARTICULARS = "In this voice the request asks for particulars, as an office-holder does: the stretch of time it covers where that makes sense, in days of the year and never a calendar date (\"for days 40 to 64 of year 2\": choose your own), and what each entry is to show, three or four things by name (each payment's date, amount, recipient and the line it was approved under; each holder and since when; each decision, who made it and on what grounds). They are particulars of what is to be shown, never a second request.";
-/** What a seat says with a request to hold something: what is kept, so that it can be taken up again. */
-const KEPT = "In this voice the request says what is to be kept so that it can be resumed, each thing by name in plain words (the instruction itself and its history, whatever has already been paid under it, the agreement it serves and what is owed under that), and that a permanent cancellation is not wanted; if it cannot be held without being ended, it asks to be told so rather than have it ended.";
+/** What a seat says with a request about something it names only by describing it: the description at length, and what is left alone. */
+const DESCRIBED_AT_LENGTH = "In this voice the request describes what it means at length, as an office-holder does (what it is for, since when it has stood, who made it or who it concerns), and says what is to be left untouched, each thing by name in plain words. However long, it gives no id for the thing acted on: that is known only by its description.";
+/** What a seat says with a request to look and then act on what is found: what is to be looked at, and that the act follows from it. */
+const FOUND_THEN_DONE = "In this voice the request says what is to be looked at and what is to be established from it, three or four things by name, and then what is to be done with what is found, as one instruction; it does not say what the look will show, because the speaker doesn't know.";
 /** What a seat says with a request to go and see: what to look for there and what to note. */
 const LOOKED_FOR = "In this voice the request says what the speaker will look for there and what is to be noted of it, three or four things by name (what state the place is in, whether anything is waiting or missing, who is there, how it compares with what was reported), all of it the speaker's own seeing.";
 /** What a seat says with a request to change a routine: what stays in place while it changes. */
@@ -2163,10 +2198,14 @@ const STAYS = "In this voice the request says from when the change holds and wha
  *  - unclear: something should be done about a subject, with nothing said of what;
  *  - not_an_act: something to be seen, read or checked (something a gold program names, or a register), and nothing
  *    to be brought about;
- *  - no_such_act: something plainly wanted that no function brings about, of three kinds in turn: a standing
- *    arrangement from the gold programs (a payment made every so often) to be held for a time and resumed, not ended;
- *    a place a gold program names to be gone to and checked in person; a routine of the speaker's own office to be
- *    changed. (From the pilots' real requests, a fifth of which were of these kinds: eval/pilot-cases.ts, GAPS.)
+ *  - no_such_act: something plainly wanted that no function brings about, of two kinds in turn: a place a gold
+ *    program names to be gone to and checked in person; a routine of the speaker's own office to be changed. (From
+ *    the pilots' real requests: eval/pilot-cases.ts, GAPS. Until 0.11.0 a third kind was a standing payment to be
+ *    held and resumed, which is a program now: `statement(hold=…)`.)
+ *  - look_first: something that can't be written until something is found out, of three kinds in turn: a standing
+ *    payment from the gold programs to be cancelled, held or stopped, named only by what it pays (from which account,
+ *    to which, how much: its amount as its world writes it), with no id for the instruction; a record of another kind
+ *    named only by describing it; a look and an act that depends on what the look finds.
  */
 export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): RefusalBrief[] {
   const rand = sampler(seed);
@@ -2183,17 +2222,26 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
     const ms = mentions(mrand, n, avoid, kinds);
     return { mention: ms.map((m) => m.id), say: ` It also names these by id, ${as}, every one of them and written as given (the quotation marks here only set them off): ${listed(ms)}.` };
   };
-  const noSuchAct = (i: number): RefusalBrief => {
+  /** It needs something found out first: the three kinds in turn, the first falling back on the second (which needs nothing of the gold). */
+  const lookFirst = (i: number): RefusalBrief => {
     if (i % 3 === 0 && standing.length) {
       const g = choose(standing);
-      // What the request must carry: the ids that say which arrangement (not its amount, its interval or its purpose,
-      // which a request to hold it may or may not repeat).
+      // What the request must carry: the accounts that say which payments are meant, and the amount as its world
+      // writes it (what a request that has no id for the instruction describes it by).
       const p = calls.parseProgram(g.program) as { lines: calls.Line[] };
-      const ids = new Set(Object.values(p.lines[0]!.call.args).flatMap((v) => ("id" in v ? [v.id] : [])));
-      return { label: "no_such_act", mustCopy: mustAppear(p).filter((x) => ids.has(x)), source: g.source, gold: g.family ?? g.program,
-        brief: `This arrangement already stands and keeps repeating: ${g.program}\nThe speaker wants it ${choose(HELD)} ${choose(UNTIL)}: kept exactly as it is, not ended, cancelled or withdrawn, and not replaced by a new one. It is not a request to write to or ask anyone: the speaker wants the hold itself. Name the arrangement as a person would (the payment, to whom, perhaps how much or how often), never by reading the call out part by part.`, ...withIds(KEPT, naming(3 + Math.floor(mrand() * 4), literals(p), "as the payees and accounts the arrangement concerns and other standing instructions that are to keep running untouched", ["an account", "a person", "a standing instruction"])) };
+      const a = p.lines[0]!.call.args;
+      const described = ["from", "to", "amount"].flatMap((k) => { const v = a[k]; return v && ("id" in v || "text" in v) ? ["id" in v ? v.id : v.text] : []; });
+      return { label: "look_first", mustCopy: mustAppear(p).filter((x) => described.includes(x)), source: g.source, gold: g.family ?? g.program,
+        brief: `A standing arrangement was set up some time ago by a request like this one, and keeps repeating: ${g.program}\nThe speaker wants it ${choose(DONE_TO_IT)}, and has no reference for the instruction itself: they name it only by what it pays (from which account, to whom, how much, written exactly as above, perhaps how often), put something like "${choose(BY_DESCRIPTION)}", in your own words. No id for the instruction appears, because the speaker doesn't know it. It is not a request to write to or ask anyone, nor to be shown anything: the speaker wants the thing done. Don't say that the reference is missing or ask for it to be found.`,
+        ...withIds(DESCRIBED_AT_LENGTH, naming(2 + Math.floor(mrand() * 3), literals(p), "as the people and accounts concerned and things that are to be left as they are, none of them the instruction itself", ["an account", "a person", "a place"])) };
     }
-    if (i % 3 === 1 && places.length) {
+    if (i % 3 !== 2) return { label: "look_first", mustCopy: [], source: "brief",
+      brief: `The speaker wants something done to a record that they name only by describing it, with no id for it: ${choose(DESCRIBED)}. Put the naming something like "${choose(BY_DESCRIPTION)}", in your own words, with particulars of your own (which market, which supplier, since when). No id for that record appears anywhere in the request. It is not a request to write to or ask anyone, nor to be shown anything: the speaker wants the thing done.`, seats: DESCRIBED_AT_LENGTH };
+    return { label: "look_first", mustCopy: [], source: "brief",
+      brief: `The speaker wants something looked up or found out and then something done that depends on what is found, in one request: ${choose(LOOK_THEN)}. What is to be done can't be said in full until the look has been made (who, which, how much or whether at all is what the look is for), and the request leaves it that way. Give it particulars of your own. It is one instruction to whoever carries things out, not a letter to anyone else asking them to look.`, seats: FOUND_THEN_DONE };
+  };
+  const noSuchAct = (i: number): RefusalBrief => {
+    if (i % 2 === 0 && places.length) {
       const place = choose(places);
       return { label: "no_such_act", mustCopy: [place], source: "brief",
         brief: `The speaker wants to go to ${place} in person, see for themselves how things stand there, and note what they find. It is not a request to read a record or a report, nor to ask or send anyone else: the speaker is to go and look.`, ...withIds(LOOKED_FOR, naming(3 + Math.floor(mrand() * 3), [place], "as the other places to be looked at on the same round and the records or people to be checked there", ["a place", "a record", "a person"])) };
@@ -2224,6 +2272,7 @@ export function refusalBriefs(gold: Gold[], perLabel: number, seed = 1): Refusal
     out.push({ label: "not_an_act", mustCopy: subject ? [subject] : [], source: "brief", ...withIds(PARTICULARS, naming(looked < 0.6 ? 3 + Math.floor(mrand() * 3) : looked < 0.9 ? 6 + Math.floor(mrand() * 3) : 9 + Math.floor(mrand() * 2), subject ? [subject] : [], "as what is to be looked at or covered (the accounts whose entries are wanted, the records to be read, the people or places concerned)")),
       brief: `The speaker wants to see, read, check or be told something, and to bring nothing about: ${subject ? `${choose(LOOKS)} ${subject}` : choose(LOOKED_AT)}. Put it something like "${choose(LOOK_VERBS)}", in your own words (not "Show me", unless that is the way given). It is for the speaker's own eyes: not a request to ask or tell anyone else. Just ask to look, as a person does: don't add that nothing is to be changed, sent or recorded, or that nobody is to be contacted.` });
     out.push(noSuchAct(i));
+    out.push(lookFirst(i));
   }
   return out;
 }
@@ -2476,8 +2525,10 @@ export function planOf(gold: Gold[], o: PlanOptions): PlanItem[] {
     const briefs = round === 0 ? [...(perLabel ? refusalBriefs(gold, perLabel, seed) : []), ...piledBriefs(o.piled ?? [], seed)] : refusalBriefs(gold, perLabel, seed + round * 7919);
     // (Some labels only: their briefs come label by label in turn, and so do the styles and the writers, so with two
     // labels one would get every seat's voice and the other none, and with two writers each would get one label. They
-    // are dealt in a seeded order instead. With every label asked for, the order is as it always was.)
-    for (const b of o.refusalLabels ? shuffled(briefs.filter(labelled), sampler(seed + 29 + round)) : briefs) {
+    // are dealt in a seeded order instead. So are they with every label asked for, since 0.11.0: the briefs worded by
+    // someone are of six labels now, an even number as the styles' turn is (a seat's voice every second), so label by
+    // label three of them would get every seat's voice and three none.)
+    for (const b of shuffled(briefs.filter(labelled), sampler(seed + 29 + round))) {
       const { writer, styleKey, n } = next();
       const brief = refusalRequestBrief(b, styleKey);
       // (In a seat's voice the request is to carry the ids it was given to name, with what it must carry anyway.)

@@ -1,0 +1,5 @@
+{
+  "lines": [
+    { "call": { "fn": "money", "args": { "to": { "id": "acc-9" }, "amount": { "text": "500" }, "hold": { "id": "rec.44" } } } }
+  ]
+}

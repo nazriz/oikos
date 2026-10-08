@@ -1,0 +1,5 @@
+{
+  "lines": [
+    { "call": { "fn": "statement", "args": { "hold": { "json": ["rec.44", "rec.45"] }, "text": { "text": "While the payroll is checked." } } } }
+  ]
+}

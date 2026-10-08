@@ -18,6 +18,7 @@
 //   one each    a call repeated once for each of several recipients is the call made once to all of them, where the
 //               call language makes those the same act (ONE_EACH: a letter). Work is not such a call: `units` is
 //               the whole job, so four people doing 12 units is not four jobs of 12.
+//   a hold      `statement(kind=hold, hold=x)` is `statement(hold=x)`
 //   names       what a line calls the thing it makes is the writer's choice; one that nothing uses is no part of it
 //
 // This file depends on the call language and the resolver's label rule only, so the translator's test set can use it
@@ -132,6 +133,8 @@ function call(c: calls.Call, ctx: MeaningContext, names: Map<string, string>): {
     if (n !== undefined) out[key] = n;
   }
   if (c.fn === "form" && office !== undefined) out.to = office;
+  // A hold is its own kind of statement: written with the kind or without, the same act (the resolver's rule).
+  if (c.fn === "statement" && "hold" in out && out.kind === "hold") delete out.kind;
   return { fn: c.fn, ...sorted(out) };
 }
 
