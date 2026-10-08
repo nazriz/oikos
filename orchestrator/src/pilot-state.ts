@@ -91,3 +91,46 @@ export function localStamp(d = new Date()): string {
   const off = -d.getTimezoneOffset();
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${off < 0 ? "-" : "+"}${p(Math.trunc(Math.abs(off) / 60))}:${p(Math.abs(off) % 60)}`;
 }
+
+export interface OptOut { participant: string; t: number; day: number; statement: string }
+
+/**
+ * Opt-outs in a run's log (the `opt_out` command), from a byte offset on: for a pilot still running, so that a seat
+ * leaving is heard of when it happens. Returns the offset to continue from (a plain log's complete lines only). A
+ * compressed log is a finished run's and is read whole. A log that is shorter than the offset was replaced: read again.
+ */
+export async function scanOptOuts(log: string, from = 0): Promise<{ offset: number; optOuts: OptOut[] }> {
+  const found: OptOut[] = [];
+  const take = (line: string) => {
+    if (!line.includes('"command":"opt_out"')) return;
+    try {
+      const e = JSON.parse(line);
+      if (e.kind === "command" && e.body?.command === "opt_out") found.push({ participant: e.body.participant, t: e.t, day: Math.floor(e.t / 86_400), statement: e.body.statement ?? "" });
+    } catch { /* (a line cut off) */ }
+  };
+  if (log.endsWith(".zst")) {
+    for await (const l of logLines(log)) take(l);
+    return { offset: 0, optOuts: found };
+  }
+  const size = statSync(log).size;
+  let at = size < from ? 0 : from;
+  const fd = openSync(log, "r");
+  try {
+    const PIECE = 32 << 20;
+    let carry = Buffer.alloc(0);
+    while (at < size) {
+      const n = Math.min(PIECE, size - at);
+      const buf = Buffer.alloc(n);
+      readSync(fd, buf, 0, n, at);
+      at += n;
+      const all = Buffer.concat([carry, buf]);
+      const end = all.lastIndexOf(10) + 1; // (cut at a line's end, in bytes: no character is split)
+      for (const l of all.subarray(0, end).toString("utf8").split("\n")) take(l);
+      carry = all.subarray(end);
+    }
+    // (A last line not yet ended is left for the next look.)
+    return { offset: at - carry.length, optOuts: found };
+  } finally {
+    closeSync(fd);
+  }
+}
