@@ -86,7 +86,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     if (!s) seats.set(name, (s = {
       model: undefined as string | undefined, model_calls: 0, failed_calls: 0, cost_microusd: 0, input_tokens: 0, output_tokens: 0, tool_uses: {} as { [k: string]: number },
       answers_without_tool_use: 0, malformed_tool_uses: {} as { [k: string]: number }, dropped_tool_uses: {} as { [k: string]: number },
-      notes: { look_each_sitting: 0, no_turn: 0, notebook_not_changed: 0 }, notebook_not_changed_reasons: {} as { [k: string]: number }, opted_out: null as any,
+      notes: { look_each_sitting: 0, no_turn: 0, notebook_not_changed: 0 },
+      // What a seat was shown, against the most it may be: prompts its model would not take, prompts something was left
+      // out of to keep them within that, looks cut at the most one look shows; and what it sent that was not sent.
+      prompts_too_long: 0, prompts_trimmed: 0, looks_cut: 0, not_sent: {} as { [k: string]: number }, notebook_not_changed_reasons: {} as { [k: string]: number }, opted_out: null as any,
     }));
     return s;
   };
@@ -148,6 +151,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       if (d.dropped_tool_use !== undefined) count(s.dropped_tool_uses, String(d.reason ?? "?"));
       if (d.look_each_sitting) s.notes.look_each_sitting++;
       if (d.no_turn) s.notes.no_turn++;
+      if (d.prompt_too_long) s.prompts_too_long++;
+      if (d.prompt_trimmed) s.prompts_trimmed++;
+      if (d.look_cut) s.looks_cut++;
+      if (d.not_sent) count(s.not_sent, String(d.not_sent.what ?? "?"));
       if (d.notebook_not_changed) {
         s.notes.notebook_not_changed++;
         for (const why of d.notebook_not_changed.reasons ?? []) count(s.notebook_not_changed_reasons, String(why).slice(0, 120));
@@ -247,6 +254,8 @@ export function renderReport(r: any): string {
   for (const [k, s] of Object.entries<any>(r.per_seat)) {
     L.push(`-- ${k}: ${s.model_calls} calls${s.failed_calls ? ` (${s.failed_calls} failed)` : ""}, ${s.cost_microusd} microusd; tool uses: ${kv(s.tool_uses)}; answers with no tool use: ${s.answers_without_tool_use}`);
     L.push(`   malformed: ${kv(s.malformed_tool_uses)}; dropped: ${kv(s.dropped_tool_uses)}; notes: ${kv(s.notes)}`);
+    if (s.prompts_too_long || s.prompts_trimmed || s.looks_cut) L.push(`   PROMPT SIZE: ${s.prompts_too_long ?? 0} prompt${s.prompts_too_long === 1 ? "" : "s"} too long for its model (each a sitting not held); ${s.prompts_trimmed ?? 0} with something left out to stay within the most a prompt may be; ${s.looks_cut ?? 0} look${s.looks_cut === 1 ? "" : "s"} cut at the most one look shows`);
+    if (Object.keys(s.not_sent ?? {}).length) L.push(`   NOT SENT (the seat was told each time): ${kv(s.not_sent)}`);
     if (s.opted_out) L.push(`   OPTED OUT on day ${s.opted_out.day}: ${JSON.stringify(s.opted_out.statement)}`);
   }
   const t = r.translator_report;

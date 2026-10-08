@@ -50,7 +50,7 @@ test("a language-model participant with on-request reports can look at them, in 
   const participant = createLlmParticipant({ participant: "s", entity: "e", framing: { disclosure: "simulation", reason: "test" }, standing: [], titles: new Map([["board", "Noticeboard"]]), onRequest: ["board"], cadenceDays: 7, draftText: () => "" },
     { adapter, annotate: async () => {}, now: () => 0 });
   const a = await participant.step(obs({}), { world: { config: {}, currency: PROFILE.values.currency } } as any);
-  expect(a).toEqual({ type: "look", looks: [{ channel: "board", query: { standing: true, limit: 20 } }] });
+  expect(a).toEqual({ type: "look", looks: [{ channel: "board", query: { standing: true, order: { field: "at", desc: true }, limit: 20 } }] });
 });
 
 test("a language-model participant can look things up in an on-request report: what to find, newest first", async () => {
@@ -278,14 +278,21 @@ test("where a list of papers is cut, the seat is told how to see the rest; what 
   expect(renderObservation(obs({ mine: { kind: "records", records: many.slice(0, 3) } }), o)).not.toContain("look at");
   expect(renderObservation(obs({ mine: { kind: "records", records: claims } }), { titles: o.titles })).not.toContain("look at");
 
-  // What it looked up: every claim by itself, long text whole.
+  // What it looked up: a list, every claim by itself, a line to a paper (a paper's full text comes when that paper is
+  // asked for by its id: participants/test/seat-papers.test.ts).
   const found = renderObservation(obs({ mine: { kind: "records", search: true, records: [...claims, long] } }), { ...o, looked: new Map([["mine", { limit: 50 }]]) });
   expect(found).toContain("## Filings: what you looked up (31 found)");
-  expect(found).toContain("- [t29] city has a right: kind: ownership; object: p29");
-  expect(found).toContain("x".repeat(1500));
-  expect(found).toContain("y".repeat(600));
-  expect(found).not.toContain("…");
+  expect(found).toContain("- 30 ownership claims, from the start: city has a right: p0 [t0], p1 [t1], p2 [t2], p3 [t3], p4 [t4], p5 [t5], and 24 more (to find one, say what it is about)");
+  expect(found).toContain(`- [m1] minutes, year 1, day 1, from clerk: "${"x".repeat(160)}…"`);
+  expect(found).not.toContain("x".repeat(161));
+  expect(found).toContain('(To read one in full: look at this report (mine) with paper: its id.)');
   expect(found).not.toContain("There may be more");
+  // The one paper, asked for by its id: whole.
+  const one = renderObservation(obs({ mine: { kind: "records", search: true, records: [long] } }), { ...o, looked: new Map([["mine", { paper: "m1" }]]) });
+  expect(one).toContain("## Filings: the paper m1\n- [m1] minutes from clerk");
+  expect(one).toContain("x".repeat(1500));
+  expect(one).toContain("y".repeat(600));
+  expect(one).not.toContain("…");
   expect(renderObservation(obs({ mine: { kind: "records", search: true, records: claims.slice(0, 20) } }), { ...o, looked: new Map([["mine", { limit: 20 }]]) })).toContain("(There may be more: at most 20 were asked for. Ask for more at once, or say more closely what to find.)");
   expect(renderObservation(obs({ mine: { kind: "records", search: true, records: [] } }), o)).toContain("## Filings: what you looked up (0 found)\nNothing found.");
   // A look that brought nothing new, or at a report that's no longer its own: said.

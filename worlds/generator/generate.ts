@@ -1567,6 +1567,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const entityName = entities.find((e) => e.id === pos.entity)?.name ?? pos.entity;
     part.controller = { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       params: { cadence_days: 7, standing: ["laws", "forms", "prices"], ...(RD ? { sessions: { start: RD.work_start_hour * HOUR, end: RD.work_end_hour * HOUR, days: RD.work_days } } : {}),
+        // (What a folder holds, for whoever reads it: the code in the office reads every paper of the organisation's own
+        // through its payroll channel; a person is shown the employment agreements under that name, and finds the rest
+        // in the office's files.)
+        ...(pos.channels.some((c: any) => c.id === "payroll") ? { folders: { payroll: ["employment agreement"] } } : {}),
         mock: { brain: impl, params: params ?? {} } } };
     // What a person in the office could look up, and the code never needed to (pilot 8: finance and planning spent
     // their days asking to "inspect the ledger" and "see who holds the mayor's post", which nothing could do for them):

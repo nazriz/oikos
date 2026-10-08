@@ -429,7 +429,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     const ways = new Map<string, { way: string; by?: string[]; board?: boolean }>(chans.filter((x) => x.ch.way).map((x) => [x.path, { way: x.ch.way, ...(x.ch.by ? { by: x.ch.by } : {}),
       ...(x.ch.way === "published" && !x.ch.from && (x.ch.match?.statement_kinds ?? []).some((k: string) => boards.has(k)) ? { board: true } : {}) }]));
     const config = { participant: p.id, entity, entityName, onRequest, kinds, ways, title: office?.title ?? p.title, role: office?.role, framing: p.framing, standing: standingIds, titles, cadenceDays: pp.cadence_days ?? 7, draftText,
-      ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}) };
+      ...(pp.sessions ? { sessions: pp.sessions } : {}), ...(pp.max_actions ? { maxActions: pp.max_actions } : {}),
+      // Folders that hold some kinds of paper only (by the channel's own id, as `standing` is given), and the most a prompt may be.
+      ...(pp.folders ? { folders: new Map<string, string[]>(Object.entries(pp.folders as { [id: string]: string[] }).flatMap(([id, kinds]) => chans.filter((x) => x.path === id || x.path.endsWith(`/${id}`)).map((x) => [x.path, kinds] as [string, string[]]))) } : {}),
+      ...(pp.prompt_max ? { promptMax: pp.prompt_max } : {}) };
     const controller = createLlmParticipant(config, io);
     const module: BehaviourModule = { name: "llm.participant", version: LLM_PARTICIPANT_VERSION, doc: "docs/design/m2-llm-participants.md", cadence: () => cadence, create: () => controller as unknown as Controller };
     const ctx = ctxFor(p.id, office?.id ?? "self", entity, {});

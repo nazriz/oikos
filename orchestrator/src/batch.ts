@@ -520,6 +520,6 @@ export function healthWarnings(r: { health?: RunSummary["health"]; profile?: Run
     if (h.times > REPEAT_WARNING) out.push(`${m}: ${h.unit} did the same thing ${h.times.toLocaleString("en-US")} times in one day (${h.act.slice(0, 80)}): a retry loop?`);
   const odd = Object.entries(r.health?.refused ?? {}).filter(([code]) => !EXPECTED_REFUSALS.has(code));
   if (odd.length) out.push(`refusals other than same-moment races: ${odd.map(([c, n]) => `${c} ${n}`).join(", ")}`);
-  if (r.participantErrors) out.push(`${r.participantErrors} participant error${r.participantErrors === 1 ? "" : "s"} (recovered in place: see the log's participant_error notes)`);
+  if (r.participantErrors) out.push(`${r.participantErrors} participant error${r.participantErrors === 1 ? "" : "s"} (each waited that wake, with nothing done: see the log's participant_error notes)`);
   return out;
 }

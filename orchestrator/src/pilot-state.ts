@@ -93,15 +93,28 @@ export function localStamp(d = new Date()): string {
 }
 
 export interface OptOut { participant: string; t: number; day: number; statement: string }
+/** Something that went wrong at a seat that whoever runs a wave should hear of while it runs: a prompt too long for the
+ * seat's model (the call failed; the next is cut), or something a seat sent that was not sent. */
+export interface SeatFault { participant: string; t: number; day: number; kind: "prompt_too_long" | "not_sent"; detail: string }
 
 /**
  * Opt-outs in a run's log (the `opt_out` command), from a byte offset on: for a pilot still running, so that a seat
  * leaving is heard of when it happens. Returns the offset to continue from (a plain log's complete lines only). A
  * compressed log is a finished run's and is read whole. A log that is shorter than the offset was replaced: read again.
  */
-export async function scanOptOuts(log: string, from = 0): Promise<{ offset: number; optOuts: OptOut[] }> {
+export async function scanOptOuts(log: string, from = 0): Promise<{ offset: number; optOuts: OptOut[]; faults: SeatFault[] }> {
   const found: OptOut[] = [];
+  const faults: SeatFault[] = [];
   const take = (line: string) => {
+    // (A seat's note that a prompt was too long for its model, or that something it sent was not sent.)
+    if (line.includes('"prompt_too_long"') || line.includes('"not_sent"')) {
+      try {
+        const e = JSON.parse(line);
+        const d = e.kind === "annotation" && e.body?.annotation === "note" ? e.body.data : undefined;
+        if (d?.prompt_too_long) faults.push({ participant: e.body.subject, t: e.t, day: Math.floor(e.t / 86_400), kind: "prompt_too_long", detail: `${d.prompt_too_long.characters} characters; cut to ${d.prompt_too_long.limit_now} from now on` });
+        if (d?.not_sent) faults.push({ participant: e.body.subject, t: e.t, day: Math.floor(e.t / 86_400), kind: "not_sent", detail: String(d.not_sent.why ?? "").slice(0, 200) });
+      } catch { /* (a line cut off) */ }
+    }
     if (!line.includes('"command":"opt_out"')) return;
     try {
       const e = JSON.parse(line);
@@ -110,7 +123,7 @@ export async function scanOptOuts(log: string, from = 0): Promise<{ offset: numb
   };
   if (log.endsWith(".zst")) {
     for await (const l of logLines(log)) take(l);
-    return { offset: 0, optOuts: found };
+    return { offset: 0, optOuts: found, faults };
   }
   const size = statSync(log).size;
   let at = size < from ? 0 : from;
@@ -129,7 +142,7 @@ export async function scanOptOuts(log: string, from = 0): Promise<{ offset: numb
       carry = all.subarray(end);
     }
     // (A last line not yet ended is left for the next look.)
-    return { offset: at - carry.length, optOuts: found };
+    return { offset: at - carry.length, optOuts: found, faults };
   } finally {
     closeSync(fd);
   }

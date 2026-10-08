@@ -453,7 +453,7 @@ test("a model mayor finds things out as a code mayor does: it sends someone to s
   // Someone sent: said so at once; what they found comes with a later report, in full, as it was when they were there.
   expect(first.hall).toContain("Someone has set out. What they find comes with the report after they are back.");
   expect(first.who).toContain("## Who's who (look someone up: a person, an organisation or a post, by name or id): who you looked for\n- post: Finance officer (finance), for city: ");
-  expect(first.papers).toContain("what you looked up (1 found)\n- [signatories-city] signatories from city, to bank:");
+  expect(first.papers).toContain("what you looked up (1 found)\n- [signatories-city] signatories, from the start, from city: to bank:");
   const later = read.slice(1).join("\n");
   expect(later).toMatch(/what was found there \(year 1, day 1\)\\n- civic town-hall, at [^:\\]+: wear 0, rising [\d,]+ a day\\n  - town-hall\//);
   void second;

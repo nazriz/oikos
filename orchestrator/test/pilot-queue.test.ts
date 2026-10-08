@@ -111,7 +111,7 @@ test("an opt-out is found in a log as it grows, once, from where the last look e
   writeFileSync(log, line({ kind: "event", t: 1, body: {} }) + line({ kind: "command", t: 2_800_000, body: { command: "opt_out", participant: "finance-system", statement: "x \u00e9" } }));
   const a = await scanOptOuts(log, 0);
   expect(a.optOuts).toEqual([{ participant: "finance-system", t: 2_800_000, day: 32, statement: "x \u00e9" }]);
-  expect(await scanOptOuts(log, a.offset)).toEqual({ offset: a.offset, optOuts: [] });
+  expect(await scanOptOuts(log, a.offset)).toEqual({ offset: a.offset, optOuts: [], faults: [] });
   // (A line half written is left for the next look.)
   const more = line({ kind: "command", t: 3_000_000, body: { command: "opt_out", participant: "mayor-system", statement: "" } });
   appendFileSync(log, more.slice(0, 30));
@@ -122,3 +122,17 @@ test("an opt-out is found in a log as it grows, once, from where the last look e
   await compressLog(log);
   expect((await scanOptOuts(log + ".zst")).optOuts.map((o) => o.participant)).toEqual(["finance-system", "mayor-system"]);
 }, 60_000);
+
+test("a prompt too long for a seat's model, and something a seat sent that was not sent, are found in a growing log for the alerts", async () => {
+  const log = join(base, "faults.seed1.jsonl");
+  const line = (e: object) => JSON.stringify(e) + "\n";
+  const note = (t: number, subject: string, data: object) => line({ kind: "annotation", t, body: { annotation: "note", subject, data } });
+  writeFileSync(log, note(9 * 3600, "finance-seat", { prompt_too_long: { characters: 602_000, limit_was: 150_000, limit_now: 75_000 } }) + note(2 * 86_400, "mayor-seat", { not_sent: { what: "letter", why: "the letter named nobody it could go to" } }) + note(5, "mayor-seat", { no_turn: {} }));
+  const a = await scanOptOuts(log, 0);
+  expect(a.optOuts).toEqual([]);
+  expect(a.faults).toEqual([
+    { participant: "finance-seat", t: 9 * 3600, day: 0, kind: "prompt_too_long", detail: "602000 characters; cut to 75000 from now on" },
+    { participant: "mayor-seat", t: 2 * 86_400, day: 2, kind: "not_sent", detail: "the letter named nobody it could go to" },
+  ]);
+  expect((await scanOptOuts(log, a.offset)).faults).toEqual([]);
+});

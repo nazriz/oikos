@@ -16,10 +16,10 @@ import type { Observation, ParticipantAction } from "../contracts";
 import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
-import { callModel, type LlmIO } from "./call";
-import { NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked } from "./render";
+import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
+import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.11.0"; // 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.12.0"; // 0.12.0: a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -53,6 +53,100 @@ export interface LlmParticipantConfig {
   maxActions?: number;
   /** How a draft awaiting confirmation reads (from the translator package). */
   draftText: (d: any) => string;
+  /** Folders that hold papers of some kinds only (by channel path: the kinds, in the words a list of papers names
+   * them by, such as "employment agreement"): a folder named for payroll holds payroll papers, whatever else is the
+   * organisation's own. Nothing else is shown under its name, as it comes or looked up. */
+  folders?: Map<string, string[]>;
+  /** The most one prompt may come to, in characters (the system prompt and everything shown): `PROMPT_MAX` unless set. */
+  promptMax?: number;
+}
+
+/** The most one prompt comes to, in characters, whatever a seat looked up: what is over is left out, the oldest of what
+ * it looked up first, with a line saying so (and noted in the log). A model is never sent more than it can take. */
+export const PROMPT_MAX = 150_000;
+/** The least a prompt's ceiling is brought down to when a model says a prompt was too long for it. */
+export const PROMPT_MIN = 12_000;
+/** What stands where a look's result was, once it has been left out. */
+export const LOOK_LEFT_OUT = "(What this look showed is no longer set out here: there was more than can be read at once, and the oldest of what you looked up was left out first. Look again for what you need.)";
+const LOOKED_SECTION = /^## (Looked up for you|.*: (what you looked up|what you looked at|who you looked for|what was found there|the paper |new since you last looked))/;
+
+/**
+ * A prompt within the most one may come to. What is over is left out in this order, each with a line saying so: the
+ * results of looks, the oldest first; then, of what was set out in words, the parts that were looked up, then the other
+ * parts, the oldest first (the opening lines, with the notebook, stay); and only if that is not enough, the longest
+ * text is cut. `left`: what was left out, if anything was.
+ */
+export function fitPrompt(system: string, messages: LlmMessage[], max: number, looks: ReadonlySet<string>): { system: string; messages: LlmMessage[]; characters: number; left?: { looks: number; parts: number; cut: boolean; characters_before: number } } {
+  const len = (c: ContentBlock) => (c.type === "text" ? c.text.length : c.type === "tool_result" ? c.content.length : JSON.stringify(c.input ?? {}).length + c.name.length);
+  const size = (sys: string, ms: LlmMessage[]) => sys.length + ms.reduce((a, m) => a + (typeof m.content === "string" ? m.content.length : m.content.reduce((b, c) => b + len(c), 0)), 0);
+  const before = size(system, messages);
+  if (before <= max) return { system, messages, characters: before };
+  let ms = messages.map((m) => ({ ...m, content: typeof m.content === "string" ? m.content : m.content.map((c) => ({ ...c })) })) as LlmMessage[];
+  let now = before;
+  const left = { looks: 0, parts: 0, cut: false, characters_before: before };
+  // 1. What looks showed, the oldest first.
+  for (const m of ms) {
+    if (typeof m.content === "string") continue;
+    for (const c of m.content) {
+      if (now <= max) break;
+      if (c.type !== "tool_result" || !looks.has(c.tool_use_id) || c.content.length <= LOOK_LEFT_OUT.length) continue;
+      now -= c.content.length - LOOK_LEFT_OUT.length;
+      c.content = LOOK_LEFT_OUT;
+      left.looks++;
+    }
+  }
+  // 2. Of what was set out in words: the parts that were looked up, then the rest, the oldest first.
+  const shed = (textOf: string, only: boolean): string => {
+    const parts = textOf.split("\n\n## ").map((x, n) => (n ? `## ${x}` : x));
+    const out: string[] = [];
+    let dropped = 0;
+    for (const [n, x] of parts.entries()) {
+      if (n > 0 && now > max && (!only || LOOKED_SECTION.test(x)) && !x.startsWith("## Waiting for you to confirm") && !x.startsWith("## Letters")) {
+        now -= x.length + 2;
+        dropped++;
+        if (dropped === 1) out.push("\u0000");
+      } else out.push(x);
+    }
+    if (!dropped) return textOf;
+    left.parts += dropped;
+    const line = `(Left out here, so that this is not more than can be read at once: ${dropped} ${dropped === 1 ? "part" : "parts"} of what you had ${only ? "looked up" : "looked up or been shown"}. Look again for what you need.)`;
+    now += line.length + 2;
+    return out.map((x) => (x === "\u0000" ? line : x)).join("\n\n");
+  };
+  for (const only of [true, false]) {
+    for (const m of ms) {
+      if (now <= max) break;
+      if (typeof m.content === "string") m.content = shed(m.content, only);
+      else for (const c of m.content) {
+        if (c.type === "text") c.text = shed(c.text, only);
+        else if (c.type === "tool_result" && !only) c.content = shed(c.content, only);
+      }
+    }
+  }
+  // 3. Still over (one part longer than everything allowed): the longest text is cut, and then what is on file.
+  const cutNote = "\n(Cut short here: there was more than can be read at once. Look again for what you need.)";
+  for (let guard = 0; now > max && guard < 64; guard++) {
+    let best: { get: () => string; set: (s: string) => void } | undefined;
+    for (const m of ms) {
+      const cands: { get: () => string; set: (s: string) => void }[] = typeof m.content === "string" ? [{ get: () => m.content as string, set: (s) => void (m.content = s) }]
+        : m.content.flatMap((c) => (c.type === "text" ? [{ get: () => c.text, set: (s: string) => void (c.text = s) }] : c.type === "tool_result" ? [{ get: () => c.content, set: (s: string) => void (c.content = s) }] : []));
+      for (const c of cands) if (!best || c.get().length > best.get().length) best = c;
+    }
+    if (!best || best.get().length <= cutNote.length + 200) break;
+    const was = best.get();
+    const keep = Math.max(200, was.length - (now - max) - cutNote.length);
+    best.set(was.slice(0, keep) + cutNote);
+    now -= was.length - keep - cutNote.length;
+    left.cut = true;
+  }
+  let sys = system;
+  if (now > max && sys.length > cutNote.length + 200) {
+    const keep = Math.max(200, sys.length - (now - max) - cutNote.length);
+    now -= sys.length - keep - cutNote.length;
+    sys = sys.slice(0, keep) + cutNote;
+    left.cut = true;
+  }
+  return { system: sys, messages: ms, characters: size(sys, ms), left };
 }
 
 /** The capacity an act is done in: a post it holds, or (left out) itself. */
@@ -81,9 +175,27 @@ const BY_WORDS: { [field: string]: string } = { id: "id (its own number)", claim
 const WHO_MAX = 16;
 /** How many places one going takes in (the contract's). */
 const VISIT_MAX = 16;
-/** The most a look brings at once (papers found: the participant API's own limit on a search is higher, 200; what's
- * found is shown whole, so this is what keeps one look a readable size). */
+/** The most a look lists at once (papers found, a line each), and the most whoever keeps papers gives to one search
+ * (the participant API's limit): what is asked for when a list is narrowed here, by what a search cannot be asked. */
 const LOOK_MAX = 50;
+const SEARCH_MAX = 200;
+/** What a paper is, where it is not a statement: what a search is asked for when a kind is one of these words. */
+const RECORD_WORDS: { [said: string]: string } = { agreement: "agreement", claim: "claim", signature: "signature", notice: "notice", withdrawal: "withdrawal", vote: "vote", "claim transfer": "claim_transfer", "claim release": "claim_release", declaration: "entity_declaration" };
+
+/** A kind of paper as a seat says it ("employment agreement", "invoices", "ownership claim"), as a search can be asked
+ * for it, as nearly as it can: a statement by its kind, an agreement or a claim as such (which agreement, by what it
+ * is for, is told from the list: `here`). A guess that finds nothing is followed by a look through the folder's latest
+ * papers for kinds like it, so nothing rests on the guess being right. */
+export function kindWhere(said: string): { where: Where[]; here: boolean } {
+  const k = kindSaid(said);
+  if (RECORD_WORDS[k]) return { where: [{ field: "record", op: "=", value: RECORD_WORDS[k]! }], here: false };
+  const of = /^(.+) (agreement|claim)$/.exec(k);
+  if (of?.[2] === "agreement") return { where: [{ field: "record", op: "=", value: "agreement" }], here: true };
+  if (of?.[2] === "claim") return { where: [{ field: "record", op: "=", value: "claim" }, { field: "about.kind", op: "=", value: of[1]!.replace(/ /g, "_") }], here: false };
+  return { where: [{ field: "kind", op: "=", value: plainKind(said) }], here: false };
+}
+/** A statement's kind as the records write it: lower case, an underscore between words. */
+const plainKind = (said: string) => said.trim().toLowerCase().replace(/[\s-]+/g, "_");
 type Op = "=" | "!=" | "<" | "<=" | ">" | ">=";
 const OPS: Op[] = ["=", "!=", "<", "<=", ">", ">="];
 const DAYS_IN_YEAR = 365;
@@ -128,7 +240,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
     "You'll see what's there with your next report.",
     `What you look at sitting after sitting can be set out for you at the start of each, without your asking again: look at it once with each_sitting (up to ${READY_MAX} at a time; with each_sitting false, no longer).`,
     "If all you do in an answer is look into reports whole (nothing to find, no one and nothing named), and there's nothing in any of them, the sitting ends there: you're told so at your next, which comes after the days you last gave. Anything you mean to do whatever they hold, do in the same answer.",
-    ...(papers ? [`${c.kinds ? `Papers and filings: ${papers}. ` : ""}To look something up in them, say what to find: those where something matches (kind, from, on behalf of, citing, date as "year 1, day 12", or detail.<name> for one of a paper's details, e.g. detail.employer), newest first. What you look up is shown whole.`] : []),
+    ...(papers ? [`${c.kinds ? `Papers and filings: ${papers}. ` : ""}A look into papers answers with a list, newest first: each paper's id, what it is, its date, who it is from, and a line of what it says. To narrow it, say what to find: those where something matches (kind in plain words, such as employment agreement; from; on behalf of; citing; date as "year 1, day 12"; or detail.<name> for one of a paper's details, e.g. detail.employer), those since a date, those about something (an id the paper names: a person, an account, a lot, another paper), or those with certain words in them. To read one paper in full, give its id in paper. A very long paper (a register, a map) is read a part at a time: its entries from the one you give on, or only those with the words you give. One look shows at most ${LOOK_CHARS_MAX.toLocaleString("en")} characters.`] : []),
     ...(places ? [`Buildings and ground: ${places}. Name the places to see in full as they are today (a building, a room, a piece of ground, or a kind of building); or name a measure the report gives, to see every building where it's above zero or rising, the highest first.`] : []),
     ...(elsewhere ? [`Places you are not at: ${elsewhere}. Nobody is shown them: name where to send someone (a building by its id, or a piece of ground by its cell, such as cell.3.4; a lot's cells are on its plan), up to ${VISIT_MAX} at a time. Going takes your office's time (the way there and back, and the time to look), and you're shown what was there with the report after they're back.`] : []),
     ...(people ? [`Who's who: ${people}. Nobody is shown it: name who you're looking for (a person or an organisation by its id or full name; a post by its id, its title or what it is, such as mayor), up to ${WHO_MAX} at a time, and you're told who they are.`] : []),
@@ -163,9 +275,14 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
             ...(papers ? {
               current_only: { type: "boolean", description: "Papers: only what's still current (not withdrawn by whoever put it up)." },
               find: { type: "array", maxItems: 8, description: "Papers: only those where each of these holds.", items: { type: "object", required: ["field", "value"], properties: {
-                field: { type: "string", description: "kind, from, on behalf of, citing, date, or detail.<name>" },
+                field: { type: "string", description: "kind, from, on behalf of, citing, date, id, or detail.<name>" },
                 op: { enum: OPS, description: "= if not given" },
-                value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } } } : {}),
+                value: { anyOf: [{ type: "string" }, { type: "integer" }, { type: "boolean" }] } } } },
+              paper: { type: "string", description: "Papers: one paper's id, to read that paper in full." },
+              from_entry: { type: "integer", minimum: 1, description: "Papers, with paper: for a very long paper, the entry to start from." },
+              about: { type: "string", description: "Papers: only those that name this id (a person, an organisation, an account, a lot, another paper)." },
+              since: { type: "string", description: 'Papers: only those from this date on, as "year 1, day 12".' },
+              words: { type: "string", description: "Papers: only those with these words in them; with paper, only that paper's entries with them." } } : {}),
             ...(places || people || elsewhere ? { named: { type: "array", maxItems: 40, items: { type: "string" }, description: [places ? "Buildings and ground: the places to see in full." : "", elsewhere ? "Places you are not at: where to send someone." : "", people ? "Who's who: who to find." : ""].filter(Boolean).join(" ") } } : {}),
             ...(places ? { measure: { type: "string", description: "Buildings and ground: a measure, as the report names it; every building where it's above zero or rising is listed." } } : {}),
             limit: { type: "integer", minimum: 1, maximum: LOOK_MAX, description: "At most this many (20 if not given)." },
@@ -193,6 +310,8 @@ export interface LlmController {
 }
 
 type Use = Extract<ContentBlock, { type: "tool_use" }>;
+/** The look that follows one for a kind of paper that found nothing: the folder's latest, looked through for kinds like it. */
+type Follow = { said: string; action: ParticipantAction; looked: [string, Looked] };
 const text = (x: unknown): x is string => typeof x === "string" && x.length > 0;
 const quote = (s: string, max = 80) => `"${s.length > max ? `${s.slice(0, max)}…` : s}"`;
 
@@ -236,7 +355,7 @@ export function editNotebook(was: string, i: any): { text: string; problems: str
 /** The most looks kept ready for every sitting. */
 export const READY_MAX = 6;
 /** What a look is, whatever else was said with it: the same look asked for again is the same. */
-const lookKey = (i: any) => JSON.stringify([i.report, i.find ?? null, !!i.current_only, i.named ?? null, i.measure ?? null, i.limit ?? null]);
+const lookKey = (i: any) => JSON.stringify([i.report, i.find ?? null, !!i.current_only, i.named ?? null, i.measure ?? null, i.limit ?? null, i.paper ?? null, i.from_entry ?? null, i.about ?? null, i.since ?? null, i.words ?? null]);
 /** A report, cut where its sections begin (the first: its opening lines). */
 const sections = (b: string) => b.split("\n\n## ").map((x, n) => (n ? `## ${x}` : x));
 /** The longest statement recorded with an opt-out (the contracts' limit on free text). */
@@ -282,7 +401,15 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   // The last answer's tool uses (the APIs need a result for every one): each action's result is the report after it.
   let pending: { id: string; name: string }[] = [];
   // Actions from the last answer still to carry out, in order, and the reports seen after each one carried out.
-  let queue: { id: string; action: ParticipantAction; label?: string; looked?: [string, Looked] }[] = [];
+  let queue: { id: string; action: ParticipantAction; label?: string; looked?: [string, Looked]; kindSaid?: Follow; follows?: string }[] = [];
+  // A look for a kind of paper, just made: if it found nothing, the folder's latest papers are looked through next.
+  let kindLook: Follow | undefined;
+  let queueFollowed: string | undefined; // the use whose look the action just carried out goes on with
+  // The uses of this sitting that were looks (what they showed is the first to be left out of a prompt too long).
+  const lookIds = new Set<string>();
+  // The most a prompt may come to: brought down when the model says one was too long for it.
+  let promptMax = c.promptMax ?? PROMPT_MAX;
+  const cutLooks: { report: string; characters: number; limit: number }[] = [];
   // The reports it can look into, and what it asked to see in the one it just looked at (the next report sets it out).
   const reports = lookable(c);
   const canLook = new Set(reports.keys());
@@ -344,6 +471,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     current = q.id;
     lastAction = q.label;
     lastLooked = q.looked ? new Map([q.looked]) : undefined;
+    kindLook = q.kindSaid;
+    queueFollowed = q.follows;
+    if (q.follows !== undefined) return q.action; // (the same look, gone on with: not another)
     if (q.action.type === "propose") tally.requests++;
     if (q.action.type === "sign") q.action.decision === "accept" ? tally.confirmed++ : tally.declined++;
     if (q.action.type === "message") tally.letters++;
@@ -366,6 +496,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     extra = [];
     retried = false;
     open = false;
+    lookIds.clear();
     return until !== undefined ? { type: "wait", until } : { type: "wait" };
   };
   /** Done for now, for the days given (none: its usual rhythm): back then, or at the next sitting if someone writes. */
@@ -386,7 +517,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const lookWords = (i: any) => {
     const finds: any[] = Array.isArray(i.find) ? i.find : i.find ? [i.find] : [];
     const names: string[] = Array.isArray(i.named) ? i.named : text(i.named) ? [i.named] : [];
-    return `"${c.titles.get(i.report) ?? i.report}" (${i.report})${i.current_only ? ", what's current" : ""}${finds.length ? `, where ${finds.map((f) => `${f?.field} ${f?.op ?? "="} ${f?.value}`).join(" and ")}` : ""}${names.length ? `: ${names.join(", ")}` : ""}${text(i.measure) ? `, by ${i.measure}` : ""}`;
+    return `"${c.titles.get(i.report) ?? i.report}" (${i.report})${i.current_only ? ", what's current" : ""}${finds.length ? `, where ${finds.map((f) => `${f?.field} ${f?.op ?? "="} ${f?.value}`).join(" and ")}` : ""}${names.length ? `: ${names.join(", ")}` : ""}${text(i.measure) ? `, by ${i.measure}` : ""}${text(i.paper) ? `, the paper ${i.paper}${Number.isInteger(i.from_entry) ? ` from entry ${i.from_entry}` : ""}` : ""}${text(i.about) ? `, about ${i.about}` : ""}${text(i.since) ? `, since ${i.since}` : ""}${text(i.words) ? `, with the words "${i.words}"` : ""}`;
   };
   /** Whether a look's result holds nothing it hasn't been shown this sitting, but that there's nothing there. */
   const nothingNew = (obs: Observation, body: string) => {
@@ -398,7 +529,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   };
 
   /** What a tool use asks for, as an action; or, if it can't be done as written, what it was and why not, in words. */
-  const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string; looked?: [string, Looked] } | { why: string }) => {
+  const read = (use: Use, held: Set<string>): { what: string } & ({ action: ParticipantAction; label?: string; looked?: [string, Looked]; kindSaid?: Follow } | { why: string }) => {
     const i = use.input;
     const what = use.name === "do" ? (text(i?.what) ? `what you asked for (${quote(i.what)})` : "something you asked for")
       : use.name === "confirm" ? (text(i?.ref) ? `your answer on ${i.ref}` : "your answer on something waiting for you to confirm")
@@ -458,26 +589,64 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         }
         return { what, action: { type: "look", looks: [{ channel: i.report }] }, looked: [i.report, looked] };
       }
-      if (names.length || i.measure !== undefined) return no("that report is one of papers: say what to find in it");
+      if (names.length > 1 || i.measure !== undefined) return no("that report is one of papers: say what to find in it, or give one paper's id in paper to read it in full (one paper to a look; several looks can go in one answer)");
+      for (const [k, v] of Object.entries({ paper: i.paper, about: i.about, since: i.since, words: i.words })) if (v !== undefined && v !== null && !text(v)) return no(`what you gave as ${k} couldn't be read`);
+      if (i.from_entry !== undefined && i.from_entry !== null && !(Number.isInteger(i.from_entry) && i.from_entry >= 1)) return no("the entry to start from is a whole number, 1 or more");
       // A search (what matches now, newest first). Anything to find that can't be read is said, never left out: a
       // search wider than the one asked for would read as its answer.
       const where: Where[] = [];
-      for (const w of finds) {
+      // A kind is said in plain words: asked for as nearly as a search can be, and told from the list here.
+      const kinds: string[] = [];
+      const rest: Where[] = []; // (what to find, the kind aside)
+      let here = false;
+      for (const w of [...finds, ...(text(i.since) ? [{ field: "date", op: ">=", value: i.since }] : [])] as any[]) {
+        if (typeof w?.field === "string" && w.field.trim().toLowerCase() === "kind" && typeof w.value === "string" && (w.op ?? "=") === "=") {
+          const k = kindWhere(w.value);
+          where.push(...k.where);
+          kinds.push(w.value.trim());
+          here ||= k.here;
+          continue;
+        }
         const r = condition(w);
         if (typeof r === "string") return no(r);
         where.push(...r);
+        rest.push(...r);
+      }
+      // One paper, by its id, read in full (a long one a part at a time): named in `paper`, or as the one thing named,
+      // or as the only thing to find.
+      const byId = where.length === 1 && where[0]!.field === "id" && where[0]!.op === "=" && typeof where[0]!.value === "string" ? where[0]!.value : undefined;
+      const paper: string | undefined = text(i.paper) ? i.paper.trim() : names.length === 1 ? names[0]!.trim() : byId;
+      if (paper !== undefined && !byId) {
+        if (where.length || kinds.length || text(i.about)) return no("to read one paper in full, give only its id (and, for a long one, the entry to start from or the words to find in it)");
+        where.push({ field: "id", op: "=", value: paper });
       }
       // A register someone else keeps answers a question about one named thing: the question has to name it.
       if (way?.way === "ask") {
         const by = way.by ?? ["id"];
         if (!where.some((w) => w.op === "=" && by.includes(w.field))) return no(`whoever keeps that register answers a question about one thing, never everything: say which, by ${by.map((f) => BY_WORDS[f] ?? f).join(" or ")}`);
       }
-      // Papers it's shown as they come can still be looked through: with nothing to find, the latest of them. (A board
-      // is never read through: with nothing to find, its latest few.)
-      const query = where.length ? { query: { ...(i.current_only ? { standing: true } : {}), where, order: { field: "at", desc: true }, limit } }
-        : i.current_only ? { query: { standing: true, limit } }
-        : c.onRequest?.includes(i.report) && !way?.board ? {} : { query: { order: { field: "at", desc: true }, limit } };
-      return { what, action: { type: "look", looks: [{ channel: i.report, ...query }] }, looked: [i.report, { limit }] };
+      if (paper !== undefined) return { what, action: { type: "look", looks: [{ channel: i.report, query: { where, limit: 1 } }] },
+        looked: [i.report, { paper, ...(Number.isInteger(i.from_entry) ? { fromEntry: i.from_entry } : {}), ...(text(i.words) ? { words: i.words } : {}) }] };
+      // A folder of some kinds only: asked for by its kind where it has one, and told from the list here otherwise.
+      const folder = c.folders?.get(i.report);
+      if (folder && !kinds.length) {
+        if (folder.length === 1) where.push(...kindWhere(folder[0]!).where);
+        here = true;
+      }
+      // What a search cannot be asked (what a paper names, the words in it, what an agreement is for) is told from
+      // what it gives: then the latest papers that match the rest are looked through, as many as one search gives.
+      here ||= text(i.about) || text(i.words);
+      const fetched = here ? SEARCH_MAX : limit;
+      const looked: Looked = { limit, ...(text(i.about) ? { about: i.about.trim() } : {}), ...(text(i.words) ? { words: i.words } : {}), ...(kinds.length ? { kinds } : {}), ...(here ? { fetched } : {}) };
+      // Papers it's shown as they come can still be looked through: with nothing to find, the latest of them. Papers it
+      // only reads when it chooses, looked into with nothing to find: what has come since it last looked (so that a look
+      // into the same folder, sitting after sitting, reaches what is new, and says so when nothing is). A board is never
+      // read through: with nothing to find, its latest few.
+      const whole = !where.length && !here && !i.current_only && c.onRequest?.includes(i.report) && !way?.board;
+      const query = whole ? {} : { query: { ...(i.current_only ? { standing: true } : {}), ...(where.length ? { where } : {}), order: { field: "at", desc: true }, limit: fetched } };
+      return { what, action: { type: "look", looks: [{ channel: i.report, ...query }] }, looked: [i.report, looked],
+        // (A kind that finds nothing: the folder's latest papers are looked through for kinds like it.)
+        ...(kinds.length ? { kindSaid: { said: kinds.join(", "), action: { type: "look", looks: [{ channel: i.report, query: { ...(i.current_only ? { standing: true } : {}), ...(rest.length ? { where: rest } : {}), order: { field: "at", desc: true }, limit: SEARCH_MAX } }] } as ParticipantAction, looked: [i.report, { limit, kindSaid: kinds[0]!, fetched: SEARCH_MAX, ...(text(i.about) ? { about: i.about.trim() } : {}), ...(text(i.words) ? { words: i.words } : {}) }] as [string, Looked] } } : {}) };
     }
     return no("it isn't something you can do");
   };
@@ -504,13 +673,33 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // (What stands now, as this report's standing documents show it: nothing, once the last of them is withdrawn. A
       // report that brings none of those documents leaves what's on file as it was.)
       if (standing || Object.entries(obs.channels).some(([id, ch]) => standingIds.has(id) && ch.kind === "records" && ch.records.length)) standingText = standing;
-      const body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}) });
+      let body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
+      for (const cut of cutLooks.splice(0)) await note({ look_cut: cut });
       lastAction = undefined;
       lastLooked = undefined;
       if (obs.inbox.length) mail = true;
       // This report is the result of the action just carried out, if one was.
       const wasResult = current !== undefined;
       if (current) {
+        // A look for a kind of paper that found nothing: the folder's latest papers are looked through for kinds like
+        // it (no turn is taken for it), and what that shows stands where "nothing found" stood.
+        const follow = kindLook;
+        kindLook = undefined;
+        const nothing = (x: string) => /: what you looked up \(0 found\)$/.test(x.split("\n")[0]!);
+        if (follow && sections(body).some(nothing)) {
+          results.set(current, body);
+          queue.unshift({ id: current, action: follow.action, looked: follow.looked, follows: current });
+          current = undefined;
+          return next(obs);
+        }
+        const first = results.get(current);
+        if (first !== undefined && queueFollowed === current) {
+          const [head, ...rest] = sections(first);
+          const [head2, ...rest2] = sections(body);
+          const said = new Set(head!.split("\n"));
+          body = [[head, ...head2!.split("\n").filter((l) => l && !said.has(l))].join("\n"), ...rest.filter((x) => !nothing(x)), ...rest2].join("\n\n");
+        }
+        queueFollowed = undefined;
         results.set(current, body);
         if (trays) quiet.set(current, nothingNew(obs, body));
         current = undefined;
@@ -563,7 +752,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         for (const r of ready) {
           const x = read({ type: "tool_use", id: `ready-${still.length + 1}`, name: "look", input: r.input }, held);
           if ("action" in x) {
-            queue.push({ id: `ready-${still.length + 1}`, action: x.action, ...(x.looked ? { looked: x.looked } : {}) });
+            queue.push({ id: `ready-${still.length + 1}`, action: x.action, ...(x.looked ? { looked: x.looked } : {}), ...(x.kindSaid ? { kindSaid: x.kindSaid } : {}) });
             still.push(r);
           } else unsaid.push(`${lookWords(r.input)} is no longer looked up for you at each sitting: ${x.why}.`);
         }
@@ -618,15 +807,26 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
 
         let res: Awaited<ReturnType<typeof callModel>>;
         let unreadTwice: string | undefined;
+        let sentCharacters = 0;
+        let fitted: LlmMessage[] = sending;
         try {
-          const ask = (messages: LlmMessage[]) => callModel(io, {
-            purpose: "participant", subject: c.participant, system: systemPrompt(c, standingText), messages, tools: toolset, maxTokens: c.maxTokens ?? 4000,
-            context: { observation: obs, notes, participant: c.participant, ...(missed.length ? { missed } : {}) },
-          }, seenSystems);
+          // A prompt is never more than a model can take: what is over is left out (the oldest of what was looked up
+          // first), with a line saying so where it stood, and noted.
+          const ask = async (given: LlmMessage[]) => {
+            const fit = fitPrompt(systemPrompt(c, standingText), given, promptMax, lookIds);
+            if (fit.left) await note({ prompt_trimmed: { ...fit.left, characters: fit.characters, limit: promptMax } });
+            sentCharacters = fit.characters;
+            fitted = fit.messages;
+            return callModel(io, {
+              purpose: "participant", subject: c.participant, system: fit.system, messages: fit.messages, tools: toolset, maxTokens: c.maxTokens ?? 4000,
+              context: { observation: obs, notes, participant: c.participant, ...(missed.length ? { missed } : {}) },
+            }, seenSystems);
+          };
           // An answer is read exactly or not at all: one that could not be is not guessed at. The seat is told plainly what
           // could not be read, once, in the same exchange; if the second can't be read either, nothing is done.
           const answered = async (messages: LlmMessage[]): Promise<{ res: Awaited<ReturnType<typeof callModel>>; sending: LlmMessage[]; unread?: string }> => {
             let r = await ask(messages);
+            messages = fitted; // (what it was shown, as it was shown it)
             let why = unreadWhy(r.content);
             if (!why) return { res: r, sending: messages };
             await note({ unread_answer: { why, text: unreadText(r.content), asked_again: true } });
@@ -668,6 +868,16 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
           sending = got.sending;
           unreadTwice ??= got.unread && "your answer could not be read, so nothing was done. Nothing you wrote was carried out";
         } catch (e) {
+          // The model said the prompt was too long for it: the same prompt is never sent again. The most a prompt may
+          // come to is brought down to half of what was sent, so the next is cut to that (the oldest of what was looked
+          // up first); it is noted, and the seat is told at its next sitting.
+          if (e instanceof ModelCallFailed && promptTooLong(e.message)) {
+            const was = promptMax;
+            promptMax = Math.max(PROMPT_MIN, Math.floor(Math.min(promptMax, sentCharacters || promptMax) / 2));
+            await note({ prompt_too_long: { characters: sentCharacters, limit_was: was, limit_now: promptMax, error: String(e.message).slice(0, 300) } });
+            const told = "When you were last to sit, more was set out for you than could be read at once, so that sitting was not held. Less is set out now: the oldest of what you had looked up is left out, and says so where it stood. Look again for what you need, a little at a time.";
+            if (!unsaid.includes(told)) unsaid.push(told);
+          }
           // No answer (the call failed, or the run is stopping): nothing it was to be shown is dropped. What was kept
           // for it stays kept, and this report joins it, so the next call shows everything this one would have.
           if (turn === 1) {
@@ -759,8 +969,9 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             await note({ dropped_tool_use: JSON.stringify(use).slice(0, 4000), reason: `more than ${max} actions in one answer` });
             continue;
           }
-          queue.push({ id: use.id, action: r.action, ...(r.label ? { label: r.label } : {}), ...(r.looked ? { looked: r.looked } : {}) });
+          queue.push({ id: use.id, action: r.action, ...(r.label ? { label: r.label } : {}), ...(r.looked ? { looked: r.looked } : {}), ...(r.kindSaid ? { kindSaid: r.kindSaid } : {}) });
           if (use.name !== "look") continue;
+          lookIds.add(use.id);
           // A look to keep ready for every sitting from now on (it's made now too); or one it made last sitting as well,
           // which it's told it could keep ready.
           const key = lookKey(i);
@@ -781,7 +992,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         // nothing said about being done: if there's nothing in any of them, nothing came of the answer.
         const lookUses = uses.filter((u) => u.name === "look");
         trays = lookUses.length > 0 && queue.length === lookUses.length && !notDone.size && uses.every((u) => u.name === "notebook" || u.name === "look")
-          && lookUses.every((u) => (u.input.find === undefined || (Array.isArray(u.input.find) && !u.input.find.length)) && u.input.named === undefined && u.input.measure === undefined);
+          && lookUses.every((u) => (u.input.find === undefined || (Array.isArray(u.input.find) && !u.input.find.length)) && u.input.named === undefined && u.input.measure === undefined && u.input.paper === undefined && u.input.about === undefined && u.input.since === undefined && u.input.words === undefined);
         const done = uses.find((x) => x.name === "done_for_now");
         const days = Number.isInteger(done?.input?.days) && done!.input.days > 0 ? { days: done!.input.days as number } : {};
         if (done) lastDays = days.days;
