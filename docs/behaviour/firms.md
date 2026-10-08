@@ -33,7 +33,7 @@
 
 The tenant pays the new rent from when it starts, or gives notice (docs/behaviour/citizen.md). This is where tight housing reaches sitting tenants, the counterpart of the BoE model's cut for unlet homes. Victoria's law (the first profile): once in 12 months, 60 days' notice.
 
-**The owners' draw (landlord 0.7.0):** monthly, 60% of rent received goes to the landlord's owners. With a `shareholders` register (the generated town's: its households), it's paid to them by their shares, and they spend it as they will. Without one, the old money-only stand-in (spent at a local shop) remains. 20% goes on upkeep bought from outside (maintenance comes in phase C).
+**The owners' draw (landlord 0.7.0):** monthly, 60% of rent received goes to the landlord's owners. With a `shareholders` register, it's paid to those on it by their shares, and they spend it as they will. In the generated town a landlord is held by one household or a few, or from outside ([firm-ownership.md](firm-ownership.md); until 2026-10-08 every household held a part of every landlord). Without one, the old money-only stand-in (spent at a local shop) remains. 20% goes on upkeep bought from outside (maintenance comes in phase C).
 
 ## `firm.employer`: a manager with a fixed headcount
 

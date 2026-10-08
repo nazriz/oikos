@@ -3,16 +3,21 @@
 // goods taken, and investigate each: work at the station that finds who took them, with the world's chance (only the
 // police learn it). Found: a charge to the tribunal, with what they found as evidence, asking that the taker make good
 // what was taken. Not found: the report stays unsolved, as most do.
+//
+// They are also who comes to the door of someone who has died with nobody at home to say so (docs/behaviour/deaths.md):
+// each working day they look at the town's homes, and a death in a home that has stood empty since is reported to the
+// registry once the time it takes for such a person to be found has passed (the world's figures: found_after).
 
 import * as C from "../calls";
 import type { SiteStructure } from "../contracts";
+import type { ParticipantAction, Observation } from "../contracts";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, nextLook, outOfTime, say, type Step, usd } from "./common";
+import { because, Book, DAY, nextLook, outOfTime, say, stoodEmpty, type Step, usd } from "./common";
 import { Staffing, stepper } from "./firms";
 
 export const station: BehaviourModule = {
   name: "police.station",
-  version: "0.1.1",
+  version: "0.2.0",
   doc: "docs/behaviour/crime.md",
   cadence: () => DAY,
   firstWake: (ctx) => 10 * 3600 + ctx.rng("first-wake").below(3600),
@@ -26,6 +31,13 @@ export const station: BehaviourModule = {
       tribunal: "", // where charges go
       look_at: 0, look_days: 5,
       channel: "premises",
+      // Found dead at home (docs/behaviour/deaths.md): the channel the town's homes are looked at through (asked for, once
+      // a working day; none: no such calls are made), where a death is reported, how long after a death someone with
+      // nobody at home is found (shares of such deaths found within so many days; the world's figures), and the
+      // officer's time a call takes.
+      homes_channel: "", registry: "",
+      found_after: [] as { within_days: number; bps: number }[],
+      call_seconds: 3600,
     }, ctx.params);
     need(p, ["building", "workplace", "account", "tribunal"], "police.station");
     const me = ctx.entity;
@@ -40,13 +52,45 @@ export const station: BehaviourModule = {
     // What investigations found, as each comes in (one done while the next is under way is seen then, not at our next
     // plan: until 2026-10-02 the first of two in a day was lost).
     const results = new Map<string, { taker?: string | null }>();
-    return stepper(
+    // Deaths seen in a home with nobody in it: where, when, and when we come to its door (drawn once for each).
+    const dead = new Map<string, { space: string; at: number; due: number }>();
+    const told = new Set<string>();
+    let homesAsOf = -1;
+    let lookedDay = -1;
+    /** How long until someone who has died with nobody at home is found: a band by its share, then any moment in it. */
+    const foundAfter = (who: string): number => {
+      const total = p.found_after.reduce((n, b) => n + b.bps, 0);
+      if (total <= 0) return 0;
+      const rng = ctx.rng(`found-${who}`);
+      let x = rng.below(total);
+      let from = 0;
+      for (const b of p.found_after) {
+        if (x < b.bps) return from * DAY + rng.below(Math.max(1, (b.within_days - from) * DAY));
+        x -= b.bps;
+        from = b.within_days;
+      }
+      return from * DAY;
+    };
+    const inner = stepper(
       (obs) => {
         book.absorb(obs);
         staffing.absorb(obs);
         for (const o of obs.outcomes) if (o.investigated) results.set(o.action, o.investigated);
         const ch = obs.channels[p.channel];
         if (ch?.kind === "sites") for (const c of ch.cells) if (c.structure?.structure === p.building) view = c.structure;
+        // The homes, as we last looked: a death in one nobody has been in or out of for a day since is ours to report;
+        // one where somebody lives is theirs.
+        const homes = p.homes_channel ? obs.channels[p.homes_channel] : undefined;
+        if (homes?.kind === "sites" && homes.as_of !== homesAsOf) {
+          homesAsOf = homes.as_of;
+          const seen = new Set<string>();
+          for (const c of homes.cells) for (const sp of c.structure?.spaces ?? []) for (const l of sp.left ?? []) {
+            if (l.reason !== "died" || told.has(l.occupant) || !stoodEmpty(sp, homes.as_of)) continue;
+            seen.add(l.occupant);
+            if (!dead.has(l.occupant)) dead.set(l.occupant, { space: sp.space, at: l.at, due: l.at + foundAfter(l.occupant) });
+          }
+          for (const who of [...dead.keys()]) if (!seen.has(who)) dead.delete(who);
+        }
       },
       (obs) => {
         const t = obs.t;
@@ -78,6 +122,23 @@ export const station: BehaviourModule = {
         }
         const mine = new Set(staffing.workers(book, t));
         const here = [...new Set(view?.spaces.find((sp) => sp.space === p.workplace)?.occupants ?? [])].filter((w) => mine.has(w)).sort();
+        // Found dead at home: called at when the time has come, by an officer with the time for it that day; reported
+        // to the registry, unless it has been registered since.
+        const registered = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
+        for (const [who, d] of [...dead].sort(([a], [b]) => (a < b ? -1 : 1))) {
+          if (registered.has(who)) {
+            dead.delete(who);
+            continue;
+          }
+          if (t < d.due || !p.registry) continue;
+          const officer = here.find((w) => p.working_day - (used.get(w) ?? 0) >= p.call_seconds);
+          if (!officer) break;
+          used.set(officer, (used.get(officer) ?? 0) + p.call_seconds);
+          dead.delete(who);
+          told.add(who);
+          steps.push(because(`Nobody has been in or out of ${d.space} since ${who} died there: called at, and reporting the death to the registry.`,
+            say("death_notification", `${who} was found dead at ${d.space}.`, { to: [p.registry], data: { deceased: who, found_at: d.space } })));
+        }
         while (queue.length) {
           const officer = here.find((w) => p.working_day - (used.get(w) ?? 0) >= p.task_seconds);
           if (!officer) break;
@@ -97,5 +158,17 @@ export const station: BehaviourModule = {
       },
       p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
     );
+    if (!p.homes_channel) return inner;
+    // Once a day we work, when the day's other business is in hand, a look at the town's homes (what it shows is acted
+    // on at our next plan).
+    return {
+      step(obs: Observation): ParticipantAction {
+        const action = inner.step(obs);
+        const day = Math.floor(obs.t / DAY);
+        if (action.type !== "wait" || day === lookedDay) return action;
+        lookedDay = day;
+        return { type: "look", looks: [{ channel: p.homes_channel }] };
+      },
+    };
   },
 };

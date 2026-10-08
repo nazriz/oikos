@@ -134,10 +134,10 @@ test("a form that can't be one of the forms shown is not offered: none of them b
   expect(f.oneOf.get("kind")).toEqual(["law", "budget", "other"]);
   expect(formsMisfit('form(form=council_proposal, kind=law, affects=tenants, proposal="A rule.")', forms)).toBeUndefined();
   expect(formsMisfit('form(form=amend_tenancy, to=city, notice="90 days")', forms)).toBeUndefined();
-  expect(formsMisfit('form(form=notice, notice="60 days")', forms)).toBe("unknown_form");
-  expect(formsMisfit('form(form=council_proposal, kind=law)', forms)).toBe("unclear"); // the proposal's text is required
-  expect(formsMisfit('form(form=council_proposal, kind=tenants, proposal="A rule.")', forms)).toBe("unclear"); // not one of its kinds
-  expect(formsMisfit('form(form=amend_tenancy, staff="$5")', forms)).toBe("unclear"); // no field of this form
+  expect(formsMisfit('form(form=notice, notice="60 days")', forms)).toEqual({ label: "unknown_form" });
+  expect(formsMisfit('form(form=council_proposal, kind=law)', forms)).toEqual({ label: "unclear", unsure: { kind: "form_needs", form: "council_proposal", fields: ["proposal"] } });
+  expect(formsMisfit('form(form=council_proposal, kind=tenants, proposal="A rule.")', forms)).toEqual({ label: "unclear", unsure: { kind: "form_option", form: "council_proposal", field: "kind" } });
+  expect(formsMisfit('form(form=amend_tenancy, staff="$5")', forms)).toEqual({ label: "unclear", unsure: { kind: "form_field", form: "amend_tenancy", fields: ["staff"] } });
   expect(formsMisfit('form(form=council_proposal, kind=law, proposal="A rule.")\nmessage(to=council-clerk, text="put it to a ballot")', forms)).toBeUndefined();
   // Nothing to check against, or nothing to check: passes.
   expect(formsMisfit('form(form=anything, x="1")', [])).toBeUndefined();

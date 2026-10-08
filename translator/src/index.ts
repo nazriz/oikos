@@ -166,6 +166,39 @@ export function formShown(f: Knowledge["forms"][number]): string {
   return `- ${f.data?.form}, to=${f.in_position ?? f.speaks_for ?? f.author}, id ${f.id}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`;
 }
 
+/** What a translator may say was unclear, beside `none(unclear)`: one of a few things, never words of its own. A
+ * translator sees only the request and the forms this person already knows of, and what is said back is made here
+ * from fixed sentences and from those forms alone (a form or field named that the person's forms don't have is not
+ * said), so an answer can't tell anyone what they didn't know. */
+export type Unsure =
+  | { kind: "act" | "which" | "words" }
+  | { kind: "form_field" | "form_needs"; form: string; fields: string[] }
+  | { kind: "form_option"; form: string; field: string };
+
+/** The sentence for it, or undefined where it names what this person's forms don't hold (then the plain text of `unclear` stands). */
+export function unsureText(u: unknown, req: TranslateRequest): string | undefined {
+  const x = u as { kind?: string; form?: unknown; fields?: unknown; field?: unknown } | undefined;
+  if (!x || typeof x.kind !== "string") return undefined;
+  if (x.kind === "act") return LABEL_TEXT.unclear;
+  if (x.kind === "which") return "It isn't clear which one you mean. Name each person, account, record and place by its id.";
+  if (x.kind === "words") return "It isn't clear which words are to go as they stand. Put them in quotation marks.";
+  const form = req.knowledge.forms.find((f) => f.data?.form === x.form);
+  const fields = (form?.data?.fields ?? {}) as { [k: string]: { options?: string[] } };
+  if (!form) return undefined;
+  const name = String(x.form).replace(/_/g, " ");
+  if (x.kind === "form_needs" || x.kind === "form_field") {
+    const named = Array.isArray(x.fields) ? x.fields.filter((f): f is string => typeof f === "string") : [];
+    if (x.kind === "form_needs") {
+      const needed = named.filter((f) => f in fields);
+      return needed.length ? `The ${name} needs: ${needed.join(", ")}.` : undefined;
+    }
+    // (A field the form doesn't have is the request's own word: it is said back only as "no such field".)
+    return named.length ? `The ${name} form has no such field as was given. Its fields are: ${Object.keys(fields).join(", ")}.` : undefined;
+  }
+  if (x.kind === "form_option" && typeof x.field === "string" && fields[x.field]?.options?.length) return `On the ${name} form, ${x.field.replace(/_/g, " ")} is one of: ${fields[x.field]!.options!.join(", ")}.`;
+  return undefined;
+}
+
 /** What the translator is given: the request, and the forms this person knows of (where each goes, and its fields). */
 export function translatorContext(req: TranslateRequest): string {
   const forms = req.knowledge.forms.map(formShown);
@@ -245,6 +278,10 @@ export function createTranslator(io: LlmIO, check: KernelCheck, typeOf: (type: s
       return { ok: false, notices: [NOT_PUT], call: text, invalid: [`not in the call language: ${String((e as Error).message).slice(0, 300)}`] };
     }
     const call = calls.programText(program);
+    // Asked back with what was unclear: said to the participant as it is. Asking the translator again would get the
+    // same answer (it has said what it couldn't tell), so this ends the exchange.
+    const said = "none" in program && program.none === "unclear" ? unsureText(out?.input?.unsure, req) : undefined;
+    if (said) return { ok: false, notices: [said], call, final: true };
     const r = resolver ? await resolver(req, program) : resolve(program, req.knowledge, typeOf, req.as);
     if (!r.ok && r.questions.some((q) => MALFORMED.test(q))) return { ok: false, notices: [NOT_PUT], call, invalid: [...(r.invalid ?? []), ...r.questions] };
     // A question another attempt can't answer (which account? which cell?) goes to the participant as it is: the call

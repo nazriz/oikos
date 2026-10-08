@@ -1,6 +1,7 @@
-// Deaths and what follows (D54): those at home see a household member die and report it; the registry registers
-// it; the bank stops the dead person's payments and settles the estate by law-succession; employers stop wages;
-// landlords give notice; a household picks a new leaseholder; children left with no adult are taken into care.
+// Deaths and what follows (D54; docs/behaviour/deaths.md): those at home see a household member die and report it;
+// someone with nobody at home is found by their landlord or the police; the registry registers it; the bank stops the
+// dead person's payments and settles the estate by law-succession; employers stop wages; landlords give notice; a
+// household picks a new leaseholder; children left with no adult are taken into care.
 
 import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
@@ -23,15 +24,46 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   const died = ev.filter((e) => e.event === "person_died");
   expect(died.length).toBeGreaterThan(3);
   const regs = new Map<string, any>(ev.filter((e) => e.event === "recorded" && e.record.kind === "death_registration").map((e) => [e.record.data.deceased, { ...e.record, t: e.t }]));
-  // Nearly every death at home is registered within a fortnight (someone sees it; a lone person's landlord does).
   // Deaths at home: the body leaves a dwelling as they die.
-  const atHome = new Set(ev.filter((e) => e.event === "vacated" && e.reason === "died" && e.space.includes("/dwelling.")).map((e) => e.occupant));
-  const early = died.filter((d) => d.t < 365 * DAY - 14 * DAY && atHome.has(d.person));
-  const registeredSoon = early.filter((d) => regs.has(d.person) && regs.get(d.person).t - d.t <= 14 * DAY);
-  // (At least 80%, rounding down: a year of the small town has only a handful. With more deaths it's about 96%. The
-  // late ones are housemates who never came home: workers stay at work, there's no daily round yet;
-  // docs/design/world-expansion.md 6.3.)
-  expect(registeredSoon.length).toBeGreaterThanOrEqual(Math.floor(early.length * 0.8));
+  const homeOf = new Map<string, string>(ev.filter((e) => e.event === "vacated" && e.reason === "died" && e.space.includes("/dwelling.")).map((e) => [e.occupant, e.space]));
+  // Who lived with whom: the household's record as it stood when they died (the town's first, or one written since).
+  const households = [...config.world.records.filter((r: any) => r.kind === "household").map((r: any) => ({ t: 0, data: r.data })),
+    ...ev.filter((e) => e.event === "recorded" && e.record.kind === "household").map((e) => ({ t: e.t, data: e.record.data }))];
+  const diedAt = new Map<string, number>(died.map((d) => [d.person, d.t]));
+  const leftTown = new Map<string, number>(ev.filter((e) => e.event === "person_left").map((e) => [e.person, e.t]));
+  /** The other adults of their household, alive and still in town three days after: living there. */
+  const housemates = (d: { person: string; t: number }): string[] => {
+    const hh = households.filter((h) => h.t <= d.t && h.data.members.some((m: any) => m.person === d.person)).at(-1)?.data;
+    return (hh?.members ?? []).filter((m: any) => m.person !== d.person && (diedAt.get(m.person) ?? Infinity) > d.t && d.t - m.born_at >= 18 * 365 * DAY && (leftTown.get(m.person) ?? Infinity) > d.t + 3 * DAY).map((m: any) => m.person);
+  };
+  const early = died.filter((d) => d.t < 365 * DAY - 14 * DAY && homeOf.has(d.person));
+  const shared = early.filter((d) => housemates(d).length > 0);
+  const alone = early.filter((d) => housemates(d).length === 0);
+  expect(shared.length).toBeGreaterThan(3);
+  expect(alone.length).toBeGreaterThan(1);
+  // Someone who lived with another adult: reported by one of them, every time, the next time one is awake at home
+  // (within three days: a weekend at most, when nobody need get up). This was "at least 80% within a fortnight" until
+  // 2026-10-08, and passed at exactly that (14 of 18) by luck: a death was seen only in the week's plan, if made while
+  // the death was still among the home's last five departures. It is now looked for at every wake at home, so the
+  // floor is everyone. That it is one of the household who reports matters as much as how soon: only they can say who
+  // the family is, and an estate reported by anyone else goes to the town.
+  for (const d of shared) {
+    const r = regs.get(d.person);
+    expect(r, `${d.person}'s death is registered`).toBeDefined();
+    expect(housemates(d), `${d.person}'s death is reported by someone they lived with`).toContain(r.data.reported_by);
+    expect(r.t - d.t).toBeLessThanOrEqual(3 * DAY);
+  }
+  // Someone with nobody at home: found by their landlord or the police, and never before the home has stood empty for
+  // a day (how anyone outside can tell nobody lives there). How long it takes is the profile's (found_alone_after: most
+  // within a week, one in eleven after a month or more), so no floor is set on it here; participants/test/police.test.ts
+  // holds the police to their times.
+  for (const d of alone) {
+    const r = regs.get(d.person);
+    if (!r) continue;
+    expect(r.data.reported_by).toMatch(/^(police|landlord-\d+)$/);
+    expect(r.t - d.t).toBeGreaterThanOrEqual(DAY);
+  }
+  expect(alone.some((d) => regs.get(d.person)?.data.reported_by === "police")).toBe(true);
 
   const holder = new Map<string, string>([...config.world.accounts.map((a: any) => [a.id, a.holder]), ...ev.filter((e) => e.event === "account_opened").map((e) => [e.account, e.holder])] as [string, string][]);
   for (const [who, r] of regs) {
@@ -70,5 +102,11 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   expect(heldLease.some((who) => records.some((r) => r.data.leaseholder !== who && !r.data.members.some((m: any) => m.person === who)))).toBe(true);
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own) and moving into a home still being left.
-  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "flooded"].includes(e.code)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
+  // (And, as the households test allows with the daily round: an act its doer died in the middle of, which comes to
+  // nothing when its time is up, here only theirs, since anyone else refused for no longer acting would be a fault;
+  // and a partner gone to work while a conception was under way, "isn't near". Both turned up when the run became a
+  // different one, 2026-10-08.)
+  const diedDoing = (e: any) => e.code === "participant_inactive" && diedAt.has(String(e.participant).replace(/-self$/, "")) && e.t >= diedAt.get(String(e.participant).replace(/-self$/, ""))!;
+  const partnerGone = (e: any) => e.code === "too_far" && / isn't near /.test(e.detail ?? "");
+  expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "flooded"].includes(e.code) && !diedDoing(e) && !partnerGone(e)).map((e) => e.code)).toEqual([]); // (flooded: the season's)
 }, 300_000);

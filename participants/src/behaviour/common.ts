@@ -906,6 +906,12 @@ export function nextLook(t: number, at: number, days: number): number {
   for (let d = Math.floor(t / DAY); ; d++) if (d % 7 < days && d * DAY + at > t) return d * DAY + at;
 }
 
+/** A space nobody lives in any more, as someone looking in from outside can tell: nobody there, and nobody in or out of
+ * it for a day. (Where people share a home, one of them comes or goes within a day, and it is theirs to say that
+ * someone of the home has died: docs/behaviour/deaths.md.) */
+export const stoodEmpty = (sp: { occupants?: string[]; left?: { at: number }[] }, t: number): boolean =>
+  (sp.occupants ?? []).length === 0 && (sp.left ?? []).every((l) => l.at <= t - DAY);
+
 /** A step with its reason: `because("Rent is due", pay(...))`. */
 export const because = (why: string, ...lines: (C.Call | [string, C.Call])[]): Step => Object.assign(lines, { why });
 

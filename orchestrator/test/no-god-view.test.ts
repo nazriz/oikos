@@ -139,6 +139,7 @@ const OWED: string[] = [
   "firm.retailer: property_sold",
   "police.station: death_registration",
   "police.station: directory",
+  "police.station: map",
   "school.principal: death_registration",
   "school.principal: directory",
   "tribunal.member: directory",

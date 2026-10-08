@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { MockAdapter } from "@oikos/participants/llm";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
-import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, NOT_CHECKED, NOT_PUT, translatorContext, translatorSystem } from "../src/index";
+import { createTranslator, draftHash, draftText, lawWarnings, Knowledge, LABEL_TEXT, NOT_CHECKED, NOT_PUT, translatorContext, translatorSystem, unsureText } from "../src/index";
 
 const law = { id: "law-planning", record: "statement", author: "genesis", at: 0, visible_to: "public", kind: "law", text: "No building without a permit.",
   adico: { deontic: "must_not" }, formal: { language: "cel", condition: "block.block == 'construct' && !holds_liberty(actor, 'build', block.lot)" } } as any;
@@ -112,4 +112,37 @@ test("a call put together wrongly, no call at all, and a check that fails are to
   expect((checked as any).retries).toBeUndefined();
   // A request that really is unclear still reads as before.
   expect(await createTranslator(io("none(unclear)"), ok, type).translate(req)).toMatchObject({ ok: false, notices: ["It isn't clear what should happen. Could you say it more plainly?"] });
+});
+
+test("asked back, a translator may say what was unclear: one of a few fixed sentences, and of a form only what the person's own forms hold", async () => {
+  const k = knows();
+  k.absorb({ participant: "mayor-system", t: 0, status: "active", entity: "city", outcomes: [], inbox: [], drafts: [], channels: {
+    forms: { kind: "records", records: [{ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form", text: "Council proposal.",
+      data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: { proposal: { type: "text", required: true }, kind: { type: "choice", required: true, options: ["law", "budget", "other"] }, parks: { type: "amount" } } } }] } } } as any);
+  const req = { draftId: "d1", participant: "mayor-system", as: "mayor", proposal: "Table it.", knowledge: k };
+  const says = (unsure: unknown) => unsureText(unsure, req);
+  expect(says({ kind: "which" })).toBe("It isn't clear which one you mean. Name each person, account, record and place by its id.");
+  expect(says({ kind: "words" })).toBe("It isn't clear which words are to go as they stand. Put them in quotation marks.");
+  expect(says({ kind: "act" })).toBe(LABEL_TEXT.unclear);
+  expect(says({ kind: "form_needs", form: "council_proposal", fields: ["proposal", "kind"] })).toBe("The council proposal needs: proposal, kind.");
+  expect(says({ kind: "form_option", form: "council_proposal", field: "kind" })).toBe("On the council proposal form, kind is one of: law, budget, other.");
+  expect(says({ kind: "form_field", form: "council_proposal", fields: ["staff"] })).toBe("The council proposal form has no such field as was given. Its fields are: proposal, kind, parks.");
+  // Nothing is said of a form this person hasn't got, of a field their form doesn't have, or in words of the translator's own.
+  expect(says({ kind: "form_needs", form: "secret_levy", fields: ["rate"] })).toBeUndefined();
+  expect(says({ kind: "form_needs", form: "council_proposal", fields: ["treasury_code"] })).toBeUndefined();
+  expect(says({ kind: "form_option", form: "council_proposal", field: "parks" })).toBeUndefined();
+  expect(says({ kind: "note", text: "acc-9 holds 5,000" })).toBeUndefined();
+  expect(says("acc-9 holds 5,000")).toBeUndefined();
+  // Through the translator: the sentence is what the participant is told, and the translator isn't asked again.
+  let asked = 0;
+  const adapter = new MockAdapter("mock", { translator: () => { asked++; return [{ type: "tool_use", id: "1", name: "call", input: { program: "none(unclear)", unsure: { kind: "form_needs", form: "council_proposal", fields: ["proposal"] } } }]; } });
+  const r = await createTranslator({ adapter, annotate: async () => {}, now: () => 0 }, ok, () => undefined).translate(req);
+  expect(r).toMatchObject({ ok: false, notices: ["The council proposal needs: proposal."] });
+  expect(asked).toBe(1);
+  // What can't be said (a form they haven't got) leaves the plain refusal, asked again as before.
+  asked = 0;
+  const hidden = new MockAdapter("mock", { translator: () => { asked++; return [{ type: "tool_use", id: "1", name: "call", input: { program: "none(unclear)", unsure: { kind: "form_needs", form: "secret_levy", fields: ["rate"] } } }]; } });
+  const plain = await createTranslator({ adapter: hidden, annotate: async () => {}, now: () => 0 }, ok, () => undefined).translate(req);
+  expect(plain).toMatchObject({ ok: false, notices: [LABEL_TEXT.unclear] });
+  expect(asked).toBe(2);
 });
