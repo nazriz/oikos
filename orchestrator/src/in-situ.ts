@@ -231,7 +231,7 @@ export async function situationsOf(logPath: string, o: { run?: string; tests?: T
       }
       s.open = {
         id: `${short}/${b.subject}/d${day}/${n}`, run, seat: b.subject, day, n, turn: d.turn, model: `${d.provider}/${d.model}`, system, shown: sitting.parts.join("\n\n"),
-        ...(s.observed ? { forms: [...s.forms.values()].filter((f) => !s.withdrawn.has(f.id)).map(formShown) } : {}), ...(currency ? { currency } : {}),
+        ...(s.observed ? { forms: [...s.forms.values()].filter((f) => !s.withdrawn.has(f.id)).map((f) => formShown(f)) } : {}), ...(currency ? { currency } : {}),
         requests: output.filter((u) => u.type === "tool_use" && u.name === "do" && typeof u.input?.what === "string" && u.input.what).map((u) => ({ request: u.input.what as string, test: false })),
         test: false, ...(first || carried ? {} : { partial: true as const }),
       };

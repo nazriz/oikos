@@ -129,8 +129,9 @@ export class ClaudeCodeAdapter implements LlmAdapter {
         content = !result || result.is_error ? [] : req.answer ? objectAnswer(result, req.answer.name, nextId) : answerFrom(result, names, nextId);
         const unread = content.some((b) => b.type === "text" && b.unread !== undefined);
         const failed = r.timedOut || r.code !== 0 || !result || result.is_error || (unread && askAgain && n < attempts);
-        // (What it said only when it failed: a word in a good answer isn't a limit.)
-        const said = failed && !r.timedOut ? [r.stderr, typeof result?.result === "string" ? result.result : "", result?.api_error_status === 429 ? "429" : ""].find((s) => CLAUDE_CODE_LIMITED.test(s)) : undefined;
+        // (What it said only when it failed: a word in a good answer isn't a limit. A call that ran out of time failed
+        // too, and what had come by then is read the same way.)
+        const said = failed ? [r.stderr, typeof result?.result === "string" ? result.result : "", result?.api_error_status === 429 ? "429" : ""].find((s) => CLAUDE_CODE_LIMITED.test(s)) : undefined;
         if (said) throw new UsageLimitReached(`the Claude plan's limit for claude -p was reached (${said.trim().slice(0, 300)}): the run stops here; resume it once the limit resets (oikos resume <log>)`);
         if (!failed) break;
         const why = r.timedOut ? `no answer within ${Math.round(timeoutMs / 1000)} s` : `exit ${r.code}: ${(r.stderr || String(result?.result ?? r.stdout)).slice(0, 500)}`;

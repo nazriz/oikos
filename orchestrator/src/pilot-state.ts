@@ -9,7 +9,7 @@ import { currentLogs, logLines, runOf } from "./logs";
 /** Why a pilot's run stopped, as far as the queue cares: it reached its `until` (done); a usage limit (waits and
  * resumes); its own spending limit (over, as far as it got); a signal (someone asked it to stop); anything else (a
  * failure); or it has no log (never started). */
-export type Stop = "done" | "usage_limit" | "spending_limit" | "signal" | "failed" | "none";
+export type Stop = "done" | "usage_limit" | "unreachable" | "spending_limit" | "signal" | "failed" | "none";
 
 export interface RunState {
   /** The run's current log (plain or compressed), if the folder has one. */
@@ -26,6 +26,7 @@ export interface RunState {
 
 const USAGE_LIMIT = /limit|429|too many requests|credit/i;
 const SPENDING_LIMIT = /spending limit/i;
+const UNREACHABLE = /the model can.t be reached/i;
 const ASKED_TO_STOP = /asked to stop|TERM signal|SIGTERM|SIGINT/i;
 
 /** The last non-empty line of a plain log, read from its end (a log can be gigabytes). */
@@ -81,7 +82,10 @@ export async function runState(dir: string, until: number): Promise<RunState> {
   const stop: Stop = t !== undefined && t >= until ? "done"
     : SPENDING_LIMIT.test(text) ? "spending_limit" // (before the usage limit: its words are in this one's)
     : by === "StopRequested" || ASKED_TO_STOP.test(text) ? "signal"
-    : USAGE_LIMIT.test(text) ? "usage_limit" : "failed";
+    : USAGE_LIMIT.test(text) ? "usage_limit"
+    // (Call after call unanswered, with nothing said of a limit: a provider that is limiting without saying so looks
+    // like this, and so does a network down. Waited for and resumed, as a limit is.)
+    : by === "ModelUnreachable" || UNREACHABLE.test(text) ? "unreachable" : "failed";
   return { log, ...(t !== undefined ? { t } : {}), ...(ended ? { ended } : {}), ...(detail ? { detail } : {}), ...(by ? { by } : {}), stop };
 }
 
@@ -129,7 +133,7 @@ export function localStamp(d = new Date()): string {
 export interface OptOut { participant: string; t: number; day: number; statement: string }
 /** Something that went wrong at a seat that whoever runs a wave should hear of while it runs: a prompt too long for the
  * seat's model (the call failed; the next is cut), or something a seat sent that was not sent. */
-export interface SeatFault { participant: string; t: number; day: number; kind: "prompt_too_long" | "not_sent"; detail: string }
+export interface SeatFault { participant: string; t: number; day: number; kind: "prompt_too_long" | "not_sent" | "sitting_missed"; detail: string }
 
 /**
  * Opt-outs in a run's log (the `opt_out` command), from a byte offset on: for a pilot still running, so that a seat
@@ -141,11 +145,12 @@ export async function scanOptOuts(log: string, from = 0): Promise<{ offset: numb
   const faults: SeatFault[] = [];
   const take = (line: string) => {
     // (A seat's note that a prompt was too long for its model, or that something it sent was not sent.)
-    if (line.includes('"prompt_too_long"') || line.includes('"not_sent"')) {
+    if (line.includes('"prompt_too_long"') || line.includes('"not_sent"') || line.includes('"sitting_missed"')) {
       try {
         const e = JSON.parse(line);
         const d = e.kind === "annotation" && e.body?.annotation === "note" ? e.body.data : undefined;
         if (d?.prompt_too_long) faults.push({ participant: e.body.subject, t: e.t, day: Math.floor(e.t / 86_400), kind: "prompt_too_long", detail: `${d.prompt_too_long.characters} characters; cut to ${d.prompt_too_long.limit_now} from now on` });
+        if (d?.sitting_missed && d.sitting_missed.why !== "prompt_too_long") faults.push({ participant: e.body.subject, t: e.t, day: Math.floor(e.t / 86_400), kind: "sitting_missed", detail: `it sits again on day ${Math.floor((d.sitting_missed.back_at ?? e.t) / 86_400)} (${String(d.sitting_missed.error ?? "").slice(0, 160)})` });
         if (d?.not_sent) faults.push({ participant: e.body.subject, t: e.t, day: Math.floor(e.t / 86_400), kind: "not_sent", detail: String(d.not_sent.why ?? "").slice(0, 200) });
       } catch { /* (a line cut off) */ }
     }

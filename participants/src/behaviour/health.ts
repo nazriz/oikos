@@ -17,6 +17,7 @@ export const practice: BehaviourModule = {
   name: "clinic.practice",
   routines: [{ task: "treat", at: "building", what: "Each working day, in the hours the clinic is open, its doctors see those who have asked for care and are waiting, in the order they asked, as far as the doctors' hours go, and each patient is told they have been seen." }],
   issues: [P.JOB_ADVERTISEMENT],
+  staffed: (p) => ({ role: p.role ?? "doctor", posts: { establishment: p.doctors ?? 0 } }),
   issuesWith: (p) => P.staffingOwn({ role: p.role ?? "doctor", industry: p.industry ?? "health_care", workplace: p.workplace, notice_days: p.notice_days ?? 14 }),
   version: "0.2.1",
   doc: "docs/behaviour/health.md",

@@ -398,6 +398,8 @@ const SET_OUT = "Someone has set out. What they find comes with the report after
 export interface Looked {
   named?: string[]; measure?: string; limit?: number; /** Someone was sent to the places named: what they find comes later. */ sent?: true;
   paper?: string; fromEntry?: number; about?: string; words?: string; kinds?: string[]; kindSaid?: string;
+  /** What was asked for, in words (what to find, about what, since when), as the answer says back what was searched. */
+  said?: string;
   /** How many papers at most were asked of whoever keeps them (more than `limit` where the list is narrowed here). */
   fetched?: number;
 }
@@ -557,10 +559,23 @@ function lookedPapers(head: string, id: string, records: Record[], asked: Looked
   }
   // (Newest first, as whoever keeps them was asked; said again here, so that a list never depends on it.)
   const found = records.filter((r) => narrowed(r) && (!a.kinds || ofKind(r, a.kinds))).map((r, n) => [r, n] as const).sort(([x, i], [y, j]) => y.at - x.at || i - j).map(([r]) => r);
-  const shown = listLines(found, limit, readings);
-  const more = shown.left ? `(${num(shown.left)} more found and not listed: ask for more at once, or say more closely what to find.)`
-    : records.length >= (a.fetched ?? limit) && !through ? `(There may be more: at most ${limit} were asked for. Ask for more at once, or say more closely what to find.)` : "";
-  return [`## ${head}: what you looked up (${found.length - shown.left} found)`, ...(found.length ? shown.lines.map((l) => `- ${l}`) : [NOTHING_FOUND]), ...(more ? [more] : []), ...(through ? [`(${through})`] : []), ...(found.length ? [how] : [])];
+  // A list is gone through a part at a time: from the entry asked for (the first, if none), and it says how to go on.
+  const from = Math.max(1, a.fromEntry ?? 1);
+  const shown = listLines(found.slice(from - 1), limit, readings);
+  const last = found.length - shown.left;
+  const full = records.length >= (a.fetched ?? limit);
+  const more = shown.left ? `(Entries ${num(from)} to ${num(last)} of ${num(found.length)}${through ? " found among those" : ""}. For the next: look again the same way with from_entry: ${last + 1}.)`
+    : from > 1 && found.length < from ? `(Nothing from entry ${num(from)} on: ${found.length ? `there are ${num(found.length)}` : "nothing was found"}.)`
+    : full && !through ? `(There may be more: at most ${num(a.fetched ?? limit)} were asked for. For the next: look again the same way with from_entry: ${last + 1}.)` : "";
+  // What was searched, said with every answer, so that "nothing found" is never mistaken for "nothing looked at": the
+  // folder, how much of it, over what span; and, where only its latest papers were read through, that earlier ones were not.
+  const span = records.length ? ` (${when(Math.min(...records.map((r) => r.at)))} to ${when(Math.max(...records.map((r) => r.at)))})` : "";
+  const narrowedHere = a.fetched !== undefined;
+  const where = `(Looked in "${head}" (${id})${a.said ? `, for: ${a.said}` : ""}. ${narrowedHere
+    ? `${records.length ? `The latest ${num(records.length)} paper${records.length === 1 ? "" : "s"} there that could match${span} ${records.length === 1 ? "was" : "were"} read through` : "There was no paper there that could match"}${full ? "; there are earlier ones that were not, so this is not everything there" : ": that is all of them"}.`
+    : `Everything kept there was searched${full ? `, and the ${num(records.length)} newest that match are what came back` : `: ${records.length ? `${num(records.length)} ${records.length === 1 ? "paper matches" : "papers match"}` : "nothing there matches"}`}.`})`;
+  const none = found.length ? [] : [NOTHING_FOUND, ...(narrowedHere && full ? ["(Not found among those read through, which is not the same as not there: say more closely what to find (a kind, a date, who from), to reach earlier papers.)"] : [])];
+  return [`## ${head}: what you looked up (${Math.max(0, last - (from - 1))} found)`, ...(found.length ? shown.lines.map((l) => `- ${l}`) : none), ...(more ? [more] : []), where, ...(found.length ? [how] : [])];
 }
 
 /** The places a participant asked to see, in full as they are today: buildings by id, by kind, by a room in them or
@@ -587,15 +602,20 @@ function lookedPlaces(cells: SiteCell[], structures: SiteStructure[], asked: Loo
       out.push(picked.length ? `${cap(asked.measure)} is above zero or rising at ${picked.length} ${picked.length === 1 ? "building" : "buildings"}${names.length ? " of those you named" : ""}, the highest first:` : `${cap(asked.measure)} is above zero or rising at none of ${names.length ? "the buildings you named" : "the buildings here"}.`);
     }
   }
-  const shown = asked.measure && out[0]?.startsWith("Nothing is kept") ? [] : picked.slice(0, limit);
+  // (A long list is gone through a part at a time: from the entry asked for, and it says how to go on.)
+  const from = Math.max(1, asked.fromEntry ?? 1);
+  const shown = asked.measure && out[0]?.startsWith("Nothing is kept") ? [] : picked.slice(from - 1, from - 1 + limit);
   out.push(...describeBuildings(shown, me, t, true));
   const room = Math.max(0, limit - shown.length);
   for (const c of open.slice(0, room)) out.push(`- open ground ${c.cell}${c.terrain ? `, ${words(c.terrain)}` : ""}${c.seen?.length ? `; seen living there: ${c.seen.map(words).join(", ")}` : ""}`);
-  const left = picked.length - shown.length + Math.max(0, open.length - room);
-  if (shown.length && left > 0) out.push(`(${num(left)} more not listed: ask for more at once, or name the ones you want.)`);
+  const left = Math.max(0, picked.length - (from - 1) - shown.length) + Math.max(0, open.length - room);
+  if (shown.length && left > 0) out.push(`(Entries ${num(from)} to ${num(from - 1 + shown.length)} of ${num(picked.length)}${open.length > room ? `, and ${num(open.length - room)} of open ground not listed` : ""}. For the next: look again the same way with from_entry: ${from + shown.length}; or name the ones you want.)`);
+  else if (from > 1 && !shown.length) out.push(`(Nothing from entry ${num(from)} on: there are ${num(picked.length)}.)`);
   out.push(...scales(shown));
   if (unknown.length) out.push(`Nothing is known here by ${unknown.length === 1 ? "this name" : "these names"}: ${(asked.named ?? []).filter((n) => unknown.includes(plain(n))).join(", ")}.`);
   if (!out.length) out.push("Nothing to be seen there.");
+  // (What was looked at, said with the answer: how much is there to be seen from where the seat is.)
+  out.push(`(Looked at what is here: ${num(structures.length)} ${structures.length === 1 ? "building" : "buildings"} and ${num(cells.filter((c) => !c.structure).length)} ${cells.filter((c) => !c.structure).length === 1 ? "cell" : "cells"} of open ground.)`);
   return out;
 }
 
@@ -690,6 +710,14 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   }
   // Anything on file (standing documents) isn't repeated in other reports.
   const onFile = new Set(Object.entries(obs.channels).flatMap(([id, ch]) => (o.standing?.has(id) && ch.kind === "records" ? ch.records.map((r) => r.id) : [])));
+  // Under which heading each new paper is set out, where it reaches the seat under more than one: the one with the
+  // fewest new papers (the narrower folder), the first of equals.
+  const under = new Map<string, string>();
+  {
+    const lists = Object.entries(obs.channels).flatMap(([id, ch]) => (ch.kind === "records" && !ch.search && !o.standing?.has(id) && !o.looked?.has(id)
+      ? [[id, ch.records.filter((r) => !onFile.has(r.id) && (!o.folders?.get(id) || ofKind(r, o.folders.get(id)!)))] as const] : []));
+    for (const [id, list] of [...lists].sort((x, y) => x[1].length - y[1].length)) for (const r of list) if (!under.has(r.id)) under.set(r.id, id);
+  }
   for (const [id, ch] of Object.entries(obs.channels)) {
     const asked = o.looked?.get(id);
     if (ch.kind === "records" && ch.search) {
@@ -718,7 +746,7 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
       const fresh = ch.records.filter((r) => !onFile.has(r.id) && (!kinds || ofKind(r, kinds)));
       if (fresh.length === 0) {
         // It looked, and there was nothing: said, not left for it to work out from a report that isn't there.
-        if (asked) out.push("", `## ${title(id)}`, NOTHING_NEW);
+        if (asked) out.push("", `## ${title(id)}`, NOTHING_NEW, `(Looked in "${title(id)}" (${id}) for what has come into it since you last looked there: nothing has. What was there before is still there: to go through it, say what to find, or give from_entry: 1.)`);
         continue;
       }
       if (asked) {
@@ -726,16 +754,25 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
         const limit = asked.limit ?? 20;
         const latest = listLines([...fresh].reverse(), limit, obs.readings);
         out.push("", ...within(id, [`## ${title(id)}: new since you last looked (${num(fresh.length)})`, ...latest.lines.map((l) => `- ${l}`),
-          ...(latest.left ? [`(${num(latest.left)} earlier ones not listed: say what to find (a kind, who from, since when, what about), or ask for more at once.)`] : []),
+          ...(latest.left ? [`(${num(latest.left)} earlier ones not listed: say what to find (a kind, who from, since when, what about), or, for the next, look again with from_entry: ${fresh.length - latest.left + 1}.)`] : []),
+          `(Looked in "${title(id)}" (${id}) for what has come into it since you last looked there.)`,
           `(To read one in full: look at this report (${id}) with paper: its id.)`]));
         continue;
       }
+      // (A paper that reaches it under two of its headings is set out once, under the narrower: a complaint in the
+      // folder for complaints, not again among everything of the organisation's.)
+      const here = fresh.filter((r) => (under.get(r.id) ?? id) === id);
+      if (!here.length) continue;
       const before = cuts;
-      const lines = recordLines(fresh, obs.readings);
+      const lines = recordLines(here, obs.readings);
       out.push("", `## ${title(id)} (${lines.length} new)`);
+      // What has come, by kind, where there is more than a line or two: a heading names a folder, not what is in it.
+      const by = new Map<string, number>();
+      for (const r of here) by.set(paperKind(r), (by.get(paperKind(r)) ?? 0) + 1);
+      if (here.length > 2) out.push(`(What came: ${[...by].sort(([x], [y]) => (x < y ? -1 : 1)).map(([k, n]) => `${num(n)} ${k}${n === 1 ? "" : "s"}`).join(", ")}.)`);
       if (lines.length > max) out.push(`(${lines.length - max} earlier ${lines.length - max === 1 ? "item" : "items"} not listed.)`);
       for (const l of lines.slice(-max)) out.push(`- ${l}`);
-      if (lines.length > max || cuts > before) out.push(...look(id, "Not everything here is set out in full. To see the rest, say what to find"));
+      if (lines.length > max || cuts > before) out.push(...look(id, `Not everything here is set out in full. To see the rest, say what to find, or go through it a part at a time (from_entry: 1, then as each answer says)`));
     } else if (ch.kind === "sites" && ch.visited) {
       // Places gone to (nobody is shown where they are not): what the latest going found, as it was then, in full,
       // said once, with the report that brings it; someone just sent is said to be on the way. What earlier goings
@@ -793,7 +830,7 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
         // Each name that found nothing is said (who's who is open to anyone: that it has no entry under a name tells
         // nothing that was not there to be looked up).
         const missed = asked.named.filter((said) => { const n = plain(said); return n && !ch.entities.some((e) => plain(e.entity) === n || plain(e.name).includes(n) || plain(e.kind) === n) && !ch.positions.some((p) => plain(p.position) === n || plain(p.title ?? "").includes(n) || plain(p.role ?? "") === n || plain(p.entity) === n); });
-        out.push("", `## ${title(id)}: who you looked for`, ...(lines.length ? lines.slice(0, limit) : ["No one and nothing found by that name."]));
+        out.push("", `## ${title(id)}: who you looked for`, ...(lines.length ? lines.slice(0, limit) : ["No one and nothing found by that name.", `(Looked up in "${title(id)}" (${id}), which enters the town's people, organisations and posts: nothing is entered under ${asked.named.join(", ")}. A name is matched whole: a person or an organisation by its full name or its id; a post by its title, its id or what it is, such as mayor.)`]));
         if (lines.length > limit) out.push(`(${lines.length - limit} more not listed: ask for more at once, or name them more closely.)`);
         if (missed.length && lines.length) out.push(`Nothing is entered under: ${missed.join(", ")}. (A name is matched whole: a person or an organisation by its full name or its id; a post by its title, its id or what it is, such as mayor.)`);
         continue;

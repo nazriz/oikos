@@ -70,7 +70,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.39.0";
+export const GENERATOR_VERSION = "0.39.1"; // 0.39.1: an office's own form says what issuing it does and that it is its holder's to fill in
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -285,10 +285,14 @@ function ownFilled(t: unknown, own: { [name: string]: unknown }): unknown {
  * A form of an office's own stationery (docs/behaviour/office-papers.md), from its module's declaration (`issues`):
  * filled in, it is the paper itself, written as the form says. Seen by the office's organisation alone.
  */
-export function stationeryForm(office: string, entity: string, x: Issued, own: { [name: string]: unknown }): any {
+export function stationeryForm(office: string, entity: string, x: Issued, own: { [name: string]: unknown }, holder?: string): any {
   const writes = ownFilled(x.writes, own) as Issued["writes"];
+  // One line a form: its name, what issuing it does (where the module says), and who may fill it in: the office's
+  // holder, of its own accord. (A works manager read its staffing direction form as needing the mayor, and never used
+  // its own job advertisement, which was on file beside it and said nothing of what it was for: 2026-10-09.)
+  const whose = holder ? `Filled in by the ${holder.charAt(0).toLowerCase()}${holder.slice(1)}, of the office's own accord (nobody's direction or leave is needed)` : "A paper of the office's own";
   return { id: `form-${office}-${x.form}`.replace(/_/g, "-"), record: "statement", author: "genesis", at: 0, visible_to: [entity], speaks_for: entity, kind: "form",
-    text: `${x.title}. A paper of the office's own: filled in, it is issued as the form sets it out.`,
+    text: `${x.title}. ${x.does ? `${x.does} ` : ""}${whose}: filled in, it is issued as the form sets it out.`,
     data: { form: x.form, office, submit_as: writes.kind, submit_to: [entity], fields: x.fields,
       writes: { ...writes, text: writes.text.replace(/\{@([a-z_][a-z0-9_]*)\}/g, (_, name: string) => String(own[name] ?? "")) } } };
 }
@@ -1868,7 +1872,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const withLines: Issued = !lines.length ? x : { ...x,
         fields: { ...x.fields, ...Object.fromEntries(lines.map((k) => [k, { type: "amount", description: `The ${k} line.` }])) },
         writes: { ...x.writes, data: { ...(x.writes.data as object), lines: Object.fromEntries(lines.map((k) => [k, `#${k}`])) } } };
-      records.push(stationeryForm(pos.id, pos.entity, withLines, own));
+      records.push(stationeryForm(pos.id, pos.entity, withLines, own, pos.title));
     }
     pos.channels.push(K.mine("stationery", ["form"], { title: "The office's own forms" }));
     part.controller.params.standing = [...part.controller.params.standing, "stationery"];

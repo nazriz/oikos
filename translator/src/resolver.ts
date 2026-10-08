@@ -41,6 +41,9 @@ export const LABEL_TEXT: Record<calls.Label, string> = {
 };
 
 class Ask extends Error {}
+/** Asked of work with neither how much nor how often: which of the two it is, in the words of whoever asked (a seat
+ * that wanted a standing order to maintain was asked "How much of it?" four times, 2026-10-09). */
+export const ONCE_OR_ROUTINE = "Is this work to be done once, or as a standing routine of your staff? Done once: say how much of it. As a routine: say how often (every day, every week), and it is a standing work order.";
 
 /** Words as a label (a statement's kind, an organisation's, a post's role, an agreement's template): lower case,
  * letters and digits kept, anything else one underscore between them, starting with a letter, at most 64 characters.
@@ -313,7 +316,7 @@ class Resolver {
     const cells = survey ? this.ids(c, "cells") : undefined;
     if (survey && !cells?.length) throw new Ask("Survey which cells?");
     const units = this.quantity(c, "units") ?? (cells ? String(cells.length) : undefined);
-    if (!units || units === "0") throw new Ask("How much of it?");
+    if (!units || units === "0") throw new Ask(ONCE_OR_ROUTINE);
     const at = this.need(c, "at", "Where?");
     const by = this.has(c, "by") ? (this.ids(c, "by") ?? [this.id(c, "by")!]).map((p) => this.k.entityOf(p)) : [];
     const on = this.id(c, "on");

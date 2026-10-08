@@ -64,7 +64,7 @@ export function setKnowledge(c: Pick<SetCase, "forms" | "currency">): Knowledge 
 /** The lines the translator would be shown for a case's forms: the same as the file's, or the case is not one the
  * translator can be asked as its seat was (counted, never silently different). */
 export const shownAsWritten = (c: Pick<SetCase, "forms" | "currency">): boolean => {
-  const shown = setKnowledge(c).forms.map(formShown);
+  const shown = setKnowledge(c).forms.map((f) => formShown(f));
   return shown.length === (c.forms ?? []).length && (c.forms ?? []).every((l) => shown.includes(l));
 };
 

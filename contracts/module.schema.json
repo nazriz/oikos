@@ -133,6 +133,12 @@
           "minLength": 5,
           "maxLength": 200
         },
+        "does": {
+          "type": "string",
+          "description": "What issuing the paper does, in a sentence, for whoever holds the office: said on the form with its name.",
+          "minLength": 5,
+          "maxLength": 400
+        },
         "fields": {
           "type": "object",
           "propertyNames": {

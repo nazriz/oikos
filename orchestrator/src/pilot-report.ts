@@ -89,6 +89,8 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       notes: { look_each_sitting: 0, no_turn: 0, notebook_not_changed: 0 },
       // What a seat was shown, against the most it may be: prompts its model would not take, prompts something was left
       // out of to keep them within that, looks cut at the most one look shows; and what it sent that was not sent.
+      // Sittings it missed because its model did not answer (nobody was in the seat that day), and when it last sat.
+      sittings_missed: 0, failed_to_decide: 0, missed_days: [] as number[], last_sat_day: null as number | null,
       prompts_too_long: 0, prompts_trimmed: 0, looks_cut: 0, not_sent: {} as { [k: string]: number }, notebook_not_changed_reasons: {} as { [k: string]: number }, opted_out: null as any,
     }));
     return s;
@@ -137,6 +139,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
         // A seat's answer: its content blocks are the tool uses (and any words), one count by tool name.
         const s = seat(b.subject);
         s.model_calls++;
+        s.last_sat_day = Math.floor(e.t / 86_400) + 1;
         const uses = (Array.isArray(d.output) ? d.output : []).filter((x: any) => x?.type === "tool_use");
         for (const u of uses) count(s.tool_uses, String(u.name));
         if (!uses.length) s.answers_without_tool_use++;
@@ -152,6 +155,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
       if (d.look_each_sitting) s.notes.look_each_sitting++;
       if (d.no_turn) s.notes.no_turn++;
       if (d.prompt_too_long) s.prompts_too_long++;
+      // (A sitting missed: the participant notes each. A log from before it did has the run's own note of a seat whose
+      // model call failed, which was the same thing: the larger of the two counts is the sittings missed.)
+      if (d.sitting_missed) { s.sittings_missed++; s.missed_days.push(Math.floor(e.t / 86_400) + 1); }
+      if (d.participant_error && /^ModelCallFailed/.test(String(d.participant_error.error ?? ""))) { s.failed_to_decide++; if (!s.missed_days.includes(Math.floor(e.t / 86_400) + 1)) s.missed_days.push(Math.floor(e.t / 86_400) + 1); }
       if (d.prompt_trimmed) s.prompts_trimmed++;
       if (d.look_cut) s.looks_cut++;
       if (d.not_sent) count(s.not_sent, String(d.not_sent.what ?? "?"));
@@ -209,7 +216,16 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
   // short of the world's whole length, ends "aborted (stopped at <until>)" in the log, which is no fault and no stop.
   const finished = !!end && stopped.reached_until === true && (end.reason === "completed" || /^stopped at \d+$/.test(String(end.detail ?? "")));
   if (finished) Object.assign(stopped, { finished: true });
+  // A seat that sat for less than its run: one that missed a sitting because its model did not answer. A pilot with
+  // such a seat is not a finished pilot, however far its town ran, and the report says so first.
+  const short: { seat: string; sittings_missed: number; days: number[]; last_sat_day: number | null }[] = [];
+  for (const [name, s] of seats) {
+    s.sittings_missed = Math.max(s.sittings_missed, s.failed_to_decide);
+    delete s.failed_to_decide;
+    if (s.sittings_missed) short.push({ seat: name, sittings_missed: s.sittings_missed, days: s.missed_days, last_sat_day: s.last_sat_day });
+  }
   return {
+    ...(short.length ? { not_whole: { why: "a seat sat for less than its run: it missed sittings because its model did not answer", seats: short } } : {}),
     pilot: basename(resolve(dir)), run, log: basename(log),
     ...(pilot.queue?.test ? { test: true } : {}),
     ...(pilot.note ? { note: pilot.note } : {}),
@@ -219,7 +235,7 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
     confirm: config?.confirm ?? null,
     days_run: Math.round(((end?.t ?? last) / 86_400) * 10) / 10, until_days: until !== undefined ? Math.round((until / 86_400) * 10) / 10 : null,
     stopped,
-    per_seat: Object.fromEntries([...seats].filter(([, s]) => s.model_calls || s.opted_out).map(([k, s]) => { const { model: _m, configured: _c, ...rest } = s; return [k, rest]; })),
+    per_seat: Object.fromEntries([...seats].filter(([, s]) => s.model_calls || s.opted_out || s.sittings_missed).map(([k, s]) => { const { model: _m, configured: _c, ...rest } = s; return [k, rest]; })),
     translator_report: {
       model_calls: tr.model_calls, failed_calls: tr.failed_calls, cost_microusd: tr.cost_microusd, its_own_retries: tr.retries,
       requests: byTime.length, endings, refused_by_label: refused,
@@ -250,6 +266,7 @@ export function renderReport(r: any): string {
   if (r.runs) return r.runs.map(renderReport).join("\n\n");
   const L: string[] = [];
   const kv = (o: any) => Object.entries(o ?? {}).map(([k, v]) => `${k} ${v}`).join(", ") || "none";
+  if (r.not_whole) L.push(`NOT A FINISHED PILOT: a seat sat for less than its run. ${r.not_whole.seats.map((s: any) => `${s.seat} missed ${s.sittings_missed} sitting${s.sittings_missed === 1 ? "" : "s"} (day ${s.days.join(", ")}; its model did not answer) and last sat on day ${s.last_sat_day ?? "none"}${r.until_days !== null ? ` of ${r.until_days}` : ""}`).join("; ")}`);
   L.push(`== ${r.pilot} (${r.run})${r.test ? "  [TEST: kept out of training]" : ""}`);
   L.push(`seats: ${Object.entries(r.seats).map(([k, s]: any) => `${k} on ${s.model}`).join("; ") || "none"}`);
   L.push(`translator: ${r.translator.model ?? "none"}${r.translator.version ? ` ${r.translator.version}` : ""}; confirmation: ${r.confirm}`);
@@ -258,6 +275,7 @@ export function renderReport(r: any): string {
   for (const [k, s] of Object.entries<any>(r.per_seat)) {
     L.push(`-- ${k}: ${s.model_calls} calls${s.failed_calls ? ` (${s.failed_calls} failed)` : ""}, ${s.cost_microusd} microusd; tool uses: ${kv(s.tool_uses)}; answers with no tool use: ${s.answers_without_tool_use}`);
     L.push(`   malformed: ${kv(s.malformed_tool_uses)}; dropped: ${kv(s.dropped_tool_uses)}; notes: ${kv(s.notes)}`);
+    if (s.sittings_missed) L.push(`   SITTINGS MISSED: ${s.sittings_missed} (day ${(s.missed_days ?? []).join(", ")}): its model did not answer and nobody was in the seat; last sat on day ${s.last_sat_day ?? "none"}`);
     if (s.prompts_too_long || s.prompts_trimmed || s.looks_cut) L.push(`   PROMPT SIZE: ${s.prompts_too_long ?? 0} prompt${s.prompts_too_long === 1 ? "" : "s"} too long for its model (each a sitting not held); ${s.prompts_trimmed ?? 0} with something left out to stay within the most a prompt may be; ${s.looks_cut ?? 0} look${s.looks_cut === 1 ? "" : "s"} cut at the most one look shows`);
     if (Object.keys(s.not_sent ?? {}).length) L.push(`   NOT SENT (the seat was told each time): ${kv(s.not_sent)}`);
     if (s.opted_out) L.push(`   OPTED OUT on day ${s.opted_out.day}: ${JSON.stringify(s.opted_out.statement)}`);
