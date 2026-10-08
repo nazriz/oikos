@@ -51,6 +51,9 @@ pub struct Knowledge {
     pub lots: Lots,
     /// Forms seen, by id (their statement records; shared likewise).
     pub forms: BTreeMap<Arc<str>, Arc<Value>>,
+    /// Statements seen that are addressed to someone: who each is addressed to (whoever acts on it). What a hold on
+    /// one is addressed to.
+    pub addressed: BTreeMap<Arc<str>, Arc<[String]>>,
     pub entity: String,
     pub t: i64,
     /// How the world's money is written (its config's first currency): how the resolver reads and writes amounts.
@@ -72,6 +75,8 @@ pub struct RecordFacts {
     lot: Option<(Arc<str>, Arc<[String]>)>,
     /// Someone asking to be paid names where the money should go: who, and the account.
     stated: Option<(String, String)>,
+    /// A statement addressed to someone: its id, and who it is addressed to.
+    addressed: Option<(Arc<str>, Arc<[String]>)>,
 }
 
 impl RecordFacts {
@@ -88,6 +93,9 @@ impl RecordFacts {
         }
         if kind == "statement" {
             let id: Arc<str> = s(&r["id"]).unwrap_or_default().into();
+            if let Some(to) = r["addressed_to"].as_array().filter(|a| !a.is_empty()) {
+                facts.addressed = Some((id.clone(), to.iter().filter_map(|x| x.as_str().map(String::from)).collect()));
+            }
             match s(&r["kind"]) {
                 Some("form") => facts.form = Some((id, Arc::new(r.clone()))),
                 Some("lot") => {
@@ -153,7 +161,7 @@ impl Registers {
     /// The map a seat that knows of no lot makes of this list, if every record in it is a lot and nothing more
     /// (learning them one by one from nothing gives exactly this map: each lot's cells, the last said of each).
     fn of(&mut self, list: &[Arc<RecordFacts>]) -> Option<Lots> {
-        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.stated.is_none()) {
+        if list.len() < A_REGISTER || !list.iter().all(|f| f.lot.is_some() && f.withdraws.is_none() && f.declares.is_none() && f.form.is_none() && f.stated.is_none() && f.addressed.is_none()) {
             return None;
         }
         if let Some((_, lots)) = self.lists.iter().find(|(known, _)| known.len() == list.len() && known.iter().zip(list).all(|(a, b)| Arc::ptr_eq(a, b))) {
@@ -308,6 +316,9 @@ impl Knowledge {
         }
         if let Some((who, to)) = &facts.stated {
             self.stated.entry(who.clone()).or_default().insert(to.clone());
+        }
+        if let Some((id, to)) = &facts.addressed {
+            self.addressed.insert(id.clone(), to.clone());
         }
     }
 

@@ -344,6 +344,16 @@ class Draw {
     const r = this.rand();
     return tx(r < 0.45 ? `${this.pick(ASKS)} ${this.pick(NOUNS)} by ${this.pick(DAYS)}.` : r < 0.7 ? `The ${this.pick(SITES)} ${this.pick(EVENTS)} ${this.pick(WHEN)}.` : r < 0.85 ? `Work on the ${this.pick(SITES)} starts ${this.pick(WHEN)}.` : `${this.pick(SAYS)} ${this.pick(NOUNS)}.`);
   }
+  /** What an entry in one's own books says: something noted for the file, most with a sum in the world's money. */
+  entryWords(): V {
+    const sum = (this.amount() as { text: string }).text;
+    return tx(this.pick([
+      `${sum} withheld from this fortnight's wages, to be passed on at the month's end`, `${sum} charged to the ${this.pick(SPENT_ON)} line`, `Deposit of ${sum} held for the tenant of the ${this.pick(SITES)}`,
+      `${sum} set aside for ${this.pick(PURPOSES)}`, `Invoice ${this.int(100, 9999)} checked against the delivery notes and found in order`, `${sum} owed to us for ${this.pick(PURPOSES)}, not yet received`,
+      `The keys to the ${this.pick(SITES)} were returned ${this.pick(WHEN)}`, `Payment of ${sum} for ${this.pick(PURPOSES)} counted against this year's budget`, `Stock at the ${this.pick(SITES)} counted ${this.pick(WHEN)}: nothing missing`,
+      `${sum} received in cash at the counter, to be banked ${this.pick(WHEN)}`,
+    ]));
+  }
   /** What something published says, as befits its kind: a law lays down a rule, a notice gives news of a place, a
    * receipt says what was received (a "receipt" whose words forbid fishing is nobody's receipt). */
   publicWords(kind: string): V {
@@ -491,6 +501,12 @@ const RECIPES: { [fn in Exclude<calls.Fn, "form">]: (d: Draw) => Lines } = {
     })];
   },
   statement: (d) => {
+    // A hold on something standing (one record, or a few), and an entry on one's own file.
+    if (d.maybe(0.14)) {
+      const held = Array.from({ length: d.maybe(0.6) ? 1 : d.int(2, 4) }, () => (d.job() as { id: string }).id);
+      return [call("statement", { hold: held.length === 1 ? id(held[0]!) : list([...new Set(held)]), basis: d.maybe(0.08) ? d.record() : undefined })];
+    }
+    if (d.maybe(0.12)) return [call("statement", { kind: id("entry"), visible: id("own"), text: d.entryWords(), basis: d.maybe(0.5) ? d.rec() : undefined })];
     if (d.maybe(0.15)) return [call("statement", { withdraw: d.rec(), text: d.maybe(0.3) ? tx(d.pick(["It was issued in error.", "It has been replaced.", "The matter is settled.", "The figures were wrong."])) : undefined })];
     const to = d.rand();
     const kind = d.pick(STATEMENTS);

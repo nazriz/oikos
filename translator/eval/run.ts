@@ -36,6 +36,9 @@ export function fixture(): Knowledge {
       mine: { kind: "records", records: [
         rec({ id: "form-permit", record: "statement", author: "planning-system", in_position: "planning", speaks_for: "city", kind: "form", text: "Permit application.",
           data: { form: "permit_application", submit_as: "permit_application", submit_to: ["city"], fields: { lot: { type: "lot", required: true }, structure_type: { type: "structure_type", required: true }, notes: { type: "text" } } } }),
+        // (The town's own standing payments, as it asked the bank for them: what a hold on one is addressed to.)
+        ...["rec.90", "rec.91", "rec.92"].map((id, i) => rec({ id, record: "statement", author: "mayor-system", in_position: "mayor", speaks_for: "city", kind: "request", text: "A standing payment.", addressed_to: ["bank"], visible_to: ["city", "bank"],
+          data: { outcome: { money: { from: "acc-city", to: ["acc-builder", "acc-greenco", "acc-c0042"][i], amount: "85000" } }, every: 30 * 86_400 } })),
       ] },
     },
   } as any);

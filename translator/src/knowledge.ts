@@ -41,6 +41,9 @@ export class Knowledge {
   readonly cells = new Map<string, { x: number; y: number; terrain?: string; built: boolean }>();
   /** Lots in a registry the participant has seen (statements of kind "lot"): lot -> its cells. */
   readonly lots = new Map<string, string[]>();
+  /** Statements seen that are addressed to someone: who each is addressed to (whoever acts on it: the keeper of the
+   * account a standing payment instruction is paid from, say). What a hold on one is addressed to. */
+  readonly addressed = new Map<string, string[]>();
   private readonly formsById = new Map<string, StatementRecord>();
   /** Laws and claims the participant has seen: what law warnings are judged against (§10). */
   readonly laws = new Map<string, StatementRecord>();
@@ -99,6 +102,7 @@ export class Knowledge {
     }
     if (r.record === "entity_declaration") this.names.set(r.entity, r.name);
     if (r.record === "statement") {
+      if (r.addressed_to?.length) this.addressed.set(r.id, r.addressed_to);
       if (r.kind === "form") this.formsById.set(r.id, r);
       if (r.kind === "law" && r.formal?.condition) this.laws.set(r.id, r);
       if (r.kind === "lot" && Array.isArray(r.data?.cells)) this.lots.set(r.id, r.data.cells as string[]);
