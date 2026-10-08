@@ -4,7 +4,7 @@ What the generated town's outcomes should look like, where each target comes fro
 
 ## The economy (phase C, stage C0: a sourced baseline)
 
-Every economic figure the town used to have as a placeholder now comes from its profile, with its source: award and median wages, regional rents, the household saving ratio and a wealth effect, the retirement age and support payments, wealth by quintile, industry shares. Measured on `worlds/town.yaml` (200 people), three seeds, two years (`economy/summary`, `town/rent-stress`):
+Every economic figure the town used to have as a placeholder now comes from its profile, with its source: award and median wages, regional rents, the household saving ratio and a wealth effect, the retirement age and support payments, wealth by quintile, industry shares. Measured on `worlds/town.yaml` (200 people), one town (the spec's seed) run three times (`--seeds 3`), two years (`economy/summary`, `town/rent-stress`). The ranges are that town's from run to run, not the range over towns: who lives there never varied (docs/decisions.md, "Towns and runs"; `--towns N` runs different towns).
 
 | Outcome | Target | Measured | Notes |
 |---|---|---|---|
@@ -18,7 +18,7 @@ Every economic figure the town used to have as a placeholder now comes from its 
 
 ## Earlier outcomes
 
-Measured on `worlds/town-1000.yaml` (1,000 people, two years, several seeds), as of 2026-09-28.
+Measured on `worlds/town-1000.yaml` (1,000 people, two years, one town run several times: `--seeds`), as of 2026-09-28.
 
 | Outcome | Target | Source | Measured | Query | Gap |
 |---|---|---|---|---|---|
@@ -33,7 +33,7 @@ Measured on `worlds/town-1000.yaml` (1,000 people, two years, several seeds), as
 | **Deaths** | The ABS life table, by age | ABS, *Life Tables 2021–2023* | Follows the table (kernel statistical tests); 1–3 deaths a run | `cast` | Matches, by construction |
 | **Births** | Total fertility rate **1.481**; ages 15–49 | ABS, *Births, Australia 2024* | About 10 births a run over two years, the first after nine months | `cast` | To check against the expected count for the town's women by age (roughly 11 a year once under way) |
 | **Migration** | To source: ABS regional internal migration rates | ABS, *Regional internal migration estimates* | Almost none on this town (vacancies fill within the month) | `cast` | The response and outside income are placeholders |
-| **Taking part in a social group** | **50.0%** of adults in the last 12 months | ABS, *General Social Survey 2019* | **50.6–54.3%** of adults went to a gathering in the year; about 55 at each (the 1,000-person town, one year, two seeds) | `town/gatherings` | Close. Half of adults belong to a group at the start (the same survey), so the test is that it holds: how many join through friends and drift away. |
+| **Taking part in a social group** | **50.0%** of adults in the last 12 months | ABS, *General Social Survey 2019* | **50.6–54.3%** of adults went to a gathering in the year; about 55 at each (the 1,000-person town, one year, one town run twice) | `town/gatherings` | Close. Half of adults belong to a group at the start (the same survey), so the test is that it holds: how many join through friends and drift away. |
 | **Industrial disputes, over five years** | Working days lost: 11.3 per 1,000 employees a year | ABS, *Industrial Disputes* (profile targets) | After the fix: 5–7 stoppages in five years per run, one-day to three-day, none twice at one employer (before: 11–105) | `--sql` on `stop_work` | To convert to working days lost per 1,000 employees and compare |
 | **Religious affiliation, over five years** | −1.64 points a year (52.1% Christian in 2016 to 43.9% in 2021) | ABS, Census 2016 and 2021 | Affiliated (holding or leaning) 41–42% at the start. Fading 2.25% a month: −1.1, +0.2, −1.0 points a year (`runs/c9-run5`); **3% a month: −1.65, −1.32, −1.63** (mean −1.53; `runs/c10-run5`) | `town/beliefs` | **Calibrated** (`belief.fade_bps` 300). (Before: firm belief rose 12 to 22–27%, from hearsay converting non-believers; fixed.) |
 | **Religious belief** | **43.9%** reported a Christian affiliation | ABS, Census 2021 (to confirm) | Held at the start by that share (members strongly, others nominally). Stated when held firmly: **11–15%** of adults, steady or rising over a year while members keep going | `town/beliefs` | Not comparable: the census counts affiliation, and code citizens state only a firm belief. Needs a stated-affiliation measure, or a practising-share target (attendance), to calibrate. |

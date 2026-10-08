@@ -72,4 +72,7 @@ oikos run worlds/town-300.yaml --until 7776000 --log lean --record-observations 
   the size is not the point; `worlds/town-1000.yaml` when it is. Ninety days, lean, on a quiet machine: 9 s and 0.7 GB
   for 200 people, 13 s and 0.8 GB for 300, 44 s and 1.8 GB for 1,000.
 - `--no-measure` when only the state hash or the summary is wanted; `--set k=v` to vary the spec.
+- `--seeds N` is **one town run N times**; `--towns T` is **T different towns** (each run `--seeds` times, once if not
+  given). A before and after that is to say anything of towns in general is `--towns 3` on each side; `oikos diff` says
+  on its first line what each side was (docs/measurement.md, "Running a batch").
 - Write to a folder outside `runs/` that you remove yourself; never remove anything under `runs/`.

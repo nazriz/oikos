@@ -48,6 +48,9 @@ test("rents are reviewed as landlords practise, within the law as a record says 
     // The tenant answers (given a week to): a standing order for the new rent, or notice on the lease.
     if (r.at > 15 * MONTH - 7 * DAY) continue;
     const tenant = r.addressed_to[0];
+    // (A tenant who had died alone and not yet been found answers nothing: the landlord, who doesn't know, writes to
+    // them as to anyone. One such, in this town, since people stop work at ages of their own.)
+    if (ev.some((e) => e.event === "person_died" && e.person === tenant && e.t <= r.at + 7 * DAY)) continue;
     const order = recs.find((x) => x.kind === "request" && x.speaks_for === tenant && x.basis === r.data.lease && x.data?.outcome?.money?.amount === String(r.data.rent) && x.at >= r.at);
     const pays = !!order;
     const leaves = recs.some((x) => x.record === "notice" && x.agreement === r.data.lease && x.as === tenant && x.at >= r.at);

@@ -2,6 +2,7 @@
 // within a stated tolerance, and signs of trouble that don't stop a run. Breaches first. The targets are the profile's
 // (a place's figures, with sources); which measure answers each, and how close counts as close, are measurement's.
 
+import { drawnText, type Drawn } from "./diff";
 import { runQuery } from "./index";
 
 export interface Target {
@@ -65,11 +66,13 @@ export async function health(dir: string, targets: Target[]): Promise<HealthRow[
   return rows.sort((a, b) => Number(b.breach) - Number(a.breach));
 }
 
-export function healthText(rows: HealthRow[]): string {
+/** The report in words; with `over`, what it is a report of (how many towns, how many runs of each). */
+export function healthText(rows: HealthRow[], over?: Drawn): string {
   const f = (x: number) => (Math.abs(x) >= 100 || Number.isInteger(x) ? x.toFixed(0) : x.toFixed(2));
   const breaches = rows.filter((r) => r.breach).length;
   return [
-    `Health: ${breaches ? `${breaches} breach${breaches === 1 ? "" : "es"}` : "no breaches"} of ${rows.length} measures.`,
+    `Health: ${breaches ? `${breaches} breach${breaches === 1 ? "" : "es"}` : "no breaches"} of ${rows.length} measures${over ? `, over ${drawnText(over)}` : ""}.`,
+    ...(over?.towns === 1 && over.runs > 1 ? ["  One town run several times: the ranges below are that town's from run to run, not the range over towns (oikos run --towns N for that)."] : []),
     ...rows.map((r) =>
       `${r.breach ? "!" : " "} ${r.what.padEnd(44)} ${r.measured ? `${f(r.measured.mean)}${r.measured.runs > 1 ? ` (${f(r.measured.low)} to ${f(r.measured.high)}, ${r.measured.runs} runs)` : ""}` : "-"}`.padEnd(100) +
       (r.target !== undefined ? `target ${f(r.target)}${r.tolerance !== undefined ? ` ± ${f(r.tolerance)}` : ""}` : r.tolerance !== undefined ? `at most ${f(r.tolerance)}` : "") +

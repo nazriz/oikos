@@ -1,10 +1,16 @@
-// Batch runs: one world, several seeds, each run in its own process (with its
+// Batch runs: one world, several runs, each in its own process (with its
 // own kernel) so they run in parallel. A run's result never depends on how it
-// was scheduled: each is the same as running that seed alone.
+// was scheduled: each is the same as running it alone.
 //
-// Seeds vary a run's randomness, not the world: a generated world is built
-// once from its spec (set `seed` in the spec for a different town), and each
-// run gets the config with its own seed.
+// Two seeds, and they are different things:
+// - the **town's seed** is the spec's `seed`: what the generator draws the town from (who lives there, how old, in
+//   which homes, which firms). One spec seed, one town.
+// - the **run's seed** is the config's `seed`, which the kernel's randomness starts from: what happens in a town
+//   once it is drawn.
+// `seeds: N` runs ONE town N times: the town is generated once, from the spec's seed, and the runs' seeds are that seed
+// and the N - 1 after it. It varies what happens, never who is there. `towns: T` generates T towns, from the spec's
+// seed and the T - 1 after it, and runs each `seeds` times (a town's runs are seeded from its own seed, as they would
+// be with the spec's seed set to it: town 2 of `towns: 3` is the run `--set seed=2` makes).
 //
 // A batch folder holds each run's log, anchors and summary; batch.json (what
 // ran, with which versions, and how long it took); the measurement tables
@@ -57,11 +63,47 @@ export function setPath(obj: any, assignment: string): void {
 }
 
 export interface RunRecord extends RunSummary {
+  /** The run's seed (the kernel's randomness). */
   seed: number;
+  /** The town's seed (the generator's), where the batch named its towns (`towns`); else the spec's own, unsaid. */
+  town?: number;
   wallMs: number;
 }
 
-export const runIdFor = (world: string, seed: number) => `${basename(world).replace(/\.(json|ya?ml)$/, "")}.seed${seed}`;
+/** A run's id: the world and the run's seed; in a batch of several towns, the town's seed too. */
+export const runIdFor = (world: string, seed: number, town?: number) => `${basename(world).replace(/\.(json|ya?ml)$/, "")}${town === undefined ? "" : `.town${town}`}.seed${seed}`;
+
+/** One run of a batch: the run's seed, and the town's where the batch names its towns. */
+export interface Planned { seed: number; town?: number }
+
+/**
+ * The runs of a batch (see the top of this file). Without `towns`: one town, the spec's, run `seeds` times from the
+ * config's seed up, as it always was. With `towns`: that many towns, generated from the spec's seed up, each run
+ * `seeds` times from its own seed up.
+ */
+export function planRuns(configSeed: number, seeds: number, towns?: number, specSeed?: number): Planned[] {
+  if (!Number.isInteger(seeds) || seeds < 1) throw new Error(`--seeds is a whole number of runs, 1 or more, not ${seeds}`);
+  if (towns === undefined) return Array.from({ length: seeds }, (_, i) => ({ seed: configSeed + i }));
+  if (!Number.isInteger(towns) || towns < 1) throw new Error(`--towns is a whole number of towns, 1 or more, not ${towns}`);
+  if (specSeed === undefined || !Number.isInteger(specSeed)) throw new Error("--towns needs a world generated from a spec with a seed: a world given whole is one town");
+  return Array.from({ length: towns }, (_, k) => Array.from({ length: seeds }, (_, i) => ({ town: specSeed + k, seed: specSeed + k + i }))).flat();
+}
+
+/** How a run is named to a reader: its seed, and its town's where the batch names its towns. */
+export const runName = (r: Planned) => (r.town === undefined ? `seed ${r.seed}` : `town ${r.town}, seed ${r.seed}`);
+
+/** What a batch ran, in words: how many towns, and how many runs of each (so "N seeds" is never read as N towns). */
+export function batchShape(runs: Planned[], generated: boolean, specSeed?: number): string {
+  const towns = [...new Set(runs.map((r) => r.town))];
+  const range = (xs: number[]) => (xs.length === 1 ? `${xs[0]}` : xs.every((x, i) => i === 0 || x === xs[i - 1]! + 1) ? `${xs[0]} to ${xs.at(-1)}` : xs.join(", "));
+  if (towns[0] === undefined) {
+    const seeds = runs.map((r) => r.seed);
+    const town = generated ? `1 town (generated from seed ${specSeed})` : "1 town (the world as given)";
+    return `${town}, ${seeds.length} run${seeds.length === 1 ? "" : "s"} of it (run seed${seeds.length === 1 ? "" : "s"} ${range(seeds)})`;
+  }
+  const per = runs.length / towns.length;
+  return `${towns.length} town${towns.length === 1 ? "" : "s"} (generated from seed${towns.length === 1 ? "" : "s"} ${range(towns as number[])}), ${per} run${per === 1 ? "" : "s"} of each (run seeds from each town's own seed)`;
+}
 
 /** Behaviour modules from a researcher's own file (`--modules`): its export `modules`, keyed by the names worlds use. */
 export async function loadModules(file?: string): Promise<RunOptions["modules"]> {
@@ -72,8 +114,9 @@ export async function loadModules(file?: string): Promise<RunOptions["modules"]>
 }
 
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
- * log): run again from its own config, with every model response served from that log (resume.ts, D59). */
-export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
+ * log): run again from its own config, with every model response served from that log (resume.ts, D59). `town`: the
+ * town's seed (the spec's `seed` set to it, after any `sets`), named in the run's id; absent, the spec's own. */
+export async function runOne(o: { world?: string; seed?: number; town?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   let consult = !!o.consult;
   let recordObservations = o.recordObservations;
@@ -92,10 +135,10 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
     consultAvoid = r.consultAvoid;
     serving = new Serving(recordedCalls(r.stoppedLog));
   } else {
-    config = { ...(await loadWorld(o.world!, o.sets)).config, seed: o.seed };
+    config = { ...(await loadWorld(o.world!, townSets(o.sets, o.town))).config, seed: o.seed };
     // How much the log keeps (docs/reliability.md): lean for quick test runs, full (the default) when the data matters.
     if (o.logDetail) config.log = { ...config.log, detail: o.logDetail };
-    runId = runIdFor(o.world!, o.seed!);
+    runId = runIdFor(o.world!, o.seed!, o.town);
     out = o.out ?? "runs";
     // Runs are never overwritten: a folder that already holds this run's log refuses a fresh one (logs.ts).
     await clearForFreshRun(out, runId, o.overwrite);
@@ -129,10 +172,13 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
     // stopped run's process from exiting (pilot 11).
     for (const m of [real, tr]) (m?.adapter as { close?: () => void } | undefined)?.close?.();
   }
-  const rec: RunRecord = { ...s, seed: Number(config.seed), wallMs: Math.round(performance.now() - t0) };
+  const rec: RunRecord = { ...s, seed: Number(config.seed), ...(o.town !== undefined && !o.resume ? { town: o.town } : {}), wallMs: Math.round(performance.now() - t0) };
   writeFileSync(join(out, `${runId}.summary.json`), JSON.stringify(rec, null, 2));
   return rec;
 }
+
+/** The `--set`s that make a town's world: the batch's own, then the spec's seed set to the town's. */
+export const townSets = (sets: string[] = [], town?: number) => (town === undefined ? sets : [...sets, `seed=${town}`]);
 
 /** A request to stop from outside (a TERM signal: cli.ts). A run stops before its next moment, its log closed, to be
  * resumed; a batch starts no more seeds, and passes the request on to those under way. */
@@ -150,7 +196,11 @@ export function resumeCommand(logPath: string, o: { model?: string; translatorMo
 
 export interface BatchOptions {
   world: string;
+  /** How many times each town is run (the runs' seeds differ; the town does not). */
   seeds: number;
+  /** How many towns: generated from the spec's seed and those after it, each run `seeds` times. Absent: one town, the
+   * spec's (what a batch always was). Only for a world generated from a spec. */
+  towns?: number;
   out?: string;
   /**
    * Run again into a folder that already holds these runs, replacing them. Never the default: runs are never
@@ -203,10 +253,12 @@ export interface BatchOptions {
 export interface BatchResult {
   out: string;
   runs: RunRecord[];
-  /** Seeds that didn't finish (D59), with what went wrong: the others are measured and reported as usual. */
-  failed: { seed: number; reason: string; diagnosis?: object }[];
+  /** Runs that didn't finish (D59), with what went wrong: the others are measured and reported as usual. */
+  failed: { seed: number; town?: number; reason: string; diagnosis?: object }[];
   /** Runs (among `runs`) that stopped before they were meant to, to be resumed: why, and the command that resumes each. */
-  stopped: { seed: number; runId: string; t: number; why: string; by: string; resume: string }[];
+  stopped: { seed: number; town?: number; runId: string; t: number; why: string; by: string; resume: string }[];
+  /** What ran, in words: how many towns, and how many runs of each. */
+  shape: string;
   /** What went wrong after the runs, measuring or compressing them (the runs themselves, and batch.json, are there). */
   problems: string[];
   measureDir?: string;
@@ -228,13 +280,18 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   let batchHeld = 0;
   const out = resolve(o.out ?? join("runs", basename(o.world).replace(/\.(json|ya?ml)$/, "")));
   mkdirSync(out, { recursive: true });
-  const seeds = Array.from({ length: o.seeds }, (_, i) => Number(config.seed) + i);
+  // What runs: one town `seeds` times, or `towns` towns each `seeds` times (the top of this file).
+  const plan = planRuns(Number(config.seed), o.seeds, o.towns, spec ? Number(spec.seed) : undefined);
+  const seeds = plan.map((r) => r.seed);
+  const idOf = (r: Planned) => runIdFor(o.world, r.seed, r.town);
+  const shape = batchShape(plan, !!spec, spec ? Number(spec.seed) : undefined);
+  const order = (a: Planned, b: Planned) => (a.town ?? 0) - (b.town ?? 0) || a.seed - b.seed;
   // Runs are never overwritten: a folder that already holds any of these runs, or a batch's measures, refuses another
   // (before anything is started, so that no seed runs while another is refused). `overwrite` is the deliberate
   // exception, and even then nothing in the folder that holds a real model's answers may be replaced.
   const measureDir = join(out, "measure");
   if (!o.overwrite) {
-    const there = seeds.flatMap((seed) => logsOf(out, runIdFor(o.world, seed)));
+    const there = plan.flatMap((r) => logsOf(out, idOf(r)));
     if (there.length) throw new Error(`${there[0]} exists${there.length > 1 ? ` (and ${there.length - 1} more of this batch's logs)` : ""}: these runs are already in ${out}, and runs are never overwritten. Choose another --out, or resume a run that stopped (oikos resume ${there.find((l) => !isStoppedLog(l)) ?? there[0]}).`);
     if (o.measure !== false && existsSync(measureDir)) throw new Error(`${measureDir} exists: ${out} already holds a batch's measures, which this batch would replace. Choose another --out.`);
   } else {
@@ -246,17 +303,18 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
   const parallel = Math.max(1, Math.min(seeds.length, o.parallel ?? Math.floor(availableParallelism() / 2)));
   const started = new Date();
   log(`${seeds.length} run${seeds.length === 1 ? "" : "s"} of ${o.world}${sets.length ? ` (${sets.join(", ")})` : ""}, ${parallel} at a time, into ${out}`);
+  log(`  ${shape}`);
 
   // Each seed in its own process: the kernel and the participants of one run never share a process with another's.
   const runs: RunRecord[] = [];
   const failed: BatchResult["failed"] = [];
   const stopped: BatchResult["stopped"] = [];
-  const queue = [...seeds];
+  const queue = [...plan];
   // Asked to stop (a TERM signal): no more seeds are started, and those under way are asked to stop in their turn (each
   // closes its log, and is reported below with the command that resumes it).
   const children = new Set<{ kill(signal?: NodeJS.Signals | number): void }>();
   if (o.stop) o.stop.onRequest = () => {
-    for (const seed of queue.splice(0)) failed.push({ seed, reason: `not started: the batch was asked to stop (${o.stop!.requested ?? "a signal"})` });
+    for (const r of queue.splice(0)) failed.push({ ...r, reason: `not started: the batch was asked to stop (${o.stop!.requested ?? "a signal"})` });
     for (const c of children) c.kill("SIGTERM");
   };
   // A run that asks a model spends its time waiting for answers, not on a core: it takes no slot.
@@ -265,9 +323,11 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     while (queue.length) {
       // One of the machine's slots for each run under way (scripts/slots.ts): a batch starts with as many of its P as
       // are free and adds the rest as they free. Waiting changes when a run starts, and nothing in it.
-      const slot = slotted ? await take(1, `oikos run ${o.world} (${seeds.length} seed${seeds.length === 1 ? "" : "s"}) into ${out}`, { cancel: () => !queue.length, say: log }) : undefined;
-      const seed = queue.shift();
-      if (seed === undefined) { slot?.release(); break; }
+      const slot = slotted ? await take(1, `oikos run ${o.world} (${seeds.length} run${seeds.length === 1 ? "" : "s"}) into ${out}`, { cancel: () => !queue.length, say: log }) : undefined;
+      const next = queue.shift();
+      if (next === undefined) { slot?.release(); break; }
+      const { seed, town } = next;
+      const runId = idOf(next), name = runName(next);
       try {
       // This run's spending limit: the per-run limit, or what's left of the batch's, whichever is less.
       let limitUsd = o.budgetUsd;
@@ -276,14 +336,14 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         const left = batchLimit - batchSpent - batchHeld;
         held = Math.min(o.budgetUsd !== undefined ? Math.round(o.budgetUsd * 1e6) : left, left);
         if (held <= 0) {
-          failed.push({ seed, reason: `not started: the batch's spending limit ($${o.batchBudgetUsd}) is spent or held by runs under way` });
-          log(`  seed ${seed}: not started, the batch's spending limit is reached`);
+          failed.push({ ...next, reason: `not started: the batch's spending limit ($${o.batchBudgetUsd}) is spent or held by runs under way` });
+          log(`  ${name}: not started, the batch's spending limit is reached`);
           continue;
         }
         batchHeld += held;
         limitUsd = held / 1e6;
       }
-      const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
+      const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), ...(town !== undefined ? ["--town", String(town)] : []), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
         ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : []), ...(o.overwrite ? ["--overwrite"] : [])];
       const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: slotted ? insideSlot(1, { ...process.env }) : { ...process.env } }); // (the environment as it is now)
@@ -295,7 +355,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         batchHeld -= held;
         let spent = held;
         try {
-          spent = JSON.parse(readFileSync(join(out, `${runIdFor(o.world, seed)}.summary.json`), "utf8")).spentMicroUsd ?? held;
+          spent = JSON.parse(readFileSync(join(out, `${runId}.summary.json`), "utf8")).spentMicroUsd ?? held;
         } catch {
           // no summary: count all of it
         }
@@ -305,44 +365,48 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         // One seed failing doesn't sink the batch: it's reported with its diagnosis, and can be resumed on its own.
         let diagnosis: any;
         try {
-          diagnosis = JSON.parse(readFileSync(join(out, `${runIdFor(o.world, seed)}.failure.json`), "utf8"));
+          diagnosis = JSON.parse(readFileSync(join(out, `${runId}.failure.json`), "utf8"));
         } catch {
           // no diagnosis written (killed from outside, or before it could)
         }
         const reason = diagnosis ? `${diagnosis.reason}: ${diagnosis.error ?? JSON.stringify(diagnosis.doing)}` : `exit ${code}${p.signalCode ? ` (${p.signalCode})` : ""}: ${err.trim().split("\n").at(-1) ?? ""}`;
-        failed.push({ seed, reason, ...(diagnosis ? { diagnosis } : {}) });
-        log(`  seed ${seed}: FAILED, ${reason}`);
+        failed.push({ ...next, reason, ...(diagnosis ? { diagnosis } : {}) });
+        log(`  ${name}: FAILED, ${reason}`);
         continue;
       }
-      const rec = JSON.parse(readFileSync(join(out, `${runIdFor(o.world, seed)}.summary.json`), "utf8")) as RunRecord;
+      const rec = JSON.parse(readFileSync(join(out, `${runId}.summary.json`), "utf8")) as RunRecord;
       runs.push(rec);
       if (rec.stopped) {
         // It didn't get to its end: said plainly, with why and how to go on. (It's measured with the rest, as far as it got.)
         const resume = resumeCommand(rec.logPath, { ...o, budgetUsd: limitUsd });
-        stopped.push({ seed, runId: rec.runId, t: rec.t, why: rec.stopped.why, by: rec.stopped.by, resume });
-        log(`  seed ${seed}: STOPPED at ${(rec.t / (365 * 86_400)).toFixed(2)} years (day ${Math.floor(rec.t / 86_400)}), not finished: ${rec.stopped.why}`);
+        stopped.push({ ...next, runId: rec.runId, t: rec.t, why: rec.stopped.why, by: rec.stopped.by, resume });
+        log(`  ${name}: STOPPED at ${(rec.t / (365 * 86_400)).toFixed(2)} years (day ${Math.floor(rec.t / 86_400)}), not finished: ${rec.stopped.why}`);
         log(`    resume it with: ${resume}${rec.stopped.by === "SpendingLimitReached" ? "  (with a higher --budget: it stopped at this one)" : ""}`);
-      } else log(`  seed ${seed}: ${(rec.t / (365 * 86_400)).toFixed(2)} years, ${rec.commands.toLocaleString("en-US")} commands, ${rec.refused} refused, ${(rec.wallMs / 1000).toFixed(0)} s; final state ${rec.stateHash.slice(0, 16)}`);
+      } else log(`  ${name}: ${(rec.t / (365 * 86_400)).toFixed(2)} years, ${rec.commands.toLocaleString("en-US")} commands, ${rec.refused} refused, ${(rec.wallMs / 1000).toFixed(0)} s; final state ${rec.stateHash.slice(0, 16)}`);
       for (const w of healthWarnings(rec)) log(`    ! ${w}`);
       } finally { slot?.release(); }
     }
   };
   await Promise.all(Array.from({ length: parallel }, worker));
-  runs.sort((a, b) => a.seed - b.seed);
+  runs.sort(order);
 
-  failed.sort((a, b) => a.seed - b.seed);
-  stopped.sort((a, b) => a.seed - b.seed);
+  failed.sort(order);
+  stopped.sort(order);
   const problems: string[] = [];
-  const result: BatchResult = { out, runs, failed, stopped, problems };
+  const result: BatchResult = { out, runs, failed, stopped, problems, shape };
   // What ran is written down before anything else is done with it, and again at the end: if measuring or compressing
   // fails, the batch's runs still have their manifest, and it says what went wrong.
   const recipes = new Map<string, string>();
   const manifest = () => writeFileSync(join(out, "batch.json"), JSON.stringify({
-    world: o.world, sets, ...(spec ? { spec, generator } : {}), config_seed: config.seed, seeds, parallel, until: o.until ?? null,
+    world: o.world, sets, ...(spec ? { spec, generator } : {}), config_seed: config.seed, seeds,
+    // The towns run, by the seed each was generated from (a world given whole: one town, no seed), and how many runs of
+    // each. `seeds` above are the runs' seeds, in the runs' order: of one town, unless `towns` says otherwise.
+    towns: o.towns !== undefined ? [...new Set(plan.map((r) => r.town!))] : spec ? [Number(spec.seed)] : [null], runs_per_town: o.seeds, shape,
+    parallel, until: o.until ?? null,
     ...(batchLimit !== undefined ? { spending: { limit_microusd: batchLimit, spent_microusd: batchSpent } } : {}),
     orchestrator: ORCHESTRATOR_VERSION, measure: o.measure !== false ? MEASURE_VERSION : null,
     started: started.toISOString(), finished: new Date().toISOString(), wall_ms: Date.now() - started.getTime(),
-    runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, log: r.logPath || null, anchors: r.logPath ? r.anchorsPath : null, ...(recipes.has(r.runId) ? { recipe: recipes.get(r.runId) } : {}), state_hash: r.stateHash, t: r.t,
+    runs: runs.map((r) => ({ run_id: r.runId, seed: r.seed, ...(r.town !== undefined ? { town: r.town } : {}), log: r.logPath || null, anchors: r.logPath ? r.anchorsPath : null, ...(recipes.has(r.runId) ? { recipe: recipes.get(r.runId) } : {}), state_hash: r.stateHash, t: r.t,
       end: r.end, ...(r.stopped ? { stopped: { ...r.stopped, resume: stopped.find((x) => x.runId === r.runId)?.resume } } : {}),
       commands: r.commands, refused: r.refused, wakes: r.wakes, wall_ms: r.wallMs, health: r.health, warnings: healthWarnings(r) })),
     failed,
@@ -376,7 +440,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
       const recipe = join(out, `${r.runId}.recipe.json`);
       writeFileSync(recipe, JSON.stringify({
         about: "This run's log wasn't kept (--keep measures). Running the command at the commit regenerates it exactly: the final state hash says so.",
-        command: ["oikos", "run-one", ...recipeArgs(o, r.seed)],
+        command: ["oikos", "run-one", ...recipeArgs(o, r.seed, r.town)],
         commit: gitCommit(), kernel: kernelVersion(), orchestrator: ORCHESTRATOR_VERSION, state_hash: r.stateHash, commands: r.commands, t: r.t,
       }, null, 2));
       for (const f of [r.logPath, r.anchorsPath]) rmSync(f, { force: true });
@@ -407,7 +471,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
 }
 
 /** The arguments to `oikos run-one` that regenerate a batch's run of a seed (with `--out` for where). */
-export const recipeArgs = (o: BatchOptions, seed: number) => [o.world, "--seed", String(seed), ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...(o.sets ?? []).flatMap((s) => ["--set", s]),
+export const recipeArgs = (o: BatchOptions, seed: number, town?: number) => [o.world, "--seed", String(seed), ...(town !== undefined ? ["--town", String(town)] : []), ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...(o.sets ?? []).flatMap((s) => ["--set", s]),
   ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : [])];
 
 /** Why a batch's runs couldn't be regenerated from a recipe (so their logs must be kept), or null if they can. */
