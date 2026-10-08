@@ -9,7 +9,7 @@ import { MockAdapter, type LlmRequest } from "@oikos/participants/llm";
 import { generate } from "@oikos/worlds/generator/generate";
 import { unsureText } from "../../translator/src/index";
 import { compressLog } from "../src/logs";
-import { ASK_BACK, endingOf, longestAskBackRun, mattersOf, pilotReport } from "../src/pilot-report";
+import { ASK_BACK, endingOf, longestAskBackRun, mattersOf, pilotReport, renderReport } from "../src/pilot-report";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -44,6 +44,11 @@ test("the report reads what the script did, from the log alone, plain or compres
   writeFileSync(join(out, "PILOT.txt"), `A held-out test.\n\n${JSON.stringify({ name: "pilot-t", until: 12 * DAY, test: true })}\n`);
 
   const r = await pilotReport(out);
+  // A run that went as far as it was asked has finished: its log's end is "aborted (stopped at <until>)", being short of
+  // the world's two years, and the report does not call that a stop (the live check of 2026-10-09).
+  expect(r.stopped).toMatchObject({ reason: "aborted", detail: `stopped at ${12 * DAY}`, reached_until: true, finished: true });
+  expect(renderReport(r)).toContain("days run: 12 of 12; finished: it ran to its until\n");
+  expect(renderReport(r)).not.toContain("stopped:");
   expect(r).toMatchObject({ pilot: "test-pilot-report", run: "town.seed1", test: true, note: "A held-out test." });
   expect(r.seats).toEqual({ "mayor-system": { model: "mock/mock", configured: "anthropic/claude-sonnet-5" } });
   expect(r.translator.model).toBe("mock/mock");

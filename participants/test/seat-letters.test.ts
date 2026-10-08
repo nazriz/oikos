@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import PROFILE from "../../worlds/profiles/au-vic-2026.json";
 import type { Observation } from "../src/contracts";
 import type { ContentBlock, LlmRequest } from "../src/llm/adapter";
-import { createLlmParticipant, isId, TEXT_MAX, tools, type LlmParticipantConfig } from "../src/llm/participant";
+import { createLlmParticipant, isId, NOTEBOOK_MAX, notebookRoom, TEXT_MAX, tools, type LlmParticipantConfig } from "../src/llm/participant";
 
 const HOUR = 3_600;
 const ctx = { world: { currency: PROFILE.values.currency } } as any;
@@ -68,7 +68,7 @@ test("what could not go is told at once, in the seat's terms, and nothing else i
   ]]);
   // The request goes, its reason kept as far as a record holds; so does the answer on a draft, with its note.
   expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "propose", text: "Publish a notice: the hall opens at nine.", as: "mayor", reasoning: long.slice(0, TEXT_MAX) });
-  expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "sign", draft: "draft.mayor.1", decision: "reject", note: long.slice(0, TEXT_MAX) });
+  expect(await p.step(obs(9 * HOUR), ctx)).toEqual({ type: "sign", draft: "draft.mayor-system.1", decision: "reject", note: long.slice(0, TEXT_MAX) });
   await p.step(obs(9 * HOUR), ctx);
   const r = resultsOf(calls[1]!);
   expect(r.a).toBe(`Not done: "Council Clerk" isn't an id: a letter goes to people and organisations by the ids your reports give them (to find one, look them up in who's who).`);
@@ -91,4 +91,40 @@ test("the debrief counts the letters that were sent, beside those written; and t
   await p.step(obs(7 * 86_400 + 9 * HOUR), ctx);
   await p.debrief("The run is over. How was it?");
   expect(debriefs[0].prompt).toContain("From day 1 to day 8 1 letter of yours was sent (2 more that you wrote were not: you were told at the time), you asked for 0 things to be done");
+});
+
+test("a notebook has room for a half-year, and a seat is told how to make room before it is full", async () => {
+  // (The live check: 4,000 characters were full by day 5, and seven changes were refused for room before the seat was
+  // told anything but the count.)
+  expect(NOTEBOOK_MAX).toBe(8000);
+  expect(notebookRoom(1200)).toBe("(1,200 of the 8,000 characters it holds are used.)");
+  expect(notebookRoom(6400)).toBe("(6,400 of the 8,000 characters it holds are used: it is nearly full, with 1,600 left. To make room before something won't fit, strike out what is settled (change the passage to nothing), or write the notebook afresh, shorter.)");
+  const nearly = "Day 1: wrote to the bank. ".repeat(250).slice(0, 6400);
+  const { p, calls, c } = harness([[use("n", "notebook", { text: nearly }), use("d", "done_for_now", {})]]);
+  await p.step(obs(9 * HOUR), ctx);
+  await p.step(obs(7 * 86_400 + 9 * HOUR), ctx);
+  expect(calls[1]!.messages[0]!.content as string).toContain(`${nearly}\n(6,400 of the 8,000 characters it holds are used: it is nearly full, with 1,600 left. To make room`);
+  expect(tools(c).find((t) => t.name === "notebook")!.description).toContain("It holds 8,000 characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told: to make room, strike out what is settled (change the passage to nothing), or write it all afresh, shorter.");
+});
+
+test("a request that came to nothing is put to the seat at once, in the same sitting; a second time, first thing at its next", async () => {
+  // (The live check, finding 7: told two days later among other things, the seat went on to say it had filed.)
+  const about = 'About what you asked for ("File the budget proposal."): nothing was filed or done. It could not be set out on the council proposal form from what you said. Please say it again.';
+  const failed = (t: number) => obs(t, { notices: [{ t, text: about, re: "draft.mayor-system.1" }] });
+  const { p, calls } = harness([
+    [use("a", "do", { what: "File the budget proposal.", as: "mayor" }), use("d", "done_for_now", { days: 2 })],
+    [use("b", "do", { what: "File the budget proposal, staff 300,000.", as: "mayor" }), use("d2", "done_for_now", { days: 2 })],
+  ]);
+  expect(await p.step(obs(9 * HOUR), ctx)).toMatchObject({ type: "propose", text: "File the budget proposal." });
+  // It said it was done for now, but what it asked for was not filed: the sitting goes on, and it is told why.
+  expect(await p.step(failed(9 * HOUR), ctx)).toMatchObject({ type: "propose", text: "File the budget proposal, staff 300,000." });
+  expect(calls.length).toBe(2);
+  const back = Object.fromEntries((calls[1]!.messages.at(-1)!.content as any[]).map((b) => [b.tool_use_id, b.content]));
+  expect(back.a).toContain(about);
+  expect(back.d).toBe("Not yet: something you asked for in the same answer was not filed or done, so the sitting goes on. See what came back from it, and say it again or leave it; then say when you're done.");
+  // Again in the same sitting: it has been held once, so it goes as it asked, and is told first thing at its next.
+  expect(await p.step(failed(9 * HOUR), ctx)).toMatchObject({ type: "wait" });
+  await p.step(obs(2 * 86_400 + 9 * HOUR), ctx);
+  expect(calls.length).toBe(3);
+  expect(calls[2]!.messages[0]!.content as string).toStartWith(`Your notebook: (empty)\n\nWhen you were last here, after you had finished: about what you asked for ("File the budget proposal."): nothing was filed or done.`);
 });

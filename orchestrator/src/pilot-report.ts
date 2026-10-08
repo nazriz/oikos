@@ -205,6 +205,10 @@ export async function reportOfLog(dir: string, log: string): Promise<any> {
   const through = allMatters.filter((m) => m.through).length;
 
   const stopped = end ? { reason: end.reason, detail: end.detail, reached_until: until !== undefined ? (end.t ?? last) >= until : null } : { reason: "no end written", reached_until: until !== undefined ? last >= until : null };
+  // A run that went as far as it was asked to has finished, whatever its log's end is called: a run cut at `until`,
+  // short of the world's whole length, ends "aborted (stopped at <until>)" in the log, which is no fault and no stop.
+  const finished = !!end && stopped.reached_until === true && (end.reason === "completed" || /^stopped at \d+$/.test(String(end.detail ?? "")));
+  if (finished) Object.assign(stopped, { finished: true });
   return {
     pilot: basename(resolve(dir)), run, log: basename(log),
     ...(pilot.queue?.test ? { test: true } : {}),
@@ -249,7 +253,7 @@ export function renderReport(r: any): string {
   L.push(`== ${r.pilot} (${r.run})${r.test ? "  [TEST: kept out of training]" : ""}`);
   L.push(`seats: ${Object.entries(r.seats).map(([k, s]: any) => `${k} on ${s.model}`).join("; ") || "none"}`);
   L.push(`translator: ${r.translator.model ?? "none"}${r.translator.version ? ` ${r.translator.version}` : ""}; confirmation: ${r.confirm}`);
-  L.push(`days run: ${r.days_run}${r.until_days !== null ? ` of ${r.until_days}` : ""}; stopped: ${r.stopped.reason}${r.stopped.detail ? ` (${String(r.stopped.detail).slice(0, 160)})` : ""}${r.stopped.reached_until === true ? ", reached its until" : r.stopped.reached_until === false ? ", short of its until" : ""}`);
+  L.push(`days run: ${r.days_run}${r.until_days !== null ? ` of ${r.until_days}` : ""}; ${r.stopped.finished ? "finished: it ran to its until" : `stopped: ${r.stopped.reason}${r.stopped.detail ? ` (${String(r.stopped.detail).slice(0, 160)})` : ""}${r.stopped.reached_until === true ? ", reached its until" : r.stopped.reached_until === false ? ", short of its until" : ""}`}`);
   if (r.folder_note) L.push(`folder note: ${r.folder_note.slice(0, 400)}`);
   for (const [k, s] of Object.entries<any>(r.per_seat)) {
     L.push(`-- ${k}: ${s.model_calls} calls${s.failed_calls ? ` (${s.failed_calls} failed)` : ""}, ${s.cost_microusd} microusd; tool uses: ${kv(s.tool_uses)}; answers with no tool use: ${s.answers_without_tool_use}`);

@@ -17,9 +17,9 @@ import type { ParticipantContext } from "../module";
 import { inCurrency } from "../money";
 import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
-import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked } from "./render";
+import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked, type WhoIs } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -57,6 +57,9 @@ export interface LlmParticipantConfig {
    * them by, such as "employment agreement"): a folder named for payroll holds payroll papers, whatever else is the
    * organisation's own. Nothing else is shown under its name, as it comes or looked up. */
   folders?: Map<string, string[]>;
+  /** Who someone is in the world, by any id of theirs (render.ts, `WhoIs`): how a letter's writer and a paper's author
+   * are named to the seat, and what a participant's own id (the platform's, which no seat is shown) is put as. */
+  whoIs?: WhoIs;
   /** The most one prompt may come to, in characters (the system prompt and everything shown): `PROMPT_MAX` unless set. */
   promptMax?: number;
 }
@@ -236,7 +239,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
   const registers = [...reports].filter(([id]) => c.ways?.get(id)?.way === "ask" && reports.get(id) === "records")
     .map(([id]) => `"${c.titles.get(id) ?? id}" (${id}): say which one, by ${(c.ways!.get(id)!.by ?? ["id"]).map((f) => BY_WORDS[f] ?? f).join(" or ")}`).join("; ");
   const lookWords = [
-    c.kinds ? "Look into one of your reports yourself, when you choose." : `Look at one of the reports you only read when you choose to: ${papers}.`,
+    c.kinds ? `Look into one of your reports yourself${elsewhere ? ", or send someone to go and see a place" : ""}, when you choose.` : `Look at one of the reports you only read when you choose to: ${papers}.`,
     "You'll see what's there with your next report.",
     `What you look at sitting after sitting can be set out for you at the start of each, without your asking again: look at it once with each_sitting (up to ${READY_MAX} at a time; with each_sitting false, no longer).`,
     "If all you do in an answer is look into reports whole (nothing to find, no one and nothing named), and there's nothing in any of them, the sitting ends there: you're told so at your next, which comes after the days you last gave. Anything you mean to do whatever they hold, do in the same answer.",
@@ -250,23 +253,23 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
     ? "Stop taking part in this study, permanently. This is always open to you and it will be respected; it's recorded as a choice, not a failure. (Stepping down from your office is different: that's something you would do in the world.)"
     : "Stop, permanently. This is always open to you and it will be respected.";
   return [
-    { name: "do", description: "Say what you do, in plain words, one thing at a time, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports, and any record it rests on (the permit, the budget, the papers that back it) by its id too. A paper is named by its id: one you can't name is looked up first, and then asked about by its id. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them.",
+    { name: "do", description: "Say what you do, in plain words, one thing at a time, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports, and any record it rests on (the permit, the budget, the papers that back it) by its id too. A paper is named by its id: one you can't name is looked up first, and then asked about by its id. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them." + (elsewhere ? " To find out how a place stands, send someone to go and see it: that is a look too." : ""),
       input_schema: { type: "object", required: ["what"], properties: { what: { type: "string" }, as: AS, why: { type: "string", description: "Why (optional; kept on record)." } } } },
     { name: "confirm", description: "Confirm or decline something waiting for you to confirm, by its reference.",
       input_schema: { type: "object", required: ["ref", "decision"], properties: { ref: { type: "string" }, decision: { enum: ["confirm", "decline"] }, note: { type: "string" } } } },
     { name: "write", description: "Write to people or organisations, by id. The words go exactly as you write them. If the letter is about one thing that has an id (a paper, an account, a lot), give that id as about, and the letter is filed as about it. If what it is about is anything else (some words, or several things), say so in about all the same: it is put at the head of the letter as its subject line, and the letter is sent.",
       input_schema: { type: "object", required: ["to", "text"], properties: { to: { type: "array", items: { type: "string" } }, text: { type: "string" }, as: AS, about: { type: "string", description: "What it's about (optional): one id, or a subject line in words." } } } },
     { name: "done_for_now", description: c.sessions
-        ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner, at the next sitting, if someone writes to you. You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
+        ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner, at the next sitting, if someone writes to you (a letter: a paper filed with your office, a vote or a notice does not bring you back sooner, so give fewer days when you are waiting on one). You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
         : "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you. You can use it alongside other actions: they're done, and you're back after the days given, when you'll see how they went.",
       input_schema: { type: "object", properties: { days: { type: "integer", minimum: 1 } } } },
-    { name: "notebook", description: "Your notebook: the only thing you'll remember from one sitting to the next. It holds 4,000 characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told. Use it alongside your actions.",
+    { name: "notebook", description: `Your notebook: the only thing you'll remember from one sitting to the next. It holds ${NOTEBOOK_MAX.toLocaleString("en")} characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told: to make room, strike out what is settled (change the passage to nothing), or write it all afresh, shorter. Use it alongside your actions.`,
       input_schema: { type: "object", properties: {
         add: { type: "string", description: "Words to add at the end, on a new line." },
         change: { type: "array", maxItems: 8, description: "Passages to change, each where it stands.", items: { type: "object", required: ["from", "to"], properties: {
           from: { type: "string", description: "The passage as it stands in your notebook, word for word (enough of it to be the only one)." },
           to: { type: "string", description: "What it should say instead; empty to strike it out." } } } },
-        text: { type: "string", maxLength: 4000, description: "The whole notebook, written afresh: it replaces everything there." } } } },
+        text: { type: "string", maxLength: NOTEBOOK_MAX, description: "The whole notebook, written afresh: it replaces everything there." } } } },
     { name: "opt_out", description: leave, input_schema: { type: "object", required: ["statement"], properties: { statement: { type: "string" } } } },
     ...(reports.size
       ? [{ name: "look", description: lookWords,
@@ -310,6 +313,8 @@ export interface LlmController {
 }
 
 type Use = Extract<ContentBlock, { type: "tool_use" }>;
+/** A participant's own id as worlds are generated (an office's system, a person's own seat): a word of the platform's. */
+const PLATFORM_ID = /(?<![A-Za-z0-9_-])[a-z][a-z0-9_-]{0,56}-(?:system|self)(?![A-Za-z0-9_-])/g;
 /** The most a letter, a request or a note can run to (the contracts' limit on free text), and the most a letter goes to. */
 export const TEXT_MAX = 16_384;
 const TO_MAX = 64;
@@ -324,7 +329,11 @@ const text = (x: unknown): x is string => typeof x === "string" && x.length > 0;
 const quote = (s: string, max = 80) => `"${s.length > max ? `${s.slice(0, max)}…` : s}"`;
 
 /** The most a notebook holds, and the most of what came in between sittings that's set out at the next. */
-export const NOTEBOOK_MAX = 4000;
+export const NOTEBOOK_MAX = 8000;
+/** From this much used, a seat is told its notebook is nearly full, and how to make room, before anything is refused for room. */
+export const NOTEBOOK_NEARLY = 6000;
+/** What a seat is told of its notebook's room, with the notebook: how much is used, and from nearly full how to make room. */
+export const notebookRoom = (used: number) => `(${used.toLocaleString("en")} of the ${NOTEBOOK_MAX.toLocaleString("en")} characters it holds are used${used >= NOTEBOOK_NEARLY ? `: it is nearly full, with ${(NOTEBOOK_MAX - used).toLocaleString("en")} left. To make room before something won't fit, strike out what is settled (change the passage to nothing), or write the notebook afresh, shorter` : ""}.)`;
 export const CARRY_MAX = 40_000;
 
 /** A notebook as one use of it leaves it: written afresh (`text`), passages changed where they stand (`change`), words
@@ -407,6 +416,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   // (Letters: those that went, by what came back from sending each, beside those it wrote.)
   const tally = { requests: 0, confirmed: 0, declined: 0, letters: 0, written: 0, looks: 0, first: -1, last: -1 };
   let sending = false; // the action just carried out was a letter (the next report says whether it went)
+  // Requests of the last answer that came to nothing, by use (what it is asked back), and whether this sitting has
+  // already gone on once for one.
+  const askedBack = new Map<string, string[]>();
+  let stayed = false;
   let messages: LlmMessage[] = [];
   // The last answer's tool uses (the APIs need a result for every one): each action's result is the report after it.
   let pending: { id: string; name: string }[] = [];
@@ -506,6 +519,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     [lookedLast, lookedNow] = [lookedNow, new Set()];
     extra = [];
     retried = false;
+    stayed = false;
+    askedBack.clear();
     open = false;
     lookIds.clear();
     return until !== undefined ? { type: "wait", until } : { type: "wait" };
@@ -520,10 +535,18 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const keepForNext = () => {
     for (const u of pending) {
       if (results.has(u.id)) carried.push(results.get(u.id)! + (after.get(u.id) ?? ""));
+      // (A request that came to nothing, unread as the sitting ends: said first thing at the next, not left among the rest.)
+      for (const text of askedBack.get(u.id) ?? []) unsaid.push(`When you were last here, after you had finished: ${text.charAt(0).toLowerCase()}${text.slice(1)}`);
       if (notDone.has(u.id)) unsaid.push(notDone.get(u.id)!.later);
     }
   };
   const note = (data: object) => io.annotate({ annotation: "note", subject: c.participant, data });
+  /** What it is shown, with no id of the platform's own in it: wherever a participant's id stands (in a letter's
+   * words, a paper's, a reference to something waiting to be confirmed), the id the world knows that party by stands
+   * instead: an office's post, a person themselves. The same party, by the name a seat can write to. */
+  const inWorld = (shown: string) => (c.whoIs ? shown.replace(PLATFORM_ID, (id) => c.whoIs!(id)?.id ?? id) : shown);
+  /** A reference to something waiting to be confirmed, as the seat is shown it, back as it is kept: a seat's drafts are its own. */
+  const draftRef = (ref: string) => { const m = /^\[?draft\.(.+)\.([0-9]+)\]?$/.exec(ref.trim()); return m ? `draft.${c.participant}.${m[2]}` : ref; };
   /** A look, in words: the report, and what of it. */
   const lookWords = (i: any) => {
     const finds: any[] = Array.isArray(i.find) ? i.find : i.find ? [i.find] : [];
@@ -563,7 +586,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     if (use.name === "confirm") {
       if (!text(i.ref)) return no("it didn't say which one");
       if (i.decision !== "confirm" && i.decision !== "decline") return no('it has to say "confirm" or "decline"');
-      return { what, action: { type: "sign", draft: i.ref, decision: i.decision === "confirm" ? "accept" : "reject", ...(text(i.note) ? { note: i.note.slice(0, TEXT_MAX) } : {}) },
+      return { what, action: { type: "sign", draft: draftRef(i.ref), decision: i.decision === "confirm" ? "accept" : "reject", ...(text(i.note) ? { note: i.note.slice(0, TEXT_MAX) } : {}) },
         ...(i.decision === "confirm" ? { label: "What you confirmed" } : {}), ...(text(i.note) && i.note.length > TEXT_MAX ? { clipped: `note (${i.note.length} characters; ${TEXT_MAX} kept)` } : {}) };
     }
     if (use.name === "write") {
@@ -695,18 +718,23 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   return {
     async step(obs, ctx) {
       inCurrency(ctx.world.currency);
-      const standing = renderStanding(obs, standingIds);
+      const standing = inWorld(renderStanding(obs, standingIds, c.whoIs));
       // (What stands now, as this report's standing documents show it: nothing, once the last of them is withdrawn. A
       // report that brings none of those documents leaves what's on file as it was.)
       if (standing || Object.entries(obs.channels).some(([id, ch]) => standingIds.has(id) && ch.kind === "records" && ch.records.length)) standingText = standing;
-      let body = renderObservation(obs, { standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
+      let body = renderObservation(obs, { ...(c.whoIs ? { whoIs: c.whoIs } : {}), standing: standingIds, titles: c.titles, lastAction, draftText: c.draftText, lookable: canLook, ...(lastLooked ? { looked: lastLooked } : {}), ...(c.folders ? { folders: c.folders } : {}), onCut: (cut) => void cutLooks.push(cut) });
       for (const cut of cutLooks.splice(0)) await note({ look_cut: cut });
+      body = inWorld(body);
       lastAction = undefined;
       lastLooked = undefined;
       if (obs.inbox.length) mail = true;
       // This report is the result of the action just carried out, if one was.
       const wasResult = current !== undefined;
       if (current && sending && obs.outcomes.some((x) => x.status === "applied")) tally.letters++;
+      // Something it asked to be done came to nothing (its request could not be drawn up): kept by the use it was, so
+      // that it is asked back in this sitting, or first thing at its next.
+      const back = (obs.notices ?? []).filter((n) => n.re !== undefined).map((n) => inWorld(n.text));
+      if (current && back.length) askedBack.set(current, back);
       sending = false;
       if (current) {
         // A look for a kind of paper that found nothing: the folder's latest papers are looked through for kinds like
@@ -749,11 +777,17 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // Done for now, said alongside: what its actions showed is kept for next time. If someone wrote meanwhile (with
       // the result of any of them), it's back sooner, as it was told: at the next sitting, or, with no office hours, now.
       let backEarly = false;
+      let stayOn = false;
       if (doneAfter) {
         const was = doneAfter;
         doneAfter = undefined;
         if (!S && mail) backEarly = true;
-        else {
+        // Something it asked for in that answer was not filed: it is asked back at once, in this sitting, rather than
+        // told days later among other things (once a sitting; after that, first thing at its next).
+        else if (askedBack.size && !stayed) {
+          stayed = true;
+          stayOn = true;
+        } else {
           keepForNext();
           missed.push(obs);
           return leave(obs.t, was.days);
@@ -821,7 +855,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         if (!fresh) {
           const content: ContentBlock[] = pending.map((u) => ({ type: "tool_result", tool_use_id: u.id,
             content: (results.has(u.id) ? results.get(u.id)! + (after.get(u.id) ?? "") : undefined) ?? notDone.get(u.id)?.now ?? said.get(u.id) ?? (u.name === "notebook" ? "Notebook updated."
-              : u.name === "done_for_now" ? (backEarly ? "Someone wrote to you as you finished, so you're back now." : "Noted.")
+              : u.name === "done_for_now" ? (backEarly ? "Someone wrote to you as you finished, so you're back now." : stayOn ? "Not yet: something you asked for in the same answer was not filed or done, so the sitting goes on. See what came back from it, and say it again or leave it; then say when you're done." : "Noted.")
               : "Not done: it wasn't something you can do, as written.") }));
           // Reports it hasn't been shown that aren't the result of anything it did (they came while it couldn't be reached).
           const more = [...extra, ...(turn === 1 && !wasResult ? [body] : [])];
@@ -830,7 +864,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         } else {
           const since = sinceLast(now);
           if (since.left) await note({ carried_not_shown: { reports: since.left, of: since.of, limit_characters: CARRY_MAX } });
-          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n(${notes.length} of the ${NOTEBOOK_MAX} characters it holds are used.)` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}` }];
+          sending = [{ role: "user", content: `Your notebook: ${notes ? `${notes}\n${notebookRoom(notes.length)}` : "(empty)"}\n\n${unsaid.length ? `${unsaid.join("\n")}\n\n` : ""}${since.before ? `Since you last looked:\n${since.before}\n\nNow:\n` : ""}${now}` }];
         }
 
         let res: Awaited<ReturnType<typeof callModel>>;
@@ -925,12 +959,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         unsaid = unreadTwice ? [`When you were last here, ${unreadTwice}.`] : [];
         extra = [];
         results.clear();
+        askedBack.clear();
         notDone.clear();
         after.clear();
         said.clear();
         quiet.clear();
         mail = false;
         backEarly = false;
+        stayOn = false;
 
         const uses = res.content.filter((b): b is Use => b.type === "tool_use");
         pending = uses.map((u) => ({ id: u.id, name: u.name }));

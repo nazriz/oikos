@@ -5,7 +5,7 @@
 // after counting a ballot; money moves because the finance officer instructed
 // the bank, and the bank checked its signatory list.
 
-import { cents, smallestNow } from "../money";
+import { cents, moneyNow } from "../money";
 import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
@@ -630,7 +630,7 @@ export const taxClerk: BehaviourModule = {
           const fine = Math.floor((a.amount * penalty) / 10_000);
           steps.push(because(`Tax still unpaid after ${p.grace_days} days: recording the law's penalty (${penalty / 100}%) and writing to the payer.`,
             record("right", me, { kind: "tax_penalty", amount: fine }, { against: a.payer, basis: id }),
-            message([a.payer], `Tax of ${smallestNow(a.amount)} on report ${id} is overdue; a penalty of ${smallestNow(fine)} has been recorded.`, id),
+            message([a.payer], `Tax of ${moneyNow(a.amount)} on report ${id} is overdue; a penalty of ${moneyNow(fine)} has been recorded.`, id),
           ));
         }
         steps.push(...letters.answer(() => {

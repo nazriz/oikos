@@ -193,16 +193,16 @@ test("more kept for a sitting than can be set out: whole reports are left out fr
 });
 
 test("a notebook too long to keep: it's told what was kept, and it's recorded", async () => {
-  const long = `${"a".repeat(3990)}0123456789 and the part that doesn't fit`;
+  const long = `${"a".repeat(7990)}0123456789 and the part that doesn't fit`;
   const { p, calls, notes } = harness([[use("n", "notebook", { text: long }), use("a", "write", { to: ["clerk"], text: "Hello." })], [use("n2", "notebook", { text: long }), use("d", "done_for_now", {})]]);
   await p.step(obs(9 * HOUR), ctx);
   await p.step(obs(9 * HOUR + 60), ctx);
-  expect(resultsOf(calls[1]!).n).toBe(`Notebook updated only in part: it was too long (${long.length} characters; it holds 4000), so only the first 4000 characters were kept. It now ends: "${"a".repeat(50)}0123456789".`);
-  expect(notes.find((n) => n.notebook_cut)).toEqual({ notebook_cut: { length: long.length, kept: 4000 } });
+  expect(resultsOf(calls[1]!).n).toBe(`Notebook updated only in part: it was too long (${long.length} characters; it holds 8000), so only the first 8000 characters were kept. It now ends: "${"a".repeat(50)}0123456789".`);
+  expect(notes.find((n) => n.notebook_cut)).toEqual({ notebook_cut: { length: long.length, kept: 8000 } });
   // Said with done for now: told at the next sitting.
   await p.step(obs(8 * DAY), ctx);
   expect(shown(calls[2]!)).toContain("When you were last here, your notebook was updated only in part");
-  expect(shown(calls[2]!)).toContain(`Your notebook: ${long.slice(0, 4000)}\n`);
+  expect(shown(calls[2]!)).toContain(`Your notebook: ${long.slice(0, 8000)}\n`);
 });
 
 test("a letter that comes with the result of its last action brings it back sooner, as done for now says", async () => {
@@ -424,7 +424,7 @@ test("nothing came of looking into whole reports: no turn is taken to say so; th
   const next = shown(calls[2]!);
   expect(next).toContain("When you were last here, there was nothing in what you looked into, so the sitting ended there.");
   expect(next).toContain("## The town's files: what you looked up (0 found)\nNothing found.");
-  expect(next).toContain("Your notebook: Looked on day 4.\n(16 of the 4000 characters it holds are used.)");
+  expect(next).toContain("Your notebook: Looked on day 4.\n(16 of the 8,000 characters it holds are used.)");
 
   // A turn follows whenever something came of it: something found; a letter in; money moved; something to find named
   // (that nothing was found answers a question); another act beside the look.
@@ -457,12 +457,12 @@ test("the notebook is added to, or changed where a passage stands, without writi
   expect(e.text).toBe("Paid the works. Paid the works once.");
   expect(e.problems).toEqual(['it doesn\'t say "Paid the clerk" (a passage to change is given word for word)', 'it says "Paid the works" more than once (give more of the passage)', "a change couldn't be read (it gives a passage as it stands, and what it should say instead)"]);
   // The limit: nothing is put in that doesn't fit, and nothing is cut to make room.
-  const full = "a".repeat(3990);
+  const full = "a".repeat(7990);
   const over = editNotebook(full, { add: "0123456789 and more" });
   expect(over.text).toBe(full);
-  expect(over.problems).toEqual(['there wasn\'t room to add "0123456789 and more": it holds 4000 characters and has 3990, so 9 are free (strike something out, or write it afresh, shorter)']);
-  expect(editNotebook(full, { add: "123456789" }).text.length).toBe(4000);
-  expect(editNotebook(`${full}bbbbbbbbbb`, { change: [{ from: "bbbbbbbbbb", to: "ccccccccccc" }] }).problems).toEqual(['changing "bbbbbbbbbb" would make it 4001 characters, and it holds 4000']);
+  expect(over.problems).toEqual(['there wasn\'t room to add "0123456789 and more": it holds 8000 characters and has 7990, so 9 are free (strike something out, or write it afresh, shorter)']);
+  expect(editNotebook(full, { add: "123456789" }).text.length).toBe(8000);
+  expect(editNotebook(`${full}bbbbbbbbbb`, { change: [{ from: "bbbbbbbbbb", to: "ccccccccccc" }] }).problems).toEqual(['changing "bbbbbbbbbb" would make it 8001 characters, and it holds 8000']);
   expect(editNotebook("Kept.", {}).read).toBe(false);
 
   // Through a sitting: said in the same sitting if a turn follows, and it's recorded; the notebook it's shown next is as left.
@@ -475,12 +475,12 @@ test("the notebook is added to, or changed where a passage stands, without writi
   await p.step(obs(9 * HOUR + 60), ctx);
   await p.step(obs(9 * HOUR + 120), ctx);
   const r = resultsOf(calls[2]!);
-  expect(r.n2).toBe('Notebook not updated: there wasn\'t room to add "0123456789 and more": it holds 4000 characters and has 3990, so 9 are free (strike something out, or write it afresh, shorter). It still says what it said before.');
+  expect(r.n2).toBe('Notebook not updated: there wasn\'t room to add "0123456789 and more": it holds 8000 characters and has 7990, so 9 are free (strike something out, or write it afresh, shorter). It still says what it said before.');
   expect(r.n3).toContain("Notebook not updated: it says \"aaaaaaaaaa\" more than once");
   expect(r.n4).toBe("Notebook updated.");
   expect(notes.filter((n) => n.notebook_not_changed).length).toBe(2);
   await p.step(obs(8 * DAY), ctx);
-  expect(shown(calls[3]!)).toContain("Your notebook: Short.\nDay 2.\n(13 of the 4000 characters it holds are used.)\n");
+  expect(shown(calls[3]!)).toContain("Your notebook: Short.\nDay 2.\n(13 of the 8,000 characters it holds are used.)\n");
 });
 
 test("who's who is looked up by name, a register someone else keeps is asked about one named thing, and a board is searched: a look that names nothing is answered in words, never with everything", async () => {
