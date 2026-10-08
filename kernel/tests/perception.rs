@@ -121,7 +121,7 @@ fn check_run(params: &WorldParams, ops: &[Op]) -> Result<usize, TestCaseError> {
         prop_assert_eq!(wire, serde_json::from_slice::<serde_json::Value>(&plain).unwrap(), "participant {}'s observation by reference, its records put back, isn't the observation", participant);
         let (whole, apart) = known.entry(participant.clone()).or_default();
         whole.absorb(&serde_json::to_value(&obs).unwrap());
-        apart.absorb_with(&observed.value, &observed.shown);
+        apart.absorb_seen(&oikos_kernel::kernel::seen(&obs), &observed.shown, &mut Default::default());
         prop_assert_eq!(format!("{whole:?}"), format!("{apart:?}"), "participant {}'s seat knows something else from the observation as delivered", participant);
         let reference = run.full_view(participant).unwrap();
         for (ch, data) in &obs.channels {

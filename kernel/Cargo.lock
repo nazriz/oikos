@@ -863,6 +863,7 @@ dependencies = [
 name = "oikos-perception"
 version = "0.7.0"
 dependencies = [
+ "imbl",
  "oikos-terms",
  "oikos-world",
  "serde",
