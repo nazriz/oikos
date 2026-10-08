@@ -424,15 +424,23 @@
           "type": "string"
         },
         "applied": {
+          "description": "For an act: whether it was applied, or refused (`refusal`: why), joined by the act's action (an act takes time, and how it ended is logged when it ends). Absent: not an act, or still under way when the log ended.",
           "type": "boolean"
         },
         "refusal": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
+        },
+        "created": {
+          "description": "The ids of what the act made, as the log's events for it say: records (a notice, a decision, an order, an agreement) and letters. What is later written in answer names one of them.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
     "Decision": {
-      "description": "A language-model participant's model call: what it was shown, what it answered, and what followed in the world.",
+      "description": "A language-model participant's model call: what it was shown, what it answered, what followed in the world, and what had come back of its earlier acts.",
       "type": "object",
       "required": [
         "run",
@@ -507,6 +515,33 @@
           "items": {
             "type": "string"
           }
+        },
+        "came_back": {
+          "description": "What the seat had been shown, since its last model call, that names something an earlier act of its own made: a reply to its letter, a decision on its form, a paper made on its direction, a vote on its proposal. `of`: the id of what the seat made; `seq`: the command that made it (a row of some earlier call's `commands`); `in`: the id of the record or letter that names it (in observations.jsonl); `from`: who wrote it, for a letter. A join by reference and nothing more: it does not say whether what came back was what the seat wanted.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "of",
+              "seq",
+              "in"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "of": {
+                "type": "string"
+              },
+              "seq": {
+                "$ref": "urn:oikos:contracts:0.8:common#/$defs/Count"
+              },
+              "in": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
@@ -517,8 +552,7 @@
         "run",
         "t",
         "seq",
-        "participant",
-        "applied"
+        "participant"
       ],
       "additionalProperties": false,
       "properties": {
@@ -547,10 +581,18 @@
           "type": "array"
         },
         "applied": {
+          "description": "Whether the act was applied, or refused (`refusal`: why). Joined by the act's action: an act takes time, and how it ended is logged when it ends. Absent: still under way when the log ended.",
           "type": "boolean"
         },
         "refusal": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/Opaque"
+        },
+        "created": {
+          "description": "The ids of what the act made, as the log's events for it say: records (a notice, a decision, an order, an agreement) and letters. What is later written in answer names one of them.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

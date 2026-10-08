@@ -50,13 +50,16 @@ One line per model call a participant made:
 - what it was shown (the rendered input, which is its observation as the seat's prompt presents it, and the system prompt's hash);
 - what it answered (the model's content: tool calls and text, in full);
 - tokens;
-- what followed from it in the world: the commands it gave that wake (the acts, looks and messages, with their provenance) and whether each was applied or refused, and the drafts it proposed or signed (joining to `translations.jsonl`).
+- what followed from it in the world: the commands it gave that wake (the acts, looks and messages, with their provenance), whether each was applied or refused, what each made (`created`: the ids of the records and letters the act wrote), and the drafts it proposed or signed (joining to `translations.jsonl`);
+- `came_back`: what the seat had been shown, since its last call, that names something an earlier act of its own made: a reply to its letter, a decision on its form, a paper made on its direction, a vote on its proposal. Each says `of` (the id the seat made), `seq` (the command that made it, a row of an earlier call's `commands`) and `in` (the record or letter that names it, to be read in `observations.jsonl`; `from` for a letter). It is a join by reference and nothing else: no reward is designed for seats, and nothing says whether what came back was what the seat wanted.
+
+An act takes time, so how it ended is logged when it ends, under the step of the clock that ended it. The export follows the act's action to it. (Until 2026-10-09 it looked under the act's own command and found nothing: every refused act, a seat's and a code participant's, was written `applied: true`. A dataset made before that date should be made again from its log.) An act still under way when the log ends has no `applied`.
 
 With this, a participant model can be trained on (prompt, answer) pairs, and filtered or weighted by what followed.
 
 ### `actions.jsonl`: what code participants did (opt-in)
 
-One line per act by a code participant: who (the participant and the position it acted in), when, its reasoning (the rule it followed, in words), the call program, the blocks, and whether the kernel applied it. It's large (about 130,000 lines for two years of the 1,000-person town), so it's opt-in.
+One line per act by a code participant: who (the participant and the position it acted in), when, its reasoning (the rule it followed, in words), the call program, the blocks, whether the kernel applied it or why it refused, and what the act made (`created`). It's large (about 130,000 lines for two years of the 1,000-person town), so it's opt-in.
 
 With recorded observations it's imitation data: what a rule-following citizen saw, and what it did.
 
