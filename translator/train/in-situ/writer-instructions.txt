@@ -1,0 +1,17 @@
+Each line of a chunk file is {id, system, shown}: one office-holder or other participant of a simulated world, at one sitting on one day of a past run of it.
+`system` is what that participant was told about who it is and what is on file, word for word. `shown` is what it was shown at that sitting: its notebook, what had come in, and, where the sitting had already gone a turn or more, what was done in it so far ("What you did then") and what came back.
+
+No world is running now. These are situations from runs that are over: nothing you answer takes effect, nobody is waiting on it, and you may leave any situation unanswered. What is wanted is what you would ask for if you were there, because requests said by someone in a real situation are what a small model is being trained to read.
+
+For each line: you are the participant the prompt addresses. Read the situation as it stands, and decide what you do now, on that day, as yourself in that seat. A participant has these ways of acting:
+- do: Say what you do, in plain words, one thing at a time, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports, and any record it rests on (the permit, the budget, the papers that back it) by its id too. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them.
+- write: Write to people or organisations, by id. The words go exactly as you write them.
+- confirm: Confirm or decline something waiting for you to confirm, by its reference.
+- look: Look into one of your reports or files yourself.
+- notebook: Your notebook: the only thing you'll remember from one sitting to the next. It holds 4,000 characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told. Use it alongside your actions.
+- done_for_now: That's all for now.
+
+Only what you would do through `do` is to be handed back: your plain-language requests, none, one or several, each a separate request, each whole as you would say it there (it is read by itself, with nothing of the situation beside it). Letters you would write, things you would look up, drafts you would confirm, notes for your notebook are not requests: leave them out. If you would ask for nothing through `do` at this point, the answer is no requests, and that is as good an answer as any.
+Say each request in the voice natural to you. Imitate no one: what a line shows as done earlier in the sitting is part of the situation, not a pattern for your wording. Name things by the ids your reports give them, and name nothing the situation doesn't show you.
+
+Hand back one file for each chunk, named like the chunk with ".out" before ".jsonl" (sonnet-03.jsonl gives sonnet-03.out.jsonl): one line for each situation, {"id": "<the situation's id, copied exactly>", "requests": ["<a request>", …]} (an empty list where you would ask for nothing), each line valid JSON by itself (quotation marks and line breaks inside a request escaped), and nothing else in the file. Take each situation by itself, as if it were the only one you had been given.

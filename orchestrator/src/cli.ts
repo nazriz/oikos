@@ -92,6 +92,10 @@
 //   oikos in-situ-label <FILE> --answers FILE --reader NAME --answers FILE --reader NAME --out DIR
 //     Two readers' answers ({id, program}) to a file of such requests, made into DIR's examples.jsonl (a request both
 //     read as the same program, which the request carries whole), rejects.jsonl (the rest, each with why) and manifest.json.
+//   oikos translator-pipeline <config.json>
+//     The translator's training pipeline in one unattended command (pipeline.ts, docs/translator-pipeline.md): pilots'
+//     situations, writers, two readers, the labelled examples, test sets, the join, the export and (if the config says
+//     so) training on a rented GPU. Resumable: the same command goes on where it stopped.
 //   oikos replay <log.jsonl> [--anchors <anchors.jsonl>]      (the kernel's own replay)
 //   oikos story <log.jsonl> [participant]                     (what a language-model participant did, day by day)
 //
@@ -323,6 +327,11 @@ try {
     const m = label(positional()[0]!, files.map((file, i) => ({ file, reader: names[i]! })), flag("out")!);
     console.log(`${m.examples} examples of ${m.requests} requests written to ${flag("out")} (examples.jsonl, rejects.jsonl, manifest.json); dropped: ${Object.entries(m.by_reason).filter(([, n]) => n).map(([why, n]) => `${why} ${n}`).join(", ") || "none"}`);
     console.log(`  by function: ${Object.entries(m.by_function).map(([fn, n]) => `${fn} ${n}`).join(", ")}`);
+  } else if (cmd === "translator-pipeline" && positional()[0]) {
+    const { loadConfig, plainReport, runPipeline } = await import("./pipeline");
+    const m = await runPipeline(loadConfig(positional()[0]!));
+    console.log(plainReport(m));
+    if (m.status !== "complete") process.exit(3);
   } else if (cmd === "dataset" && positional()[0]) {
     // Run datasets: every run's data as training examples (docs/design/run-datasets.md).
     const { logsIn } = await import("./corpus");

@@ -38,6 +38,7 @@
  "orchestrator/test/pilot-queue.test.ts": 0.8,
  "orchestrator/test/pilot-report.test.ts": 12.3,
  "orchestrator/test/pilot-wave.test.ts": 1.4,
+ "orchestrator/test/pipeline.test.ts": 2.1,
  "orchestrator/test/prices.test.ts": 830.9,
  "orchestrator/test/production.test.ts": 1047.9,
  "orchestrator/test/public-finance.test.ts": 68.9,
