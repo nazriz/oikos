@@ -56,10 +56,30 @@ test("a run's dataset: a manifest, and every translation, decision, act and reco
   // Every draft a decision names is a translation.
   const drafts = new Set(rows(join(dir, "translations.jsonl")).map((x) => x.draft));
   for (const d of decisions) for (const id of d.drafts) expect(drafts.has(id)).toBe(true);
+  // What came of a seat's acts can be followed by reference: each act says what it made, and a later call says what
+  // the seat had been shown that names it (here, the council's ballot on the mayor's proposal).
+  const commandOf = new Map<number, any>(decisions.flatMap((d) => d.commands.map((c: any) => [c.seq, c] as [number, any])));
+  expect([...commandOf.values()].some((c) => c.created?.length)).toBe(true);
+  const back = decisions.flatMap((d) => (d.came_back ?? []).map((x: any) => ({ ...x, t: d.t })));
+  expect(back.length).toBeGreaterThan(0);
+  for (const x of back) {
+    expect(commandOf.get(x.seq)?.created).toContain(x.of);
+    expect(x.in).not.toBe(x.of);
+  }
+  const shown = new Set(JSON.stringify(rows(join(dir, "observations.jsonl")).filter((o) => o.participant === "mayor-system")).match(/"id":"[^"]+"/g));
+  for (const x of back) expect(shown.has(`"id":"${x.in}"`)).toBe(true);
   // Actions: code participants only, each with whether it was applied.
   const actions = rows(join(dir, "actions.jsonl"));
   expect(actions.some((a) => a.participant.endsWith("-self") && a.reasoning && a.call)).toBe(true);
   expect(actions.some((a) => a.participant === "mayor-system")).toBe(false);
+  // An act refused is written as refused, with why: every refusal in the log is on its act's row (an act takes time,
+  // and its refusal is logged when it ends, under the step that ended it).
+  const refusedInLog = readFileSync(s.logPath, "utf8").split("\n").filter((l) => l.includes('"event":"action_refused"')).length;
+  expect(refusedInLog).toBeGreaterThan(0);
+  const refusedRows = [...actions, ...commandOf.values()].filter((a) => a.applied === false);
+  expect(refusedRows.length).toBe(refusedInLog);
+  expect(refusedRows.every((a) => typeof a.refusal?.code === "string")).toBe(true);
+  expect(actions.some((a) => a.created?.length)).toBe(true);
   // Citizens' decisions: where each stands in the log (what followed is that citizen's acts after it), and what the
   // citizen had before it.
   const minds = rows(join(dir, "citizen_decisions.jsonl"));
