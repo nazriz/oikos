@@ -217,7 +217,16 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
   switch (r.record) {
     case "statement": {
       if (r.kind === "request" && r.data?.outcome) return `[${r.id}] ${who} asked ${(r.addressed_to ?? []).join(", ")} to ${outcomeWords(r.data.outcome, r.data.every)}${from}`;
-      const d = dataWords(r);
+      // A ballot that is closed is said to be closed, with where its result is, and never as closing on a day gone
+      // by; a result says who voted which way where the paper says (a council's votes are public record: an
+      // election's result carries no names, and none are shown).
+      const closed = r.kind === "ballot" && r.data?.closed === true;
+      const named = r.kind === "ballot_result" && (Array.isArray(r.data?.voted_for) || Array.isArray(r.data?.voted_against));
+      const shownData = closed ? Object.fromEntries(Object.entries(r.data as object).filter(([k]) => !["closes_at", "closed", "result"].includes(k)))
+        : named ? Object.fromEntries(Object.entries(r.data as object).filter(([k]) => k !== "voted_for" && k !== "voted_against")) : r.data;
+      const voters = (list: unknown) => (Array.isArray(list) && list.length ? list.map((p) => writer(String(p))).join(", ") : "nobody");
+      const d = [closed ? `closed: no more votes are taken${typeof r.data.result === "string" ? `; its result is ${r.data.result}` : ""}` : "", dataWords({ kind: r.kind, data: shownData }),
+        named ? `voted for: ${voters(r.data.voted_for)}; voted against: ${voters(r.data.voted_against)}` : ""].filter(Boolean).join("; ");
       const rule = ruleWords(r);
       return `[${r.id}] ${words(r.kind)} from ${who}${r.place ? `, put up on ${r.place}` : ""}${r.addressed_to ? `, to ${r.addressed_to.join(", ")}` : ""}${from}: "${clip(r.text, 1000)}"${d ? ` (${d})` : ""}${r.basis ? `, citing ${citedWords(r)}` : ""}${rule ? `. ${rule}` : ""}`;
     }
@@ -234,7 +243,8 @@ function describe(r: Record, readings?: { [id: string]: Reading }): string {
     case "withdrawal":
       return `[${r.id}] ${who} withdrew ${r.withdraws}${r.text ? `: "${clip(r.text)}"` : ""}${from}`;
     case "vote":
-      return `[${r.id}] ${who} voted "${r.choice}" on ${r.ballot}${from}`;
+      // (A vote is whoever cast it's: the post it was cast in, where it was cast in one, not the organisation the post is of.)
+      return `[${r.id}] ${r.in_position ? writer(r.in_position) : who} voted "${r.choice}" on ${r.ballot}${from}`;
     case "claim_transfer":
       return `[${r.id}] ${r.claim} now belongs to ${r.to}${from}`;
     case "claim_release":
@@ -282,7 +292,9 @@ function recordLines(records: Record[], readings?: { [id: string]: Reading }, on
     const v = tallies.get(x)!;
     const counts = new Map<string, number>();
     for (const r of v) counts.set(r.choice, (counts.get(r.choice) ?? 0) + 1);
-    return `${v.length} vote${v.length === 1 ? "" : "s"} on ${v[0]!.ballot}: ${[...counts].sort().map(([c, n]) => `${c} ${n}`).join(", ")}`;
+    // (Votes cast in a post are public record, and say whose they are; a vote cast in no post, an elector's, is counted and no more.)
+    const by = (choice: string) => v.filter((r) => r.choice === choice && r.in_position).map((r) => writer(r.in_position!));
+    return `${v.length} vote${v.length === 1 ? "" : "s"} on ${v[0]!.ballot}: ${[...counts].sort().map(([c, n]) => `${c} ${n}${by(c).length ? ` (${by(c).join(", ")})` : ""}`).join(", ")}`;
   });
 }
 
@@ -438,7 +450,7 @@ const says = (x: unknown, asked: string) => {
 
 /** One paper as a line of a list: its id, what it is, its date, from whom, and a line of what it says. */
 function listLine(r: Record, readings?: { [id: string]: Reading }): string {
-  const who = r.speaks_for ?? (r.author === "genesis" ? undefined : writer(r.author));
+  const who = r.record === "vote" && r.in_position ? writer(r.in_position) : r.speaks_for ?? (r.author === "genesis" ? undefined : writer(r.author));
   const date = r.author === "genesis" && r.at === 0 ? "from the start" : when(r.at);
   const cut = (x: string) => (x.length > GIST_MAX ? `${x.slice(0, GIST_MAX)}…` : x);
   let gist: string;
