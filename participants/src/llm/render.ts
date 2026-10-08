@@ -751,8 +751,19 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
           ...look(id, `To see any building, room or piece of ground in full, name it (or a kind of building)${structures.some((s) => s.variables) ? "; to see every building where one of these is above zero or rising, name the measure" : ""}`));
       }
     } else if (ch.kind === "directory") {
-      const nameOf = new Map(ch.entities.filter((e) => e.participant).map((e) => [e.participant!, `${e.name} (${e.entity})`]));
-      const office = (p: (typeof ch.positions)[number]) => `${p.title ?? words(p.role ?? p.position)} (${p.position}), for ${p.entity}: ${p.holder ? (nameOf.get(p.holder) ?? p.held_by ?? "filled") : "vacant"}`;
+      // (Someone whose name is only their id is said once: "c0297, a person", not "c0297 (c0297)".)
+      const called = (e: (typeof ch.entities)[number]) => (e.name && e.name !== e.entity ? `${e.name} (${e.entity})` : e.entity);
+      const nameOf = new Map(ch.entities.filter((e) => e.participant).map((e) => [e.participant!, called(e)]));
+      // Who holds a post, as a town publishes it: a person by name; an office that runs itself (held by a system of the
+      // organisation's own, which has the post's title and no name of its own) said to be so, with how to reach it.
+      const office = (p: (typeof ch.positions)[number]) => {
+        const title = p.title ?? words(p.role ?? p.position);
+        const holder = !p.holder ? "vacant: nobody holds it"
+          : nameOf.has(p.holder) ? `held by ${nameOf.get(p.holder)}`
+          : p.held_by && plain(p.held_by) !== plain(title) ? `held by ${p.held_by}`
+          : `filled: the office answers for itself, with no person named to it (write to the post, by its id: ${p.position})`;
+        return `${title} (${p.position}), for ${p.entity}: ${holder}`;
+      };
       if (asked?.named?.length) {
         // Who it asked after: the people, organisations and posts its look-ups found, one by one.
         const names = asked.named.map(plain).filter(Boolean);
@@ -760,14 +771,18 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
         const entities = ch.entities.filter((e) => names.some((n) => plain(e.entity) === n || plain(e.name).includes(n) || plain(e.kind) === n));
         const found = new Set(entities.map((e) => e.entity));
         const posts = ch.positions.filter((p) => names.some((n) => plain(p.position) === n || plain(p.title ?? "").includes(n) || plain(p.role ?? "") === n || plain(p.entity) === n) || (p.holder !== undefined && [...found].some((e) => nameOf.get(p.holder!)?.endsWith(`(${e})`))));
-        const lines = [...entities.map((e) => `- ${e.name} (${e.entity}), ${e.kind === "person" ? "a person" : words(e.kind)}`), ...posts.map((p) => `- post: ${office(p)}`)];
+        const lines = [...entities.map((e) => `- ${called(e)}, ${e.kind === "person" ? "a person" : words(e.kind)}`), ...posts.map((p) => `- post: ${office(p)}`)];
+        // Each name that found nothing is said (who's who is open to anyone: that it has no entry under a name tells
+        // nothing that was not there to be looked up).
+        const missed = asked.named.filter((said) => { const n = plain(said); return n && !ch.entities.some((e) => plain(e.entity) === n || plain(e.name).includes(n) || plain(e.kind) === n) && !ch.positions.some((p) => plain(p.position) === n || plain(p.title ?? "").includes(n) || plain(p.role ?? "") === n || plain(p.entity) === n); });
         out.push("", `## ${title(id)}: who you looked for`, ...(lines.length ? lines.slice(0, limit) : ["No one and nothing found by that name."]));
         if (lines.length > limit) out.push(`(${lines.length - limit} more not listed: ask for more at once, or name them more closely.)`);
+        if (missed.length && lines.length) out.push(`Nothing is entered under: ${missed.join(", ")}. (A name is matched whole: a person or an organisation by its full name or its id; a post by its title, its id or what it is, such as mayor.)`);
         continue;
       }
       // Nobody is shown who's who: what stands here is its own address book, those it has looked up so far.
-      const orgs = ch.entities.filter((e) => e.kind !== "person").map((e) => `${e.name} (${e.entity})`);
-      const people = ch.entities.filter((e) => e.kind === "person").map((e) => `${e.name} (${e.entity})`);
+      const orgs = ch.entities.filter((e) => e.kind !== "person").map(called);
+      const people = ch.entities.filter((e) => e.kind === "person").map(called);
       const offices = ch.positions.map(office);
       const few = (xs: string[], most: number) => `${xs.slice(0, most).join("; ")}${xs.length > most ? `; and ${xs.length - most} more` : ""}`;
       out.push("", `## ${title(id)}`, ...(orgs.length + people.length + offices.length ? ["Those you have looked up so far:",

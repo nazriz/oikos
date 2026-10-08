@@ -236,7 +236,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
   const registers = [...reports].filter(([id]) => c.ways?.get(id)?.way === "ask" && reports.get(id) === "records")
     .map(([id]) => `"${c.titles.get(id) ?? id}" (${id}): say which one, by ${(c.ways!.get(id)!.by ?? ["id"]).map((f) => BY_WORDS[f] ?? f).join(" or ")}`).join("; ");
   const lookWords = [
-    c.kinds ? "Look into one of your reports yourself, when you choose." : `Look at one of the reports you only read when you choose to: ${papers}.`,
+    c.kinds ? `Look into one of your reports yourself${elsewhere ? ", or send someone to go and see a place" : ""}, when you choose.` : `Look at one of the reports you only read when you choose to: ${papers}.`,
     "You'll see what's there with your next report.",
     `What you look at sitting after sitting can be set out for you at the start of each, without your asking again: look at it once with each_sitting (up to ${READY_MAX} at a time; with each_sitting false, no longer).`,
     "If all you do in an answer is look into reports whole (nothing to find, no one and nothing named), and there's nothing in any of them, the sitting ends there: you're told so at your next, which comes after the days you last gave. Anything you mean to do whatever they hold, do in the same answer.",
@@ -250,7 +250,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
     ? "Stop taking part in this study, permanently. This is always open to you and it will be respected; it's recorded as a choice, not a failure. (Stepping down from your office is different: that's something you would do in the world.)"
     : "Stop, permanently. This is always open to you and it will be respected.";
   return [
-    { name: "do", description: "Say what you do, in plain words, one thing at a time, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports, and any record it rests on (the permit, the budget, the papers that back it) by its id too. A paper is named by its id: one you can't name is looked up first, and then asked about by its id. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them.",
+    { name: "do", description: "Say what you do, in plain words, one thing at a time, naming what you're using (amounts, accounts, lots, people, papers) by the ids in your reports, and any record it rests on (the permit, the budget, the papers that back it) by its id too. A paper is named by its id: one you can't name is looked up first, and then asked about by its id. Before it takes effect you'll see exactly what will happen, and confirm or decline. It's for doing things in the world, not for reading or asking: to look something up use look (if you have files to look in), and to ask someone something, write to them." + (elsewhere ? " To find out how a place stands, send someone to go and see it: that is a look too." : ""),
       input_schema: { type: "object", required: ["what"], properties: { what: { type: "string" }, as: AS, why: { type: "string", description: "Why (optional; kept on record)." } } } },
     { name: "confirm", description: "Confirm or decline something waiting for you to confirm, by its reference.",
       input_schema: { type: "object", required: ["ref", "decision"], properties: { ref: { type: "string" }, decision: { enum: ["confirm", "decline"] }, note: { type: "string" } } } },

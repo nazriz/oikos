@@ -88,7 +88,7 @@ test("a body, posts, buildings with their spaces, and the directory's posts read
   // (Who's who is its own address book now: those it has looked up, each post set out, none merely counted. Until
   // 2026-10-08 it was shown every post in the town, and the ones without a public role were counted.)
   expect(text).toContain("Those you have looked up so far:");
-  expect(text).toContain("Posts: Mayor (mayor), for city: Ada (ada-p); Town clerk (clerk), for city: vacant;");
+  expect(text).toContain("Posts: Mayor (mayor), for city: held by Ada (ada-p); Town clerk (clerk), for city: vacant: nobody holds it;");
   expect(text).not.toContain("till-system");
 });
 
@@ -310,10 +310,10 @@ test("who's who, looked into: people, organisations and posts by id or by part o
   const o = { lookable: new Set(["who"]) };
   // Nobody is shown who's who (docs/design/knowing.md): what a seat has of it is whom it has looked up, by name, and
   // how to look someone up. (Until 2026-10-08: "People: 2." of a directory it was shown whole.)
-  expect(renderObservation(obs({ who }), o)).toContain('Those you have looked up so far:\nOrganisations: Millbrook (city).\nPosts: Mayor (mayor), for city: Ada Lovelace (c0001); Town clerk (clerk), for city: vacant.\nPeople: Ada Lovelace (c0001); Bo Diddley (c0002).\n(To find out who someone is, name them (a person or an organisation by its id or full name; a post by its id, its title or what it is, such as mayor): look at "Who" (who).)');
+  expect(renderObservation(obs({ who }), o)).toContain('Those you have looked up so far:\nOrganisations: Millbrook (city).\nPosts: Mayor (mayor), for city: held by Ada Lovelace (c0001); Town clerk (clerk), for city: vacant: nobody holds it.\nPeople: Ada Lovelace (c0001); Bo Diddley (c0002).\n(To find out who someone is, name them (a person or an organisation by its id or full name; a post by its id, its title or what it is, such as mayor): look at "Who" (who).)');
   expect(renderObservation(obs({ who: { kind: "directory", entities: [], positions: [] } }), o)).toContain("You have looked nobody up yet.");
   const found = renderObservation(obs({ who }), { ...o, looked: new Map([["who", { named: ["lovelace", "clerk"] }]]) });
-  expect(found).toContain("## Who: who you looked for\n- Ada Lovelace (c0001), a person\n- post: Mayor (mayor), for city: Ada Lovelace (c0001)\n- post: Town clerk (clerk), for city: vacant");
+  expect(found).toContain("## Who: who you looked for\n- Ada Lovelace (c0001), a person\n- post: Mayor (mayor), for city: held by Ada Lovelace (c0001)\n- post: Town clerk (clerk), for city: vacant: nobody holds it");
   expect(found).not.toContain("Bo Diddley");
   expect(renderObservation(obs({ who }), { ...o, looked: new Map([["who", { named: ["zed"] }]]) })).toContain("No one and nothing found by that name.");
 
