@@ -7,7 +7,7 @@ import { basename, join } from "node:path";
 import { logLines, runOf } from "./logs";
 import type { CorpusExample } from "./corpus";
 
-export const DATASET_VERSION = "0.1.0";
+export const DATASET_VERSION = "0.2.0";
 
 interface Command { seq: number; command: string; as?: string; blocks?: unknown[]; looks?: unknown[]; provenance?: unknown; reasoning?: string; applied?: boolean; refusal?: unknown }
 interface Decision {
@@ -123,7 +123,12 @@ export async function exportDataset(logPath: string, outDir: string, o: DatasetO
         const dec = openDecision.get(b.participant);
         if (dec && !dec.drafts.includes(b.draft)) dec.drafts.push(b.draft);
       } else if (a === "decision") {
-        citizenDecisions.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, domain: b.data?.domain, strategy: b.data?.strategy, ...(b.data?.choice !== undefined ? { choice: b.data.choice } : {}), options: b.data?.options ?? [], ...(b.data?.state ? { state: b.data.state } : {}) });
+        // (With where it stands in the log: what that citizen did and what came of it is what follows there, in
+        // actions.jsonl by `seq`. What it had before it, as the mind was given it, where the record has it.)
+        const d = b.data ?? {};
+        citizenDecisions.write({ run: run(), t: d.t ?? e.t, seq: e.seq, participant: b.subject, domain: d.domain, strategy: d.strategy, ...(d.choice !== undefined ? { choice: d.choice } : {}), options: d.options ?? [],
+          ...(d.current !== undefined ? { current: d.current } : {}), ...(d.circumstances ? { circumstances: d.circumstances } : {}), ...(d.satisfied_here !== undefined ? { satisfied_here: d.satisfied_here } : {}),
+          ...(d.doubt !== undefined ? { doubt: d.doubt } : {}), ...(d.person ? { person: d.person } : {}), ...(d.state ? { state: d.state } : {}) });
       } else if (a === "observation") {
         observations.write({ run: run(), t: b.data?.t ?? e.t, participant: b.subject, ...(b.data?.as ? { as: b.data.as } : {}), observation: b.data?.observation });
       }
