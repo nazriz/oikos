@@ -107,7 +107,7 @@ export class DecideAdapter implements LlmAdapter {
   private buffer = "";
   private queue: Promise<unknown> = Promise.resolve();
   /** Each answer's sureness and time, in the order asked (for whoever measures). */
-  answers: { sure: number; ms: number; program: string; parts?: { choices: number; places: number; texts: number; least: number }; unsure?: object }[] = [];
+  answers: { sure: number; ms: number; program: string; steps?: number; parts?: { choices: number; places: number; texts: number; least: number }; unsure?: object }[] = [];
   constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean } = {}) {}
 
   private start(): void {
@@ -166,7 +166,7 @@ export class DecideAdapter implements LlmAdapter {
       program = `none(${misfit.label})`;
       unsure = misfit.label === "unclear" ? misfit.unsure : undefined;
     }
-    this.answers.push({ sure: a.sure, ms: a.ms, program, ...(a.parts ? { parts: a.parts } : {}), ...(unsure ? { unsure } : {}) });
+    this.answers.push({ sure: a.sure, ms: a.ms, program, steps: a.steps.length, ...(a.parts ? { parts: a.parts } : {}), ...(unsure ? { unsure } : {}) });
     return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}) };
   }
 

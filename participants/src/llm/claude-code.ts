@@ -29,7 +29,7 @@ import { answerContent, leadingObject, runBounded, transcript } from "./codex";
 
 /** What Claude Code says when no call will go through for a while: the plan's limit or credit is used up, or its own
  * retries on rate limits gave up. Only those: any other failure is retried and then reported. */
-export const CLAUDE_CODE_LIMITED = /usage[ _-]?limit|rate[ _-]?limit|too many requests|\b429\b|credit balance|out of (extra |usage )?credits?|limit reached/i;
+export const CLAUDE_CODE_LIMITED = /usage[ _-]?limit|session[ _-]?limit|weekly[ _-]?limit|hit your [a-z -]*limit|rate[ _-]?limit|too many requests|\b429\b|credit balance|out of (extra |usage )?credits?|limit reached/i;
 
 /** Runs the claude binary: args, stdin and a working directory in; stdout out; ended if it takes longer than
  * `timeoutMs`. Injectable for tests. */

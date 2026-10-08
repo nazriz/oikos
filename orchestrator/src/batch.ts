@@ -118,6 +118,9 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
     throw e;
   } finally {
     watchdog.stop();
+    // A model that runs as a process of ours (the trained translator) is ended with the run: left up, it kept a
+    // stopped run's process from exiting (pilot 11).
+    for (const m of [real, tr]) (m?.adapter as { close?: () => void } | undefined)?.close?.();
   }
   const rec: RunRecord = { ...s, seed: Number(config.seed), wallMs: Math.round(performance.now() - t0) };
   writeFileSync(join(out, `${runId}.summary.json`), JSON.stringify(rec, null, 2));

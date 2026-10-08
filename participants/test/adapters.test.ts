@@ -265,6 +265,9 @@ test("Claude Code: one `claude -p` per call with our system prompt in place of i
   // The plan's limit: the run stops, to be resumed.
   const limited = async () => ({ code: 1, stderr: "", stdout: result("Claude usage limit reached. Your limit will reset at 3pm.", { is_error: true }) });
   await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", limited).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
+  // (The words seen on 2026-10-08, when the plan's five-hour window ran out under a pilot and the agents beside it.)
+  const session = async () => ({ code: 1, stderr: "", stdout: result("You've hit your session limit · resets 2:20pm (Australia/Melbourne)", { is_error: true }) });
+  await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", session).complete(req)).rejects.toBeInstanceOf(UsageLimitReached);
   // Any other failure is an error, with what it said.
   const failing = async () => ({ code: 1, stdout: "", stderr: "not signed in" });
   await expect(new ClaudeCodeAdapter("claude-sonnet-5-5", failing, { attempts: 1 }).complete(req)).rejects.toThrow("not signed in");
