@@ -10,7 +10,9 @@
 // handed the facts the prose was rendered from.
 
 export type ContentBlock =
-  | { type: "text"; text: string }
+  /** `unread`: an answer that could not be read whole and exactly (why, in the seat's own terms). Its words are kept as
+   * written and nothing is made of them; the participant asks once more (participant.ts). */
+  | { type: "text"; text: string; unread?: string }
   | { type: "tool_use"; id: string; name: string; input: any }
   | { type: "tool_result"; tool_use_id: string; content: string };
 
