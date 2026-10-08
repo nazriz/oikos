@@ -191,7 +191,7 @@ export const inspector: BehaviourModule = {
  */
 export const builder: BehaviourModule = {
   name: "firm.builder",
-  version: "0.11.1",
+  version: "0.11.2",
   doc: "docs/behaviour/institutions.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -458,8 +458,8 @@ export const builder: BehaviourModule = {
           target: want, wage: wage, canPost: acc.balance >= bill + wage,
           why: `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands to do within ${p.horizon_days} days; we have ${crewNow.length}: posting a job.`,
         }));
-        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || (crewNow.length && acc.balance < crewNow.length * wage)) {
-          const broke = acc.balance < crewNow.length * wage;
+        if ((crewNow.length > want && t - lastLetGo >= p.let_go_every_days * DAY) || (crewNow.length && acc.balance < staffing.staying(book, t) * wage)) {
+          const broke = acc.balance < staffing.staying(book, t) * wage;
           const s = staffing.letGo(book, t, broke ? `Can't cover the next pay period (${usd(acc.balance)} for ${crewNow.length}): letting the most recent hire go.` : `${Math.round(inHand / 3600)} hours of work in hand need ${want} hands; we have ${crewNow.length}: letting the most recent hire go.`,
             broke ? "Redundancy: we can't cover the wage bill." : "Redundancy: there isn't the work.");
           if (s.length) lastLetGo = t;

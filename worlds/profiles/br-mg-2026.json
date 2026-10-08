@@ -472,7 +472,8 @@
     }
    ]
   },
-  "wages_per_fortnight": {
+  "pay_period_days": 14,
+  "wages_per_pay_period": {
    "shop": 134215,
    "factory": 142985,
    "construction": 133846
@@ -808,8 +809,6 @@
    "town": 110000000,
    "builder": 16500000,
    "landlord": 33000000,
-   "shop": 1650000,
-   "factory": 22000000,
    "person_min_savings": 55000
   },
   "town_finance": {
@@ -911,6 +910,7 @@
    "leave_notice_days": 0
   },
   "elections": {
+   "compulsory_voting": true,
    "term_years": 4,
    "method": "plurality",
    "turnout_bps": 7830,
@@ -919,7 +919,7 @@
   },
   "health": {
    "doctors_per_1000": 0.51,
-   "doctor_wage_per_fortnight": 553846,
+   "doctor_wage_per_pay_period": 553846,
    "consult_minutes": 30,
    "seek_care_bps": 9000,
    "treats": [
@@ -1084,7 +1084,7 @@
    "detection_bps": 1000,
    "investigation_hours": 4,
    "police_per_1000": 2.2,
-   "officer_wage_per_fortnight": 253846
+   "officer_wage_per_pay_period": 253846
   },
   "justice": {
    "hearing_after_days": 45,
@@ -1101,7 +1101,7 @@
    "students_per_teacher": 17,
    "school_days_per_year": 200,
    "hours_per_day": 4,
-   "teacher_wage_per_fortnight": 236798,
+   "teacher_wage_per_pay_period": 236798,
    "attainment": [
     {
      "label": "No schooling or primary school not finished",
@@ -1309,9 +1309,11 @@
   "life.treatable": "Placeholder: carried over unchanged from the reference profile. To replace from the Ministry of Health, Painel de Mortalidade Evitavel (reducible causes), SIM (to confirm).",
   "life.found_alone_after": "Placeholder: carried over unchanged from the reference profile; no Brazilian source searched.",
   "life.work_injury_bps": "Placeholder estimate: INSS Anuario Estatistico de Acidentes do Trabalho (AEAT) records on the order of 600,000 registered work accidents a year among about 45 million formal workers, near 1.4% (figures from memory; to confirm); factory above and shop below that mean by assumption.",
-  "wages_per_fortnight.shop": "IBGE, PNAD Continua quarterly, SIDRA table 5442 (average real monthly earnings of employed people, usual main job, by activity group), Minas Gerais, 2nd quarter 2026: commerce and vehicle repair R$2,908 a month (mean, including the self-employed; opened via the SIDRA API 2026-10-08); converted to 14 days as x 12 / 26. Note: a mean, above the minimum wage of R$1,621 and probably above a small town's retail pay.",
-  "wages_per_fortnight.factory": "IBGE, PNAD Continua, SIDRA table 5442, Minas Gerais, 2nd quarter 2026: manufacturing R$3,098 a month (mean; opened 2026-10-08), converted to 14 days (x 12 / 26). (RAIS/CAGED formal-pay tables were not found as open files in the time spent.)",
-  "wages_per_fortnight.construction": "IBGE, PNAD Continua, SIDRA table 5442, Minas Gerais, 2nd quarter 2026: construction R$2,900 a month (mean; opened 2026-10-08), converted to 14 days (x 12 / 26).",
+  "wages_per_pay_period.shop": "IBGE, PNAD Continua quarterly, SIDRA table 5442 (average real monthly earnings of employed people, usual main job, by activity group), Minas Gerais, 2nd quarter 2026: commerce and vehicle repair R$2,908 a month (mean, including the self-employed; opened via the SIDRA API 2026-10-08); converted to 14 days as x 12 / 26. Note: a mean, above the minimum wage of R$1,621 and probably above a small town's retail pay.",
+  "wages_per_pay_period.factory": "IBGE, PNAD Continua, SIDRA table 5442, Minas Gerais, 2nd quarter 2026: manufacturing R$3,098 a month (mean; opened 2026-10-08), converted to 14 days (x 12 / 26). (RAIS/CAGED formal-pay tables were not found as open files in the time spent.)",
+  "wages_per_pay_period.construction": "IBGE, PNAD Continua, SIDRA table 5442, Minas Gerais, 2nd quarter 2026: construction R$2,900 a month (mean; opened 2026-10-08), converted to 14 days (x 12 / 26).",
+  "pay_period_days": "Added 2026-10-08 by the platform change that made this a profile figure; needs its author's check. 14 days, because this profile's wages are stated for fourteen days (where pay here is monthly, its author converted them: see wages_per_pay_period). To set to the place's own pay period, with the wages restated for it.",
+  "elections.compulsory_voting": "Added 2026-10-08 by the platform change that made this a profile figure; needs its author's check. Voting is compulsory for literate citizens aged 18 to 70, and optional at 16 and 17 and over 70 (Constituicao Federal 1988, art. 14, para 1; from knowledge of the text, to confirm).",
   "ordinary_hours_per_week": "Constituicao Federal 1988, art. 7, XIII: normal working hours up to eight a day and 44 a week (a proposed constitutional amendment to shorten the week was being debated; check status in 2026; to confirm). (cited from knowledge of the text; not opened in this pass; to confirm)",
   "rents_per_month": "Derived, not observed: IBGE, Pesquisa de Orcamentos Familiares 2017-18, SIDRA table 6715, Minas Gerais: average monetary rent paid R$92.49 a family a month across all families (opened 2026-10-08); divided by the renting share of occupied dwellings in Minas Gerais, 22.5% (Census 2022, table 9929: 1,693,310 of 7,534,797) = R$411.6 per renting family in 2017-18; times the IPCA from January 2018 to August 2026, 1.548 (Banco Central SGS 433, opened) = R$637 a month (two-bedroom). Other sizes are 0.75x (one bedroom), 1.25x (three bedrooms, house) and 1.6x (four bedrooms): an assumption, not data. Census 2022 did not publish rent amounts; the state mean is used for a small town (likely high).",
   "spending.saving_bps": "IBGE, POF 2017-18, SIDRA tables 6715 and 6974, Minas Gerais: additions to assets (R$164.72) plus debt repaid (R$143.70) are 6.5% of total family income (R$4,724.29 a month): 653 bps (opened 2026-10-08). 2017-18 survey; the national-accounts household saving rate was not found as open data.",
@@ -1402,7 +1404,7 @@
   "crime.detection_bps": "Placeholder: about 10% of thefts solved. The clearance rate for property crime in Brazil is low (Forum Brasileiro de Seguranca Publica, Anuario Brasileiro de Seguranca Publica 2026, released July 2026; no clearance figure retrieved). To replace from the Anuario or Minas Gerais SEJUSP data.",
   "crime.investigation_hours": "Placeholder: carried over.",
   "crime.police_per_1000": "Forum Brasileiro de Seguranca Publica, Anuario Brasileiro de Seguranca Publica 2026 (read in search summaries; the PDF could not be text-extracted): Minas Gerais military police 37,261 active of 51,669 posts, civil police 8,935 of 16,178 posts: 46,196 officers for 21.32 million people (CFM population) = 2.2 a thousand (state average; a small town has fewer).",
-  "crime.officer_wage_per_fortnight": "Placeholder: R$5,500 a month for a military police soldier or corporal in Minas Gerais (estimate; to confirm against the state's Lei de remuneracao), converted to 14 days (x 12 / 26).",
+  "crime.officer_wage_per_pay_period": "Placeholder: R$5,500 a month for a military police soldier or corporal in Minas Gerais (estimate; to confirm against the state's Lei de remuneracao), converted to 14 days (x 12 / 26).",
   "justice.hearing_after_days": "Placeholder: about 45 days. The Juizado Especial Civel (Lei 9.099/1995) is the small-claims court for tenancy and consumer disputes up to 40 minimum wages; the Justica do Trabalho handles wage claims; Conselho Nacional de Justica, Justica em Numeros gives times (to source).",
   "justice.pay_within_days": "Placeholder: carried over.",
   "justice.challenge_bps": "Placeholder: carried over.",
@@ -1412,7 +1414,7 @@
   "education.students_per_teacher": "Placeholder: 17 students a teacher (INEP, Censo Escolar; not opened).",
   "education.school_days_per_year": "Lei de Diretrizes e Bases (Lei 9.394/1996), art. 24, I: at least 200 school days a year and 800 hours. (cited from knowledge of the text; not opened in this pass; to confirm)",
   "education.hours_per_day": "LDB art. 34: at least four hours of actual teaching a day in primary school. (cited from knowledge of the text; not opened in this pass; to confirm)",
-  "education.teacher_wage_per_fortnight": "Lei 15.437, 18 June 2026, art. 2 (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2026/lei/l15437.htm, 2026-10-08): the national salary floor of public basic-education teachers is R$5,130.63 a month for 40 hours a week (MEC Portaria 82/2026 first fixed it); converted to 14 days (x 12 / 26).",
+  "education.teacher_wage_per_pay_period": "Lei 15.437, 18 June 2026, art. 2 (opened at planalto.gov.br/ccivil_03/_ato2023-2026/2026/lei/l15437.htm, 2026-10-08): the national salary floor of public basic-education teachers is R$5,130.63 a month for 40 hours a week (MEC Portaria 82/2026 first fixed it); converted to 14 days (x 12 / 26).",
   "education.attainment": "IBGE, SIDRA open API (apisidra.ibge.gov.br), PNAD Continua Educacao, table 7189 (people aged 25 and over by level of schooling), Minas Gerais, 2025: no schooling 3.7%, primary not finished 30.0%, primary finished 7.9%, secondary not finished 4.7%, secondary finished 30.4%, higher not finished 3.6%, higher finished 19.7% (the first two merged). Years of schooling: 5 (placeholder), 9 and 12 (legal lengths of primary and secondary school), 10 and 13 (placeholders) and 16.",
   "education.return_per_year_bps": "Placeholder: about 10% a year, carried over from the reference profile; Brazilian estimates of the return to schooling are higher, 10 to 15% (for example Menezes-Filho, various; to confirm).",
   "education.max_years": "Placeholder: carried over.",

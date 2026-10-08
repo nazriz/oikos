@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.8.0",
+  version: "0.8.2",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -103,6 +103,11 @@ export const retailer: BehaviourModule = {
     let onOrder = 0; // goods ordered from suppliers, not yet delivered
     const ours = new Map<string, { seller: string; quantity: number }>(); // our order -> for how many, from whom
     const shortAt = new Map<string, number>(); // supplier -> when it last came up short
+    // Between suppliers at one price, a shop has its own order of preference (its own, drawn once for each: whom it
+    // happens to deal with). By name, every shop in a town ordered from the same factory, which could fill a few of
+    // the orders, while the others' goods stood unsold.
+    const standing = new Map<string, number>();
+    const standingOf = (seller: string) => standing.get(seller) ?? (standing.set(seller, ctx.rng(`supplier-${seller}`).below(1_000_000_000)), standing.get(seller)!);
     let unitCost = 0; // what we last paid a supplier for an item
     const used = new Map<string, number>(); // worker -> seconds worked today
     const pace = new Pace(p.serve_labour); // how long a unit takes, as we learn it (our figure at first)
@@ -239,10 +244,10 @@ export const retailer: BehaviourModule = {
             say("crime_report", `Report: ${expected - stock} ${p.kind} missing from ${p.premises}, found at our stocktake.`, { to: [p.police], visible: [me, p.police],
               data: { kind: p.kind, quantity: expected - stock, at: p.premises, value: (expected - stock) * price, account: acc.account } })));
         }
-        // Our suppliers' prices, cheapest first (and those that came up short in the last week, last).
+        // Our suppliers' prices, cheapest first (those that came up short in the last week, last; at one price, in our own order).
         const offers = [...suppliers].sort().map((s) => ({ seller: s, ...goodsPrices(book, s) })).filter((x) => x.prices[p.kind] !== undefined && x.account)
           .map((x) => ({ seller: x.seller, account: x.account!, unit: x.prices[p.kind]!, min: x.min_order ?? 1 }))
-          .sort((a, b) => Number(t - (shortAt.get(a.seller) ?? -Infinity) < 7 * DAY) - Number(t - (shortAt.get(b.seller) ?? -Infinity) < 7 * DAY) || a.unit - b.unit || (a.seller < b.seller ? -1 : 1));
+          .sort((a, b) => Number(t - (shortAt.get(a.seller) ?? -Infinity) < 7 * DAY) - Number(t - (shortAt.get(b.seller) ?? -Infinity) < 7 * DAY) || a.unit - b.unit || standingOf(a.seller) - standingOf(b.seller) || (a.seller < b.seller ? -1 : 1));
         if (!unitCost && offers.length) unitCost = offers[0]!.unit;
         const marginalCost = unitCost + Math.ceil((hourly() * p.serve_labour) / 3600);
 
@@ -293,7 +298,7 @@ export const retailer: BehaviourModule = {
         steps.push(...staffing.routine(obs, book, acc.account, {
           // Only with room at the workplace (someone let go may still be there, working out their notice).
           target: trading ? Math.min(p.max_staff, headcount) : 0, wage, canPost: trading && acc.balance >= Math.floor(((workers.length + 1) * wage * MONTH) / p.period) && roomAtWork(obs, workers.length) > 0,
-          why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} a fortnight.`,
+          why: `Short of this month's headcount (${workers.length} of ${headcount}${headcountWhy}): posting a job at ${usd(wage)} every ${p.period / DAY} days.`,
         }));
         steps.push(...borrowing.steps(book, t, acc.account));
         // Insolvent (it can't pay its debts as they fall due): wind up.
@@ -315,7 +320,8 @@ export const retailer: BehaviourModule = {
           if (borrowing.canApply(t)) {
             const amount = Math.ceil((2 * bill) / 100_000) * 100_000;
             steps.push(borrowing.apply(t, acc.account, amount, 12, "working capital", `We have ${usd(acc.balance)}, not enough for the next pay period (${workers.length} staff): asking our bank for ${usd(amount)} of working capital before letting anyone go.`));
-          } else if (!borrowing.waiting(t)) {
+          } else if (!borrowing.waiting(t) && acc.balance < staffing.staying(book, t) * wage) {
+            // (Until those who stay can be paid: the ones already given notice are going.)
             const s = staffing.letGo(book, t, `Can't cover the next pay period (${usd(acc.balance)} for ${workers.length} staff), and no loan to be had: letting the most recent hire go.`, "Redundancy: we can't cover the wage bill.");
             if (s.length) headcount = Math.min(headcount, workers.length - 1);
             steps.push(...s);

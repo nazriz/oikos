@@ -31,14 +31,14 @@ Each run's log is exported to Parquet, one file per table per run (`measure/<tab
 
 | Table | One row per | Columns |
 |---|---|---|
-| `runs` | run | `run_id`, `seed`, `world`, `contracts`, `config_hash`, `kernel_version`, `kernel_build`, `run_seconds`, `end_reason`, `end_t`, `state_hash`, `entries`, `orchestrator_version` |
+| `runs` | run | `run_id`, `seed`, `world`, `contracts`, `config_hash`, `kernel_version`, `kernel_build`, `run_seconds`, `currency` and `minor_units` (the world's money: its code, and the decimal places of the smallest unit every amount is counted in), `end_reason`, `end_t`, `state_hash`, `entries`, `orchestrator_version` |
 | `participants` | participant: the world config's (`created_t` = 0) and those created during the run from a template | `participant`, `kind` (person or system), `person`, `owner`, `title`, `template`, `created_t`, `created_seq`, `controller` (code or llm), `impl`, `model`, `adapter` (what actually answered), `configured` (the model the world names) |
 | `entities` | entity: the world config's (`created_t` = 0) and those created or born during the run | `entity`, `kind`, `name`, `born_at` (people), `parents` (the newborn), `created_t` |
 | `positions` | position: the world config's (`created_t` = 0) and those created during the run | `position`, `entity` (the organisation), `title`, `role`, `role_module` (the code module a code holder runs), `created_t` |
 | `appointments` | the world config's holders (`t` = 0, `by` = genesis), then every appointment | `position`, `holder` (null: left vacant), `by` (the participant who appointed, or null when it fell vacant because its holder ended) |
 | `life` | a body's coming, going and health | `event` (person_created, person_arrived, person_left, person_died, birth_started, condition_began, condition_ended, harmed), `person`, `by`, `detail` (the cause of death, or illness or injury), `severity`, `condition`, `until`, `parents` |
 | `events` | kernel event | `seq`, `t`, `event`, `cause` (the command's seq), `body` (JSON) |
-| `transfers` | money movement | `from`, `to`, `amount` (cents), `reason`, `by`, `settles`, `per_instruction`, `memo` |
+| `transfers` | money movement | `from`, `to`, `amount` (in the currency's smallest unit: `runs.minor_units`), `reason`, `by`, `settles`, `per_instruction`, `memo` |
 | `occupancy` | a body going into or out of a space, including the world's starting occupancy (`t` = 0, `by` = genesis) | `event` (occupied or vacated), `occupant` (a person), `space`, `structure` and `space_kind` (split out of the space id, `<structure>/<kind>.<n>`), `reason` (a departure's: departed, died, evicted…), `by` |
 | `spaces` | space in a building, the world's and those built during the run (`built_t`) | `space`, `structure`, `type`, `kind`, `capacity`, `bedrooms` (a dwelling's, from its attributes), `attrs` |
 | `records` | record, including the world's genesis records (`t` = 0) | `id`, `record`, `kind` (a statement's kind), `author` (a participant), `in_position` (the position it was made in, if any), `speaks_for`, `at`, `basis` (the record it rests on; of several, the one cited first), `bases` (all of them, a list in the order cited; empty where it cites nothing), `place`, `template` (an agreement's), `withdraws`, `body` |
