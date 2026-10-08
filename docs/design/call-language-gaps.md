@@ -1,7 +1,13 @@
 # What seats asked for that the call language could not say
 
-*Proposal, 2026-10-08. Awaiting sign-off: nothing here is built, and no contract has changed. Part A is evidence from
-the pilots' logs, part B a design for each gap, part C a build order. The questions for the owner are at the end.*
+*Proposal, 2026-10-08. Part A is evidence from the pilots' logs, part B a design for each gap, part C a build order.
+The questions for the owner are at the end.*
+
+*Built the same day, on the owner's approval: steps 1 and 2 of part C (the bank's letters and the `no_such_act`
+sentence; the hold, `visible=own` and `look_first`). What was built, where it departs from part B and why, and the
+real-world rule for payments under a hold are in docs/decisions.md ("A hold, an entry on one's own file, and
+look_first") and docs/behaviour/bank-payment-system.md ("A hold"). Steps 3 and 4 wait as part C says. The rest of
+this document is as it was proposed.*
 
 ## Summary
 
