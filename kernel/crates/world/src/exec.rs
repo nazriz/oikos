@@ -248,13 +248,11 @@ fn vacate_all(s: &Statics, st: &mut State, person: &str, reason: VacateReason, b
 /// Every position a participant holds falls vacant (it has gone).
 fn vacate_positions(st: &mut State, participant: &str) -> Vec<Timed> {
     let t = st.t;
-    let held: Vec<Id> = st.positions.iter().filter(|(_, x)| x.holder.as_deref() == Some(participant)).map(|(id, _)| id.clone()).collect();
+    let held: Vec<Id> = st.held_by(participant).into_iter().cloned().collect();
     let mut events = vec![];
     for id in held {
         let c = st.stamp();
-        let x = st.positions.get_mut(&id).unwrap();
-        x.holder = None;
-        x.changed = c;
+        st.set_holder(&id, None, c);
         events.push(Timed::new(t, EventBody::Appointed { position: id, holder: None, by: None }));
     }
     events
@@ -1224,7 +1222,7 @@ impl<'a> Exec<'a> {
         self.check_new_channels("the position", entity, channels)?;
         let id = self.st.mint("pos");
         let c = self.st.stamp();
-        self.st.positions.insert(
+        self.st.add_position(
             id.clone(),
             Position { entity: entity.into(), title: title.clone(), role: role.clone(), channels: Arc::new(channels.to_vec()), role_module: role_module.clone(), holder: holder.clone(), changed: c },
         );
@@ -1401,10 +1399,8 @@ impl<'a> Exec<'a> {
                 if p.person.is_some() {
                     out.insert((id.clone(), SELF.to_string()));
                 } else {
-                    for (pos, x) in self.st.positions.iter() {
-                        if x.holder.as_deref() == Some(id.as_str()) {
-                            out.insert((id.clone(), pos.clone()));
-                        }
+                    for pos in self.st.held_by(id) {
+                        out.insert((id.clone(), pos.clone()));
                     }
                 }
             } else if let Some(x) = self.st.positions.get(id) {
@@ -1841,9 +1837,7 @@ impl<'a> Exec<'a> {
                     }
                 }
                 let c = self.st.stamp();
-                let x = self.st.positions.get_mut(&position).unwrap();
-                x.holder = holder.clone();
-                x.changed = c;
+                self.st.set_holder(&position, holder.clone(), c);
                 self.emit(EventBody::Appointed { position, holder, by: Some(self.participant.into()) });
                 Ok(())
             }

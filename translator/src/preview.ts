@@ -89,7 +89,22 @@ export class Preview {
           return [`You will ask ${this.who(b.addressed_to?.[0])} to ${this.outcome(b.data.outcome, b.data.every)}${named(b)}${b.addressed_to?.length > 1 ? to : ""}${this.seenBy(b.visible_to)}${rest}${citing(b)}. Your request will read: "${b.text}".${this.rule(b)}`,
             ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
+        // A hold: an instruction to whoever acts on something standing. What it does is theirs to do, and it settles nothing.
+        if (b.kind === "hold" && Array.isArray(b.data?.holds) && b.addressed_to?.length) {
+            const held = b.data.holds as string[];
+            const many = held.length > 1;
+            const rest = this.also(b.data, ["holds"], " With these details: ");
+            return [`You will instruct ${b.addressed_to.map((x: string) => this.who(x)).join(", ")} to hold ${held.join(", ")}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}. ${many ? "They stay" : "It stays"} on record. This by itself stops nothing and settles nothing: whoever you instruct acts on it, or doesn't, and whatever ${many ? "they were" : "it was"} for is still owed. To resume ${many ? "them" : "it"}, withdraw this instruction. Your instruction will read: "${b.text}".${rest}${this.rule(b)}`,
+              ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+        }
         const d = this.details(b.data);
+        // On its own file: seen by nobody but whoever it is made for, and addressed to nobody.
+        const own = Array.isArray(b.visible_to) && b.visible_to.length === 1 && b.visible_to[0] === (b.speaks_for ?? this.me) && !b.addressed_to?.length && !b.place;
+        if (own) {
+          const kind = String(b.kind).replace(/_/g, " ");
+          return [`You will put a${/^[aeiou]/.test(kind) ? "n" : ""} ${kind} on ${this.k.entityOf(b.visible_to[0]) === this.me ? "your own file" : `the file of ${this.who(b.visible_to[0])}`}, seen by nobody else: "${b.text}"${d ? `, with these details: ${d}` : ""}${citing(b)}. It moves nothing and tells nobody.${this.rule(b)}`,
+            ["kind", "text", "data", "adico", "formal", ...RECORD]];
+        }
         return [`You will ${b.place ? "put up" : "publish"} a ${String(b.kind).replace(/_/g, " ")}${b.place ? ` on ${b.place}` : ""}${named(b)}${to}${this.seenBy(b.visible_to)}: "${b.text}"${d ? `, with these details: ${d}` : ""}${citing(b)}.${this.rule(b)}`,
           ["kind", "text", "data", "place", "addressed_to", "adico", "formal", ...RECORD]];
       }

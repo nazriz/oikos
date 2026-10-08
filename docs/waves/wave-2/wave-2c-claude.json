@@ -1,0 +1,128 @@
+[
+ {
+  "name": "w2-13-flood-long",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=113",
+   "profile=au-vic-2026",
+   "mayor=llm",
+   "model_seats=finance,planning,inspector,landlord-1-office,landlord-2-office"
+  ],
+  "args": [
+   "--scenario",
+   "wet-year"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "decide/pod-small-d16-s1",
+  "until": 15552000,
+  "budget": 85,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "note": "Wave 2c (planned 2026-10-08), for the translator's data. Profile au-vic-2026, seed 113, 1,000 people, 180 days, starting conditions wet-year. Seats: mayor, finance, planning, inspector, landlord-1-office, landlord-2-office, all on claude-code/claude-sonnet-5-5. Translator: decide/pod-small-d16-s1 (the trained one). Every draft is confirmed or declined by its seat. The longest: half a year of a wet year with six seats and the trained translator."
+ },
+ {
+  "name": "w2-14-largest",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=914",
+   "profile=au-vic-2026",
+   "mayor=llm",
+   "model_seats=finance,landlord-1-office"
+  ],
+  "model": "claude-code/claude-fable-5-1",
+  "translator": "codex/gpt-6-luna",
+  "until": 3888000,
+  "budget": 70,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "test": true,
+  "note": "Wave 2c (planned 2026-10-08), for the translator's data. Profile au-vic-2026, seed 914, 1,000 people, 45 days. Seats: mayor, finance, landlord-1-office, all on claude-code/claude-fable-5-1. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: a model no training pilot has in a seat."
+ },
+ {
+  "name": "w2-15-largest-election",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=915",
+   "profile=gb-eng-2026",
+   "mayor=llm",
+   "model_seats=electoral,council-clerk,councillor-1"
+  ],
+  "args": [
+   "--scenario",
+   "election-due"
+  ],
+  "model": "claude-code/claude-fable-5-1",
+  "translator": "decide/pod-small-d16-s1",
+  "until": 6480000,
+  "budget": 120,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "test": true,
+  "note": "Wave 2c (planned 2026-10-08), for the translator's data. Profile gb-eng-2026, seed 915, 1,000 people, 75 days, starting conditions election-due. Seats: mayor, electoral, council-clerk, councillor-1, all on claude-code/claude-fable-5-1. Translator: decide/pod-small-d16-s1 (the trained one). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: that model again, through an election, with the trained translator."
+ },
+ {
+  "name": "w2-16-newplace",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=916",
+   "profile=mx-jal-2026",
+   "mayor=llm",
+   "model_seats=landlord-1-office,bank-lending,registry"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "codex/gpt-6-luna",
+  "until": 5184000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "test": true,
+  "note": "Wave 2c (planned 2026-10-08), for the translator's data. Profile mx-jal-2026, seed 916, 1,000 people, 60 days. Seats: mayor, landlord-1-office, bank-lending, registry, all on claude-code/claude-sonnet-5-5. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: a profile no training pilot uses."
+ },
+ {
+  "name": "w2-17-newmoney",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=917",
+   "profile=in-tn-2026",
+   "mayor=llm",
+   "model_seats=finance,council-clerk"
+  ],
+  "model": "claude-code/claude-haiku-5-5",
+  "translator": "decide/pod-small-d16-s1",
+  "until": 5184000,
+  "budget": 55,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "test": true,
+  "note": "Wave 2c (planned 2026-10-08), for the translator's data. Profile in-tn-2026, seed 917, 1,000 people, 60 days. Seats: mayor, finance, council-clerk, all on claude-code/claude-haiku-5-5. Translator: decide/pod-small-d16-s1 (the trained one). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: a profile whose amounts are grouped in twos and said in lakh and crore, which the trained model has never read."
+ },
+ {
+  "name": "w2-18-newoffices",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=918",
+   "profile=au-vic-2026",
+   "model_seats=police-oic,union-organiser,council-clerk"
+  ],
+  "model": "claude-code/claude-sonnet-5-5",
+  "translator": "codex/gpt-6-luna",
+  "until": 5184000,
+  "budget": 15,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "test": true,
+  "note": "Wave 2c (planned 2026-10-08), for the translator's data. Profile au-vic-2026, seed 918, 1,000 people, 60 days. Seats: police-oic, union-organiser, council-clerk, all on claude-code/claude-sonnet-5-5. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: two offices no training pilot has as a seat (the police and the union)."
+ }
+]

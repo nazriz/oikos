@@ -55,7 +55,8 @@ export async function health(dir: string, targets: Target[]): Promise<HealthRow[
   }
   // Demand that went unmet: what households wanted and didn't get, over the runs (more than 5% is a sign).
   const monthly = await q("economy/monthly");
-  const wanted = monthly.reduce((a, r) => a + (num(r.wanted) ?? 0), 0);
+  // (Of the orders that were settled: one still being served when the log ends is neither met nor unmet.)
+  const wanted = monthly.reduce((a, r) => a + (num(r.wanted) ?? 0) - (num(r.pending) ?? 0), 0);
   const without = monthly.reduce((a, r) => a + (num(r.went_without) ?? 0), 0);
   if (wanted > 0) {
     const pct = (100 * without) / wanted;

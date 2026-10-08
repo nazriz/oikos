@@ -11,3 +11,5 @@ oikos-world = { path = "../world" }
 oikos-terms = { path = "../terms" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# The state's maps are persistent ones: what changed between two looks is read off the two (observe.rs, `Changes`).
+imbl = "7.0.2"

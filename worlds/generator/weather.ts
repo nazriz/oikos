@@ -60,3 +60,53 @@ export function drawWeather(C: Climate, days: number, below: (n: number) => numb
   events.sort((a, b) => a.from_day - b.from_day || (a.kind < b.kind ? -1 : 1));
   return { rain: steps(rain), heat: steps(heat), events };
 }
+
+/**
+ * Which of the climate's own years a run is given (docs/scenarios.md): `draws` weathers are drawn from the climate,
+ * ranked by a measure over the run's first `over_days` days, and the one at `percentile` is the run's (99: the
+ * highest in a hundred; 5: among the lowest in twenty). Nothing of the climate is changed: the year is one the
+ * climate gives, as often as its percentile says.
+ */
+export interface WeatherChoice {
+  /** wettest_spell: the most the river is sent in any five days running. inflow: what it is sent in all.
+   * heatwave_days: the days of heatwave. */
+  rank_by: "wettest_spell" | "inflow" | "heatwave_days";
+  percentile: number;
+  draws: number;
+  over_days: number;
+}
+
+/** A value for each day from steps. */
+function daily(s: DayStep[], days: number): number[] {
+  const out: number[] = [];
+  let i = 0, v = 0;
+  for (let d = 0; d < days; d++) {
+    while (i < s.length && s[i]!.from_day <= d) v = s[i++]!.bps;
+    out.push(v);
+  }
+  return out;
+}
+
+/** A weather's measure over its first days (what `WeatherChoice` ranks by). */
+export function weatherMeasure(w: { rain: DayStep[]; heat: DayStep[] }, by: WeatherChoice["rank_by"], overDays: number): number {
+  if (by === "heatwave_days") return daily(w.heat, overDays).filter((x) => x > 0).length;
+  const rain = daily(w.rain, overDays);
+  if (by === "inflow") return rain.reduce((a, b) => a + b, 0);
+  const SPELL = 5;
+  let best = 0, sum = 0;
+  rain.forEach((x, d) => {
+    sum += x - (d >= SPELL ? rain[d - SPELL]! : 0);
+    if (sum > best) best = sum;
+  });
+  return best;
+}
+
+/** The weather at a percentile of the climate's own draws: `stream(i)` is the seeded randomness of the i-th draw. */
+export function chooseWeather(C: Climate, days: number, stream: (i: number) => (n: number) => number, startMonth: number, choice: WeatherChoice) {
+  const over = Math.min(days, choice.over_days);
+  const drawn = Array.from({ length: choice.draws }, (_, i) => {
+    const w = drawWeather(C, days, stream(i), startMonth);
+    return { w, i, measure: weatherMeasure(w, choice.rank_by, over) };
+  }).sort((a, b) => a.measure - b.measure || a.i - b.i);
+  return drawn[Math.round((choice.percentile * (drawn.length - 1)) / 100)]!.w;
+}

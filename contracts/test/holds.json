@@ -1,0 +1,59 @@
+{
+  "about": "A hold, an entry on one's own file, and the refusal sentences: what both resolvers (translator/src/resolver.ts and kernel/crates/resolver) must make of each program, from what this seat knows. Each case has `blocks` (the acts) or `asks` (the questions back, whole).",
+  "currency": { "code": "XYZ", "minor_units": 2 },
+  "observation": {
+    "participant": "finance-system", "t": 2592000, "status": "active", "entity": "c0007", "outcomes": [], "inbox": [], "drafts": [],
+    "positions": [{ "position": "finance", "entity": "city", "title": "Finance Officer", "role": "finance_officer" }],
+    "channels": {
+      "treasury": { "kind": "accounts", "transactions": [], "accounts": [{ "account": "acc-city", "holder": "city", "custodian": "bank", "balance": "10000000" }] },
+      "who": { "kind": "directory", "entities": [{ "entity": "city", "kind": "town", "name": "Millbrook" }, { "entity": "bank", "kind": "bank", "name": "Millbrook Bank" }, { "entity": "greenco", "kind": "firm", "name": "GreenCo" }, { "entity": "c0007", "kind": "person", "name": "Dana Reyes", "participant": "finance-system" }], "positions": [{ "position": "finance", "entity": "city", "role": "finance_officer", "title": "Finance Officer", "holder": "finance-system" }] },
+      "mine": { "kind": "records", "records": [
+        { "id": "rec.44", "record": "statement", "author": "finance-system", "in_position": "finance", "speaks_for": "city", "at": 0, "kind": "request", "text": "Please pay XYZ 2393.34 from acc-city to acc-c0003 every 14 days, for Wages.", "addressed_to": ["bank"], "visible_to": ["city", "bank"], "data": { "outcome": { "money": { "from": "acc-city", "to": "acc-c0003", "amount": "239334", "for": "Wages." } }, "every": 1209600 } },
+        { "id": "rec.45", "record": "statement", "author": "finance-system", "in_position": "finance", "speaks_for": "city", "at": 0, "kind": "request", "text": "Please pay XYZ 2393.34 from acc-city to acc-c0004 every 14 days, for Wages.", "addressed_to": ["bank"], "visible_to": ["city", "bank"], "data": { "outcome": { "money": { "from": "acc-city", "to": "acc-c0004", "amount": "239334", "for": "Wages." } }, "every": 1209600 } },
+        { "id": "rec.46", "record": "statement", "author": "finance-system", "in_position": "finance", "speaks_for": "city", "at": 0, "kind": "order", "text": "Mow the green every week.", "addressed_to": ["greenco"], "visible_to": ["city", "greenco"] },
+        { "id": "rec.47", "record": "statement", "author": "greenco-office", "speaks_for": "greenco", "at": 0, "kind": "invoice", "text": "Invoice.", "addressed_to": ["city"], "visible_to": ["city", "greenco"] },
+        { "id": "rec.48", "record": "statement", "author": "finance-system", "in_position": "finance", "speaks_for": "city", "at": 0, "kind": "request", "text": "Please pay XYZ 100.00 from acc-city to acc-c0005 every 30 days.", "addressed_to": ["bank"], "visible_to": ["city", "bank"], "data": { "outcome": { "money": { "from": "acc-city", "to": "acc-c0005", "amount": "10000" } }, "every": 2592000 } },
+        { "id": "rec.49", "record": "withdrawal", "author": "finance-system", "in_position": "finance", "speaks_for": "city", "at": 86400, "withdraws": "rec.48", "visible_to": ["city", "bank"] },
+        { "id": "rec.50", "record": "statement", "author": "finance-system", "in_position": "finance", "speaks_for": "city", "at": 0, "kind": "notice", "text": "The hall is closed.", "visible_to": "public" }
+      ] }
+    }
+  },
+  "cases": [
+    { "name": "a hold on a standing payment goes to whoever it is addressed to, seen by them and by whoever it is made for", "as": "finance", "program": "statement(hold=rec.44)",
+      "blocks": [{ "block": "publish", "kind": "hold", "text": "Please hold rec.44: nothing is to be done under it until this is withdrawn.", "addressed_to": ["bank"], "data": { "holds": ["rec.44"] }, "visible_to": ["city", "bank"], "speaks_for": "city" }] },
+    { "name": "one hold on several records, in the order given, each named once, to everyone who acts on any of them; its own words and what it cites go with it", "as": "finance", "program": "statement(hold=[\"rec.45\",\"rec.46\",\"rec.45\"], text=\"While the payroll is checked.\", basis=rec.50)",
+      "blocks": [{ "block": "publish", "kind": "hold", "text": "While the payroll is checked.", "addressed_to": ["bank", "greenco"], "data": { "holds": ["rec.45", "rec.46"] }, "visible_to": ["city", "bank", "greenco"], "speaks_for": "city", "basis": "rec.50" }] },
+    { "name": "a hold may be written as its own kind", "as": "finance", "program": "statement(kind=hold, hold=rec.44)",
+      "blocks": [{ "block": "publish", "kind": "hold", "text": "Please hold rec.44: nothing is to be done under it until this is withdrawn.", "addressed_to": ["bank"], "data": { "holds": ["rec.44"] }, "visible_to": ["city", "bank"], "speaks_for": "city" }] },
+    { "name": "whoever the call says is to hold it is taken as said, known record or not", "as": "finance", "program": "statement(hold=rec.900, to=bank)",
+      "blocks": [{ "block": "publish", "kind": "hold", "text": "Please hold rec.900: nothing is to be done under it until this is withdrawn.", "addressed_to": ["bank"], "data": { "holds": ["rec.900"] }, "visible_to": ["city", "bank"], "speaks_for": "city" }] },
+    { "name": "a record the seat has not seen addressed to anyone is not looked for", "as": "finance", "program": "statement(hold=rec.900)",
+      "asks": ["You don't know of a standing paper called rec.900 that someone acts on. Look it up and name it by its id, or say who is to hold it."] },
+    { "name": "a notice addressed to nobody has nobody to hold it", "as": "finance", "program": "statement(hold=rec.50)",
+      "asks": ["You don't know of a standing paper called rec.50 that someone acts on. Look it up and name it by its id, or say who is to hold it."] },
+    { "name": "something withdrawn is not held", "as": "finance", "program": "statement(hold=rec.48)",
+      "asks": ["rec.48 has been withdrawn: there is nothing to hold."] },
+    { "name": "what is addressed to oneself needs nobody telling", "as": "finance", "program": "statement(hold=rec.47)",
+      "asks": ["rec.47 is yours to act on: nobody else needs telling."] },
+    { "name": "a hold is not also another kind of statement", "as": "finance", "program": "statement(hold=rec.44, kind=notice, text=\"Paused.\")",
+      "asks": ["A hold says only what it holds, in what words, for whom and on what basis: nothing else should be written."] },
+    { "name": "something described and not named is no id", "as": "finance", "program": "statement(hold=\"the wage payments\")",
+      "asks": ["You don't know of anyone or anything called \"the wage payments\" (for hold)."] },
+    { "name": "acting as oneself, a hold is in one's own name (whether that person may hold it is for whoever acts on it)", "program": "statement(hold=rec.44)",
+      "blocks": [{ "block": "publish", "kind": "hold", "text": "Please hold rec.44: nothing is to be done under it until this is withdrawn.", "addressed_to": ["bank"], "data": { "holds": ["rec.44"] }, "visible_to": ["c0007", "bank"], "speaks_for": "c0007" }] },
+    { "name": "lifting a hold is withdrawing it", "as": "finance", "program": "statement(withdraw=rec.61)",
+      "blocks": [{ "block": "withdraw", "record": "rec.61", "speaks_for": "city" }] },
+    { "name": "an entry on the organisation's own file is seen by it alone", "as": "finance", "program": "statement(kind=entry, visible=own, text=\"Tax withheld from the wages paid today, to be passed on at the month's end.\", basis=rec.44)",
+      "blocks": [{ "block": "publish", "kind": "entry", "text": "Tax withheld from the wages paid today, to be passed on at the month's end.", "speaks_for": "city", "basis": "rec.44", "visible_to": ["city"] }] },
+    { "name": "one's own file is one's own person's, acting as oneself", "program": "statement(kind=entry, visible=own, text=\"Keys returned.\")",
+      "blocks": [{ "block": "publish", "kind": "entry", "text": "Keys returned.", "speaks_for": "c0007", "visible_to": ["c0007"] }] },
+    { "name": "own is whoever the act is made for", "as": "finance", "program": "statement(kind=entry, visible=own, for=greenco, text=\"Kept for them.\")",
+      "blocks": [{ "block": "publish", "kind": "entry", "text": "Kept for them.", "speaks_for": "greenco", "visible_to": ["greenco"] }] },
+    { "name": "own on any record that says who sees it", "as": "finance", "program": "claim(position=liberty, holder=greenco, about={\"action\":\"mow\"}, visible=own)",
+      "blocks": [{ "block": "record_claim", "position": "liberty", "holder": "greenco", "about": { "action": "mow" }, "speaks_for": "city", "visible_to": ["city"] }] },
+    { "name": "a request that needs something found out first is answered with one fixed sentence", "as": "finance", "program": "none(look_first)",
+      "asks": ["That needs something found out first. Look it up (in your own papers, or by asking whoever keeps it), then say what is to be done, naming each paper by its id."] },
+    { "name": "what nothing does: direct whoever sees to it", "as": "finance", "program": "none(no_such_act)",
+      "asks": ["Nothing here does that as such. If it is for someone else to see to, direct them in writing, on their form for it if they have one."] }
+  ]
+}

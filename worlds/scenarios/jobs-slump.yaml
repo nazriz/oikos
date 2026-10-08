@@ -1,0 +1,13 @@
+# Twice as many out of work: the share of the labour force in work at the start falls short of everyone by twice what
+# the town's description says (5% out of work becomes 10%). Shops are staffed to what such a town spends.
+id: jobs-slump
+about: Twice the share of the labour force is out of work at the start as the town's description says.
+bears_on: [mayor, finance, outside-support, union-organiser, police-oic]
+changes:
+  - in: town
+    path: employed_bps
+    shortfall_times_bps: 20000
+    basis: >-
+      Unemployment about doubles in a deep recession: in the United States from 5.0% in December 2007 to 10.0% in
+      October 2009 (Bureau of Labor Statistics, Current Population Survey, as served by the Federal Reserve Bank of
+      St. Louis: series UNRATE).

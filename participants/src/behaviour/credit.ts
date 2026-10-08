@@ -30,14 +30,17 @@ export function repayment(principal: number, annualBps: number, months: number):
 export class Borrowing {
   private applied: number | null = null; // when we applied, if we're waiting to hear
   private refusedAt = -Infinity;
+  private grantedAt = -Infinity; // when a loan was last approved, or signed for: its money is on the way
   private readonly taken = new Set<string>();
   private repayingUntil = -Infinity; // a loan we're repaying (or have been offered): no other till it's done
   impaired = false; // we've defaulted: the lender won't lend to us again
   constructor(private readonly me: string, private readonly lender: string, private readonly o: { retry_days?: number } = {}) {}
 
-  /** Waiting on an application (so don't act as if the money won't come, for a few days). */
+  /** Waiting on an application (so don't act as if the money won't come, for a few days), or on the money of a loan
+   * granted: the lender pays it out once it has seen our signature, at its next look, not in the moment we sign (a day
+   * is allowed for it). Without the second, a firm let someone go for want of a loan in the moment it signed for one. */
   waiting(t: number): boolean {
-    return this.applied !== null && t - this.applied < 14 * DAY;
+    return (this.applied !== null && t - this.applied < 14 * DAY) || t - this.grantedAt < DAY;
   }
 
   /** Whether we'd apply now: not waiting, not refused lately, not in default. */
@@ -61,7 +64,10 @@ export class Borrowing {
       this.taken.add(r.id);
       this.applied = null;
       if (!r.data?.approved) this.refusedAt = t;
-      else this.repayingUntil = Math.max(this.repayingUntil, t + (Number(r.data?.months) || 12) * MONTH);
+      else {
+        this.repayingUntil = Math.max(this.repayingUntil, t + (Number(r.data?.months) || 12) * MONTH);
+        this.grantedAt = t;
+      }
     }
     for (const r of book.all("loan_default")) if ((r.addressed_to ?? []).includes(this.me)) this.impaired = true;
     if (!account) return steps;
@@ -72,6 +78,7 @@ export class Borrowing {
       const owe = commitmentOf(r, this.me);
       const m = owe.outcome?.money;
       if (!m) continue;
+      this.grantedAt = t;
       steps.push(because(`The loan we applied for is offered: signing, and asking our bank to pay the ${usd(cents(m.amount))} a month.`,
         sign(r.id),
         pay(m.to, cents(m.amount), { from: account, every: owe.every ?? MONTH, first: owe.every ?? MONTH, basis: r.id, for: "Loan repayment." })));
@@ -104,6 +111,7 @@ export const lending: BehaviourModule = {
   name: "bank.lending",
   keeps: [
     { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
+    { what: "accounts", why: "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it." },
   ],
   version: "0.4.0",
   doc: "docs/behaviour/credit.md",

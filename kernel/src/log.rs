@@ -78,6 +78,16 @@ impl<W: Write> LogWriter<W> {
         Ok(Entry { seq, t, kind, body, prev, hash })
     }
 
+    /// `append`, for a body in a shape of its own: its canonical bytes are written from it (`canon::canonical`: what
+    /// its JSON value's would be), with no JSON value made of it on the way. Returns the entry's seq and its body's
+    /// canonical bytes.
+    pub fn append_as<T: Serialize + ?Sized>(&mut self, t: i64, kind: Kind, body: &T) -> io::Result<(u64, Vec<u8>)> {
+        let bytes = canon::canonical(body).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+        let seq = self.next_seq;
+        self.append_canonical(t, kind, &bytes)?;
+        Ok((seq, bytes))
+    }
+
     /// `append`, for a body whose canonical JSON the caller has (and vouches for). The hashed form and the written
     /// line are both made of it, part by part, and neither is put together first: a large body (the header's, with
     /// its config) is held once. Keys in canonical order: body, hash, kind, prev, seq, t. Returns the entry's hash.

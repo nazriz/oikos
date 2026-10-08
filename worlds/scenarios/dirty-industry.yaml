@@ -1,0 +1,22 @@
+# Works of an older, dirtier kind: each factory puts out two and a half times the profile's pollution a day. Where it
+# goes (decay, spread, the river's flow) and what it does to the species that can't bear it are the land's physics.
+id: dirty-industry
+about: Each factory puts out two and a half times the pollution the profile gives.
+bears_on: [environment, planning, mayor]
+status: inert
+inert_because: >-
+  Nothing in the run differs from the plain town's, to the count of every species. The profile's unit of pollution
+  is a placeholder: at two and a half times a factory's output the field never reaches the level the one sensitive
+  species can't bear where that species lives, pollution makes nobody ill, and no office measures the field (the
+  environment office counts species, not pollution). It needs a sourced unit of pollution, an effect on people or
+  habitat at realistic levels, and someone who measures it (nature.pollution.per_factory_per_day against the
+  species' tolerance; docs/behaviour/health.md).
+changes:
+  - in: profile
+    path: nature.pollution.per_factory_per_day
+    times_bps: 25000
+    basis: >-
+      Emissions of the main air pollutants from United States manufacturing fell by about 60% from 1990 to 2008 while
+      output rose (Shapiro and Walker 2018, American Economic Review 108(12)): works of the earlier kind put out about
+      two and a half times as much for what they made. (The fall is the paper's abstract's; the rise in output isn't given there: to confirm. The profile's own unit of pollution is a
+      placeholder.)

@@ -41,7 +41,9 @@ const said = (field: "keeps" | "boundary") => Object.values(modules).flatMap((m)
  * register someone else keeps is never declared: it is asked for (`ask`, participants/src/behaviour/common.ts).
  */
 const KEEPERS = [
+  "bank.lending: accounts",
   "bank.lending: request",
+  "bank.payment_system: accounts",
   "bank.payment_system: request",
   "city.electoral_office: electoral_roll",
   "city.electoral_office: enrolment",

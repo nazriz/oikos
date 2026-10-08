@@ -9,6 +9,7 @@ use crate::statics::Statics;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// A cell of ground, and the building standing on it (repeated on every cell of its footprint).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -19,7 +20,8 @@ pub struct SiteCell {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terrain: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub structure: Option<SiteStructure>,
+    /// (One building's is shared by the cells it stands on: built once for a look, not once for each cell.)
+    pub structure: Option<Arc<SiteStructure>>,
     /// Nature: conspicuous species anyone there would notice (never how many).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub seen: Vec<Id>,
@@ -99,8 +101,7 @@ pub struct Visited {
 
 /// A cell as someone there sees it. `names`: who is in each space of its building, and who last left (known in one's
 /// own building, and to whoever goes in); otherwise how many.
-pub fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> SiteCell {
-    let c = &st.cells[id];
+pub fn site_cell(s: &Statics, st: &State, id: &Id, c: &crate::state::Cell, me: &str, names: bool, shown: &mut Shown) -> SiteCell {
     SiteCell {
         cell: id.clone(),
         x: c.x,
@@ -109,9 +110,19 @@ pub fn site_cell(s: &Statics, st: &State, id: &Id, me: &str, names: bool) -> Sit
         seen: st.nature.as_deref().map_or(vec![], |n| {
             s.config.catalogue.species.iter().filter(|sp| sp.conspicuous && n.populations.get(&sp.id).is_some_and(|m| m.get(id).is_some_and(|x| *x > 0))).map(|sp| sp.id.clone()).collect()
         }),
-        structure: c.structure.as_ref().map(|sid| site_structure(s, st, sid, me, names)),
+        structure: c.structure.as_ref().map(|sid| {
+            if let Some((_, structure)) = shown.iter().rev().find(|(shown, _)| shown == sid) {
+                return structure.clone();
+            }
+            let structure = Arc::new(site_structure(s, st, sid, me, names));
+            shown.push((sid.clone(), structure.clone()));
+            structure
+        }),
     }
 }
+
+/// The buildings one look has shown so far, each as it shows it (the same for every cell a building stands on).
+pub type Shown = Vec<(Id, Arc<SiteStructure>)>;
 
 /// A building as someone there sees it (`names` as for a cell). The building must stand.
 pub fn site_structure(s: &Statics, st: &State, sid: &Id, me: &str, names: bool) -> SiteStructure {
@@ -255,7 +266,8 @@ pub fn end(s: &Statics, st: &mut State, participant: &str, position: Option<&str
     let mut seen: Vec<Id> = cells.iter().filter(|c| st.cells.contains_key(*c)).cloned().collect();
     seen.sort();
     seen.dedup();
-    let found = Visited { channel: channel.into(), as_of: t, cells: seen.iter().map(|c| site_cell(s, st, c, &me, names)).collect() };
+    let mut shown: Shown = vec![];
+    let found = Visited { channel: channel.into(), as_of: t, cells: seen.iter().map(|c| site_cell(s, st, c, &st.cells[c], &me, names, &mut shown)).collect() };
     let key = position.map_or_else(|| crate::config::SELF.to_string(), String::from);
     std::sync::Arc::make_mut(st.participants.get_mut(participant).unwrap()).pending.entry(key).or_default().visits.push(found);
     vec![Timed::new(t, EventBody::Visited { participant: participant.into(), position: position.map(String::from), channel: channel.into(), places })]

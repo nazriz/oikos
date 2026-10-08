@@ -244,24 +244,9 @@ impl World {
                     )
                 })
                 .collect(),
-            positions: c
-                .positions
-                .iter()
-                .map(|p| {
-                    (
-                        p.id.clone(),
-                        Position {
-                            entity: p.entity.clone(),
-                            title: p.title.clone(),
-                            role: p.role.clone(),
-                            channels: Arc::new(p.channels.clone()),
-                            role_module: p.role_module.clone(),
-                            holder: p.holder.clone(),
-                            changed: 0,
-                        },
-                    )
-                })
-                .collect(),
+            positions: Default::default(),
+            positions_of: Default::default(),
+            held: Default::default(),
             schedule: Default::default(),
             timelines: Default::default(),
             nature: None,
@@ -269,6 +254,10 @@ impl World {
             flooded: Default::default(),
             takings: vec![],
         };
+        for p in &c.positions {
+            let position = Position { entity: p.entity.clone(), title: p.title.clone(), role: p.role.clone(), channels: Arc::new(p.channels.clone()), role_module: p.role_module.clone(), holder: p.holder.clone(), changed: 0 };
+            st.add_position(p.id.clone(), position);
+        }
         for x in &w.structures {
             let f = s.types[&x.structure_type].footprint;
             let cells = crate::config::footprint_cells(&crate::config::detailed_rects(&w.places), &x.at, f).expect("validated");
@@ -458,6 +447,12 @@ impl World {
     pub fn precheck_as(&self, cmd: &Command, body: &Value) -> Result<(), ProtocolError> {
         canon::check_integers(body).map_err(|e| ProtocolError(e.to_string()))?;
         crate::contracts::check(&crate::contracts::contracts().command, body).map_err(|e| ProtocolError(format!("command {e}")))?;
+        self.precheck_in_world(cmd)
+    }
+
+    /// The part of `precheck` that asks the world (does the participant exist, is the time ahead...), for a command
+    /// whose shape is known to keep to the contract.
+    pub fn precheck_in_world(&self, cmd: &Command) -> Result<(), ProtocolError> {
         let exists = |p: &str| if self.state.participants.contains_key(p) { Ok(()) } else { perr(format!("unknown participant {p}")) };
         match cmd {
             Command::Act { participant, position, thinking, .. } => {
@@ -589,12 +584,10 @@ impl World {
                 let mut events = vec![Timed::new(t, EventBody::ParticipantOptedOut { participant: participant.clone(), statement: statement.clone() })];
                 // Without a stand-in, nobody is there to act in its positions any more.
                 if vacant {
-                    let held: Vec<Id> = self.state.positions.iter().filter(|(_, x)| x.holder.as_deref() == Some(participant.as_str())).map(|(id, _)| id.clone()).collect();
+                    let held: Vec<Id> = self.state.held_by(participant).into_iter().cloned().collect();
                     for id in held {
                         let c = self.state.stamp();
-                        let x = self.state.positions.get_mut(&id).unwrap();
-                        x.holder = None;
-                        x.changed = c;
+                        self.state.set_holder(&id, None, c);
                         events.push(Timed::new(t, EventBody::Appointed { position: id, holder: None, by: None }));
                     }
                 }
@@ -747,6 +740,25 @@ impl World {
             events.extend(crate::sites::begin(&self.s, &mut self.state, participant, &key, &l.channel, &channels, &v.places, names, look_seconds));
         }
         events
+    }
+
+    /// The outcomes and messages waiting for a participant in the capacities it would observe in, in the order
+    /// `deliver` hands them over; nothing is handed over.
+    /// Is what a visit found waiting for a participant (in the capacities it would observe in)?
+    pub fn visited_waiting(st: &State, participant: &str, only: Option<&str>) -> bool {
+        st.participants.get(participant).is_some_and(|p| p.pending.iter().any(|(k, x)| only.is_none_or(|o| o == k.as_str()) && !x.visits.is_empty()))
+    }
+
+    pub fn waiting(st: &State, participant: &str, only: Option<&str>) -> (Vec<Outcome>, Vec<crate::state::Message>) {
+        let mut outcomes = vec![];
+        let mut inbox = vec![];
+        for (_, x) in st.participants[participant].pending.iter().filter(|(k, _)| only.is_none_or(|o| o == k.as_str())) {
+            outcomes.extend(x.outcomes.iter().cloned());
+            inbox.extend(x.inbox.iter().cloned());
+        }
+        outcomes.sort_by(|a, b| (a.t, &a.action).cmp(&(b.t, &b.action)));
+        inbox.sort_by(|a, b| (a.t, &a.id).cmp(&(b.t, &b.id)));
+        (outcomes, inbox)
     }
 }
 

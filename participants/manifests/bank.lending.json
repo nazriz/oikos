@@ -125,6 +125,10 @@
     {
       "what": "request",
       "why": "The bank's own files: its customers' instructions, among them the repayments of the loans this office made."
+    },
+    {
+      "what": "accounts",
+      "why": "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it."
     }
   ]
 }

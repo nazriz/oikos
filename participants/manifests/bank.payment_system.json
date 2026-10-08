@@ -1,6 +1,6 @@
 {
   "name": "bank.payment_system",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "doc": "docs/behaviour/bank-payment-system.md",
   "params": {
     "amount": {
@@ -17,9 +17,23 @@
       "schema": {},
       "source": "the world gives it (no default)"
     },
+    "hold_notice": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 86400,
+      "source": "placeholder"
+    },
     "instruction": {
       "schema": {},
       "source": "the world gives it (no default)"
+    },
+    "letter_lists": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 40,
+      "source": "placeholder"
     },
     "max_batch": {
       "schema": {
@@ -68,6 +82,10 @@
     {
       "what": "request",
       "why": "A bank keeps its own customers' instructions: every standing order and payment request it is asked to carry out is addressed to it."
+    },
+    {
+      "what": "accounts",
+      "why": "The ledger is the bank's own book: it keeps its customers' accounts, and pays from them as they instruct."
     }
   ]
 }

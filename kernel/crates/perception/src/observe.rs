@@ -332,15 +332,111 @@ pub struct RecordIndex {
     standing_record: BTreeMap<&'static str, BTreeSet<u64>>,
     /// cell -> records placed there (and withdrawals of them).
     by_place: BTreeMap<Id, Vec<u64>>,
+    /// The latest record placed anywhere (0: none).
+    placed_last: u64,
     accounts: Option<AccountsByEntity>,
-    /// entity -> (its `moved` stamp, the footprints of the buildings it's in then).
-    places: BTreeMap<Id, (u64, Vec<Rect>)>,
-    /// entity -> how near -> (its `moved` stamp, the cells within that of where it is then): worked out from `places`,
-    /// once for each place it's in, not at every look.
-    near: BTreeMap<Id, BTreeMap<i64, (u64, std::sync::Arc<BTreeSet<Id>>)>>,
-    /// place -> its cells, and a channel's list of cells -> the same as a set: the same for the whole run.
+    /// Which accounts, entities and positions have changed, and when (their change stamps): what a channel that
+    /// delivers changes reads, where going through every one would cost more.
+    account_changes: Changes<Arc<crate::state::Account>>,
+    entity_changes: Changes<crate::state::Entity>,
+    position_changes: Changes<crate::state::Position>,
+    /// The cells areas cover, as worked out so far. (Behind a lock: observations of one moment may be built at once,
+    /// `observe_prepared`, and each answer here is the same whoever works it out first. Read far more than written:
+    /// readers don't wait for each other.)
+    scopes: std::sync::RwLock<Scopes>,
+}
+
+/// The cells areas cover, kept from the first time each is worked out: each the same for the whole run.
+#[derive(Debug, Default)]
+struct Scopes {
+    /// (the footprints of the buildings a body is in, how near) -> the cells within that of them. By where, not by
+    /// whom: everyone in a building has the same surroundings, worked out once, and nothing is redone when a body moves
+    /// to somewhere a body has been before.
+    near: BTreeMap<(Vec<(i64, i64, i64, i64)>, i64), std::sync::Arc<BTreeSet<Id>>>,
+    /// place -> its cells, and a channel's list of cells -> the same as a set.
     place_cells: BTreeMap<Id, std::sync::Arc<BTreeSet<Id>>>,
     listed_cells: BTreeMap<Vec<Id>, std::sync::Arc<BTreeSet<Id>>>,
+}
+
+/// Which of a map's values have changed, by change stamp: kept by comparing the map as it is with the map as it was
+/// at the last look (the state's maps are persistent, and the two share everything untouched between them, so only
+/// what was touched is compared). Derived from the state (never part of it, never hashed). It answers "which ids
+/// might have a stamp above this one" without going through the map; whoever asks still reads each one's stamp.
+#[derive(Debug)]
+struct Changes<V> {
+    /// The map at the last look, and the state's change stamp then.
+    seen: Option<crate::state::Map<Id, V>>,
+    synced: u64,
+    /// The stamp at the first look: changes after it are all in `log`.
+    from: u64,
+    /// Ids, numbered as they first appear in `log`.
+    ids: Vec<Id>,
+    numbers: BTreeMap<Id, u32>,
+    /// (stamp, id's number), in stamp order: an id's value had that stamp at some look.
+    log: Vec<(u64, u32)>,
+}
+
+impl<V> Default for Changes<V> {
+    fn default() -> Self {
+        Changes { seen: None, synced: 0, from: 0, ids: vec![], numbers: BTreeMap::new(), log: vec![] }
+    }
+}
+
+impl<V: Clone + PartialEq> Changes<V> {
+    /// Take in the map as it is now, at the state's change stamp `stamp`; `changed`: a value's own stamp.
+    fn sync(&mut self, now: &crate::state::Map<Id, V>, stamp: u64, changed: impl Fn(&V) -> u64) {
+        // (Stamps only go up in one world: a map from before the last look is another world's, and starts afresh.)
+        if stamp < self.synced {
+            *self = Changes::default();
+        }
+        match &self.seen {
+            None => self.from = stamp,
+            Some(seen) if seen.ptr_eq(now) => return,
+            Some(seen) => {
+                let start = self.log.len();
+                for d in seen.diff(now) {
+                    let (id, v) = match d {
+                        imbl::ordmap::DiffItem::Add(id, v) | imbl::ordmap::DiffItem::Update { new: (id, v), .. } => (id, v),
+                        imbl::ordmap::DiffItem::Remove(..) => continue,
+                    };
+                    let c = changed(v);
+                    if c > self.synced {
+                        let n = match self.numbers.get(id) {
+                            Some(n) => *n,
+                            None => {
+                                let n = self.ids.len() as u32;
+                                self.ids.push(id.clone());
+                                self.numbers.insert(id.clone(), n);
+                                n
+                            }
+                        };
+                        self.log.push((c, n));
+                    }
+                }
+                self.log[start..].sort_unstable();
+            }
+        }
+        self.seen = Some(now.clone());
+        self.synced = stamp;
+    }
+
+    /// The log's entries with a stamp above `after`; None if it doesn't go back that far, or `now` isn't the map last
+    /// taken in (`sync`).
+    fn tail(&self, now: &crate::state::Map<Id, V>, after: u64) -> Option<&[(u64, u32)]> {
+        (self.seen.as_ref().is_some_and(|seen| seen.ptr_eq(now)) && after >= self.from).then(|| &self.log[self.log.partition_point(|(c, _)| *c <= after)..])
+    }
+
+    /// Every id whose value's stamp in `now` is above `after` (and perhaps others), in id order, if that's known and
+    /// there are at most `most` entries to go through.
+    fn since(&self, now: &crate::state::Map<Id, V>, after: u64, most: usize) -> Option<Vec<&Id>> {
+        let tail = self.tail(now, after).filter(|t| t.len() <= most)?;
+        let mut numbers: Vec<u32> = tail.iter().map(|(_, n)| *n).collect();
+        numbers.sort_unstable();
+        numbers.dedup();
+        let mut ids: Vec<&Id> = numbers.into_iter().map(|n| &self.ids[n as usize]).collect();
+        ids.sort_unstable();
+        Some(ids)
+    }
 }
 
 /// entity -> accounts it holds or keeps, for the account set identified by
@@ -370,6 +466,7 @@ impl RecordIndex {
             }
             if let Some(p) = place_of(st, rec) {
                 self.by_place.entry(p.clone()).or_default().push(seq);
+                self.placed_last = self.placed_last.max(seq);
             }
             // Everything stands when made, except a withdrawal: it takes something down.
             if !matches!(rec.body, crate::blocks::RecordBody::Withdrawal { .. }) {
@@ -448,38 +545,59 @@ impl RecordIndex {
 
     /// Records placed within the scope, above `after`, in order.
     fn placed(&self, scope: &Scope, after: u64) -> Vec<u64> {
-        let tail = |v: &Vec<u64>| v[v.partition_point(|&q| q <= after)..].to_vec();
-        let mut seqs: Vec<u64> = match scope {
-            Scope::Everywhere => self.by_place.values().flat_map(tail).collect(),
-            Scope::Cells(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(tail).collect(),
+        // (Nothing placed anywhere since: most looks, which ask for what is new. No cell is gone through for it.)
+        if after >= self.placed_last {
+            return vec![];
+        }
+        let mut seqs: Vec<u64> = vec![];
+        let mut tail = |v: &Vec<u64>| {
+            if v.last().is_some_and(|&q| q > after) {
+                seqs.extend_from_slice(&v[v.partition_point(|&q| q <= after)..]);
+            }
         };
+        match scope {
+            Scope::Everywhere => self.by_place.values().for_each(&mut tail),
+            // (Whichever is fewer is gone through: the scope's cells, or the cells anything is placed on.)
+            Scope::Cells(ps) if ps.len() <= self.by_place.len() => ps.iter().filter_map(|p| self.by_place.get(p)).for_each(&mut tail),
+            Scope::Cells(ps) => self.by_place.iter().filter(|(p, _)| ps.contains(*p)).for_each(|(_, v)| tail(v)),
+        }
         seqs.sort_unstable();
+        #[cfg(debug_assertions)]
+        {
+            let plain = |v: &Vec<u64>| v[v.partition_point(|&q| q <= after)..].to_vec();
+            let mut all: Vec<u64> = match scope {
+                Scope::Everywhere => self.by_place.values().flat_map(plain).collect(),
+                Scope::Cells(ps) => ps.iter().filter_map(|p| self.by_place.get(p)).flat_map(plain).collect(),
+            };
+            all.sort_unstable();
+            assert_eq!(seqs, all, "what is placed in a scope, found the short way, isn't what going through every cell finds");
+        }
         seqs
     }
 
-    /// The cells an area covers for an entity, now.
-    fn scope(&mut self, s: &Statics, st: &State, area: &Area, me: &str) -> Scope {
+    /// The cells an area covers for an entity, now. (Worked out without the lock held, then kept: two at once work
+    /// out the same thing.)
+    fn scope(&self, s: &Statics, st: &State, area: &Area, me: &str) -> Scope {
+        let known = || self.scopes.read().unwrap_or_else(|e| e.into_inner());
+        let keep = || self.scopes.write().unwrap_or_else(|e| e.into_inner());
         match area {
             Area::All(_) => Scope::Everywhere,
             Area::Cells(cs) | Area::Premises(crate::config::Premises { premises: cs }) => {
-                if let Some(cells) = self.listed_cells.get(cs) {
+                if let Some(cells) = known().listed_cells.get(cs) {
                     return Scope::Cells(cells.clone());
                 }
                 let cells: std::sync::Arc<BTreeSet<Id>> = std::sync::Arc::new(cs.iter().cloned().collect());
-                self.listed_cells.insert(cs.clone(), cells.clone());
-                Scope::Cells(cells)
+                Scope::Cells(keep().listed_cells.entry(cs.clone()).or_insert(cells).clone())
             }
             Area::Near(n) => {
-                let moved = st.entities.get(me).map_or(0, |e| e.moved);
-                if let Some((_, cells)) = self.near.get(me).and_then(|by| by.get(&n.near)).filter(|(m, _)| *m == moved) {
+                let rects = crate::geo::body_rects(s, st, me);
+                let key = (rects.iter().map(|r| (r.x, r.y, r.w, r.h)).collect::<Vec<_>>(), n.near);
+                if let Some(cells) = known().near.get(&key) {
                     return Scope::Cells(cells.clone());
-                }
-                if self.places.get(me).is_none_or(|(m, _)| *m != moved) {
-                    self.places.insert(me.to_string(), (moved, crate::geo::body_rects(s, st, me)));
                 }
                 let g = &s.config.world.ground;
                 let mut cells = BTreeSet::new();
-                for r in &self.places[me].1 {
+                for r in &rects {
                     for y in (r.y - n.near - 1).max(0)..(r.y + r.h + n.near + 1).min(g.h) {
                         for x in (r.x - n.near - 1).max(0)..(r.x + r.w + n.near + 1).min(g.w) {
                             if within(*r, Rect::cell(x, y), n.near) && crate::config::cell_in(&s.detailed, x, y) {
@@ -488,13 +606,11 @@ impl RecordIndex {
                         }
                     }
                 }
-                let cells = std::sync::Arc::new(cells);
-                self.near.entry(me.to_string()).or_default().insert(n.near, (moved, cells.clone()));
-                Scope::Cells(cells)
+                Scope::Cells(keep().near.entry(key).or_insert(std::sync::Arc::new(cells)).clone())
             }
             // A place's cells: where its area meets a detailed place (never walking a summarised area cell by cell).
             Area::Place(p) => {
-                if let Some(cells) = self.place_cells.get(&p.place) {
+                if let Some(cells) = known().place_cells.get(&p.place) {
                     return Scope::Cells(cells.clone());
                 }
                 let mut cells = BTreeSet::new();
@@ -510,13 +626,13 @@ impl RecordIndex {
                     }
                 }
                 let cells = std::sync::Arc::new(cells);
-                self.place_cells.insert(p.place.clone(), cells.clone());
-                Scope::Cells(cells)
+                Scope::Cells(keep().place_cells.entry(p.place.clone()).or_insert(cells).clone())
             }
         }
     }
 
-    fn accounts_of<'a>(&'a mut self, st: &State, entity: &str) -> &'a [Id] {
+    /// The accounts map for the state's set of accounts, made if it isn't the one kept.
+    fn accounts_now(&mut self, st: &State) {
         let key = (st.counters.acc, st.accounts.len());
         if self.accounts.as_ref().is_none_or(|(k, _)| *k != key) {
             let mut m: BTreeMap<Id, Vec<Id>> = BTreeMap::new();
@@ -528,8 +644,36 @@ impl RecordIndex {
             }
             self.accounts = Some((key, m));
         }
-        self.accounts.as_ref().unwrap().1.get(entity).map(Vec::as_slice).unwrap_or(&[])
     }
+
+    /// The accounts an entity holds or keeps, in id order. (From the map `accounts_now` made for this state; were it
+    /// another state's, by going through the accounts.)
+    fn accounts_of(&self, st: &State, entity: &str) -> std::borrow::Cow<'_, [Id]> {
+        let key = (st.counters.acc, st.accounts.len());
+        match self.accounts.as_ref().filter(|(k, _)| *k == key) {
+            Some((_, m)) => std::borrow::Cow::Borrowed(m.get(entity).map(Vec::as_slice).unwrap_or(&[])),
+            None => std::borrow::Cow::Owned(st.accounts.iter().filter(|(_, a)| a.holder == entity || a.custodian == entity).map(|(id, _)| id.clone()).collect()),
+        }
+    }
+
+    /// Bring the index up to the state, before observations of it are built (`build` only reads it): the records
+    /// made since, the accounts by entity, and what has changed in the accounts and (for a directory) among the
+    /// entities and positions.
+    fn prepare(&mut self, st: &State, directory: bool) {
+        self.catch_up(st);
+        self.accounts_now(st);
+        self.account_changes.sync(&st.accounts, st.counters.change, |a| a.changed);
+        if directory {
+            self.entity_changes.sync(&st.entities, st.counters.change, |e| e.changed);
+            self.position_changes.sync(&st.positions, st.counters.change, |x| x.changed);
+        }
+    }
+}
+
+/// Does any of the capacities a participant would observe in have a directory it is shown? (One that is only looked
+/// up in, which is every directory a valid world has, is answered from the state as asked: nothing is kept ready.)
+fn has_directory(st: &State, participant: &str, only: Option<&str>) -> bool {
+    capacities(st, participant).iter().filter(|cap| only.is_none_or(|o| o == cap.key)).any(|cap| cap.channels.iter().any(|ch| matches!(ch.kind, ChannelKind::Directory { way } if way != Way::Ask)))
 }
 
 /// A field a search can use. Purely mechanical: names a place in a record, and never says what it means.
@@ -609,7 +753,7 @@ fn holds(r: &Record, c: &crate::config::Condition) -> bool {
     }
 }
 
-use crate::sites::site_cell;
+use crate::sites::{site_cell, Shown};
 pub use crate::sites::site_structure;
 
 /// How an observation is built.
@@ -637,10 +781,9 @@ fn capacities<'a>(st: &'a State, participant: &str) -> Vec<Capacity<'a>> {
     if let (ParticipantKind::Person, Some(person)) = (p.kind, &p.person) {
         v.push(Capacity { key: SELF.into(), prefix: String::new(), entity: person.clone(), channels: &p.def.channels });
     }
-    for (id, x) in st.positions.iter() {
-        if x.holder.as_deref() == Some(participant) {
-            v.push(Capacity { key: id.clone(), prefix: format!("{id}/"), entity: x.entity.clone(), channels: &x.channels });
-        }
+    for id in st.held_by(participant) {
+        let x = &st.positions[id];
+        v.push(Capacity { key: id.clone(), prefix: format!("{id}/"), entity: x.entity.clone(), channels: &x.channels });
     }
     v
 }
@@ -649,18 +792,37 @@ fn capacities<'a>(st: &'a State, participant: &str) -> Vec<Capacity<'a>> {
 /// seen), and the transactions it was shown (for the world to drain). `only`: one capacity ("self" or a position it
 /// holds); None: all of them. The world then delivers it (World::deliver), with the outcomes and messages waiting.
 pub fn observe(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, only: Option<&str>, requested: &[LookRequest]) -> (Observation, Vec<(Id, Look)>, Vec<Id>) {
+    index.prepare(st, has_directory(st, participant, only));
     build(s, st, index, participant, Mode::Look, only, requested)
+}
+
+/// Bring the index up to the state for observing these participants (each in one capacity, or all): after it, and
+/// until the state changes, `observe_prepared` builds each one's observation reading the index only, so several may
+/// be built at once.
+pub fn prepare<'a>(st: &State, index: &mut RecordIndex, who: impl Iterator<Item = (&'a str, Option<&'a str>)>) {
+    let mut directory = false;
+    for (participant, only) in who {
+        directory = directory || (st.participants.contains_key(participant) && has_directory(st, participant, only));
+    }
+    index.prepare(st, directory);
+}
+
+/// `observe`, with nothing asked for, for an index `prepare` has brought up to this state: the same observation.
+pub fn observe_prepared(s: &Statics, st: &State, index: &RecordIndex, participant: &str, only: Option<&str>) -> (Observation, Vec<(Id, Look)>, Vec<Id>) {
+    build(s, st, index, participant, Mode::Look, only, &[])
 }
 
 /// The full picture a participant's channels cover right now (Mode::Full), changing nothing.
 pub fn full_view(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str) -> Observation {
+    index.prepare(st, true);
     build(s, st, index, participant, Mode::Full, None, &[]).0
 }
 
 type Built = (Observation, Vec<(Id, Look)>, Vec<Id>);
 
-fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mode: Mode, only: Option<&str>, requested: &[LookRequest]) -> Built {
-    index.catch_up(st);
+fn build(s: &Statics, st: &State, index: &RecordIndex, participant: &str, mode: Mode, only: Option<&str>, requested: &[LookRequest]) -> Built {
+    // (The index is the caller's to bring up to the state first: `RecordIndex::prepare`.)
+    assert_eq!(index.indexed, st.record_order.len(), "the record index isn't up to the state it's asked about");
     let p = &st.participants[participant];
 
     let mut channels = BTreeMap::new();
@@ -730,14 +892,21 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
             let changed = |c: u64| after.is_none_or(|a| c > a);
             let data = match &ch.kind {
                 ChannelKind::Accounts => {
-                    let mut accounts: Vec<AccountItem> = index
-                        .accounts_of(st, &me)
-                        .iter()
-                        .filter_map(|id| {
-                            let a = &st.accounts[id];
-                            changed(a.changed).then(|| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), currency: a.currency.clone(), balance: a.balance, closed: None })
-                        })
-                        .collect();
+                    let item = |id: &Id, a: &crate::state::Account| AccountItem { account: id.clone(), holder: a.holder.clone(), custodian: a.custodian.clone(), currency: a.currency.clone(), balance: a.balance, closed: None };
+                    // Whoever has many accounts (a bank keeps a town's) is shown the few that changed since its last
+                    // look from the list of changes, not by going through them all: the same accounts.
+                    let mine = index.accounts_of(st, &me);
+                    let recent = after.and_then(|a| index.account_changes.since(&st.accounts, a, mine.len()));
+                    let mut accounts: Vec<AccountItem> = match &recent {
+                        Some(ids) => ids.iter().filter_map(|id| st.accounts.get(*id).filter(|a| (a.holder == me || a.custodian == me) && changed(a.changed)).map(|a| item(id, a))).collect(),
+                        None => mine.iter().filter_map(|id| Some(&st.accounts[id]).filter(|a| changed(a.changed)).map(|a| item(id, a))).collect(),
+                    };
+                    #[cfg(debug_assertions)]
+                    if recent.is_some() {
+                        let mut plain: Vec<AccountItem> = mine.iter().filter_map(|id| Some(&st.accounts[id]).filter(|a| changed(a.changed)).map(|a| item(id, a))).collect();
+                        plain.sort_by(|a, b| a.account.cmp(&b.account));
+                        assert_eq!(accounts, plain, "the list of changed accounts and the accounts themselves disagree for {me}");
+                    }
                     if after.is_some() {
                         for (id, x) in st.closed_accounts.iter() {
                             if (x.holder == me || x.custodian == me) && changed(x.changed) {
@@ -787,13 +956,13 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                 }
                 ChannelKind::Sites { occupants, .. } => {
                     let names = *occupants == Some(Occupants::Names);
-                    let site = |id: &Id| st.cells.get(id).filter(|c| changed(c.changed)).map(|_| site_cell(s, st, id, &me, names));
+                    let mut shown: Shown = vec![];
                     ChannelData::Sites {
                         as_of: st.t,
                         visited: None,
                         cells: match scope.as_ref().expect("a map that is not a visit has an area (the contract)") {
                             // (Every cell: read as they're walked, not looked up again one by one.)
-                            Scope::Everywhere => st.cells.iter().filter(|(_, c)| changed(c.changed)).map(|(id, _)| site_cell(s, st, id, &me, names)).collect(),
+                            Scope::Everywhere => st.cells.iter().filter(|(_, c)| changed(c.changed)).map(|(id, c)| site_cell(s, st, id, c, &me, names, &mut shown)).collect(),
                             // A scope that's much of the ground (a whole place) is walked beside the state's cells,
                             // both being in id order: the same cells in the same order as looking each one up.
                             Scope::Cells(ps) if ps.len() * 8 > st.cells.len() => {
@@ -807,43 +976,49 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
                                         break;
                                     }
                                     if wanted.peek().is_some_and(|w| *w == id) && changed(c.changed) {
-                                        cells.push(site_cell(s, st, id, &me, names));
+                                        cells.push(site_cell(s, st, id, c, &me, names, &mut shown));
                                     }
                                 }
                                 cells
                             }
-                            Scope::Cells(ps) => ps.iter().filter_map(site).collect(),
+                            Scope::Cells(ps) => ps.iter().filter_map(|id| st.cells.get(id).filter(|c| changed(c.changed)).map(|c| site_cell(s, st, id, c, &me, names, &mut shown))).collect(),
                         },
                         whole,
                     }
                 }
-                ChannelKind::Directory { .. } => ChannelData::Directory {
-                    entities: st
-                        .entities
-                        .iter()
-                        .filter(|(_, e)| changed(e.changed))
-                        .map(|(id, e)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) })
-                        .collect(),
-                    positions: st
-                        .positions
-                        .iter()
-                        .filter(|(_, x)| changed(x.changed))
-                        .map(|(id, x)| PositionItem {
-                            position: id.clone(),
-                            entity: x.entity.clone(),
-                            title: x.title.clone(),
-                            role: x.role.clone(),
-                            holder: x.holder.clone(),
-                            held_by: x.holder.as_ref().and_then(|h| {
-                                let hp = st.participants.get(h)?;
-                                match &hp.person {
-                                    Some(person) => st.entities.get(person).map(|e| e.name.clone()),
-                                    None => hp.def.title.clone(),
-                                }
-                            }),
-                        })
-                        .collect(),
-                },
+                ChannelKind::Directory { .. } => {
+                    let entity = |(id, e): (&Id, &crate::state::Entity)| EntityItem { entity: id.clone(), kind: e.kind.clone(), name: e.name.clone(), participant: e.body.as_ref().and_then(|b| b.participant.clone()) };
+                    let position = |(id, x): (&Id, &crate::state::Position)| PositionItem {
+                        position: id.clone(),
+                        entity: x.entity.clone(),
+                        title: x.title.clone(),
+                        role: x.role.clone(),
+                        holder: x.holder.clone(),
+                        held_by: x.holder.as_ref().and_then(|h| {
+                            let hp = st.participants.get(h)?;
+                            match &hp.person {
+                                Some(person) => st.entities.get(person).map(|e| e.name.clone()),
+                                None => hp.def.title.clone(),
+                            }
+                        }),
+                    };
+                    // What has changed since the last look is read from the lists of changes (in id order, as the
+                    // maps are), where they go back that far; a first look goes through everyone.
+                    let entities: Vec<EntityItem> = match after.and_then(|a| index.entity_changes.since(&st.entities, a, st.entities.len())) {
+                        Some(ids) => ids.into_iter().filter_map(|id| st.entities.get(id).filter(|e| changed(e.changed)).map(|e| (id, e))).map(entity).collect(),
+                        None => st.entities.iter().filter(|(_, e)| changed(e.changed)).map(entity).collect(),
+                    };
+                    let positions: Vec<PositionItem> = match after.and_then(|a| index.position_changes.since(&st.positions, a, st.positions.len())) {
+                        Some(ids) => ids.into_iter().filter_map(|id| st.positions.get(id).filter(|x| changed(x.changed)).map(|x| (id, x))).map(position).collect(),
+                        None => st.positions.iter().filter(|(_, x)| changed(x.changed)).map(position).collect(),
+                    };
+                    #[cfg(debug_assertions)]
+                    {
+                        assert_eq!(entities, st.entities.iter().filter(|(_, e)| changed(e.changed)).map(entity).collect::<Vec<_>>(), "the list of changed entities and the entities themselves disagree");
+                        assert_eq!(positions, st.positions.iter().filter(|(_, x)| changed(x.changed)).map(position).collect::<Vec<_>>(), "the list of changed positions and the positions themselves disagree");
+                    }
+                    ChannelData::Directory { entities, positions }
+                }
             };
             if mode == Mode::Look {
                 let cursor = if matches!(ch.kind, ChannelKind::Records { .. }) { st.counters.record_seq } else { st.counters.change };
@@ -874,9 +1049,9 @@ fn build(s: &Statics, st: &State, index: &mut RecordIndex, participant: &str, mo
         in_space: st.structures_of(person).into_iter().find_map(|sid| st.occupancy.get(&sid)?.iter().find(|(_, bodies)| bodies.contains(person)).map(|(sp, _)| sp.clone())),
     });
     let positions = st
-        .positions
-        .iter()
-        .filter(|(_, x)| x.holder.as_deref() == Some(participant))
+        .held_by(participant)
+        .into_iter()
+        .map(|id| (id, &st.positions[id]))
         .map(|(id, x)| HeldPosition { position: id.clone(), entity: x.entity.clone(), title: x.title.clone(), role: x.role.clone() })
         .collect();
     // Readings of the agreements the records here bring.
@@ -975,7 +1150,7 @@ fn looked_up_one(st: &State, who: &Who) -> ChannelData {
 /// and the query, now. Standing records only if asked; ordered as asked (newest first by default);
 /// at most `limit` (default 20).
 #[allow(clippy::too_many_arguments)]
-fn search(st: &State, index: &mut RecordIndex, me: &str, filter: &RecordFilter, want: Option<&Want>, area: Option<&Scope>, q: &Query, most: Option<u32>) -> Vec<Arc<Record>> {
+fn search(st: &State, index: &RecordIndex, me: &str, filter: &RecordFilter, want: Option<&Want>, area: Option<&Scope>, q: &Query, most: Option<u32>) -> Vec<Arc<Record>> {
     let at_seq = |seq: u64| &index.by_seq[(seq - 1) as usize];
     // A search for one record by its id reads that record, not the register it is in (the same answer: every other
     // condition is still asked of it below).

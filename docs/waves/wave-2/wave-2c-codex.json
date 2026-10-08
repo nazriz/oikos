@@ -1,0 +1,42 @@
+[
+ {
+  "name": "w2-31-newmoney",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=931",
+   "profile=in-tn-2026",
+   "mayor=llm",
+   "model_seats=finance,planning"
+  ],
+  "model": "codex/gpt-6-luna",
+  "translator": "codex/gpt-6-luna",
+  "until": 5184000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "test": true,
+  "note": "Wave 2c (planned 2026-10-08), for the translator's data. Profile in-tn-2026, seed 931, 1,000 people, 60 days. Seats: mayor, finance, planning, all on codex/gpt-6-luna. Translator: codex/gpt-6-luna (under the translator's prompt). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: that profile's amounts from the other family's weaker model."
+ },
+ {
+  "name": "w2-32-newoffices",
+  "world": "worlds/town-1000.yaml",
+  "sets": [
+   "seed=932",
+   "profile=us-oh-2026",
+   "mayor=llm",
+   "model_seats=police-oic,union-organiser"
+  ],
+  "model": "codex/gpt-6.1-sol",
+  "translator": "decide/pod-small-d16-s1",
+  "until": 5184000,
+  "budget": 25,
+  "env": {
+   "OIKOS_CLAUDE_BIN": "/Users/clawd/.local/bin/claude",
+   "OIKOS_TRANSLATOR_MODELS": "/Users/clawd/oikos/runs/translator-model"
+  },
+  "test": true,
+  "note": "Wave 2c (planned 2026-10-08), for the translator's data. Profile us-oh-2026, seed 932, 1,000 people, 60 days. Seats: police-oic, union-organiser, mayor, all on codex/gpt-6.1-sol. Translator: decide/pod-small-d16-s1 (the trained one). Every draft is confirmed or declined by its seat. TEST ONLY: kept out of training. Test-only: the held-out offices on the other family."
+ }
+]

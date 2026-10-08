@@ -19,6 +19,7 @@
  "orchestrator/test/government.test.ts": 33.3,
  "orchestrator/test/hazards.test.ts": 94.5,
  "orchestrator/test/health.test.ts": 0.3,
+ "orchestrator/test/holds-run.test.ts": 8.9,
  "orchestrator/test/home-market.test.ts": 61.5,
  "orchestrator/test/households.test.ts": 190.9,
  "orchestrator/test/in-situ.test.ts": 1.2,
@@ -50,6 +51,7 @@
  "orchestrator/test/river.test.ts": 79.6,
  "orchestrator/test/run-machinery.test.ts": 50.8,
  "orchestrator/test/run.test.ts": 12.9,
+ "orchestrator/test/scenarios.test.ts": 420,
  "orchestrator/test/services.test.ts": 56.7,
  "orchestrator/test/tenancy.test.ts": 94.5,
  "orchestrator/test/training.test.ts": 4.4,
@@ -61,6 +63,7 @@
  "orchestrator/test/worktree-clean.test.ts": 3.1,
  "participants/test/adapters.test.ts": 4.6,
  "participants/test/answer-reading.test.ts": 1.1,
+ "participants/test/bank-holds.test.ts": 0.1,
  "participants/test/bank.test.ts": 1,
  "participants/test/book.test.ts": 2.3,
  "participants/test/boundaries.test.ts": 0.1,
@@ -96,6 +99,7 @@
  "translator/test/amounts.test.ts": 2.7,
  "translator/test/eval-pilot.test.ts": 0.3,
  "translator/test/eval.test.ts": 0.3,
+ "translator/test/holds.test.ts": 0.6,
  "translator/test/model-encode.test.ts": 0.2,
  "translator/test/preview.test.ts": 0.2,
  "translator/test/readers.test.ts": 0.3,
@@ -103,8 +107,10 @@
  "translator/test/set-run.test.ts": 0.1,
  "translator/test/train-audit2.test.ts": 1.2,
  "translator/test/train-files.test.ts": 0.3,
+ "translator/test/train-holds.test.ts": 0.5,
  "translator/test/train-seats.test.ts": 2.2,
  "translator/test/train.test.ts": 1.5,
  "translator/test/translator.test.ts": 0.2,
- "worlds/test/generate.test.ts": 1.3
+ "worlds/test/generate.test.ts": 1.3,
+ "worlds/test/scenario.test.ts": 9
 }

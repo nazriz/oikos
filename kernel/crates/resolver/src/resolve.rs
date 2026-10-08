@@ -12,7 +12,7 @@ use crate::knowledge::Knowledge;
 use serde_json::{json, Map, Value as Json};
 use std::collections::BTreeSet;
 
-pub const RESOLVER_VERSION: &str = "0.4.0";
+pub const RESOLVER_VERSION: &str = "0.5.0";
 
 /// Fixed texts for the translator's refusal labels (section 11.1).
 pub fn label_text(label: &str) -> &'static str {
@@ -22,7 +22,9 @@ pub fn label_text(label: &str) -> &'static str {
         "too_much" => "Please take this one step at a time.",
         "unknown_form" => "You haven't seen a form by that name.",
         "not_an_act" => "That's something to look up or read, not something to do. Look at your reports and papers, or write to whoever keeps it.",
-        "no_such_act" => "Nothing here does that as such. You could write to whoever would have to see to it, or go about it another way.",
+        "no_such_act" => "Nothing here does that as such. If it is for someone else to see to, direct them in writing, on their form for it if they have one.",
+        // (Said of the request alone: nothing is looked up to say it, so it tells the caller nothing it didn't know.)
+        "look_first" => "That needs something found out first. Look it up (in your own papers, or by asking whoever keeps it), then say what is to be done, naming each paper by its id.",
         _ => "It isn't clear what should happen. Could you say it more plainly?",
     }
 }
@@ -254,6 +256,8 @@ impl Resolver<'_> {
         match c.get("visible") {
             None => Ok(None),
             Some(Value::Id(i)) if i == "public" => Ok(Some(json!("public"))),
+            // Its own file: seen only by the entity the act is made for.
+            Some(Value::Id(i)) if i == "own" => Ok(Some(json!([self.speaks_for(c)?]))),
             Some(_) => Ok(self.ids(c, "visible")?.map(|v| json!(v))),
         }
     }
@@ -849,6 +853,9 @@ impl Resolver<'_> {
             v.extend(common);
             return Ok(vec![obj(v)]);
         }
+        if Self::has(c, "hold") {
+            return self.hold(c, common);
+        }
         let kind = Self::str_(c, "kind")?.map(|k| as_label(&k)).filter(|k| !k.is_empty());
         let text = Self::str_(c, "text")?.filter(|t| !t.is_empty());
         let Some(kind) = kind else { return ask("What kind of statement is it (a notice, a law, a report, …)?") };
@@ -877,6 +884,63 @@ impl Resolver<'_> {
             ("registry", registry),
         ];
         v.extend(common);
+        Ok(vec![obj(v)])
+    }
+
+    /// A hold (contracts/calls.md): an instruction to whoever acts on a standing record not to act on it while the
+    /// hold stands. Who that is, is the one physical answer: whoever the record is addressed to, as the seat knows it
+    /// (or whoever the call says). Nothing is stopped here: the one addressed honours it, or doesn't.
+    fn hold(&self, c: &Call, common: Vec<(&'static str, Option<Json>)>) -> R<Vec<Json>> {
+        let kind = Self::str_(c, "kind")?.map(|k| as_label(&k)).filter(|k| !k.is_empty());
+        let other = ["kind", "data", "adico", "formal", "on", "offer", "practice", "assertion", "registry"].iter().any(|k| Self::has(c, k) && !(*k == "kind" && kind.as_deref() == Some("hold")));
+        if other {
+            return ask("A hold says only what it holds, in what words, for whom and on what basis: nothing else should be written.");
+        }
+        let mut held: Vec<String> = vec![];
+        for x in self.ids(c, "hold")?.unwrap_or_default() {
+            if !held.contains(&x) {
+                held.push(x);
+            }
+        }
+        if held.is_empty() {
+            return ask("Hold what? Name it by its id.");
+        }
+        let me = self.speaks_for(c)?;
+        let given = self.ids(c, "to")?.map(|v| v.iter().map(|x| if x.starts_with('$') { x.clone() } else { self.k.entity_of(x) }).collect::<Vec<_>>());
+        let mut to: Vec<String> = vec![];
+        for x in &held {
+            if x.starts_with('$') {
+                return ask("A hold names something already on record, not something made in the same act.");
+            }
+            if self.k.withdrawn.contains(x) {
+                return ask(format!("{x} has been withdrawn: there is nothing to hold."));
+            }
+            let acts: Vec<String> = match (&given, self.k.addressed.get(x.as_str())) {
+                (Some(g), _) => g.clone(),
+                (None, Some(a)) => a.to_vec(),
+                (None, None) => return ask(format!("You don't know of a standing paper called {x} that someone acts on. Look it up and name it by its id, or say who is to hold it.")),
+            };
+            for a in acts {
+                if a != me && !to.contains(&a) {
+                    to.push(a);
+                }
+            }
+        }
+        let several = held.len() > 1;
+        if to.is_empty() {
+            return ask(format!("{} {} yours to act on: nobody else needs telling.", held.join(", "), if several { "are" } else { "is" }));
+        }
+        let text = Self::str_(c, "text")?.filter(|t| !t.is_empty()).unwrap_or_else(|| format!("Please hold {}: nothing is to be done under {} until this is withdrawn.", held.join(", "), if several { "them" } else { "it" }));
+        let mut seen = vec![me];
+        seen.extend(to.iter().cloned());
+        let mut v = vec![("block", some("publish")), ("kind", some("hold")), ("text", some(text)), ("addressed_to", some(json!(to))), ("data", some(json!({ "holds": held }))), ("visible_to", some(json!(seen)))];
+        // (What the call says of who sees it stands in place of that.)
+        for (k, x) in common {
+            if x.is_some() {
+                v.retain(|(name, _)| *name != k);
+                v.push((k, x));
+            }
+        }
         Ok(vec![obj(v)])
     }
 
@@ -1111,6 +1175,25 @@ mod tests {
     fn words_as_a_label() {
         for (written, label) in [("notice", "notice"), ("permit_application", "permit_application"), ("supplementary evidence statement", "supplementary_evidence_statement"), ("  Rent-Increase  Notice ", "rent_increase_notice"), ("2nd reading", "nd_reading"), ("works_manager", "works_manager"), ("—", "")] {
             assert_eq!(as_label(written), label, "{written}");
+        }
+    }
+
+    /// A hold, an entry on one's own file and the refusal sentences: the table this resolver and the repository's
+    /// TypeScript one are both held to (contracts/test/holds.json; translator/test/holds.test.ts reads the same file).
+    #[test]
+    fn holds_entries_and_refusals_as_the_shared_table_says() {
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/holds.json")).unwrap();
+        let mut k = Knowledge::new(Currency::from_config(&table["currency"]));
+        k.absorb(&table["observation"]);
+        let cases = table["cases"].as_array().unwrap();
+        assert!(cases.len() > 15);
+        for c in cases {
+            let name = c["name"].as_str().unwrap();
+            let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            match resolve(&program, &k, &|_| None, c["as"].as_str()) {
+                Resolution::Blocks(b) => assert_eq!(json!(b), c["blocks"], "{name}"),
+                Resolution::Questions { questions, .. } => assert_eq!(json!(questions), c["asks"], "{name}"),
+            }
         }
     }
 

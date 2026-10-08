@@ -1,0 +1,20 @@
+# A police station below strength: its establishment is 86% of the profile's for the town's size. What is reported,
+# investigated and found follows from its officers' hours as ever.
+id: police-understrength
+about: The police station has 14% fewer officers for the town's size than the profile gives.
+bears_on: [police-oic, tribunal-member, mayor]
+status: inert
+inert_because: >-
+  The police are sent no report of a taking in 120 days, with or without the scenario: the chance of offending is a
+  placeholder kept deliberately rare (two in a hundred a month, and only for someone in need who works where goods
+  are kept), so there is nothing for fewer officers to fall behind on; and an investigation is four hours of a day.
+  It needs a sourced rate of offending and of time per investigation (crime.take_bps_per_month_in_need,
+  crime.investigation_hours; docs/behaviour/crime.md).
+changes:
+  - in: profile
+    path: crime.police_per_1000
+    times_bps: 8600
+    basis: >-
+      Police officer numbers in England and Wales fell by about 14% from March 2010 to March 2017 (Home Office, Police
+      workforce, England and Wales, 31 March 2017: 143,734 to 123,142 full-time equivalents; read in search results
+      only, to confirm).

@@ -11,7 +11,8 @@ import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
 import { landscape } from "./nature";
-import { drawWeather } from "./weather";
+import { chooseWeather, drawWeather, type WeatherChoice } from "./weather";
+import { applyScenarios } from "./scenario";
 import * as K from "./knowing";
 
 /** The body that keeps the register of land, and the one that keeps the electoral roll: each its own (never the
@@ -149,6 +150,10 @@ export interface TownSpec {
   shocks?: { from_day: number; kind: string; what: "price" | "demand"; factor_bps: number }[];
   /** People moving in from elsewhere (world.migration, docs/behaviour/boundary.md): its parameters, or false for none. Default: on. */
   migration?: false | Record<string, unknown>;
+  /** The starting conditions the town is put under (docs/scenarios.md): the names of scenarios (worlds/scenarios/),
+   * one, a list, or several in one text ("wet-year+lean-council"), applied in that order to this description and to
+   * the profile's figures before the town is made. Default: none (the same as "baseline"). */
+  scenario?: string | string[];
 }
 
 /** The town's life physics (docs/behaviour/life.md), from the profile: deaths by age (the mean of the sexes' life
@@ -232,12 +237,19 @@ export function amendmentForm(schedule: { id: string; data: LawSchedule }): any 
       affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." } } } };
 }
 
-export function generate(spec: TownSpec): any {
-  return generateFrom(spec, loadProfile(spec.profile ?? "au-vic-2026"));
+export function generate(described: TownSpec): any {
+  // The town as described, under the starting conditions it names (docs/scenarios.md): its description and its
+  // profile's figures as those conditions leave them. With none, both are as given.
+  const under = applyScenarios(described, loadProfile(described.profile ?? "au-vic-2026"));
+  return generateFrom(under.town, under.profile, under);
 }
 
-/** A town from a spec and a profile in hand (generate: the profile the spec names, from worlds/profiles). */
-export function generateFrom(spec: TownSpec, P: Profile): any {
+/**
+ * A town from a spec and a profile in hand (generate: the profile the spec names, from worlds/profiles, both under the
+ * starting conditions the spec names). The spec's `scenario` is not applied here: the profile in hand is used as it is,
+ * and `under` says which of the climate's years the run is given and which conditions were applied, if any.
+ */
+export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: WeatherChoice; applied: string[] } = { applied: [] }): any {
   const V = P.values;
   // Money in words, as the town writes it (its currency's sign, grouping and decimal places; whole units without their
   // decimals, as a rule or a round figure is written).
@@ -380,7 +392,11 @@ export function generateFrom(spec: TownSpec, P: Profile): any {
   // experiment's). Rain and drought need the river (utilities); heat, the land's fields (nature).
   const CL = V.climate && spec.climate !== false ? V.climate : undefined;
   const weatherRng = rng("weather");
-  const W = CL ? drawWeather(CL, spec.years * 365 + 1, (n) => weatherRng.below(n), spec.start_month ?? 1) : undefined;
+  // (Under a scenario that says which of the climate's years the run is given: that many drawn, each from a stream of
+  // its own, and the one at its place among them taken. Otherwise the one draw.)
+  const W = !CL ? undefined
+    : under.weather ? chooseWeather(CL, spec.years * 365 + 1, (i) => { const r = rng(`weather-${i + 1}`); return (n) => r.below(n); }, spec.start_month ?? 1, under.weather)
+    : drawWeather(CL, spec.years * 365 + 1, (n) => weatherRng.below(n), spec.start_month ?? 1);
   // (With the round, employers look at the day's work an hour after it starts, when their staff are in.)
   const look = RD ? { look_at: (RD.work_start_hour + 1) * HOUR, look_days: RD.work_days } : {};
   const SHOP_DAYS = RD ? RD.work_days : 6; // (a shop opens when its staff are in)
@@ -1502,7 +1518,7 @@ export function generateFrom(spec: TownSpec, P: Profile): any {
 
   return {
     contracts: "0.8",
-    meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${everyone.length} people in ${households.length} households, ${homes.length} homes, ${jobSlots.length} jobs.`, canary: CANARY },
+    meta: { name: spec.name, description: `Generated town (generator ${GENERATOR_VERSION}, seed ${spec.seed}): ${everyone.length} people in ${households.length} households, ${homes.length} homes, ${jobSlots.length} jobs.${under.applied.length ? ` Starting conditions: ${under.applied.join(", ")}.` : ""}`, canary: CANARY },
     seed: spec.seed,
     clock: { tick_seconds: 3600, run_seconds: spec.years * 365 * DAY },
     log: { checkpoint_every: MONTH, anchor_every_entries: 1000 },

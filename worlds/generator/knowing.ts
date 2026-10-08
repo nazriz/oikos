@@ -104,7 +104,7 @@ export function knowing(positions: { entity: string; role_module?: { code?: stri
   for (const pos of positions) {
     for (const k of modules[pos.role_module?.code ?? ""]?.keeps ?? []) {
       // (A map and every entity of a kind are not registers: the guard's test holds those to what is declared.)
-      if (k.what === "map" || k.what === "directory" || k.what.startsWith("every:")) continue;
+      if (k.what === "map" || k.what === "directory" || k.what === "accounts" || k.what.startsWith("every:")) continue;
       const answers = answersOf(k.what, town);
       if (!keepers.has(`${pos.entity}|${k.what}`)) keepers.set(`${pos.entity}|${k.what}`, { entity: pos.entity, what: k.what, why: k.why, ...(answers.length ? { answers } : {}) });
     }

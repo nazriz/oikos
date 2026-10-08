@@ -35,7 +35,8 @@
             "unclear",
             "unknown_form",
             "not_an_act",
-            "no_such_act"
+            "no_such_act",
+            "look_first"
           ]
         }
       }
@@ -465,6 +466,7 @@
                     "for",
                     "data",
                     "withdraw",
+                    "hold",
                     "adico",
                     "formal",
                     "on",

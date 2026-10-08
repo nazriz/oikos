@@ -71,6 +71,8 @@ export function wholeViews(config: any): WholeView[] {
   const accountsOf = new Map<string, string[]>();
   for (const a of (config.world.accounts ?? []) as { id: string; holder: string }[]) accountsOf.set(a.holder, [...(accountsOf.get(a.holder) ?? []), a.id]);
   const populations = [...byKind].filter(([, ids]) => ids.length >= POPULATION);
+  /** How many accounts an organisation keeps for others. */
+  const kept = (entity: string) => ((config.world.accounts ?? []) as { holder: string; custodian?: string }[]).filter((a) => a.custodian === entity && a.holder !== entity).length;
 
   const found = new Map<string, WholeView>();
   const add = (module: string, through: string, what: string, seat: string) => {
@@ -87,6 +89,12 @@ export function wholeViews(config: any): WholeView[] {
   const channelsOf = (module: string, seat: string, entity: string | undefined, channels: Channel[]) => {
     for (const ch of channels ?? []) {
       const through = `channel:${ch.id}`;
+      // A ledger: the accounts its organisation keeps for others (it is their custodian). Whole, and to be declared:
+      // a bank keeps its customers' accounts, and nobody else is shown anyone's balance but their own.
+      if (ch.kind === "accounts") {
+        if (entity && kept(entity) >= WHOLE.least) add(module, through, "accounts", seat);
+        continue;
+      }
       // What a seat is asked about, goes to, reads as published, or sees where it is, is not a whole view: the kernel
       // holds each to its scope. Premises that are half the ground are a map all the same.
       if (ch.kind === "sites" || ch.way === "here") {

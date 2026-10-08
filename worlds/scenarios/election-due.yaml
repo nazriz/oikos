@@ -1,0 +1,12 @@
+# The mayor's term is nearly up: polling day is sixty days in, so the electoral office's notice goes out as the run
+# starts and the whole timetable (nominations, the ballot, the count) falls within the first two months.
+id: election-due
+about: The mayor's term ends sixty days in; the election's notice, nominations, ballot and count all fall in the run's first two months.
+bears_on: [mayor, electoral, editor, council-clerk]
+changes:
+  - in: town
+    path: first_election_days
+    set: 60
+    basis: >-
+      Not a size to source: when a term happens to end. Sixty days is the electoral office's own notice period, so the
+      election is run by its ordinary timetable from the first day (docs/behaviour/elections.md).

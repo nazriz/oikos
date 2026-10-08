@@ -7,6 +7,7 @@ import { expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { generate } from "@oikos/worlds/generator/generate";
+import { exportLogs, query } from "@oikos/measure";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -112,6 +113,17 @@ test("a death is seen, reported, registered, and the world's people act on it", 
   // Estates are settled: something moved under a registration, to a partner, adult children or the town.
   const estates = ev.filter((e) => e.event === "transfer" && [...regs.values()].some((r) => r.id === e.per_instruction));
   expect(estates.length).toBeGreaterThan(0);
+  // An estate is wealth moving, not spending: what a dead person's account pays out is no part of households' saving
+  // (measure/queries/economy/summary.sql). Counted, the estates that went to the town or the tax office lowered it.
+  await exportLogs([s.logPath], join(out, "measure"));
+  const sql = readFileSync(join(root, "measure/queries/economy/summary.sql"), "utf8");
+  const clause = " and not (fi.died_t is not null and t.t >= fi.died_t)";
+  expect(sql).toContain(clause);
+  const [now] = await query(join(out, "measure"), sql);
+  const [counted] = await query(join(out, "measure"), sql.replace(clause, ""));
+  const fromEstates = estates.filter((e) => !String(e.to).startsWith("acc-c")).reduce((x, e) => x + Number(e.amount), 0);
+  if (fromEstates > 0) expect(Number(now!.people_saving_pct)).toBeGreaterThan(Number(counted!.people_saving_pct));
+  else expect(Number(now!.people_saving_pct)).toBeGreaterThanOrEqual(Number(counted!.people_saving_pct));
   // Landlords give notice on a dead tenant's lease.
   expect(ev.some((e) => e.event === "recorded" && e.record.record === "notice" && e.record.text === "The tenant has died.")).toBe(true);
   // A household whose leaseholder died has a new record, without them, and with another leaseholder.
