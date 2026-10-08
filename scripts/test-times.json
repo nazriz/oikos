@@ -116,6 +116,7 @@
  "scripts/slots.test.ts": 12.2,
  "scripts/test-runner.test.ts": 3,
  "translator/test/amounts.test.ts": 2.7,
+ "translator/test/ask-again.test.ts": 0.1,
  "translator/test/eval-pilot.test.ts": 0.3,
  "translator/test/eval.test.ts": 0.3,
  "translator/test/forms.test.ts": 0.2,

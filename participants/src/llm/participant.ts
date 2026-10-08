@@ -19,7 +19,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, ModelCallFailed, promptTooLong, type LlmIO } from "./call";
 import { kindSaid, LOOK_CHARS_MAX, NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked, type WhoIs } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.13.0"; // 0.13.0: a request that came to nothing is put to it at once and by its own words, a notebook of 8,000 characters and told how to make room when nearly full, offices and people by their names in the world and never a participant's own id, who holds a post, figures in the papers it is shown read as a person reads them (money, days, dates, per cent), a letter whose about is not one id goes with it at its head, and nothing a seat sends is lost without a word; a look into papers answers with a list (a paper is read when asked for by its id, a long one a part at a time), one look and one whole prompt have a ceiling, a prompt its model would not take is never sent again unchanged; 0.12.0: told that a paper is named by its id, and one it cannot name is looked up first; 0.11.0: a place it is not at is gone to (someone is sent, and what they found is told when they are back); 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -260,7 +260,7 @@ export function tools(c: LlmParticipantConfig): ToolSpec[] {
     { name: "write", description: "Write to people or organisations, by id. The words go exactly as you write them. If the letter is about one thing that has an id (a paper, an account, a lot), give that id as about, and the letter is filed as about it. If what it is about is anything else (some words, or several things), say so in about all the same: it is put at the head of the letter as its subject line, and the letter is sent.",
       input_schema: { type: "object", required: ["to", "text"], properties: { to: { type: "array", items: { type: "string" } }, text: { type: "string" }, as: AS, about: { type: "string", description: "What it's about (optional): one id, or a subject line in words." } } } },
     { name: "done_for_now", description: c.sessions
-        ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner, at the next sitting, if someone writes to you. You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
+        ? `That's all for now. You're back after the given number of days, at that day's sitting (given none: after ${c.cadenceDays}); sooner, at the next sitting, if someone writes to you (a letter: a paper filed with your office, a vote or a notice does not bring you back sooner, so give fewer days when you are waiting on one). You can use it alongside other actions: they're done, and you'll see how they went when you're back.`
         : "That's all for now. You'll be back after the given number of days, or sooner if someone writes to you. You can use it alongside other actions: they're done, and you're back after the days given, when you'll see how they went.",
       input_schema: { type: "object", properties: { days: { type: "integer", minimum: 1 } } } },
     { name: "notebook", description: `Your notebook: the only thing you'll remember from one sitting to the next. It holds ${NOTEBOOK_MAX.toLocaleString("en")} characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told: to make room, strike out what is settled (change the passage to nothing), or write it all afresh, shorter. Use it alongside your actions.`,
@@ -416,6 +416,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   // (Letters: those that went, by what came back from sending each, beside those it wrote.)
   const tally = { requests: 0, confirmed: 0, declined: 0, letters: 0, written: 0, looks: 0, first: -1, last: -1 };
   let sending = false; // the action just carried out was a letter (the next report says whether it went)
+  // Requests of the last answer that came to nothing, by use (what it is asked back), and whether this sitting has
+  // already gone on once for one.
+  const askedBack = new Map<string, string[]>();
+  let stayed = false;
   let messages: LlmMessage[] = [];
   // The last answer's tool uses (the APIs need a result for every one): each action's result is the report after it.
   let pending: { id: string; name: string }[] = [];
@@ -515,6 +519,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
     [lookedLast, lookedNow] = [lookedNow, new Set()];
     extra = [];
     retried = false;
+    stayed = false;
+    askedBack.clear();
     open = false;
     lookIds.clear();
     return until !== undefined ? { type: "wait", until } : { type: "wait" };
@@ -529,6 +535,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
   const keepForNext = () => {
     for (const u of pending) {
       if (results.has(u.id)) carried.push(results.get(u.id)! + (after.get(u.id) ?? ""));
+      // (A request that came to nothing, unread as the sitting ends: said first thing at the next, not left among the rest.)
+      for (const text of askedBack.get(u.id) ?? []) unsaid.push(`When you were last here, after you had finished: ${text.charAt(0).toLowerCase()}${text.slice(1)}`);
       if (notDone.has(u.id)) unsaid.push(notDone.get(u.id)!.later);
     }
   };
@@ -723,6 +731,10 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // This report is the result of the action just carried out, if one was.
       const wasResult = current !== undefined;
       if (current && sending && obs.outcomes.some((x) => x.status === "applied")) tally.letters++;
+      // Something it asked to be done came to nothing (its request could not be drawn up): kept by the use it was, so
+      // that it is asked back in this sitting, or first thing at its next.
+      const back = (obs.notices ?? []).filter((n) => n.re !== undefined).map((n) => inWorld(n.text));
+      if (current && back.length) askedBack.set(current, back);
       sending = false;
       if (current) {
         // A look for a kind of paper that found nothing: the folder's latest papers are looked through for kinds like
@@ -765,11 +777,17 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
       // Done for now, said alongside: what its actions showed is kept for next time. If someone wrote meanwhile (with
       // the result of any of them), it's back sooner, as it was told: at the next sitting, or, with no office hours, now.
       let backEarly = false;
+      let stayOn = false;
       if (doneAfter) {
         const was = doneAfter;
         doneAfter = undefined;
         if (!S && mail) backEarly = true;
-        else {
+        // Something it asked for in that answer was not filed: it is asked back at once, in this sitting, rather than
+        // told days later among other things (once a sitting; after that, first thing at its next).
+        else if (askedBack.size && !stayed) {
+          stayed = true;
+          stayOn = true;
+        } else {
           keepForNext();
           missed.push(obs);
           return leave(obs.t, was.days);
@@ -837,7 +855,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         if (!fresh) {
           const content: ContentBlock[] = pending.map((u) => ({ type: "tool_result", tool_use_id: u.id,
             content: (results.has(u.id) ? results.get(u.id)! + (after.get(u.id) ?? "") : undefined) ?? notDone.get(u.id)?.now ?? said.get(u.id) ?? (u.name === "notebook" ? "Notebook updated."
-              : u.name === "done_for_now" ? (backEarly ? "Someone wrote to you as you finished, so you're back now." : "Noted.")
+              : u.name === "done_for_now" ? (backEarly ? "Someone wrote to you as you finished, so you're back now." : stayOn ? "Not yet: something you asked for in the same answer was not filed or done, so the sitting goes on. See what came back from it, and say it again or leave it; then say when you're done." : "Noted.")
               : "Not done: it wasn't something you can do, as written.") }));
           // Reports it hasn't been shown that aren't the result of anything it did (they came while it couldn't be reached).
           const more = [...extra, ...(turn === 1 && !wasResult ? [body] : [])];
@@ -941,12 +959,14 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         unsaid = unreadTwice ? [`When you were last here, ${unreadTwice}.`] : [];
         extra = [];
         results.clear();
+        askedBack.clear();
         notDone.clear();
         after.clear();
         said.clear();
         quiet.clear();
         mail = false;
         backEarly = false;
+        stayOn = false;
 
         const uses = res.content.filter((b): b is Use => b.type === "tool_use");
         pending = uses.map((u) => ({ id: u.id, name: u.name }));

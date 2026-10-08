@@ -63,7 +63,7 @@ export function readable(x: unknown, how: { fields?: FieldKinds; money?: (a: str
   // A figure with its unit beside it.
   if (whole(o.value) && typeof o.unit === "string" && Object.keys(o).every((k) => ["unit", "value", "label", "description", "type"].includes(k))) {
     const v = Number(o.value);
-    const said = o.unit === "seconds" ? duration(v) : o.unit === "bps" ? percent(v, 10_000) : o.unit === "ppm" ? percent(v, 1_000_000) : `${num(v)} ${o.unit}`;
+    const said = o.unit === "seconds" ? duration(v) : o.unit === "bps" || o.unit === "basis points" ? percent(v, 10_000) : o.unit === "ppm" ? percent(v, 1_000_000) : `${num(v)} ${o.unit}`;
     return Object.keys(o).length === 2 ? said : { ...Object.fromEntries(Object.entries(o).filter(([k]) => k !== "unit" && k !== "value")), value: said };
   }
   const out: { [k: string]: unknown } = {};
@@ -681,8 +681,8 @@ export function renderObservation(obs: Observation, o: RenderOptions = {}): stri
   if (obs.body) out.push(...describeBody(obs.body, obs.t));
   if (obs.positions?.length) out.push(`You hold ${obs.positions.length === 1 ? "a post" : "these posts"}: ${obs.positions.map((p) => `${p.title ?? words(p.role ?? p.position)} (${p.position}), for ${p.entity}`).join("; ")}.`);
   for (const x of obs.outcomes) out.push(...outcomeLines(x, o.lastAction ?? "What you did", obs.t));
-  // (A note about something it asked to be done names it; anything else it is told stands as it is said.)
-  for (const n of obs.notices ?? []) out.push(n.re ? `A note on your request: ${n.text}` : n.text);
+  // (What it is told stands as it is said: a note about something it asked to be done says which, in its own words.)
+  for (const n of obs.notices ?? []) out.push(n.text);
   if (obs.inbox.length) {
     out.push("", "## Letters");
     // A letter is signed: by the post it was written in and whose post that is, or by the person or organisation.

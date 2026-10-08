@@ -110,3 +110,26 @@ test("a mayor's letters all go, whatever it writes as what they are about; none 
   expect(shown.join("\n")).toMatch(/- From [^\n]*\((finance|council-clerk|bank-payments)\), [^\n]*\((city|bank)\) \(year 1, day \d+\)/);
   for (const x of everything) expect(x).not.toMatch(/[a-z]-system\b|[0-9]-self\b/);
 }, 120_000);
+
+test("a council whose clerk, councillors and mayor are all the mock votes and declares a result within twenty days, as one run by code does", async () => {
+  // (The mock sat weekly whatever the office: a proposal filed on day 1 went to the vote on day 8 and was counted on
+  // day 22, so a twenty-day dry run showed no council result of any kind. It now sits as often as its brain's own
+  // module looks in.)
+  const out = join(root, "runs", "test-seat-council");
+  rmSync(out, { recursive: true, force: true });
+  await runWorld({ config: generate({ ...spec, mayor: "llm", model_seats: "council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5" }), runId: "town.seed1", outDir: out, until: 20 * DAY, recordObservations: "none" });
+  const council: { day: number; who: string; what: string }[] = [];
+  for await (const line of logLines(join(out, "town.seed1.jsonl"))) {
+    if (!line.includes('"kind":"command"') || !(line.includes('"ballot') || line.includes('"block":"vote"'))) continue;
+    const e = JSON.parse(line);
+    for (const b of e.body.blocks ?? []) if (b.block === "vote" || b.kind === "ballot" || b.kind === "ballot_result") council.push({ day: Math.floor(e.t / DAY), who: e.body.participant, what: b.block === "vote" ? `vote ${b.choice}` : `${b.kind}: ${b.text}` });
+  }
+  const result = council.find((x) => x.what.startsWith("ballot_result"));
+  expect(council.find((x) => x.what.startsWith("ballot:"))!.day).toBeLessThanOrEqual(2);
+  expect(council.filter((x) => x.what.startsWith("vote ") && x.who.startsWith("councillor")).length).toBe(5);
+  expect(result).toBeDefined();
+  // Every councillor's vote is in the count.
+  expect(result!.what).toMatch(/^ballot_result: (Passed|Rejected): (\d) for, (\d) against\.$/);
+  const [, , yes, no] = /(Passed|Rejected): (\d) for, (\d) against/.exec(result!.what)!;
+  expect(Number(yes) + Number(no)).toBe(5);
+}, 180_000);

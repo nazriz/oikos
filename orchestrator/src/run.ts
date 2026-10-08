@@ -462,7 +462,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       if (brainModule) {
         await hashSource(brainModule);
         const bctx = { ...ctx, params: sortedKeys(pp.mock?.params ?? {}) as any };
-        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", rejectBps: pp.mock?.reject_bps, optOutAt: pp.mock?.opt_out_at });
+        brains.set(p.id, { controller: brainModule.create(bctx), ctx: bctx, capacity: office?.id ?? "self", cadence: brainModule.cadence(bctx), rejectBps: pp.mock?.reject_bps, optOutAt: pp.mock?.opt_out_at });
         bindings[p.id] = { ...bindings[p.id], mock_brain: b };
       }
     }
@@ -833,7 +833,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
       if (!tr.ok) {
         await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: tr.notices.join(" "), ...(tr.asked_back ? { asked_back: true } : {}), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw) } : {}) } } });
-        for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
+        for (const text of tr.notices) u.notices.push({ t, text: aboutRequest(action.text, text), re: draftId });
         return true;
       }
       // A draft the log won't take (something in it breaks the contract: a kind that isn't a label, an id that isn't
@@ -842,7 +842,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       const drafted = await k.tryRequest({ op: "annotate", annotation: { annotation: "draft", draft: tr.draft } });
       if (drafted === null) {
         await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: NOT_CHECKED, call: tr.draft.call, invalid: ["the draft breaks the contract and couldn't be recorded"] } } });
-        u.notices.push({ t, text: NOT_CHECKED, re: draftId });
+        u.notices.push({ t, text: aboutRequest(action.text, NOT_CHECKED), re: draftId });
         return true;
       }
       const pending = { draft: tr.draft, hash: tr.hash, ...(action.reasoning ? { reasoning: action.reasoning } : {}) };
@@ -854,7 +854,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     if (action.type === "sign") {
       const i = L.drafts.findIndex((d) => d.draft.id === action.draft);
       if (i < 0) {
-        u.notices.push({ t, text: `There's nothing waiting for you to confirm called ${action.draft}.`, re: action.draft });
+        u.notices.push({ t, text: `There's nothing waiting for you to confirm called ${action.draft}.` });
         return true;
       }
       const [pending] = L.drafts.splice(i, 1);
@@ -863,6 +863,10 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
     }
     return true;
   };
+
+  /** What a seat is told of a request of its own that came to nothing: which request, in its own words, that nothing
+   * was filed or done, and then what is asked of it. Never a bare remark that could be read as about something else. */
+  const aboutRequest = (asked: string, text: string) => `About what you asked for (${JSON.stringify(asked.length > 120 ? `${asked.slice(0, 120)}…` : asked)}): nothing was filed or done. ${text}`;
 
   /** The capacity an action is done in: the unit's own, or the one it names, or its only one. */
   const asOf = (u: Unit, action: ParticipantAction): string | undefined => (u.capacity && u.capacity !== "self" ? u.capacity : ("as" in action && action.as) || capacityOf(u));

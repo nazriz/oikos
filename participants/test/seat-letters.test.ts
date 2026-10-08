@@ -106,3 +106,25 @@ test("a notebook has room for a half-year, and a seat is told how to make room b
   expect(calls[1]!.messages[0]!.content as string).toContain(`${nearly}\n(6,400 of the 8,000 characters it holds are used: it is nearly full, with 1,600 left. To make room`);
   expect(tools(c).find((t) => t.name === "notebook")!.description).toContain("It holds 8,000 characters. Add to it, change or strike out a passage of it, or write it all out afresh; what you don't touch stays as it is. What wouldn't fit isn't put in, and you're told: to make room, strike out what is settled (change the passage to nothing), or write it all afresh, shorter.");
 });
+
+test("a request that came to nothing is put to the seat at once, in the same sitting; a second time, first thing at its next", async () => {
+  // (The live check, finding 7: told two days later among other things, the seat went on to say it had filed.)
+  const about = 'About what you asked for ("File the budget proposal."): nothing was filed or done. It could not be set out on the council proposal form from what you said. Please say it again.';
+  const failed = (t: number) => obs(t, { notices: [{ t, text: about, re: "draft.mayor-system.1" }] });
+  const { p, calls } = harness([
+    [use("a", "do", { what: "File the budget proposal.", as: "mayor" }), use("d", "done_for_now", { days: 2 })],
+    [use("b", "do", { what: "File the budget proposal, staff 300,000.", as: "mayor" }), use("d2", "done_for_now", { days: 2 })],
+  ]);
+  expect(await p.step(obs(9 * HOUR), ctx)).toMatchObject({ type: "propose", text: "File the budget proposal." });
+  // It said it was done for now, but what it asked for was not filed: the sitting goes on, and it is told why.
+  expect(await p.step(failed(9 * HOUR), ctx)).toMatchObject({ type: "propose", text: "File the budget proposal, staff 300,000." });
+  expect(calls.length).toBe(2);
+  const back = Object.fromEntries((calls[1]!.messages.at(-1)!.content as any[]).map((b) => [b.tool_use_id, b.content]));
+  expect(back.a).toContain(about);
+  expect(back.d).toBe("Not yet: something you asked for in the same answer was not filed or done, so the sitting goes on. See what came back from it, and say it again or leave it; then say when you're done.");
+  // Again in the same sitting: it has been held once, so it goes as it asked, and is told first thing at its next.
+  expect(await p.step(failed(9 * HOUR), ctx)).toMatchObject({ type: "wait" });
+  await p.step(obs(2 * 86_400 + 9 * HOUR), ctx);
+  expect(calls.length).toBe(3);
+  expect(calls[2]!.messages[0]!.content as string).toStartWith(`Your notebook: (empty)\n\nWhen you were last here, after you had finished: about what you asked for ("File the budget proposal."): nothing was filed or done.`);
+});
