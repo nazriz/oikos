@@ -44,6 +44,8 @@ The builder buys materials for the jobs it has signed and not yet begun, oldest 
 - **a lot already built on:** a lot whose every cell it has seen built on, or one with a job of its own there, queued or under way (2026-09-30: a town commissioned a second park where the builder was already building one, and the builder signed a contract it couldn't carry out).
 Whether a building fits a lot's open ground exactly is the resolver's to judge when it builds.
 
+**What a client does with a decline** is the client's own rule. A landlord reads it a week on and offers again at the price named, if it can pay it (docs/behaviour/firms.md, "Development"). The town's office does not read it: a park or road declined is not offered again, though the next year's park is applied for afresh (known, not changed: docs/decisions.md, "A landlord whose offer is declined").
+
 ## Leaves out
 
 - **One kind of material**, instead of concrete, timber, steel and fittings.

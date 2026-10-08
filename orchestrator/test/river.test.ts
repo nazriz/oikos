@@ -29,12 +29,27 @@ async function run(compliance: number, name: string) {
   return { riverSite, riverCells: cellsOf(riverSite), ev, recs };
 }
 
-// (Marked as expected to fail on 2026-10-08, for a landlord whose offer the builder declined and who never offered
-// again: in this town the builder republishes its prices the morning the landlord commissions the house. Since
-// firm.landlord 0.13.2 a declined offer is made again at the builder's price, and the test passes for that reason:
-// the house goes up on the river site, the builder gives notice of it, and the inspector goes there.)
+// (In the town drawn from this seed the builder republishes its prices in the moment the landlord commissions the
+// house, the offer is at the list just before, and the builder declines it in writing, naming its price. Until
+// 2026-10-08 the landlord never read that reply and never built: docs/decisions.md, "A landlord whose offer is
+// declined". It reads it with the week's post and offers again, which the first lines below hold it to wherever a
+// town has such a moment; participants/test/landlord.test.ts holds the rule itself, whatever town is drawn.)
 test("a refused permit, a landlord who builds anyway, and an inspector who notices", async () => {
   const { riverSite, riverCells, ev, recs } = await run(0, "defiant");
+  // An offer that crossed a change of prices and was declined: offered again once, at the price named, a week on.
+  const no = recs.find((r) => r.kind === "offer_declined" && (r.addressed_to ?? []).includes("landlord-1"));
+  if (no) {
+    const offers = recs.filter((r) => r.record === "agreement" && r.terms?.template === "construction" && r.terms.parties[0] === "landlord-1" && r.terms.commitments[0].does.outcome.structure?.on === riverSite);
+    const first = offers.find((o) => o.id === no.data.agreement);
+    expect(first).toBeDefined();
+    const again = offers.filter((o) => o.at > no.at);
+    expect(again).toHaveLength(1);
+    expect(again[0].terms.commitments[1].does.outcome.money.amount).toBe(no.data.price);
+    // (At its first plan a week or more after it offered: not in the moment the answer came, and no later than the
+    // week after that, since it plans at least weekly.)
+    expect(again[0].at - first.at).toBeGreaterThanOrEqual(7 * DAY);
+    expect(again[0].at - first.at).toBeLessThanOrEqual(14 * DAY + 3600);
+  }
   const app = recs.find((r) => r.kind === "permit_application" && r.data.lot === riverSite);
   expect(app).toBeDefined();
   const decision = recs.find((r) => r.kind === "permit_decision" && r.data.application === app.id);

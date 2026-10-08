@@ -24,6 +24,34 @@ export function repayment(principal: number, annualBps: number, months: number):
 }
 
 /**
+ * A share of an amount, in ten-thousandths, as a whole number of the smallest unit: rounded down, or up. Whole numbers
+ * throughout (the remainder decides the rounding; no fraction is ever made), exact while the amount times ten thousand
+ * is within 2^53.
+ */
+export function shareDown(amount: number, bps: number): number {
+  const n = amount * bps;
+  if (!Number.isSafeInteger(n)) throw new Error(`a share of ${amount} is beyond this code's exact arithmetic`);
+  return (n - (n % 10_000)) / 10_000;
+}
+export function shareUp(amount: number, bps: number): number {
+  const n = amount * bps;
+  return shareDown(amount, bps) + (n % 10_000 > 0 ? 1 : 0);
+}
+
+/** The most a lender lends against a price at a share of it (a loan-to-value limit): that share, rounded down to a
+ * whole unit. A loan is within the limit exactly when it is no more than this. */
+export const mostAgainst = (price: number, lvrBps: number) => shareDown(price, lvrBps);
+
+/**
+ * What a buyer borrows for something at a price, putting down a share of it as the deposit: the deposit is rounded up
+ * to a whole unit, so the loan is the rest of the price rounded down. A lender that lends at most the rest of the price
+ * (80% against a 20% deposit) admits it at any price. Rounding the deposit down asks for a unit more than that limit
+ * wherever the share is not whole, and was refused for it (until 2026-10-08: docs/decisions.md, "A home loan asked a
+ * fraction over the limit").
+ */
+export const loanFor = (price: number, depositBps: number) => price - shareUp(price, depositBps);
+
+/**
  * A borrower's side: apply to a lender when short, take the loan offered (sign it, and ask the bank to pay the
  * repayments monthly), and remember a refusal for a while. The same for a household or a firm.
  */
@@ -113,7 +141,7 @@ export const lending: BehaviourModule = {
     { what: "request", why: "The bank's own files: its customers' instructions, among them the repayments of the loans this office made." },
     { what: "accounts", why: "The bank's own ledger: it keeps its customers' accounts, and a lending office reads what an applicant holds with it." },
   ],
-  version: "0.4.0",
+  version: "0.4.1", // 0.4.1: main's 0.3.1 with this branch's 0.4.0 (an applicant is looked up)
   doc: "docs/behaviour/credit.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -251,7 +279,8 @@ export const lending: BehaviourModule = {
           const holderOk = accounts.get(account)?.holder === who && accounts.get(account)?.custodian === me;
           const refuse = !holderOk ? "we don't keep that account for you" : amount <= 0 ? "it doesn't say how much" : defaulted.has(who) ? "you're in default on a loan with us"
             : behind(who) ? "you're behind on a loan with us"
-            : mortgage && amount * 10_000 > price * p.max_lvr_bps ? `it's more than ${p.max_lvr_bps / 100}% of the home's price (${usd(price)})`
+            // (In whole units: the most we lend on the price, rounded down; a loan of exactly that much is within it.)
+            : mortgage && amount > mostAgainst(price, p.max_lvr_bps) ? `it's more than ${p.max_lvr_bps / 100}% of the home's price (${usd(price)})`
             : assessed > cap ? `the repayments${already ? ` (with the ${usd(already)} a month you already repay us)` : ""}, ${usd(assessed)} a month at ${(rate + p.buffer_bps) / 100}% (our rate and the buffer we assess at), are more than ${(p.max_share_bps[kind] ?? 2000) / 100}% of your regular income (${usd(income)}, the least that came into your account in any of the last three months)` : "";
           if (refuse) {
             steps.push(because(`A loan application we can't approve: ${refuse}.`, say("loan_decision", `Loan application ${a.id} declined: ${refuse}.`, { to: [who], visible: [who, me], basis: a.id, data: { application: a.id, approved: false, reason: refuse } })));

@@ -34,7 +34,7 @@ import { ask, Asked, because, Book, breaches, noted, callAction, commitmentOf, D
 import { ADULT_YEARS, ageAt, bedroomsNeeded, hear, householdOf, SAYING, type Heard, type HouseholdData, type Member, type OccupancyStandard } from "./household";
 import { Deliveries, goodsPrices, offerOf as shopOffer, order } from "./trade";
 import { incomeTaxLaw, withholding } from "./tax";
-import { Borrowing } from "./credit";
+import { Borrowing, loanFor } from "./credit";
 import { factsOf, Feelings, Mind, MIND_DEFAULTS, MIND_VERSION, Pursuit, satisfaction, Ties, type Circumstances, type Facts, type MindParams, type NeedLevels, type PopulationValues, type Value } from "./mind";
 
 /** How belief changes (docs/behaviour/citizen.md "Belief"; placeholders): a month's fading; how much of the way to
@@ -117,7 +117,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.41.0", // 0.41.0: main's 0.40.0 (extended households, the occupancy standard) with this branch's 0.40.0 (asks the police to call at a silent home next door; registers a birth)
+  version: "0.41.1", // 0.41.1: main's 0.40.1 (a buyer rounds the deposit up) with 0.41.0
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -2194,7 +2194,8 @@ export const citizen: BehaviourModule = {
             .sort((a, b) => Number(a.data?.price) - Number(b.data?.price) || (a.id < b.id ? -1 : 1))[0];
           if (l) {
             const price = Number(l.data!.price);
-            const loan = price - Math.floor((price * m.deposit_bps) / 10_000);
+            // (The deposit rounded up to a whole unit, the loan the rest: what a lender's share of the price admits.)
+            const loan = loanFor(price, m.deposit_bps);
             buying = { listing: l.id, seller: l.speaks_for!, account: String(l.data!.account), price, lot: String(l.data!.lot), space: String(l.data!.space), structure: String(l.data!.structure), stage: "applied", since: t };
             steps.push(borrowing.apply(t, acc.account, loan, m.mortgage_months, "a home",
               `${l.data!.structure} is for sale at ${usd(price)}, and we have the deposit and costs: asking the bank for a mortgage of ${usd(loan)}.`, { price, home: l.data!.space }));

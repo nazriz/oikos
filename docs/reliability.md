@@ -9,7 +9,7 @@ A run never hangs silently or carries on against something broken. What happens 
 | A behaviour module throws | Deterministic | Logged as a `participant_error` note (the error's name and message, and how many in a row); the participant waits this wake; the run goes on. After **3 in a row** it's retired (`participant_retired`): its stand-in carries on if the world names one (`on_opt_out`), otherwise it stops acting. The run summary counts them. |
 | A model call fails after its retries (every call has a time limit, 180 s by default, and retries with backoff) | Deterministic once logged | `ModelCallFailed`: the call is logged as a `model_call_failed` annotation (what was sent, and the error), and the participant waits this wake (a `participant_error` note). A translator call that fails becomes "That couldn't be drafted just now." A debrief that fails is skipped (`debrief_skipped`). A resumed run is served the failure as the same failure. |
 | The model can't be reached (3 calls in a row fail, with none answered between), or a provider's usage limit is reached | Timing | The run stops there, saying so, its log closed ("aborted"), to be resumed. Nobody is retired, and nobody is debriefed (`debriefs_deferred`): for those in it the run isn't over. |
-| The run is asked to stop (`scripts/mini stop`, a TERM signal, Ctrl-C) | Timing | It stops before its next moment and closes its log, as above. A batch passes the request on to its seeds and starts no more. If a model call is still out after `OIKOS_STOP_GRACE_SECONDS` (120), the process ends as it is: the log resumes all the same. |
+| The run is asked to stop (`scripts/mini stop`, a TERM signal, Ctrl-C) | Timing | It stops before its next moment and closes its log, as above. A batch passes the request on to its runs and starts no more. If a model call is still out after `OIKOS_STOP_GRACE_SECONDS` (120), the process ends as it is: the log resumes all the same. |
 | Participants wake each other without end at one moment | Deterministic | `RunStuck` after 1,000 rounds of wakes at one moment: the run stops with a diagnosis. |
 | Nothing makes progress (a module stuck in a loop, a kernel that stalls, a call that never returns despite its limit) | Timing | A watchdog thread sees the run's breadcrumbs stop. A model call in flight keeps them moving every 10 s for up to 20 minutes, beyond every adapter's own limits, so a slow but healthy call isn't taken for a stall. After `OIKOS_STALL_SECONDS` (default 300), it writes `<run>.failure.json` beside the log, saying what the run was doing, for whom, and when, and ends the process. Time the machine spends asleep doesn't count: a gap between the watchdog's ticks far longer than a tick means everything was frozen, the run included, so a laptop closed overnight pauses a run rather than failing it. |
 | The kernel process dies | Timing | `KernelDied` at once, with its exit code, never mistaken for an off-contract request. `<run>.failure.json` says so. |
@@ -20,7 +20,7 @@ A run never hangs silently or carries on against something broken. What happens 
 
 ## Logs are never overwritten
 
-A model's answers can't be made again. So a fresh run refuses to start where its log already is: `oikos run` and `run-one` stop with the log's name ("choose another --out, or resume it") if the folder holds that run's log, plain or compressed, or one a resume left behind; a batch checks every seed, and the folder's `measure/`, before it starts any. `--overwrite` replaces a run, for tests' own folders; it's never the default, and it never replaces a log in which any model call came from a real provider (anything but the mock), nor anything in a folder that holds one.
+A model's answers can't be made again. So a fresh run refuses to start where its log already is: `oikos run` and `run-one` stop with the log's name ("choose another --out, or resume it") if the folder holds that run's log, plain or compressed, or one a resume left behind; a batch checks every run, and the folder's `measure/`, before it starts any. `--overwrite` replaces a run, for tests' own folders; it's never the default, and it never replaces a log in which any model call came from a real provider (anything but the mock), nor anything in a folder that holds one.
 
 ## Signs of trouble that don't stop a run
 
@@ -32,7 +32,7 @@ A run that finishes can still have gone wrong quietly. This session found two su
 
 `batch.json` keeps each run's health and warnings. For the batch as a whole:
 - **`oikos health <DIR>`:** the batch's measures against its profile's calibration targets, each within a stated tolerance, breaches first, and the demand households went without.
-- **`oikos diff <BASELINE> <CHANGE>`:** every measure of two batches of the same world, judged against seed-to-seed noise. Run it before and after any change to behaviour.
+- **`oikos diff <BASELINE> <CHANGE>`:** every measure of two batches of the same world, judged against the noise between each side's runs; it says first how many runs of how many towns each side is (runs of one town, `--seeds`, are not towns: `--towns`). Run it before and after any change to behaviour.
 
 ## Resuming a run
 
