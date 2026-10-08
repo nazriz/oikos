@@ -3,7 +3,8 @@
 // [--dry-run] [--wait MINUTES] [--no-build] [--no-start] [--repo DIR]`. A resumed run replays its log and can only be
 // resumed on the code it started on, while development goes on in other worktrees, so a wave has a worktree of its own,
 // pinned to one commit: <repo>/.claude/worktrees/wave-<wave>, made at <git-ref> (or reused, if it is at that commit; a
-// wave never moves to another one: name a new wave). There it installs and builds (`bun install`, `bun run kernel`),
+// wave never moves to another one: name a new wave). There it installs and builds (`bun install`, `bun run kernel`, after
+// cloning what the nearest checkout has built: scripts/worktree-warm.ts),
 // records the commit in <runs>/pilot-queues/<wave>.commit, and starts scripts/pilot-queue.ts from THAT worktree for each
 // queue file, detached (nohup, and caffeinate on macOS), one process each; a queue already running isn't started twice.
 // --dry-run says what it would do and does nothing. --no-build and --no-start are for trying the worktree part alone.
@@ -17,6 +18,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { lastAlerts } from "../orchestrator/src/pilot-alerts";
 import { runState, scanOptOuts } from "../orchestrator/src/pilot-state";
 import { describe, scan } from "./worktree-clean";
+import { warm } from "./worktree-warm";
 
 const args = process.argv.slice(2);
 const flag = (name: string) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
@@ -93,13 +95,14 @@ if (existsSync(dir)) {
   }
 }
 
-// 2. Installed and built there (the engine is a build of the commit's own kernel).
-for (const cmd of [["bun", "install"], ["bun", "run", "kernel"]]) {
-  if (noBuild) continue;
-  say(`in ${dir}: ${cmd.join(" ")}`);
-  if (dry) continue;
-  const b = Bun.spawnSync(cmd, { cwd: dir, stdout: "inherit", stderr: "inherit" });
-  if (b.exitCode !== 0) throw new Error(`${cmd.join(" ")} failed in ${dir}`);
+// 2. Installed and built there (the engine is a build of the commit's own kernel). First what the nearest checkout
+// already has is cloned in (scripts/worktree-warm.ts: copy-on-write, and only what the worktree lacks); the install
+// and the build then redo whatever differs, so the engine is this commit's whatever was cloned.
+if (!noBuild) {
+  say(`in ${dir}: clone node_modules and kernel/target from the nearest checkout that has them (scripts/worktree-warm.ts)`);
+  say(`in ${dir}: bun install`);
+  say(`in ${dir}: bun run kernel`);
+  if (!dry) warm(dir, { say });
 }
 
 // 2b. A dry run on the mock instead of the real thing: nothing is recorded or started.
