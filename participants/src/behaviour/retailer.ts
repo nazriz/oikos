@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.9.0", // 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
+  version: "0.9.1", // 0.9.1: a business of one buys stock when it runs low (daily), keeps its stock money at today's price, follows its owner's home, and closes when its owner has gone; 0.9.0: a business run by its owner alone (operator), stocked for a few days and drawn on by its owner; 0.8.4: takes on the share of its hands the world gives by the day; 0.8.3: registers the share of its jobs the world gives for shops (firms.md, "Jobs an employer does not register")
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -141,6 +141,9 @@ export const retailer: BehaviourModule = {
     let monthStart = -1;
     let nextRestock = 0;
     let nextDraw = -1;
+    // A business of one: where it trades from now (its owner tells it when they move home), whether it has anywhere
+    // to, and whether its owner has gone from the town (it then closes: what it holds is its owner's).
+    const at = { premises: p.premises, workplace: p.workplace, cell: p.premises_cell, nowhere: false, read: 0, gone: false, closed: false };
     /** A month's sales, as the days of them we stock and keep money for. */
     const stockFor = (monthly: number) => (p.stock_days === 30 ? monthly : Math.ceil((monthly * p.stock_days) / 30));
     const books = { last: null as number | null, in: 0, out: 0, next: 0 }; // the stocktake's books
@@ -250,7 +253,19 @@ export const retailer: BehaviourModule = {
         if (headcount < 0) headcount = p.operator ? 0 : Math.max(workers.length, p.min_staff); // (a new shop starts by hiring its minimum)
         const hands = p.operator ? 1 : workers.length; // (who serves: its staff, or its owner alone)
         if (monthStart < 0) monthStart = acc.balance;
-        const stock = held(obs, p.premises, p.kind);
+        // (Its owner has moved home: it trades from there now, and takes its stock along.)
+        const moves = p.operator ? book.all("trading_from") : [];
+        for (; at.read < moves.length; at.read++) {
+          const r = moves[at.read]!;
+          if (r.speaks_for !== p.operator || !(r.addressed_to ?? []).includes(me)) continue;
+          publishedPrice = -1; // (its prices go up where it now is, or come down)
+          if (r.data?.nowhere) { at.nowhere = true; continue; }
+          const had = held(obs, at.premises, p.kind);
+          const to = String(r.data?.structure);
+          if (had > 0 && to !== at.premises) steps.push(because(`Our owner lives at ${r.data?.space} now: taking our stock there.`, C.call("goods", { kind: p.kind, quantity: C.text(String(had)), to: me, at: to, from_at: at.premises })));
+          Object.assign(at, { premises: to, workplace: String(r.data?.space), cell: String(r.data?.cell ?? at.cell), nowhere: false });
+        }
+        const stock = held(obs, at.premises, p.kind);
         // The stocktake (crime: docs/behaviour/crime.md), monthly: what's here against our books (last count, what came,
         // what we served). Short: reported to the police, with what it was worth at our price.
         if (p.police && t >= books.next) {
@@ -351,16 +366,31 @@ export const retailer: BehaviourModule = {
         }
 
         // ---- our price list: where we are, and what we charge ----
+        // A business of one whose owner has gone from the town, or has nowhere to trade from: its prices come down, what
+        // it was to serve is refunded, and (gone) what it holds goes to its owner's account and it says it has closed.
+        if (p.operator && (at.gone || at.nowhere)) {
+          const old = book.open("price_list").filter((r) => r.speaks_for === me);
+          if (old.length) steps.push(because(at.gone ? "Our owner has gone: we have stopped trading." : "Nowhere to trade from: our prices come down until there is.", ...old.map((r) => withdraw(r.id, "Not trading."))));
+          publishedPrice = -1;
+          for (const x of queue.splice(0)) steps.push(fillWith(x.o, 0, x.served, [], "We are not trading: refunding what we had not served."));
+          for (const o of orders.due(book, t).paid) steps.push(fillWith(o, 0, 0, [], "We are not trading: refunding the order."));
+          if (at.gone && !at.closed) {
+            at.closed = true;
+            const out = distribute(book, me, acc, acc.balance, "Our owner has gone from the town: what the business holds is theirs");
+            steps.push(...out.steps, because("Closed: our owner has gone.", say("closure", `${me} has closed: its owner has gone.`, { visible: "public", data: { firm: me, to_creditors: 0, to_shareholders: out.paid } })));
+          }
+          return steps;
+        }
         if (price !== publishedPrice && winding.state === "trading") {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our price is now ${usd(price)}.` : "Publishing our price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
-            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises }, me, p.shopfront ? premisesOf(obs)?.cell ?? (p.premises_cell || undefined) : undefined)));
+            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${at.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: at.premises }, me, p.shopfront ? premisesOf(obs)?.cell ?? (at.cell || undefined) : undefined)));
         }
 
         // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----
         if (t >= nextRestock && offers.length && winding.state === "trading") {
-          nextRestock = t + 7 * DAY;
+          nextRestock = t + (p.operator ? 1 : 7) * DAY; // (someone trading alone on a few days' stock buys when it runs low, not once a week)
           const top = Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000);
           const mid = Math.ceil((((p.phi_low_bps + p.phi_high_bps) / 2) * stockFor(lastDemand)) / 10_000);
           const have = stock + onOrder;
@@ -372,7 +402,7 @@ export const retailer: BehaviourModule = {
             const q = Math.min(Math.max(best.min, top - have), affordable);
             if (q >= best.min) {
               onOrder += q;
-              const st = order({ me, seller: best.seller, sellerAccount: best.account, kind: p.kind, quantity: q, unitPrice: best.unit, at: p.premises, from: acc.account,
+              const st = order({ me, seller: best.seller, sellerAccount: best.account, kind: p.kind, quantity: q, unitPrice: best.unit, at: at.premises, from: acc.account,
                 why: `Restocking: ${stock} in stock and ${onOrder - q} on order, below ${mid} (the middle of our band of last month's sales, ${lastDemand}): ordering ${q}${q < top - have ? `, as many as we can pay for (up to ${top} would fill our band)` : ""} from ${best.seller}, the cheapest of our suppliers at ${usd(best.unit)}.` });
               st.then = (out) => {
                 const id = out.created?.order;
@@ -392,7 +422,9 @@ export const retailer: BehaviourModule = {
           if (nextDraw < 0) nextDraw = t + p.draw_days * DAY;
           if (t >= nextDraw) {
             nextDraw = t + p.draw_days * DAY;
-            const keep = Math.max(Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000), offers[0]?.min ?? 0) * (unitCost || offers[0]?.unit || 0);
+            // (At what its supplier charges now, and a tenth over: kept to the last unit, a rise in the price left it
+            // one item short of the least order, and it never bought again.)
+            const keep = Math.ceil((Math.max(Math.ceil((p.phi_high_bps * stockFor(lastDemand)) / 10_000), offers[0]?.min ?? 0) * Math.max(unitCost, offers[0]?.unit ?? 0) * 11) / 10);
             if (acc.balance > keep) steps.push(...distribute(book, me, acc, acc.balance - keep, `We hold ${usd(acc.balance)} and keep ${usd(keep)} for stock: the rest is our owner's`).steps);
           }
         }
@@ -456,6 +488,12 @@ export const retailer: BehaviourModule = {
             const short = outOfTime(res);
             if (short?.who) used.set(short.who, p.working_day - short.left);
             else if (short) for (const w of crew) used.set(w, p.working_day);
+            // (A business of one whose owner could not work where they trade, for whatever the world's reason: the place
+            // under water, the owner elsewhere. They see it, and try no more today.)
+            else if (p.operator && q && res.status === "refused") {
+              used.set(p.operator, p.working_day);
+              if (String(res.refusal?.detail ?? "").startsWith(`${p.operator} isn't in the world`) || String(res.refusal?.detail ?? "").startsWith(`${p.operator} has died`)) at.gone = true; // (they are not in the town at all)
+            }
             x.served = before;
             // Where it was to go, or whom to, is gone: refund what's left of it. Otherwise (someone left in the same
             // moment, say) it waits its turn again.
@@ -478,7 +516,7 @@ export const retailer: BehaviourModule = {
          * served, all told), a refund for what we couldn't serve and a note saying so. */
         function fillWith(o: Order, q: number, total: number, staff: string[], why: string): Step {
           const s: Step = because(why);
-          if (q > 0) s.push(C.call("work", { task: p.serve_task, units: C.text(String(q)), at: p.premises, by: C.json(staff) }), C.call("goods", { kind: o.kind, quantity: C.text(String(q)), to: o.to, at: o.at, from_at: p.premises }));
+          if (q > 0) s.push(C.call("work", { task: p.serve_task, units: C.text(String(q)), at: at.premises, by: C.json(staff) }), C.call("goods", { kind: o.kind, quantity: C.text(String(q)), to: o.to, at: o.at, from_at: at.premises }));
           if (total < 0) return s;
           const refund = (o.quantity - total) * o.unitPrice;
           if (refund > 0) s.push(pay(o.account, refund, { from: acc!.account, for: `Refund: ${o.quantity - total} ${o.kind} we couldn't sell you.` }));

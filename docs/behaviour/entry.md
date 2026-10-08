@@ -32,10 +32,12 @@
 | **Staff** | hired to what its sales need | none: it posts no job and takes nobody on |
 | **Where** | premises it owns | a room of the owner's home, or a pitch in a market the town keeps (it owns neither) |
 | **The task** | `serve`, set in a workplace | `sell`: the same time an item, set in no kind of space |
-| **Stock** | Lengnick's band of a month's sales | the same band of `stock_days` of sales (seven, unless the profile says); never less than a supplier's least order when it buys |
+| **Stock** | Lengnick's band of a month's sales, looked at weekly | the same band of `stock_days` of sales (seven, unless the profile says), looked at daily: it buys when it runs low; never less than a supplier's least order when it buys |
 | **Suppliers** | the world market and the factories it finds advertising to the trade | the same, on the same terms: a wholesaler's least order binds it |
 | **Price** | Lengnick's rule, monthly | the same (its owner's hour valued at a shop hand's wage, for the bounds) |
-| **What it clears** | to its shareholders at the month's end, out of the month's earnings | to its owner every pay period: whatever it holds beyond the money for its stock |
+| **What it clears** | to its shareholders at the month's end, out of the month's earnings | to its owner every pay period: whatever it holds beyond the money for its stock (the top of its band or a supplier's least order, at today's price and a tenth over) |
+| **When its owner moves home** | | worked from home, it goes with them: the owner tells it (`trading_from`), it takes its stock there and puts its prices up there. With no home, its prices come down and orders are refunded until there is one |
+| **When its owner leaves town** | | it finds it cannot be worked (the world says its owner is not there), refunds what it had not served, pays what it holds to its owner's account and says it has closed |
 | **Tax** | withholds from its staff | none: nobody is on its payroll, and nothing in the town taxes a trader's takings |
 
 Its customers find it as they find a shop: its prices are put up where it trades (the cell of the home or of the market), seen by those who live and work near, and found by anyone who looks through what sellers advertise. They order, pay with the order, and are served and delivered to as by a shop ([retailer.md](retailer.md), [citizen.md](citizen.md)). Earnings are not a figure anywhere: a trader clears the margin on what households buy from them, and more traders share the same custom.
@@ -54,7 +56,9 @@ The generator then: draws that share of people in work into businesses of one; g
 
 **Not here, by decision: who takes this up and when.** The standard accounts (people queue for scarce formal jobs: Harris and Todaro 1970; those who cannot wait work in an easy-entry sector and search less well from it: Fields 1975; much of it is chosen: Maloney 2004) are used for nothing but the opening allocation, which is the survey's share. Starting such a business when out of work, giving it up for a job, closing it when custom fails, a household deciding who does what: all of it is the citizen redesign's (docs/design/ai-citizens.md, Open). So in a run the number of these businesses only falls (an owner dies or leaves town), and nobody new starts one.
 
-**Leaves out, besides that:** the kinds above that the town cannot hold; a plot (land worked for food, part eaten); a pitch fee (no place's was sourced; the agreement is where it would be written, and the town's account where it would be paid); buying from the town's shops in small lots; unpaid family help; the business's money and stock when its owner dies or leaves (it stays in the business: nobody winds it up); a trader registering, or being taxed on turnover (docs/behaviour/public-finance.md, "Leaves out").
+**Three faults of the first version, found in the Kenyan towns and fixed** (2026-10-09; none is a figure): a trader at home stayed at the home they started in when their household moved (thousands of refusals, and no sales); a trader looked at their stock once a week, as a shop does, with a week's stock (sold out for days); and one kept exactly a least order's money at the last price paid, so a rise in the world price left them one item short of ever buying again (half had stopped selling by the sixth month).
+
+**Leaves out, besides that:** the kinds above that the town cannot hold; a plot (land worked for food, part eaten); a pitch fee (no place's was sourced; the agreement is where it would be written, and the town's account where it would be paid); buying from the town's shops in small lots; unpaid family help; the business of an owner who dies (their participant ends, and nothing runs the business after: its prices stay up, an order to it is never answered, and its money and stock stay in it; an estate's executor would wind it up, and there is none); the stock of a business whose owner has left town; a trader registering, or being taxed on turnover (docs/behaviour/public-finance.md, "Leaves out").
 
 ## Firms that close without failing
 

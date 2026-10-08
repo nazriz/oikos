@@ -76,6 +76,7 @@ test("the town starts with the stated share in businesses of one, each run by it
       expect(config.world.occupancy.some((o: any) => o.occupant === person && o.space === space)).toBe(true);
       expect(/\/dwelling\.\d+$/.test(space)).toBe(true);
       expect(me.at).toBeUndefined();
+      expect(me.home).toBe(space);
     }
     // A few days' stock where it trades, and money for one more buying of it.
     expect(Number(config.world.holdings.find((h: any) => h.holder === f.id).quantity)).toBeGreaterThan(0);
@@ -108,7 +109,7 @@ test("they sell to households by their own hours, draw what the business clears,
   for (const w of sold) {
     expect(w.performers.length).toBe(1);
     expect(owners.has(w.performers[0])).toBe(true);
-    expect(places.has(w.at)).toBe(true);
+    expect(places.has(w.at) || recs.some((r) => r.kind === "trading_from" && r.speaks_for === w.performers[0] && r.data?.structure === w.at)).toBe(true);
     const k = `${w.performers[0]}|${Math.floor(w.t / DAY)}`;
     perDay.set(k, (perDay.get(k) ?? 0) + w.labour);
   }
@@ -147,6 +148,13 @@ test("they sell to households by their own hours, draw what the business clears,
   expect(n(sum!.employed_by_agreement)).toBe(n(work!.employees));
   expect(n(work!.informal_employment_pct)).toBeCloseTo((100 * n(work!.own_account)) / n(work!.employed), 0);
   expect(n(sum!.unemployment_pct)).toBeLessThan(n(sum!.unemployment_by_agreement_pct) - 20);
+  // An owner who moved home took the business along: told, it sells from the new home after.
+  const moved = recs.filter((r) => r.kind === "trading_from" && r.data?.structure);
+  for (const r of moved) {
+    expect(owners.has(r.speaks_for)).toBe(true);
+    const later = sold.filter((w) => w.performers[0] === r.speaks_for && w.t > r.at + DAY && !moved.some((x) => x.speaks_for === r.speaks_for && x.at > r.at && x.at < w.t));
+    for (const w of later) expect(w.at).toBe(r.data.structure);
+  }
   const perSeller = sold.reduce((x, w) => x + w.units, 0) / firms.size;
-  console.log(`own-account: ${firms.size} businesses, ${sellers.size} sold, ${sold.reduce((x, w) => x + w.units, 0)} items in 90 days (${perSeller.toFixed(0)} each), ${draws.length} drawings; shops served ${ev.filter((e) => e.event === "worked" && e.task === "serve").reduce((x, w) => x + w.units, 0)}`);
+  console.log(`own-account: ${firms.size} businesses, ${moved.length} moves of home, ${sellers.size} sold, ${sold.reduce((x, w) => x + w.units, 0)} items in 90 days (${perSeller.toFixed(0)} each), ${draws.length} drawings; shops served ${ev.filter((e) => e.event === "worked" && e.task === "serve").reduce((x, w) => x + w.units, 0)}`);
 }, 900_000);

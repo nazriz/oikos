@@ -118,7 +118,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.43.0", // 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
+  version: "0.43.1", // 0.43.1: tells their own business when they move home; 0.43.0: someone who works for themself (own_work): not out of work, their income what the business pays them, at their pitch in working hours; 0.42.1: work by the day (a day's pay known as pay; no claim for a day not worked); 0.42.0: reads the support law, stops work at an age of its own (0.41.0 on its branch), with main's 0.41.1
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -150,7 +150,8 @@ export const citizen: BehaviourModule = {
       // Working for ourselves (docs/behaviour/entry.md, "A person working for themself"): the business we run alone,
       // the account it pays our drawings from, where we work from when that is not our home, and what it was
       // expected to bring in a month before it had (none: we work for an employer, or look for work).
-      own_work: null as { firm: string; account: string; at?: string; expect_per_month: number } | null,
+      // (`home`: the dwelling it trades from, where it trades from our home: we tell it when we live somewhere else.)
+      own_work: null as { firm: string; account: string; at?: string; home?: string; expect_per_month: number } | null,
       in_labour_force: true, // false: not looking for work (studying, caring...), and not claiming support for being out of it
       // A child born here: whether they'll look for work as an adult, at the world's participation (the template for
       // those who won't; "": every child takes `child_template`).
@@ -481,6 +482,7 @@ export const citizen: BehaviourModule = {
     // reckoned on; before that many days have passed, what it was expected to.
     const drawings: { t: number; amount: number }[] = [];
     const ownWork = p.own_work;
+    let tradingFrom: string | null = ownWork?.home ?? null; // where our business, worked from home, has been told it trades
     const ownIncome = (t: number) => (!ownWork ? 0 : t < p.income_window_days * DAY ? ownWork.expect_per_month : Math.floor((drawings.reduce((x, d) => x + d.amount, 0) * MONTH) / (p.income_window_days * DAY)));
     const wageIncome = () => ownIncome(book.now) + (!job ? 0 : job.period === DAY ? Math.floor((job.wage * 30 * (p.round?.work_days ?? 5)) / 7) : Math.floor((job.wage * MONTH) / job.period));
     // (Support for being out of work isn't income once we're in work: we stop claiming it. Counting it, a household applied
@@ -1059,6 +1061,17 @@ export const citizen: BehaviourModule = {
         toldMoveIn = null;
         home = null;
         homelessSince = t;
+      }
+      // Our own business, worked from our home: when we live somewhere else (or nowhere), we tell it, and it trades
+      // from there (its stock goes with us). Where our new home stands we know from having been there.
+      if (ownWork && !ownWork.at) {
+        const dwelling = home?.movedIn ? home.space : livingAt ?? null;
+        const where = dwelling ? channels.cells(obs).find((c) => c.structure?.structure === structureOf(dwelling))?.cell : undefined;
+        if (dwelling !== tradingFrom && (dwelling === null || where)) {
+          tradingFrom = dwelling;
+          steps.push(because(dwelling ? `We live at ${dwelling} now: our business trades from there.` : "We have no home to trade from: our business stops trading until we do.",
+            say("trading_from", dwelling ? `Trading from ${dwelling} now.` : "Not trading: nowhere to trade from.", { to: [ownWork.firm], visible: [me, ownWork.firm], data: dwelling ? { space: dwelling, structure: structureOf(dwelling), cell: where } : { nowhere: true } })));
+        }
       }
       // Wages not paid: a pay period (and a few days' grace) without them, we resign, and claim what we're owed, as an
       // employee can (docs/behaviour/citizen.md). The claim is a debt recorded against the employer.

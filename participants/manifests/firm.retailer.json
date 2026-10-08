@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {

@@ -62,7 +62,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.36.0";
+export const GENERATOR_VERSION = "0.36.1";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1005,7 +1005,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
       const days = kind.stock_days ?? 7;
       const stock = Math.max(1, Math.ceil((OWN.sales * days) / 30));
       entities.push({ id: firm, kind: "own_account", name: `${kind.name} (${c.id})` });
-      accounts.push({ id: `acc-${firm}`, holder: firm, custodian: "bank", balance: Math.max(stock, WHOLESALE_LEAST) * WORLD.goods_import });
+      accounts.push({ id: `acc-${firm}`, holder: firm, custodian: "bank", balance: Math.ceil((Math.max(stock, WHOLESALE_LEAST) * WORLD.goods_import * 11) / 10) }); // (and a tenth over: the price moves)
       ownStock.push({ kind: "goods", holder: firm, at: premises, quantity: String(stock) });
       records.push({ id: `shareholders-${firm}`, record: "statement", author: "genesis", at: 0, visible_to: [firm, c.id], speaks_for: firm, kind: "shareholders",
         text: `The shareholders of ${firm}, and their shares.`, data: { holders: [{ holder: c.id, account: `acc-${c.id}`, shares: 1_000_000 }] } });
@@ -1584,7 +1584,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     channels: [{ id: "books", kind: "accounts" }, mine(), market("outside"), shopBoards[0], { id: "stock", kind: "holdings" }],
     role_module: { code: "firm.retailer", params: { premises: b.premises, workplace: b.space, operator: b.person, max_staff: 0, min_staff: 0, industry: "retail", wage: wages.shop, period: PAY, working_day: WORKING_DAY,
       serve_task: "sell", serve_labour: SHOP.serve, suppliers: ["outside"], trade_board: "trade", price: RETAIL_PRICE, demand: OWN.sales, shopfront: true, premises_cell: b.cell, ...(RD && b.space.startsWith(`${MARKET}/`) ? { open_from: RD.work_start_hour * HOUR, open_until: RD.work_end_hour * HOUR } : {}), stock_days: b.days, draw_days: V.pay_period_days, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}) } } });
-  const ownWorkOf = new Map(ownBusinesses.map((b) => [b.person, { firm: b.firm, account: `acc-${b.firm}`, ...(b.space.startsWith(`${MARKET}/`) ? { at: b.space } : {}), expect_per_month: OWN.monthly }]));
+  const ownWorkOf = new Map(ownBusinesses.map((b) => [b.person, { firm: b.firm, account: `acc-${b.firm}`, ...(b.space.startsWith(`${MARKET}/`) ? { at: b.space } : { home: b.space }), expect_per_month: OWN.monthly }]));
   // Citizens see petitions and their published counts, not each other's signatures.
   const petitions = K.published("petitions", ["petition"], { on_request: true });
   const counts = K.published("counts", ["petition_count"]);
