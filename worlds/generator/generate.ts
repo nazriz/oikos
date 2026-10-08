@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, modules, Randomness, chargesInWords, forAge, forOutOfWork, paymentsInWords, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
+import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, modules, Randomness, chargesInWords, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -27,6 +27,14 @@ const WHO = "Who's who (look someone up: a person, an organisation or a post, by
 const SHOP_UTILISATION_BPS = 8000;
 /** The builder's margin over its costs (its published prices; placeholder). */
 const BUILD_MARKUP_BPS = 2000;
+/** The council as the town is given it: its ballots stay open this many days (placeholder: a fortnight), and its
+ * members' leanings on the tenants-and-development axis (docs/behaviour/government.md). */
+const COUNCIL_VOTE_DAYS = 14;
+const COUNCIL_LEANINGS = [-80, -40, 0, 40, 80];
+/** How many days before a year begins the mayor's office tables that year's budget: long enough that a budget the
+ * council rejects can be tabled once more (the office tables again after 45 days) and that ballot close too, with a
+ * week's slack for each office's own round, before the year starts. A budget is adopted before its year begins. */
+const BUDGET_LEAD_DAYS = 45 + COUNCIL_VOTE_DAYS + 14;
 const HOUR = 3600;
 /** The work an item of goods stands for where a profile doesn't fix the unit: this much of a factory worker's time. The
  * platform's choice of unit, no place's figure (docs/profiles.md). */
@@ -157,6 +165,10 @@ export interface TownSpec {
    * one, a list, or several in one text ("wet-year+lean-council"), applied in that order to this description and to
    * the profile's figures before the town is made. Default: none (the same as "baseline"). */
   scenario?: string | string[];
+  /** Whether the town opens with its first year's budget adopted, as a council does (docs/behaviour/government.md, "The
+   * budget year"). false: a town whose council has adopted none (the mayor is to propose one, and until the council
+   * adopts it the finance office has no budget to pay within). Default: true. */
+  opening_budget?: boolean;
 }
 
 /** The town's life physics (docs/behaviour/life.md), from the profile: deaths by age (the mean of the sexes' life
@@ -1211,7 +1223,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // profile's staff per 1,000 residents gives, and the landfill for a year's waste.
   // (With nature, the town's environment office: its scientists, at the public wage.)
   const envStaff = L ? V.nature!.survey_staff : 0;
-  const mayorParams = { population: adultCount, builder: "builder", park_budget: V.town_finance.parks_per_year, visits: "town", ...(E ? { electoral: ELECTORAL } : {}),
+  const mayorParams = { population: adultCount, builder: "builder", park_budget: V.town_finance.parks_per_year, visits: "town", budget_lead_days: BUDGET_LEAD_DAYS, ...(E ? { electoral: ELECTORAL } : {}),
     ...(RDS ? { road_budget: RDS.budget_per_resident * everyone.length, road_within: RDS.within_cells } : {}), staff_budget: crew * crewAnnual, services_budget: servicesBudget, ...(envStaff ? { environment_budget: envStaff * crewAnnual } : {}) };
   const mayorCode = code("city.mayor_code", mayorParams);
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
@@ -1413,16 +1425,16 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     K.kept("lots", ["lot"]), K.kept("titles", { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] })],
     code("land.registry", { notify: ["outside", ...(UT ? ["water-corp"] : [])] }));
   office("child-protection", "city", "Child protection officer", "child_protection", [deaths, K.mine("requests", ["care_request"])], code("city.child_protection"));
-  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), K.mine("proposals", ["proposal"]), votes, K.lookUp()], code("city.council_clerk", { who: "who", ...(E ? { electoral: ELECTORAL } : {}) }));
-  [-80, -40, 0, 40, 80].forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
+  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), K.mine("proposals", ["proposal"]), votes, K.lookUp()], code("city.council_clerk", { who: "who", vote_days: COUNCIL_VOTE_DAYS, ...(E ? { electoral: ELECTORAL } : {}) }));
+  COUNCIL_LEANINGS.forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
   // The payments procedure's figure, as the town writes its money.
   const approvalOver = asWritten(V.town_finance.payment_approval_over);
   // The town tells its bank who may instruct payments from its account: the finance officer (the position, whoever holds it).
   records.push({ id: "signatories-city", record: "statement", author: "genesis", at: 0, visible_to: ["city", "bank"], speaks_for: "city", kind: "signatories", addressed_to: ["bank"],
     text: "Payments from the town's account may be instructed only by the finance officer.", data: { account: "acc-city", positions: ["finance"] } });
   records.push({ id: "proc-payments", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
-    text: `The finance officer pays an invoice only within the adopted budget, and any payment over ${approvalOver} only with the mayor's written approval.`,
-    adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay an invoice", condition: `outside the adopted budget, or over ${approvalOver} without the mayor's written approval` } });
+    text: `The finance officer pays the town's wages and bills only within the budget the council has adopted for the year. While a year has no adopted budget, the finance officer pays only as the charter allows: what the town is already bound to pay, at no more each month than a twelfth of the budget last adopted. Any one payment over ${approvalOver} needs the mayor's written approval.`,
+    adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay the town's wages and bills", condition: `outside the budget adopted for the year (or, while the year has none, beyond what the charter allows in the meantime), or over ${approvalOver} in one payment without the mayor's written approval` } });
   // Who may direct the town's offices (docs/behaviour/directions.md): the town's own rule, a record, as its payments
   // procedure is. The charter gives the town a mayor and a council and no chief executive, so the mayor heads its
   // administration; the council directs by resolution, which its clerk files. An office follows a direction only on
@@ -1443,12 +1455,34 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     if (!pos.channels.some((c: any) => c.kind === "records" && c.way === "mine" && !c.on_request && !Object.keys(c.match ?? {}).length))
       pos.channels.push(K.mine("directions", ["direction", "form", "procedure"], { title: "Directions to the town's offices, their forms for them, and the town's rule on directions" }));
   }
+  // ---- the budget the town opens with (docs/behaviour/government.md, "The budget year") ----
+  // A council does not begin a year without a budget: the year's was adopted before the year began. It is on file as
+  // the papers the town's own procedure leaves: the mayor's proposal on the council proposal form, the clerk's ballot
+  // of the councillors, their votes, the result, and the budget itself, resting on the ballot. Like the agreements
+  // people start with, these were made before the run began and are dated at its first moment, and their words say so.
+  // The lines are the ones the mayor's office tables every year (`tabledLines`): each from the town's own figures
+  // (the posts on its crew at a year's wage, the landfill's charge on a year's waste, what the profile gives for
+  // parks and roads), none set to make the sum come out. What the town expects to take in is said beside them.
+  if (spec.opening_budget !== false) {
+    const lines = tabledLines(mayorParams);
+    const expects = { rates: V.public_finance.rates_per_resident_per_year * everyone.length, grants: V.public_finance.grants_per_resident_per_year * everyone.length };
+    const words = `The town's budget for year 1 (${yearInDays(1)}): ${linesInWords(lines, asWritten)}. In the year the town expects about ${asWritten(toWholeUnit(expects.rates))} in rates and ${asWritten(toWholeUnit(expects.grants))} in grants.`;
+    const [proposal, ballot, result, budget] = ["budget-year-1-proposal", "budget-year-1-ballot", "budget-year-1-result", "budget-year-1"];
+    const paper = (id: string, kind: string, position: string, x: object) => ({ id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", in_position: position, kind, ...x });
+    records.push(paper(proposal, "proposal", "mayor", { visible_to: ["city"], addressed_to: ["city"], basis: "form-council-proposal", text: `Council proposal (a budget, put before the year began): ${words}`,
+      data: { proposal: words, kind: "budget", affects: "neither", year: 1, ...Object.fromEntries(Object.entries(lines).map(([k, v]) => [k, String(v)])) } }));
+    records.push(paper(ballot, "ballot", "council-clerk", { basis: proposal, text: `Council ballot (held before the year began): ${words}`, data: { proposal, options: ["yes", "no"], closes_at: 0, electorate: "council", tags: ["budget"] } }));
+    COUNCIL_LEANINGS.forEach((_, i) => records.push({ id: `${ballot}-vote-${i + 1}`, record: "vote", author: "genesis", at: 0, visible_to: ["city"], speaks_for: "city", in_position: `councillor-${i + 1}`, ballot, choice: "yes" }));
+    records.push(paper(result, "ballot_result", "council-clerk", { basis: ballot, text: `Passed: ${COUNCIL_LEANINGS.length} for, 0 against. The council adopted the budget for year 1 before the year began.`, data: { ballot, yes: COUNCIL_LEANINGS.length, no: 0, passed: true } }));
+    records.push(paper(budget, "budget", "council-clerk", { basis: ballot, text: `${words} Adopted by the council before the year began (ballot ${ballot}).`, data: { year: 1, lines } }));
+  }
   // The council clerk publishes how to put something to the council: anyone may, on this form.
   records.push({ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
-    text: "Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for 14 days. A law proposed here stands as its words: no rule is set down with it for acts to be checked against. To change a figure in a law in force (a notice period, how often, a threshold), use that law's amendment form.",
+    text: `Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for ${COUNCIL_VOTE_DAYS} days. A law proposed here stands as its words: no rule is set down with it for acts to be checked against. To change a figure in a law in force (a notice period, how often, a threshold), use that law's amendment form.`,
     data: { form: "council_proposal", submit_as: "proposal", submit_to: ["city"], fields: {
       proposal: { type: "text", required: true, description: "What's proposed, in full: the law's words, or what the budget is for." },
       kind: { type: "choice", required: true, options: ["law", "budget", "other"], description: "A law, a budget, or something else." },
+      year: { type: "count", description: "For a budget: the year it is for, as a number (a year's budget is adopted before the year begins; left out, it is for the year in which the council adopts it)." },
       affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." },
       // A budget's lines, one field each (the finance office's brief says what each pays for).
       ...Object.fromEntries(Object.keys(budgetLines).map((k) => [k, { type: "amount", description: `For a budget: the ${k} line.` }])) } } });

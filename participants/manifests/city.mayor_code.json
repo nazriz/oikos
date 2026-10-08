@@ -1,8 +1,16 @@
 {
   "name": "city.mayor_code",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "doc": "docs/behaviour/government.md",
   "params": {
+    "budget_lead_days": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "days",
+      "default": 0,
+      "source": "placeholder"
+    },
     "builder": {
       "schema": {
         "type": "string"

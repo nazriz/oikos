@@ -24,6 +24,7 @@ Turns a short spec (`worlds/town.yaml`) and a **profile** (`worlds/profiles/`, d
   - leases and jobs already in force (tenancies part-way through, 12–24-month terms; a lease is the leaseholder's, naming the household and the account the rent is paid from);
   - the standing orders that pay rent, the other adults' shares of the rent, and wages;
   - the town's `signatories` list for its account (the finance officer's position) and its payments procedure;
+  - the budget the town opens with (`budget-year-1`, adopted by its council before the year began, with the proposal, ballot, votes and result it rests on; its lines are the ones the mayor's office tables each year: [government.md](government.md), "The budget year"). `opening_budget: false` in a spec gives a town whose council has adopted none;
   - who owns each firm (its `shareholders` register): its owners, the outside world, or (a factory) the outside world and the households that hold shares directly; with a retirement fund, the fund too, and its register of members ([firm-ownership.md](firm-ownership.md)).
 - **Positions and participants:** every organisation acts through positions, each held at the start by a system participant running the job's module:
   - the mayor: with `mayor: llm`, a language-model participant (weekly cadence; the laws and the forms on file as standing documents; until a real model is used, the mock, with `city.mayor_code` as its brain, see docs/design/m2-llm-participants.md), or with `mayor: code` the rule-following code mayor (the all-code control);

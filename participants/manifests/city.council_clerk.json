@@ -1,6 +1,6 @@
 {
   "name": "city.council_clerk",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "doc": "docs/behaviour/government.md",
   "params": {
     "electoral": {

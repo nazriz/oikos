@@ -24,7 +24,8 @@ test("--set overrides a path, reading JSON where it can", () => {
 test("a batch runs seeds in parallel, each exactly as it runs alone; its logs are measured and costed", async () => {
   const out = join(root, "runs", "test-batch");
   rmSync(out, { recursive: true, force: true });
-  const sets = ["citizens=60", "mayor=llm"];
+  // (No budget on file at the start: the mock mayor proposes one in its first days, which is the run's translation.)
+  const sets = ["citizens=60", "mayor=llm", "opening_budget=false"];
   const r = await runBatch({ world, seeds: 3, parallel: 3, out, until: 40 * DAY, sets });
   expect(r.runs.map((x) => x.seed)).toEqual([1, 2, 3]);
   expect(new Set(r.runs.map((x) => x.stateHash)).size).toBe(3); // different randomness, different towns' histories

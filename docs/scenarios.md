@@ -142,6 +142,9 @@ What was measured, the platform faults found on the way, and what was not verifi
   (`police-understrength`) and how many are in need (`jobs-slump`); they can be named together.
 - **A council in deficit from the first day.** An account can't open below nothing, and the town has no debts at the
   start to give it. `lean-council` is a town with almost no reserves, which has to live on what comes in.
+  (Since 2026-10-09 every town opens with its first year's budget adopted, `lean-council`'s too: the same lines as
+  the plain town, against a hundredth of the money. docs/decisions.md, "A town opens with its first year's budget
+  adopted", has it measured.)
 - **A works crew too small for its rounds.** Tried (`services.council_staff_per_1000` at 70%: four staff, not six) and
   dropped: nothing moved. The whole town's waste takes the crew about half an hour a day at the profile's
   `collect_seconds_per_10kg` (12, a placeholder), so no honest cut leaves a round undone.

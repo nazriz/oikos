@@ -16,7 +16,8 @@ const spec = Bun.YAML.parse(readFileSync(join(root, "worlds/town.yaml"), "utf8")
 const POLL = 200;
 
 async function town(name: string, negligent: boolean, days: number, standBps?: number, extra: object = {}, standsAgain = true) {
-  const config = generate({ ...spec, years: 1, first_election_days: POLL, ...extra });
+  // (The negligent mayor's town has no budget on file at the start: the one its council adopts is that mayor's, with no staff line.)
+  const config = generate({ ...spec, years: 1, first_election_days: POLL, ...(negligent ? { opening_budget: false } : {}), ...extra });
   if (!standsAgain) for (const x of config.participants) if (x.controller?.impl === "city.mayor_code") x.controller.params.stands_again = false;
   if (negligent) for (const x of config.participants) if (x.controller?.impl === "city.mayor_code") x.controller.params.staff_budget = 0;
   // (How readily people stand, where the test needs a contest, or none.)
