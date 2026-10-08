@@ -103,19 +103,13 @@ export const retailer: BehaviourModule = {
     let onOrder = 0; // goods ordered from suppliers, not yet delivered
     const ours = new Map<string, { seller: string; quantity: number }>(); // our order -> for how many, from whom
     const shortAt = new Map<string, number>(); // supplier -> when it last came up short
-    // Among suppliers asking the same price, a shop has its own usual order of asking, drawn once. (By name, every shop
-    // in town asked the same one: while the factories' prices were level, thirty shops sent each week's order to the
-    // factory whose name sorts first, and the next week to the one whose name sorts second.)
+    // Among suppliers asking the same price, a shop has its own usual order of asking: each supplier's place in it is
+    // drawn once, by the shop, when it first knows of the supplier (the draw is keyed by the supplier, so it doesn't
+    // depend on the order suppliers were found in). (By name, every shop in town asked the same one: while the
+    // factories' prices were level, thirty shops sent each week's order to the factory whose name sorts first, and the
+    // next week to the one whose name sorts second.)
     const usual = new Map<string, number>();
-    {
-      const r = ctx.rng("suppliers");
-      const order = [...p.suppliers].sort();
-      for (let i = order.length - 1; i > 0; i--) {
-        const j = r.below(i + 1);
-        [order[i], order[j]] = [order[j]!, order[i]!];
-      }
-      order.forEach((s, i) => usual.set(s, i));
-    }
+    const place = (s: string) => usual.get(s) ?? (usual.set(s, ctx.rng(`supplier-${s}`).below(1 << 30)), usual.get(s)!);
     let unitCost = 0; // what we last paid a supplier for an item
     const used = new Map<string, number>(); // worker -> seconds worked today
     const pace = new Pace(p.serve_labour); // how long a unit takes, as we learn it (our figure at first)
@@ -253,11 +247,10 @@ export const retailer: BehaviourModule = {
               data: { kind: p.kind, quantity: expected - stock, at: p.premises, value: (expected - stock) * price, account: acc.account } })));
         }
         // Our suppliers' prices, cheapest first (and those that came up short in the last week, last); at the same
-        // price, in our own usual order (a supplier found since we began comes after those we knew, in the order found).
-        for (const s of [...suppliers].sort()) if (!usual.has(s)) usual.set(s, usual.size);
+        // price, in our own usual order.
         const offers = [...suppliers].sort().map((s) => ({ seller: s, ...goodsPrices(book, s) })).filter((x) => x.prices[p.kind] !== undefined && x.account)
           .map((x) => ({ seller: x.seller, account: x.account!, unit: x.prices[p.kind]!, min: x.min_order ?? 1 }))
-          .sort((a, b) => Number(t - (shortAt.get(a.seller) ?? -Infinity) < 7 * DAY) - Number(t - (shortAt.get(b.seller) ?? -Infinity) < 7 * DAY) || a.unit - b.unit || usual.get(a.seller)! - usual.get(b.seller)!);
+          .sort((a, b) => Number(t - (shortAt.get(a.seller) ?? -Infinity) < 7 * DAY) - Number(t - (shortAt.get(b.seller) ?? -Infinity) < 7 * DAY) || a.unit - b.unit || place(a.seller) - place(b.seller) || (a.seller < b.seller ? -1 : 1));
         if (!unitCost && offers.length) unitCost = offers[0]!.unit;
         const marginalCost = unitCost + Math.ceil((hourly() * p.serve_labour) / 3600);
 

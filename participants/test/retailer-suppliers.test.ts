@@ -36,3 +36,20 @@ test("at level prices shops don't all ask the same supplier, and a shop asks the
 test("a cheaper supplier is asked by every shop, whatever its place in a shop's usual order", () => {
   for (const cheap of ["factory-5", "factory-10"]) expect(new Set(shops.map((s) => firstOrder(s, { [cheap]: 9_900 })))).toEqual(new Set([cheap]));
 });
+
+// The generated town's shops are told of no factory: they find the factories' wholesale lists by looking through what
+// producers advertise to the trade. A supplier found that way has its place in the shop's order as one named to it has
+// (a merge once ranked the found ones by name again: the whole town asked one factory, as before).
+test("suppliers found on the trade board are asked in the shop's own order too, whatever order they were found in", () => {
+  const first = (shop: string, found: string[]) => {
+    const m = retailer.create(context(`${shop}-manager-system`, shop, { premises: shop, workplace: `${shop}/workplace.1`, suppliers: ["outside"], trade_board: "trade", demand: 200 }, { position: `${shop}-manager` }));
+    const books = { kind: "accounts", accounts: [{ account: `acc-${shop}`, holder: shop, custodian: "bank", currency: "AUD", balance: "100000000" }], transactions: [] };
+    const w = wake(m, DAY, { books, lists: { kind: "records", records: [list("outside", 11_000)] }, trade: { kind: "records", search: true, records: found.map((s) => list(s, 10_000)) } },
+      { entity: shop, as: { participant: `${shop}-manager-system`, position: `${shop}-manager` } });
+    return w.of("statement", "order")[0]?.args.to?.[0];
+  };
+  const asked = shops.map((s) => first(s, SUPPLIERS));
+  for (const a of asked) expect(SUPPLIERS).toContain(a!);
+  expect(new Set(asked).size).toBeGreaterThan(2);
+  expect(shops.map((s) => first(s, [...SUPPLIERS].reverse()))).toEqual(asked);
+});
