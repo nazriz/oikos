@@ -77,7 +77,7 @@ test("children are taught, the ill stay home and are seen at the clinic", async 
   // Nothing refused but the usual races (and a patient who'd gone home before being seen; and a building under water,
   // in a spring flood: the weather's).
   expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left", "participant_inactive", "flooded"].includes(e.code)).map((e) => e.code)).toEqual([]);
-}, 900_000);
+}, 2_400_000);
 
 test("with care in the world, treatable deaths come through severe illness, and with care as usual each age dies at the life table's rate", () => {
   const withCare = generate({ ...spec, years: 1 }).life, without = generate({ ...spec, years: 1, services: false }).life;

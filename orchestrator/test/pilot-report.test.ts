@@ -32,7 +32,7 @@ test("the report reads what the script did, from the log alone, plain or compres
     translator: () => {
       translated++;
       // Asked back (which one), then the notice; then a refusal (the translator tries twice before giving it up).
-      if (translated === 1) return [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)", unsure: { kind: "which" } } }];
+      if (translated === 1) return [{ type: "tool_use", id: "x", name: "call", input: { program: "none(unclear)", unsure: { kind: "act" } } }];
       if (translated === 2) return [{ type: "tool_use", id: "x", name: "call", input: { program: 'statement(kind=notice, text="The hall opens at nine.")' } }];
       return [{ type: "tool_use", id: "x", name: "call", input: { program: "none(too_much)" } }];
     },
@@ -57,7 +57,7 @@ test("the report reads what the script did, from the log alone, plain or compres
   expect(t.requests).toBe(3);
   expect(t.endings).toEqual({ asked_back: 1, draft_offered: 1, refused: 1 });
   expect(t.refused_by_label).toEqual({ too_much: 1 });
-  expect(t.asked_back).toMatchObject([{ draft: "draft.mayor-system.1", sentence: "It isn't clear which one you mean. Name each person, account, record and place by its id." }]);
+  expect(t.asked_back).toMatchObject([{ draft: "draft.mayor-system.1", sentence: "It isn't clear what should happen. Could you say it more plainly?" }]); // (the plain sentence: told from a refusal by the run's own record)
   expect(t).toMatchObject({ drafts_offered: 1, drafts_confirmed: 1, drafts_declined: 0, drafts_unanswered: 0 });
   // A request and the one after the ask-back are one matter, got through; the refused one is another, not.
   expect(t).toMatchObject({ matters: 2, matters_through_within_two_tries: 1, longest_ask_back_run: { seat: "mayor-system", length: 1 } });
@@ -74,7 +74,8 @@ test("the report reads what the script did, from the log alone, plain or compres
 
 test("how a request ended, matters, and runs of ask-backs", () => {
   expect(endingOf("none(unclear)", "It isn't clear which words are to go as they stand. Put them in quotation marks.")).toEqual({ ending: "asked_back" });
-  expect(endingOf("none(unclear)", "It isn't clear what should happen. Could you say it more plainly?")).toEqual({ ending: "refused", label: "unclear" });
+  expect(endingOf("none(unclear)", "It isn't clear what should happen. Could you say it more plainly?")).toEqual({ ending: "refused", label: "unclear" }); // (an older log)
+  expect(endingOf("none(unclear)", "It isn't clear what should happen. Could you say it more plainly?", true)).toEqual({ ending: "asked_back" });
   expect(endingOf("none(not_yours)", "That's for someone else to decide.")).toEqual({ ending: "refused", label: "not_yours" });
   expect(endingOf('pay(amount="$5")', "Which account should it come from?")).toEqual({ ending: "resolver_question" });
   expect(endingOf(undefined, "That couldn't be put into effect as it was said, and nothing was done. You could say it again, or another way.")).toEqual({ ending: "not_put" });

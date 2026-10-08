@@ -219,3 +219,10 @@ Sources opened on 2026-10-08 unless marked.
 | Idea | Citation | Used in |
 |---|---|---|
 | Values that are the same are held once and found again by what they are made of (hash consing; the flyweight) | Goto, E. (1974), "Monocopy and associative algorithms in extended Lisp", Technical Report 74-03, University of Tokyo **(to confirm)**; Gamma, E., Helm, R., Johnson, R. & Vlissides, J. (1994), *Design Patterns*, Addison-Wesley (Flyweight) | A book's shelves: a list shown whole to many readers is one shelf, found by its records, with each reader's differences beside it (`Book`, `Pages`) |
+
+## A shared development machine (docs/dev-machine.md; docs/decisions.md, 2026-10-08; scripts/slots.ts)
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A pool of tokens that every job on a machine draws from before it starts heavy work, however deep in a tree of processes it is, with a job's children counted as inside its token | GNU Make's jobserver: Smith, P. D., "Jobserver Implementation", in the GNU Make manual, "Sharing Job Slots with GNU make" (Free Software Foundation) **(to confirm: section title and author as cited)** | `scripts/slots.ts`: the tokens are files in one directory rather than bytes in a pipe, so that jobs in unrelated process trees share them and a dead holder's can be reclaimed |
+| A lock taken by making a hard link to a file already written (atomic on a local file system; the lock is never seen half written) | The `open(2)` manual's note on lock files over NFS (`link(2)` to a unique file, in place of `O_EXCL`) **(to confirm)** | `scripts/slots.ts`, `claim` |

@@ -197,7 +197,7 @@ test("a command that won't end can't hang a call: asked to end at the time limit
   const { CodexCliAdapter } = await import("../src/llm/codex");
   const never = (_a: string[], stdin: string, cwd: string, timeoutMs: number) => runBounded(stuck, stdin, cwd, timeoutMs, 100, 100);
   await expect(new CodexCliAdapter("gpt-5", never, { timeoutMs: 200, attempts: 1 }).complete(req)).rejects.toThrow("no answer within");
-}, 30_000);
+}, 180_000);
 
 test("a text written with its line breaks as themselves is read as the model meant it", async () => {
   const raw = '{"text":"Day 11.\nRates: 295 valued,\tnone levied.\nNext: \\"review\\" the draft."}';

@@ -25,6 +25,23 @@ command -v cargo >/dev/null || { echo "rustup is installed but cargo isn't found
 rustup toolchain list | grep -q stable || rustup default stable
 rustup target list --installed | grep -q wasm32-unknown-unknown || rustup target add wasm32-unknown-unknown
 
+# A compile cache shared by every checkout and worktree on the machine (docs/dev-machine.md): a kernel build in a
+# second worktree reuses the first one's compiled dependencies. Incremental compilation goes off with it (the cache
+# can't store incremental builds). Left alone if cargo already has a wrapper configured.
+command -v sccache >/dev/null || brew install sccache
+CARGO_CONFIG="$HOME/.cargo/config.toml"
+if ! grep -q "rustc-wrapper" "$CARGO_CONFIG" 2>/dev/null; then
+  mkdir -p "$HOME/.cargo"
+  if grep -qE '^\[(build|env)\]' "$CARGO_CONFIG" 2>/dev/null; then
+    echo "$CARGO_CONFIG already has a [build] or [env] section: add by hand  rustc-wrapper = \"$(command -v sccache)\"  under [build] and  CARGO_INCREMENTAL = \"0\"  under [env]"
+  else
+    printf '%s\n' "# A shared compile cache across every checkout and worktree on this machine (docs/dev-machine.md in oikos)." \
+      "# Incremental compilation is off because the cache cannot store incremental builds." \
+      "[build]" "rustc-wrapper = \"$(command -v sccache)\"" "" "[env]" "CARGO_INCREMENTAL = \"0\"" >> "$CARGO_CONFIG"
+  fi
+fi
+# The machine's slots (scripts/slots.ts) need no setup: their folder (~/.oikos/slots) is made on first use.
+
 if [ ! -d "$DIR/.git" ]; then
   if [ -n "$REPO_URL" ]; then
     git clone "$REPO_URL" "$DIR"
