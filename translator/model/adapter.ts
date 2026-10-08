@@ -57,10 +57,12 @@ export function formsShown(forms: string[]): Map<string, { fields: Set<string>; 
 
 /** What is wrong with a program's forms as against the forms shown, if anything: `unknown_form` where one is none of
  * them by name (the refusal the call language has for that); `unclear` where one fills in a field that isn't its own,
- * leaves a required field out, or gives a field that takes one of a few values something else. Only what the forms'
- * own lines say: a draft that fails could not be handed in, so nothing is lost by not offering it. (A program with
- * no form, or with no forms shown to check against, has nothing wrong.) */
-export function formsMisfit(program: string, forms: string[]): "unknown_form" | "unclear" | undefined {
+ * leaves a required field out, or gives a field that takes one of a few values something else, with which of those it
+ * is (`unsure`, for the participant to be told: translator/src/index.ts `unsureText`). Only what the forms' own lines
+ * say: a draft that fails could not be handed in, so nothing is lost by not offering it. (A program with no form, or
+ * with no forms shown to check against, has nothing wrong.) */
+export type Misfit = { label: "unknown_form" } | { label: "unclear"; unsure?: { kind: "form_field" | "form_needs"; form: string; fields: string[] } | { kind: "form_option"; form: string; field: string } };
+export function formsMisfit(program: string, forms: string[]): Misfit | undefined {
   if (!program.includes("form(")) return undefined;
   const shownForms = formsShown(forms);
   if (!shownForms.size) return undefined;
@@ -68,25 +70,28 @@ export function formsMisfit(program: string, forms: string[]): "unknown_form" | 
   try {
     p = calls.parseProgram(program);
   } catch {
-    return "unclear";
+    return { label: "unclear" };
   }
   if ("none" in p) return undefined;
   const said = (v: calls.Value | undefined) => (v && "id" in v ? v.id : v && "text" in v ? v.text : undefined);
-  const wrong = (c: calls.Call): "unknown_form" | "unclear" | undefined => {
+  const wrong = (c: calls.Call): Misfit | undefined => {
     for (const v of Object.values(c.args)) {
       const inner = "call" in v ? wrong(v.call) : undefined;
       if (inner) return inner;
     }
     if (c.fn !== "form") return undefined;
-    const f = shownForms.get(said(c.args.form) ?? "");
-    if (!f) return "unknown_form";
-    for (const [k, v] of Object.entries(c.args)) {
-      if (k === "form" || k === "to") continue;
-      if (!f.fields.has(k)) return "unclear";
+    const form = said(c.args.form) ?? "";
+    const f = shownForms.get(form);
+    if (!f) return { label: "unknown_form" };
+    const given = Object.keys(c.args).filter((k) => k !== "form" && k !== "to");
+    const strange = given.filter((k) => !f.fields.has(k));
+    if (strange.length) return { label: "unclear", unsure: { kind: "form_field", form, fields: strange } };
+    for (const k of given) {
       const one = f.oneOf.get(k);
-      if (one && !one.includes(said(v) ?? "")) return "unclear";
+      if (one && !one.includes(said(c.args[k]) ?? "")) return { label: "unclear", unsure: { kind: "form_option", form, field: k } };
     }
-    return f.required.every((k) => k in c.args) ? undefined : "unclear";
+    const missing = f.required.filter((k) => !(k in c.args));
+    return missing.length ? { label: "unclear", unsure: { kind: "form_needs", form, fields: missing } } : undefined;
   };
   for (const l of p.lines) {
     const w = wrong(l.call);
@@ -102,7 +107,7 @@ export class DecideAdapter implements LlmAdapter {
   private buffer = "";
   private queue: Promise<unknown> = Promise.resolve();
   /** Each answer's sureness and time, in the order asked (for whoever measures). */
-  answers: { sure: number; ms: number; program: string; parts?: { choices: number; places: number; texts: number; least: number } }[] = [];
+  answers: { sure: number; ms: number; program: string; parts?: { choices: number; places: number; texts: number; least: number }; unsure?: object }[] = [];
   constructor(public model: string, private o: { dir?: string; threshold?: number; unchecked?: boolean } = {}) {}
 
   private start(): void {
@@ -138,7 +143,7 @@ export class DecideAdapter implements LlmAdapter {
   }
 
   /** The program for a request and the forms known, and how sure the model is. */
-  async translate(request: string, forms: string[]): Promise<{ program: string; sure: number; ms: number }> {
+  async translate(request: string, forms: string[]): Promise<{ program: string; sure: number; ms: number; unsure?: object }> {
     const input = inputOf(request, forms);
     const ps = pieces(input);
     const breaks: number[] = [];
@@ -147,20 +152,30 @@ export class DecideAdapter implements LlmAdapter {
     // answers in pieces as every model does.
     const a = await this.ask({ pieces: ps.map((p) => p.text), breaks, at: ps.map((p) => p.at) });
     let program = programOf(input, ps, a.steps);
-    if (a.sure < (this.o.threshold ?? 0)) program = "none(unclear)";
+    // What was unclear, where it asks back: the part of its answer it was least sure of (what to do, which thing is
+    // meant, or which words are to be copied), or what about a form doesn't fit the form as shown.
+    let unsure: object | undefined;
+    if (a.sure < (this.o.threshold ?? 0)) {
+      const least = a.parts ? (["choices", "places", "texts"] as const).reduce((x, y) => (a.parts[y] < a.parts[x] ? y : x)) : "choices";
+      program = "none(unclear)";
+      unsure = { kind: least === "places" ? "which" : least === "texts" ? "words" : "act" };
+    }
     // (A form that can't be one of the forms shown is not offered, however sure the model is.)
     const misfit = this.o.unchecked ? undefined : formsMisfit(program, forms);
-    if (misfit) program = `none(${misfit})`;
-    this.answers.push({ sure: a.sure, ms: a.ms, program, ...(a.parts ? { parts: a.parts } : {}) });
-    return { program, sure: a.sure, ms: a.ms };
+    if (misfit) {
+      program = `none(${misfit.label})`;
+      unsure = misfit.label === "unclear" ? misfit.unsure : undefined;
+    }
+    this.answers.push({ sure: a.sure, ms: a.ms, program, ...(a.parts ? { parts: a.parts } : {}), ...(unsure ? { unsure } : {}) });
+    return { program, sure: a.sure, ms: a.ms, ...(unsure ? { unsure } : {}) };
   }
 
   async complete(req: LlmRequest): Promise<LlmResponse> {
     const first = req.messages.find((m) => m.role === "user");
     const text = typeof first?.content === "string" ? first.content : (first?.content ?? []).map((b) => (b.type === "text" ? b.text : "")).join("");
     const { request, forms } = shown(text);
-    const { program } = await this.translate(request, forms);
-    return { content: [{ type: "tool_use", id: "decide", name: req.tools?.[0]?.name ?? "call", input: { program } }], usage: { input_tokens: 0, output_tokens: 0 }, estimated: true };
+    const { program, unsure } = await this.translate(request, forms);
+    return { content: [{ type: "tool_use", id: "decide", name: req.tools?.[0]?.name ?? "call", input: { program, ...(unsure ? { unsure } : {}) } }], usage: { input_tokens: 0, output_tokens: 0 }, estimated: true };
   }
 
   close(): void {
