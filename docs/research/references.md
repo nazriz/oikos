@@ -173,6 +173,15 @@ sources); this list is for the architecture and design ideas.
 | Fine-tuning a pretrained encoder at a lower rate than the layers added on top of it | Howard, J. & Ruder, S. (2018), "Universal language model fine-tuning for text classification", *ACL* (discriminative fine-tuning) **(to confirm)** | `py/train.py`: `--encoder-lr` for the encoder, `--lr` for the writer and heads |
 | Fitting one temperature on held-out data so stated confidence matches how often answers are right (to confirm: not built yet) | Guo, C., Pleiss, G., Sun, Y. & Weinberger, K. Q. (2017), "On calibration of modern neural networks", *ICML* | Planned for the threshold below which the model asks back |
 
+## Nobody has a god's view (docs/no-god-view.md; docs/decisions.md, 2026-10-08)
+
+Sources opened on 2026-10-08 unless marked.
+
+| Idea | Citation | Used in |
+|---|---|---|
+| A roll is kept by the electoral authority, open to inspection at its offices, not sent out or sold | Australian Electoral Commission, "About the electoral roll", https://www.aec.gov.au/Enrolling_to_vote/About_Electoral_Roll/ ; Electoral and Referendum Amendment (Access to Electoral Roll and Other Measures) Act 2004 (Cth), inserting ss 90A and 90B of the Commonwealth Electoral Act 1918 (the current compilation's wording **(to confirm)**); for comparison, North Northamptonshire Council, "Viewing the electoral register" (the full register "can only be inspected under supervision at the council offices") | The roll is the electoral office's own; an elector knows by having enrolled (docs/behaviour/elections.md, "Who sees the roll") |
+| A seat is shown the price list of whom it deals with, not every seller's | Trade practice: a builder quotes on its own published rates; a supplier sends its price list to its customers **(to confirm: no source opened; the rule narrows what was shown to what each office's code already read)** | `pricesOf` and `market` in `worlds/generator/generate.ts` |
+
 ## What an act rests on (contracts: Basis; docs/decisions.md, 2026-10-08)
 
 | Idea | Citation | Used in |

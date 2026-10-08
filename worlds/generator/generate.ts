@@ -42,7 +42,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.24.0";
+export const GENERATOR_VERSION = "0.25.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -807,8 +807,10 @@ export function generate(spec: TownSpec): any {
   ];
   const builderTypes = Object.fromEntries(structureTypes.map((t) => [t.id, { materials: t.materials, build_labour: t.build_labour, demolition_labour: t.demolition_labour }]));
   const forms = { id: "forms", kind: "records", match: { statement_kinds: ["form"] } };
-  // Builders' published prices (firm.builder publishes its own).
-  const priceLists = { id: "prices", kind: "records", match: { statement_kinds: ["price_list"] } };
+  // The price lists of those a seat deals with, each named (the builder's published prices; a supplier's): nobody is
+  // shown every seller's (docs/no-god-view.md).
+  const pricesOf = (...sellers: string[]) => ({ id: "prices", kind: "records", match: { statement_kinds: ["price_list"], involving: sellers } });
+  const priceLists = pricesOf("builder");
   // The laws in force (what an employer withholds under, among others).
   const lawBook = { id: "laws", kind: "records", match: { statement_kinds: ["law"] } };
 
@@ -849,7 +851,8 @@ export function generate(spec: TownSpec): any {
     text: "An employer must not pay employees for time on protected industrial action.",
     adico: { attribute: "employers", deontic: "must_not", aim: "pay employees", condition: "for time on protected industrial action" } });
   const mine = (id = "mine") => ({ id, kind: "records", match: { involving: ["self"] } });
-  const votes = { id: "votes", kind: "records", match: { records: ["vote"] } };
+  // (The votes on its own ballots: a vote names its ballot, and so whoever put the ballot.)
+  const votes = { id: "votes", kind: "records", match: { records: ["vote"], involving: ["self"] } };
   // Attention: the housing and job markets, and the petitions board, are looked at when the citizen wants to (on request),
   // as searches for what's standing now; nothing about them is broadcast.
   const homeBoard = { id: "homes", kind: "records", match: { statement_kinds: ["rental_listing"] }, on_request: true };
@@ -884,9 +887,10 @@ export function generate(spec: TownSpec): any {
   office("mayor", "city", `Mayor of ${spec.name}`, "mayor",
     [{ id: "budget", title: "The town's accounts", kind: "accounts" }, { id: "laws", title: "Laws, the charter and procedures", kind: "records", match: { statement_kinds: ["charter", "law", "procedure"] } },
       { ...mine("city-business"), title: "Correspondence and filings concerning the town" }, { id: "files", title: "The town's files: every record the town can see, looked up on request (look, with what to find)", kind: "records", match: {}, on_request: true }, { ...forms, title: "Forms on file" }, { ...priceLists, title: "Price lists" }, { id: "who", title: "Who's who", kind: "directory" },
-      { id: "civic", title: "Petitions, budgets, invoices, council results and complaints", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "invoice", "ballot_result", "complaint"] } },
+      { id: "civic", title: "Petitions, budgets and council results", kind: "records", match: { statement_kinds: ["petition", "petition_count", "budget", "ballot_result"] } },
+      { id: "in-tray", title: "Invoices and complaints sent to the town", kind: "records", match: { statement_kinds: ["invoice", "complaint"], involving: ["self"] } },
       ...(W?.events.length ? [{ id: "weather", title: "The weather bureau's warnings", kind: "records", match: { statement_kinds: ["weather_warning"] } }] : []),
-      ...(E ? [{ id: "elections", title: "Elections, and the local paper", kind: "records", match: { statement_kinds: ["election_notice", "nomination", "ballot", "electoral_roll", "news"] } }] : []), { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
+      ...(E ? [{ id: "elections", title: "Elections, and the local paper", kind: "records", match: { statement_kinds: ["election_notice", "nomination", "ballot", "news"] } }] : []), { id: "town", title: "Survey of the town", kind: "sites", area: "all", every: 30 * DAY }],
     spec.mayor === "code" ? mayorCode : { type: "llm", impl: "anthropic", model: "claude-sonnet-5",
       // Until a real model is used, the mock runs the office with the code mayor as its brain (docs/design/m2-llm-participants.md).
       // (Office hours, where the world has working hours: one sitting a working day; pilot 7.)
@@ -915,7 +919,7 @@ export function generate(spec: TownSpec): any {
   // The foreman looks up in the register the plan of a lot it is asked to build on (nobody has the register by heart),
   // and goes to see the ground, to know where on a lot a building goes.
   // It sees its crew at the yard, its supplier's prices and what it holds.
-  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, priceLists, lawBook, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true },
+  office("builder-foreman", "builder", "Site foreman", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, pricesOf("self", "outside"), lawBook, { id: "stock", kind: "holdings" }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] }, on_request: true },
     { id: "ground", kind: "sites", area: "all", every: 7 * DAY }, { id: "yard", kind: "sites", area: [cellOf.get(yardLot)], occupants: "names" }],
     code("firm.builder", { types: builderTypes, yard: "builder-yard", supplier: "outside", industry: "construction", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, build_markup_bps: BUILD_MARKUP_BPS,
       workplace: "builder-yard/workplace.1", max_crew: CREW.capacity, register: { lots: "lots" }, ...look }));
@@ -924,7 +928,7 @@ export function generate(spec: TownSpec): any {
     [laws, { id: "applications", kind: "records", match: { statement_kinds: ["permit_application"], involving: ["self"] } },
       // The land register: lots, who owns them, and a monthly survey of what's built.
       { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY },
-      ...(L ? [{ id: "habitat", kind: "records", match: { statement_kinds: ["habitat_register"] } }] : [])],
+      ...(L ? [{ id: "habitat", kind: "records", match: { statement_kinds: ["habitat_register"], involving: ["self"] } }] : [])],
     code("city.planning_officer", L?.listed.length ? { habitat_law: "law-habitat" } : {}));
   office("inspector", "city", "Building inspector", "inspector",
     [laws, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }, { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "patrol", kind: "sites", area: "all", every: 14 * DAY }],
@@ -938,14 +942,14 @@ export function generate(spec: TownSpec): any {
       ...(RDS ? { roads: "building roads on the town's free lots, commissioned from a builder (a road a lot): the town's streets, which people travel far quicker on than on foot across lots." } : {}),
       ...(L ? { environment: `the wages of the town's environment office, whose scientists survey the district's wildlife each quarter and report on it (about ${Math.round(crewAnnual / 100)} a year each; with none, nobody counts).` } : {}),
   };
-  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, civic("bills", ["invoice", "approval", "budget"]), priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
+  office("finance", "city", "Finance officer", "finance_officer", [{ id: "treasury", kind: "accounts" }, { ...civic("bills", ["invoice", "approval", "budget"]), match: { statement_kinds: ["invoice", "approval", "budget"], involving: ["self"] } }, priceLists, mine("payroll"), deaths, lawBook], code("city.finance_officer", {
     // What the town's budget pays for, as the finance office would brief anyone preparing one (the only lines this town has).
     budget_lines: budgetLines,
     // The procedure its approval rule comes from (a record): withdrawn, the rule goes with it. Its figure is the profile's.
     procedure: "proc-payments", approval_over: V.town_finance.payment_approval_over }));
   // The works office: hires the crew the staff line pays for, and sets them to the services from the hall (its depot).
   const hallCell = structures.find((x) => x.id === "town-hall")!.at;
-  office("works", "city", "Works manager", "works_manager", [mine("works-business"), civic("budgets", ["budget", "complaint"]), { id: "stock", kind: "holdings" },
+  office("works", "city", "Works manager", "works_manager", [mine("works-business"), { ...civic("budgets", ["budget", "complaint"]), match: { statement_kinds: ["budget", "complaint"], involving: ["self"] } }, { id: "stock", kind: "holdings" },
     { id: "town", kind: "sites", area: { place: "town" } }, { id: "depot", kind: "sites", area: [hallCell], occupants: "names" }],
     code("city.works", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: 14 * DAY, working_day: WORKING_DAY, work_days: 5,
       collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
@@ -954,10 +958,10 @@ export function generate(spec: TownSpec): any {
   // winner. And the local paper, which reports the public record.
   if (E) {
     office("electoral", "city", "Electoral commissioner", "electoral_officer", [civic("roll", ["enrolment", "death_registration", "departure", "nomination", "ballot", "electoral_roll", "election_notice"]),
-      { id: "votes", kind: "records", match: { records: ["vote"] } }],
+      votes],
       code("city.electoral_office", { office: "mayor", office_title: `Mayor of ${spec.name}`, term_days: E.term_years * 365, first_poll_day: spec.first_election_days ?? 365, method: E.method, town: "city" }));
     entities.push({ id: "paper", kind: "firm", name: `The ${spec.name} Times` });
-    office("editor", "paper", "Editor", undefined, [civic("record", ["petition", "complaint", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision"])],
+    office("editor", "paper", "Editor", undefined, [civic("record", ["petition", "environment_report", "budget", "law", "ballot_result", "election_notice", "nomination", "permit_decision"])],
       code("firm.newspaper", { town: "city" }));
   }
   // The environment office (nature): surveys the district's wildlife with the scientists its budget line pays for, and
@@ -1004,7 +1008,7 @@ export function generate(spec: TownSpec): any {
     office("water-operations", "water-corp", "Operations manager", undefined, [{ id: "books", kind: "accounts" }, mine("water-business"), { id: "town", kind: "sites", area: { place: "town" } },
       { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "registry", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }],
       code("utility.water", { works: "water-works", litres_per_person_per_day: UT.water.litres_per_person_per_day, price_per_kl: UT.water.price_per_kl, service_per_quarter: UT.water.service_per_quarter }));
-    office("energy-operations", "energy-co", "Retail manager", undefined, [{ id: "books", kind: "accounts" }, mine("energy-business"), deaths, priceLists, { id: "stock", kind: "holdings" },
+    office("energy-operations", "energy-co", "Retail manager", undefined, [{ id: "books", kind: "accounts" }, mine("energy-business"), deaths, pricesOf("outside"), { id: "stock", kind: "holdings" },
       { id: "departures", kind: "records", match: { statement_kinds: ["departure"] } }],
       code("utility.energy", { depot: "substation", grid: "outside", units_per_customer_per_day: UT.energy.kwh_per_household_per_day, price_per_unit: UT.energy.price_per_kwh, supply_per_day: UT.energy.supply_per_day }));
   }
@@ -1022,10 +1026,10 @@ export function generate(spec: TownSpec): any {
   }
   // The union's organiser: members (and applications to join), the claims it makes and the answers, its ballots' votes,
   // and the shops' prices (what its claims follow).
-  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), { id: "votes", kind: "records", match: { records: ["vote"] } }, priceLists, { id: "dues", kind: "accounts" }, lawBook,
+  office("union-organiser", "union", "Organiser", "organiser", [mine("union-business"), votes, { id: "prices", kind: "records", match: { statement_kinds: ["price_list"] } }, { id: "dues", kind: "accounts" }, lawBook,
     { id: "closures", kind: "records", match: { statement_kinds: ["closure"] } }],
     code("union.organiser", { employers: [...factories, ...shops, "builder"], claim_margin_bps: V.unions.claim_margin_bps, dues: V.unions.dues_per_month, resignation_notice_days: V.unions.resignation_notice_days, dues_account: "acc-union" }));
-  office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"] } }],
+  office("outside-landfill", "outside", "Landfill", undefined, [{ id: "dockets", kind: "records", match: { statement_kinds: ["disposal_docket"], involving: ["self"] } }],
     code("world.disposal", { kind: "waste", price_per_tonne: SV.landfill_levy_per_tonne, account: "acc-outside" }));
   // Rates (docs/behaviour/public-finance.md): the rates officer levies them on the valuer's valuations, under the rating law.
   office("rates", "city", "Rates officer", "rates_officer", [{ id: "treasury", kind: "accounts" }, laws, mine("rates-business"), civic("valuations", ["valuation"])], code("city.rates_officer"));
@@ -1034,11 +1038,11 @@ export function generate(spec: TownSpec): any {
     { id: "survey", kind: "sites", area: "all", every: 30 * DAY }, priceLists], code("world.valuer", { land_value: landValue, builder: "builder", rating: "city", exempt: rateExempt }));
   office("outside-grants", "outside", "Grants to local government", undefined, [{ id: "ledger", kind: "accounts" }, { id: "survey", kind: "sites", area: "all", every: 30 * DAY }],
     code("world.grants", { account: "acc-outside", to: "city", to_account: "acc-city", per_resident_per_year: V.public_finance.grants_per_resident_per_year }));
-  office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [civic("notifications", ["death_notification"]), deaths,
+  office("registry", "city", "Registrar of births, deaths and marriages", "registrar", [{ ...civic("notifications", ["death_notification"]), match: { statement_kinds: ["death_notification"], involving: ["self"] } }, deaths,
     // (And of land: to pass a deceased's titles to their heirs, as the succession law says.)
     { id: "lots", kind: "records", match: { statement_kinds: ["lot"] } }, { id: "titles", kind: "records", match: { records: ["claim", "claim_transfer", "claim_release", "withdrawal"] } }], code("city.registry"));
-  office("child-protection", "city", "Child protection officer", "child_protection", [deaths, civic("requests", ["care_request"])], code("city.child_protection"));
-  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["proposal", "ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
+  office("child-protection", "city", "Child protection officer", "child_protection", [deaths, { ...civic("requests", ["care_request"]), match: { statement_kinds: ["care_request"], involving: ["self"] } }], code("city.child_protection"));
+  office("council-clerk", "city", "Council clerk", "council_clerk", [civic("business", ["ballot", "ballot_result", "budget", "law", "form", "law_schedule"]), { id: "proposals", kind: "records", match: { statement_kinds: ["proposal"], involving: ["self"] } }, votes, { id: "who", kind: "directory" }], code("city.council_clerk"));
   [-80, -40, 0, 40, 80].forEach((leaning, i) => office(`councillor-${i + 1}`, "city", `Councillor ${i + 1}`, "councillor", [civic("ballots", ["ballot"])], code("city.councillor", { leaning })));
   // The payments procedure's figure, as the town writes its money (whole units without their decimals, as a rule is written).
   const perUnit = 10 ** V.currency.minor_units;
@@ -1083,14 +1087,15 @@ export function generate(spec: TownSpec): any {
         rent_review_months: V.tenancy.rent_review_months, rent_increase_notice_days: V.tenancy.rent_increase_notice_days, ...(V.tenancy.after_fixed_term ? { after_term: V.tenancy.after_fixed_term } : {}) }));
   }
   // What the town's firms sell and buy: their price lists, and the world market's buying offers.
-  const market = { id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"] } };
+  // (Of those it trades with, each named, and its own: nobody is shown every seller's.)
+  const market = (...traders: string[]) => ({ id: "market", kind: "records", match: { statement_kinds: ["price_list", "buying_offer"], involving: ["self", ...traders] } });
   for (const w of workplaces) {
     if (w.employer === "builder") continue; // the foreman hires its own crew, to the work in hand
     if (w.employer === "city") continue; // the town's works office, below
     if (w.employer === "clinic" || w.employer === "school") continue; // their own offices, above
     if (w.employer.startsWith("factory")) {
       const cell = structures.find((x) => x.id === w.structure)!.at;
-      office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, lawBook, { id: "stock", kind: "holdings" }, { id: "works", kind: "sites", area: [cell], occupants: "names" }],
+      office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market("outside"), lawBook, { id: "stock", kind: "holdings" }, { id: "works", kind: "sites", area: [cell], occupants: "names" }],
         code("firm.producer", { works: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, industry: w.industry, lender: "bank", builder: "builder",
           per_unit: { inputs: MAKE.inputs }, labour_per_unit: MAKE.labour, price: WORLD.goods_export, supplier: "outside", market: "outside", ...look }));
       continue;
@@ -1098,7 +1103,7 @@ export function generate(spec: TownSpec): any {
     // A shop: it buys from the factories or the world market, whichever is cheaper, and serves whoever orders.
     const cell = structures.find((x) => x.id === w.structure)!.at;
     const price = RETAIL_PRICE;
-    office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market, lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
+    office(`${w.employer}-manager`, w.employer, "Manager", undefined, [{ id: "books", kind: "accounts" }, mine(), deaths, market(...factories, "outside"), lawBook, { id: "stock", kind: "holdings" }, { id: "premises", kind: "sites", area: [cell], occupants: "names" }],
       code("firm.retailer", { premises: w.structure, workplace: w.space, max_staff: w.capacity, wage: w.wage, period: 14 * DAY, working_day: WORKING_DAY, serve_labour: SHOP.serve, industry: w.industry, lender: "bank", builder: "builder",
         suppliers: [...factories, "outside"], price, demand: SHOP.demand, ...look, ...(RD ? { work_days: SHOP_DAYS } : {}), ...(CR ? { police: "police" } : {}) }));
   }
@@ -1116,7 +1121,7 @@ export function generate(spec: TownSpec): any {
     // Gatherings: whatever holds one, in whatever words (a statement having a practice); and what groups teach.
     { id: "gatherings", kind: "records", match: { has: ["practice"] } }, { id: "teachings", kind: "records", match: { has: ["assertion"] } },
     // Elections and the local paper (world-expansion 3).
-    ...(E ? [{ id: "elections", kind: "records", match: { statement_kinds: ["election_notice", "ballot", "electoral_roll", "ballot_result", "nomination", "news"] } }] : []),
+    ...(E ? [{ id: "elections", kind: "records", match: { statement_kinds: ["election_notice", "ballot", "ballot_result", "nomination", "news"] } }] : []),
     // The land register (world-expansion 6.2), looked up, never shown unasked (nobody has the register by heart): the
     // plan of a named lot, a title, and the dealings in a title (its transfers and releases), each a search. A title
     // of one's own, and its passing to or from one, come through `mine` (docs/behaviour/ownership.md).
@@ -1180,7 +1185,8 @@ export function generate(spec: TownSpec): any {
   }
   // Support paid from outside the town (for a town, the national government's): the profile's payments.
   office("outside-support", "outside", "Support payments", undefined,
-    [{ id: "ledger", kind: "accounts" }, { id: "claims", kind: "records", match: { statement_kinds: ["benefit_claim", "benefit_change", "death_registration", "departure"] } }],
+    [{ id: "ledger", kind: "accounts" }, { id: "claims", kind: "records", match: { statement_kinds: ["benefit_claim", "benefit_change"], involving: ["self"] } },
+      { id: "gone", kind: "records", match: { statement_kinds: ["death_registration", "departure"] } }],
     code("world.transfers", { account: "acc-outside", publish_every_days: 30, payments: {
       pension: { ...V.support.pension },
       unemployment: { ...V.support.unemployment, to_age: V.retirement_age - 1 },

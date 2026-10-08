@@ -117,7 +117,7 @@ interface Job { agreement: string; employer: string; wage: number; period: numbe
 
 export const citizen: BehaviourModule = {
   name: "citizen.default",
-  version: "0.36.0",
+  version: "0.37.0",
   doc: "docs/behaviour/citizen.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,
@@ -2172,9 +2172,11 @@ export const citizen: BehaviourModule = {
       }
       // Voting: on a ballot open to the roll, if we're on it, once; nearly everyone, where voting is compulsory. A ranking:
       // the incumbent by our approval, a challenger by how well their platform speaks to our values.
-      const roll = new Set((book.open("electoral_roll").sort((a, b) => b.at - a.at)[0]?.data?.electors as string[] | undefined) ?? []);
+      // (On the roll: we know it by having enrolled before the ballot was put. The roll itself is the electoral
+      // office's, and nobody is sent it: docs/behaviour/elections.md.)
+      const enrolledAt = Math.min(...book.open("enrolment").filter((r) => r.speaks_for === me).map((r) => r.at), Infinity);
       for (const b of book.open("ballot")) {
-        if (voted.has(b.id) || b.data?.electorate !== "roll" || !roll.has(me) || t < Number(b.data?.opens_at ?? 0) || t >= Number(b.data?.closes_at ?? 0)) continue;
+        if (voted.has(b.id) || b.data?.electorate !== "roll" || !(enrolledAt < b.at) || t < Number(b.data?.opens_at ?? 0) || t >= Number(b.data?.closes_at ?? 0)) continue;
         voted.add(b.id);
         if (ctx.rng(`turnout-${b.id}`).below(10_000) >= p.civic.turnout_bps) continue;
         const candidates = (b.data?.candidates ?? []) as { candidate: string; number?: string; nomination: string }[];
