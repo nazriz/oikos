@@ -259,6 +259,9 @@ test("every word a generated town is given is in its own money: no other place's
       // smallest unit, or seconds. (An id is no number: it has letters or marks beside its digits.)
       const bare = /(?<![\w.,:-])\d{5,}(?![\w.,:-]*\w)/.exec(s);
       if (bare) found.push(`${p.id} ${where}: a bare figure ${bare[0]}, in "${s.slice(0, 80)}"`);
+      // Nor a length of time in seconds or a share in basis points: the units the world holds things in are not words.
+      const unit = /\bseconds?\b|\bbasis points?\b|\bbps\b/.exec(s);
+      if (unit) found.push(`${p.id} ${where}: "${unit[0]}", in "${s.slice(0, 80)}"`);
     }
     // The planning law's fine is the profile's, in its words and in what the inspector is told.
     const planning = c.world.records.find((r: any) => r.id === "law-planning");
