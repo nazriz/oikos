@@ -15,6 +15,7 @@ export interface Manifest {
   state?: string;
   keeps?: { what: string; why: string }[];
   boundary?: { what: string; why: string }[];
+  takes?: { form: string; title: string; fields: { [name: string]: { type: string; required?: boolean; options?: string[]; description: string } }; follows: string }[];
 }
 
 const DIR = join(import.meta.dir, "../manifests");

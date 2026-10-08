@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, drawHousehold, drawSavings, formatMoney, Randomness, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule } from "@oikos/participants";
+import { adultAgeBands, drawHousehold, drawSavings, formatMoney, modules, Randomness, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type LawSchedule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -59,7 +59,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.33.0";
+export const GENERATOR_VERSION = "0.34.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -78,6 +78,9 @@ export interface TownSpec {
   factories: number;
   landlords: number;
   hall_capacity?: number; // the town hall's hall: how many a gathering can hold (default 200)
+  /** How many of the town's works crew are in work at the start (default: all of them, the profile's staff per 1,000
+   * residents; 0: a works office that has still to take its crew on). The budget's staff line is the same either way. */
+  works_crew_at_start?: number;
   /** A retirement fund holding part of the town's widely held firms for its members (docs/behaviour/firm-ownership.md).
    * Off unless a world asks for it; its figures are the profile's (retirement_fund), which must then have them. */
   retirement_fund?: boolean;
@@ -235,6 +238,20 @@ export function amendmentForm(schedule: { id: string; data: LawSchedule }): any 
     data: { form: name, amends: schedule.id, submit_as: "proposal", submit_to: ["city"], fields: {
       ...Object.fromEntries(Object.entries(s.figures).map(([k, f]) => [k, { type: f.type, description: f.description ?? `${f.label ?? k}, in ${f.unit}.`, unit: f.unit, ...(f.per_unit ? { per_unit: f.per_unit } : {}) }])),
       affects: { type: "choice", options: ["tenants", "development", "neither"], description: "Whom it mainly bears on." } } } };
+}
+
+/** The town's rule on who may direct its offices (a record: docs/behaviour/directions.md). */
+const DIRECTIONS = "proc-directions";
+
+/**
+ * The form an office publishes for a written direction it takes (docs/behaviour/directions.md), from its module's
+ * declaration (`takes`): its fields, and what following one means. Filled in, it is a statement of kind `direction`
+ * to the office's organisation, citing the form; the office reads it, and follows it or does not.
+ */
+export function directionForm(office: string, entity: string, t: Taken): any {
+  return { id: `form-${t.form.replace(/_/g, "-")}`, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: entity, kind: "form",
+    text: `${t.title}. ${t.follows} The office follows a direction only from those the town's rule on directions names.`,
+    data: { form: t.form, office, submit_as: "direction", submit_to: [entity], fields: t.fields } };
 }
 
 export function generate(described: TownSpec): any {
@@ -553,7 +570,10 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   // the firms' staff (docs/behaviour/services.md).
   const townCrew = Math.max(1, Math.round((V.services.council_staff_per_1000 * everyone.length) / 1000));
   // (First, so it's filled whatever the size of the town's workforce.)
-  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: 20, start: townCrew, industry: "public_administration" });
+  // (A town may be described as starting with fewer of them in work, or none: a works office that has still to take
+  // its crew on. What its budget pays for is the same.)
+  const crewAtStart = Math.max(0, Math.min(townCrew, Math.floor(spec.works_crew_at_start ?? townCrew)));
+  workplaces.unshift({ employer: "city", structure: "town-hall", space: "town-hall/workplace.1", wage: wages.construction, capacity: 20, start: crewAtStart, industry: "public_administration" });
   // ---- public services (docs/design/world-expansion.md 4): a clinic and a school, staffed from the start like the
   // town's crew, each its own organisation, paid for from outside (a higher government's, as the profile has it) ----
   const ageNow = (m: Person) => Math.floor(-m.born_at / YEAR);
@@ -1323,6 +1343,26 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
   records.push({ id: "proc-payments", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
     text: `The finance officer pays an invoice only within the adopted budget, and any payment over ${approvalOver} only with the mayor's written approval.`,
     adico: { attribute: "the finance officer", deontic: "must_not", aim: "pay an invoice", condition: `outside the adopted budget, or over ${approvalOver} without the mayor's written approval` } });
+  // Who may direct the town's offices (docs/behaviour/directions.md): the town's own rule, a record, as its payments
+  // procedure is. The charter gives the town a mayor and a council and no chief executive, so the mayor heads its
+  // administration; the council directs by resolution, which its clerk files. An office follows a direction only on
+  // its own form for it and only from these posts; whoever holds the office decides whether it does.
+  records.push({ id: DIRECTIONS, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "procedure", basis: "law-charter", addressed_to: ["city"],
+    text: "The town's offices take written directions on how they do their work from the mayor, as head of the town's administration, and from the council by resolution, filed by the council clerk. A direction is given on the office's own form for it and stands until it is replaced or withdrawn. An office follows no other direction on those matters, and a direction changes no law, no budget and nobody's employment.",
+    adico: { attribute: "the town's offices", deontic: "must", aim: "follow a written direction on their own form for it", condition: "given by the mayor, or by the council clerk on the council's resolution" },
+    data: { directions: { by: ["mayor", "council-clerk"] } } });
+  // Each town office that takes directions publishes its forms for them (what it takes is its module's to say:
+  // `takes`), and is told which record says whose it follows.
+  for (const pos of positions.filter((x) => x.entity === "city")) {
+    const takes = modules[pos.role_module?.code ?? ""]?.takes ?? [];
+    if (!takes.length) continue;
+    pos.role_module.params.directed_under = DIRECTIONS;
+    for (const t of takes) records.push(directionForm(pos.id, pos.entity, t));
+    // (It reads the directions given to the town, its own forms and the rule among the town's papers: an office
+    // that is not shown all of those is shown these.)
+    if (!pos.channels.some((c: any) => c.kind === "records" && c.way === "mine" && !c.on_request && !Object.keys(c.match ?? {}).length))
+      pos.channels.push(K.mine("directions", ["direction", "form", "procedure"], { title: "Directions to the town's offices, their forms for them, and the town's rule on directions" }));
+  }
   // The council clerk publishes how to put something to the council: anyone may, on this form.
   records.push({ id: "form-council-proposal", record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", kind: "form",
     text: "Council proposal: what's proposed, what kind it is, and whom it mainly affects. The council clerk puts it to a ballot of the councillors, open for 14 days. A law proposed here stands as its words: no rule is set down with it for acts to be checked against. To change a figure in a law in force (a notice period, how often, a threshold), use that law's amendment form.",

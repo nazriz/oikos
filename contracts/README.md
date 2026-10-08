@@ -211,6 +211,13 @@ A model call that fails (after its adapter's own time limits and retries) is rec
   - **Removed:** `way: "whole"` (the migration's form for a view not yet replaced). No world may say it.
 - **Unchanged:** blocks, records, the call language, datasets. Going to look is a look, not an act.
 
+## Changes since v0.8 closed (2026-10-09: offices that take directions; docs/behaviour/directions.md; under the owner's standing approval for readiness changes, to look over)
+
+- **`module.schema.json`: `takes`** (optional): the written directions a module's office takes, each a `Taken`: `form` (the form's name), `title`, `fields` (a form's fields, each with a `description`) and `follows` (what following one means, in words, 20 characters or more). A world publishes one form for each from this declaration; who may direct the office is a record of the world's, never the manifest. A manifest without it is valid as before.
+- **`outcomes.schema.json`, `FormData`: `office`** (optional): the office (a position) a form is the form of, where it is one office's and not its whole organisation's. In a call, such a form's `to` is its office (`form(form=works_staffing, to=works, …)`); named by its organisation it is still found, and another office of the same organisation is not where it goes. The call language's schema is unchanged.
+- **No new block, record or kernel rule.** A direction is a statement of kind `direction`, made on the form, and following it is the office's own conduct. Both resolvers are held to `contracts/test/forms.json`.
+- **A form's summary in words** (both resolvers): a form-made statement's text says an amount as the world writes its money and a length of time in days ("every 14 days"), where it said the bare integer.
+
 ## Changes from v0.7 (v0.8, closed 2026-10-02; docs/design/world-expansion.md)
 
 - **Nature** (signed 2026-10-01; world-expansion §2.4): `catalogue.land_covers` (with succession), `default_cover`, `cleared_cover`, `fields` (sources by cover and by building, decay, diffusion, flow, bounds) and `species` (growth, capacities by cover, tolerances, dispersal, barriers, detection); structure types' `cover`; a `flow` layer on places; fields and populations on cells in state and log; events `species_extinct` and `nature_census`; tasks that `survey` (the estimate in the actor's outcome, `surveyed`, for it alone); cover and conspicuous species in the sites view. Reserved covers `built` and `open`.

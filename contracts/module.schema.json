@@ -80,9 +80,86 @@
         "$ref": "#/$defs/Kept"
       },
       "maxItems": 64
+    },
+    "takes": {
+      "type": "array",
+      "description": "The written directions its office takes (docs/behaviour/directions.md): for each, the form the office publishes for it and what following one means. A direction is followed only when it is filed on the form by someone the office's organisation says may direct it (a record of the world's, never this manifest), from the office's next plan until it is replaced or withdrawn. A world publishes one form for each, from this declaration.",
+      "items": {
+        "$ref": "#/$defs/Taken"
+      },
+      "maxItems": 16
     }
   },
   "$defs": {
+    "Taken": {
+      "type": "object",
+      "required": [
+        "form",
+        "title",
+        "fields",
+        "follows"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "form": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "description": "The form's name, as the call language's form names it."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 200,
+          "description": "What the form is, in a few words."
+        },
+        "fields": {
+          "type": "object",
+          "description": "The form's fields, as a form's data has them (outcomes.schema.json, FormData).",
+          "propertyNames": {
+            "pattern": "^[a-z_][a-z0-9_]{0,31}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/Field"
+          },
+          "maxProperties": 32
+        },
+        "follows": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 1000,
+          "description": "What following it means, in words: what the office does while the direction stands."
+        }
+      }
+    },
+    "Field": {
+      "type": "object",
+      "required": [
+        "type",
+        "description"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "$ref": "urn:oikos:contracts:0.8:outcomes#/$defs/FieldType"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "maxItems": 32
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 500
+        }
+      }
+    },
     "Param": {
       "type": "object",
       "required": [

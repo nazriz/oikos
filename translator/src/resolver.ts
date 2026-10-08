@@ -15,7 +15,7 @@ import { Knowledge } from "./knowledge";
 type Call = calls.Call;
 type Value = calls.Value;
 
-export const RESOLVER = { id: "resolver", version: "0.5.0" };
+export const RESOLVER = { id: "resolver", version: "0.6.0" };
 
 /** What the resolver reads from a structure type in the world's catalogue (which is public): its footprint, the terrains it can stand on, and its spaces. */
 export interface StructureTypeInfo {
@@ -59,6 +59,13 @@ export function asLabel(s: string): string {
   return out.slice(0, 64);
 }
 
+
+/** A length of time in words: whole days where it is whole days ("14 days", "1 day"), seconds otherwise. */
+export function durationWords(seconds: number): string {
+  if (seconds % 86_400 !== 0) return `${seconds} seconds`;
+  const days = seconds / 86_400;
+  return days === 1 ? "1 day" : `${days} days`;
+}
 
 /** Resolve a program. `typeOf` gives a structure type from the world's catalogue, for building on a lot. */
 export function resolve(program: calls.Program, k: Knowledge, typeOf: (type: string) => StructureTypeInfo | undefined = () => undefined, as?: string): Resolution {
@@ -655,14 +662,14 @@ class Resolver {
     const known = this.k.forms.filter((x) => spellings.includes(x.data?.form) || x.id === written);
     if (!known.length) throw new Ask(LABEL_TEXT.unknown_form);
     const name: string = known.some((x) => x.id === written) ? written : known[0]!.data.form;
-    const goes = [...new Set(known.map((x) => x.in_position ?? x.speaks_for ?? x.author))].sort();
+    const goes = [...new Set(known.map((x) => Knowledge.formOf(x)))].sort();
     const to = this.has(c, "to") ? this.need(c, "to", "Which office's form?") : goes.length === 1 ? goes[0]! : (() => { throw new Ask("Which office's form?"); })();
     const f = this.k.form(to, name);
     if (!f) {
       // Known by name but not from that office: say where it goes, rather than that it's unknown.
       const elsewhere = this.k.forms.filter((x) => x.data?.form === name || x.id === name);
       if (!elsewhere.length) throw new Ask(LABEL_TEXT.unknown_form);
-      const where = [...new Set(elsewhere.map((x) => x.in_position ?? x.speaks_for ?? x.author))];
+      const where = [...new Set(elsewhere.map((x) => Knowledge.formOf(x)))];
       throw new Ask(`The ${name.replace(/_/g, " ")} form isn't one ${to} takes: it goes to ${where.join(" or ")}.`);
     }
     const spec = f.data as { form: string; submit_as: string; submit_to: string[]; fields: { [k: string]: { type: string; required?: boolean; options?: string[] } } };
@@ -687,7 +694,14 @@ class Resolver {
     const unknown = Object.keys(c.args).filter((a) => !["to", "form", "for"].includes(a) && !(a in spec.fields));
     if (unknown.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} form has no ${unknown.join(" or ")} field. Its fields are: ${Object.keys(spec.fields).join(", ")}.`);
     if (missing.length) throw new Ask(`The ${spec.form.replace(/_/g, " ")} needs: ${missing.join(", ")}.`);
-    const summary = Object.entries(data).map(([k, x]) => `${k.replace(/_/g, " ")} ${typeof x === "string" ? x : JSON.stringify(x)}`).join(", ");
+    // What was filled in, in words: an amount as the world writes its money, a length of time in days.
+    const words = (k: string, x: unknown): string => {
+      const type = spec.fields[k]?.type;
+      if (type === "amount" && typeof x === "string") return this.sum(x);
+      if (type === "duration" && typeof x === "number") return durationWords(x);
+      return typeof x === "string" ? x : JSON.stringify(x);
+    };
+    const summary = Object.entries(data).map(([k, x]) => `${k.replace(/_/g, " ")} ${words(k, x)}`).join(", ");
     return [{ block: "publish", kind: spec.submit_as, speaks_for: this.id(c, "for") ?? this.me, addressed_to: spec.submit_to, basis: f.id, text: `${spec.form.replace(/_/g, " ")}: ${summary}.`.slice(0, 16384), data, ...(bind ? { ref: bind } : {}) }];
   }
 

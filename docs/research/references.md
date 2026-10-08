@@ -305,3 +305,14 @@ The sources for how a real place does each of these, with what was and was not o
 | A water supplier bills by a meter read on a round | Common practice **(to confirm: no source opened)** | `utility.water` (the `water_used` measure, read by a visit before each quarter's bills) |
 | Estimating the next demand from what was last found, and correcting by what was left over | Exponential smoothing in its plainest form: Brown, R. G. (1956), *Exponential Smoothing for Predicting Demand*, Arthur D. Little **(to confirm: named from memory)**. Used only in spirit: the office keeps one rate an address, replaced each call | `city.works`: how many loads it sends for at each address on its round |
 
+
+## Written directions to an office (docs/behaviour/directions.md; docs/decisions.md, 2026-10-09)
+
+No source below was opened (one attempt, at the Victorian Act on AustLII, was refused by the site): each is stated from memory and marked.
+
+| Idea | Citation | Used in |
+|---|---|---|
+| An office works to written directions from whoever it answers to, given in a set form and standing until replaced or revoked | Ordinary administrative practice: instruments of direction and delegation, standing instructions **(to confirm: no source opened)** | `Directions` (`participants/src/behaviour/common.ts`); `takes` on a module; the direction forms |
+| Where the council appoints a chief executive, staff answer to that officer and a councillor must not direct them | Local Government Act 2020 (Vic), ss 46 and 124 **(to confirm)**; Local Government and Housing Act 1989 (England and Wales), s 4, the head of paid service **(to confirm)** | Why who may direct is a record (`proc-directions`) and not a rule of the platform; the open question of a chief executive seat |
+| Where the mayor is the executive, the mayor directs the administration | Niedersächsisches Kommunalverfassungsgesetz § 85 **(to confirm)**; Local Autonomy Act (Japan), arts 147 to 154 **(to confirm)**; Ohio Revised Code 733.03 **(to confirm)** | `proc-directions` naming the mayor in the generated town |
+| A council acts by resolution, which its officers carry out | Ordinary council procedure, as docs/behaviour/government.md has it **(to confirm: no source opened)** | `proc-directions` naming the council clerk |

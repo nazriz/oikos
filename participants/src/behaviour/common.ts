@@ -4,9 +4,10 @@
 
 import * as C from "../calls";
 import type { Assertion, LookRequest, Observation, Offer, Outcome as ActOutcome, Practice, Reading, Record, ParticipantAction, Registry, StatementRecord, SiteCell } from "../contracts";
-import { channels } from "../contracts";
+import { basesOf, channels } from "../contracts";
 import { cents, moneyNow } from "../money";
 import { evaluate } from "../law";
+import type { ParticipantContext } from "../module";
 
 export const DAY = 86_400;
 export const MONTH = 30 * DAY;
@@ -1021,6 +1022,70 @@ export class Letters {
     const out = this.pending.map((m) => because(why, message([m.from], report({ participant: m.from, as: m.as, entity: m.entity }), m.id)));
     this.pending = [];
     return out;
+  }
+}
+
+/**
+ * The written directions an office takes (docs/behaviour/directions.md). An office works to written procedures and to
+ * directions from whoever it answers to: here, a direction is a statement of kind `direction` filed on the office's
+ * own form for it (the form is its basis), addressed to the office's organisation. Who may direct the office is the
+ * organisation's own rule, a record (`under`: a procedure, say, whose data names the posts: `directions.by`, or for
+ * one office `directions.offices[office]`); a direction made in any other post is not followed, and its writer is
+ * told so in a letter, once, that says nothing but what the rule itself says. The direction that stands is the latest
+ * one not withdrawn; the office follows it, or (below its `compliance_bps`) does not, as it follows any procedure.
+ */
+export class Directions {
+  private readonly answered = new Set<string>();
+  private readonly acknowledged = new Set<string>();
+  constructor(private readonly ctx: ParticipantContext, private readonly o: { under: string; compliance_bps?: number; office_words: string }) {}
+
+  /** The posts that may direct this office, by the organisation's rule as it stands (none: it has no such rule, or the rule is withdrawn). */
+  private may(book: Book): string[] {
+    const rule = this.o.under ? book.current(this.o.under) : undefined;
+    const d = rule?.record === "statement" ? (rule.data?.directions as { by?: unknown; offices?: { [office: string]: unknown } } | undefined) : undefined;
+    const posts = (this.ctx.position && d?.offices?.[this.ctx.position]) ?? d?.by;
+    return Array.isArray(posts) ? posts.filter((x): x is string => typeof x === "string") : [];
+  }
+
+  /** The directions filed on our form `form` that still stand, oldest first. */
+  private filed(book: Book, form?: string): StatementRecord[] {
+    const office = this.ctx.position;
+    return book.standingOf("direction").filter((d) => (d.addressed_to ?? []).includes(this.ctx.entity) && basesOf(d).some((b) => {
+      const f = book.records.get(b);
+      return f?.record === "statement" && f.kind === "form" && f.data?.office === office && (form === undefined || f.data?.form === form);
+    })).sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : 1));
+  }
+
+  /** The direction in force on a form: the latest standing one from a post that may direct us, if we follow it. */
+  standing(book: Book, form: string): StatementRecord | undefined {
+    const may = this.may(book);
+    const d = this.filed(book, form).filter((x) => x.in_position !== undefined && may.includes(x.in_position)).at(-1);
+    if (!d) return undefined;
+    return this.ctx.rng(`direction-${d.id}`).below(10_000) < (this.o.compliance_bps ?? 10_000) ? d : undefined;
+  }
+
+  /**
+   * Letters about directions newly received, one to each writer, once: to one who may direct us, that we have it and
+   * what we will do while it stands (`doing`: in the office's words, by form); to anyone else, that it is not
+   * followed, and the rule that says whose directions are.
+   */
+  letters(book: Book, doing: (d: StatementRecord, form: string) => string): Step[] {
+    const may = this.may(book);
+    const steps: Step[] = [];
+    for (const d of this.filed(book)) {
+      if (this.answered.has(d.id) || this.acknowledged.has(d.id) || d.author === this.ctx.participant) continue;
+      const form = basesOf(d).map((b) => book.records.get(b)).find((f) => f?.record === "statement" && f.kind === "form") as StatementRecord | undefined;
+      if (d.in_position !== undefined && may.includes(d.in_position)) {
+        this.acknowledged.add(d.id);
+        steps.push(because(`A direction from ${d.in_position} on our ${String(form?.data?.form ?? "form").replace(/_/g, " ")} form: acknowledging it.`,
+          message([d.author], `From ${this.o.office_words}: your direction ${d.id} is received. ${doing(d, String(form?.data?.form ?? ""))} It stands until you replace or withdraw it.`, d.id)));
+      } else {
+        this.answered.add(d.id);
+        steps.push(because(`A direction (${d.id}) from someone our rules don't say may direct us: not following it, and saying so.`,
+          message([d.author], `From ${this.o.office_words}: your direction ${d.id} is not being followed. ${this.o.under && may.length ? `This office takes directions on its forms only from those ${this.o.under} names.` : "No rule of this organisation's says who may direct this office."}`, d.id)));
+      }
+    }
+    return steps;
   }
 }
 

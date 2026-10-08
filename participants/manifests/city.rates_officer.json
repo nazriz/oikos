@@ -1,8 +1,23 @@
 {
   "name": "city.rates_officer",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "doc": "docs/behaviour/public-finance.md",
   "params": {
+    "directed_under": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "direction_compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
+      "source": "placeholder"
+    },
     "first_day": {
       "schema": {
         "type": "integer"
@@ -24,6 +39,24 @@
     {
       "what": "valuation",
       "why": "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on."
+    }
+  ],
+  "takes": [
+    {
+      "form": "rates_recovery",
+      "title": "Recovery direction to the rates officer",
+      "fields": {
+        "interest": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "description": "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added."
+        }
+      },
+      "follows": "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record."
     }
   ]
 }

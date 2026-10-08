@@ -10,8 +10,8 @@ import * as C from "../calls";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX } from "./common";
-import { Staffing, stepper } from "./firms";
+import { nextLook, because, Book, cellsOf, DAY, draftLaw, figureWords, heldValue, jobTerms, Letters, lotOf, message, MONTH, ownAccount, pay, publishedCount, publishedPrice, record, say, type LawFigure, type LawSchedule, type Step, usd, variableToday, vote, withdraw, outOfTime, team, lookUp, goSee, visited, VISIT_MAX, Directions } from "./common";
+import { Staffing, staffingForm, staffingUnder, stepper } from "./firms";
 import { incomeTaxLaw, withholding } from "./tax";
 import { ownLand } from "./institutions";
 
@@ -607,13 +607,20 @@ export const ratesOfficer: BehaviourModule = {
   keeps: [
     { what: "valuation", why: "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on." },
   ],
-  version: "0.2.1",
+  takes: [{ form: "rates_recovery", title: "Recovery direction to the rates officer",
+    fields: { interest: { type: "choice", options: ["yes", "no"], required: true, description: "Whether rates left unpaid after their due date are charged the law's penalty interest: yes, as the office does of its own accord; no, none is added." } },
+    follows: "While a direction with interest no stands, the rates officer adds no penalty interest to overdue rates and writes to nobody about them. The rates themselves are still levied and still owed, and interest already recorded stays on record." }],
+  version: "0.3.0", // 0.3.0: takes a written direction on penalty interest (docs/behaviour/directions.md)
   doc: "docs/behaviour/public-finance.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
-    const p = params({ law: "law-rates", first_day: 30 }, ctx.params);
+    const p = params({ law: "law-rates", first_day: 30,
+      // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
+      // names (none: it follows nobody's); and how often it follows one it is given.
+      directed_under: "", direction_compliance_bps: 10_000 }, ctx.params);
     const book = new Book();
     const letters = new Letters();
+    const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the rates office" });
     const settled = new Set<string>(); // claims a payment into our account has named
     const lastInterest = new Map<string, number>(); // overdue claim -> when interest was last charged
     let next = p.first_day * DAY;
@@ -666,8 +673,11 @@ export const ratesOfficer: BehaviourModule = {
           }
           for (let i = 0; i < lines.length; i += 30) steps.push(because(`The rates instalment: a ${instalments === 1 ? "year" : `${instalments}th of a year`}'s rates at the law's ${ratePpm / 10_000}% of each property's value.`, ...lines.slice(i, i + 30)));
         }
-        // Overdue: penalty interest, monthly, on what's still unpaid after its due date.
-        if (interestBps > 0) for (const c of book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
+        // Overdue: penalty interest, monthly, on what's still unpaid after its due date (unless a recovery direction
+        // that stands, from whoever the town says may direct us, says to add none).
+        const recovery = directions.standing(book, "rates_recovery");
+        steps.push(...directions.letters(book, (d) => (d.data?.interest === "no" ? "No penalty interest is added to overdue rates while it stands; the rates are still owed." : "Overdue rates are charged the law's penalty interest.")));
+        if (interestBps > 0 && recovery?.data?.interest !== "no") for (const c of book.ofType("claim").filter((r) => r.record === "claim" && r.position === "right" && r.holder === me && r.about?.kind === "rates") as any[]) {
           if (settled.has(c.id) || t < c.about.due) continue;
           if (t - (lastInterest.get(c.id) ?? c.about.due) < 30 * DAY) continue;
           lastInterest.set(c.id, t);
@@ -703,7 +713,13 @@ export const ratesOfficer: BehaviourModule = {
 export const works: BehaviourModule = {
   name: "city.works",
   keeps: [{ what: "service_address", why: "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built." }],
-  version: "0.3.0", // 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
+  takes: [
+    staffingForm("works_staffing", "the works office", "works crew"),
+    { form: "works_collection", title: "Collection direction to the works office",
+      fields: { every: { type: "duration", required: true, description: "How often each address on the round is to be collected from (a week, a fortnight)." } },
+      follows: "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round." },
+  ],
+  version: "0.4.0", // 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -721,11 +737,15 @@ export const works: BehaviourModule = {
       // from (a register it keeps itself; none: it collects from nowhere), and the channel it sends someone through
       // to inspect an asset of the town's it has not seen (none: an asset is seen only by the crew that works on it).
       round: "", inspections: "",
+      // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
+      // names (none: it follows nobody's); and how often it follows one it is given.
+      directed_under: "", direction_compliance_bps: 10_000,
     }, ctx.params);
     need(p, ["depot", "workplace", "landfill"], "city.works");
     const me = ctx.entity;
     const book = new Book();
     const letters = new Letters();
+    const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the works office" });
     const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed" });
     // Each building as we last saw it: as the crew that worked on it left it, or as whoever we sent to inspect it found it.
     const known = new Map<string, SiteStructure>();
@@ -788,8 +808,20 @@ export const works: BehaviourModule = {
           month = m;
           if (workers.length > target) steps.push(...staffing.letGo(book, t, `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}, and we have ${workers.length}: letting one go.`, "Redundancy: the budget doesn't pay for the position."));
         }
-        steps.push(...staffing.routine(obs, book, "", { target, wage: p.wage, canPost: !!budget && target > workers.length,
-          why: `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}; we have ${workers.length}: posting a job.` }));
+        // A staffing direction that stands (from whoever the town says may direct us): whether to recruit, and the most
+        // posts to fill. It stands nobody down: the budget's crew is still what we keep.
+        const staffingDir = directions.standing(book, "works_staffing");
+        const directed = staffingUnder(staffingDir);
+        const hireTo = Math.min(target, directed.posts ?? Infinity);
+        steps.push(...staffing.routine(obs, book, "", { target: hireTo, wage: p.wage, canPost: !!budget && hireTo > workers.length, recruit: directed.recruit,
+          ...(staffingDir ? { stopped: `Direction ${staffingDir.id} says not to recruit: taking our advertisements down.` } : {}),
+          why: `The adopted budget's ${p.staff_line} line (${usd(line)}) pays for a crew of ${target}${hireTo < target ? ` (and direction ${staffingDir!.id} says to fill ${hireTo})` : ""}; we have ${workers.length}: posting a job.` }));
+        // How often each address is collected from: as directed, while a direction on it stands; else our own round.
+        const collectionDir = directions.standing(book, "works_collection");
+        const collectEvery = Number.isSafeInteger(collectionDir?.data?.every) && collectionDir!.data!.every >= DAY ? (collectionDir!.data!.every as number) : p.collect_every_days * DAY;
+        steps.push(...directions.letters(book, (d, form) => form === "works_staffing"
+          ? (staffingUnder(d).recruit ? `The office recruits up to ${Math.min(target, staffingUnder(d).posts ?? Infinity)} crew.` : "The office advertises no post, takes down the advertisements it has out and takes nobody on.")
+          : `The crew collects from each address every ${Math.round(Number(d.data?.every) / DAY)} days, as its hours allow.`));
 
         // Complaints about a home's waste: that home first, on the next round.
         for (const c of book.open("complaint")) {
@@ -830,7 +862,7 @@ export const works: BehaviourModule = {
           const round: { on: string; call: C.Call; before?: number; full: boolean; fit: number; of: number }[] = [];
           if (p.collect_labour > 0 && p.collect_per_unit > 0) {
             const due = [...addresses].sort().map((structure) => ({ structure, st: known.get(structure) }))
-              .filter((b) => complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= p.collect_every_days * DAY - DAY / 2)
+              .filter((b) => complained.has(b.structure) || t - (collectedAt.get(b.structure) ?? -Infinity) >= collectEvery - DAY / 2)
               .sort((a, b) => Number(complained.has(b.structure)) - Number(complained.has(a.structure)) || (collectedAt.get(a.structure) ?? -1) - (collectedAt.get(b.structure) ?? -1) || (a.structure < b.structure ? -1 : 1));
             for (const b of due) {
               // An address the crew has been to and found nothing kept of waste at: not a home; off the round.
@@ -914,11 +946,13 @@ export const works: BehaviourModule = {
         steps.push(...letters.answer(() => {
           // (A home never collected from is overdue a week after it was first due, not from the beginning of time: pilot 7
           // found every home "a week or more overdue" on the first morning, and the mayor kept asking why.)
-          const overdue = [...addresses].sort().filter((s) => t - (collectedAt.get(s) ?? knownSince.get(s) ?? t) >= (p.collect_every_days + 7) * DAY);
+          const overdue = [...addresses].sort().filter((s) => t - (collectedAt.get(s) ?? knownSince.get(s) ?? t) >= collectEvery + 7 * DAY);
+          const standing = [staffingDir, collectionDir].filter((d): d is StatementRecord => !!d);
           const state = assets.map((a) => known.get(a)).filter((b): b is SiteStructure => !!b?.variables?.[p.wear]).map((b) => `${b.structure} ${Math.round(((variableToday(b.variables![p.wear], t) ?? 0) * 100) / Math.max(1, b.variables![p.wear]!.max))}% worn`);
           const unseen = assets.filter((a) => !known.has(a)).length;
           return `Report from the works office: a crew of ${workers.length} (the adopted budget's ${p.staff_line} line, ${usd(line)}, pays for ${target} at ${usd(annual)} a year each). ` +
-            `Waste is collected from every home every ${p.collect_every_days} days as the crew's hours allow; ${collectedKg} loads collected so far. ` +
+            (standing.length ? `Directions we are following: ${standing.map((d) => `${d.id} (${d === staffingDir ? (directed.recruit ? `recruit up to ${hireTo}` : "do not recruit") : `collect every ${Math.round(collectEvery / DAY)} days`})`).join(", ")}. ` : "") +
+            `Waste is collected from every home every ${Math.round(collectEvery / DAY)} days as the crew's hours allow; ${collectedKg} loads collected so far. ` +
             (overdue.length ? `Homes a week or more overdue: ${overdue.join(", ")}. ` : "No home is overdue. ") +
             `The round has ${addresses.size} addresses. ` +
             (state.length ? `The town's assets, as last seen: ${state.slice(0, 60).join(", ")}${state.length > 60 ? `, and ${state.length - 60} more` : ""}.` : "") +

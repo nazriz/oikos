@@ -95,7 +95,36 @@ export interface Kept {
   why: string;
 }
 
+/** A field of a form (contracts/outcomes.schema.json, FormData): what whoever fills it in is asked for. */
+export interface FormField {
+  /** amount, duration, count, text, choice (one of `options`), or what an id names (lot, cell, space, structure_type,
+   * account, entity, structure, record). */
+  type: string;
+  required?: boolean;
+  options?: string[];
+  description: string;
+}
+
+/**
+ * A written direction an office takes (docs/behaviour/directions.md): the form it publishes for it, and what following
+ * one means. Whoever the office's organisation says may direct it files the direction on the form; the office reads
+ * the direction that stands and follows it at its next plan, until it is replaced or withdrawn. Declared beside the
+ * code that follows it, as `keeps` is beside the code that holds a register.
+ */
+export interface Taken {
+  /** The form's name (a label), as the call language's `form` names it. */
+  form: string;
+  /** What the form is, in a few words ("Staffing direction to the works office"). */
+  title: string;
+  fields: { [name: string]: FormField };
+  /** What following it means, in words: what the office does while it stands. */
+  follows: string;
+}
+
 export interface BehaviourModule {
+  /** The written directions it takes, each on a form its office publishes (docs/behaviour/directions.md). An office
+   * follows only what is filed on its form by someone its organisation says may direct it. */
+  takes?: Taken[];
   /** Its own registers, held whole because this is the office that keeps them (the land registry its register, a bank
    * its customers' instructions): never a way to know what someone else keeps, which is asked for (`ask` in
    * behaviour/common.ts). */

@@ -97,6 +97,7 @@
       "additionalProperties": false,
       "properties": {
         "form": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label" },
+        "office": { "description": "The office (a position) whose form it is, where it is one office's and not its whole organisation's: a direction that office takes. A call names such a form's office as its `to`.", "$ref": "#/$defs/Id" },
         "submit_as": { "$ref": "urn:oikos:contracts:0.8:common#/$defs/Label" },
         "submit_to": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } },
         "fields": {

@@ -97,6 +97,14 @@ export class Preview {
             return [`You will instruct ${b.addressed_to.map((x: string) => this.who(x)).join(", ")} to hold ${held.join(", ")}${named(b)}${this.seenBy(b.visible_to)}${citing(b)}. ${many ? "They stay" : "It stays"} on record. This by itself stops nothing and settles nothing: whoever you instruct acts on it, or doesn't, and whatever ${many ? "they were" : "it was"} for is still owed. To resume ${many ? "them" : "it"}, withdraw this instruction. Your instruction will read: "${b.text}".${rest}${this.rule(b)}`,
               ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
         }
+        // A direction on an office's own form: what is filed, with whom, and that following it is the office's to do.
+        const filedOn = typeof b.basis === "string" ? this.k.forms.find((f) => f.id === b.basis) : undefined;
+        if (b.kind === "direction" && typeof filedOn?.data?.office === "string") {
+          const office: string = filedOn.data.office;
+          const title = this.k.positionWords.get(office)?.title;
+          return [`You will give ${title ? `the ${title} (${office})` : office} a written direction on its ${String(filedOn.data.form).replace(/_/g, " ")} form (${filedOn.id})${named(b)}${this.seenBy(b.visible_to)}: "${b.text}". This by itself changes nothing: the office follows a direction only from those its organisation's rules say may direct it, and writes back to say whether it does. It stands until you replace it with another or withdraw it.${this.rule(b)}`,
+            ["kind", "text", "data", "addressed_to", "adico", "formal", ...RECORD]];
+        }
         const d = this.details(b.data);
         // On its own file: seen by nobody but whoever it is made for, and addressed to nobody.
         const own = Array.isArray(b.visible_to) && b.visible_to.length === 1 && b.visible_to[0] === (b.speaks_for ?? this.me) && !b.addressed_to?.length && !b.place;

@@ -12,7 +12,7 @@ use crate::knowledge::Knowledge;
 use serde_json::{json, Map, Value as Json};
 use std::collections::BTreeSet;
 
-pub const RESOLVER_VERSION: &str = "0.5.0";
+pub const RESOLVER_VERSION: &str = "0.6.0";
 
 /// Fixed texts for the translator's refusal labels (section 11.1).
 pub fn label_text(label: &str) -> &'static str {
@@ -983,7 +983,7 @@ impl Resolver<'_> {
         let name = if known.iter().any(|x| x["id"].as_str() == Some(written.as_str())) { written.clone() } else { known[0]["data"]["form"].as_str().unwrap_or_default().to_string() };
         let mut goes: Vec<String> = vec![];
         for x in &known {
-            let w = x["in_position"].as_str().or(x["speaks_for"].as_str()).or(x["author"].as_str()).unwrap_or_default().to_string();
+            let w = Knowledge::form_of(x);
             if !goes.contains(&w) {
                 goes.push(w);
             }
@@ -1004,7 +1004,7 @@ impl Resolver<'_> {
             }
             let mut where_: Vec<String> = vec![];
             for x in elsewhere {
-                let w = x["in_position"].as_str().or(x["speaks_for"].as_str()).or(x["author"].as_str()).unwrap_or_default().to_string();
+                let w = Knowledge::form_of(x);
                 if !where_.contains(&w) {
                     where_.push(w);
                 }
@@ -1050,7 +1050,17 @@ impl Resolver<'_> {
         if !missing.is_empty() {
             return ask(format!("The {form_name} needs: {}.", missing.join(", ")));
         }
-        let summary = data.iter().map(|(k, x)| format!("{} {}", k.replace('_', " "), x.as_str().map(String::from).unwrap_or_else(|| x.to_string()))).collect::<Vec<_>>().join(", ");
+        // What was filled in, in words: an amount as the world writes its money, a length of time in days.
+        let mut said: Vec<String> = vec![];
+        for (k, x) in &data {
+            let words = match (fields[k]["type"].as_str().unwrap_or_default(), x) {
+                ("amount", Json::String(a)) => calls::format_money(a, self.currency()?),
+                ("duration", Json::Number(n)) if n.as_i64().is_some() => duration_words(n.as_i64().unwrap_or_default()),
+                _ => x.as_str().map(String::from).unwrap_or_else(|| x.to_string()),
+            };
+            said.push(format!("{} {words}", k.replace('_', " ")));
+        }
+        let summary = said.join(", ");
         let sf = self.id(c, "for")?.unwrap_or_else(|| self.me.clone());
         Ok(vec![obj(vec![
             ("block", some("publish")),
@@ -1063,6 +1073,15 @@ impl Resolver<'_> {
             ("ref", bind.map(Json::from)),
         ])])
     }
+}
+
+/// A length of time in words: whole days where it is whole days ("14 days", "1 day"), seconds otherwise.
+pub fn duration_words(seconds: i64) -> String {
+    if seconds % 86_400 != 0 {
+        return format!("{seconds} seconds");
+    }
+    let days = seconds / 86_400;
+    if days == 1 { "1 day".to_string() } else { format!("{days} days") }
 }
 
 /// Seconds as whole days, to the nearest (half a day and over rounds up; a negative span mirrors it). Exact integers:
@@ -1197,7 +1216,33 @@ mod tests {
         }
     }
 
-    use super::nearest_days;
+    /// Forms (a direction filed on an office's own form): the table this resolver and the repository's TypeScript one
+    /// are both held to (contracts/test/forms.json; translator/test/forms.test.ts reads the same file).
+    #[test]
+    fn forms_as_the_shared_table_says() {
+        let table: Json = serde_json::from_str(include_str!("../../../../contracts/test/forms.json")).unwrap();
+        let mut k = Knowledge::new(Currency::from_config(&table["currency"]));
+        k.absorb(&table["observation"]);
+        let cases = table["cases"].as_array().unwrap();
+        assert!(cases.len() >= 12);
+        for c in cases {
+            let name = c["name"].as_str().unwrap();
+            let program = parse_program(c["program"].as_str().unwrap()).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            match resolve(&program, &k, &|_| None, c["as"].as_str()) {
+                Resolution::Blocks(b) => assert_eq!(json!(b), c["blocks"], "{name}"),
+                Resolution::Questions { questions, .. } => assert_eq!(json!(questions), c["asks"], "{name}"),
+            }
+        }
+    }
+
+    use super::{duration_words, nearest_days};
+
+    #[test]
+    fn a_length_of_time_in_words() {
+        for (seconds, words) in [(86_400, "1 day"), (14 * 86_400, "14 days"), (3600, "3600 seconds"), (0, "0 days"), (86_401, "86401 seconds")] {
+            assert_eq!(duration_words(seconds), words);
+        }
+    }
 
     #[test]
     fn seconds_round_to_the_nearest_day_half_up() {

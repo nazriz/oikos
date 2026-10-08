@@ -1,6 +1,6 @@
 {
   "name": "city.environment",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "doc": "docs/behaviour/environment.md",
   "params": {
     "decline_flag_bps": {
@@ -26,6 +26,21 @@
         "type": "string"
       },
       "default": "depot",
+      "source": "placeholder"
+    },
+    "directed_under": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "direction_compliance_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
       "source": "placeholder"
     },
     "industry": {
@@ -169,5 +184,27 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "takes": [
+    {
+      "form": "environment_staffing",
+      "title": "Staffing direction to the environment office",
+      "fields": {
+        "recruit": {
+          "type": "choice",
+          "options": [
+            "yes",
+            "no"
+          ],
+          "required": true,
+          "description": "Whether the environment office recruits: yes, it advertises and fills the posts it is short of; no, it advertises none and takes nobody on."
+        },
+        "posts": {
+          "type": "count",
+          "description": "The most environmental scientists it is to have, where that is fewer than its budget pays for. Left out: as many as the budget pays for."
+        }
+      },
+      "follows": "While a direction with recruit no stands, the environment office advertises no post, takes down the advertisements it has out and offers nobody employment. With recruit yes it recruits up to what its budget pays for, or up to posts where that is fewer. Nobody is stood down by it and nobody's pay changes."
+    }
+  ]
 }

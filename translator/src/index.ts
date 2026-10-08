@@ -16,7 +16,7 @@ import { calls, canonical, DOMAIN_DRAFT, evaluate, hashWithDomain, standingClaim
 import { callModel, refusalText, type LlmIO, type LlmMessage, type ToolSpec } from "@oikos/participants/llm";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Knowledge } from "./knowledge";
+import { Knowledge } from "./knowledge";
 import { Preview } from "./preview";
 import { LABEL_TEXT, RESOLVER, resolve, type Resolution, type StructureTypeInfo } from "./resolver";
 
@@ -172,7 +172,7 @@ export function translatorSystem(): string {
  * name; 2026-10-06), and its fields; a choice field lists its options. */
 export function formShown(f: Knowledge["forms"][number]): string {
   const field = ([k, v]: [string, any]) => `${k} (${v.type === "choice" && v.options?.length ? `one of ${v.options.join(" | ")}` : v.type}${v.required ? ", required" : ""})`;
-  return `- ${f.data?.form}, to=${f.in_position ?? f.speaks_for ?? f.author}, id ${f.id}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`;
+  return `- ${f.data?.form}, to=${Knowledge.formOf(f)}, id ${f.id}: fields ${Object.entries(f.data?.fields ?? {}).map(field).join(", ")}`;
 }
 
 /** What a translator may say was unclear, beside `none(unclear)`: one of a few things, never words of its own. A

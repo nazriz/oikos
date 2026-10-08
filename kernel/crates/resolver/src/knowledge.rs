@@ -532,20 +532,40 @@ impl Knowledge {
     /// entity id names (the latest).
     pub fn form(&self, to: &str, name: &str) -> Option<&Value> {
         let ent = self.entity_of(to);
-        let mut best: Option<&Value> = None;
-        for f in self.standing_forms().into_iter().filter(|f| {
-                (f["data"]["form"].as_str() == Some(name) || f["id"].as_str() == Some(name))
-                    && (f["author"].as_str() == Some(to)
+        let named: Vec<&Value> = self.standing_forms().into_iter().filter(|f| f["data"]["form"].as_str() == Some(name) || f["id"].as_str() == Some(name)).collect();
+        // One office's own form (a direction it takes, a paper it issues) is that office's: named by the office, it
+        // is that one and no other of the same name.
+        let offices: Vec<&Value> = named.iter().copied().filter(|f| f["data"]["office"].as_str() == Some(to)).collect();
+        let among: Vec<&Value> = if !offices.is_empty() {
+            offices
+        } else {
+            // (Named by anything else, one office's form is found only by its organisation itself: another office of
+            // the same organisation is not where it goes.)
+            named
+                .into_iter()
+                .filter(|f| f["data"]["office"].as_str().is_none() || f["speaks_for"].as_str() == Some(to))
+                .filter(|f| {
+                    f["author"].as_str() == Some(to)
                         || f["in_position"].as_str() == Some(to)
                         || f["speaks_for"].as_str() == Some(ent.as_str())
-                        || f["data"]["submit_to"].as_array().is_some_and(|a| a.iter().any(|x| x.as_str() == Some(ent.as_str()))))
-        }) {
+                        || f["data"]["submit_to"].as_array().is_some_and(|a| a.iter().any(|x| x.as_str() == Some(ent.as_str())))
+                })
+                .collect()
+        };
+        let mut best: Option<&Value> = None;
+        for f in among {
             // (The latest; of several at once, the first seen.)
             if best.is_none_or(|b| f["at"].as_i64() > b["at"].as_i64()) {
                 best = Some(f);
             }
         }
         best
+    }
+
+    /// Whose form it is, as a call's `to` names it: the office it is one office's form of, else the post it was made
+    /// in, else whom it speaks for (or its author).
+    pub fn form_of(f: &Value) -> String {
+        f["data"]["office"].as_str().or(f["in_position"].as_str()).or(f["speaks_for"].as_str()).or(f["author"].as_str()).unwrap_or_default().to_string()
     }
 }
 
