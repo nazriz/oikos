@@ -385,6 +385,11 @@ test("every town opens with its first year's budget on file: adopted by its coun
     const votes = c.world.records.filter((r: any) => r.record === "vote" && r.ballot === ballot.id);
     expect(votes.map((v: any) => v.in_position).sort()).toEqual(councillors);
     expect(result).toMatchObject({ in_position: "council-clerk", basis: ballot.id, data: { ballot: ballot.id, yes: votes.filter((v: any) => v.choice === "yes").length, no: 0, passed: true } });
+    // The ballot says it is closed and names its result, in its words and its content; the result names who voted.
+    expect(ballot.data).toMatchObject({ closed: true, result: result.id });
+    expect(ballot.text).toStartWith(`Council ballot, held and closed before the year began (result ${result.id}: passed, ${councillors.length} for, 0 against): `);
+    expect(result.data).toMatchObject({ voted_for: councillors, voted_against: [] });
+    expect(result.text).toContain(`Voting for: ${councillors.join(", ")}; against: none.`);
     expect(budget).toMatchObject({ kind: "budget", in_position: "council-clerk", speaks_for: "city", visible_to: "public", basis: ballot.id, author: "genesis", at: 0 });
     // The budget is what the clerk's own form for an adopted budget writes: a year, and the town's lines.
     expect(Object.keys(budget.data).sort()).toEqual(["lines", "year"]);

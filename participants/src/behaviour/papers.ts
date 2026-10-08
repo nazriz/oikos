@@ -87,8 +87,9 @@ export const COUNCIL_CLERK: Issued[] = [
     fields: { proposal: f("record", "The proposal put to the vote.", req), open_for: f("duration", "How long the ballot stays open.", req), tags: f("list", "What the proposal is about, a word each (budget, tenant_protection, development).") },
     writes: { kind: "ballot", text: "Ballot of the council on {proposal}, open for {open_for}.", basis: "=proposal", data: { proposal: "=proposal", options: ["yes", "no"], closes_at: "+open_for", electorate: "council", tags: "=tags" } } },
   { form: "council_result", title: "The result of a ballot of the council",
-    fields: { ballot: f("record", "The ballot counted.", req), yes: f("count", "Votes for.", req), no: f("count", "Votes against.", req), passed: f("choice", "Whether it passed.", { ...req, options: YES_NO }) },
-    writes: { kind: "ballot_result", text: "Result of {ballot}: {yes} for, {no} against.", basis: "=ballot", data: { ballot: "=ballot", yes: "=yes", no: "=no", passed: "?passed" } } },
+    fields: { ballot: f("record", "The ballot counted.", req), yes: f("count", "Votes for.", req), no: f("count", "Votes against.", req), passed: f("choice", "Whether it passed.", { ...req, options: YES_NO }),
+      voted_for: f("list", "The councillors' posts that voted for (a council's votes are public record)."), voted_against: f("list", "The councillors' posts that voted against.") },
+    writes: { kind: "ballot_result", text: "Result of {ballot}: {yes} for, {no} against.", basis: "=ballot", data: { ballot: "=ballot", yes: "=yes", no: "=no", passed: "?passed", voted_for: "=voted_for", voted_against: "=voted_against" } } },
   // (Its lines, one amount each, are the town's own budget lines: the world adds them when it publishes the form.)
   { form: "adopted_budget", title: "The budget as the council adopted it",
     fields: { year: f("count", "The year the budget is for.", req), ballot: f("record", "The ballot that adopted it.", req) },

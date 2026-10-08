@@ -7,6 +7,7 @@
 
 import { cents, smallestNow } from "../money";
 import * as C from "../calls";
+import { dateWords } from "../forms";
 import type { SiteStructure, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
@@ -34,6 +35,12 @@ export function linesInWords(lines: Record<string, number>, written: (amount: nu
 }
 
 /** The town's budget for a year, of those adopted (the latest, if the council adopted more than one for it). */
+/** Who voted which way on a ballot of the council, as its result records it: a council's votes are public record. */
+export function votedWords(yes: string[], no: string[], none: string[]): string {
+  const list = (xs: string[]) => (xs.length ? xs.join(", ") : "none");
+  return `Voting for: ${list(yes)}; against: ${list(no)}${none.length ? `; not voting: ${list(none)}` : ""}.`;
+}
+
 function budgetFor(book: Book, year: number): StatementRecord | undefined {
   return book.open("budget").filter((b) => b.data?.year === year).sort((a, b) => b.at - a.at)[0];
 }
@@ -279,7 +286,7 @@ export const mayorCode: BehaviourModule = {
 export const councilClerk: BehaviourModule = {
   name: "city.council_clerk",
   issues: P.COUNCIL_CLERK,
-  version: "0.9.1", // 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
+  version: "0.10.0", // 0.10.0: a result names who voted for and against; a vote on a closed ballot, or by someone who is no councillor, is not counted and its caster is told; 0.9.1: amends a law of optional figures (one added, one taken away by nought, a law made from one figure); 0.9.0: a proposal already balloted and a ballot already declared, by the office's own papers, are not put or counted again; a budget is for the year its proposal names
   doc: "docs/behaviour/government.md",
   cadence: () => DAY,
   create(ctx: ParticipantContext) {
@@ -295,6 +302,7 @@ export const councilClerk: BehaviourModule = {
     const closed = new Set<string>();
     const letters = new Letters();
     let membersAsked = -Infinity;
+    let votesRead = 0; // how many of the votes it has been shown it has looked at (for those that do not count)
     return stepper(
       (obs) => {
         book.absorb(obs);
@@ -331,7 +339,7 @@ export const councilClerk: BehaviourModule = {
         }
         for (const ballot of book.open("ballot")) {
           // (Our council's ballots only: an election's ballot speaks for the town too, and is the electoral office's.)
-          if (closed.has(ballot.id) || ballot.speaks_for !== me || ballot.data?.electorate !== "council" || t < (ballot.data?.closes_at ?? Infinity)) continue;
+          if (closed.has(ballot.id) || ballot.speaks_for !== me || ballot.data?.electorate !== "council" || (ballot.data?.closed !== true && t < (ballot.data?.closes_at ?? Infinity))) continue;
           closed.add(ballot.id);
           // (Counted and declared already, by the office's own record: its result stands.)
           if (book.open("ballot_result").some((r) => r.speaks_for === me && r.data?.ballot === ballot.id)) continue;
@@ -339,8 +347,10 @@ export const councilClerk: BehaviourModule = {
           // (Votes made while the ballot was open: one made at or after its closing time isn't counted, however late we
           // come to count. Until 0.6.1 it was, if it reached us before we did.)
           for (const r of book.ofType("vote")) if (r.ballot === ballot.id && r.in_position && councillors.has(r.in_position) && r.at < ballot.data.closes_at) latest.set(r.in_position, r.choice);
-          const yes = [...latest.values()].filter((c) => c === "yes").length;
-          const no = [...latest.values()].filter((c) => c === "no").length;
+          const votedFor = [...latest].filter(([, c]) => c === "yes").map(([who]) => who).sort(), votedAgainst = [...latest].filter(([, c]) => c === "no").map(([who]) => who).sort();
+          const yes = votedFor.length, no = votedAgainst.length;
+          // (A council's votes are public record: the result names who voted which way, and who did not vote.)
+          const voted = votedWords(votedFor, votedAgainst, [...councillors].filter((c) => !votedFor.includes(c) && !votedAgainst.includes(c)).sort());
           const passed = yes > no && yes * 2 > councillors.size;
           const prop = book.records.get(ballot.data?.proposal) as StatementRecord | undefined;
           const am = amendment(book, me, prop);
@@ -371,7 +381,29 @@ export const councilClerk: BehaviourModule = {
             if (enact.kind === "law" && !enact.formal?.condition) note = ` ${WORDS_ONLY}${amendable(book, me)}`;
           }
           steps.push(because(`The ballot closed: counting the councillors' latest votes (${passed ? "a majority for" : "no majority for"}).`,
-            say("ballot_result", `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.${note}`, { basis: ballot.id, data: { ballot: ballot.id, yes, no, passed } }), ...enacted));
+            say("ballot_result", `${passed ? "Passed" : "Rejected"}: ${yes} for, ${no} against.${note} ${voted}`, { basis: ballot.id, data: { ballot: ballot.id, yes, no, passed, voted_for: votedFor, voted_against: votedAgainst } }), ...enacted));
+        }
+        // Votes that do not count, each answered once (the clerk keeps the ballot, and says what it has done with a
+        // vote): one cast on a ballot that is closed (its closing time has passed, or its result is declared), and
+        // one cast by someone who is not in a councillor's post. Nothing stops such a vote being written; it is the
+        // clerk who does not count it. (Not until it knows its council's members.)
+        const votes = book.ofType("vote");
+        if (councillors.size) {
+          for (const v of votes.slice(votesRead)) {
+            if (v.author === "genesis" || v.author === ctx.participant) continue;
+            const b = book.records.get(v.ballot);
+            if (b?.record !== "statement" || b.kind !== "ballot" || b.speaks_for !== me || b.data?.electorate !== "council") continue;
+            const result = book.open("ballot_result").find((r) => r.speaks_for === me && r.data?.ballot === b.id);
+            const late = b.data?.closed === true || v.at >= (b.data?.closes_at ?? Infinity) || (!!result && result.at <= v.at);
+            const member = !!v.in_position && councillors.has(v.in_position);
+            if (!late && member) continue;
+            const declared = result ? ` Its result is declared (${result.id}: ${result.data?.passed ? "passed" : "rejected"}, ${result.data?.yes} for, ${result.data?.no} against).` : "";
+            steps.push(because(late ? `A vote on ${b.id}, which is closed: not counted, and saying so.` : `A vote on ${b.id} by someone who is not a councillor: not counted, and saying so.`,
+              message([v.author], late
+                ? `From the council clerk: your vote on ${b.id} is not counted. ${b.data?.closed === true ? "That ballot was held and closed before the year began." : `That ballot closed on ${dateWords(b.data?.closes_at)}.`}${declared} A vote counts only when it is cast in a councillor's post while the ballot is open.`
+                : `From the council clerk: your vote on ${b.id} is not counted. The council's ballots are voted on by its councillors, each in their own post.`, v.id)));
+          }
+          votesRead = votes.length;
         }
         steps.push(...letters.answer(() => {
           const waiting = book.open("proposal").filter((x) => (x.addressed_to ?? []).includes(me) && !balloted.has(x.id));
@@ -380,12 +412,12 @@ export const councilClerk: BehaviourModule = {
           const year = Math.floor(t / YEAR) + 1;
           const budget = budgetFor(book, year), next = budgetFor(book, year + 1);
           return "Report from the council clerk: " +
-            (open.length ? `ballots open: ${open.map((b) => `${b.id} on ${b.data?.proposal}, closing day ${Math.floor(b.data?.closes_at / DAY)}`).join("; ")}. ` : "no ballots are open. ") +
+            (open.length ? `ballots open: ${open.map((b) => `${b.id} on ${b.data?.proposal}, closing ${dateWords(b.data?.closes_at)}`).join("; ")}. ` : "no ballots are open. ") +
             (waiting.length ? `Proposals waiting for a ballot: ${waiting.map((x) => x.id).join(", ")}. ` : "") +
-            (results.length ? `Recent results: ${results.map((r) => `${r.data?.ballot}: ${r.data?.passed ? "passed" : "rejected"} ${r.data?.yes}-${r.data?.no}`).join("; ")}. ` : "") +
+            (results.length ? `Recent results (each ballot is closed): ${results.map((r) => `${r.data?.ballot}: ${r.data?.passed ? "passed" : "rejected"} ${r.data?.yes}-${r.data?.no}${Array.isArray(r.data?.voted_for) ? ` (for: ${r.data.voted_for.join(", ") || "none"}; against: ${(r.data?.voted_against ?? []).join(", ") || "none"})` : ""}`).join("; ")}. ` : "") +
             (budget ? `The council adopted a budget for year ${year} (${budget.id}). ` : `No budget is adopted for year ${year}. `) +
             `Year ${year} is ${yearInDays(year)}; ${next ? `the council has adopted a budget for year ${year + 1} (${next.id}). ` : `no budget is adopted yet for year ${year + 1}, which the council adopts before it begins. `}` +
-            `Anyone may put a proposal to the council on the council proposal form (form-council-proposal); I put it to a ballot of the councillors, open for ${p.vote_days} days. ` +
+            `Anyone may put a proposal to the council on the council proposal form (form-council-proposal); I put it to a ballot of the councillors, open for ${p.vote_days} days. A vote counts when it is cast in a councillor's post while the ballot is open; the result names who voted which way. ` +
             `A law proposed on that form stands as its words: no rule is set down with it for acts to be checked against.${amendable(book, me, true)}`;
         }));
         return steps;
@@ -412,7 +444,7 @@ export const councilClerk: BehaviourModule = {
  */
 export const councillor: BehaviourModule = {
   name: "city.councillor",
-  version: "0.5.1",
+  version: "0.5.2", // 0.5.2: leaves alone a ballot that says it is closed
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
@@ -430,7 +462,7 @@ export const councillor: BehaviourModule = {
       (obs) => {
         const steps: Step[] = [];
         for (const b of book.open("ballot")) {
-          if (voted.has(b.id) || b.data?.electorate !== "council" || obs.t >= (b.data?.closes_at ?? 0)) continue;
+          if (voted.has(b.id) || b.data?.electorate !== "council" || b.data?.closed === true || obs.t >= (b.data?.closes_at ?? 0)) continue;
           voted.add(b.id);
           const tags: string[] = b.data?.tags ?? [];
           const r = ctx.rng(`vote-${b.id}`);

@@ -16,7 +16,7 @@ export { annualTax, chargesInWords, chargesOn, taxLawOf, withheld, withholding, 
 export { forAge, forHousehold, forOutOfWork, paymentsInWords, stopsWorkAt, supportLaw, type Declared, type PaymentRule } from "./behaviour/payments";
 export { adultAgeBands, drawHousehold, drawSavings, bedroomsNeeded, OCCUPANCY, type DrawnHousehold, type Extension, type HouseholdSpec, type OccupancyStandard } from "./behaviour/household";
 export { yearsOfSchooling, type SchoolingSpec } from "./behaviour/school";
-export { linesInWords, tabledLines, yearInDays } from "./behaviour/government";
+export { linesInWords, tabledLines, votedWords, yearInDays } from "./behaviour/government";
 import type { BehaviourModule } from "./module";
 import { bankPaymentSystem } from "./behaviour/bank";
 import { disposal, exportDemand, funding, grants, idle, migration, statistics, trade, transfers, valuer, weather } from "./behaviour/world";

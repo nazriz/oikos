@@ -167,7 +167,7 @@ test("a law in free words passes as words, and the clerk says so and where figur
   run(clerk, obs(20 * DAY, [p2]));
   run(clerk, obs(21 * DAY, [ballot("b2", 20 * DAY, "p2"), ...votes("b2", 21 * DAY, ["yes", "yes", "yes"])]));
   const third = run(clerk, obs(34 * DAY, []));
-  expect(lines(third, "ballot_result")[0]).toContain('text="Passed: 3 for, 0 against."');
+  expect(lines(third, "ballot_result")[0]).toContain('text="Passed: 3 for, 0 against. Voting for: councillor-1, councillor-2, councillor-3; against: none."');
   expect(third).toContain("block.kind == 'walk'");
 });
 

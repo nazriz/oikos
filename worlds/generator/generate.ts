@@ -6,7 +6,7 @@
 // support payments, industry shares...) comes from the spec's profile (worlds/profiles/, docs/profiles.md), and what
 // isn't there is derived from it here by general formulas, or is a placeholder of the town's own shape.
 
-import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, Randomness, chargesInWords, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
+import { adultAgeBands, bedroomsNeeded, drawHousehold, drawSavings, formatMoney, forms as formWords, modules, votedWords, Randomness, chargesInWords, forAge, forOutOfWork, linesInWords, paymentsInWords, tabledLines, yearInDays, stopsWorkAt, withholding, yearsOfSchooling, draftLaw, type HouseholdSpec, type IncomeTaxLaw, type Issued, type LawSchedule, type PaymentRule, type Taken } from "@oikos/participants";
 import law from "../law/basic.json";
 import schedules from "../law/schedules.json";
 import { loadProfile, type Profile } from "./profile";
@@ -67,7 +67,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.39.0";
+export const GENERATOR_VERSION = "0.40.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1511,9 +1511,14 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     const paper = (id: string, kind: string, position: string, x: object) => ({ id, record: "statement", author: "genesis", at: 0, visible_to: "public", speaks_for: "city", in_position: position, kind, ...x });
     records.push(paper(proposal, "proposal", "mayor", { visible_to: ["city"], addressed_to: ["city"], basis: "form-council-proposal", text: `Council proposal (a budget, put before the year began): ${words}`,
       data: { proposal: words, kind: "budget", affects: "neither", year: 1, ...Object.fromEntries(Object.entries(lines).map(([k, v]) => [k, String(v)])) } }));
-    records.push(paper(ballot, "ballot", "council-clerk", { basis: proposal, text: `Council ballot (held before the year began): ${words}`, data: { proposal, options: ["yes", "no"], closes_at: 0, electorate: "council", tags: ["budget"] } }));
+    // (The ballot was held and closed before the year began, and says so: in its words, and as `closed` with its
+    // result beside the closing time a record must have. A vote on it now is too late, and the clerk says so.)
+    const councillorPosts = COUNCIL_LEANINGS.map((_, i) => `councillor-${i + 1}`);
+    records.push(paper(ballot, "ballot", "council-clerk", { basis: proposal, text: `Council ballot, held and closed before the year began (result ${result}: passed, ${councillorPosts.length} for, 0 against): ${words}`,
+      data: { proposal, options: ["yes", "no"], closes_at: 0, closed: true, result, electorate: "council", tags: ["budget"] } }));
     COUNCIL_LEANINGS.forEach((_, i) => records.push({ id: `${ballot}-vote-${i + 1}`, record: "vote", author: "genesis", at: 0, visible_to: ["city"], speaks_for: "city", in_position: `councillor-${i + 1}`, ballot, choice: "yes" }));
-    records.push(paper(result, "ballot_result", "council-clerk", { basis: ballot, text: `Passed: ${COUNCIL_LEANINGS.length} for, 0 against. The council adopted the budget for year 1 before the year began.`, data: { ballot, yes: COUNCIL_LEANINGS.length, no: 0, passed: true } }));
+    records.push(paper(result, "ballot_result", "council-clerk", { basis: ballot, text: `Passed: ${COUNCIL_LEANINGS.length} for, 0 against. The council adopted the budget for year 1 before the year began. ${votedWords(councillorPosts, [], [])}`,
+      data: { ballot, yes: COUNCIL_LEANINGS.length, no: 0, passed: true, voted_for: councillorPosts, voted_against: [] } }));
     records.push(paper(budget, "budget", "council-clerk", { basis: ballot, text: `${words} Adopted by the council before the year began (ballot ${ballot}).`, data: { year: 1, lines } }));
   }
   // The council clerk publishes how to put something to the council: anyone may, on this form.

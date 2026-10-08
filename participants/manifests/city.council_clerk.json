@@ -1,6 +1,6 @@
 {
   "name": "city.council_clerk",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "doc": "docs/behaviour/government.md",
   "params": {
     "electoral": {
@@ -107,6 +107,14 @@
             "no"
           ],
           "description": "Whether it passed."
+        },
+        "voted_for": {
+          "type": "list",
+          "description": "The councillors' posts that voted for (a council's votes are public record)."
+        },
+        "voted_against": {
+          "type": "list",
+          "description": "The councillors' posts that voted against."
         }
       },
       "writes": {
@@ -117,7 +125,9 @@
           "ballot": "=ballot",
           "yes": "=yes",
           "no": "=no",
-          "passed": "?passed"
+          "passed": "?passed",
+          "voted_for": "=voted_for",
+          "voted_against": "=voted_against"
         }
       }
     },

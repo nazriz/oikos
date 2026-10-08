@@ -5,7 +5,8 @@
 
 import * as C from "../calls";
 import { need, params, type BehaviourModule, type ParticipantContext } from "../module";
-import { because, Book, DAY, say, type Step } from "./common";
+import { dateWords } from "../forms";
+import { because, Book, DAY, message, say, type Step } from "./common";
 import { stepper } from "./firms";
 import * as P from "./papers";
 
@@ -42,7 +43,7 @@ export const electoralOffice: BehaviourModule = {
     { what: "enrolment", why: "The electoral office keeps the roll: every elector's enrolment is lodged with it." },
     { what: "electoral_roll", why: "The roll it publishes at each election is its own." },
   ],
-  version: "0.5.0", // 0.5.0: declares a result without seating the winner where the office is another body's (`seats`)
+  version: "0.6.0", // 0.6.0: a vote cast after the poll closed is answered (not counted, as before); 0.5.0: declares a result without seating the winner where the office is another body's (`seats`)
   doc: "docs/behaviour/elections.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -67,6 +68,10 @@ export const electoralOffice: BehaviourModule = {
     let stage: "waiting" | "nominating" | "voting" = "waiting";
     let notice: string | undefined;
     let ballot: string | undefined;
+    // Its ballots that have closed, and when; and how many of the votes it has been shown it has looked at since (a
+    // vote cast after the poll closed is not counted, and its caster is told so: nothing of how anyone voted).
+    const pollsClosed = new Map<string, number>();
+    let votesRead = 0;
     return stepper(
       (obs) => void book.absorb(obs),
       (obs) => {
@@ -139,10 +144,19 @@ export const electoralOffice: BehaviourModule = {
             say("ballot_result", `Election result, ${p.office_title || p.office}: ${winner ? `${who?.name ?? winner} elected` : "no one elected"}; ${last.size} formal votes of ${electors.size} on the roll (turnout ${turnout / 100}%).`,
               { visible: "public", basis: ballot, data: { ballot, office: p.office, winner, rounds, formal: last.size, electors: electors.size, turnout_bps: turnout } }),
             ...(winner && p.seats ? [C.call("position", { appoint: p.office, to: winner })] : [])));
+          pollsClosed.set(ballot, closes);
           stage = "waiting";
           ballot = undefined;
           poll += p.term_days * DAY;
         }
+        const votes = book.ofType("vote");
+        for (const v of votes.slice(votesRead)) {
+          const closedAt = pollsClosed.get(v.ballot);
+          if (closedAt === undefined || v.at < closedAt || v.author === "genesis") continue;
+          steps.push(because(`A vote on ${v.ballot}, cast after the poll closed: not counted, and saying so.`,
+            message([v.author], `From the electoral office: your vote on ${v.ballot} is not counted. The poll closed on ${dateWords(closedAt)} and the result is declared.`, v.id)));
+        }
+        votesRead = votes.length;
         return steps;
       },
     );

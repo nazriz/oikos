@@ -132,16 +132,20 @@ const count = (votes: any[], x: { closeAt?: number; extra?: any[] } = {}) => {
   const clerk = councilClerk.create(ctx("clerk", {}, "council-clerk"));
   const p1 = proposal("p-b1", DAY, { text: "Cap rent rises.", data: { enact: { kind: "law", text: "Rent rises are capped." }, tags: ["tenant_protection"] } });
   run(clerk, obs(DAY, [p1]));
-  expect(run(clerk, obs(2 * DAY, [ballot("b1", DAY, ["tenant_protection"]), ...(x.extra ?? []), ...votes]))).toBe("");
+  // (Nothing before the close but its answers to votes that do not count.)
+  const early = run(clerk, obs(2 * DAY, [ballot("b1", DAY, ["tenant_protection"]), ...(x.extra ?? []), ...votes]));
+  expect(early.split("\n").filter((l) => l && !l.startsWith("message(")).length).toBe(0);
   // (Not before it closes.)
   expect(run(clerk, obs(15 * DAY - 1, []))).toBe("");
   const closed = run(clerk, obs(x.closeAt ?? 15 * DAY, []));
   const result = lines(closed, "ballot_result")[0]!;
-  return { closed, result: dataOf(result), text: /text="([^"]*)"/.exec(result)![1]!, law: lines(closed, "law").find((l) => !l.includes("kind=ballot_result")), clerk };
+  // (The count, and beside it who voted which way: the result names them.)
+  const { voted_for, voted_against, ...counted } = dataOf(result);
+  return { closed, early, result: counted, voted: { for: voted_for, against: voted_against }, text: /text="([^"]*)"/.exec(result)![1]!, law: lines(closed, "law").find((l) => !l.includes("kind=ballot_result")), clerk };
 };
 
 test("at the close the clerk counts each councillor seat's latest vote, and nobody else's", () => {
-  const { result, text, closed } = count([
+  const { result, text, closed, voted, early } = count([
     cast("v1", "b1", 2 * DAY, "councillor-1", "yes"),
     cast("v2", "b1", 2 * DAY, "councillor-2", "yes"),
     cast("v3", "b1", 2 * DAY, "councillor-3", "no"),
@@ -156,7 +160,14 @@ test("at the close the clerk counts each councillor seat's latest vote, and nobo
     cast("v9", "b0", 2 * DAY, "councillor-5", "no"),
   ]);
   expect(result).toEqual({ ballot: "b1", yes: 3, no: 1, passed: true });
-  expect(text).toBe("Passed: 3 for, 1 against. The law is recorded as worded. No rule was set down with it for acts to be checked against.");
+  // The result names who voted which way, and who did not vote: a council's votes are public record.
+  expect(text).toBe("Passed: 3 for, 1 against. The law is recorded as worded. No rule was set down with it for acts to be checked against. Voting for: councillor-1, councillor-2, councillor-4; against: councillor-3; not voting: councillor-5.");
+  expect(voted).toEqual({ for: ["councillor-1", "councillor-2", "councillor-4"], against: ["councillor-3"] });
+  // Those whose vote does not count are told so by the clerk, once each: the mayor, another town's councillor, a resident.
+  const told = early.split("\n").filter((l) => l.startsWith("message("));
+  expect(told.length).toBe(3);
+  for (const l of told) expect(l).toContain("your vote on b1 is not counted. The council's ballots are voted on by its councillors, each in their own post.");
+  expect(told.map((l) => /re=([\w.-]+)/.exec(l)![1])).toEqual(["v6", "v7", "v8"]);
   expect(lines(closed, "law").filter((l) => !l.includes("kind=ballot_result")).length).toBe(1);
 });
 
@@ -170,7 +181,7 @@ test("a proposal passes with more yes than no AND a majority of all councillors:
   // Two yes and no one against: more yes than no, but not a majority of the five. Rejected, and nothing enacted.
   const few = count(votes(["yes", "yes", null, null, null]));
   expect(few.result).toEqual({ ballot: "b1", yes: 2, no: 0, passed: false });
-  expect(few.text).toBe("Rejected: 2 for, 0 against.");
+  expect(few.text).toBe("Rejected: 2 for, 0 against. Voting for: councillor-1, councillor-2; against: none; not voting: councillor-3, councillor-4, councillor-5.");
   expect(few.law).toBeUndefined();
   // A vote that is neither yes nor no is an abstention.
   expect(count(votes(["yes", "yes", "abstain", "no", null])).result).toEqual({ ballot: "b1", yes: 2, no: 1, passed: false });
@@ -207,7 +218,7 @@ test("the clerk counts only the council's ballots, each once, and reports what's
   expect(run(clerk, obs(16 * DAY, []))).toBe("");
   const letter = { ...obs(17 * DAY, [stmt("res-1", 15 * DAY, "ballot_result", { author: "clerk", data: { ballot: "b1", yes: 5, no: 0, passed: true } })]), inbox: [{ id: "m1", from: "mayor-system", text: "What happened?" }] } as unknown as Observation;
   const report = run(clerk, letter);
-  expect(report).toContain("Report from the council clerk: no ballots are open. Recent results: b1: passed 5-0. No budget is adopted for year 1.");
+  expect(report).toContain("Report from the council clerk: no ballots are open. Recent results (each ballot is closed): b1: passed 5-0. No budget is adopted for year 1.");
 });
 
 // ------------------------------------------------------------------ city.mayor_code and a petition
@@ -262,4 +273,34 @@ test("whoever takes the mayor's office doesn't answer again a petition the offic
   expect(answers(successor, obs(30 * DAY, [...seen, made]))).toEqual([]);
   // A second petition, never answered, is the successor's to answer.
   expect(answers(successor, obs(37 * DAY, [petition("pet-2", 31 * DAY), counted("n2", "pet-2", 37 * DAY, 100)])).length).toBe(1);
+});
+
+// ---- a closed ballot (city.council_clerk 0.10.0; the live check of 2026-10-09, finding 3: two councillor seats voted on
+// the opening budget's ballot on the first day, beside its result, and the clerk seat spent a month on the count)
+
+test("a vote on a ballot that is closed is not counted, and the clerk tells whoever cast it: after the closing time, after the result, and on the ballot the town opened with", () => {
+  const clerk = councilClerk.create(ctx("clerk", {}, "council-clerk"));
+  // The ballot the town opened with: held and closed before the year began, its result on file.
+  const opening = stmt("budget-year-1-ballot", 0, "ballot", { in_position: "council-clerk", data: { proposal: "budget-year-1-proposal", options: ["yes", "no"], closes_at: 0, closed: true, result: "budget-year-1-result", electorate: "council", tags: ["budget"] } });
+  const declared = stmt("budget-year-1-result", 0, "ballot_result", { in_position: "council-clerk", basis: opening.id, data: { ballot: opening.id, yes: 5, no: 0, passed: true, voted_for: SEATS, voted_against: [] } });
+  const genesisVotes = SEATS.map((seat, i) => ({ ...cast(`gv${i}`, opening.id, 0, seat, "yes"), author: "genesis" }));
+  expect(run(clerk, obs(0, [opening, declared, ...genesisVotes]))).toBe("");
+  // Day 1: a councillor votes on it. Not counted; told why, with the result; nothing else is published.
+  const day1 = run(clerk, obs(DAY, [cast("v1", opening.id, DAY - 3600, "councillor-1", "YES")]));
+  expect(day1.split("\n").length).toBe(1);
+  expect(day1).toContain('to=["councillor-1-system"]');
+  expect(day1).toContain("From the council clerk: your vote on budget-year-1-ballot is not counted. That ballot was held and closed before the year began. Its result is declared (budget-year-1-result: passed, 5 for, 0 against). A vote counts only when it is cast in a councillor's post while the ballot is open.");
+  expect(lines(day1, "ballot_result")).toEqual([]);
+  // A code councillor leaves it alone.
+  const member = councillor.create(ctx("councillor-2-system", { leaning: 0 }, "councillor-2"));
+  expect(acts(member, obs(0, [opening]))).toEqual([]);
+  // An ordinary ballot: a vote after its closing time, counted late, is answered too, and is not in the count.
+  const late = count([cast("v1", "b1", 2 * DAY, "councillor-1", "yes"), cast("v2", "b1", 2 * DAY, "councillor-2", "yes"), cast("v3", "b1", 15 * DAY, "councillor-3", "yes")], { closeAt: 16 * DAY });
+  expect(late.result).toEqual({ ballot: "b1", yes: 2, no: 0, passed: false });
+  expect(late.voted).toEqual({ for: ["councillor-1", "councillor-2"], against: [] });
+  expect(late.early).toContain("From the council clerk: your vote on b1 is not counted. That ballot closed on year 1, day 16. A vote counts only when it is cast in a councillor's post while the ballot is open.");
+  // And one cast after the result is declared: told the result.
+  const made = { ...stmt("res-b1", 16 * DAY, "ballot_result", { author: "clerk", basis: "b1", data: { ballot: "b1", yes: 2, no: 0, passed: false } }) };
+  const after = run(late.clerk, obs(17 * DAY, [made, cast("v4", "b1", 17 * DAY - 60, "councillor-4", "yes")]));
+  expect(after).toContain("your vote on b1 is not counted. That ballot closed on year 1, day 16. Its result is declared (res-b1: rejected, 2 for, 0 against).");
 });
