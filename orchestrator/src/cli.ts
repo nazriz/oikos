@@ -77,7 +77,8 @@
 //     a label comes out short of its floor).
 //     Weighting a part toward what seats really ask: --only writes requests for the programs of those functions
 //     alone (--only none: for none, refusal briefs only; --generated and --limit then count those functions'
-//     programs); --indirect is the share of plain letters asked for as "Direct them to …" (a half if absent);
+//     programs; a kind of program by name counts as its function does: hold, entry, standing_work,
+//     standing_work_hold, standing_work_withdraw, direction, paper, direction_unlisted); --indirect is the share of plain letters asked for as "Direct them to …" (a half if absent);
 //     --refusal-labels plans, builds and holds to the floor those labels only. All three are in plan.json and the
 //     manifest. --amount-forms N adds N invented forms of several amounts to the gold set, each filled in four
 //     ways (--only amount_form: requests for those alone). --pairs SHARE asks for that share of the forms filled in
