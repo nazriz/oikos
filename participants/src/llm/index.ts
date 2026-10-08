@@ -7,6 +7,7 @@ export * from "./mock";
 export * from "./words";
 export * from "./anthropic";
 export * from "./openai";
+export * from "./answer";
 export * from "./codex";
 export * from "./claude-code";
 export * from "./consult";

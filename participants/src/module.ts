@@ -80,7 +80,25 @@ export type Belief =
   | { of: "between"; template: string; parties: [string, string]; in_force: boolean }
   | { of: "held"; party: string; template: string; agreements: string[] };
 
+/**
+ * A whole collection a kind of participant holds, said where the kind is defined, with the reason in words
+ * (docs/no-god-view.md). `what`: a statement kind ("enrolment"), a record type ("records:claim"), "directory", "map",
+ * every entity of a kind ("every:factory"), or "future". Nobody is shown a whole register, population or map, or the
+ * run's future, unless its module says so here; orchestrator/test/no-god-view.test.ts lists every one.
+ */
+export interface Kept {
+  what: string;
+  why: string;
+}
+
 export interface BehaviourModule {
+  /** Its own registers, held whole because this is the office that keeps them (the land registry its register, a bank
+   * its customers' instructions): never a way to know what someone else keeps, which is asked for (`ask` in
+   * behaviour/common.ts). */
+  keeps?: Kept[];
+  /** What it carries of the world's edge: a module that stands for the simulation's own boundary conditions (the
+   * weather to come, the outside market's prices) is handed them, and says so here so that it is seen. */
+  boundary?: Kept[];
   /** The name worlds use in controller.impl, e.g. "bank.payment_system". */
   name: string;
   /** Bump whenever the rules change; recorded in every run's log. */
@@ -101,9 +119,18 @@ export interface BehaviourModule {
  */
 export const DECISIONS = Symbol.for("oikos.decisions");
 /** `state`: the mind's state behind it (contracts-0.7 A2): needs, satisfaction and certainty, and the strongest feeling,
- * beliefs held and goal pursued when there are any. */
+ * beliefs held and goal pursued when there are any. What it had before it, where the mind decided: each option's `facts`
+ * (a month's money in or out, a home and its bedrooms, hours, goods, company), how many `others` it knows took it, its
+ * `meaning` to them and what they have `learned` of it (basis points; absent: not known); `current`: their routine;
+ * `circumstances`; `satisfied_here` and `doubt` as the decision was given them; `person` (values, temperament, need
+ * weights), with a citizen's first recorded decision only. Whole numbers throughout. */
 export interface DecisionRecord {
-  t: number; domain: string; strategy: string; choice?: string; options: { key: string; score: number }[];
+  t: number; domain: string; strategy: string; choice?: string;
+  options: { key: string; score: number; facts?: { money_per_month: number; home?: { bedrooms?: number }; work_hours_per_month?: number; goods_per_month?: number; company?: number; time_hours_per_month?: number }; others?: number; meaning?: number; learned?: number }[];
+  current?: string;
+  circumstances?: { monthly_income: number; savings: number; homeless: boolean; bedrooms_needed?: number; essentials?: number };
+  satisfied_here?: number; doubt?: number;
+  person?: { values: { [value: string]: number }; temperament: { [facet: string]: number }; weights: { [need: string]: number } };
   state?: { mind: string; needs: { [need: string]: number }; satisfaction: number; certainty: number; emotion?: { kind: string; about: string; bps: number }; beliefs?: { [assertion: string]: number }; goal?: { goal: string; method: string } };
 }
 

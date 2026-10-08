@@ -62,7 +62,8 @@ test("at the close of nominations: the candidates are those nominated to the tow
     { id: "w8", at: 48 * DAY, record: "withdrawal", author: "c8-self", speaks_for: "c8", visible_to: "public", withdraws: "nom-8" }, // stood down
   ]);
   expect(closing.said.map((c) => c.args.kind)).toEqual(["electoral_roll", "ballot"]);
-  expect(closing.of("statement", "electoral_roll")[0]!.args).toMatchObject({ visible: "public", data: { electors: ["c1", "c2", "c3", "c4"], poll_at: POLL } });
+  // (The roll is the office's own, for the town's eyes only: until 0.4.0 it was published to everyone, docs/no-god-view.md.)
+  expect(closing.of("statement", "electoral_roll")[0]!.args).toMatchObject({ visible: ["city"], data: { electors: ["c1", "c2", "c3", "c4"], poll_at: POLL } });
   expect(ballot.visible_to).toBe("public");
   expect(ballot.data).toEqual({ office: "mayor", electorate: "roll", method: "preferential", opens_at: OPENS, closes_at: POLL, options: ["1", "2"], candidates: [
     { candidate: "c2-self", number: "1", for: "c2", name: "Second thoughts", nomination: "nom-2b" },

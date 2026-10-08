@@ -8,6 +8,7 @@ import { generate } from "@oikos/worlds/generator/generate";
 import { exportDataset } from "../src/dataset";
 import { kernelBinary } from "../src/kernel";
 import { compressLog, logLines, readLog } from "../src/logs";
+import { prepareResume } from "../src/resume";
 import { runWorld } from "../src/run";
 
 const root = join(import.meta.dir, "../..");
@@ -39,6 +40,24 @@ test("a lean log: no observation hashes, no code participants' reasoning (a mode
   expect(new Set(decisions(f).map((d) => d.domain))).toContain("shop");
   expect(decisions(f).every((d) => Array.isArray(d.options) && d.options.every((o: any) => Number.isInteger(o.score)))).toBe(true);
   expect(decisions(l)).toEqual([]);
+  // What each had before it: the options' facts and the citizen's circumstances, wherever the mind decided; who they
+  // are, with each citizen's first and no other.
+  const minded = decisions(f).filter((d) => d.state);
+  expect(minded.length).toBeGreaterThan(0);
+  expect(minded.every((d) => Number.isInteger(d.circumstances?.savings) && d.options.every((o: any) => Number.isInteger(o.facts?.money_per_month)))).toBe(true);
+  expect(minded.some((d) => d.options.some((o: any) => Number.isInteger(o.learned)))).toBe(true);
+  const firstOf = new Map<string, any>();
+  for (const e of f) if (e.kind === "annotation" && e.body.annotation === "decision" && e.body.data.state && !firstOf.has(e.body.subject)) firstOf.set(e.body.subject, e.body.data);
+  expect([...firstOf.values()].every((d) => d.person?.values && d.person.temperament && d.person.weights)).toBe(true);
+  expect(minded.filter((d) => d.person).length).toBe(firstOf.size);
+  // Asked not to record them: the same world, none in the log, and the log says so for a run that resumes it.
+  const config = generate({ ...spec, citizens: 80, mayor: "llm" });
+  const quiet = await runWorld({ config, runId: "quiet", outDir: out, until: 30 * DAY, recordDecisions: "none", recordObservations: "none" });
+  expect(quiet.stateHash).toBe(full.stateHash);
+  const q = entries(quiet.logPath);
+  expect(decisions(q)).toEqual([]);
+  expect(q.some((e) => e.kind === "annotation" && e.body.annotation === "observation")).toBe(false);
+  expect(acts(q).length).toBe(acts(f).length);
   // A language model's observations are recorded without being asked (training data), and no one else's.
   const recorded = l.filter((e) => e.kind === "annotation" && e.body.annotation === "observation").map((e) => e.body.subject);
   expect(recorded.length).toBeGreaterThan(0);
@@ -50,6 +69,8 @@ test("a lean log: no observation hashes, no code participants' reasoning (a mode
   // It replays.
   const replay = Bun.spawnSync([kernelBinary(), "replay", lean.logPath, "--anchors", lean.anchorsPath], { stdout: "pipe", stderr: "pipe" });
   expect(replay.exitCode).toBe(0);
+
+  expect(prepareResume(quiet.logPath).recording).toEqual({ observations: "none", decisions: "none" });
 
   // Compressed: much smaller, reads back byte for byte, and gives the same dataset.
   const plain = readFileSync(full.logPath, "utf8");

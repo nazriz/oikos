@@ -64,6 +64,22 @@
         "none"
       ],
       "description": "Whether it saves and restores its state, for resuming from a checkpoint."
+    },
+    "keeps": {
+      "type": "array",
+      "description": "Whole collections its seats are shown unasked because this is the office that keeps them (the land registry its register, a bank its customers' instructions), each with the reason. Nobody is shown a whole register, population or map unless its module says so here (docs/no-god-view.md).",
+      "items": {
+        "$ref": "#/$defs/Kept"
+      },
+      "maxItems": 64
+    },
+    "boundary": {
+      "type": "array",
+      "description": "What it carries of the world's edge: boundary conditions of the simulation it is handed (the weather to come, the outside market's scripted prices), each with the reason (docs/no-god-view.md).",
+      "items": {
+        "$ref": "#/$defs/Kept"
+      },
+      "maxItems": 64
     }
   },
   "$defs": {
@@ -92,6 +108,27 @@
           "type": "string",
           "maxLength": 2000,
           "description": "Where the default figure comes from; 'placeholder' when it's unsourced."
+        }
+      }
+    },
+    "Kept": {
+      "type": "object",
+      "required": [
+        "what",
+        "why"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "what": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "A statement kind (enrolment), a record type (records:claim), directory, map, every entity of a kind (every:factory), or future."
+        },
+        "why": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 1000,
+          "description": "Why this kind of participant holds it whole, in words."
         }
       }
     },

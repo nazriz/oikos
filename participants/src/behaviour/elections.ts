@@ -36,7 +36,11 @@ export function instantRunoff(candidates: string[], rankings: string[][]): { win
 
 export const electoralOffice: BehaviourModule = {
   name: "city.electoral_office",
-  version: "0.3.1",
+  keeps: [
+    { what: "enrolment", why: "The electoral office keeps the roll: every elector's enrolment is lodged with it." },
+    { what: "electoral_roll", why: "The roll it publishes at each election is its own." },
+  ],
+  version: "0.4.0",
   doc: "docs/behaviour/elections.md",
   cadence: () => DAY,
   firstWake: (ctx) => 9 * 3600 + ctx.rng("first-wake").below(3600),
@@ -98,7 +102,9 @@ export const electoralOffice: BehaviourModule = {
           stage = "voting";
           const r = roll();
           const st = because(`Nominations closed: ${names.length} candidates. Publishing the roll (${r.length}) and the ballot.`,
-            say("electoral_roll", `The electoral roll for the election on day ${Math.floor(poll / DAY)}: ${r.length} electors.`, { visible: "public", data: { electors: r, poll_at: poll } }),
+            // (The roll is the office's own: it is kept here and votes are checked against it. Nobody is sent it; an elector
+            // knows they are on it by having enrolled.)
+            say("electoral_roll", `The electoral roll for the election on day ${Math.floor(poll / DAY)}: ${r.length} electors.`, { visible: [p.town], data: { electors: r, poll_at: poll } }),
             ["ballot", say("ballot", `Ballot: ${p.office_title || p.office}. Candidates: ${names.map((x) => `${x.number}. ${x.name}`).join(", ")}. ${p.method === "preferential" ? "Rank them, first to last, as the choice: their numbers, in order, joined by > (2>1>3)." : "Choose one, by number."} Voting closes on day ${Math.floor(poll / DAY)}.`,
               { visible: "public", data: { office: p.office, electorate: "roll", candidates: names, method: p.method, opens_at: poll - p.voting_days * DAY, closes_at: poll, options: names.map((x) => x.number) } })]);
           st.then = (out) => { ballot = out.created?.ballot; };

@@ -112,6 +112,8 @@ export function manifest(name: string): object {
     ...(decisions.length ? { decisions } : {}),
     ...(beliefs.length ? { beliefs: beliefs.map((b) => ({ name: b, about: "agreement" })) } : {}),
     state: "none",
+    ...(m.keeps?.length ? { keeps: m.keeps } : {}),
+    ...(m.boundary?.length ? { boundary: m.boundary } : {}),
   };
 }
 

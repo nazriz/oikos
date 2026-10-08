@@ -19,5 +19,11 @@
     }
   },
   "perceives": [],
-  "state": "none"
+  "state": "none",
+  "keeps": [
+    {
+      "what": "valuation",
+      "why": "The rating authority keeps the rate book: the valuer sends it the valuation of every rateable lot, which is what it levies on."
+    }
+  ]
 }

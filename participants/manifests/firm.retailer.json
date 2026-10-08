@@ -1,6 +1,6 @@
 {
   "name": "firm.retailer",
-  "version": "0.6.0",
+  "version": "0.8.0",
   "doc": "docs/behaviour/retailer.md",
   "params": {
     "bank": {
@@ -234,6 +234,21 @@
       "default": "shop assistant",
       "source": "placeholder"
     },
+    "sale_board": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "search_limit": {
+      "schema": {
+        "type": "integer",
+        "description": "how many lists or listings a search reads"
+      },
+      "default": 20,
+      "source": "placeholder"
+    },
     "serve_labour": {
       "schema": {
         "type": "integer",
@@ -258,12 +273,26 @@
       "default": 3,
       "source": "placeholder"
     },
+    "shopfront": {
+      "schema": {
+        "type": "boolean"
+      },
+      "default": false,
+      "source": "placeholder"
+    },
     "short_days": {
       "schema": {
         "type": "integer"
       },
       "unit": "days",
       "default": 60,
+      "source": "placeholder"
+    },
+    "sold_board": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "stocktake_days": {
@@ -289,6 +318,13 @@
       },
       "unit": "bps",
       "default": 7500,
+      "source": "placeholder"
+    },
+    "trade_board": {
+      "schema": {
+        "type": "string"
+      },
+      "default": "",
       "source": "placeholder"
     },
     "unpaid_days": {

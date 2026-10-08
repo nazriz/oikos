@@ -6,7 +6,7 @@ import * as C from "../calls";
 import { channels, type ParticipantAction, type SiteStructure, type StatementRecord } from "../contracts";
 import { DAY, need, params, wait, type BehaviourModule } from "../module";
 import { cents } from "../money";
-import { because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step } from "./common";
+import { ask, because, Book, callAction, MONTH, pay, publishedPrice, say, usd, withdraw, type Step } from "./common";
 import { ownerOf } from "./institutions";
 import { stepper } from "./firms";
 import { fill, held, OrderBook, priceList } from "./trade";
@@ -54,6 +54,10 @@ export const exportDemand: BehaviourModule = {
  */
 export const trade: BehaviourModule = {
   name: "world.trade",
+  boundary: [
+    { what: "future", why: "A researcher's scripted shocks to world prices and demand are a scenario's boundary condition: this module is the world market and applies each from its day, publishing nothing of one before it comes." },
+    { what: "every:factory", why: "The outside world's demand for the town's goods is a boundary condition, split when the world is made among the factories that export." },
+  ],
   version: "0.2.0",
   doc: "docs/behaviour/boundary.md",
   cadence: () => DAY,
@@ -331,6 +335,9 @@ export const funding: BehaviourModule = {
  */
 export const weather: BehaviourModule = {
   name: "world.weather",
+  boundary: [
+    { what: "future", why: "The weather is fixed before the run, like the ground: this module stands for it at the world's edge, and is handed the spells to come so that it can warn of each a few days ahead. Nothing in the world can know or change them otherwise." },
+  ],
   version: "0.1.0",
   doc: "docs/behaviour/weather.md",
   cadence: () => DAY,
@@ -353,6 +360,51 @@ export const weather: BehaviourModule = {
         return steps;
       },
       () => (next < p.events.length ? warnAt(p.events[next]!) : ctx.world.runEnd + DAY),
+    );
+  },
+};
+
+/**
+ * world.statistics: the statistician the world's government keeps (for a town, an office of a higher government: the
+ * outside world). Once a month its collectors read the prices of a sample of outlets (a search of what sellers
+ * advertise, the first `sample` standing lists that sell to anyone) and it publishes the mean for each kind of goods:
+ * a price index, which is what anyone who needs "prices" reads (a union's claim). Documented in docs/behaviour/boundary.md.
+ */
+export const statistics: BehaviourModule = {
+  name: "world.statistics",
+  version: "0.1.0",
+  doc: "docs/behaviour/boundary.md",
+  cadence: () => DAY,
+  firstWake: () => 0,
+  create(ctx) {
+    const p = params({
+      adverts: "", // its channel onto what sellers advertise, searched (the world must say)
+      sample: 200, // outlets priced a month, at most (placeholder: what one search reads)
+      every_days: 30,
+    }, ctx.params);
+    need(p, ["adverts"], "world.statistics");
+    let next = 0;
+    let read: StatementRecord[] | undefined;
+    return stepper(
+      (obs) => {
+        const ch = obs.channels[p.adverts];
+        if (ch?.kind === "records" && ch.search) read = ch.records as StatementRecord[];
+      },
+      (obs) => {
+        if (!read) return [];
+        const lists = read.filter((r) => r.data?.goods && !r.data?.min_order);
+        read = undefined;
+        next = obs.t + p.every_days * DAY;
+        const by = new Map<string, number[]>();
+        for (const r of lists) for (const [kind, price] of Object.entries(r.data!.goods as { [k: string]: unknown })) if (typeof price === "number") by.set(kind, [...(by.get(kind) ?? []), price]);
+        return [...by].sort(([a], [b]) => (a < b ? -1 : 1)).map(([kind, prices]) => {
+          const mean = Math.round(prices.reduce((x, y) => x + y, 0) / prices.length);
+          return because(`This month's prices of ${kind}, read at ${prices.length} outlets: publishing the mean.`,
+            say("price_index", `Price index, ${kind}: ${usd(mean)} on average at ${prices.length} outlets.`, { visible: "public", data: { kind, mean, outlets: prices.length } }));
+        });
+      },
+      () => next,
+      (obs) => (obs.t >= next && !read ? [ask.board(p.adverts, { most: p.sample })] : []),
     );
   },
 };
@@ -587,7 +639,7 @@ export const migration: BehaviourModule = {
         }
         if (looked !== obs.t && obs.woke_for !== "done" && todo.length === 0 && !expecting) {
           looked = obs.t;
-          return { type: "look", looks: [{ channel: "jobs", query: { standing: true, limit: p.search_limit } }] };
+          return { type: "look", looks: [ask.board("jobs", { most: p.search_limit })] };
         }
         if (looked === obs.t && postings.length && todo.length === 0 && !expecting && !pending.length) {
           const monthly = postings.map((x) => Math.floor(((x.data?.wage ?? 0) * 30 * DAY) / (x.data?.period ?? 14 * DAY)));

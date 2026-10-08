@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:oikos:contracts:0.8:dataset",
-  "title": "Run dataset (0.1.0)",
-  "description": "A run's data, derived deterministically from its log, joined and flattened into examples a training run can use (docs/design/run-datasets.md). A folder per run: manifest.json (Manifest), systems.jsonl (SystemPrompt), translations.jsonl (Translation), decisions.jsonl (Decision), and optionally actions.jsonl (Action) and observations.jsonl (ObservationRow). The log stays the record; a dataset can always be made again from it.",
+  "title": "Run dataset (0.2.0)",
+  "description": "A run's data, derived deterministically from its log, joined and flattened into examples a training run can use (docs/design/run-datasets.md). A folder per run: manifest.json (Manifest), systems.jsonl (SystemPrompt), translations.jsonl (Translation), decisions.jsonl (Decision), and optionally actions.jsonl (Action), observations.jsonl (ObservationRow) and citizen_decisions.jsonl (CitizenDecision). The log stays the record; a dataset can always be made again from it.",
   "$defs": {
     "Version": {
       "type": "string",
@@ -542,7 +542,7 @@
       }
     },
     "CitizenDecision": {
-      "description": "A code citizen's decision, as its mind made it (docs/design/ai-citizens.md 7): the options it saw, how it decided (repeat, imitate, compare, deliberate), each option's score (basis points), and what it chose. Training data for citizen models, and the baseline they're compared with.",
+      "description": "A code citizen's decision, as its mind made it (docs/design/ai-citizens.md 7): what it had before it (each option's facts, how many it knows took it, what it means to them, what they have learned of it; their routine; their circumstances), how it decided (repeat, imitate, compare, deliberate), each option's score (basis points), and what it chose. Facts as the citizen had them, and the mind's own figures: nothing here says whether a choice was good. Training data for citizen models, and the baseline they're compared with. What followed is in the log after `seq`, by the same participant (actions.jsonl rows carry `seq`).",
       "type": "object",
       "required": [
         "run",
@@ -559,6 +559,11 @@
         },
         "t": {
           "$ref": "urn:oikos:contracts:0.8:common#/$defs/SimTime"
+        },
+        "seq": {
+          "description": "Where the decision stands in the run's log (the annotation's sequence number): the citizen's acts that carried it out, and what came of them, are that participant's entries after it.",
+          "type": "integer",
+          "minimum": 0
         },
         "participant": {
           "type": "string"
@@ -593,6 +598,136 @@
               },
               "score": {
                 "type": "integer"
+              },
+              "facts": {
+                "description": "What taking it up would change in a month, as the citizen appraised it (from an offer's typed terms): money in (+) or out (-), in minor units; a home, and its bedrooms where known; hours of work; goods (units); company (people); hours of one's own time.",
+                "type": "object",
+                "required": [
+                  "money_per_month"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "money_per_month": {
+                    "type": "integer"
+                  },
+                  "home": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "bedrooms": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
+                  },
+                  "work_hours_per_month": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "goods_per_month": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "company": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "time_hours_per_month": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              },
+              "others": {
+                "description": "How many people the citizen knows took it (told so, or led there).",
+                "type": "integer",
+                "minimum": 1
+              },
+              "meaning": {
+                "description": "What it means to them beyond its facts, from what they believe or were told (basis points; may be negative).",
+                "type": "integer"
+              },
+              "learned": {
+                "description": "What the citizen has learned of it from their own experience and what others told them (its attraction, on the payoff scale: basis points), when it decided. Absent: never tried nor heard of.",
+                "type": "integer"
+              }
+            }
+          },
+          "description": "Every option the citizen had before it, by key. `score` is 0 where the way of deciding gave it none: all of them under repeat; under imitate, those nobody known to the citizen took."
+        },
+        "current": {
+          "description": "The option that is the citizen's routine, if they have one.",
+          "type": "string"
+        },
+        "circumstances": {
+          "description": "Where the citizen stood: the household's income a month and their savings (minor units), whether without a home, the bedrooms the household needs (home decisions), and what a month's essentials cost in their world.",
+          "type": "object",
+          "required": [
+            "monthly_income",
+            "savings",
+            "homeless"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "monthly_income": {
+              "type": "integer"
+            },
+            "savings": {
+              "type": "integer"
+            },
+            "homeless": {
+              "type": "boolean"
+            },
+            "bedrooms_needed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "essentials": {
+              "type": "integer"
+            }
+          }
+        },
+        "satisfied_here": {
+          "description": "How this area of life has gone for them, where the decision was given it (basis points).",
+          "type": "integer"
+        },
+        "doubt": {
+          "description": "What a feeling (fear) took from how sure they were of their options (basis points), when above 0.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "person": {
+          "description": "Who the citizen is: values, temperament and how much each need weighs (basis points; weights 10000 to 20000). It does not change, and comes with a citizen's first recorded decision only (again after a restart of its controller).",
+          "type": "object",
+          "required": [
+            "values",
+            "temperament",
+            "weights"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "values": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "temperament": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "weights": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20000
               }
             }
           }

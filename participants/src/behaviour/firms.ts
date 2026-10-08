@@ -19,7 +19,7 @@ import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
 import { distribute } from "./lengnick";
 import { incomeTaxLaw, withholding } from "./tax";
-import { because, between, Book, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
+import { ask, Asked, because, between, Book, PAYEE_DIED, breaches, noting, callAction, usd, cellsOf, commitmentOf, DAY, jobTerms, leaseTerms, MONTH, notice, offer, ownAccount, pay, publishedPrice, say, stoodEmpty, structureOf, withdraw, type Step } from "./common";
 
 /**
  * A participant observes after every action, not just when it wakes: `absorb` takes
@@ -137,14 +137,13 @@ export const landlord: BehaviourModule = {
     const me = ctx.entity;
     const book = new Book();
     // Our titles are our own papers; the plan of each lot is looked up in the register, once.
-    const planAsked = new Set<string>();
+    const planAsked = new Asked();
     const ownLotsNow = () => book.ofType("claim").flatMap((r) => (r.record === "claim" && r.holder === me && r.about?.kind === "ownership" ? [r.about.object as string] : [])).sort();
     const plansToRead = (): LookRequest[] => {
       if (!p.register) return [];
       for (const lot of ownLotsNow()) {
-        if (book.records.has(lot) || planAsked.has(lot)) continue;
-        planAsked.add(lot);
-        return [{ channel: p.register.lots, query: { where: [{ field: "id", op: "=", value: lot }], limit: 1 } }];
+        if (book.records.has(lot) || !planAsked.first(lot)) continue;
+        return [ask.one(p.register.lots, lot)];
       }
       return [];
     };
@@ -535,6 +534,8 @@ export class Staffing {
   private readonly pendingOrder = new Map<string, string>(); // step marker -> agreement
   private readonly handled = new Set<string>();
   readonly noticed = new Map<string, number>(); // agreement -> when we gave notice
+  /** Whom our bank has told us has died: someone a standing order of ours pays (docs/behaviour/deaths.md). */
+  private readonly bankSaysDead = new Set<string>();
   private n = 0; // unique names for standing orders we create
   // Income tax withheld from wages (docs/behaviour/public-finance.md): what each wage order withholds a pay, what we've
   // withheld and not yet paid over, and when we next pay it over.
@@ -566,6 +567,10 @@ export class Staffing {
   }
 
   absorb(obs: Observation) {
+    for (const m of obs.inbox) {
+      const who = PAYEE_DIED.who(m.text);
+      if (who) this.bankSaysDead.add(who);
+    }
     for (const x of obs.outcomes) for (const [ref, id] of Object.entries(x.created ?? {})) if (this.pendingOrder.has(ref)) {
       this.orders.set(this.pendingOrder.get(ref)!, id);
       this.pendingOrder.delete(ref);
@@ -669,12 +674,15 @@ export class Staffing {
       steps.push(because(tax > 0 ? `A new hire has signed: starting their wages by standing order, ${usd(pays.wage - tax)} after the ${usd(tax)} of income tax the law says to withhold.` : "A new hire has signed: starting their wages by standing order.",
         [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
     }
-    // A worker who has died (registered): stop the wages, and end the employment on record.
-    for (const r of doesPay ? book.all("death_registration") : []) {
-      const a = staff.find((x) => x.terms.parties[1] === r.data?.deceased);
+    // A worker who has died: stop the wages, and end the employment on record. We know of it when we are told: by the
+    // registry's entry, if whoever reported the death named us, or by our bank, when a wage is next paid into the
+    // account of someone it has been told has died (nobody is shown the register: docs/behaviour/deaths.md).
+    const died = doesPay ? [...new Set([...book.all("death_registration").map((r) => r.data?.deceased as string), ...this.bankSaysDead])] : [];
+    for (const who of died) {
+      const a = staff.find((x) => x.terms.parties[1] === who);
       if (!a || this.noticed.has(a.id)) continue;
       this.noticed.set(a.id, t);
-      const s: Step = because(`${r.data?.deceased}, who worked for us, has died: stopping their wages.`, notice(a.id, "The employee has died."));
+      const s: Step = because(`${who}, who worked for us, has died: stopping their wages.`, notice(a.id, "The employee has died."));
       if (this.orders.has(a.id)) {
         s.push(withdraw(this.orders.get(a.id)!, "The employee has died; stop wages."));
         this.orders.delete(a.id);
@@ -1142,7 +1150,7 @@ function creditorAccount(book: Book, holder: string): string | undefined {
 
 export const employer: BehaviourModule = {
   name: "firm.employer",
-  version: "0.6.1",
+  version: "0.6.2",
   doc: "docs/behaviour/firms.md",
   cadence: () => 7 * DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(7) * DAY,

@@ -14,6 +14,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ContentBlock, LlmAdapter, LlmMessage, LlmRequest, LlmResponse } from "./adapter";
+import { readAnswerText } from "./answer";
 import { UsageLimitReached } from "./call";
 
 /** What the Codex CLI says when the subscription's usage limit is reached ("You've hit your usage limit",
@@ -176,97 +177,20 @@ export class CodexCliAdapter implements LlmAdapter {
           // not an event line
         }
       }
-      let answer: { tool?: string; input_json?: string; also?: { tool?: string; input_json?: string }[]; text?: string } = {};
+      const said = readFileSync(last, "utf8");
+      const nextId = () => `codex-${++this.calls}`;
+      // (Exactly or not at all: the schema keeps the answer's shape, but a use's input is a string the model wrote.)
+      const names = (req.tools ?? []).map((t) => t.name);
+      let words = said;
       try {
-        answer = JSON.parse(readFileSync(last, "utf8"));
+        if (typeof JSON.parse(said)?.text === "string") words = JSON.parse(said).text;
       } catch {
-        answer = { text: readFileSync(last, "utf8").slice(0, 4000) };
+        // (not the object: its text as it came)
       }
-      const content = answerContent(answer, () => `codex-${++this.calls}`);
+      const content = names.length ? readAnswerText(said, names, nextId) : [{ type: "text" as const, text: words.slice(0, 4000) }];
       return { content, usage };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   }
-}
-
-/** An answer in `answerSchema`'s shape, as content blocks: its words, then each tool use with its input read from the
- * JSON the model wrote (and, where that is not quite JSON, read as the model meant it). */
-export function answerContent(answer: { tool?: string; input_json?: string; also?: { tool?: string; input_json?: string }[]; text?: string }, nextId: () => string): ContentBlock[] {
-  const content: ContentBlock[] = [];
-  if (answer.text) content.push({ type: "text", text: answer.text });
-  for (const u of [{ tool: answer.tool, input_json: answer.input_json }, ...(answer.also ?? [])]) {
-    if (!u.tool) continue;
-    let input: any;
-    try {
-      input = JSON.parse(u.input_json ?? "{}");
-    } catch {
-      // A line break or a tab written as itself inside a text (not as \n): the commonest way a long notebook
-      // comes back unreadable (the stress run of 2026-10-06: six of a finance officer's notebooks in two days).
-      // Each is written as its escape, and what the model wrote is read as it meant it.
-      try {
-        input = JSON.parse(controlsEscaped(u.input_json ?? ""));
-        content.push({ type: "tool_use", id: nextId(), name: u.tool, input });
-        continue;
-      } catch {
-        // not that: below
-      }
-      // A whole object followed by stray characters (pilot 7d: a notebook's text, then "}]}],"): the object, as the
-      // model wrote it. Anything else is recorded as it came, and treated as malformed.
-      input = leadingObject(u.input_json ?? "") ?? { _unparsed: u.input_json };
-    }
-    content.push({ type: "tool_use", id: nextId(), name: u.tool, input });
-  }
-  return content;
-}
-
-/** JSON text with the control characters inside its strings written as their escapes (a raw line break as \n), and
- * everything else as it was: for a model that wrote a text's line breaks as themselves. */
-export function controlsEscaped(s: string): string {
-  let out = "";
-  let inString = false;
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i]!;
-    if (inString) {
-      if (ch === "\\") {
-        out += ch + (s[i + 1] ?? "");
-        i++;
-      } else if (ch === '"') {
-        inString = false;
-        out += ch;
-      } else if (ch < " ") out += ch === "\n" ? "\\n" : ch === "\r" ? "\\r" : ch === "\t" ? "\\t" : `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`;
-      else out += ch;
-    } else {
-      if (ch === '"') inString = true;
-      out += ch;
-    }
-  }
-  return out;
-}
-
-/** The JSON object a string starts with, if it starts with a whole one (and only stray characters follow). */
-export function leadingObject(s: string): object | undefined {
-  const t = s.trimStart();
-  if (!t.startsWith("{")) return undefined;
-  let depth = 0;
-  let inString = false;
-  for (let i = 0; i < t.length; i++) {
-    const ch = t[i];
-    if (inString) {
-      if (ch === "\\") i++;
-      else if (ch === '"') inString = false;
-    } else if (ch === '"') inString = true;
-    else if (ch === "{" || ch === "[") depth++;
-    else if (ch === "}" || ch === "]") {
-      if (--depth === 0) {
-        try {
-          const v = JSON.parse(t.slice(0, i + 1));
-          return v && typeof v === "object" && !Array.isArray(v) ? v : undefined;
-        } catch {
-          return undefined;
-        }
-      }
-    }
-  }
-  return undefined;
 }

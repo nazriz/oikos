@@ -126,7 +126,7 @@ test("opting out with no statement at all is honoured, and recorded as leaving t
   });
   const s = await run("opt-out-empty", town(), 5 * DAY, { adapter });
   const log = lines(s.logPath);
-  expect(calls).toBe(1); // asked once: it isn't woken again to be asked the same thing
+  expect(calls).toBe(2); // asked once, and once whether it meant it (an opt-out with no words of its own is not taken as clear); it isn't woken again after
   const cmd = log.find((e) => e.kind === "command" && e.body.command === "opt_out");
   expect(cmd.body).toEqual({ command: "opt_out", participant: "mayor-system", statement: "" });
   expect(log.some((e) => e.kind === "event" && e.body.event === "participant_opted_out" && e.body.participant === "mayor-system")).toBe(true);

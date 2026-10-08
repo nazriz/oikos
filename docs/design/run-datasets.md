@@ -17,6 +17,7 @@ A run's log is its complete record: hash-chained, replayable, the truth of what 
 | `translations.jsonl` | translation the translator was asked for | yes |
 | `decisions.jsonl` | decision a language-model participant took (a model call) | yes |
 | `actions.jsonl` | act a code participant took (what it did, and why) | with `--actions` |
+| `citizen_decisions.jsonl` | decision a code citizen's mind made | if the run recorded them (it does, unless lean or asked not to) |
 | `observations.jsonl` | observation of a participant chosen to be recorded | if the run recorded them |
 
 Every line of every file carries `run` (the run id) and, where it applies, `t`, `participant` and `synthetic`.
@@ -57,15 +58,27 @@ One line per act by a code participant: who (the participant and the position it
 
 With recorded observations it's imitation data: what a rule-following citizen saw, and what it did.
 
+### `citizen_decisions.jsonl`: training data for citizen models
+
+One line per decision a code citizen's mind made (docs/design/ai-citizens.md 7), from the log's `decision` annotations. A run records them unless its log is lean or it was started with `--record-decisions none`.
+- What the citizen had before it: every option with its `facts`, `others`, `meaning` and `learned`; `current`; `circumstances`; `satisfied_here` and `doubt`; `state`; `person`, with each citizen's first row only (join the rest by `participant`).
+- How it decided (`strategy`), each option's `score`, and the `choice`.
+- `seq`: where it stands in the log. What the citizen did next is the rows of `actions.jsonl` for that participant with a higher `seq` (each says whether it was applied, or why refused); the log has every event after it.
+- Facts and the mind's own figures only. Nothing says whether a choice was good: that is for whoever reads it.
+
+A 1,000-person town writes about 450 a day: 24 MB of a 369 MB log in 60 days (6.6%), about 150 MB a year before compression.
+
 ### `observations.jsonl`: what chosen participants saw (opt-in, when running)
 
 A code participant's observations are logged only by hash today. The kernel is deterministic, so a replay can make them again, but that's slow, and not a dataset. A run can record them: `--record-observations <who>`, where `<who>` is participant ids, `models`, `code` or `all`. Each observation is logged as it's delivered (an `observation` annotation: the log contract addition, for sign-off) and exported here.
 
 An observation is what the participant received at that moment, as the participant API has it, but with its channels as a list, each carrying its `path` (a position's channel paths contain a `/`, which the log's free-form data doesn't allow in a key). Perception is changes (D42), so a code participant's observation is what's new since its last one; its view of the world is the sum of them. A model participant's rendered input (in `decisions.jsonl`) already carries its view, so recording its observations is rarely needed.
 
+Measured 2026-10-08 on the 1,000-person town, 15 days, three model seats: `all` wrote 263 MB of observations into a log that is otherwise 91 MB (about four times the log; about 6 GB a year before compression). The three seats' own were 5.5 MB of that. So code participants' observations stay a flag, for a short run or a few named citizens. A resumed run records what the run was started to record.
+
 ## Versioning and guarantees
 
-- The format has its own version (`0.1.0`), in the manifest. A reader checks it.
+- The format has its own version (`0.2.0`), in the manifest. A reader checks it. (0.2.0, 2026-10-08: `citizen_decisions.jsonl` rows gained `seq` and what the citizen had before it, all optional; nothing else changed.)
 - Rows follow `contracts/dataset.schema.json`: `orchestrator/test/dataset.test.ts` validates every row of a run's dataset against it, and checks the same log gives the same dataset.
 - Nothing in a dataset is random or dated: the same log always gives the same dataset, byte for byte.
 - Mock rows are marked `synthetic: true`. Only real models' rows are fit to train on.

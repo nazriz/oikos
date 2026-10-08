@@ -75,16 +75,62 @@ oikos translator-eval --model anthropic/claude-haiku-4-5 --budget 1 --out runs/t
 **How it runs:**
 - Each call is one `claude -p`: no tools of its own, no settings, skills or servers, no session kept, in an empty temporary directory, and without `ANTHROPIC_API_KEY` (with one set, Claude Code would bill the key).
 - Our system prompt replaces Claude Code's own (`--system-prompt-file`), so unlike Codex nothing sits under the seat's instructions. The tools and how to answer go with it, because they are the same call after call; the conversation goes in on stdin.
-- The answer is one JSON object in the shape the Codex adapter's schema has, asked for in words. An answer that isn't one is asked for again, then taken as words.
+- The answer is asked for as structured output (`--json-schema`), in the shape the Codex adapter's schema has, and read exactly or not at all (below). Until 2026-10-08 it was asked for in words; the measurement that changed it is below.
 - Tokens come from the result, cached ones too. Claude Code caches what repeats (the system prompt and tools) for an hour by itself.
 
 **What it costs, and the spending limit:**
 - It is priced as `anthropic/<model>` in `orchestrator/prices.json`, and needs `--budget` like any priced model.
 - Claude Code also says what each call cost, and that is more than its token counts come to at the published price: in the first smoke run (three simulated days, one mayor, five calls) $0.24 by its count against $0.09 by ours. Why is not known (thinking that is billed but not counted as output is my guess). The call's recorded cost is the larger of the two, so the limit holds against what Claude Code says is drawn.
 - `OIKOS_CLAUDE_CODE_LOG=<file>` adds each call's counts and reported cost to a file (never the prompt or the answer).
-- Forcing the answer's shape with `--json-schema` was tried and dropped: Claude Code then takes two to four turns of the model for one answer ($0.046 against $0.022 on one seat-sized call).
+- The structured output takes two to eight turns of the model for one answer, but the turns re-read what is cached: over 19 replayed sittings it cost 7 to 10% more a call than asking in words (Sonnet 5.5 $0.048 against $0.044, Haiku 5.5 $0.156 against $0.151), at the same median time. The earlier measurement (2026-10-07, one short call: $0.046 against $0.022) was a call too small for the cache to matter.
 
 **Caveats:** the plan's limits apply, and when Claude Code says a limit is reached the run stops cleanly to be resumed, as with Codex. What the account is really charged is on the account's usage page, not in our log: check the two against each other before trusting a projection.
+
+## How an answer is asked for and read (2026-10-08)
+
+Every seat answer is **read exactly or not at all**. What is read is only what the seat wrote as uses (`participants/src/llm/answer.ts`): nothing taken from words around them, no use filled in on the seat's behalf, no markup read as uses, no part of an answer repaired (the one thing done to a use's input is writing a raw line break inside a text as `\n`, which changes nothing). An answer that is not whole and exact comes back from the adapter as one text block marked `unread`, with why in the seat's terms. Then, in the participant loop:
+
+1. The seat is told, in the same exchange: "Your last answer could not be read: <why>. Nothing in it has been done. Please give your answer again, in the form asked for." It is asked once.
+2. If that cannot be read either, the sitting ends with nothing done. Both are noted in the log (`unread_answer`, with the words as written), and the seat's next sitting opens: "When you were last here, your answer could not be read, so nothing was done."
+3. A use past the limit of actions (8 unless set) is refused: the seat is told in its next turn ("Not done: at most 8 actions at once."), or, if it left, at its next sitting; the log has a `dropped_tool_use` note. The adapters no longer drop anything silently (an `also` entry naming a tool the seat does not have used to be filtered out; it now makes the answer unread).
+
+**What a seat is told about how to answer**, per provider:
+- Claude Code (`claude -p`, `--json-schema`): in its system prompt, after its tools, "=== How you answer ===: Give your answer in the structured output asked for: the tool you use in `tool`, its input as a JSON object in input_json; any further tools, if your instructions allow several, in `also`, each with its own input_json, in the order they're to be carried out." The shape is the schema's (`tool`, `input_json`, `also`, `text`).
+- Codex CLI (`--output-schema`): "Give the tool you use in `tool`, with its input as a JSON object in input_json. If you use more than one tool in this answer, as your instructions allow, the first goes in `tool` and every other one in `also`, each with its own input_json, in the order they're to be carried out. With only the one, leave `also` empty." Unchanged.
+- The direct APIs (Anthropic, OpenAI-compatible) answer with native tool use and are not touched.
+
+**Measured, from the logs** (read-only; `runs/seat-answer-forms-2026-10-08/counts-pilot-*.json`). A log keeps an answer as the adapter read it, so markup the old reader took as uses (pilots 11 to 13) cannot be told from the object; only markup left unread (pilot 10, before the reader) can be counted.
+
+| pilot | seat model | answers | as asked (uses read) | markup, unread | other words | answers over 8 uses | malformed notes | dropped notes |
+|---|---|---|---|---|---|---|---|---|
+| 10 | claude-code/claude-sonnet-5-5 | 450 | 402 | 46 | 2 | 0 | 7 (a look into papers with nothing to find) | 0 |
+| 11 | claude-code/claude-sonnet-5-5 | 54 | 54 | 0 | 0 | 2 | 9: notebook text 3, what to do 3, no one to write to 2, which report 1 | 40 (more than 8 in one answer) |
+| 12 | claude-code/claude-sonnet-5-5 | 103 | 103 | 0 | 0 | 0 | 7: what to do 3, which report 2, notebook text 1, which one 1 | 0 |
+| 13 | claude-code/claude-haiku-5-5 | 35 | 35 | 0 | 0 | 0 | 0 | 0 |
+| 18 | codex/gpt-6.1-sol | 121 | 121 | 0 | 0 | 0 | 0 | 0 |
+
+- In pilot 10, 48 of 450 answers (11%) were markup or words, taken together: 46 markup and 2 other words. Every one was a Sonnet 5.5 seat on the old object-in-words ask, after three attempts. They were a seat's first question of a sitting 28 times in 215 (13%) and a later one 20 in 235 (9%); never after a markup answer in the same exchange (an unread answer ended the sitting, so there was no later one). The prompts were not longer (median 9.4 thousand characters against 7.7 thousand), and the finance seat was 18 of the 28 first-turn ones (a seat with a longer list of things to settle). What is in the answer before the markup (thinking written into it) cannot be seen in the logs; the replay below shows it.
+- Pilots 11 and 12 (Sonnet 5.5, the reader of markup in place) and 13 (Haiku 5.5): no answer was left unread, but how many were read from markup is not recorded. Pilot 11's 40 dropped uses are two answers of more than 8 uses.
+- Codex (pilot 18, the schema): all 121 answers were read, none malformed, none over the limit.
+
+**Measured, by replay** (`runs/seat-answer-forms-2026-10-08/`: 19 stored first-turn prompts, 5 of them from pilot 10 sittings whose answers came as markup, 7 early with an empty notebook, 7 late with a notebook of 1,600 to 3,500 characters; each through `claude -p` in four forms, Haiku 5.5 and Sonnet 5.5; 157 calls, $14.54 as Claude Code reports; the tools were rebuilt from `tools()` with a stand-in set of four reports, so descriptions are close to, not exactly, those a seat had). "Exact" means the strict reader above read it whole:
+
+| form | model | read exactly | model turns (mean) | cost a call (Claude Code's report) | median seconds |
+|---|---|---|---|---|---|
+| (a) the object in words, as before | Sonnet 5.5 | 10 of 19 (53%) | 1.00 | $0.0439 | 4 |
+| | Haiku 5.5 | 18 of 19 (95%) | 1.00 | $0.1505 | 11 |
+| (b) its own tool-use markup, asked for, read strictly | Sonnet 5.5 | 15 of 19 (79%) | 1.00 | $0.0450 | 6 |
+| | Haiku 5.5 | 18 of 19 (95%) | 1.05 | $0.1250 | 11 |
+| (c) `--json-schema` | Sonnet 5.5 | 19 of 19 (100%) | 3.32 (2 to 8) | $0.0482 | 6 |
+| | Haiku 5.5 | 19 of 19 (100%) | 2.53 (2 to 9) | $0.1562 | 10 |
+| (d) the object in words, one worked example (two tools) | Sonnet 5.5 | 8 of 19 (42%) | 1.00 | $0.0472 | 4 |
+| | Haiku 5.5 | 18 of 19 (95%) | 1.00 | $0.1424 | 10 |
+
+- Sonnet 5.5 asked for the object in words wrote its own markup instead in 9 of 19, and a worked example did not help (11 of 19): it starts a markup answer and then corrects itself in the same reply ("Wait, I must answer with a single JSON object"), so the reply holds both. That is what pilot 10 saw as 11%. Of the 5 prompts that had produced markup, the object in words was read in 1.
+- Asked for its markup, Sonnet 5.5 was read whole in 79%: the rest had words around the uses or between their parameters. Haiku 5.5 was read in 95% in every form but the schema, and its one miss in (a) and in (b) was markup; it writes more (about 3,600 output tokens an answer, mostly thinking) and so costs about 3.4 times as much a call as Sonnet 5.5 at these sizes.
+- The first markup probe asked for the markup inside a `<function_calls>` block: Claude Code took that for a real tool use, and the reply came back as `_placeholder` (one call, Haiku 5.5, kept as `b0_markup_wrapped`). The markup form in the table has no wrapper.
+- The schema was read whole in all 38. Four calls timed out at 240 seconds under four-at-a-time load (kept in the record as `_timedout`) and were run again.
+- Not measured: a second turn of a sitting (tool results in the prompt; the replay is first turns only), Fable 5.1 and Codex models other than pilot 18's (not called, by instruction), and the schema with the uses as a list of objects rather than `input_json` strings.
 
 ## Pilots (directional testing, not evidence)
 
@@ -229,3 +275,23 @@ dollars.
 - **A letter to "works" in quotes** came back "you don't know of anyone called works": a quoted word was looked up as a name only. Now an id in quotes is that id (both resolvers).
 - **What worked:** translations ran at once, three seats made 250 calls in the 59 days, and every act went through the translator. The heatwave and heavy-rain warnings reached the mayor, who tried to act on them (inspect the hall as a refuge, direct the works crew), the first time a steward responded to weather.
 - **Still open:** three `write` uses came back malformed from Codex (one with two recipients run together).
+
+## Running many pilots
+
+Pilots for the translator's data are run unattended, in waves. Three pieces: a queue that runs and resumes pilots, a report on each pilot read from its log, and a pinned copy of the code for the wave.
+
+**The queue** (`scripts/pilot-queue.ts <queue.json> [--wait MINUTES]`). A queue file is a list of `{name, world, sets?, model, translator?, until, budget, env?, note?, test?}`. Each pilot runs into `<runs>/<name>` (`OIKOS_RUNS`, or `~/oikos/runs`), one after another, and is taken up again where it stopped if its log is there. What it does with a pilot's folder is decided from its run's log and summary, read either way (plain while stopped, `.jsonl.zst` once finished), by `orchestrator/src/pilot-state.ts`:
+- reached its `until` (the log's last entry, or the summary's, is at or past it): done, not started again. The report is written;
+- stopped at a usage limit: waited for (`--wait`, 20 minutes by default) and resumed;
+- stopped at its spending limit: over as far as it got; left there, the next pilot is started;
+- asked to stop (a signal, as `scripts/mini stop` sends): not a failure. The queue stops with it; running the queue again resumes it;
+- anything else: tried once more after a minute, then left with why.
+The status log (`<queue>.status.log`) writes times in local time with the offset from UTC. `"test": true` marks a pilot whose requests are kept out of training (a held-out test): the runner writes it into the pilot's `PILOT.txt` (a first line, and the entry as JSON) and the pilot report carries `"test": true`, so later steps (the training data, the in-situ cases) can leave that pilot's requests out. Nothing yet acts on the flag but the report.
+
+**The report** (`bun orchestrator/src/cli.ts pilot-report <DIR>... [--no-write]`). Reads a pilot folder's log alone, prints, and writes `<DIR>/pilot-report.json`:
+- the seats and their models, the translator, days run, why it stopped, and whether that was its `until`;
+- per seat: model calls, tool uses by kind, answers with no tool use, malformed and dropped tool uses by reason, the notes (`look_each_sitting`, `no_turn`, `notebook_not_changed`), and whether it opted out, on which day, with what statement;
+- for the translator: the requests made through `do` (each `draft.<seat>.<n>` once), how each ended (a draft offered; asked back, with the sentence the seat read; refused, with its label; a resolver question; not put), drafts confirmed, declined and unanswered, **matters that got through within two tries**, and the longest run of ask-backs for one seat.
+A matter is a request, or that request and the next one by the same seat when the first was asked back; it got through if either became a draft. A draft the seat confirms or declines is its sign-off. Two limits: the translator's plain "could you say it more plainly" is the refusal `unclear`'s own text and is counted as a refusal, not an ask-back; and the cost of a seat includes its debrief. Where each figure is read from is said in `orchestrator/src/pilot-report.ts`.
+
+**A pinned copy for a wave** (`bun scripts/pilot-wave.ts <wave> <git-ref> <queue.json>... [--dry-run] [--wait MINUTES]`). A resumed run replays its log and can only be resumed on the code it started on, while development goes on in other worktrees. So a wave has its own worktree at `<repo>/.claude/worktrees/wave-<wave>`, made at `<git-ref>` (or reused, if it is at that commit; a wave never moves to another, so a new commit is a new wave), where it runs `bun install` and `bun run kernel`, records the commit in `<runs>/pilot-queues/<wave>.commit`, and starts `scripts/pilot-queue.ts` from that worktree for each queue file: detached (`nohup`, with `caffeinate -i -w <pid>` on macOS), one process each, its output in `<runs>/pilot-queues/<wave>.<queue>.out` and its pid beside it. A queue already running isn't started twice. `--dry-run` says what it would do and does nothing. A wave's worktree is removed (`git worktree remove`) once none of its runs is to be resumed.

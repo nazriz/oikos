@@ -31,7 +31,11 @@ test("goods are made from inputs by workers' hours, exported within each factory
   const trader = config.participants.find((p: any) => p.id === "outside-trade-system").controller.params;
   const share = trader.buys.goods.from as { [f: string]: number };
   const task = config.catalogue.tasks.find((t: any) => t.id === "make");
-  const { ev, recs } = await run("town", config, 200 * DAY);
+  // (300 days: until citizen 0.39.0 it was 200, and a factory first paid a dividend on day 120, by a margin of 4% of
+  // its buffer. People now know the shops near them, not every shop; less of what a shop cannot serve is bought
+  // elsewhere, shops order a little less, and a factory's first month over its buffer comes later. What is checked of a
+  // dividend is the same.)
+  const { ev, recs } = await run("town", config, 300 * DAY);
   // Nothing refused but same-moment races (D58; and a new employer naming, on their first day, someone who has
   // already worked a full day at the job they just left: acts take time, so starting the new job is a moment of its own), and households moving into homes still being left.
   expect(ev.filter((e) => e.event === "action_refused" && !["not_present", "not_at_work", "capacity_exceeded", "no_time_left"].includes(e.code))).toEqual([]);
@@ -70,7 +74,7 @@ test("goods are made from inputs by workers' hours, exported within each factory
     // Paid with the order; or, if the bank couldn't pay it (other payments went first), declined unpaid.
     const paid = ev.some((e) => e.event === "transfer" && e.to === "acc-outside" && e.from === `acc-${o.speaks_for}` && e.amount === String(o.data.quantity * o.data.unit_price) && e.t >= o.at);
     const declined = recs.some((r) => r.kind === "delivery_note" && r.data.order === o.id && r.data.declined === "unpaid");
-    expect(paid || declined || o.at > 190 * DAY).toBe(true);
+    expect(paid || declined || o.at > 290 * DAY).toBe(true);
   }
   // Exports: paid for at the month's offer price (world prices move), never beyond a factory's share of that month's demand.
   const offersBy = recs.filter((r) => r.kind === "buying_offer" && r.speaks_for === "outside");
@@ -113,7 +117,7 @@ test("goods are made from inputs by workers' hours, exported within each factory
 // The retirement fund is off unless a town asks for it (docs/behaviour/firm-ownership.md); this town does.
 test("a town that asks for a retirement fund: the factories pay it as any holder, and it pays its costs and its retired members", async () => {
   const config = generate({ ...base, retirement_fund: true });
-  const { ev, recs } = await run("fund", config, 200 * DAY);
+  const { ev, recs } = await run("fund", config, 300 * DAY);
   const asked = recs.filter((r) => r.kind === "request" && r.speaks_for?.startsWith("factory-") && Array.isArray(r.data?.payments) && r.data.payments[0]?.for === "Dividend.");
   expect(asked.length).toBeGreaterThan(0);
   const register = config.world.records.find((r: any) => r.id === `shareholders-${asked[0].speaks_for}`).data.holders as { account: string; shares: number }[];

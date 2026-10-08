@@ -57,6 +57,24 @@ A first-come-first-served quantity, shared by two factories, made the demand eac
 - exchange rates (one currency);
 - trade policy (tariffs, quotas): these would be laws, as records, applied by an office.
 
+## `world.statistics` (v0.1.0): the statistician
+
+An office of the outside world's government. Once a month (`every_days`, 30) its collectors read the prices of a sample
+of outlets: one search of what sellers advertise, the first `sample` (200, what one search can read: a placeholder)
+standing price lists, of which those that sell to anyone (no minimum order) count. It publishes the mean price of each
+kind of goods as a `price_index` (`{ kind, mean, outlets }`), public. It is what anyone who needs "prices" reads: the
+union's claims follow it (docs/behaviour/unions.md).
+
+**Where the rule comes from:** a price index is made by a statistics office from prices collected at a sample of
+outlets by its own staff, online and from retailers' data (Australian Bureau of Statistics, *Consumer Price Index:
+Concepts, Sources and Methods*, 2025, "Price collection": "trained and experienced ABS staff", web-scraping, scanner
+data; "87% of the CPI by weight is collected on a monthly basis"; opened 2026-10-08). It is not a keeper of prices and
+is shown none unasked: it goes and reads them, capped at its sample.
+
+**Leaves out:** weights (a plain mean of outlets); a basket (one index a kind of goods); a sample drawn at random
+(a search returns the oldest standing lists first, so in a town with more outlets than the sample it leans to shops
+whose prices have not changed: at 200 this bites above about 200 sellers); the collectors' time.
+
 ## `world.transfers` (v0.2.0): support paid from outside
 
 Support paid to people in the world by someone outside it: for a town, a national government's payments. The world names the payments (`payments`: a kind, its amount, how often, and the ages it's for). A person claims (a `benefit_claim` to the payer, with the kind, the account to pay and their date of birth); the payer grants the claim if their age fits (taking the stated date of birth as true), says so (`benefit_decision`), and pays on schedule until the person asks to stop (`benefit_change`), dies (a death registration) or leaves (a departure). One payment a person: a new claim replaces the old.

@@ -1,0 +1,18 @@
+Where each text here came from. The pipeline (orchestrator/src/pipeline.ts, docs/translator-pipeline.md) gives writers and
+readers the same instructions the hand-run steps used; a text copied word for word is marked so.
+
+reader-task-0.7.5.txt       word for word: runs/translator-data-2026-10-06b/reader-task-0.7.5.txt, the task the hand-run readers
+                            were given (it names two files, the prompt and a blind file; kept for the record).
+reader-call.txt             the same task worded for a call: the prompt is the system message and the blind lines are in the
+                            message; the rest is the task's own words. Written for the pipeline, 2026-10-08.
+writer-instructions.txt     word for word: runs/translator-data-in-situ/pilot-10-situ/writer-instructions.txt, which is what
+                            `inSituInstructions()` (orchestrator/src/in-situ.ts) wrote on 2026-10-07; a test holds the file to the
+                            function's output (change both together, and say so in docs/decisions.md).
+writer-addendum.txt         word for word: runs/translator-data-in-situ/writer-addendum.txt (up to eight requests a situation).
+writer-round2.txt           word for word: runs/translator-data-in-situ/pilot-10-situ/writer-round2.txt (a round weighted toward
+                            things done: decisions, payments, permissions, notices). Used when the config names it.
+writer-task.txt             word for word: runs/translator-data-in-situ/writer-task.txt, the task a hand-run writer was given for a
+                            chunk file (instructions, addendum, chunk). Kept for the record.
+writer-task-2.txt           word for word: runs/translator-data-in-situ/pilot-10-situ/writer-task-2.txt (as above, with round 2's text).
+writer-call.txt             the same task worded for a call: the instructions are the system message and the chunk's lines are
+                            in the message. Written for the pipeline, 2026-10-08.

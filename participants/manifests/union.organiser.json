@@ -1,6 +1,6 @@
 {
   "name": "union.organiser",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "doc": "docs/behaviour/unions.md",
   "params": {
     "accept_share_bps": {
@@ -91,7 +91,7 @@
     "employers": {
       "schema": {
         "type": "array",
-        "description": "whom it bargains with, where it has members"
+        "description": "workplaces it is told of besides (none: it bargains where its members work, as it learns of them)"
       },
       "default": [],
       "source": "placeholder"
@@ -105,6 +105,13 @@
       "default": 60,
       "source": "its first claims, spread over this long (placeholder)"
     },
+    "industries": {
+      "schema": {
+        "type": "array"
+      },
+      "default": [],
+      "source": "placeholder"
+    },
     "notice_days": {
       "schema": {
         "type": "integer",
@@ -117,7 +124,7 @@
     "price_kind": {
       "schema": {
         "type": "string",
-        "description": "prices tracked for the claim (shops' price lists)"
+        "description": "prices tracked for the claim (the published index of this kind's price)"
       },
       "default": "goods",
       "source": "placeholder"

@@ -3,10 +3,10 @@
 
 import * as C from "../calls";
 import { cents } from "../money";
-import type { Observation } from "../contracts";
+import type { LookRequest, Observation, StatementRecord } from "../contracts";
 import { channels } from "../contracts";
 import { need, params, type Belief, type BehaviourModule, type ParticipantContext } from "../module";
-import { nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
+import { ask, nextLook, because, Book, publishedPrice as buildingPrice, DAY, MONTH, ownAccount, Pace, pay, say, type Step, usd, withdraw, outOfTime, team } from "./common";
 import { Bargaining, Staffing, stepper, WindingUp } from "./firms";
 import { Borrowing } from "./credit";
 import { distribute, LENGNICK, movePrice, moveWage, payOut } from "./lengnick";
@@ -22,7 +22,7 @@ import { Deliveries, goodsPrices, held, order, OrderBook, priceList, UNDELIVERAB
  */
 export const retailer: BehaviourModule = {
   name: "firm.retailer",
-  version: "0.6.0",
+  version: "0.8.0",
   doc: "docs/behaviour/retailer.md",
   cadence: () => DAY,
   firstWake: (ctx) => ctx.rng("first-wake").below(24) * 3600,
@@ -65,6 +65,14 @@ export const retailer: BehaviourModule = {
         premises_sale_bps: 5000,
         // A shop just founded (docs/behaviour/entry.md): who founded it, the capital they put in, the property listing it
         // buys its premises from, and its bank. None: a shop that's trading already.
+        // Our prices are put up at our premises (seen by those who live, work or shop near; found by anyone who looks
+        // through what sellers advertise), not sent to the town: docs/behaviour/retailer.md. False: published to all.
+        shopfront: false,
+        // What it looks up (docs/no-god-view.md; none: it knows what it is shown): what producers advertise to the
+        // trade, searched at each week's restock for the wholesale lists, whose sellers join its suppliers; and, for a
+        // shop just founded, the listings of property for sale and the notices of sales, searched for its own premises.
+        trade_board: "", sale_board: "", sold_board: "",
+        search_limit: 20, // how many lists or listings a search reads
         founder: null as string | null,
         capital: 0,
         listing: null as string | null,
@@ -86,6 +94,10 @@ export const retailer: BehaviourModule = {
       return c?.structure ? { structure: c.structure.structure, type: c.structure.type, cell: c.cell } : undefined;
     };
 
+    const suppliers = new Set<string>(p.suppliers); // those the world named, and producers found advertising to the trade
+    let nextTradeLook = 0;
+    // A shop just founded: what the last look at its premises' listings and sale showed, and when.
+    const premisesNow = { asked: -1, listings: null as StatementRecord[] | null, sold: null as StatementRecord[] | null, goneSince: undefined as number | undefined };
     const orders = new OrderBook(me, p.unpaid_days);
     const deliveries = new Deliveries();
     let onOrder = 0; // goods ordered from suppliers, not yet delivered
@@ -151,16 +163,24 @@ export const retailer: BehaviourModule = {
         steps.push(because("Our shareholders: our founder, who put in the capital.", say("shareholders", `The shareholders of ${me}, and their shares.`, { to: [p.founder!], visible: [me, p.founder!], data: { holders: [{ holder: p.founder, account: setup.founderAccount, shares: 10_000 }] } })));
       }
       // The listing we founded ourselves to buy from; if the seller has published it again (at a new price), that one.
+      // (Looked up, where the world gives us the boards: the standing listings of our premises, and a notice of their
+      // sale. A relisting can be found with none standing for a moment: gone, when a look a day later still finds none.)
+      const looked = !!p.sale_board;
+      if (looked && !premisesNow.listings) return steps;
       const first = p.listing ? book.records.get(p.listing) : undefined;
-      const structure = first?.record === "statement" ? first.data?.structure : undefined;
-      const relisted = book.open("property_for_sale").filter((r) => r.data?.structure === structure).sort((a, b) => b.at - a.at)[0];
-      const listing = relisted ?? first;
-      const sold = book.all("property_sold").find((r) => structure && r.data?.structure === structure);
+      const structure = looked ? p.premises : first?.record === "statement" ? first.data?.structure : undefined;
+      const relisted = (looked ? premisesNow.listings! : book.open("property_for_sale")).filter((r) => r.data?.structure === structure).sort((a, b) => b.at - a.at)[0];
+      const listing = relisted ?? (looked ? undefined : first);
+      const sold = (looked ? premisesNow.sold ?? [] : book.all("property_sold")).find((r) => structure && r.data?.structure === structure);
+      if (looked && !sold) {
+        if (listing) premisesNow.goneSince = undefined;
+        else if ((premisesNow.goneSince ??= obs.t) > obs.t - DAY) return steps;
+      }
       if (sold && sold.data?.buyer === me) {
         setup.ready = true;
         return [...steps, because(`Our premises (${sold.data.structure}) are ours: opening for trade.`)];
       }
-      if (sold || (listing && book.withdrawn.has(listing.id))) {
+      if (sold || (looked ? !listing : listing && book.withdrawn.has(listing.id))) {
         // Someone else bought them: the capital goes back, and we close.
         winding.state = "closed";
         return [...steps, because("The premises we meant to buy were sold to someone else: returning the capital, and closing.",
@@ -182,6 +202,13 @@ export const retailer: BehaviourModule = {
         book.absorb(obs);
         staffing.absorb(obs);
         winding.absorb(obs, ownAccount(obs)?.account);
+        // What our looks found: producers advertising to the trade; our premises' listings and sale.
+        const found = (id: string) => { const ch = id ? obs.channels[id] : undefined; return ch?.kind === "records" && ch.search ? (ch.records as StatementRecord[]) : undefined; };
+        for (const r of found(p.trade_board) ?? []) if (r.speaks_for && r.speaks_for !== me) suppliers.add(r.speaks_for);
+        if (premisesNow.asked === obs.t) {
+          premisesNow.listings = found(p.sale_board) ?? premisesNow.listings;
+          premisesNow.sold = found(p.sold_board) ?? premisesNow.sold;
+        }
         // Setting up: the founder's capital, as it arrives (the account it comes from is theirs).
         const mine = ownAccount(obs)?.account;
         if (!setup.ready && setup.capitalCalled && !setup.founderAccount && mine) for (const tx of channels.transactions(obs)) if (tx.to === mine && tx.from !== mine) setup.founderAccount = tx.from;
@@ -226,8 +253,9 @@ export const retailer: BehaviourModule = {
               data: { kind: p.kind, quantity: expected - stock, at: p.premises, value: (expected - stock) * price, account: acc.account } })));
         }
         // Our suppliers' prices, cheapest first (and those that came up short in the last week, last); at the same
-        // price, in our own usual order.
-        const offers = p.suppliers.map((s) => ({ seller: s, ...goodsPrices(book, s) })).filter((x) => x.prices[p.kind] !== undefined && x.account)
+        // price, in our own usual order (a supplier found since we began comes after those we knew, in the order found).
+        for (const s of [...suppliers].sort()) if (!usual.has(s)) usual.set(s, usual.size);
+        const offers = [...suppliers].sort().map((s) => ({ seller: s, ...goodsPrices(book, s) })).filter((x) => x.prices[p.kind] !== undefined && x.account)
           .map((x) => ({ seller: x.seller, account: x.account!, unit: x.prices[p.kind]!, min: x.min_order ?? 1 }))
           .sort((a, b) => Number(t - (shortAt.get(a.seller) ?? -Infinity) < 7 * DAY) - Number(t - (shortAt.get(b.seller) ?? -Infinity) < 7 * DAY) || a.unit - b.unit || usual.get(a.seller)! - usual.get(b.seller)!);
         if (!unitCost && offers.length) unitCost = offers[0]!.unit;
@@ -318,7 +346,7 @@ export const retailer: BehaviourModule = {
           const old = book.open("price_list").filter((r) => r.speaks_for === me);
           publishedPrice = price;
           steps.push(because(old.length ? priceWhy || `Our price is now ${usd(price)}.` : "Publishing our price.", ...old.map((r) => withdraw(r.id, "Superseded.")),
-            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises }, me)));
+            priceList({ [p.kind]: price }, acc.account, `${p.kind} at ${usd(price)} each, at ${p.premises}: delivered to your home, or kept here for you. Order and pay with the order.`, { at: p.premises }, me, p.shopfront ? premisesOf(obs)?.cell : undefined)));
         }
 
         // ---- restocking, weekly: below the middle of Lengnick's band of last month's sales, up to its top ----
@@ -436,6 +464,19 @@ export const retailer: BehaviourModule = {
         }
       },
       p.look_at ? (obs) => nextLook(obs.t, p.look_at, p.look_days) : undefined,
+      (obs) => {
+        const looks: LookRequest[] = [];
+        if (p.trade_board && setup.ready && obs.t >= nextTradeLook) {
+          nextTradeLook = obs.t + 7 * DAY;
+          looks.push(ask.board(p.trade_board, { most: p.search_limit, where: [{ field: "data.min_order", op: ">", value: 1 }] }));
+        }
+        if (p.sale_board && !setup.ready && setup.capitalCalled && premisesNow.asked !== obs.t) {
+          premisesNow.asked = obs.t;
+          looks.push(ask.about(p.sale_board, "data.structure", p.premises, { most: p.search_limit, standing: true }));
+          if (p.sold_board) looks.push(ask.about(p.sold_board, "data.structure", p.premises, { most: 1, newest: true }));
+        }
+        return looks;
+      },
     ), { beliefs: (): Belief[] => staffing.beliefs(book) });
   },
 };

@@ -30,7 +30,11 @@ export function yearsOfSchooling(age: number, s: SchoolingSpec, pick: (n: number
 
 export const principal: BehaviourModule = {
   name: "school.principal",
-  version: "0.2.0",
+  keeps: [
+    { what: "school_enrolment", why: "A school keeps its own roll: every pupil's enrolment is made with it." },
+    { what: "school_place", why: "The places it has given, each to a pupil on its own roll." },
+  ],
+  version: "0.2.1",
   doc: "docs/behaviour/education.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(1800),
