@@ -43,11 +43,16 @@ export interface Paper { kind: string; text: string; data?: unknown; addressed_t
 
 export class FormError extends Error {}
 
-/** A length of time in words: whole days where it is whole days ("14 days", "1 day"), seconds otherwise. */
+/** A length of time in words, as people say one: whole days where it is whole days ("14 days", "1 day"); else whole
+ * hours ("8 hours"); else hours and minutes ("1 hour 30 minutes", "45 minutes"); seconds only where nothing rounder
+ * fits. (The kernel's resolver writes the same: `duration_words`.) */
 export function durationWords(seconds: number): string {
-  if (seconds % DAY !== 0) return `${seconds} seconds`;
-  const days = seconds / DAY;
-  return days === 1 ? "1 day" : `${days} days`;
+  const n = (x: number, word: string) => `${x} ${word}${x === 1 ? "" : "s"}`;
+  if (seconds % DAY === 0) return n(seconds / DAY, "day");
+  if (seconds < 0) return n(seconds, "second");
+  if (seconds % 3_600 === 0) return n(seconds / 3_600, "hour");
+  if (seconds % 60 === 0) return seconds > 3_600 ? `${n(Math.floor(seconds / 3_600), "hour")} ${n((seconds % 3_600) / 60, "minute")}` : n(seconds / 60, "minute");
+  return n(seconds, "second");
 }
 
 /** A date in words, as a report gives one ("year 1, day 12"). The world has no calendar: a year is 365 days. */

@@ -53,7 +53,51 @@ How any employer hires and pays (postings, offers, standing orders, notice, a wo
 The labour-market literature (the Dosi et al. "Schumpeter meeting Keynes" labour extension) is the planned refinement for wage-setting and hiring.
 
 
-**A worker's death** (v0.5.0): on the registration, it stops the wages and ends the employment on record; the post is advertised again as staffing allows.
+## Jobs an employer does not register (2026-10-09; profile-depth item 1, part a)
+
+**In the real world.** Most of what is called informal employment is an employer not doing what the payroll law says: nothing withheld, no contributions paid, the worker on no return. The ILO counts an employee as informally employed when the job is "not subject to national labour legislation, income taxation, social protection or entitlement to certain employment benefits", whatever the firm (17th ICLS guidelines, 2003; docs/research/references.md). It is a fact about the job, and it exists inside registered firms as well as outside them.
+
+**The rule.** A profile may state, by kind of firm (the kinds it gives wages for: shop, factory, construction), the share of jobs that are registered (`employment.registered_bps`, with its source). Left out for a kind, every job of that kind is registered, as always; public bodies register every job. The share is the employer's own practice (`registered_bps`, a parameter of `firm.retailer`, `firm.producer` and `firm.builder`), carried out in `Staffing`:
+
+| | A registered job | A job the employer does not register |
+|---|---|---|
+| **Pay** | the wage agreed less what the law's charges withhold | the wage agreed, whole |
+| **Paid over** | what was withheld, monthly, to each charge's account | nothing |
+| **Reported** | on the monthly report; by name where a charge is itemised | on no report |
+| **Decided** | | once, when the job's wages start, with the chance the share gives (the employer's own draw); at the start, by the generator, the same way |
+| **Recorded** | | the employer's own note (`off_books`, naming the agreement), which only the employer sees |
+
+The agreement itself is an ordinary employment agreement: the same notice, a standing wage order through the bank (the bank account stands for mobile money where that is how wages are paid). The worker sees the whole wage arrive and counts it as their wages (docs/behaviour/citizen.md already took either the wage agreed or the wage less tax as "paid as agreed").
+
+**What follows, with nothing coded for it.** The collector receives less. Whoever keeps a record of contributions (the payments office, from the reports addressed to it: docs/behaviour/boundary.md) has no line for the worker, so a payment that turns on a record is refused them, and one that is a share of past pay has no pay to be a share of. A flat payment that asks for no record is paid as to anyone. In a place whose law takes nothing from a low wage and has no itemised charge, registering a job or not changes no payment at all: only the note differs.
+
+**Nobody is shown who works unregistered** (docs/no-god-view.md): the note is the employer's own paper; the tax office knows what is reported to it and nothing else. Measurement, which reads the log from outside, counts the notes (`economy/work`).
+
+**No inspector.** The share is a stated fact of the place and stays put: nothing finds an unregistered job, fines an employer or makes it register. A labour or tax inspector would be an office of the higher government (or of the town, for a local levy) that goes to a workplace (a visit: docs/no-god-view.md), counts who is there, and asks the collector what was reported for that employer; the employer's `compliance` would then answer to the chance of a visit and the size of the penalty (Allingham and Sandmo 1972, as the landlord's tax on rent already cites). Where it attaches: a module beside `world.valuer` in `participants/src/behaviour/world.ts`, with an `ask` channel on the collector's own reports and a `visit` channel on workplaces; `Staffing.unregistered` is the one place the employer's decision is made.
+
+**Leaves out:** a worker choosing or refusing an unregistered job, or asking less for a registered one (the citizen redesign: docs/design/ai-citizens.md, Open); an unregistered wage below the registered one (the surveys show a gap; the profile gives one wage for a kind of work, so both are paid it); a union treating such jobs differently; the firm's own tax; a share that differs between firms of one kind (each employer of a kind registers the kind's share of its own jobs, because a town has too few firms of a kind for "this firm does, that one does not" to give the place's share).
+
+## Work by the day (2026-10-09; profile-depth item 1, part b)
+
+**In the real world.** Casual labour is hired and paid by the day or the task: a builder's hands for the days there is a job, a works' extra hands for an order. Labour force surveys count it as a status of its own beside regular wage work and self-employment, and publish its daily wage (the profiles' notes cite theirs).
+
+**The terms.** Work by the day is an employment agreement whose pay is a day's: the employer's commitment is a sum of money every day (`every` of one day), each side's notice is the least an agreement can say (one second: the agreement record's own fields, no new ones), and its words say "for each day worked; either may end it at once". That is all that marks it (`byTheDay`, `firms.ts`).
+
+**The rule.** A profile may state, by kind of firm, the share of jobs that are by the day (`employment.casual_bps`) and a day's pay for it (`employment.day_wage`), each with its source; a share without a day's pay is refused. At the start the generator makes that share of each such employer's jobs by the day. In the run, `Staffing` (for `firm.retailer`, `firm.producer`, `firm.builder`):
+
+| | |
+|---|---|
+| **Taking on** | A posting is for work by the day with the chance the share gives (drawn for each posting), at the day's pay, which moves as the firm's wage does. It says so (`data.by_the_day`, a period of a day), and its offer carries the terms. One applicant at random, as for any posting |
+| **Pay** | No standing order. On each working day, each hand who is at the workplace is paid the day's pay that day, once, by a payment of its own (an instruction to the firm's bank). Not there, not a working day, or no work for them today: no pay, and nothing owed. Short of money for all, the longest with the firm are paid first |
+| **The days there is work** | The builder: the days it has building in hand. The shop and the factory: every working day (a refinement for the factory, an order in hand, is left out) |
+| **What the law takes** | From a registered job by the day, what the charges take from a day's pay, reckoned as a year's over the working days of the week (a day's pay is pay for a working day, not for every day of the year: `dayPayPeriod`); paid over and reported with the rest. An unregistered one: nothing, as above |
+| **Ending** | Either side, at once. The firm lets the most recent hire go as before; with no notice to work out, the hand is gone that hour |
+
+**The hand** (docs/behaviour/citizen.md): knows the day's pay, whole or less tax, as their pay; reckons a month's income as the working days of a month of it; and, with no pay for most of a week (a pay period and five days, as for any job), takes it that there is no work for them there and ends it, with nothing to claim: no debt arises from a day not worked. Then they look for work as anyone out of work does.
+
+**Leaves out:** turning up each morning to be picked (the hand stays on the employer's list between days, which is how a regular day labourer is with a regular employer; a labour stand where strangers are picked each dawn is not modelled); pay by the task; a different crew each day; a firm choosing to fill a job by the day because trade is uncertain (the share is the place's stated fact); whether someone prefers a standing wage to more days' pay (the citizen redesign); the board's reader comparing a day's pay with a fortnight's on equal terms when the board is read in order of pay (a posting by the day reads low there; a person offered both compares them by the month).
+
+: on the registration, it stops the wages and ends the employment on record; the post is advertised again as staffing allows.
 
 ## Payroll notices (2026-10-09): where one office hires and another pays
 

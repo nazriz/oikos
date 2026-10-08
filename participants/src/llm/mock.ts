@@ -19,7 +19,7 @@ import type { Controller, ParticipantContext } from "../module";
 import { formatMoney, inCurrency, type Currency } from "../money";
 import type { ContentBlock, LlmRequest, MockPolicy } from "./adapter";
 
-export const MOCK_VERSION = "0.5.0"; // 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
+export const MOCK_VERSION = "0.6.0"; // 0.6.0: back at its desk as often as its brain's own module looks in (it sat weekly whatever the office); a look the brain asks for while reading what it missed between sittings is made at the sitting (it was dropped, and the brain never asked again); 0.5.0: a paper the brain issues is asked for on the office's own form for it, where it has one; 0.4.0: a brain's looks are made through the seat's own look (asking a register, looking someone up, sending someone to a place)
 
 export interface MockBrain {
   controller: Controller;
@@ -28,6 +28,10 @@ export interface MockBrain {
   capacity: string;
   /** Chance (basis points) of declining a faithful draft anyway, to exercise declining. */
   rejectBps?: number;
+  /** How often the brain's own module looks in (seconds): the mock is back at its desk as often, so that an office
+   * held by the mock does its work on the days the same office run by code does (a clerk that sits weekly puts a
+   * proposal to the vote a week late and counts it a week after it closed). Absent: the seat's own rhythm. */
+  cadence?: number;
   /** Opt out at the first wake at or after this time (seconds), to exercise opting out. */
   optOutAt?: number;
 }
@@ -107,6 +111,9 @@ export function onOwnForms(program: string, stationery: FormData[], o: { self: s
 
 export function mockPolicies(brains: Map<string, MockBrain>): { participant: MockPolicy; translator: MockPolicy; debrief: MockPolicy; consult: MockPolicy } {
   const queues = new Map<string, (ParticipantAction & { type: "call" | "message" })[]>();
+  /** Looks each seat's brain has asked for and that have not been made yet: those it asked for while reading what it
+   * missed between sittings (nothing could be looked up then), and any beyond what one answer takes. */
+  const owed = new Map<string, LookRequest[]>();
   /** Each seat's own stationery, as it has been shown it: the forms that write a paper of its office's. */
   const stationery = new Map<string, Map<string, FormData>>();
   const see = (id: string, capacity: string, obs: { channels: { [k: string]: any } }) => {
@@ -142,6 +149,9 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
       inCurrency(brain.ctx.world.currency);
       const x = (await brain.controller.step(slice(m, brain.capacity, brain.ctx.entity), brain.ctx)) as ParticipantAction;
       if (x.type === "call" || x.type === "message") q.push(x);
+      // (A look it asks for while reading what it missed is made now, at the sitting: the brain asks for each thing
+      // once and waits for the answer, so a look dropped here was never made at all.)
+      if (x.type === "look") owed.set(id, [...(owed.get(id) ?? []), ...x.looks]);
     }
     see(id, brain.capacity, obs);
     inCurrency(brain.ctx.world.currency);
@@ -150,16 +160,24 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
     if (a.type === "opt_out") return [tool("opt_out", { statement: a.statement })];
     // What the brain wants to find out before it goes on: looked for through the seat's own look, as a model would
     // (the answer is in the next report, which the brain reads like any other).
-    if (a.type === "look" && a.looks.length) {
+    const wanted = [...(owed.get(id) ?? []), ...(a.type === "look" ? a.looks : [])].filter((l, i, all) => all.findIndex((x) => JSON.stringify(x) === JSON.stringify(l)) === i);
+    owed.delete(id);
+    if (wanted.length) {
       // (Several look-ups of who's who through one report are one look that names them all, as the seat's tool takes them.)
       const tools: { [k: string]: any }[] = [];
-      for (const l of a.looks) {
+      const made: LookRequest[] = [];
+      for (const l of wanted) {
         const t = lookAsTool(l, brain.capacity) as { [k: string]: any };
         const same = l.who ? tools.find((x) => x.who && x.report === t.report) : undefined;
+        // (One answer takes eight uses: what is over is made at the next turn, not dropped.)
+        if (!same && tools.length >= 8) continue;
+        made.push(l);
         if (same) same.named.push(...t.named);
         else tools.push({ ...t, ...(l.who ? { who: true } : {}) });
       }
-      return tools.slice(0, 8).map(({ who: _who, ...input }) => tool("look", input));
+      const left = wanted.filter((l) => !made.includes(l));
+      if (left.length) owed.set(id, left);
+      return tools.map(({ who: _who, ...input }) => tool("look", input));
     }
     const draft = obs.drafts[0];
     if (draft) {
@@ -177,7 +195,9 @@ export function mockPolicies(brains: Map<string, MockBrain>): { participant: Moc
       const said = onOwnForms(next.call, [...(stationery.get(id)?.values() ?? [])].sort((x, y) => (x.form < y.form ? -1 : 1)), { self: brain.ctx.entity, now: obs.t, currency: brain.ctx.world.currency });
       return [tool("notebook", { text: `Last request on day ${Math.floor(obs.t / 86_400)}.` }), tool("do", { what: PREFIX + said.program, ...as })];
     }
-    return [tool("done_for_now", {})];
+    // Done for now: back when the brain itself would next look in (the time it gave, or its module's own rhythm).
+    const until = a.type === "wait" && a.until !== undefined && a.until > obs.t ? a.until - obs.t : brain.cadence;
+    return [tool("done_for_now", until ? { days: Math.max(1, Math.ceil(until / 86_400)) } : {})];
   };
 
   // The mock translator hands back the call a mock participant said, and can't translate anything else.

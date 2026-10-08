@@ -1211,13 +1211,24 @@ impl Resolver<'_> {
     }
 }
 
-/// A length of time in words: whole days where it is whole days ("14 days", "1 day"), seconds otherwise.
+/// A length of time in words, as people say one: whole days where it is whole days ("14 days", "1 day"); else whole
+/// hours ("8 hours"); else hours and minutes ("1 hour 30 minutes", "45 minutes"); seconds only where nothing rounder
+/// fits. (The participants' forms write the same: `durationWords`.)
 pub fn duration_words(seconds: i64) -> String {
-    if seconds % 86_400 != 0 {
-        return format!("{seconds} seconds");
+    let n = |x: i64, word: &str| if x == 1 { format!("1 {word}") } else { format!("{x} {word}s") };
+    if seconds % 86_400 == 0 {
+        return n(seconds / 86_400, "day");
     }
-    let days = seconds / 86_400;
-    if days == 1 { "1 day".to_string() } else { format!("{days} days") }
+    if seconds < 0 {
+        return n(seconds, "second");
+    }
+    if seconds % 3_600 == 0 {
+        return n(seconds / 3_600, "hour");
+    }
+    if seconds % 60 == 0 {
+        return if seconds > 3_600 { format!("{} {}", n(seconds / 3_600, "hour"), n((seconds % 3_600) / 60, "minute")) } else { n(seconds / 60, "minute") };
+    }
+    n(seconds, "second")
 }
 
 /// Seconds as whole days, to the nearest (half a day and over rounds up; a negative span mirrors it). Exact integers:
@@ -1394,7 +1405,7 @@ mod tests {
 
     #[test]
     fn a_length_of_time_in_words() {
-        for (seconds, words) in [(86_400, "1 day"), (14 * 86_400, "14 days"), (3600, "3600 seconds"), (0, "0 days"), (86_401, "86401 seconds")] {
+        for (seconds, words) in [(86_400, "1 day"), (14 * 86_400, "14 days"), (3600, "1 hour"), (28_800, "8 hours"), (5_400, "1 hour 30 minutes"), (2_700, "45 minutes"), (60, "1 minute"), (0, "0 days"), (86_401, "86401 seconds"), (1, "1 second")] {
             assert_eq!(duration_words(seconds), words);
         }
     }

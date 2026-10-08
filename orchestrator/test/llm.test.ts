@@ -107,7 +107,8 @@ test("a participant is told when a request can't be done, declines an unfaithful
   const ann = log.filter((e) => e.kind === "annotation").map((e) => e.body);
   expect(ann.find((a) => a.annotation === "translation_failure")?.data.reason).toBe("It isn't clear what should happen. Could you say it more plainly?");
   expect(ann.find((a) => a.annotation === "note" && a.data.translation_retry)?.data.translation_retry).toMatchObject({ attempt: 1, call: "none(unclear)" });
-  expect(seen[1]).toContain("A note on your request: It isn't clear what should happen.");
+  expect(seen[1]).toContain("About what you asked for (");
+  expect(seen[1]).toContain("): nothing was filed or done. It isn't clear what should happen.");
   expect(ann.filter((a) => a.annotation === "signoff").map((a) => a.decision)).toEqual(["reject", "accept"]);
   const recs = log.filter((e) => e.kind === "event" && e.body.event === "recorded").map((e) => e.body.record);
   expect(recs.filter((r) => r.author === "mayor-system").map((r) => r.text)).toEqual(["The town hall opens at nine."]);

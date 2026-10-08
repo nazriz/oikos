@@ -70,11 +70,13 @@ test("a mayor's letters all go, whatever it writes as what they are about; none 
   let n = 0;
   const use = (name: string, input: object) => ({ type: "tool_use" as const, id: `t${++n}`, name, input });
   const shown: string[] = [];
+  const everything: string[] = [];
   let sitting = 0;
   const adapter = new MockAdapter("mock", {
     participant: (req: LlmRequest) => {
       shown.push(shownLast(req));
-      if (req.messages.length > 1 || ++sitting > 1) return [use("done_for_now", { days: 7 })];
+      everything.push(`${req.system}\n${JSON.stringify(req.messages)}`);
+      if (req.messages.length > 1 || ++sitting > 1) return [use("done_for_now", { days: 1 })];
       // As the first real mayor wrote: what it is about in words, as an id, and not at all.
       return [use("write", { to: ["bank"], text: "Please confirm the town's account is in order.", as: "mayor", about: "acc-city payments" }),
         use("write", { to: ["finance"], text: "What does the payments procedure allow before a budget is adopted?", as: "mayor", about: "proc-payments" }),
@@ -103,4 +105,32 @@ test("a mayor's letters all go, whatever it writes as what they are about; none 
   // It is told each went, and its own record of the run counts what was sent.
   expect(shown[1]).toContain('Done: your letter to bank (headed "About: acc-city payments": what it is about is not one id, so it heads the letter).');
   expect(debrief).toContain("3 letters of yours were sent, you asked for 0 things to be done");
+  // The offices answer, and their letters are signed by post and organisation; nothing it is ever shown, in a letter, a
+  // paper or its standing instructions, has an id of the platform's own in it (principle 14).
+  expect(shown.join("\n")).toMatch(/- From [^\n]*\((finance|council-clerk|bank-payments)\), [^\n]*\((city|bank)\) \(year 1, day \d+\)/);
+  for (const x of everything) expect(x).not.toMatch(/[a-z]-system\b|[0-9]-self\b/);
 }, 120_000);
+
+test("a council whose clerk, councillors and mayor are all the mock votes and declares a result within twenty days, as one run by code does", async () => {
+  // (The mock sat weekly whatever the office: a proposal filed on day 1 went to the vote on day 8 and was counted on
+  // day 22, so a twenty-day dry run showed no council result of any kind. It now sits as often as its brain's own
+  // module looks in.)
+  const out = join(root, "runs", "test-seat-council");
+  rmSync(out, { recursive: true, force: true });
+  await runWorld({ config: generate({ ...spec, opening_budget: false, mayor: "llm", model_seats: "council-clerk,councillor-1,councillor-2,councillor-3,councillor-4,councillor-5" }), runId: "town.seed1", outDir: out, until: 20 * DAY, recordObservations: "none" });
+  const council: { day: number; who: string; what: string }[] = [];
+  for await (const line of logLines(join(out, "town.seed1.jsonl"))) {
+    if (!line.includes('"kind":"command"') || !(line.includes('"ballot') || line.includes('"block":"vote"'))) continue;
+    const e = JSON.parse(line);
+    for (const b of e.body.blocks ?? []) if (b.block === "vote" || b.kind === "ballot" || b.kind === "ballot_result") council.push({ day: Math.floor(e.t / DAY), who: e.body.participant, what: b.block === "vote" ? `vote ${b.choice}` : `${b.kind}: ${b.text}` });
+  }
+  const result = council.find((x) => x.what.startsWith("ballot_result"));
+  expect(council.find((x) => x.what.startsWith("ballot:"))!.day).toBeLessThanOrEqual(2);
+  expect(council.filter((x) => x.what.startsWith("vote ") && x.who.startsWith("councillor")).length).toBe(5);
+  expect(result).toBeDefined();
+  // Every councillor's vote is in the count.
+  // (And the result names who voted which way: a council's votes are public record.)
+  expect(result!.what).toMatch(/^ballot_result: (Passed|Rejected): (\d) for, (\d) against\. Voting for: [a-z0-9, -]+; against: [a-z0-9, -]+\.$/);
+  const [, , yes, no] = /(Passed|Rejected): (\d) for, (\d) against/.exec(result!.what)!;
+  expect(Number(yes) + Number(no)).toBe(5);
+}, 180_000);

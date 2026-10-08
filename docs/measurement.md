@@ -65,6 +65,34 @@ The standing queries live in `measure/queries/`, one SQL file each, with a one-l
 
 From TypeScript: `exportLogs`, `open`, `query`, `runQuery` and `table` in `@oikos/measure`.
 
+## Employment (2026-10-09)
+
+**The definition.** `economy/summary` counts as employed what a labour force survey counts: someone of 18 or more, in town at the run's end, who in the reference week (the run's last seven days) did at least an hour of work for pay or profit, or has a job they were not at work in. That is the ILO's: "all those of working age who, during a short reference period, were engaged in any activity to produce goods or provide services for pay or profit", being "at work, i.e. who worked in a job for at least one hour" or "not at work due to temporary absence from a job" (19th ICLS resolution, 2013, as reprinted in the 21st ICLS amending resolution; docs/research/references.md). Read from the log as:
+
+- **work done:** the person's share of each piece of work that took time (`worked` events naming them as a performer; the time split evenly among the performers, as the kernel splits it), an hour or more over the week;
+- **or a job held:** an employment agreement they signed with no notice on it (absent from it or not: ill, on strike, a day with no work for a hand by the day);
+- **or a business of their own in being** (the one a person working for themself was given at the start, unless it has said it is closing): the own-account worker's job, in a week without a sale.
+
+`employment_to_population_pct` and `unemployment_pct` follow from it; the labour force is unchanged (those looking who have not stopped).
+
+**The old series, kept.** Until 2026-10-09 employed meant the second line alone. It is still there under names of its own, so earlier runs compare: `employed_by_agreement`, `employment_by_agreement_pct`, `unemployment_by_agreement_pct`. For a town with no informal work the two differ by the few people working out a notice, who are at work and whom the old series dropped (the first profile's 1,000-person month: 427 against 424).
+
+**`economy/work`**: the employed by how they work: employees, own-account workers, employees by the day, employees in jobs their employer has not registered; and informal employment as a share of the employed (own-account workers, whose businesses of one are all unregistered here, and employees in unregistered jobs: the 17th ICLS's informal jobs, less contributing family workers and employers, whom the town does not have). The unregistered jobs are counted from each employer's own note. Measurement reads the log from outside the world; nobody in it is shown this (docs/no-god-view.md).
+
+**`economy/public-money`**: wages paid, what businesses of one paid their owners, what employers paid over of what they withheld (by payee), and what the outside world's accounts paid to people (by account, and to how many).
+
+**What each profile's town can be checked against** (each a target in the profile, measured, never set; "(to confirm)" where the source was not opened by the profile's author or for this work):
+
+| Profile | Target | Source |
+|---|---|---|
+| ke-nakuru-2026 | informal share of employment about 84% (the profile's own target, from KNBS); 86.5% by the ILO's definition, 2019 | KNBS Economic Survey 2026 via the press (to confirm); ILOSTAT, informal employment rate (opened) |
+| in-tn-2026 | 87.2% national, 2025 (with farming); urban Tamil Nadu: self-employed 29.3%, casual labour 17.8% of workers | ILOSTAT (opened); PLFS annual report 2023-24, table 19 (opened) |
+| br-mg-2026 | 36.5%, Minas Gerais, second quarter 2026 | IBGE, PNAD Contínua, SIDRA table 8529 (opened) |
+| mx-jal-2026 | 46.5%, Jalisco, second quarter 2026 (TIL1) | INEGI, ENOE, Jalisco bulletin of August 2026 (opened) |
+| au-vic-2026, de-ni-2026, gb-eng-2026, jp-akita-2026, us-oh-2026 | none stated: their towns have no informal work, and the measure reads 0 | to source: each national labour force survey's own-account share, and ILOSTAT's informal employment rate where it publishes one |
+
+A town will read below a national target that counts farming households and unpaid family workers, and below any target by the share of own-account work it cannot hold yet (docs/behaviour/entry.md).
+
 ## Health and diff
 
 - **`oikos health <DIR> [--profile NAME]`:** the batch's measures against its profile's calibration targets (`targets` in worlds/profiles/), each within a tolerance stated in `measure/src/health.ts`, breaches first; targets nothing measures yet are listed as such; and the demand households went without.

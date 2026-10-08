@@ -8,7 +8,7 @@
 // It is content: a bank run by a different module (or an AI) can freeze
 // accounts, ignore instructions, or pay the wrong people. Physics doesn't stop it.
 
-import { cents, smallestNow } from "../money";
+import { cents, moneyNow } from "../money";
 import type { Observation, Record, StatementRecord, Transaction } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { DAY, wait, type BehaviourModule, type ParticipantContext } from "../module";
@@ -516,7 +516,7 @@ export const bankPaymentSystem: BehaviourModule = {
         else if (last?.status === "refused" && inFlight.length === 1) {
           const p = inFlight[0]!;
           const holder = channels.accounts(obs).find((a) => a.account === p.from)?.holder;
-          if (holder) refusals.push(message([holder], `Payment of ${smallestNow(p.amount)} to ${p.to} (request ${p.instruction}) couldn't be made: ${refusalText(last.refusal?.code)}.`, p.instruction));
+          if (holder) refusals.push(message([holder], `Payment of ${moneyNow(p.amount)} to ${p.to} (request ${p.instruction}) couldn't be made: ${refusalText(last.refusal?.code)}.`, p.instruction));
         }
         inFlight = [];
         if (refusals.length) return callAction(because("Telling account holders about requests we couldn't carry out.", ...refusals.splice(0, 32)));
@@ -544,7 +544,7 @@ export const bankPaymentSystem: BehaviourModule = {
           } else {
             // Not enough money: the payment isn't made, and the account holder is told.
             const holder = from?.holder;
-            if (holder) blocks.push(message([holder], PAYMENT_FAILED.note(smallestNow(p.amount), p.to, p.instruction), p.instruction));
+            if (holder) blocks.push(message([holder], PAYMENT_FAILED.note(moneyNow(p.amount), p.to, p.instruction), p.instruction));
           }
           if ((p as any).single) break;
         }

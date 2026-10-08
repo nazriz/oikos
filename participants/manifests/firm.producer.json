@@ -1,6 +1,6 @@
 {
   "name": "firm.producer",
-  "version": "0.4.2",
+  "version": "0.4.4",
   "doc": "docs/behaviour/producer.md",
   "params": {
     "builder": {
@@ -11,12 +11,27 @@
       "default": "",
       "source": "placeholder"
     },
+    "casual_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 0,
+      "source": "placeholder"
+    },
     "chi_bps": {
       "schema": {
         "type": "integer"
       },
       "unit": "bps",
       "default": 1000,
+      "source": "placeholder"
+    },
+    "day_wage": {
+      "schema": {
+        "type": "integer"
+      },
+      "default": 0,
       "source": "placeholder"
     },
     "delta_bps": {
@@ -180,6 +195,14 @@
       },
       "unit": "bps",
       "default": 11500,
+      "source": "placeholder"
+    },
+    "registered_bps": {
+      "schema": {
+        "type": "integer"
+      },
+      "unit": "bps",
+      "default": 10000,
       "source": "placeholder"
     },
     "reprice_bps": {

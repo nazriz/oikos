@@ -36,6 +36,16 @@ Three things a profile states as its place's own rules, in forms general enough 
 
 **Moving a figure into these forms, and saying a rule truly.** An author states a rule as the law states it where the source gives it; where the source gives only a typical sum or an approximation, the author keeps that as a stand-in and the source note says what the true rule's form would be. Every note that was changed on 2026-10-08 ends with what was moved, what was said for the first time and from what, and what is still a stand-in.
 
+## Work outside a registered standing wage (2026-10-09)
+
+Three things a profile may state under `employment`, each from its place's labour force survey, each left out where no figure was opened (the town is then as it always was: every job registered, on a standing wage, and nobody working for themself). The mechanisms are in docs/behaviour/firms.md ("Jobs an employer does not register", "Work by the day") and entry.md ("A person working for themself").
+
+- **`registered_bps`**, by kind of work (the kinds wages are given for): of employees' jobs, the share the employer registers. State what the survey measures (employees with no social protection, no contract, no work card) and say which.
+- **`casual_bps`** and **`day_wage`**, by kind of work: of employees' jobs, the share that is by the day, and a day's pay for it.
+- **`own_account`**: `share_bps`, of people in work, those who work for themselves alone; and `kinds`, as the survey divides them by activity, their shares adding to 10,000. Each kind says what it `does`: `"trade"`, `"make"` or `"service"`. **State every kind truly, including those the town cannot hold yet** (it holds trade): the generator places the traders and draws the rest in jobs, and says how many. Do not fold a kind into trade to get its people placed. A trading kind says where it is worked `from` (`"home"` or `"pitch"`) and its `stock_days`.
+
+Stated by four profiles (ke-nakuru-2026, in-tn-2026, br-mg-2026, mx-jal-2026), each note saying what was opened; work by the day by in-tn-2026 alone. Known to be rough, for their authors: each uses one registered share for all three kinds of employer (the sources divide employees by status, not by employer); the kinds of own-account work are national, outside agriculture; the split of traders between a pitch and home is a placeholder; farming and unpaid family workers are left out everywhere. The other five profiles state nothing: their own-account work is 10 to 15% of employment and nearly all registered (to source, per profile).
+
 ## What a profile states, and what the generator derives
 
 A profile states what can be observed in a place: wages, rents, prices of real things, rates, shares, ages, how its institutions work. The generator derives the rest by formulas that are the same everywhere. An author never picks a scale.
@@ -72,6 +82,7 @@ A place that has no such institution leaves the figure out. Nothing is stated as
 - no ballot before industrial action, or no notice of it, or neither: leave out whichever of `industrial_action.ballot_turnout_bps`, `ballot_pass_bps` and `notice_days` the place does not require. The law says what is stated and nothing of the rest (a ballot's turnout alone, its majority alone, the notice alone, or any of them together), and with none of the three there is no such law. The same for the two figures of the law on rent increases and the two of the law on ending a tenancy;
 - no interest on overdue rates: leave out `public_finance.rates_penalty_interest_bps` (the rating law has no "or else");
 - no retirement fund: leave out `retirement_fund` (and a town doesn't ask for one);
+- no informal work to speak of: leave out `employment` (or the part of it that does not apply);
 - voting required by law or not: `elections.compulsory_voting` (the town's election law says "must" or "may").
 
 Still required, though some places lack them (to do): a union, council rates, a clinic and school funded from outside.
