@@ -493,12 +493,13 @@ export const councillor: BehaviourModule = {
  */
 export const financeOfficer: BehaviourModule = {
   name: "city.finance_officer",
-  version: "0.9.0", // 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
+  version: "0.10.0", // 0.10.0: sets a new starter's wage up on the hiring office's payroll notice, from the first pay day it gives (with none after payroll_wait_days, from the agreement on file); asks the mayor, once, for the written approval an invoice over the procedure's figure needs. 0.9.0: pays within the adopted budget of the year it is in; while the year has none, under the budget last adopted at a twelfth a month (the charter's interim rule); spending is reckoned by the year
   doc: "docs/behaviour/government.md",
   cadence: () => 3 * DAY,
   create(ctx: ParticipantContext) {
     const p = params({ approval_over: 5_000_000, compliance_bps: 10_000, mayor_position: "mayor", budget_lines: {} as Record<string, string>, period: 14 * DAY, notice_days: 14,
       procedure: "", // the record its approval rule comes from, if the world names one: withdrawn, the rule no longer applies
+      payroll_wait_days: 3, // how long it waits for the hiring office's notice of a new starter before setting the wage up from the agreement on file
     }, ctx.params);
     const book = new Book();
     const paid = new Set<string>();
@@ -506,7 +507,8 @@ export const financeOfficer: BehaviourModule = {
     let budgetYear = -1;
     // The town's payroll (docs/behaviour/services.md): wages for those the town employs (its works office hires them),
     // net of the income tax withheld, which is paid over monthly. They count against the adopted budget.
-    const payroll = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, role: "staff", does: { hire: false, pay: true } });
+    const payroll = new Staffing(ctx, ctx.entity, { period: p.period, notice_days: p.notice_days, role: "staff", does: { hire: false, pay: true }, notice_wait: p.payroll_wait_days * DAY });
+    const approvalAsked = new Set<string>(); // invoices it has asked the mayor to approve
     let wagesAtYear = 0;
     const letters = new Letters();
     // The town account's money in and out, as the office sees it (for its reports).
@@ -556,7 +558,16 @@ export const financeOfficer: BehaviourModule = {
           const approvalRule = !(p.procedure && book.repealed(p.procedure));
           const withinProcedure = spent + wages() + amount <= limit && (!approvalRule || amount <= p.approval_over || approved);
           const follows = ctx.rng(`procedure-${inv.id}`).below(10_000) < p.compliance_bps;
-          if (!withinProcedure && follows) continue; // wait (approval may come), or never (over budget)
+          if (!withinProcedure && follows) {
+            // Within the budget and over the procedure's figure, with no approval on file: the mayor is asked for one,
+            // once (nobody else tells the mayor that a payment is waiting on it).
+            if (approvalRule && amount > p.approval_over && !approved && spent + wages() + amount <= limit && !approvalAsked.has(inv.id)) {
+              approvalAsked.add(inv.id);
+              steps.push(because(`Invoice ${inv.id} is over the payments procedure's figure and has no written approval on file: asking the mayor for one.`,
+                message([p.mayor_position], `From the finance office: your written approval is needed for invoice ${inv.id} (${usd(amount)}, payable to ${owed.to}): it is within the budget and over ${usd(p.approval_over)}, and the payments procedure asks for the mayor's approval of such a payment. It will be paid once an approval of it is on the town's file.`, inv.id)));
+            }
+            continue; // wait (approval may come), or never (over budget)
+          }
           if (acc.balance < amount) continue;
           paid.add(inv.id);
           spent += amount;
@@ -808,8 +819,8 @@ export const works: BehaviourModule = {
     { task: "collect", at: "depot", what: "The crew at the depot collects waste from each address on the round as often as the order says, homes complained about first, as far as its hours go, and takes what it has collected to the landfill each week with a docket." },
     { task: "maintain", at: "depot", what: "With the hours the round leaves, the crew keeps up the most worn of the town's own assets, and someone is sent to inspect an asset nobody has seen." },
   ],
-  issues: [P.JOB_ADVERTISEMENT, ...P.WORKS],
-  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill }),
+  issues: [P.JOB_ADVERTISEMENT, ...P.PAYROLL, ...P.WORKS],
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "works crew", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), landfill: p.landfill, payroll_office: p.payroll_office || undefined }),
   keeps: [{ what: "service_address", why: "The round is the works office's own: it makes an entry for each address its crew collects from, and adds to it as homes are built." }],
   takes: [
     staffingForm("works_staffing", "the works office", "works crew"),
@@ -817,7 +828,7 @@ export const works: BehaviourModule = {
       fields: { every: { type: "duration", required: true, description: "How often each address on the round is to be collected from (a week, a fortnight)." } },
       follows: "While it stands, the crew collects from each address on the round once in that time, as its hours allow, homes complained about first. With no direction, the office keeps to its own round." },
   ],
-  version: "0.4.0", // 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
+  version: "0.5.0", // 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes written directions on its staffing and on how often it collects (docs/behaviour/directions.md); 0.3.0: collects from its own round of addresses and keeps up the town's own assets, each seen by the crew that works on it or by going to inspect; no longer shown the town
   doc: "docs/behaviour/services.md",
   cadence: () => DAY,
   firstWake: (ctx) => 7 * 3600 + ctx.rng("first-wake").below(3600),
@@ -830,6 +841,7 @@ export const works: BehaviourModule = {
       waste: "waste", collect_task: "collect", collect_labour: 0, collect_per_unit: 0, collect_every_days: 7, // per unit: seconds of work, and waste taken
       wear: "wear", maintain_task: "maintain", maintain_labour: 0, maintain_per_unit: 0, maintain_over: 0, // wear worth a crew's time above this
       staff_line: "staff", landfill: "", kind: "waste", dispose_every_days: 7,
+      payroll_office: "", // the office of the town that pays its staff, which is sent notice of starters and leavers (the world says; none: no notice is sent)
       depot_channel: "depot", // the channel that shows the depot, with who's there by name
       // Who knows what (docs/behaviour/services.md, "Who knows what"): the office's round, the addresses it collects
       // from (a register it keeps itself; none: it collects from nowhere), and the channel it sends someone through
@@ -849,7 +861,7 @@ export const works: BehaviourModule = {
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the works office" });
     const routines = new StandingWork(me, p.part);
     const staffOnly = p.part === "staff";
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed" });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role_or_unnamed", ...(p.payroll_office ? { payroll: p.payroll_office } : {}) });
     // Each building as we last saw it: as the crew that worked on it left it, or as whoever we sent to inspect it found it.
     const known = new Map<string, SiteStructure>();
     const addresses = new Set<string>(); // the round: the addresses we collect from (buildings)

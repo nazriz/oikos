@@ -67,7 +67,7 @@ const ACT_TIME = {
   },
 };
 
-export const GENERATOR_VERSION = "0.40.0";
+export const GENERATOR_VERSION = "0.41.0";
 const DAY = 86_400;
 const MONTH = 30 * DAY;
 const YEAR = 365 * DAY;
@@ -1337,7 +1337,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     K.kept("round", ["service_address"]), goAndSee("inspections", "a building of the town's by its id"), K.premises("depot", [hallCell])],
     code("city.works", { round: "round", inspections: "inspections", depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: PAY, working_day: WORKING_DAY, work_days: WORK_DAYS,
       collect_labour: SV.collect_seconds_per_10kg, collect_per_unit: 10_000, collect_every_days: 7,
-      maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste", ...look }),
+      maintain_labour: upkeep.labour, maintain_per_unit: upkeep.per_unit, maintain_over: 7 * wearPerDay, landfill: "outside", kind: "waste", payroll_office: "finance", ...look }),
     // (Someone sent to inspect is away while the crew works: two things at once.)
     { lanes: 2 });
   // The electoral office (elections): keeps the roll, takes nominations, runs the ballot, counts it, and appoints the
@@ -1364,7 +1364,7 @@ export function generateFrom(spec: TownSpec, P: Profile, under: { weather?: Weat
     // (Its own habitat map, among its papers; and the land register, asked which lot a cell of ground is on.)
     K.premises("depot", [hallCell]), lotByGround],
     code("city.environment", { depot: "town-hall", workplace: "town-hall/workplace.1", industry: "public_administration", wage: wages.construction, period: PAY, working_day: WORKING_DAY, work_days: WORK_DAYS,
-      survey_labour: L.survey_labour, species: V.nature!.species.map((s) => ({ id: s.id, name: s.name, covers: Object.keys(s.density_per_ha), ...(s.listed ? { listed: true } : {}) })), planning: "city", lots: "lots", ...look }));
+      survey_labour: L.survey_labour, species: V.nature!.species.map((s) => ({ id: s.id, name: s.name, covers: Object.keys(s.density_per_ha), ...(s.listed ? { listed: true } : {}) })), planning: "city", lots: "lots", payroll_office: "finance", ...look }));
   // The clinic and the school (world-expansion 4): each keeps the staff its establishment says and is paid for by a
   // grant from outside (the funder's, by the residents it serves), and does its work: seeing patients who come in,
   // teaching each classroom on school days.

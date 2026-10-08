@@ -31,6 +31,32 @@ export const JOB_ADVERTISEMENT: Issued = {
   },
 };
 
+/**
+ * Payroll notices: what an office that takes staff on sends the office that pays them, where they are two offices of
+ * one organisation (a town's works manager and its finance officer; firms.ts, `Staffing`): a new starter, with what
+ * the payroll needs to set the wage up, and a leaver, with the last day. The paper is the organisation's own and is
+ * marked with the payroll office (`data.office`); the hiring office's words say who it is for.
+ */
+export const PAYROLL: Issued[] = [
+  { form: "payroll_starter", title: "Payroll notice of a new starter, to the office that pays the organisation's staff",
+    fields: {
+      employee: f("entity", "Who has been taken on.", req), post: f("text", "The post they hold.", req), agreement: f("record", "The employment agreement, signed by both.", req),
+      wage: f("amount", "The wage for each pay period, before tax.", req), period: f("duration", "The pay period.", req),
+      first_pay: f("date", "The first pay day (a pay period after both signed, unless the agreement says otherwise).", req), account: f("account", "The account the wage is paid into.", req),
+    },
+    writes: { kind: "payroll_notice", text: "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. For the {@payroll_office} office: the wage payment is to be set up from that day.",
+      basis: "=agreement", to: ["=self"], visible: ["=self"],
+      data: { notice: "starter", office: "@payroll_office", employee: "=employee", post: "=post", agreement: "=agreement", wage: "=wage", period: "=period", first_pay: "=first_pay", account: "=account" } } },
+  { form: "payroll_leaver", title: "Payroll notice of a leaver, to the office that pays the organisation's staff",
+    fields: {
+      employee: f("entity", "Who is leaving.", req), post: f("text", "The post they held.", req), agreement: f("record", "The employment agreement that is ending.", req),
+      last_day: f("date", "The last day of the employment.", req), reason: f("choice", "Why it ends.", { ...req, options: ["notice", "died"] }),
+    },
+    writes: { kind: "payroll_notice", text: "Payroll notice, leaver: {employee}, {post}, employment agreement {agreement} ends on {last_day} ({reason}). For the {@payroll_office} office: pay is due to that day, and the wage payment under the agreement is to end then.",
+      basis: "=agreement", to: ["=self"], visible: ["=self"],
+      data: { notice: "leaver", office: "@payroll_office", employee: "=employee", post: "=post", agreement: "=agreement", last_day: "=last_day", reason: "=reason" } } },
+];
+
 /** What a job advertisement carries of the employer's own: the post, the trade, where the work is, and the notice. */
 export function staffingOwn(o: { role?: string; industry?: string; workplace?: string; notice_days?: number }): { [name: string]: unknown } {
   const notice = Number.isInteger(o.notice_days) && o.notice_days! > 0 ? o.notice_days! * 86_400 : 0;

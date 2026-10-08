@@ -14,6 +14,7 @@
 
 import { cents, smallestNow } from "../money";
 import * as C from "../calls";
+import { dateWords, durationWords } from "../forms";
 import type { LookRequest, Observation, Offer, ParticipantAction, StatementRecord } from "../contracts";
 import { basesOf, channels } from "../contracts";
 import { params, wait, type Belief, type BehaviourModule, type ParticipantContext, type Taken } from "../module";
@@ -662,10 +663,17 @@ export class Staffing {
   /** `own`: when several offices of one organisation hire (the town's works and environment offices), which staff and
    * postings are this office's: those in its `role` ("role"), or those or ones that name no role (the staff the world
    * started with: "role_or_unnamed"). Absent: all of the organisation's (a payroll). */
-  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed" }) {}
+  /** `payroll`: for an office that hires and does not pay, the office of its organisation that does (a post): it is
+   * sent a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"). `notice_wait`: for an
+   * office that pays and does not hire, how long it waits for the hiring office's notice of a new starter before it
+   * sets the wage up from the agreement on file (seconds; absent: it acts on the agreement at once, as an employer
+   * that does both does). */
+  constructor(private readonly ctx: ParticipantContext, private readonly me: string, private readonly o: { period: number; notice_days: number; workplace?: string; role: string; industry?: string; does?: { hire?: boolean; pay?: boolean }; own?: "role" | "role_or_unnamed"; payroll?: string; notice_wait?: number }) {}
+  /** Payroll notices this office has sent, by "<starter|leaver>:<agreement>" (and what is on file says the same). */
+  private readonly notified = new Set<string>();
   /** The role an employment agreement names ("... works for X as <role> for <the wage> every N days."), if any. */
   private roleOf(a: any): string | undefined {
-    return / as (.+?) for (?:(?! for ).)+ every \d+ days\.$/.exec(a.terms?.text ?? "")?.[1];
+    return / as (.+?) for (?:(?! for ).)+ every \d+ days\.(?: First pay .*)?$/.exec(a.terms?.text ?? "")?.[1];
   }
   private ours(role: string | undefined): boolean {
     return !this.o.own || role === this.o.role || (this.o.own === "role_or_unnamed" && role === undefined);
@@ -780,20 +788,71 @@ export class Staffing {
 
     // Newly signed: start paying wages by standing order, at the wage agreed less what the tax law's charges say to
     // withhold.
+    // (A payroll that another office hires for acts on that office's notice of a new starter, and pays from the first
+    // pay day it gives. With no notice after `notice_wait`, it sets the wage up from the agreement on file, whose
+    // first pay day is a pay period after both signed: docs/behaviour/firms.md, "Payroll notices".)
+    const starters = this.o.notice_wait !== undefined ? book.open("payroll_notice").filter((n) => n.speaks_for === me && n.data?.notice === "starter") : [];
     for (const a of doesPay ? staff : []) {
       // (Not a job we've given notice on: a worker who died has their order withdrawn, and isn't a new hire.)
       if (this.orders.has(a.id) || this.stopped.has(a.id) || this.noticed.has(a.id) || [...this.pendingOrder.values()].includes(a.id)) continue;
       const worker = a.terms.parties[1];
       const pays = { ...jobTerms(a, worker) };
       pays.wage = this.gross.get(a.id) ?? pays.wage;
-      const to = commitmentOf(a, me).outcome?.money?.to ?? ((book.all("job_application").find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
+      const told = starters.find((n) => n.data?.agreement === a.id);
+      const signed = book.signedAt(a.id) ?? a.at;
+      if (this.o.notice_wait !== undefined && !told && t - signed < this.o.notice_wait) continue;
+      const to = commitmentOf(a, me).outcome?.money?.to ?? (typeof told?.data?.account === "string" ? (told.data.account as string) : undefined) ?? ((book.all("job_application").find((r) => r.record === "statement" && r.kind === "job_application" && r.speaks_for === worker) as any)?.data?.account);
       if (!to) continue;
       const ref = `wo${this.n++}`;
       this.pendingOrder.set(ref, a.id);
       const w = withheld(law, pays.wage, pays.period), tax = w.total;
       if (tax > 0) this.pendingWithhold.set(ref, w);
-      steps.push(because(tax > 0 ? `A new hire has signed: starting their wages by standing order, ${usd(pays.wage - tax)} after the ${usd(tax)} of income tax the law says to withhold.` : "A new hire has signed: starting their wages by standing order.",
-        [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first: pays.period, basis: a.id, for: `Wages for ${worker}.` })]));
+      // (The first pay day: the notice's; with none, the agreement's; for an employer that hires and pays itself, a pay
+      // period from now, as it has always been.)
+      const firstPay = this.o.notice_wait === undefined ? undefined : Number.isSafeInteger(told?.data?.first_pay) ? (told!.data!.first_pay as number) : signed + pays.period;
+      const first = firstPay === undefined ? pays.period : Math.max(0, firstPay - t);
+      const on = this.o.notice_wait === undefined ? "A new hire has signed" : told ? `Payroll notice ${told.id}: a new starter, first pay day ${dateWords(firstPay!)}` : `A new starter's agreement (${a.id}) is on file and no payroll notice has come for it: setting the wage up from the agreement, first pay day ${dateWords(firstPay!)}`;
+      steps.push(because(tax > 0 ? `${on}: starting their wages by standing order, ${usd(pays.wage - tax)} after the ${usd(tax)} of income tax the law says to withhold.` : `${on}: starting their wages by standing order.`,
+        [ref, pay(to, pays.wage - tax, { from: account, every: pays.period, first, basis: a.id, for: `Wages for ${worker}.` })]));
+    }
+    // An office that hires and does not pay tells the office that does (docs/behaviour/firms.md, "Payroll notices"): of each new
+    // starter once both have signed (who, the post, the pay, the pay period, the first pay day, the account, the
+    // agreement), and of each leaver once the employment has an end (the last day). Each once, by the office's own
+    // file: whoever holds the office carries on from its papers.
+    if (this.o.payroll && !doesPay && this.o.does?.hire !== false) {
+      const filed = book.open("payroll_notice").filter((n) => n.speaks_for === me);
+      const sent = (what: string, a: any) => this.notified.has(`${what}:${a.id}`) || filed.some((n) => n.data?.notice === what && n.data?.agreement === a.id);
+      const post = (a: any) => this.roleOf(a) ?? this.o.role;
+      for (const a of staff) {
+        const signed = book.signedAt(a.id);
+        // (Those the organisation started with were on its payroll before the year began.)
+        if (a.author === "genesis" || signed === undefined || sent("starter", a)) continue;
+        const worker = a.terms.parties[1] as string, pays = jobTerms(a, worker), to = this.payee(book, a);
+        if (!to) continue;
+        this.notified.add(`starter:${a.id}`);
+        const firstPay = signed + pays.period;
+        steps.push(because(`${worker} has signed and started: sending the ${this.o.payroll} office a payroll notice (who, the post, the pay, the first pay day, the agreement), for it to set the wage up.`,
+          say("payroll_notice", `Payroll notice, new starter: ${worker}, ${post(a)}, under employment agreement ${a.id}. Pay: ${usd(pays.wage)} every ${durationWords(pays.period)} before tax, into ${to}; first pay day ${dateWords(firstPay)}, then every ${durationWords(pays.period)}. For the ${this.o.payroll} office: the wage payment is to be set up from that day.`,
+            { to: [me], visible: [me], basis: a.id, data: { notice: "starter", office: this.o.payroll, employee: worker, post: post(a), agreement: a.id, wage: String(pays.wage), period: pays.period, first_pay: firstPay, account: to } })));
+      }
+      const deaths = new Set(book.all("death_registration").map((r) => r.data?.deceased as string));
+      for (const a of contracts) {
+        if (!book.concluded(a.id) || sent("leaver", a)) continue;
+        const worker = a.terms.parties[1] as string;
+        const died = deaths.has(worker) && book.inForce(a.id) && t < this.endOf(book, a);
+        const end = died ? t : book.endsAt(a.id);
+        if (end === undefined) continue;
+        this.notified.add(`leaver:${a.id}`);
+        const reason = died ? "died" : "notice";
+        // (A member of staff who has died: the employment is ended on record by the office that employed them, if
+        // nobody of the organisation has yet.)
+        const ends = died && !(book.notices.get(a.id) ?? []).some((n) => n.as === me) ? [notice(a.id, "The employee has died.")] : [];
+        if (died) this.noticed.set(a.id, t);
+        steps.push(because(died ? `${worker}, who worked for us, has died: ending the employment on record and telling the ${this.o.payroll} office.` : `${worker}'s employment ends on ${dateWords(end)}: telling the ${this.o.payroll} office.`,
+          ...ends,
+          say("payroll_notice", `Payroll notice, leaver: ${worker}, ${post(a)}, employment agreement ${a.id} ends on ${dateWords(end)} (${reason}). For the ${this.o.payroll} office: pay is due to that day, and the wage payment under the agreement is to end then.`,
+            { to: [me], visible: [me], basis: a.id, data: { notice: "leaver", office: this.o.payroll, employee: worker, post: post(a), agreement: a.id, last_day: end, reason } })));
+      }
     }
     // A worker who has died: stop the wages, and end the employment on record. We know of it when we are told: by the
     // registry's entry, if whoever reported the death named us, or by our bank, when a wage is next paid into the
@@ -806,7 +865,9 @@ export class Staffing {
       const underNotice = !!a && this.noticed.has(a.id);
       if (!a || (underNotice && !this.orders.has(a.id))) continue;
       this.noticed.set(a.id, t);
-      const s: Step = because(`${who}, who worked for us, has died: stopping their wages.`, ...(underNotice ? [] : [notice(a.id, "The employee has died.")]));
+      // (No second notice where the office that employed them has already ended the employment on record.)
+      const ended = (book.notices.get(a.id) ?? []).some((n) => n.as === me);
+      const s: Step = because(`${who}, who worked for us, has died: stopping their wages.`, ...(underNotice || ended ? [] : [notice(a.id, "The employee has died.")]));
       if (this.orders.has(a.id)) {
         s.push(withdraw(this.orders.get(a.id)!, "The employee has died; stop wages."));
         this.orders.delete(a.id);
@@ -837,7 +898,7 @@ export class Staffing {
           template: "employment", ourNotice: this.o.notice_days * DAY, theirNotice: this.o.notice_days * DAY,
           we: pay(chosen.data?.account ?? worker, wage, { every: this.o.period, for: "wages" }),
           they: this.o.workplace ? C.call("occupancy", { who: worker, in: this.o.workplace }) : undefined,
-          text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${smallestNow(wage)} every ${this.o.period / DAY} days.`,
+          text: `${worker} works for ${me} as ${post.data?.role ?? "staff"} for ${smallestNow(wage)} every ${this.o.period / DAY} days. First pay ${this.o.period / DAY} days after both have signed.`,
           basis: chosen.id,
         })],
         withdraw(post.id, "Filled."),

@@ -1,6 +1,6 @@
 {
   "name": "city.finance_officer",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "doc": "docs/behaviour/government.md",
   "params": {
     "approval_over": {
@@ -38,6 +38,15 @@
       },
       "unit": "days",
       "default": 14,
+      "source": "placeholder"
+    },
+    "payroll_wait_days": {
+      "schema": {
+        "type": "integer",
+        "description": "how long it waits for the hiring office's notice of a new starter before setting the wage up from the agreement on file"
+      },
+      "unit": "days",
+      "default": 3,
       "source": "placeholder"
     },
     "period": {

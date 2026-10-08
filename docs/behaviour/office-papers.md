@@ -54,13 +54,13 @@ code did, said as a seat says it). "Existing act" is a call the language had alr
 | mayor | `invoice_approval`, `nomination`; the council proposal, amendment and permit forms (already there) | commissioning a builder (`structure`) | the code mayor's budget carries the budget as data (`proposal` with `enact`); a seat uses the council proposal form |
 | council clerk | `council_ballot`, `council_result`, `adopted_budget` (a line each, as the town has them) | appointing the winner of an election (`position`) | **a law amended from its figures**: the amended law's words and rule are drafted from the schedule (`draftLaw`), which no form of fields can do. A seat can publish the law in words; the rule is lost |
 | councillors | | `vote` | |
-| finance | | payments, the payroll's standing payments | `withholding_report`: nobody reads its content; a statement in words serves |
+| finance | | payments, the payroll's standing payments (set up on the hiring office's payroll notice) | `withholding_report`: nobody reads its content; a statement in words serves |
 | planning | `permit_decision` | the liberty to build (`claim`) | |
 | inspector | `valuation_request`, `demolition_order` | the fine (`claim`); going to the site (a look) | |
 | registry | `death_registration`, `death_certificate`, `birth_registration`, `transmission_application` | | |
 | child protection | | taking a child into care (`presence`) | |
-| works | `job_advertisement`, `disposal_docket` | the offer of employment (`agreement`), notice, withdrawing an advertisement; one day's work (`work`) | the daily round, by hand, is dozens of acts: standing work orders (docs/behaviour/standing-work.md) |
-| environment | `job_advertisement`, `habitat_register` | survey work (`work`) | `environment_report`: its figures are a table by species; published in words, the paper reads less into it |
+| works | `job_advertisement`, `disposal_docket`, `payroll_starter`, `payroll_leaver` (to the finance office: firms.md, "Payroll notices") | the offer of employment (`agreement`), notice, withdrawing an advertisement; one day's work (`work`) | the daily round, by hand, is dozens of acts: standing work orders (docs/behaviour/standing-work.md) |
+| environment | `job_advertisement`, `habitat_register`, `payroll_starter`, `payroll_leaver` | survey work (`work`) | `environment_report`: its figures are a table by species; published in words, the paper reads less into it |
 | landlords | `rental_listing`, `rent_increase`, `tax_report`, `death_notification`; the permit form | leases (`agreement`), notice, payments, commissioning a builder | the dividend: one instruction listing every payment. A seat pays each holder (`money`) |
 | tribunal member | `tribunal_order` | | `hearing_notice`: nobody reads its content |
 | tribunal registrar | `garnishee_order` | | |

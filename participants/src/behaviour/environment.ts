@@ -18,10 +18,10 @@ const YEAR = 365 * DAY;
 
 export const environment: BehaviourModule = {
   name: "city.environment",
-  issues: [P.JOB_ADVERTISEMENT, ...P.ENVIRONMENT],
-  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "environmental scientist", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), planning: p.planning }),
+  issues: [P.JOB_ADVERTISEMENT, ...P.PAYROLL, ...P.ENVIRONMENT],
+  issuesWith: (p) => ({ ...P.staffingOwn({ role: p.role ?? "environmental scientist", industry: p.industry, workplace: p.workplace, notice_days: p.notice_days ?? 14 }), planning: p.planning, payroll_office: p.payroll_office || undefined }),
   takes: [staffingForm("environment_staffing", "the environment office", "environmental scientists")],
-  version: "0.4.0", // 0.4.0: takes a written direction on its staffing (docs/behaviour/directions.md); 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
+  version: "0.5.0", // 0.5.0: sends the office that pays the town's staff a payroll notice of each new starter and each leaver (docs/behaviour/firms.md, "Payroll notices"); 0.4.0: takes a written direction on its staffing (docs/behaviour/directions.md); 0.3.0: samples habitat from its own habitat map and asks the land registry which lot a cell is on; no longer shown the district or the register of lots
   doc: "docs/behaviour/environment.md",
   cadence: () => DAY,
   firstWake: (ctx) => 8 * 3600 + ctx.rng("first-wake").below(3600),
@@ -45,12 +45,13 @@ export const environment: BehaviourModule = {
       // Whose written directions it follows (docs/behaviour/directions.md): the town's own rule, a record the world
       // names (none: it follows nobody's); and how often it follows one it is given.
       directed_under: "", direction_compliance_bps: 10_000,
+      payroll_office: "", // the office of the town that pays its staff, which is sent notice of starters and leavers (the world says; none: no notice is sent)
     }, ctx.params);
     need(p, ["depot", "workplace", "planning"], "city.environment");
     const me = ctx.entity;
     const book = new Book();
     const directions = new Directions(ctx, { under: p.directed_under, compliance_bps: p.direction_compliance_bps, office_words: "the environment office" });
-    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role" });
+    const staffing = new Staffing(ctx, me, { period: p.period, notice_days: p.notice_days, workplace: p.workplace, role: p.role, ...(p.industry ? { industry: p.industry } : {}), does: { hire: true, pay: false }, own: "role", ...(p.payroll_office ? { payroll: p.payroll_office } : {}) });
     // cell -> its cover: by the office's own habitat map (its own paper, made up from where its scientists have been),
     // less what the town has since had notice of being built on.
     const cover = new Map<string, string>();

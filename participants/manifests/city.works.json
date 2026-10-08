@@ -1,6 +1,6 @@
 {
   "name": "city.works",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "doc": "docs/behaviour/services.md",
   "params": {
     "collect_every_days": {
@@ -156,6 +156,14 @@
     "part": {
       "schema": {
         "type": "string"
+      },
+      "default": "",
+      "source": "placeholder"
+    },
+    "payroll_office": {
+      "schema": {
+        "type": "string",
+        "description": "the office of the town that pays its staff, which is sent notice of starters and leavers (the world says; none: no notice is sent)"
       },
       "default": "",
       "source": "placeholder"
@@ -341,6 +349,124 @@
             ],
             "termination": "@termination"
           }
+        }
+      }
+    },
+    {
+      "form": "payroll_starter",
+      "title": "Payroll notice of a new starter, to the office that pays the organisation's staff",
+      "fields": {
+        "employee": {
+          "type": "entity",
+          "required": true,
+          "description": "Who has been taken on."
+        },
+        "post": {
+          "type": "text",
+          "required": true,
+          "description": "The post they hold."
+        },
+        "agreement": {
+          "type": "record",
+          "required": true,
+          "description": "The employment agreement, signed by both."
+        },
+        "wage": {
+          "type": "amount",
+          "required": true,
+          "description": "The wage for each pay period, before tax."
+        },
+        "period": {
+          "type": "duration",
+          "required": true,
+          "description": "The pay period."
+        },
+        "first_pay": {
+          "type": "date",
+          "required": true,
+          "description": "The first pay day (a pay period after both signed, unless the agreement says otherwise)."
+        },
+        "account": {
+          "type": "account",
+          "required": true,
+          "description": "The account the wage is paid into."
+        }
+      },
+      "writes": {
+        "kind": "payroll_notice",
+        "text": "Payroll notice, new starter: {employee}, {post}, under employment agreement {agreement}. Pay: {wage} every {period} before tax, into {account}; first pay day {first_pay}, then every {period}. For the {@payroll_office} office: the wage payment is to be set up from that day.",
+        "basis": "=agreement",
+        "to": [
+          "=self"
+        ],
+        "visible": [
+          "=self"
+        ],
+        "data": {
+          "notice": "starter",
+          "office": "@payroll_office",
+          "employee": "=employee",
+          "post": "=post",
+          "agreement": "=agreement",
+          "wage": "=wage",
+          "period": "=period",
+          "first_pay": "=first_pay",
+          "account": "=account"
+        }
+      }
+    },
+    {
+      "form": "payroll_leaver",
+      "title": "Payroll notice of a leaver, to the office that pays the organisation's staff",
+      "fields": {
+        "employee": {
+          "type": "entity",
+          "required": true,
+          "description": "Who is leaving."
+        },
+        "post": {
+          "type": "text",
+          "required": true,
+          "description": "The post they held."
+        },
+        "agreement": {
+          "type": "record",
+          "required": true,
+          "description": "The employment agreement that is ending."
+        },
+        "last_day": {
+          "type": "date",
+          "required": true,
+          "description": "The last day of the employment."
+        },
+        "reason": {
+          "type": "choice",
+          "required": true,
+          "options": [
+            "notice",
+            "died"
+          ],
+          "description": "Why it ends."
+        }
+      },
+      "writes": {
+        "kind": "payroll_notice",
+        "text": "Payroll notice, leaver: {employee}, {post}, employment agreement {agreement} ends on {last_day} ({reason}). For the {@payroll_office} office: pay is due to that day, and the wage payment under the agreement is to end then.",
+        "basis": "=agreement",
+        "to": [
+          "=self"
+        ],
+        "visible": [
+          "=self"
+        ],
+        "data": {
+          "notice": "leaver",
+          "office": "@payroll_office",
+          "employee": "=employee",
+          "post": "=post",
+          "agreement": "=agreement",
+          "last_day": "=last_day",
+          "reason": "=reason"
         }
       }
     },

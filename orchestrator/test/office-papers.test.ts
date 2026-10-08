@@ -103,6 +103,27 @@ test("the works office's advertisement for crew, on its form, is the advertiseme
   expect(new Preview(k, "city").of(eight.ok ? eight.blocks : [])).toStartWith('You will publish a job posting: "Hiring: XYZ 3,000.00 every 14 days."');
 });
 
+test("the works office's payroll notice of a new starter, on its form, is the notice the module sends the finance office", () => {
+  const WAGE = 300_000, PERIOD = 14 * DAY;
+  const params = { depot: "town-hall", workplace: "town-hall/workplace.1", landfill: "outside", wage: WAGE, period: PERIOD, industry: "public_administration", payroll_office: "finance" };
+  const papers = stationery("city.works", "works", "city", params);
+  expect(papers.map((x) => x.data.form)).toContain("payroll_starter");
+  expect(papers.map((x) => x.data.form)).toContain("payroll_leaver");
+  const job = { id: "job-9", at: 8 * DAY, author: "works-system", record: "agreement", visible_to: ["city", "c9"], terms: { template: "employment", parties: ["city", "c9"],
+    text: "c9 works for city as works crew for 300000 cents every 14 days. First pay 14 days after both have signed.", commitments: [{ who: "city", does: { outcome: { money: { to: "acc-c9", amount: String(WAGE), for: "wages" } } }, every: PERIOD }] } };
+  const signatures = ["city", "c9"].map((as) => ({ id: `sig-${as}`, at: 9 * DAY, author: `${as}-x`, record: "signature", agreement: "job-9", as, visible_to: ["city", "c9"] }));
+  const programs = said("city.works", "works", "city", params, 10 * DAY, [job, ...signatures]);
+  const r = both("works", "city", 10 * DAY, papers, programs).filter((x) => x.program.includes("payroll_notice"));
+  expect(r).toHaveLength(1);
+  expect(r[0]!.turned).toMatchObject({ turned: 1, kept: [] });
+  expect(r[0]!.form).toEqual(r[0]!.module);
+  // (In the form's own words: the module's are the same, so none are given.)
+  expect(r[0]!.turned.program).toBe('form(account=acc-c9, agreement=job-9, employee=c9, first_pay="1987200", form=payroll_starter, period="14 days", post="works crew", to=works, wage="XYZ 3000.00")');
+  expect(r[0]!.form[0]).toMatchObject({ kind: "payroll_notice", addressed_to: ["city"], visible_to: ["city"], basis: "job-9",
+    text: "Payroll notice, new starter: c9, works crew, under employment agreement job-9. Pay: XYZ 3,000.00 every 14 days before tax, into acc-c9; first pay day year 1, day 24, then every 14 days. For the finance office: the wage payment is to be set up from that day.",
+    data: { notice: "starter", office: "finance", employee: "c9", post: "works crew", agreement: "job-9", wage: "300000", period: PERIOD, first_pay: 23 * DAY, account: "acc-c9" } });
+});
+
 test("a planning decision on its form is the decision the module sends, and the liberty granted with it is unchanged", () => {
   const papers = stationery("city.planning_officer", "planning", "city", {});
   const app = { id: "rec.30", at: 100, author: "c0005-self", record: "statement", speaks_for: "c0005", kind: "permit_application", addressed_to: ["city"], visible_to: ["city", "c0005"], text: "x", basis: "form-permit", data: { lot: "lot-01-02", structure_type: "house" } };
