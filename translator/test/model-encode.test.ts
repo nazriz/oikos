@@ -1,7 +1,7 @@
 // A program as decisions and copies (translator/model/encode.ts): every kind of value comes back exactly.
 import { expect, test } from "bun:test";
 import { calls } from "@oikos/participants";
-import { formsMisfit, formsShown, programOf, shown } from "../model/adapter";
+import { CUT_OFF, DecideAdapter, formsMisfit, formsShown, programOf, shown } from "../model/adapter";
 import { asWord, decode, encode, vocabulary, type Span } from "../model/encode";
 import { pieces, row, stepsOf } from "../model/export";
 import { copies, goldText, literals, spansIn, strayIds, styleBrief } from "../train/data";
@@ -178,4 +178,16 @@ test("the data pipeline's own spans for a list of bases: each record found where
   expect(goldText(calls.parseProgram(both))).toBe(canonical(both));
   // Asked for in the cited style, a program resting on several is told to cite each, in order.
   expect(styleBrief("cited", { program: both } as Parameters<typeof styleBrief>[1], () => 0.5).instruction).toContain("every one of them, those it rests on in the order the call lists them");
+});
+
+test("the trained model asks back only when very unsure, and never twice running: the next request from the same participant is drafted", async () => {
+  const a = new DecideAdapter("none", { threshold: 0.5 });
+  // (No model is started: what it would answer is given.)
+  const answers = [{ steps: ["fn:money", "arg:to", ["id", 1, 1], ")", "eos"], sure: 0.2, ms: 1, parts: { choices: 0.9, places: 0.3, texts: 1, least: 0.3 } }, { steps: ["fn:money", "arg:to", ["id", 1, 1], ")", "eos"], sure: 0.2, ms: 1, parts: { choices: 0.9, places: 0.3, texts: 1, least: 0.3 } }, { steps: ["fn:money", "arg:to", ["id", 1, 1], ")", "eos"], sure: 0.2, ms: 1, parts: { choices: 0.9, places: 0.3, texts: 1, least: 0.3 } }];
+  (a as any).ask = async () => answers.shift();
+  const ask = async (ref: string) => (await a.complete({ purpose: "translator", subject: "translator", ref, system: "", maxTokens: 10, messages: [{ role: "user", content: "Request: Pay c0412 what is owed." }] })).content[0] as any;
+  expect((await ask("draft.mayor-system.1")).input).toEqual({ program: "none(unclear)", unsure: { kind: "which" } });
+  expect((await ask("draft.mayor-system.2")).input).toEqual({ program: "money(to=c0412)" }); // asked again: the draft, to confirm or decline
+  expect((await ask("draft.mayor-system.3")).input).toEqual({ program: "none(unclear)", unsure: { kind: "which" } }); // a new matter is asked back as any is
+  expect(CUT_OFF).toBe(0.1);
 });

@@ -1972,6 +1972,11 @@ See the design note, §16.
   - **Not verified:** that seats decline wrong drafts (pilot 11 got to no draft to decline); how a seat takes "which one do you mean" when nothing was ambiguous (it rephrased six times without complaint, and did not get its budget).
   - **Revisit if** seats are seen confirming drafts that are not what they asked (then the confirmation is not the safeguard it is taken for, and the cut-off has to carry it).
 
+- **The cut-off loosened: a draft is an offer** (2026-10-08; `translator/model/adapter.ts` `CUT_OFF`). Naz, on the entry above: "yes, loosen. at the end of the day, the translator just offers the seat an option, and its on them to do the final approval." The trained model now asks back under a sureness of 0.1 where none is given (it was unset, and 0.5 in pilot 11), and never twice running for that reason: a participant just asked back because the model was unsure is given the model's best draft on its next request, to confirm or decline. (Who is asking is read off the draft's id; "asked again" is the next request, not a judgement that it is the same one: a participant asked back who then asks for something else gets a draft the cut-off might have held, which errs the way Naz chose.) What the model itself answers `none(unclear)` is still asked back, and the form check still stops a form that can't be one of the forms shown.
+  - **What the pass mark's "confidently wrong at most 1 in 100" now means:** wrong acts carried out, which the seat's confirmation guards, not wrong drafts offered (15 of 180 on the real test at 0.1).
+  - **Not verified:** on a live run (pilot 11 is resumed with it); that seats decline what is wrong.
+  - **Revisit if** seats confirm wrong drafts (then the cut-off, or what a draft shows the seat, has to carry more).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.
