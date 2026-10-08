@@ -170,18 +170,22 @@ export async function logToResume(path: string): Promise<string> {
 
 /** A log's run id and config (the header), and where its files are. The old files are kept, renamed
  * `<run>.stopped-<n>.*`, and the resumed run is written in their place. */
-export function prepareResume(logPath: string): { runId: string; config: any; outDir: string; stoppedLog: string; consult: boolean; consultAvoid?: string[] } {
+export function prepareResume(logPath: string): { runId: string; config: any; outDir: string; stoppedLog: string; consult: boolean; consultAvoid?: string[]; recording?: { observations?: string; decisions?: string } } {
   // The header, and whether the run asked the sparse mind and what it left out (its note, near the start: run.ts).
   let first = "";
   let noteLine: string | undefined;
+  let recordingLine: string | undefined;
   let lines = 0;
   eachLine(logPath, (l) => {
     if (lines++ === 0) first = l;
     else if (l.includes('"annotation":"note"') && l.includes('"consult":{')) noteLine = l;
+    else if (l.includes('"annotation":"note"') && l.includes('"recording":{')) recordingLine = l;
     return lines < 200 && !noteLine;
   });
   const consult = !!noteLine;
   const consultAvoid: string[] | undefined = noteLine ? JSON.parse(noteLine).body?.data?.consult?.avoid : undefined;
+  // (And what it was asked to record beyond the default: its note, just before.)
+  const recording: { observations?: string; decisions?: string } | undefined = recordingLine ? JSON.parse(recordingLine).body?.data?.recording : undefined;
   const header = JSON.parse(first);
   if (header.kind !== "header") throw new Error(`${logPath} doesn't start with a run header`);
   const runId: string = header.body.run_id;
@@ -196,5 +200,5 @@ export function prepareResume(logPath: string): { runId: string; config: any; ou
     const f = join(outDir, `${runId}.${ext}`);
     if (existsSync(f)) renameSync(f, join(outDir, `${runId}.stopped-${n}.${ext}`));
   }
-  return { runId, config: header.body.config, outDir, stoppedLog, consult, ...(consultAvoid ? { consultAvoid } : {}) };
+  return { runId, config: header.body.config, outDir, stoppedLog, consult, ...(consultAvoid ? { consultAvoid } : {}), ...(recording ? { recording } : {}) };
 }

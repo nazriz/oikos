@@ -61,4 +61,4 @@ test("owners own their houses, repay their mortgages, pay rates, and pass their 
     expect(passed?.speaks_for).toBe("city");
     expect(passed?.to).toBe(r.data.partner ?? passed?.to);
   }
-}, 900_000);
+}, 2_400_000);

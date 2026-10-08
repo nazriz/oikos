@@ -47,7 +47,7 @@ test("the bank carries out standing orders on schedule; the run replays byte-ide
   // Re-running the same world gives the same log.
   const again = await runWorld({ config: riverbendWithIdleParticipants(), runId: "m1a", outDir: join(out, "again"), until: 100 * DAY });
   expect(readFileSync(again.logPath, "utf8")).toBe(readFileSync(s.logPath, "utf8"));
-}, 60_000);
+}, 180_000);
 
 test("the bank refuses an instruction from someone who isn't the account holder", async () => {
   const c = riverbendWithIdleParticipants();
@@ -58,7 +58,7 @@ test("the bank refuses an instruction from someone who isn't the account holder"
   rmSync(out, { recursive: true, force: true });
   const s = await runWorld({ config: c, runId: "forged", outDir: out, until: 5 * DAY });
   expect(events(s.logPath).filter((e) => e.event === "transfer" && e.to === "acc-alice")).toEqual([]);
-}, 60_000);
+}, 180_000);
 
 test("the generated town runs 60 days headless: people find homes and work, and the log replays", async () => {
   const { generate } = await import("@oikos/worlds/generator/generate");

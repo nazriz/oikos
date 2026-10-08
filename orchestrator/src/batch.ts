@@ -11,6 +11,7 @@
 // (measure/, DuckDB over Parquet); and the cost report (cost.txt, cost.json).
 
 import { availableParallelism } from "node:os";
+import { insideSlot, take } from "../../scripts/slots";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { exportLogs, MEASURE_VERSION } from "@oikos/measure";
@@ -72,9 +73,12 @@ export async function loadModules(file?: string): Promise<RunOptions["modules"]>
 
 /** Run one seed in this process and write its summary next to its log. Or resume a run that stopped (`resume`: its
  * log): run again from its own config, with every model response served from that log (resume.ts, D59). */
-export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
+export async function runOne(o: { world?: string; seed?: number; out?: string; resume?: string; overwrite?: boolean; stop?: StopSignal; until?: number; sets?: string[]; modules?: string; model?: string; translatorModel?: string; budgetUsd?: number; baseUrl?: string; recordObservations?: string; recordDecisions?: string; logDetail?: string; consult?: boolean; consultAvoid?: string }): Promise<RunRecord> {
   let config: any, runId: string, out: string, serving: Serving | undefined, stoppedLog: string | undefined;
   let consult = !!o.consult;
+  let recordObservations = o.recordObservations;
+  let recordDecisions = o.recordDecisions;
+  if (recordDecisions !== undefined && recordDecisions !== "full" && recordDecisions !== "none") throw new Error(`--record-decisions is full or none, not "${recordDecisions}"`);
   // What an audit found unstable (its report's avoid list), left out of the sparse mind.
   let consultAvoid: string[] | undefined = o.consultAvoid ? (JSON.parse(await Bun.file(o.consultAvoid).text()).avoid as string[]) : undefined;
   if (o.resume) {
@@ -82,6 +86,9 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
     const r = prepareResume(await logToResume(o.resume));
     ({ config, runId, outDir: out, stoppedLog } = r);
     consult = r.consult;
+    // (What the run was recording, it goes on recording: its replayed part is written again, the same.)
+    recordObservations = r.recording?.observations;
+    recordDecisions = r.recording?.decisions;
     consultAvoid = r.consultAvoid;
     serving = new Serving(recordedCalls(r.stoppedLog));
   } else {
@@ -106,7 +113,7 @@ export async function runOne(o: { world?: string; seed?: number; out?: string; r
   const watchdog = new Watchdog({ stallMs: stallMs(), diagnosisPath, runId });
   let s: RunSummary;
   try {
-    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(o.recordObservations ? { recordObservations: recordWho(o.recordObservations) } : {}),
+    s = await runWorld({ config, runId, outDir: out, until: o.until, watchdog, ...(o.stop ? { stop: o.stop } : {}), ...(modules ? { modules } : {}), ...(consult ? { consult, ...(consultAvoid ? { consultAvoid } : {}) } : {}), ...(recordObservations ? { recordObservations: recordWho(recordObservations) } : {}), ...(recordDecisions === "none" ? { recordDecisions: "none" as const } : {}),
       ...(real ? { adapter: serve(real.adapter), prices: { ...real.prices, ...(tr?.prices ?? {}) }, ...(real.budget ? { budget: real.budget } : {}) } : {}),
       ...(tr ? { translatorAdapter: serve(tr.adapter) } : {}),
       ...(serving ? { resumedFrom: { log: basename(stoppedLog!), serving } } : {}) });
@@ -158,6 +165,8 @@ export interface BatchOptions {
   sets?: string[];
   /** Whose observations to record in full (docs/design/run-datasets.md): "models", "code", "all", or ids, comma-separated. */
   recordObservations?: string;
+  /** Code citizens' decisions (docs/design/ai-citizens.md 7): "full" (the default) or "none". */
+  recordDecisions?: string;
   /** How much the log keeps: "full" (the default) or "lean" (docs/reliability.md). */
   logDetail?: string;
   /** The sparse mind on (docs/design/ai-citizens.md 4), leaving out what an audit report found unstable. */
@@ -250,8 +259,16 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
     for (const seed of queue.splice(0)) failed.push({ seed, reason: `not started: the batch was asked to stop (${o.stop!.requested ?? "a signal"})` });
     for (const c of children) c.kill("SIGTERM");
   };
+  // A run that asks a model spends its time waiting for answers, not on a core: it takes no slot.
+  const slotted = !o.model;
   const worker = async () => {
-    for (let seed = queue.shift(); seed !== undefined; seed = queue.shift()) {
+    while (queue.length) {
+      // One of the machine's slots for each run under way (scripts/slots.ts): a batch starts with as many of its P as
+      // are free and adds the rest as they free. Waiting changes when a run starts, and nothing in it.
+      const slot = slotted ? await take(1, `oikos run ${o.world} (${seeds.length} seed${seeds.length === 1 ? "" : "s"}) into ${out}`, { cancel: () => !queue.length, say: log }) : undefined;
+      const seed = queue.shift();
+      if (seed === undefined) { slot?.release(); break; }
+      try {
       // This run's spending limit: the per-run limit, or what's left of the batch's, whichever is less.
       let limitUsd = o.budgetUsd;
       let held = 0;
@@ -267,9 +284,9 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         limitUsd = held / 1e6;
       }
       const args = [process.execPath, CLI, "run-one", o.world, "--seed", String(seed), "--out", out, ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...sets.flatMap((s) => ["--set", s]),
-        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
+        ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : []), ...(o.model ? ["--model", o.model] : []), ...(o.model && o.translatorModel ? ["--translator-model", o.translatorModel] : []), ...(limitUsd !== undefined ? ["--budget", String(limitUsd)] : []), ...(o.baseUrl ? ["--base-url", o.baseUrl] : []),
         ...(o.modules ? ["--modules", resolve(o.modules)] : []), ...(o.overwrite ? ["--overwrite"] : [])];
-      const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: { ...process.env } }); // (the environment as it is now)
+      const p = Bun.spawn(args, { stdout: "pipe", stderr: "pipe", env: slotted ? insideSlot(1, { ...process.env }) : { ...process.env } }); // (the environment as it is now)
       children.add(p);
       const [code, err] = await Promise.all([p.exited, new Response(p.stderr).text()]);
       children.delete(p);
@@ -307,6 +324,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
         log(`    resume it with: ${resume}${rec.stopped.by === "SpendingLimitReached" ? "  (with a higher --budget: it stopped at this one)" : ""}`);
       } else log(`  seed ${seed}: ${(rec.t / (365 * 86_400)).toFixed(2)} years, ${rec.commands.toLocaleString("en-US")} commands, ${rec.refused} refused, ${(rec.wallMs / 1000).toFixed(0)} s; final state ${rec.stateHash.slice(0, 16)}`);
       for (const w of healthWarnings(rec)) log(`    ! ${w}`);
+      } finally { slot?.release(); }
     }
   };
   await Promise.all(Array.from({ length: parallel }, worker));
@@ -390,7 +408,7 @@ export async function runBatch(o: BatchOptions): Promise<BatchResult> {
 
 /** The arguments to `oikos run-one` that regenerate a batch's run of a seed (with `--out` for where). */
 export const recipeArgs = (o: BatchOptions, seed: number) => [o.world, "--seed", String(seed), ...(o.until !== undefined ? ["--until", String(o.until)] : []), ...(o.sets ?? []).flatMap((s) => ["--set", s]),
-  ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : [])];
+  ...(o.recordObservations ? ["--record-observations", o.recordObservations] : []), ...(o.recordDecisions ? ["--record-decisions", o.recordDecisions] : []), ...(o.logDetail ? ["--log", o.logDetail] : []), ...(o.consult ? ["--consult"] : []), ...(o.consultAvoid ? ["--consult-avoid", o.consultAvoid] : [])];
 
 /** Why a batch's runs couldn't be regenerated from a recipe (so their logs must be kept), or null if they can. */
 function cannotRegenerate(config: any, o: BatchOptions): string | null {

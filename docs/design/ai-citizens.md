@@ -248,6 +248,15 @@ For each decision a citizen makes, a `decision` annotation records:
 
 It's on by default for runs that train citizen models, and off (lean) for quick tests. `oikos dataset` exports it: the training set for a small citizen model, and the baseline against which that model is compared.
 
+**As built (2026-10-08; docs/decisions.md, "What a pilot records for citizen models"):**
+- On in every run whose log is not lean, pilots included; `--record-decisions none` leaves them out, and a resumed run records as it began.
+- Where the mind decides (shop, job, home, practice), a record has, beside the way, the scores and the choice:
+  - each option's `facts` (a month's money, a home and its bedrooms, hours, goods, company), how many `others` the citizen knows took it, its `meaning` to them, and what they have `learned` of it;
+  - `current` (their routine), `circumstances` (income, savings, without a home, bedrooms needed, the cost of essentials), `satisfied_here`, `doubt`;
+  - `state` (needs, satisfaction, certainty, feeling, beliefs, goal), and `person` (values, temperament, need weights) with each citizen's first.
+- The dataset row has `seq`, where the decision stands in the log: what the citizen then did, and what came of it, follows there.
+- **Not recorded:** what the citizen made of how a choice turned out (the payoff the mind learns from); decisions the mind doesn't make (leaving town, petitions, a venture: their reasoning is in the act, in words); the citizen's whole view (`--record-observations code`, about four times the log).
+
 ## 8. Building it
 
 1. **The blocks** (2a–2e): the resolver and translator learn them, and firms, landlords, the union and the bank publish offers. Today's code migrates off the hidden conventions, and today's citizen still passes every test.

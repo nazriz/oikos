@@ -65,6 +65,9 @@ export interface RunOptions {
   /** Whose observations are recorded in full (training data): by default, language-model participants' ("models");
    * "none" for no one. */
   recordObservations?: string[] | "models" | "code" | "all" | "none";
+  /** Code citizens' decisions as their minds made them (docs/design/ai-citizens.md 7; training data for citizen models):
+   * "full" (the default: every one, in a log that is not lean) or "none". */
+  recordDecisions?: "full" | "none";
   /** The sparse mind (docs/design/ai-citizens.md 4): code citizens may ask the run's model (the mock, or --model) how
    * much their options would matter, with answers remembered by kind. Off by default. */
   consult?: boolean;
@@ -493,6 +496,12 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
   if (cfg.life?.harm && modelPeople.length)
     await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { welfare: "this world lets language-model people physically harm others (life.harm is set)", participants: modelPeople } } });
 
+  // What is recorded beyond the default, said at the start (a resumed run reads it back and records the same).
+  if ((o.recordObservations ?? "models") !== "models" || o.recordDecisions === "none")
+    await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { recording: {
+      ...((o.recordObservations ?? "models") !== "models" ? { observations: Array.isArray(o.recordObservations) ? o.recordObservations.join(",") : o.recordObservations } : {}),
+      ...(o.recordDecisions === "none" ? { decisions: "none" } : {}) } } } });
+
   // The sparse mind, if on: said at the start (a resumed run reads it back), with the model it asks.
   if (consult) await k.request({ op: "annotate", annotation: { annotation: "note", subject: "orchestrator", data: { consult: { version: CONSULT_VERSION, model: `${io.adapter.provider}/${io.adapter.model}`, ...(o.consultAvoid?.length ? { avoid: o.consultAvoid } : {}) } } } });
 
@@ -790,7 +799,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
       for (const [i, x] of (tr.retries ?? []).entries())
         await k.request({ op: "annotate", annotation: { annotation: "note", subject: u.participant, data: { translation_retry: { draft: draftId, attempt: i + 1, reason: x.reason, ...(x.call ? { call: x.call } : {}) } } } });
       if (!tr.ok) {
-        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: tr.notices.join(" "), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw) } : {}) } } });
+        await k.request({ op: "annotate", annotation: { annotation: "translation_failure", subject: u.participant, data: { draft: draftId, proposal: action.text, reason: tr.notices.join(" "), ...(tr.asked_back ? { asked_back: true } : {}), ...(tr.call ? { call: tr.call } : {}), ...(tr.invalid ? { invalid: tr.invalid } : {}), ...(tr.raw !== undefined ? { raw: JSON.stringify(tr.raw) } : {}) } } });
         for (const text of tr.notices) u.notices.push({ t, text, re: draftId });
         return true;
       }
@@ -975,7 +984,7 @@ async function runWith(o: RunOptions, k: Kernel): Promise<RunSummary> {
           if (x.u.llm) unanswered = 0;
           // A code citizen's decisions on the way to this action (docs/design/ai-citizens.md 7): training data, in full logs.
           const decisions = (r.value as any)?.[DECISIONS] as DecisionRecord[] | undefined;
-          if (decisions?.length && !lean) for (const d of decisions) await k.request({ op: "annotate", annotation: { annotation: "decision", subject: x.u.participant, data: d } });
+          if (decisions?.length && !lean && o.recordDecisions !== "none") for (const d of decisions) await k.request({ op: "annotate", annotation: { annotation: "decision", subject: x.u.participant, data: d } });
           if (thinkingCosts) {
             // Its thinking: a model's by the tokens it just used (logged, so a replay is exact), code's a fixed time.
             const used = (notes.get(x.u.participant) ?? []).filter((a: any) => a.annotation === "usage" && a.purpose === "participant") as any[];

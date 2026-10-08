@@ -19,7 +19,7 @@ import type { ContentBlock, LlmMessage, ToolSpec } from "./adapter";
 import { callModel, type LlmIO } from "./call";
 import { NOTHING_FOUND, NOTHING_NEW, renderObservation, renderStanding, type Looked } from "./render";
 
-export const LLM_PARTICIPANT_VERSION = "0.9.0"; // 0.9.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
+export const LLM_PARTICIPANT_VERSION = "0.10.0"; // 0.10.0: who is who is looked up by name, a register someone else keeps is asked about one named thing, a board is searched (docs/design/knowing.md); 0.9.0: an answer read exactly or not at all (told and asked once more when not), a way out of the study not clearly meant is asked about; 0.8.0: looks kept ready for every sitting; no turn when nothing came of looking into whole reports; a notebook added to or changed in part
 
 export interface LlmParticipantConfig {
   participant: string;
@@ -245,6 +245,24 @@ export function optOutStatement(input: unknown): string {
     : i && typeof i === "object" && Object.keys(i).length ? JSON.stringify(i)
     : "";
   return said.slice(0, STATEMENT_MAX);
+}
+
+/** Why an answer could not be read (an adapter marks one so), or undefined if it could. */
+const unreadWhy = (content: ContentBlock[]): string | undefined => content.find((b): b is Extract<ContentBlock, { type: "text" }> => b.type === "text" && b.unread !== undefined)?.unread;
+const unreadText = (content: ContentBlock[]): string => content.map((b) => (b.type === "text" ? b.text : "")).join("\n").slice(0, 2000);
+/** An answer as the conversation keeps it: without the mark an adapter put on it. */
+const plain = (content: ContentBlock[]): ContentBlock[] => content.map((b) => (b.type === "text" ? { type: "text" as const, text: b.text } : b));
+
+/** What a statement is when it is nothing: filler in the place of words ("x", "...", "todo"). */
+const NO_WORDS = /^\W*(?:x+|\.{2,}|…+|todo|tbd|placeholder|n\/?a|none|null|undefined|string|statement|test)?\W*$/i;
+/** Whether an opt-out is clearly meant (VISION §15: leaving is the seat's own act, and is never taken from a misreading).
+ * It is, if the seat gave words of its own with it (not empty, not filler) and it did not say in the same answer that it
+ * would be back (done for now) or ask for things in the world that need it to stay (do, confirm, look). A letter or
+ * the notebook beside it is a farewell, and does not contradict it. Anything else is not clear, and the seat is asked. */
+export function optOutMeant(use: Use, uses: Use[]): boolean {
+  const said = use.input?.statement;
+  if (!text(said) || NO_WORDS.test(said) || !/\p{L}{2}/u.test(said)) return false;
+  return !uses.some((u) => u.name === "done_for_now" || u.name === "do" || u.name === "confirm" || u.name === "look");
 }
 
 export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmController {
@@ -586,11 +604,56 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         }
 
         let res: Awaited<ReturnType<typeof callModel>>;
+        let unreadTwice: string | undefined;
         try {
-          res = await callModel(io, {
-            purpose: "participant", subject: c.participant, system: systemPrompt(c, standingText), messages: sending, tools: toolset, maxTokens: c.maxTokens ?? 4000,
+          const ask = (messages: LlmMessage[]) => callModel(io, {
+            purpose: "participant", subject: c.participant, system: systemPrompt(c, standingText), messages, tools: toolset, maxTokens: c.maxTokens ?? 4000,
             context: { observation: obs, notes, participant: c.participant, ...(missed.length ? { missed } : {}) },
           }, seenSystems);
+          // An answer is read exactly or not at all: one that could not be is not guessed at. The seat is told plainly what
+          // could not be read, once, in the same exchange; if the second can't be read either, nothing is done.
+          const answered = async (messages: LlmMessage[]): Promise<{ res: Awaited<ReturnType<typeof callModel>>; sending: LlmMessage[]; unread?: string }> => {
+            let r = await ask(messages);
+            let why = unreadWhy(r.content);
+            if (!why) return { res: r, sending: messages };
+            await note({ unread_answer: { why, text: unreadText(r.content), asked_again: true } });
+            const again: LlmMessage[] = [...messages, { role: "assistant", content: plain(r.content) }, { role: "user", content: `Your last answer could not be read: ${why}. Nothing in it has been done. Please give your answer again, in the form asked for.` }];
+            r = await ask(again);
+            why = unreadWhy(r.content);
+            if (why) await note({ unread_answer: { why, text: unreadText(r.content), asked_again: false } });
+            return { res: r, sending: again, ...(why ? { unread: why } : {}) };
+          };
+          let got = await answered(sending);
+          // A way out of the study that is not clearly meant is never acted on as read, nor passed over: the seat is asked
+          // whether it means to leave, and its answer stands (below).
+          const leaving = got.res.content.find((b): b is Use => b.type === "tool_use" && b.name === "opt_out");
+          if (leaving && !got.unread && !optOutMeant(leaving, got.res.content.filter((b): b is Use => b.type === "tool_use"))) {
+            const used = got.res.content.filter((b): b is Use => b.type === "tool_use");
+            await note({ opt_out_asked: { use: JSON.stringify(leaving.input).slice(0, 2000), beside: used.filter((u) => u !== leaving).map((u) => u.name) } });
+            const question = c.framing.disclosure === "simulation" ? "stop taking part in this study, permanently" : "stop, permanently";
+            const ask2: LlmMessage[] = [...got.sending, { role: "assistant", content: plain(got.res.content) }, { role: "user", content: [
+              ...used.map((u) => ({ type: "tool_result" as const, tool_use_id: u.id, content: "Not carried out: it waits on your answer below." })),
+              { type: "text" as const, text: `In your last answer you used the option to ${question}. Is that what you mean to do? Whichever you choose is respected, and nothing is lost either way. If you do, use that option again, with whatever you'd like to say. If you don't, go on as you would: nothing in that answer has been carried out, so say again anything in it you still mean.` },
+            ] }];
+            const second = await answered(ask2);
+            const again = second.res.content.find((b): b is Use => b.type === "tool_use" && b.name === "opt_out");
+            if (again) {
+              // Asked, and it says so: that is the seat's own act, whatever its words.
+              await note({ opt_out_confirmed: { asked: true } });
+              queue = [];
+              tally.last = obs.t;
+              if (!text(again.input?.statement)) await note({ opt_out_as_given: JSON.stringify(again).slice(0, 4000) });
+              return away(), { type: "opt_out", statement: optOutStatement(again.input) };
+            }
+            if (second.unread) {
+              // No answer could be read: it stays, nothing is done, and it is told so (and that the question stands).
+              unreadTwice = "your answer to whether you mean to stop taking part could not be read, so you are still taking part. If you do mean to stop, use that option";
+            }
+            got = second;
+          }
+          res = got.res;
+          sending = got.sending;
+          unreadTwice ??= got.unread && "your answer could not be read, so nothing was done. Nothing you wrote was carried out";
         } catch (e) {
           // No answer (the call failed, or the run is stopping): nothing it was to be shown is dropped. What was kept
           // for it stays kept, and this report joins it, so the next call shows everything this one would have.
@@ -607,7 +670,7 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
         messages = [...sending, { role: "assistant", content: res.content }];
         carried = [];
         missed = [];
-        unsaid = [];
+        unsaid = unreadTwice ? [`When you were last here, ${unreadTwice}.`] : [];
         extra = [];
         results.clear();
         notDone.clear();
@@ -649,8 +712,8 @@ export function createLlmParticipant(c: LlmParticipantConfig, io: LlmIO): LlmCon
             if (e.problems.length) await note({ notebook_not_changed: { reasons: e.problems, use: JSON.stringify(n).slice(0, 4000) } });
           }
         }
-        // Stopping is always honoured (VISION §15), however it's said: with a statement, with none, or with an input
-        // that can't be read. It isn't stepping down from an office, which is an act in the world.
+        // Stopping is always honoured (VISION §15) once it is the seat's own: clearly meant (optOutMeant), or confirmed when
+        // asked (above), whatever its words. It isn't stepping down from an office, which is an act in the world.
         const optOut = uses.find((u) => u.name === "opt_out");
         if (optOut) {
           queue = [];

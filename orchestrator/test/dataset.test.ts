@@ -58,6 +58,13 @@ test("a run's dataset: a manifest, and every translation, decision, act and reco
   const actions = rows(join(dir, "actions.jsonl"));
   expect(actions.some((a) => a.participant.endsWith("-self") && a.reasoning && a.call)).toBe(true);
   expect(actions.some((a) => a.participant === "mayor-system")).toBe(false);
+  // Citizens' decisions: where each stands in the log (what followed is that citizen's acts after it), and what the
+  // citizen had before it.
+  const minds = rows(join(dir, "citizen_decisions.jsonl"));
+  expect(minds.every((d, i) => Number.isInteger(d.seq) && (i === 0 || d.seq > minds[i - 1]!.seq))).toBe(true);
+  expect(minds.some((d) => d.circumstances && d.options.some((o: any) => o.facts))).toBe(true);
+  expect(minds.some((d) => d.person)).toBe(true);
+  expect(minds.some((d) => actions.some((a) => a.participant === d.participant && a.seq > d.seq && a.t === d.t))).toBe(true);
   // Observations: just the two asked for.
   const seen = new Set(rows(join(dir, "observations.jsonl")).map((x) => x.participant));
   expect([...seen].sort()).toEqual([citizen, "mayor-system"].sort());

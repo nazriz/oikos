@@ -40,6 +40,7 @@ Naz values honest pushback over agreement. Have opinions, flag trade-offs, and s
 - **Models:** the mock as long as possible. Real-model runs go through the Codex CLI on Naz's subscription until the translator is trained and the platform is mature; paid APIs need his go-ahead. The driver seat is `gpt-6.1-sol`, simple narrow work (the translator) `gpt-6-luna`, never `gpt-6-astra`; always name the model.
 - **Model runs are training data:** never delete one; keep every run's log. Translator training data is mostly generated (from code participants' calls, requests written in several styles by several models, not one steward's voice); real pilot requests and seats’ real situations may be used for training too (Naz, 2026-10-06), except the real test cases (`translator/eval/pilot-cases.ts`) and the seat-days they come from; the held-out test cases stay out of all of it.
 - **Never commit with failing tests.** `bun run test:fast` after a change, `bun run test:all` before a merge.
+- **One full suite per merge.** `bun run test:all` is run once, on the merge, by whoever merges; work on a branch runs the fast tier and the tests of what it touched (`bun run test:changed`). Heavy jobs go through the slots (`scripts/slots.ts`, docs/dev-machine.md). Never kill processes by pattern, only a process id you started.
 - **Nothing references the project's old name** (renamed Oikos, 2026-10-05).
 
 ## Where things run
