@@ -1,0 +1,1439 @@
+{
+ "id": "gb-eng-2026",
+ "place": "A market town of a few thousand people in North Yorkshire, England, United Kingdom (figures for the county, local authority E06000065, where a place figure exists; for England or the UK where not)",
+ "as_of": "2026-10",
+ "about": "Every place-specific figure the town generator uses, with its source. A world for another place and time is another profile; the platform's code holds none of these (docs/profiles.md). Most figures are for North Yorkshire (Census 2021, 2026-27 council tax) or England/UK (earnings, benefits, tax, prices). Figures marked PLACEHOLDER are estimates or carry-overs from au-vic-2026; those marked 'to confirm' were read through a search summary or remembered rather than opened in the publisher's own table. Money is in pence.",
+ "values": {
+  "currency": {
+   "code": "GBP",
+   "minor_units": 2,
+   "symbol": "£",
+   "unit_words": [
+    "pound",
+    "pounds",
+    "quid"
+   ],
+   "minor_words": [
+    "penny",
+    "pence"
+   ]
+  },
+  "households": {
+   "lone_bps": 3094,
+   "group_bps": 397,
+   "couple_bps": 3343,
+   "couple_children_bps": 2344,
+   "one_parent_bps": 822,
+   "children_couple": [
+    4700,
+    3900,
+    1400
+   ],
+   "children_one_parent": [
+    5500,
+    3000,
+    1500
+   ],
+   "same_sex_couple_bps": 100,
+   "lone_parent_female_bps": 8000,
+   "adult_female_bps": 5000,
+   "child_male_bps": 5120,
+   "adult_ages": [
+    18,
+    99
+   ],
+   "mother_age_at_first_birth": [
+    22,
+    36
+   ],
+   "child_max_age": 24,
+   "group_size": [
+    2,
+    3
+   ],
+   "age_bands_bps": [
+    {
+     "from": 0,
+     "to": 4,
+     "bps": 451
+    },
+    {
+     "from": 5,
+     "to": 9,
+     "bps": 507
+    },
+    {
+     "from": 10,
+     "to": 14,
+     "bps": 547
+    },
+    {
+     "from": 15,
+     "to": 19,
+     "bps": 519
+    },
+    {
+     "from": 20,
+     "to": 24,
+     "bps": 427
+    },
+    {
+     "from": 25,
+     "to": 29,
+     "bps": 509
+    },
+    {
+     "from": 30,
+     "to": 34,
+     "bps": 548
+    },
+    {
+     "from": 35,
+     "to": 39,
+     "bps": 540
+    },
+    {
+     "from": 40,
+     "to": 44,
+     "bps": 541
+    },
+    {
+     "from": 45,
+     "to": 49,
+     "bps": 615
+    },
+    {
+     "from": 50,
+     "to": 54,
+     "bps": 757
+    },
+    {
+     "from": 55,
+     "to": 59,
+     "bps": 807
+    },
+    {
+     "from": 60,
+     "to": 64,
+     "bps": 734
+    },
+    {
+     "from": 65,
+     "to": 69,
+     "bps": 649
+    },
+    {
+     "from": 70,
+     "to": 74,
+     "bps": 686
+    },
+    {
+     "from": 75,
+     "to": 79,
+     "bps": 494
+    },
+    {
+     "from": 80,
+     "to": 84,
+     "bps": 344
+    },
+    {
+     "from": 85,
+     "to": 99,
+     "bps": 325
+    }
+   ]
+  },
+  "life": {
+   "qx_per_100000": {
+    "male": [
+     3600,
+     450,
+     300,
+     200,
+     150,
+     100,
+     100,
+     100,
+     100,
+     100,
+     120,
+     120,
+     120,
+     120,
+     120,
+     189,
+     193,
+     199,
+     204,
+     211,
+     217,
+     225,
+     233,
+     241,
+     250,
+     260,
+     271,
+     283,
+     296,
+     310,
+     324,
+     341,
+     358,
+     377,
+     398,
+     420,
+     444,
+     470,
+     499,
+     529,
+     562,
+     598,
+     637,
+     679,
+     725,
+     774,
+     828,
+     886,
+     948,
+     1016,
+     1090,
+     1169,
+     1255,
+     1349,
+     1449,
+     1558,
+     1677,
+     1804,
+     1942,
+     2092,
+     2254,
+     2428,
+     2617,
+     2822,
+     3043,
+     3281,
+     3539,
+     3818,
+     4119,
+     4444,
+     4795,
+     5173,
+     5582,
+     6022,
+     6497,
+     7008,
+     7559,
+     8153,
+     8791,
+     9478,
+     10216,
+     11008,
+     11859,
+     12771,
+     13749,
+     14796,
+     15915,
+     17112,
+     18388,
+     19749,
+     21198,
+     22737,
+     24372,
+     26103,
+     27933,
+     29865,
+     31900,
+     34037,
+     36277,
+     38618
+    ],
+    "female": [
+     3600,
+     450,
+     300,
+     200,
+     150,
+     100,
+     100,
+     100,
+     100,
+     100,
+     120,
+     120,
+     120,
+     120,
+     120,
+     190,
+     195,
+     199,
+     204,
+     210,
+     216,
+     222,
+     229,
+     236,
+     243,
+     252,
+     260,
+     270,
+     280,
+     291,
+     302,
+     315,
+     328,
+     343,
+     358,
+     375,
+     392,
+     411,
+     432,
+     454,
+     477,
+     502,
+     529,
+     558,
+     589,
+     622,
+     658,
+     696,
+     737,
+     781,
+     828,
+     878,
+     932,
+     990,
+     1052,
+     1119,
+     1190,
+     1267,
+     1349,
+     1436,
+     1530,
+     1631,
+     1739,
+     1855,
+     1979,
+     2111,
+     2254,
+     2406,
+     2569,
+     2743,
+     2930,
+     3130,
+     3344,
+     3573,
+     3818,
+     4080,
+     4360,
+     4660,
+     4980,
+     5323,
+     5689,
+     6079,
+     6497,
+     6942,
+     7418,
+     7925,
+     8466,
+     9043,
+     9657,
+     10312,
+     11008,
+     11749,
+     12537,
+     13374,
+     14263,
+     15207,
+     16207,
+     17267,
+     18388,
+     19574
+    ]
+   },
+   "illness": {
+    "by_age": [
+     {
+      "from": 0,
+      "bps": 600
+     },
+     {
+      "from": 5,
+      "bps": 350
+     },
+     {
+      "from": 15,
+      "bps": 600
+     },
+     {
+      "from": 45,
+      "bps": 900
+     },
+     {
+      "from": 65,
+      "bps": 1800
+     },
+     {
+      "from": 85,
+      "bps": 4500
+     }
+    ],
+    "severity": [
+     {
+      "label": "serious",
+      "share_bps": 8000,
+      "days": [
+       3,
+       14
+      ],
+      "fatal_bps": 0
+     },
+     {
+      "label": "severe",
+      "share_bps": 2000,
+      "days": [
+       14,
+       60
+      ],
+      "fatal_bps": 0
+     }
+    ]
+   },
+   "injury": {
+    "bps": 210,
+    "severity": [
+     {
+      "label": "minor",
+      "share_bps": 6000,
+      "days": [
+       3,
+       14
+      ],
+      "fatal_bps": 0
+     },
+     {
+      "label": "serious",
+      "share_bps": 4000,
+      "days": [
+       14,
+       90
+      ],
+      "fatal_bps": 0
+     }
+    ]
+   },
+   "birth": {
+    "ages": [
+     15,
+     49
+    ],
+    "gestation_days": 266,
+    "female_bps": 4880
+   },
+   "treatable": {
+    "share_bps_by_age": [
+     {
+      "from": 0,
+      "bps": 1500
+     },
+     {
+      "from": 75,
+      "bps": 0
+     }
+    ],
+    "band": "severe"
+   },
+   "work_injury_bps": {
+    "factory": 160,
+    "shop": 116
+   },
+   "found_alone_after": [
+    {
+     "within_days": 1,
+     "bps": 3691
+    },
+    {
+     "within_days": 3,
+     "bps": 2062
+    },
+    {
+     "within_days": 7,
+     "bps": 1359
+    },
+    {
+     "within_days": 30,
+     "bps": 1959
+    },
+    {
+     "within_days": 365,
+     "bps": 929
+    }
+   ]
+  },
+  "wages_per_fortnight": {
+   "shop": 127531,
+   "factory": 149831,
+   "construction": 165769
+  },
+  "rents_per_month": {
+   "apartment_units": [
+    {
+     "bedrooms": 1,
+     "count": 3,
+     "rent": 58600
+    },
+    {
+     "bedrooms": 2,
+     "count": 7,
+     "rent": 72900
+    },
+    {
+     "bedrooms": 3,
+     "count": 2,
+     "rent": 86400
+    }
+   ],
+   "house_types": [
+    {
+     "id": "house",
+     "bedrooms": 3,
+     "share_bps": 5500,
+     "rent": 86400
+    },
+    {
+     "id": "large-house",
+     "bedrooms": 4,
+     "share_bps": 4500,
+     "rent": 126800
+    }
+   ]
+  },
+  "spending": {
+   "saving_bps": 880,
+   "wealth_effect_bps_per_year": 300,
+   "essentials_per_month": 30000,
+   "shops_known": 7,
+   "shop_search_bps_per_month": 2500
+  },
+  "savings_by_age": [
+   {
+    "from": 18,
+    "pct": [
+     10000,
+     50000,
+     200000,
+     600000,
+     1500000
+    ]
+   },
+   {
+    "from": 25,
+    "pct": [
+     50000,
+     200000,
+     750000,
+     2250000,
+     5000000
+    ]
+   },
+   {
+    "from": 35,
+    "pct": [
+     75000,
+     300000,
+     1000000,
+     3000000,
+     7000000
+    ]
+   },
+   {
+    "from": 45,
+    "pct": [
+     100000,
+     400000,
+     1250000,
+     3750000,
+     8500000
+    ]
+   },
+   {
+    "from": 55,
+    "pct": [
+     150000,
+     500000,
+     1750000,
+     5000000,
+     11500000
+    ]
+   }
+  ],
+  "retirement_age": 66,
+  "retiree_savings": [
+   7500000,
+   17500000
+  ],
+  "support": {
+   "pension": {
+    "amount": 48260,
+    "every_days": 14,
+    "from_age": 66
+   },
+   "unemployment": {
+    "amount": 19611,
+    "every_days": 14,
+    "from_age": 25
+   }
+  },
+  "firm_ownership": {
+   "forms_bps": {
+    "factory": {
+     "closely_held": 0,
+     "outside": 0,
+     "widely_held": 10000
+    },
+    "shop": {
+     "closely_held": 8000,
+     "outside": 2000,
+     "widely_held": 0
+    },
+    "landlord": {
+     "closely_held": 7000,
+     "outside": 3000,
+     "widely_held": 0
+    }
+   },
+   "closely_held": {
+    "households_bps": [
+     8500,
+     1200,
+     300
+    ],
+    "owner_wealth_fifth_bps": [
+     100,
+     200,
+     400,
+     800,
+     8500
+    ]
+   },
+   "widely_held": {
+    "outside_bps": 8000
+   },
+   "direct_holders": {
+    "by_wealth_fifth_bps": [
+     800,
+     2500,
+     3500,
+     5000,
+     7200
+    ],
+    "firms_held": [
+     1,
+     4
+    ]
+   }
+  },
+  "retirement_fund": {
+   "share_bps_of_local": 7200,
+   "member_bps": 8400,
+   "pension_every_days": 30,
+   "drawdown_bps_by_age": [
+    {
+     "from": 0,
+     "bps": 400
+    },
+    {
+     "from": 65,
+     "bps": 500
+    },
+    {
+     "from": 75,
+     "bps": 600
+    },
+    {
+     "from": 80,
+     "bps": 700
+    },
+    {
+     "from": 85,
+     "bps": 900
+    },
+    {
+     "from": 90,
+     "bps": 1100
+    },
+    {
+     "from": 95,
+     "bps": 1400
+    }
+   ],
+   "cost_bps_of_income": 1500
+  },
+  "industry": {
+   "factory_labour_share_bps": 2000,
+   "factory_input_share_bps": 6700,
+   "retail_purchases_share_bps": 7000,
+   "retail_labour_share_bps": 1400
+  },
+  "prices": {
+   "goods_world": 10000,
+   "goods_import_markup_bps": 1000,
+   "inputs_per_kg": 250,
+   "materials_per_kg": 125
+  },
+  "ordinary_hours_per_week": 48,
+  "fertility_per_10000": [
+   {
+    "from": 15,
+    "rate": 90
+   },
+   {
+    "from": 20,
+    "rate": 320
+   },
+   {
+    "from": 25,
+    "rate": 620
+   },
+   {
+    "from": 30,
+    "rate": 930
+   },
+   {
+    "from": 35,
+    "rate": 670
+   },
+   {
+    "from": 40,
+    "rate": 150
+   },
+   {
+    "from": 45,
+    "rate": 15
+   },
+   {
+    "from": 50,
+    "rate": 0
+   }
+  ],
+  "labour_force_participation_bps": 7910,
+  "tenancy": {
+   "rent_review_months": 12,
+   "rent_increase_notice_days": 61,
+   "after_fixed_term": "periodic"
+  },
+  "values": {
+   "benevolence": {
+    "mean_bps": 7000,
+    "sd_bps": 1500
+   },
+   "universalism": {
+    "mean_bps": 6600,
+    "sd_bps": 1500
+   },
+   "self_direction": {
+    "mean_bps": 6200,
+    "sd_bps": 1500
+   },
+   "security": {
+    "mean_bps": 5800,
+    "sd_bps": 1500
+   },
+   "conformity": {
+    "mean_bps": 5400,
+    "sd_bps": 1500
+   },
+   "hedonism": {
+    "mean_bps": 5000,
+    "sd_bps": 1500
+   },
+   "achievement": {
+    "mean_bps": 4600,
+    "sd_bps": 1500
+   },
+   "tradition": {
+    "mean_bps": 4200,
+    "sd_bps": 1500
+   },
+   "stimulation": {
+    "mean_bps": 3800,
+    "sd_bps": 1500
+   },
+   "power": {
+    "mean_bps": 3400,
+    "sd_bps": 1500
+   }
+  },
+  "industrial_action": {
+   "ballot_turnout_bps": 5000,
+   "ballot_pass_bps": 5000,
+   "notice_days": 10,
+   "paid_during_action": false
+  },
+  "world_price_process": {
+   "goods": {
+    "sd_bps": 150,
+    "persistence_bps": 9000
+   },
+   "inputs": {
+    "sd_bps": 400,
+    "persistence_bps": 9000
+   },
+   "materials": {
+    "sd_bps": 300,
+    "persistence_bps": 9000
+   }
+  },
+  "credit": {
+   "cash_rate_bps": 375,
+   "funding_spread_bps": 100,
+   "lending_rate_bps": {
+    "person": 903,
+    "organisation": 700
+   },
+   "serviceability_buffer_bps": 100,
+   "max_repayment_share_bps": {
+    "person": 3000,
+    "organisation": 2000
+   },
+   "arrears_days": 30,
+   "default_days": 90,
+   "max_months": 60,
+   "reserve": 10000000
+  },
+  "opening": {
+   "bank": 50000000,
+   "town": 200000000,
+   "builder": 30000000,
+   "landlord": 60000000,
+   "shop": 3000000,
+   "factory": 40000000,
+   "person_min_savings": 100000
+  },
+  "town_finance": {
+   "parks_per_year": 15000000,
+   "payment_approval_over": 5000000
+  },
+  "public_finance": {
+   "income_tax": {
+    "brackets": [
+     {
+      "from": 0,
+      "rate_bps": 0
+     },
+     {
+      "from": 1257000,
+      "rate_bps": 2000
+     },
+     {
+      "from": 5027000,
+      "rate_bps": 4000
+     },
+     {
+      "from": 12514000,
+      "rate_bps": 4500
+     }
+    ],
+    "levy_bps": 800,
+    "levy_from": 1257000
+   },
+   "grants_per_resident_per_year": 10000,
+   "rates_per_resident_per_year": 85210,
+   "rates_instalments": 10,
+   "rates_due_days": 30,
+   "rates_penalty_interest_bps": 0,
+   "median_house_price": 27100000,
+   "rates_exempt_kinds": [
+    "health_service",
+    "school",
+    "utility",
+    "police"
+   ]
+  },
+  "services": {
+   "waste_per_person_per_day_g": 1068,
+   "landfill_levy_per_tonne": 13075,
+   "council_staff_per_1000": 6,
+   "collect_seconds_per_10kg": 12,
+   "asset_life_years": 15,
+   "upkeep_hours_per_week_per_asset": 4,
+   "complain_bps": 3000
+  },
+  "unions": {
+   "membership_bps": {
+    "manufacturing": 1310,
+    "retail": 1220,
+    "construction": 940,
+    "public_administration": 3890,
+    "other": 2240
+   },
+   "dues_per_month": 1600,
+   "resignation_notice_days": 30,
+   "claim_margin_bps": 200,
+   "meeting_every_days": 30,
+   "teaching": "Together, workers win better pay and conditions than each alone."
+  },
+  "groups": {
+   "kinds": [
+    {
+     "kind": "sport",
+     "name": "sports club",
+     "every_days": 7,
+     "lasts_minutes": 120
+    },
+    {
+     "kind": "religious",
+     "name": "congregation",
+     "every_days": 7,
+     "lasts_minutes": 90,
+     "teaching": "There is a God who made the world and cares how we live.",
+     "held_at_start_bps": 5564
+    },
+    {
+     "kind": "arts",
+     "name": "arts society",
+     "every_days": 14,
+     "lasts_minutes": 120
+    },
+    {
+     "kind": "hobby",
+     "name": "hobby group",
+     "every_days": 14,
+     "lasts_minutes": 120
+    },
+    {
+     "kind": "interest",
+     "name": "community club",
+     "every_days": 30,
+     "lasts_minutes": 120
+    }
+   ],
+   "per_kind_per_1000_people": 1,
+   "taking_part_bps": 4000,
+   "leave_notice_days": 0
+  },
+  "elections": {
+   "term_years": 4,
+   "method": "plurality",
+   "turnout_bps": 6350,
+   "stand_bps": 200,
+   "news_readers_bps": 4000
+  },
+  "health": {
+   "doctors_per_1000": 0.45,
+   "doctor_wage_per_fortnight": 379700,
+   "consult_minutes": 30,
+   "seek_care_bps": 9000,
+   "treats": [
+    {
+     "kind": "illness",
+     "severity": "serious",
+     "consults": 1,
+     "days_kept_bps": 8000,
+     "fatal_kept_bps": 5000
+    },
+    {
+     "kind": "illness",
+     "severity": "severe",
+     "consults": 2,
+     "days_kept_bps": 8000,
+     "fatal_kept_bps": 5000
+    },
+    {
+     "kind": "injury",
+     "severity": "minor",
+     "consults": 1,
+     "days_kept_bps": 8000,
+     "fatal_kept_bps": 5000
+    },
+    {
+     "kind": "injury",
+     "severity": "serious",
+     "consults": 2,
+     "days_kept_bps": 8000,
+     "fatal_kept_bps": 5000
+    }
+   ],
+   "off_work_severities": [
+    "serious",
+    "severe"
+   ]
+  },
+  "round": {
+   "work_start_hour": 9,
+   "work_end_hour": 17,
+   "work_days": 5,
+   "school_start_hour": 9,
+   "school_end_hour": 15,
+   "travel_seconds_per_cell": 18,
+   "travel_by_cover": {
+    "water": 120,
+    "wetland": 30,
+    "woodland": 25,
+    "scrub": 25
+   },
+   "roads": {
+    "seconds_per_cell": 2,
+    "within_cells": 3,
+    "budget_per_resident": 30000
+   }
+  },
+  "ownership": {
+   "house_owner_bps": 6943,
+   "mortgage_bps_by_age": [
+    {
+     "from": 18,
+     "bps": 8000
+    },
+    {
+     "from": 45,
+     "bps": 4800
+    },
+    {
+     "from": 65,
+     "bps": 600
+    }
+   ],
+   "mortgage_payment_per_month": 95300,
+   "mortgage_rate_bps": 400,
+   "mortgage_years_left": [
+    5,
+    30
+   ],
+   "market": {
+    "buy_bps_per_month": 100,
+    "deposit_bps": 2000,
+    "costs_bps": 340,
+    "mortgage_months": 300,
+    "relist_days": 30,
+    "cut_bps": 500,
+    "floor_bps": 8000
+   }
+  },
+  "utilities": {
+   "water": {
+    "litres_per_person_per_day": 140,
+    "price_per_kl": 516,
+    "service_per_quarter": 2199,
+    "river_inflow_kl_per_cell_per_day": 1000,
+    "river_decay_bps_per_day": 1000,
+    "river_flow_bps_per_day": 5000
+   },
+   "energy": {
+    "kwh_per_household_per_day": 7,
+    "price_per_kwh": 26,
+    "supply_per_day": 55,
+    "grid_price_per_kwh": 16,
+    "grid_emissions_g_per_kwh": 128
+   }
+  },
+  "climate": {
+   "rain_by_month_bps": [
+    17854,
+    15647,
+    11637,
+    8469,
+    5478,
+    5314,
+    4216,
+    5129,
+    5886,
+    9294,
+    13724,
+    17353
+   ],
+   "storm_bps_per_month": 800,
+   "storm_days": [
+    2,
+    4
+   ],
+   "storm_bps": 25000,
+   "drought_bps_per_year": 1500,
+   "drought_months": [
+    3,
+    12
+   ],
+   "drought_bps": 4000,
+   "summer_months": [
+    6,
+    7,
+    8
+   ],
+   "heatwave_bps_per_week": 1200,
+   "heatwave_days": [
+    3,
+    5
+   ],
+   "heat_units": 10,
+   "built_heat_units": 12,
+   "heat_illness_bps_per_unit": 100,
+   "warning_lead_days": 2
+  },
+  "hazards": {
+   "river_bank_kl": 16500,
+   "spill_bps_per_day": 3000,
+   "flood_above_kl": 300,
+   "wetland_soak_kl_per_day": 500
+  },
+  "crime": {
+   "take_bps_per_month_in_need": 200,
+   "caught_bps_reckoned": 3000,
+   "take_quantity": 5,
+   "detection_bps": 910,
+   "investigation_hours": 4,
+   "police_per_1000": 2.4,
+   "officer_wage_per_fortnight": 161500
+  },
+  "justice": {
+   "hearing_after_days": 21,
+   "pay_within_days": 28,
+   "challenge_bps": 2000,
+   "apply_bps": 3000,
+   "apply_after_days": 30
+  },
+  "education": {
+   "school_ages": [
+    5,
+    17
+   ],
+   "students_per_teacher": 17.9,
+   "school_days_per_year": 190,
+   "hours_per_day": 6,
+   "teacher_wage_per_fortnight": 173900,
+   "attainment": [
+    {
+     "label": "No qualifications",
+     "share_bps": 1608,
+     "years": 10
+    },
+    {
+     "label": "Level 1 and entry level qualifications",
+     "share_bps": 923,
+     "years": 10
+    },
+    {
+     "label": "Level 2 qualifications (GCSE or equivalent)",
+     "share_bps": 1402,
+     "years": 11
+    },
+    {
+     "label": "Other qualifications",
+     "share_bps": 242,
+     "years": 11
+    },
+    {
+     "label": "Apprenticeship",
+     "share_bps": 657,
+     "years": 12
+    },
+    {
+     "label": "Level 3 qualifications (A level or equivalent)",
+     "share_bps": 1702,
+     "years": 13
+    },
+    {
+     "label": "Level 4 qualifications or above (degree or equivalent)",
+     "share_bps": 3466,
+     "years": 16
+    }
+   ],
+   "return_per_year_bps": 1000,
+   "max_years": 20
+  },
+  "nature": {
+   "cell_m": 25,
+   "landscape": {
+    "margin_cells": 100,
+    "block_cells": 16,
+    "shares_bps": {
+     "woodland": 1000,
+     "scrub": 500,
+     "grassland": 3000,
+     "farmland": 5200,
+     "wetland": 300
+    },
+    "woodland_patches": 2
+   },
+   "covers": [
+    {
+     "id": "woodland"
+    },
+    {
+     "id": "scrub",
+     "succeeds_to": {
+      "cover": "woodland",
+      "after_years": 40
+     }
+    },
+    {
+     "id": "grassland"
+    },
+    {
+     "id": "cleared",
+     "succeeds_to": {
+      "cover": "grassland",
+      "after_years": 1
+     }
+    },
+    {
+     "id": "farmland"
+    },
+    {
+     "id": "wetland"
+    },
+    {
+     "id": "riverbank"
+    }
+   ],
+   "default_cover": "grassland",
+   "cleared_cover": "cleared",
+   "river_cover": "riverbank",
+   "pollution": {
+    "decay_bps_per_day": 300,
+    "diffusion_bps_per_day": 800,
+    "flow_bps_per_day": 5000,
+    "per_factory_per_day": 40,
+    "per_farmland_cell_per_day": 1
+   },
+   "species": [
+    {
+     "id": "water-vole",
+     "name": "water vole",
+     "density_per_ha": {
+      "riverbank": 8,
+      "wetland": 4
+     },
+     "home_range_ha": 0.15,
+     "growth_bps_per_year": 15000,
+     "mortality_bps_per_year": 7500,
+     "dispersal_bps_per_year": 1500,
+     "dispersal_m": 200,
+     "barriers": [
+      "built"
+     ],
+     "min_viable": 2,
+     "tolerance": {
+      "pollution": {
+       "above": 400,
+       "mortality_bps_per_day": 50
+      }
+     },
+     "detection_bps": 4000,
+     "listed": true
+    },
+    {
+     "id": "great-crested-newt",
+     "name": "great crested newt",
+     "density_per_ha": {
+      "wetland": 40,
+      "scrub": 4,
+      "woodland": 3,
+      "grassland": 2,
+      "riverbank": 1
+     },
+     "home_range_ha": 0.3,
+     "growth_bps_per_year": 8000,
+     "mortality_bps_per_year": 3500,
+     "dispersal_bps_per_year": 1000,
+     "dispersal_m": 250,
+     "barriers": [
+      "built"
+     ],
+     "min_viable": 4,
+     "tolerance": {
+      "pollution": {
+       "above": 400,
+       "mortality_bps_per_day": 50
+      }
+     },
+     "detection_bps": 5000,
+     "listed": true
+    },
+    {
+     "id": "common-blackbird",
+     "name": "common blackbird",
+     "density_per_ha": {
+      "woodland": 2.0,
+      "scrub": 1.6,
+      "riverbank": 1.0,
+      "farmland": 0.6,
+      "grassland": 0.2
+     },
+     "home_range_ha": 0.5,
+     "growth_bps_per_year": 5000,
+     "mortality_bps_per_year": 4000,
+     "dispersal_bps_per_year": 1000,
+     "dispersal_m": 500,
+     "min_viable": 1,
+     "detection_bps": 8000,
+     "conspicuous": true
+    }
+   ],
+   "survey_hours_per_ha": 1,
+   "survey_staff": 1,
+   "spin_up_years": 10
+  }
+ },
+ "sources": {
+  "currency": "Pounds sterling, in pence: written with a pound sign before the amount (\"£1,234.56\"), or in words as pounds (informally quid) and pence. ISO 4217: GBP, two decimal places.",
+  "health": "The clinic stands for the town's health system (general practice and the hospital it refers to; a liberty: a town of a few thousand has neither). doctors_per_1000: about 0.45 full-time-equivalent fully qualified GPs per 1,000 patients in England (NHS England/NHS Digital, General Practice Workforce statistics; remembered, not re-opened this session: PLACEHOLDER, to confirm; the GP definition matches the au-vic-2026 profile's, whose 1.2 per 1,000 counts more doctors). doctor_wage_per_fortnight: the midpoint of the BMA's recommended salaried GP range for 2026/27 in England, GBP 78,699 to 118,759 (BMA model contract, after the DDRB 54th report's 3.5% uplift, as reported by salarytax.uk; a secondary site: to confirm), GBP 98,729 a year over 26 fortnights. consult_minutes, seek_care_bps, treats and off_work_severities: PLACEHOLDERS carried over from au-vic-2026 (the conditions here are hospital-level, so nearly everyone with one is treated; fatal_kept_bps has no effect while conditions don't kill: docs/behaviour/life.md).",
+  "round": "Working hours 9 to 5, Monday to Friday, for everyone, shops included (a liberty: shops open Saturdays and Sundays, not modelled); school 9 to 3 on school days (English school days run about 8:45 to 3:15; PLACEHOLDER, to confirm). Travel: off the roads, a 25 m cell on foot in about 18 seconds (walking about 1.4 m/s: Bohannon 1997; to confirm); on a road, about 2 seconds (30 mph, 13.4 m/s, the national limit in built-up areas with street lighting: Road Traffic Regulation Act 1984 s 81, to confirm); slower across water, wetland and bush (PLACEHOLDERS carried over from au-vic-2026). Roads: the town builds toward buildings more than three cells (75 m) from one, within a roads budget of GBP 300 a resident a year (PLACEHOLDER carried over from au-vic-2026's figure of $300, not converted; English highway authorities' local road maintenance spending per head is to source).",
+  "ownership": "house_owner_bps: 69.4% of households in North Yorkshire own their home, outright or with a mortgage, or part-own it through shared ownership: (188,098 + 2,426) of 274,381 (ONS, Census 2021, TS054 Tenure, North Yorkshire local authority, via Nomis NM_2072_1). Flats here are all rented (a liberty). mortgage_bps_by_age: of owner-occupiers, the share repaying a mortgage by the household head's age: 39% overall in North Yorkshire (74,473 owning with a mortgage of 190,524 owners; Census 2021 TS054); the English Housing Survey 2024-25 finds 5% of households headed by someone 65 or over paying a mortgage (MHCLG, EHS 2024-25 headline report, chapter 1, as summarised in search; to confirm); the shape by age is a PLACEHOLDER. mortgage_payment_per_month: mean weekly mortgage payment GBP 220 in England outside London, 2024-25 (MHCLG, English Housing Survey 2024-25, household resilience chapter, as summarised in search; to confirm), x52/12 = GBP 953 a month (a mean, not a median). mortgage_rate_bps: the effective rate on the outstanding stock of mortgages, 4.00% in August 2026 (Bank of England, Effective interest rates, August 2026, published 29 September 2026; as summarised in search; to confirm). mortgage_years_left: PLACEHOLDER carried over. market: buy_bps_per_month, relist_days, cut_bps and floor_bps PLACEHOLDERS carried over from au-vic-2026; deposit_bps PLACEHOLDER carried over (a typical first-time buyer's loan-to-value in England is to source); costs_bps 3.4% is an ESTIMATE: Stamp Duty Land Tax on a GBP 271,000 purchase under the 2025 thresholds (0% to 125,000, 2% to 250,000, 5% above: about GBP 3,550, 1.3%, to confirm against HMRC), plus about 2% for conveyancing, survey and agents' fees. mortgage_months 300: a typical 25-year term (PLACEHOLDER).",
+  "utilities": "Water: about 140 litres a person a day (Water UK / Ofwat per-capita consumption, roughly 140-145 in England; remembered, to confirm: PLACEHOLDER); Yorkshire Water's metered tariff from 1 April 2026: water 218.38p a cubic metre, sewerage 297.61p (foul 270.53p + highway drainage 27.08p), total 515.99p a cubic metre; fixed charges GBP 54.10 water + GBP 33.85 sewerage a year = GBP 21.99 a quarter (Yorkshire Water, 'What do I pay for?' charges 2026-27, as shown in search results; to confirm). A household pays both, and bills go to owners (a liberty: tenants usually pay water in England). The river's inflow, flow and losses are PLACEHOLDERS carried over from au-vic-2026, sized so a small town's draw is a small share of a modest river's water. Energy (electricity): Ofgem price cap, 1 October to 31 December 2026, standard variable tariff paying by direct debit, Great Britain average: 26.32p a kWh and 54.83p a day standing charge (Ofgem, 'Changes to energy price cap between 1 October and 31 December 2026', as summarised in search; to confirm), rounded to whole pence because the profile's prices are integers (a structural gap: 26.32p becomes 26p), VAT on electricity removed from 1 October 2026 to 31 March 2027 per the same summary. kwh_per_household_per_day: 7, from a typical domestic consumption value of about 2,700 kWh a year (Ofgem TDCV; remembered, to confirm: PLACEHOLDER). grid_price_per_kwh: PLACEHOLDER, 16p, the au-vic-2026 profile's ratio of the grid price to the retail price (60%) applied to 26p. grid_emissions_g_per_kwh: 128 g CO2e/kWh, the DESNZ/Defra 2025 UK electricity conversion factor of 0.128 kg per kWh (as reported by Circular Ecology; the 2026 edition is reported to be about 26% lower; to confirm against the DESNZ tables).",
+  "climate": "Weather drawn for each run (docs/behaviour/weather.md). rain_by_month_bps: the River Swale at Crakehill's mean monthly flow, 1991-2020 (UKCEH, National River Flow Archive, station 27071, gauged daily flow, calculated by this profile's author from the daily series): 37.9, 33.2, 24.7, 18.0, 11.6, 11.3, 8.9, 10.9, 12.5, 19.7, 29.1, 36.8 m3/s from January, as a share of the year's monthly mean (21.2 m3/s) in basis points. The swing is much stronger than the Victorian profile's (summer flow is 42% of the year's mean, winter 178%), and the river here is a real lowland river of northern England near the town's county. Storms: a heavy-rain spell in about one month in twelve, two to four days at two and a half times the usual inflow (PLACEHOLDER carried over from au-vic-2026; Met Office names about 10 or 11 storms in a typical UK year, but few bring flooding to one place: to calibrate against Environment Agency flood history, e.g. the December 2015 flooding at Thirsk). Drought: about 15% of years begin a drought of 3 to 12 months at 40% of usual inflow (PLACEHOLDER: shaped by the dozen or so droughts declared in England since 1976 (1976, 1989-92, 1995, 2003, 2005-06, 2010-12, 2018, 2022, 2025), from memory; the Environment Agency's drought record is to source). Heatwaves in the northern summer, June to August: 3 to 5 days, about 12 summer weeks in 100 (PLACEHOLDER carried over; the Met Office defines a heatwave as at least three consecutive days at or above a county threshold of 25 to 28 degrees C, 1991-2020 climatology). heat_units, built_heat_units, heat_illness_bps_per_unit and warning_lead_days: PLACEHOLDERS carried over from au-vic-2026.",
+  "hazards": "Floods, PLACEHOLDERS carried over from au-vic-2026 and sized against the river as modelled (about 9,000 kL a 25 m cell in the usual flow): it spills over its banks past 16,500 (raised from au-vic-2026's 12,000 in proportion to this river's wetter seasonal peak: au-vic-2026's bank sits just above its wettest month, 1.30 times the usual flow; here the wettest month is 1.79 times, so the same relation gives about 16,500; a first 60-day run with 12,000 had the river over its banks all winter and refused 1,382 acts as 'flooded'), 30% of the excess a day; a building floods with water above 300 kL on its cell; wetland soaks up 500 kL a cell a day (the floodplain function of wetlands). The market towns of the Vale of York have a real flood history (Environment Agency recorded flood event at Thirsk, 25-29 December 2015, Cod Beck); the figures here are not fitted to it. Local authorities are category 1 responders under the Civil Contingencies Act 2004 and run rest centres (to confirm): here the town hall.",
+  "crime": "Crime, deliberately rare and driven by circumstance only (need and opportunity, and the chance of being caught: Becker 1968; Cohen and Felson 1979), never by any group. take_bps_per_month_in_need, caught_bps_reckoned, take_quantity and investigation_hours: PLACEHOLDERS carried over. detection_bps: 9.1% of theft offences recorded in England and Wales in the year ending March 2026 ended in a charge or summons (Home Office, Crime outcomes in England and Wales 2025 to 2026, published 23 July 2026; as summarised in search; to confirm); another 74.4% of theft investigations identified no suspect. The au-vic-2026 profile used offences 'solved' (20%); this is the stricter measure. police_per_1000: 145,886 FTE police officers in post in England and Wales at 31 March 2026 (Home Office, Police workforce, England and Wales: 31 March 2026) over a population of about 61 to 62 million (ONS mid-year estimates; population figure to confirm) = about 2.4 per 1,000. officer_wage_per_fortnight: about GBP 42,000 a year for a constable part-way up the scale (PLACEHOLDER: the Police Remuneration Review Body's constable scale for 2025/26 and 2026/27 is to source).",
+  "justice": "The tribunals: the First-tier Tribunal (Property Chamber) hears rent disputes and the Employment Tribunal unpaid wages, after ACAS early conciliation (HMCTS tribunal statistics, to source). hearing_after_days: PLACEHOLDER carried over from au-vic-2026; real waits for an Employment Tribunal hearing are known to be many months, so this is probably far too short (to source from HMCTS, Tribunals and gender recognition certificate statistics quarterly). pay_within_days, challenge_bps, apply_bps and apply_after_days: PLACEHOLDERS carried over: few tenants or workers pursue a claim. Under the Renters' Rights Act 2025 a tenant may challenge a landlord's proposed rent increase at the First-tier Tribunal (to confirm in force).",
+  "education": "school_ages: children start school in the September after turning 4 (Reception) and must stay in education or training until 18; compulsory schooling is 5 to 16; here 5 to 17 as the nearest (Education Act 1996 s 8; Education and Skills Act 2008, to confirm). students_per_teacher: 17.9 pupils per teacher in all state-funded schools in England (DfE, School workforce in England, reporting year 2025: 20.7 primary, 16.7 secondary), as summarised in search; to confirm. school_days_per_year: 190 days (Education (School Day and School Year) (England) Regulations 1999, to confirm). hours_per_day: PLACEHOLDER 6. teacher_wage_per_fortnight: GBP 45,214 a year, point M6, the top of the main pay range outside London from September 2026 after a 3.5% rise (DfE / STRB 2026 award, as summarised by uknetpay.co.uk and local.gov.uk; to confirm), over 26 fortnights. attainment: highest level of qualification of usual residents aged 16 and over in North Yorkshire (ONS, Census 2021, TS067 Highest level of qualification, via Nomis NM_2084_1: no qualifications 82,990; level 1 and entry 47,623; level 2 72,377; apprenticeship 33,901; level 3 87,830; level 4 or above 178,949; other 12,510; total 516,180); all ages 16+, not 25-64 as the au-vic-2026 profile used. The years of schooling are a PLACEHOLDER mapping (England: 11 compulsory years after Reception, GCSEs at 16; A levels at 18; degree at 21): no qualifications 10, level 1 10, level 2 11, other 11, apprenticeship 12, level 3 13, level 4+ 16. return_per_year_bps and max_years: PLACEHOLDERS carried over.",
+  "elections": "Local councils in England are elected every four years by first past the post in single- or multi-member divisions (Local Government Act 1972 and Representation of the People Act 1983, to confirm); a general election is at most five years apart (Dissolution and Calling of Parliament Act 2022). This town elects its mayor directly (a liberty). turnout_bps: 63.5% at the 4 July 2024 general election in the Thirsk and Malton constituency (UK Parliament Election results, election 3831; as summarised in search, to confirm); English local election turnout is typically lower (about 30 to 40%: not sourced), so this overstates. stand_bps and news_readers_bps: PLACEHOLDERS carried over from au-vic-2026.",
+  "nature": "Nature (docs/design/world-expansion.md 2). cell_m: a cell is a 25 m lot. The landscape around the town: woodland about 10% of England's land (Forest Research, Forestry Statistics 2024: England about 10%; remembered, to confirm), the rest of the shares a PLACEHOLDER shaped by lowland North Yorkshire's mix of improved grass, arable and hedgerow (UKCEH Land Cover Map not opened): woodland 10%, scrub 5%, grassland 30%, farmland 52%, wetland 3%. margin_cells, block_cells, woodland_patches, the covers' succession, pollution figures, survey_hours_per_ha and survey_staff: PLACEHOLDERS carried over from au-vic-2026. spin_up_years: nature is run alone this long before the start so it begins in its own balance.",
+  "nature.species": "Species of the lowland rivers, ponds and hedgerows of northern England; every figure here is a PLACEHOLDER (best estimates from the literature surfaced in search, to confirm against each source before use). Water vole Arvicola amphibius (fully protected, Wildlife and Countryside Act 1981 Schedule 5, listed): a bank territory of 30-150 m for females, 60-300 m for males, up to about 100 voles per km of bank at best (Glasgow Natural History Society, Stewart; Swansea Univ. cronfa record 42744; as surfaced in search); at an assumed 20 a km of bank, a 25 m wide bank strip carries 8 a hectare; female range about 850 m2, male about 2,770 m2 (same sources), so a home range of 0.15 ha. Growth, mortality, dispersal, min_viable and detection are guesses. Great crested newt Triturus cristatus (European protected species, listed): adult survival 0.65 to 0.69 (British Herpetological Society, Herpetological Journal 9(1) 1999 and 10(4) 2000); 95% of summer refuges within 63 m of the pond (Copernicus Web Ecology 7:63, 2007); pond populations 0 to 620 adults, mean about 300 in one study, 1 to 11 in another (surfaced in search); 250 m taken as a dispersal distance from common survey practice (to confirm); densities per hectare are guesses. Common blackbird Turdus merula: higher densities in woodland than farmland (Hatchwell et al. 1996, 'The demography of blackbirds Turdus merula in rural habitats', J. Applied Ecology 33); adult survival about 0.6 (to confirm); densities per hectare are guesses to check against the BTO Common Birds Census / Breeding Bird Survey. Densities for the three are in individuals per hectare of each cover; the animals live in pairs and groups, not modelled.",
+  "households": "ONS, Census 2021, TS003 Household composition, North Yorkshire (via Nomis NM_2023_1; 274,381 households): one-person 84,891 (30.9%); couples without children 38,706 married + 17,041 cohabiting + 35,971 single-family households all aged 66 and over (taken as couples) = 91,718 (33.4%); couples with children (dependent 36,409 + 11,170, and all-non-dependent 15,086 + 1,648; children to age 24 are drawn at home) = 64,313 (23.4%); lone parents 22,561 (8.2%); 'other single family' 1,084 and 'other household types' 9,814 counted with groups = 10,898 (4.0%). Children per family: PLACEHOLDER [one 47%, two 39%, three or more 14% for couples; 55%/30%/15% for lone parents], shaped by ONS Families and households in the UK, from memory, to source. Same-sex couples 1.0% (PLACEHOLDER; ONS Census 2021 England and Wales reports about 1% of couples, to confirm); 80% of lone parents women (PLACEHOLDER carried over from au-vic-2026; ONS Families and households reports about 8 in 10, to confirm); boys 51.2% of live births (about 105 per 100 girls: biology, with ONS Births in England and Wales 2024 not opened for the figure). Placeholders as in au-vic-2026: adult_female_bps, group_size, mother_age_at_first_birth (ONS Births in England and Wales 2024: standardised mean age of mothers 31.0, mean age at first birth is lower than the age at birth, to source), adult_ages.",
+  "life.qx_per_100000": "ONS, National Life Tables, England, 2022-2024 (published 10 December 2025), sheet '2022-2024', qx (the probability of dying between exact age x and x+1) for males and females, ages 0 to 100, times 100,000, rounded. https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/nationallifetablesenglandreferencetables (file nlte198020223.xlsx).",
+  "life.illness": "PLACEHOLDER carried over from au-vic-2026 (shaped by an age gradient of hospitalisations: 6% for under 5 up to 45% for 85 and over); to replace with age-specific overnight admission rates from NHS England's Hospital Episode Statistics, Admitted Patient Care.",
+  "life.injury": "PLACEHOLDER carried over from au-vic-2026 (210 injury hospitalisations per 10,000 people a year, AIHW 2022-23); the England equivalent (NHS England HES: admissions for injury and poisoning) is to source. Severity split: placeholder.",
+  "life.birth": "Bearing a child from 15 to 49 (ONS fertility rates cover under-20 to 45 and over); 38 weeks from conception (266 days: biology); female_bps 4,880: a PLACEHOLDER at 105 boys per 100 girls, the usual sex ratio at birth (ONS Births in England and Wales 2024 not opened for it).",
+  "life.treatable": "PLACEHOLDER carried over from au-vic-2026 (about 15% of deaths under 75 are treatable by timely, effective health care): ONS, Avoidable mortality in Great Britain gives the England and Wales share, to source. Carried by the severe illness band, whose fatality by age the generator sets so that each age dies at the life table's rate.",
+  "life.found_alone_after": "Unchanged from au-vic-2026 and not this place's: no figure for England or the UK was found for how long after dying at home alone a person is found. Japan's is used, the one country found to count it: National Police Agency of Japan, people who died alone at home in 2025 (76,941): found the same or the next day 28,398; in 2 to 3 days 15,865; in 4 to 7 days 10,456; in 8 days or more 22,222, 7,148 after a month or more and 208 after a year or more (read 2026-10-08 as reported in the press; to confirm). PLACEHOLDER for a local figure.",
+  "life.work_injury_bps": "PLACEHOLDERS carried over from au-vic-2026 (Safe Work Australia, serious claims per million hours). The England equivalents are to source: HSE, Health and safety at work: summary statistics for Great Britain 2025 (non-fatal injury rates by industry from the Labour Force Survey and RIDDOR).",
+  "wages_per_fortnight": "Median gross annual pay of full-time employees, April 2025 (ONS, Annual Survey of Hours and Earnings 2025, published 23 October 2025; industry figures as given by a secondary summary found in search, to confirm against ASHE Table 5): wholesale and retail trade GBP 33,158 (shop), manufacturing GBP 38,956 (factory), construction GBP 43,100 (construction), each over 26 fortnights. These are UK-wide; Yorkshire and the Humber's all-industry full-time median is GBP 35,682, below the UK's, so these are probably a little high for a northern market town. Retail covers wholesale and motor trades too. The National Living Wage for 21 and over is GBP 12.71 an hour from April 2026 (GOV.UK; Low Pay Commission), about GBP 953 a fortnight at 75 hours, the floor for the shop wage. England has no fortnightly pay period; a fortnight is two weeks.",
+  "rents_per_month": "ONS, Price Index of Private Rents: average weekly market private rents in Yorkshire and The Humber, June 2025: 1 bedroom GBP 135, 2 bedrooms GBP 168, 3 bedrooms GBP 199, 4 or more GBP 292 (as quoted by a search summary of ONS data; to confirm against the ONS dataset), x52/12 a month. For North Yorkshire the average private rent was GBP 833 a month in May 2026 (ONS, Price Index of Private Rents; search summary), above the Yorkshire and the Humber figures here. A 3-bedroom flat is given the 3-bedroom rent (PLACEHOLDER); a 'large house' takes the 4-or-more figure. The apartment mix and house shares are PLACEHOLDERS.",
+  "spending.saving_bps": "The household saving ratio, 8.8% in the second quarter of 2026 (ONS, Quarterly sector accounts, UK: April to June 2026, published 30 September 2026; search summary, to confirm).",
+  "spending.wealth_effect_bps_per_year": "PLACEHOLDER carried over from au-vic-2026: about 3 pence of consumption a year per pound of wealth (Dvornak & Kohler 2003, an Australian study; RBA RDP 2003-07). A UK estimate (e.g. Bank of England work on housing wealth and consumption) is to source.",
+  "spending.shops_known": "How many sellers a household deals with and knows the prices of: 7 (Lengnick, M. (2013), 'Agent-based macroeconomics: A baseline model', Journal of Economic Behavior & Organization 86, Table 1: n = 7 type A connections). A model's figure, not this place's.",
+  "spending.shop_search_bps_per_month": "The monthly chance that a household looks at the price of a seller it does not deal with: 25% (Lengnick 2013, Table 1: 0.25 a month). A model's figure, not this place's.",
+  "spending.essentials_per_month": "ESTIMATE: what a person spends however little comes in, about GBP 300 a month: food and non-alcoholic drinks GBP 73.70 a week per household (ONS, Family spending in the UK: April 2024 to March 2025), about GBP 31 a week a person at about 2.4 people a household (household size to confirm), so about GBP 135 a month; with fuel and power, transport and the like to round it. PLACEHOLDER.",
+  "retirement_age": "The State Pension age: 66 today, rising to 67 for people born after 6 April 1960, between May 2026 and March 2028 (Pensions Act 2014; Pensions Act 2007 as amended; GOV.UK 'State Pension age', to confirm). The profile takes one integer: 66. A structural gap (the age is still rising by month of birth).",
+  "savings_by_age": "An adult's cash and deposits (not pensions, not property), by age: the 10th, 25th, 50th, 75th and 90th percentiles. PLACEHOLDER: the au-vic-2026 table converted at an assumed 0.5 pounds to the Australian dollar and rounded. It should come from the ONS Wealth and Assets Survey (household financial wealth by age of reference person, Great Britain, April 2020 to March 2022), not opened.",
+  "retiree_savings": "PLACEHOLDER: the au-vic-2026 range ($150,000-350,000) at an assumed 0.5 pounds to the Australian dollar: GBP 75,000-175,000. To confirm against the ONS Wealth and Assets Survey (private pension wealth and savings at 65 to 69) and the Pensions Policy Institute.",
+  "support.pension": "New State Pension, full rate, GBP 241.30 a week from April 2026 (4.8% rise under the triple lock; GOV.UK / DWP benefit and pension rates 2026-27; search summaries, to confirm) = GBP 482.60 a fortnight. Pension Credit, the Winter Fuel Payment and the old basic State Pension are left out; the payment is flat and not means-tested.",
+  "support.unemployment": "Universal Credit standard allowance, single claimant aged 25 or over, GBP 424.90 a month from 7 April 2026 (DWP, benefit and pension rates 2026-27; search summary, to confirm) = GBP 196.11 a fortnight (x12/26). Universal Credit is paid monthly, is means-tested and tapered at 55% (to confirm), and adds housing, child and disability elements, all left out: a claimant who rents gets no rent support here, which is the largest gap between this payment and the real one. Under 25s get a lower standard allowance (GBP 338.58 in 2025-26): here the payment starts at 25.",
+  "firm_ownership.forms_bps": "PLACEHOLDERS carried over from au-vic-2026: shops and landlords are small businesses held closely; most UK businesses are micro (DBT, Business population estimates for the UK and regions 2025: nearly all of the 5.6 million or so private-sector businesses are small, to confirm); rented homes are owned by individual landlords (MHCLG, English Private Landlord Survey 2021: most have one or two properties, to confirm). The shares owned from outside the town are placeholders.",
+  "firm_ownership.closely_held": "PLACEHOLDERS carried over from au-vic-2026 (households behind a company: 85% one, 12% two, 3% three; the top wealth fifth holds 85% of business assets, from an Australian study of household wealth). To source for Great Britain: ONS Wealth and Assets Survey, business wealth by wealth decile.",
+  "firm_ownership.widely_held": "PLACEHOLDER carried over from au-vic-2026: a factory is mostly owned by companies and investors elsewhere. The town's part is held by the households that hold shares directly.",
+  "firm_ownership.direct_holders": "PLACEHOLDERS carried over from au-vic-2026 (the shares of households holding shares directly by wealth fifth are Australian: RBA Bulletin 2009 from HILDA 2006; ASX Investor Study 2023). To source for Great Britain: ONS Wealth and Assets Survey, share and ISA holdings by wealth; the FCA Financial Lives survey. firms_held: a placeholder.",
+  "retirement_fund": "PLACEHOLDERS carried over from au-vic-2026 and modelled on Australian superannuation (a world turns it on with retirement_fund: true; off unless asked for). Great Britain's workplace pensions work differently (auto-enrolment since 2012, minimum 8% contribution on qualifying earnings; pension freedoms allow drawing any amount from 55, rising to 57 in 2028); the rule is general in form but would need re-fitting for this place.",
+  "industry": "PLACEHOLDERS carried over from au-vic-2026: manufacturing's compensation of employees and intermediate inputs as shares of output (about 20% and 67%); retail trade's purchases of goods and wages as shares of sales (about 70% and 14%). To source for the UK: ONS, UK Input-Output Analytical Tables (supply and use), and the Annual Business Survey, not opened.",
+  "prices": "PLACEHOLDERS carried over from au-vic-2026: an item of goods worth 100 pounds at world prices (the unit the town counts in); imports 10% dearer (freight and margins); inputs 2.50 pounds a kg; building materials 1.25 pounds a kg (docs/behaviour/building.md). Not a place's figures: units of the model.",
+  "ordinary_hours_per_week": "Maximum average working week, 48 hours, unless a worker opts out (Working Time Regulations 1998 reg 4, averaged over 17 weeks; to confirm). England has no 'ordinary hours' maximum like Australia's 38; the full-time norm is 37 to 40. A structural gap: the 48 is a cap averaged over a period, with opt-outs.",
+  "fertility_per_10000": "PLACEHOLDER estimate, constrained to the total fertility rate for England and Wales in 2024, 1.41 (ONS, Births in England and Wales: 2024 (refreshed populations), published 1 July 2025): births per 10,000 women a year by age: 15-19 90; 20-24 320; 25-29 620; 30-34 930; 35-39 670; 40-44 150; 45-49 15 (sum x5 = 1.40). The ONS bulletin text says rates fell at 25-29 and under (by 1.2 per 1,000 at 25-29), rose at 30-39 (30-34 by 0.5), and mothers' standardised mean age was 31.0; the age-by-age table was not opened. ONS's 40-and-over group is split here as a guess.",
+  "labour_force_participation_bps": "The economic activity rate for people aged 16 to 64, 79.1% (100% less the economic inactivity rate of 20.9%) for April to June 2026 (ONS, Labour market overview, UK: August 2026; search summary, to confirm).",
+  "tenancy": "Renters' Rights Act 2025, in force from 1 May 2026 (to confirm): assured tenancies are periodic, with fixed terms abolished; a landlord may raise the rent once a year by a section 13 notice giving at least two months' notice (taken as 61 days), which the tenant may challenge at the First-tier Tribunal. rent_review_months 12. after_fixed_term 'periodic' fits: every tenancy is periodic.",
+  "values": "PLACEHOLDER carried over from au-vic-2026: Schwartz's ten basic values, in the pan-cultural order of importance Schwartz and Bardi found across 56 nations ('Value hierarchies across cultures', Journal of Cross-Cultural Psychology 32(3), 2001; to confirm), as importance from 7,000 down to 3,400 basis points, each with a spread of 1,500. To source for this place: the European Social Survey's Schwartz items for the UK, rescaled.",
+  "industrial_action": "Trade Union Act 2016 ballot rules as amended by the Employment Rights Act 2025: a ballot needs at least 50% of those entitled to vote to vote and more than 50% of votes in favour (and, for important public services, at least 40% of all entitled in favour). The Act repeals the 50% turnout threshold once e-balloting is in place and cuts the notice of industrial action from 14 to 10 days (search summaries of the Act, to confirm what was in force at October 2026; the turnout repeal was expected April to August 2026): the profile keeps 50% turnout and 10 days. paid_during_action false: employers need not pay workers on strike. Structural gaps: the 40% test, the separate need for a ballot per bargaining unit, and the statutory ballot mandate lapsing.",
+  "world_price_process": "PLACEHOLDER carried over from au-vic-2026: world prices move each month by a mean-reverting random process (sd of the monthly move in basis points of the base price; the share of a gap kept each month). To estimate from ONS, Import and export price indices (UK trade).",
+  "credit.cash_rate_bps": "Bank Rate, 3.75%, held at the MPC's 17 September 2026 meeting (Bank of England, Monetary Policy Summary, September 2026; vote 6-3 with three members for a rise; search summary, to confirm).",
+  "credit.funding_spread_bps": "PLACEHOLDER carried over: what a small bank pays over the policy rate for its funding.",
+  "credit.lending_rate_bps": "People: 9.03%, the effective rate on the outstanding stock of 'other' lending to individuals, June 2026 (Bank of England, Effective interest rates, June 2026; search summary, to confirm). Organisations: 7.0%, a PLACEHOLDER (Bank Rate plus about 3.25 points); the Bank of England's SME lending rate series is to source.",
+  "credit.serviceability_buffer_bps": "PLACEHOLDER 1 point: the Financial Policy Committee withdrew its recommended 3-point mortgage affordability test in August 2022 (Bank of England, FPC Record, to confirm); the FCA's rules (MCOB 11.6) ask lenders to allow for rate rises but set no number; lenders use their own stress rates.",
+  "credit.max_repayment_share_bps": "PLACEHOLDERS carried over: the most of a borrower's monthly income a lender lets repayments take (people 30%, organisations 20% of what comes in). The Bank of England's FPC limits the share of new mortgages at loan-to-income 4.5 or more to 15% (to confirm); not used.",
+  "credit.arrears_days": "PLACEHOLDER carried over: a month behind is arrears (a lender's first notice).",
+  "credit.default_days": "Non-performing at 90 days past due (Prudential Regulation Authority rules following Capital Requirements Regulation Article 178; to confirm the current rule reference).",
+  "credit.max_months": "PLACEHOLDER carried over: the longest term for these loans (five years).",
+  "credit.reserve": "PLACEHOLDER carried over from au-vic-2026: the cash the bank's lending office keeps back and doesn't lend, 100,000 (a model sizing figure, not converted).",
+  "opening": "PLACEHOLDERS carried over from au-vic-2026, in pounds not converted: what each organisation holds on the first day (bank 500,000; town 2,000,000; builder 300,000; each landlord 600,000; a shop 30,000; a factory 400,000) and the least an adult in the labour force has saved (1,000). Model sizing figures, to source.",
+  "town_finance.parks_per_year": "PLACEHOLDER carried over: the town's yearly parks line, 150,000 pounds.",
+  "town_finance.payment_approval_over": "PLACEHOLDER carried over: the town's payments procedure needs the mayor's written approval for any payment over 50,000 pounds.",
+  "public_finance.income_tax": "Income tax 2026-27, England: personal allowance GBP 12,570 (frozen until 2031), basic rate 20% to GBP 50,270, higher rate 40% to GBP 125,140, additional rate 45% above (GOV.UK, Income Tax rates and Personal Allowances; to confirm for 2026-27). The levy is National Insurance (employee Class 1 main rate 8% from the primary threshold of GBP 12,570, which is 2% above GBP 50,270; thresholds frozen; GOV.UK 'National Insurance rates and categories', to confirm). The personal allowance taper (lost at GBP 1 per GBP 2 above GBP 100,000), the 2% rate on high earnings and employers' National Insurance (15% above GBP 5,000) cannot be expressed. Employers deduct tax through PAYE on cumulative pay; the profile reckons each pay as a year's income.",
+  "public_finance.grants_per_resident_per_year": "PLACEHOLDER: GBP 100 a resident. English councils get a mix of Revenue Support Grant, retained business rates and specific grants; general-purpose funding per head is to source from DLUHC/MHCLG, Local Authority Revenue Expenditure and Financing, and the local government finance settlement. For scale only: North Yorkshire Council's gross spending requirement for 2026-27 (GBP 1,323M) less its council tax requirement (GBP 524M) is about GBP 1,300 a resident, but that includes ring-fenced grants, fees and retained business rates, so it is not used.",
+  "public_finance.rates_per_resident_per_year": "Derived: North Yorkshire Council's council tax requirement for its own purposes in 2026-27, GBP 524,458,818 (North Yorkshire Council, Council Tax Resolution Report, February 2026; Band D GBP 2,036.32; tax base 257,552 Band D equivalents), over 615,492 residents (ONS Census 2021, TS007A via Nomis) = GBP 852 a resident a year. Excludes the police (GBP 335.86 Band D) and fire (GBP 116.62) precepts and parish precepts; total Band D GBP 2,544.34. Council tax in England is a charge on each dwelling by valuation band, not a rate on land value.",
+  "public_finance.rates_instalments": "Council Tax (Administration and Enforcement) Regulations 1992: council tax is payable in ten monthly instalments by default (April to January), or twelve on request (to confirm).",
+  "public_finance.rates_due_days": "PLACEHOLDER carried over: an instalment falls due 30 days after its notice.",
+  "public_finance.rates_penalty_interest_bps": "0: council tax carries no statutory penalty interest in England; unpaid instalments lead to a reminder, a final notice, a summons and a liability order, with costs (Council Tax Regulations 1992, to confirm). The profile's interest on arrears is set to zero, a structural gap: the enforcement path (liability order, then attachment of earnings or bailiffs) is not represented.",
+  "public_finance.rates_exempt_kinds": "PLACEHOLDER carried over from au-vic-2026: land used for public purposes is not rateable. In England council tax is only on dwellings; non-domestic (business) rates cover shops, offices, factories and also schools and hospitals, which are rated but funded centrally, so this list is the nearest the structure allows: the clinic's, the school's, the police station's and the utilities'. A structural gap.",
+  "public_finance.median_house_price": "ONS, UK House Price Index: average price GBP 271,000 in North Yorkshire in April 2026 (provisional; search summary of ONS 'Housing prices in North Yorkshire', to confirm). An average, not a median (the ONS House Price Statistics for Small Areas median is to source). The land value of a lot is derived from it: this less what the builder charges to build a house.",
+  "services.waste_per_person_per_day_g": "ESTIMATE: about 390 kg of household waste per person a year in England (DEFRA, Local authority collected waste management statistics, 2023/24; remembered, not opened: PLACEHOLDER, to confirm), a day's worth in grams (1,068).",
+  "services.landfill_levy_per_tonne": "Landfill Tax standard rate from 1 April 2026: GBP 130.75 a tonne (HMRC, Landfill Tax rates; remembered from the Autumn Budget 2025 announcement, the page was not opened: to confirm). The lower rate (for inert waste) is not used.",
+  "services.council_staff_per_1000": "PLACEHOLDER carried over from au-vic-2026 (about 6 per 1,000 residents, as the works crew). English councils employ many more per head once social care, planning and housing are counted (ONS, Public sector employment: local government); the town's works crew is the part modelled. To source: LGA workforce survey.",
+  "services.collect_seconds_per_10kg": "PLACEHOLDER carried over: about 12 seconds of work per 10 kg collected (side-loader lifting rates and a round of about 1,000 bins a day). English weekly or fortnightly wheeled-bin rounds are similar.",
+  "services.asset_life_years": "PLACEHOLDER carried over: a park or civic building wears out in 15 years without upkeep.",
+  "services.upkeep_hours_per_week_per_asset": "PLACEHOLDER carried over: a crew member's half a day a week keeps a park or the hall up.",
+  "services.complain_bps": "PLACEHOLDER carried over: the chance a week that a household whose waste has gone two weeks uncollected writes to the town.",
+  "unions.membership_bps": "DBT, Trade union statistics 2025, table 1.8, trade union membership as a proportion of employees by industry, UK, 2025: manufacturing 13.1%, wholesale and retail trade 12.2% (retail), construction 9.4%, public administration and defence 38.9%; `other`, the overall rate 22.4% (https://www.gov.uk/government/statistics/trade-union-statistics-2025, tables ODS read directly). Keyed by the industries employers' postings name.",
+  "unions.resignation_notice_days": "PLACEHOLDER 30 days: a member's notice is set by the union's own rules (Trade Union and Labour Relations (Consolidation) Act 1992 s 69 gives a right to resign on reasonable notice or none; to confirm). Written into each membership as the member's notice.",
+  "groups.leave_notice_days": "PLACEHOLDER carried over: a member may leave a club or congregation at once. Written into each membership as the member's notice.",
+  "unions.dues_per_month": "PLACEHOLDER: about GBP 16 a month, around what large UK unions charge full-time members (to source from union rate cards).",
+  "unions.claim_margin_bps": "PLACEHOLDER carried over: a union claims the year's rise in prices and 2% more. Settlements are measured against pay settlement data (Brightmine / IDR median pay award), a calibration target.",
+  "households.age_bands_bps": "ONS, Census 2021, TS007A Age by five-year age bands, North Yorkshire (via Nomis NM_2020_1; 615,492 people); 85 and over taken to 99. North Yorkshire is older than Victoria's regions (median age about 46, to confirm). The ages of adults living alone, as couples without children at home, or in groups are drawn from this, less the parents the family shares imply (the generator derives it).",
+  "unions.meeting_every_days": "PLACEHOLDER carried over: a members' meeting a month.",
+  "groups.kinds": "PLACEHOLDER carried over from au-vic-2026: sport or physical recreation; religious or spiritual; arts or heritage; craft or practical hobby; other recreational or special interest. For England the DCMS Community Life Survey asks about volunteering and groups with a different category list (to source). How often each meets, and for how long, are placeholders.",
+  "groups.taking_part_bps": "Carried over from au-vic-2026's calibration (2026-09-30, 40%): the share of adults who belong to a group at the start and go to its gatherings. Not re-calibrated for this place.",
+  "groups.kinds.teaching": "What a group asks people to hold, in its words (content for belief to attach to: docs/design/ai-citizens.md 5). The congregation's stands for the Christian denominations together (one congregation per town is a simplification).",
+  "groups.kinds.held_at_start_bps": "ONS, Census 2021, TS030 Religion, North Yorkshire (via Nomis NM_2049_1): 342,441 of 615,493 usual residents, 55.6%, Christian (35,758 did not answer, 5.8%; no religion 36.9%; other religions 1.6%). At the start the congregation's members hold its teaching strongly, and others up to this share hold it less; after that it strengthens, spreads and fades.",
+  "unions.teaching": "The union movement's claim, in words (content for belief). Its members hold it at the start.",
+  "groups.per_kind_per_1000_people": "PLACEHOLDER carried over: one group of each kind for every 1,000 people.",
+  "households.child_max_age": "Children at home are drawn up to 24 (a simplification), as in au-vic-2026: the census here counts 'all children non-dependent' families with the couple and lone-parent families with children."
+ },
+ "targets": [
+  {
+   "what": "employment_to_population_pct",
+   "value": 75.1,
+   "source": "ONS, Labour market overview, UK: August 2026 (April to June 2026): employment rate for people aged 16 to 64, seasonally adjusted. Definition differs from au-vic-2026's (15 and over); the 16+ rate was not retrieved."
+  },
+  {
+   "what": "unemployment_rate_pct",
+   "value": 4.9,
+   "source": "ONS, Labour market overview, UK: August 2026 (April to June 2026): 1.77 million unemployed aged 16 and over, 4.9%"
+  },
+  {
+   "what": "participation_rate_pct",
+   "value": 79.1,
+   "source": "Derived: 100% less the economic inactivity rate of 20.9% for people aged 16 to 64 (ONS, Labour market overview, UK: August 2026, April to June 2026); 16 to 64 rather than 15 and over"
+  },
+  {
+   "what": "household_saving_ratio_pct",
+   "value": 8.8,
+   "source": "ONS, Quarterly sector accounts, UK: April to June 2026, published 30 September 2026 (search summary; to confirm)"
+  },
+  {
+   "what": "union_membership_pct",
+   "value": 22.4,
+   "source": "DBT, Trade union statistics 2025, trade union membership, UK 1995 to 2025: statistical bulletin (May 2026): 22.4% of UK employees in 2025 (22.0% in 2024)"
+  },
+  {
+   "what": "union_membership_pct_of_employees",
+   "value": 22.4,
+   "source": "DBT, Trade union statistics 2025, table 1.8: all employees, 2025"
+  },
+  {
+   "what": "christian_affiliation_change_pts_per_year",
+   "value": -1.31,
+   "source": "Derived: ONS, Census 2011 (KS209EW) and 2021 (TS030), England via Nomis NM_616_1 and NM_2049_1: Christian 31,479,876 of 53,012,456 usual residents (59.4%) to 26,167,899 of 56,490,048 (46.3%): -13.1 points over ten years. Replaces au-vic-2026's religious_affiliation_change_pts_per_year (-1.64, a five-year change)."
+  },
+  {
+   "what": "christian_share_pct_north_yorkshire_2021",
+   "value": 55.6,
+   "source": "ONS, Census 2021, TS030 Religion, North Yorkshire, via Nomis NM_2049_1: 342,441 of 615,493"
+  },
+  {
+   "what": "home_ownership_pct",
+   "value": 69.4,
+   "source": "ONS, Census 2021, TS054 Tenure, North Yorkshire: (188,098 owned + 2,426 shared ownership) of 274,381 households"
+  },
+  {
+   "what": "private_rent_share_pct",
+   "value": 18.6,
+   "source": "ONS, Census 2021, TS054 Tenure, North Yorkshire: 51,164 private rented of 274,381 households"
+  },
+  {
+   "what": "average_private_rent_per_month_gbp",
+   "value": 833,
+   "source": "ONS, Price Index of Private Rents, North Yorkshire, May 2026: GBP 833 average (search summary; to confirm)"
+  },
+  {
+   "what": "average_house_price_gbp",
+   "value": 271000,
+   "source": "ONS, UK House Price Index, North Yorkshire, April 2026 (provisional): GBP 271,000 (search summary; to confirm)"
+  },
+  {
+   "what": "police_theft_charge_or_summons_pct",
+   "value": 9.1,
+   "source": "Home Office, Crime outcomes in England and Wales 2025 to 2026 (published 23 July 2026): theft offences resulting in charge/summons (search summary; to confirm)"
+  },
+  {
+   "what": "general_election_turnout_pct",
+   "value": 63.5,
+   "source": "UK Parliament, Election results: Thirsk and Malton, 4 July 2024 (search summary; to confirm)"
+  }
+ ]
+}
