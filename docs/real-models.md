@@ -229,3 +229,23 @@ dollars.
 - **A letter to "works" in quotes** came back "you don't know of anyone called works": a quoted word was looked up as a name only. Now an id in quotes is that id (both resolvers).
 - **What worked:** translations ran at once, three seats made 250 calls in the 59 days, and every act went through the translator. The heatwave and heavy-rain warnings reached the mayor, who tried to act on them (inspect the hall as a refuge, direct the works crew), the first time a steward responded to weather.
 - **Still open:** three `write` uses came back malformed from Codex (one with two recipients run together).
+
+## Running many pilots
+
+Pilots for the translator's data are run unattended, in waves. Three pieces: a queue that runs and resumes pilots, a report on each pilot read from its log, and a pinned copy of the code for the wave.
+
+**The queue** (`scripts/pilot-queue.ts <queue.json> [--wait MINUTES]`). A queue file is a list of `{name, world, sets?, model, translator?, until, budget, env?, note?, test?}`. Each pilot runs into `<runs>/<name>` (`OIKOS_RUNS`, or `~/oikos/runs`), one after another, and is taken up again where it stopped if its log is there. What it does with a pilot's folder is decided from its run's log and summary, read either way (plain while stopped, `.jsonl.zst` once finished), by `orchestrator/src/pilot-state.ts`:
+- reached its `until` (the log's last entry, or the summary's, is at or past it): done, not started again. The report is written;
+- stopped at a usage limit: waited for (`--wait`, 20 minutes by default) and resumed;
+- stopped at its spending limit: over as far as it got; left there, the next pilot is started;
+- asked to stop (a signal, as `scripts/mini stop` sends): not a failure. The queue stops with it; running the queue again resumes it;
+- anything else: tried once more after a minute, then left with why.
+The status log (`<queue>.status.log`) writes times in local time with the offset from UTC. `"test": true` marks a pilot whose requests are kept out of training (a held-out test): the runner writes it into the pilot's `PILOT.txt` (a first line, and the entry as JSON) and the pilot report carries `"test": true`, so later steps (the training data, the in-situ cases) can leave that pilot's requests out. Nothing yet acts on the flag but the report.
+
+**The report** (`bun orchestrator/src/cli.ts pilot-report <DIR>... [--no-write]`). Reads a pilot folder's log alone, prints, and writes `<DIR>/pilot-report.json`:
+- the seats and their models, the translator, days run, why it stopped, and whether that was its `until`;
+- per seat: model calls, tool uses by kind, answers with no tool use, malformed and dropped tool uses by reason, the notes (`look_each_sitting`, `no_turn`, `notebook_not_changed`), and whether it opted out, on which day, with what statement;
+- for the translator: the requests made through `do` (each `draft.<seat>.<n>` once), how each ended (a draft offered; asked back, with the sentence the seat read; refused, with its label; a resolver question; not put), drafts confirmed, declined and unanswered, **matters that got through within two tries**, and the longest run of ask-backs for one seat.
+A matter is a request, or that request and the next one by the same seat when the first was asked back; it got through if either became a draft. A draft the seat confirms or declines is its sign-off. Two limits: the translator's plain "could you say it more plainly" is the refusal `unclear`'s own text and is counted as a refusal, not an ask-back; and the cost of a seat includes its debrief. Where each figure is read from is said in `orchestrator/src/pilot-report.ts`.
+
+**A pinned copy for a wave** (`bun scripts/pilot-wave.ts <wave> <git-ref> <queue.json>... [--dry-run] [--wait MINUTES]`). A resumed run replays its log and can only be resumed on the code it started on, while development goes on in other worktrees. So a wave has its own worktree at `<repo>/.claude/worktrees/wave-<wave>`, made at `<git-ref>` (or reused, if it is at that commit; a wave never moves to another, so a new commit is a new wave), where it runs `bun install` and `bun run kernel`, records the commit in `<runs>/pilot-queues/<wave>.commit`, and starts `scripts/pilot-queue.ts` from that worktree for each queue file: detached (`nohup`, with `caffeinate -i -w <pid>` on macOS), one process each, its output in `<runs>/pilot-queues/<wave>.<queue>.out` and its pid beside it. A queue already running isn't started twice. `--dry-run` says what it would do and does nothing. A wave's worktree is removed (`git worktree remove`) once none of its runs is to be resumed.
