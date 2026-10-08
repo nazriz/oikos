@@ -475,6 +475,27 @@ test("every standing payment a town opens with says who gave it, when and under 
   }
 }, SLOW);
 
+test("a town's opening budget against the grant it expects: where the grant is far more than everything the budget spends, the profile's own note on the figure says so, for its author", () => {
+  // Nothing sets a budget's lines to what the town takes in (calibrate mechanisms, not outcomes). But a grant several
+  // times the whole budget is a profile figure that means something other than the town's budget does (a real
+  // municipality's whole transfer, against the few functions the town runs): a seat sees the surplus and asks. The
+  // figure is its author's; what is held here is that it does not pass unremarked.
+  const ratios: { [id: string]: number } = {};
+  for (const id of ids) {
+    // (A town of a thousand, the pilots' size: two of a budget's lines are sums that do not follow the town's size.)
+    const c = generate({ ...spec, citizens: 1000, profile: id }), P = loadProfile(id);
+    const budget = c.world.records.find((r: any) => r.id === "budget-year-1");
+    const spending = Object.values(budget.data.lines as { [k: string]: number }).reduce((a, x) => a + x, 0);
+    const residents = c.participants.filter((x: any) => x.kind === "person").length;
+    const grants = P.values.public_finance.grants_per_resident_per_year * residents;
+    ratios[id] = Math.round((grants * 100) / spending) / 100;
+    const note = P.sources["public_finance.grants_per_resident_per_year"] ?? "";
+    if (grants > 1.5 * spending) expect({ id, flagged: note.includes("FLAGGED FOR THIS PROFILE'S AUTHOR") }).toEqual({ id, flagged: true });
+  }
+  // (The two whose figure is a real municipality's whole general transfer, and the two placeholders sized to one.)
+  expect(Object.keys(ratios).filter((id) => ratios[id]! > 1.5).sort()).toEqual(["br-mg-2026", "jp-akita-2026", "ke-nakuru-2026", "mx-jal-2026"]);
+}, SLOW);
+
 test("a council with almost no reserves opens with the same budget and a hundredth of the money: a budget it cannot meet", () => {
   const plain = generate({ ...spec, profile: ids[0] }), lean = generate({ ...spec, profile: ids[0], scenario: "lean-council" });
   const lines = (c: any) => c.world.records.find((r: any) => r.id === "budget-year-1").data.lines;

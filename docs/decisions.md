@@ -3254,6 +3254,30 @@ See the design note, §16.
   - **Revisit if** seats keep writing to an office after its acknowledgement (then the words, or the office needs to be a seat); a seat is misled by a form's sentence the keyword added wrongly; or code offices should issue the directions they are asked for (a decision about the code mayor, not about letters).
   - **Hash.** `worlds/town-1000.yaml`, seed 1, 30 days: 8a2ca8c818146838, twice (the merged tree's, unchanged: in a code town nobody writes a letter in words to an office, and the one new office note, finance's request for an approval, is not answered).
 
+- **A grant several times the town's whole budget: what is wrong, and whose it is** (2026-10-09; `worlds/profiles/` notes for jp-akita, br-mg, ke-nakuru, mx-jal; `orchestrator/test/places.test.ts`; live check 2, finding 14).
+  - **The fault as seen.** The Japanese town's budget "expects about ¥480,379,900 in grants" against ¥64,915,711 of spending; both councillor seats spent the month asking about the surplus. It is not only words: the grants office really pays that sum into the town's account, a quarter at a time.
+  - **Which it is.** Not a mistake of transcription, and not mainly a per-resident grant meeting lines that do not scale (the two flat lines, parks and the environment office, are ¥13.1 million of the ¥64.9 million; with every line reckoned for each resident the budget is about ¥64,900 a resident against a grant of ¥479,900). **The spending lines leave out what such a town spends the grant on.** The figure is Ikawa's whole local allocation tax for each resident (47% of that town's revenue), which there pays for welfare, schools, health, administration and debt. The town in the simulation runs waste collection, the upkeep of its parks, hall and roads, a park and some roads a year, and a wildlife survey; its clinic, school and police are bodies of their own with grants of their own. A real municipality's general grant has met a town with five functions.
+  - **The nine towns** (`worlds/town-1000.yaml`, the opening budget; grants expected over all spending, and rates and grants together over spending):
+
+    | Profile | Grants / spending | Rates and grants / spending | What the grant figure is |
+    |---|---|---|---|
+    | au-vic | 0.08 | 1.16 | general-purpose grants only (its note still says "the town has no roads yet": stale) |
+    | br-mg | 8.53 | 8.55 | Aguanil's whole general-purpose transfers (the same fault as Japan's) |
+    | de-ni | 0.47 | 0.69 | key allocations; its own note says the trade tax and the income-tax share are not modelled |
+    | gb-eng | 0.12 | 1.17 | a placeholder |
+    | in-tn | 0.75 | 1.26 | a placeholder |
+    | jp-akita | 7.40 | 8.25 | Ikawa's whole local allocation tax |
+    | ke-nakuru | 2.22 | 2.40 | a placeholder, sized to a county's equitable share |
+    | mx-jal | 1.92 | 1.94 | a placeholder, sized to all federal and state transfers |
+    | us-oh | 0.04 | 0.73 | a placeholder |
+  - **Done: flagged, not tuned.** No figure and no formula changed, so no town's hash moves. The four profiles whose grant is more than one and a half times the whole budget carry a flag in their own note on the figure, saying what it is, what the town does not run, and what is wanted: the grant for the functions the town has, which the same source's spending by purpose would give (Ikawa's settlement has it; not opened here). A test holds that a profile whose grant is that large says so (it fails on main for all four), so a tenth profile does not arrive with the same surplus unremarked.
+  - **Why not fix the derivation.** There are two honest ways and both need what no profile gives: the share of the real town's spending that goes on the functions the simulated town runs (then the grant is scaled by it), or the real town's spending by purpose (then the budget has lines for what the grant pays for, and offices to spend them). The first is a figure for each profile's author to source; the second is new institutions. Cutting the grant to fit the budget would be tuning.
+  - **What a seat will still see** in the Japanese and Brazilian towns until their authors act: a surplus of about seven times the budget. Recommended: hold the two profiles' council pilots, or run them knowing the councillors will ask about it.
+  - **Not verified:** the ratios at other sizes or seeds (the flat lines weigh more in a small town: the test's 300-person towns give other ratios, the same four over the line); what a run takes in against what it spends over a year; the sources' spending by purpose.
+  - **Revisit if** a profile's author gives the share (then the generator scales the town's grant by it, a profile figure with its source), or the town gains the functions the grant pays for.
+  - **Hash.** `worlds/town-1000.yaml`, seed 1, 30 days: 8a2ca8c818146838, twice (unchanged: notes and a test). The ratios were measured again on the tree after main's informal-work changes were merged: the same.
+  - **Test.** `orchestrator/test/places.test.ts`, "a town's opening budget against the grant it expects" (a town of a thousand for each profile).
+
 ## Open (to decide at the Stage 2 checkpoint or before)
 
 - **Calibration, measured again after the first-year risk fix** (2026-10-05, at 0251d3a, `runs/calibration-2026-10-05` on the run server; the small town, 3 seeds × 2 years, code only, as below). Health: 4 breaches of 15 (8 measured). Recorded, not chased: Naz decides what to do with the numbers.
